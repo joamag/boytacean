@@ -1,3 +1,3 @@
-mod cpu
-mod gpu
-mod mmu
+pub mod cpu
+pub mod gpu
+pub mod mmu
