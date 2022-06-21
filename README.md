@@ -4,8 +4,10 @@ A Game Boy emulator that is written in Rust 🦀.
 
 ## Inspiration
 
+* [Game Boy Development community](https://gbdev.io/)
+* [Game Boy - Pandocs](https://gbdev.io/pandocs)
 * [GameBoy Emulation in JavaScript:](http://imrannazar.com/GameBoy-Emulation-in-JavaScript:-The-CPU)
-* [POKEGB: a gameboy emulator that only plays Pokémon blue](https://binji.github.io/posts/pokegb/)
+* [POKEGB: a gameboy emulator that only plays Pokémon blue](https://binji.github.io/posts/pokegb)
 
 ## License
 
