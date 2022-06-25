@@ -1,6 +1,6 @@
 use crate::mmu::Mmu;
 
-pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 11] = [
+pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 176] = [
     // 0x0 opcodes
     (nop, 4, "NOP"),
     (ld_bc_u16, 12, "LD BC, NN"),
@@ -12,8 +12,182 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 11] = [
     (rlca, 4, "RLCA"),
     (ld_mu16_sp, 20, "LD [u16], SP"),
     (add_hl_bc, 8, "ADD HL, BC"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    // 0x1 opcodes
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
     // 0x2 opcodes
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    // 0x3 opcodes
+    (nop, 4, "NOP"),
     (ld_sp_u16, 12, "LD SP, NN"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    // 0x4 opcodes
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    // 0x5 opcodes
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    // 0x6 opcodes
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    // 0x7 opcodes
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    // 0x8 opcodes
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    // 0x9 opcodes
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    // 0xa opcodes
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (xor_a_a, 4, "XOR A, A"),
 ];
 
 pub struct Cpu {
@@ -31,6 +205,7 @@ pub struct Cpu {
     half_carry: bool,
     carry: bool,
     mmu: Mmu,
+    clocks: u32,
 }
 
 impl Cpu {
@@ -50,14 +225,23 @@ impl Cpu {
             half_carry: false,
             carry: false,
             mmu: mmu,
+            clocks: 0,
         }
     }
 
     pub fn clock(&mut self) {
         // fetches the current instruction and increments
         // the PC (program counter) accordingly
-        let _instruction = self.mmu.read(self.pc);
+        let opcode = self.mmu.read(self.pc);
         self.pc += 1;
+
+        let instruction = INSTRUCTIONS[opcode as usize];
+        let (instruction_fn, instruction_size, instruction_str) = instruction;
+
+        instruction_fn(self);
+        self.clocks = self.clocks.wrapping_add(instruction_size as u32);
+
+        println!("{} ({:#x})", instruction_str, opcode)
     }
 
     #[inline(always)]
@@ -241,6 +425,10 @@ fn add_hl_bc(cpu: &mut Cpu) {
 
 fn ld_sp_u16(cpu: &mut Cpu) {
     cpu.sp = cpu.read_u16();
+}
+
+fn xor_a_a(cpu: &mut Cpu) {
+    cpu.a ^= cpu.a
 }
 
 fn add_u16_u16(cpu: &mut Cpu, first: u16, second: u16) -> u16 {
