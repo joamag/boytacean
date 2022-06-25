@@ -1,4 +1,13 @@
-const RAM_SIZE: usize = 8192;
+pub const RAM_SIZE: usize = 8192;
+
+pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 4] = [
+    // 0x0 opcodes
+    (nop, 4, "NOP"),
+    (ld_bc_u16, 12, "LD BC, NN"),
+    (ld_bc_a, 8, "LD BC, A"),
+    // 0x2 opcodes
+    (ld_sp_u16, 12, "LD SP, NN"),
+];
 
 pub struct Cpu {
     pc: u16,
@@ -36,13 +45,6 @@ impl Cpu {
         // the PC (program counter) accordingly
         let instruction = self.ram[self.pc as usize];
         self.pc += 1;
-
-        let opcode = instruction & 0xf000;
-        let address = instruction & 0x0fff;
-        let x = ((instruction & 0x0f00) >> 8) as usize;
-        let y = ((instruction & 0x00f0) >> 4) as usize;
-        let nibble = (instruction & 0x000f) as u8;
-        let byte = (instruction & 0x00ff) as u8;
     }
 
     #[inline(always)]
@@ -66,22 +68,51 @@ impl Cpu {
     }
 
     #[inline(always)]
-    fn zero_flag(&self) -> bool {
+    fn read_u8(&mut self) -> u8 {
+        let byte = self.ram[self.pc as usize];
+        self.pc += 1;
+        byte
+    }
+
+    #[inline(always)]
+    fn read_u16(&mut self) -> u16 {
+        let word = (self.ram[self.pc as usize] as u16) << 8 | self.ram[self.pc as usize + 1] as u16;
+        self.pc += 2;
+        word
+    }
+
+    #[inline(always)]
+    fn get_zero(&self) -> bool {
         self.reg_f & 0x40 == 1
     }
 
     #[inline(always)]
-    fn sub_flag(&self) -> bool {
+    fn get_sub(&self) -> bool {
         self.reg_f & 0x20 == 1
     }
 
     #[inline(always)]
-    fn half_carry_flag(&self) -> bool {
+    fn get_half_carry(&self) -> bool {
         self.reg_f & 0x10 == 1
     }
 
     #[inline(always)]
-    fn carry_flag(&self) -> bool {
+    fn get_carry(&self) -> bool {
         self.reg_f & 0x08 == 1
     }
+}
+
+fn nop(_cpu: &mut Cpu) {}
+
+fn ld_bc_u16(cpu: &mut Cpu) {
+    cpu.reg_b = cpu.read_u8();
+    cpu.reg_c = cpu.read_u8();
+}
+
+fn ld_bc_a(cpu: &mut Cpu) {
+    cpu.ram[cpu.reg_bc() as usize] = cpu.reg_a;
+}
+
+fn ld_sp_u16(cpu: &mut Cpu) {
+    cpu.sp = cpu.read_u16();
 }
