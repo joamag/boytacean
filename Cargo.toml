@@ -1,0 +1,22 @@
+[package]
+name = "boytacean"
+version = "0.1.0"
+authors = ["João Magalhães <joamag@gmail.com>"]
+description = "Game Boy in Rust"
+license = "Apache"
+keywords = ["gameboy", "emulator", "rust"]
+edition = "2018"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+wasm = ["wasm-bindgen"]
+
+[dependencies]
+wasm-bindgen = { version = "0.2", optional = true }
+
+[profile.release]
+debug = false
+lto = true
+opt-level = 3
