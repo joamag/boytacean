@@ -22,6 +22,6 @@ impl GameBoy {
     }
 
     pub fn load_boot_default(&mut self) {
-        self.load_boot("./res/mbr_rom.bin");
+        self.load_boot("./res/dmg_rom.bin");
     }
 }

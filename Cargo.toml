@@ -20,3 +20,9 @@ wasm-bindgen = { version = "0.2", optional = true }
 debug = false
 lto = true
 opt-level = 3
+
+[workspace]
+members = [
+    ".",
+    "examples/sdl",
+]
