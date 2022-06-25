@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
-use crate::{cpu::Cpu, mmu::Mmu, util::read_file};
+use crate::{cpu::Cpu, mmu::Mmu, ppu::Ppu, util::read_file};
 
 pub type SharedMut<T> = Rc<RefCell<T>>;
 
@@ -10,7 +10,8 @@ pub struct GameBoy {
 
 impl GameBoy {
     pub fn new() -> GameBoy {
-        let mmu = Mmu::new();
+        let ppu = Ppu::new();
+        let mmu = Mmu::new(ppu);
         let cpu = Cpu::new(mmu);
         GameBoy { cpu: cpu }
     }
