@@ -1,3 +1,4 @@
 pub mod cpu
-pub mod gpu
+pub mod gb
 pub mod mmu
+pub mod ppu
