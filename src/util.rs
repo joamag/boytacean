@@ -1,4 +1,6 @@
-use std::{fs::File, io::Read};
+use std::{cell::RefCell, fs::File, io::Read, rc::Rc};
+
+pub type SharedMut<T> = Rc<RefCell<T>>;
 
 pub fn read_file(path: &str) -> Vec<u8> {
     let mut file = File::open(path).unwrap();

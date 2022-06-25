@@ -1,4 +1,4 @@
-pub const RAM_SIZE: usize = 8192;
+use crate::mmu::Mmu;
 
 pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 11] = [
     // 0x0 opcodes
@@ -30,11 +30,11 @@ pub struct Cpu {
     sub: bool,
     half_carry: bool,
     carry: bool,
-    ram: [u8; RAM_SIZE],
+    mmu: Mmu,
 }
 
 impl Cpu {
-    pub fn new() -> Cpu {
+    pub fn new<'n>(mmu: Mmu) -> Cpu {
         Cpu {
             pc: 0x0,
             sp: 0x0,
@@ -49,15 +49,20 @@ impl Cpu {
             sub: false,
             half_carry: false,
             carry: false,
-            ram: [0u8; RAM_SIZE],
+            mmu: mmu,
         }
     }
 
     pub fn clock(&mut self) {
         // fetches the current instruction and increments
         // the PC (program counter) accordingly
-        let _instruction = self.ram[self.pc as usize];
+        let _instruction = self.mmu.read(self.pc);
         self.pc += 1;
+    }
+
+    #[inline(always)]
+    pub fn mmu(&mut self) -> &mut Mmu {
+        &mut self.mmu
     }
 
     #[inline(always)]
@@ -118,7 +123,7 @@ impl Cpu {
 
     #[inline(always)]
     fn read_u8(&mut self) -> u8 {
-        let byte = self.ram[self.pc as usize];
+        let byte = self.mmu.read(self.pc);
         self.pc = self.pc.wrapping_add(1);
         byte
     }
@@ -180,7 +185,7 @@ fn ld_bc_u16(cpu: &mut Cpu) {
 }
 
 fn ld_mbc_a(cpu: &mut Cpu) {
-    cpu.ram[cpu.bc() as usize] = cpu.a;
+    cpu.mmu.write(cpu.bc(), cpu.a);
 }
 
 fn inc_bc(cpu: &mut Cpu) {
@@ -225,8 +230,8 @@ fn rlca(cpu: &mut Cpu) {
 
 fn ld_mu16_sp(cpu: &mut Cpu) {
     let word = cpu.read_u16();
-    cpu.ram[word as usize] = cpu.sp as u8;
-    cpu.ram[word as usize + 1] = (cpu.sp >> 8) as u8;
+    cpu.mmu.write(word, cpu.sp as u8);
+    cpu.mmu.write(word + 1, (cpu.sp >> 8) as u8);
 }
 
 fn add_hl_bc(cpu: &mut Cpu) {

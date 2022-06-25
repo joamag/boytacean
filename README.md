@@ -11,6 +11,7 @@ A Game Boy emulator that is written in Rust 🦀.
 * [GitHub - binjgb](https://github.com/binji/binjgb)
 * [GitHub - gameroy](https://github.com/Rodrigodd/gameroy)
 * [Game Boy CPU Opcodes](https://izik1.github.io/gbops)
+* [GitHub - c-sp/gameboy-test-roms](https://github.com/c-sp/gameboy-test-roms)
 
 ## License
 
