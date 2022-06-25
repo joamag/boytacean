@@ -34,7 +34,7 @@ pub struct Cpu {
 }
 
 impl Cpu {
-    pub fn new<'n>(mmu: Mmu) -> Cpu {
+    pub fn new(mmu: Mmu) -> Cpu {
         Cpu {
             pc: 0x0,
             sp: 0x0,
