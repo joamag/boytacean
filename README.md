@@ -10,6 +10,7 @@ A Game Boy emulator that is written in Rust 🦀.
 * [POKEGB: a gameboy emulator that only plays Pokémon blue](https://binji.github.io/posts/pokegb)
 * [GitHub - binjgb](https://github.com/binji/binjgb)
 * [GitHub - gameroy](https://github.com/Rodrigodd/gameroy)
+* [Game Boy CPU Opcodes](https://izik1.github.io/gbops)
 
 ## License
 
