@@ -230,15 +230,22 @@ fn ld_mu16_sp(cpu: &mut Cpu) {
 }
 
 fn add_hl_bc(cpu: &mut Cpu) {
-    let value = cpu.hl() as u32 + cpu.bc() as u32;
-
-    cpu.set_sub(false);
-    cpu.set_carry(value & 0x1000 == 0x1000);
-    cpu.set_half_carry((value & 0xff) == 0xff); //@todo I'm not sure about this one
-
-    cpu.set_hl(value as u16);
+    let value = add_u16_u16(cpu, cpu.hl(), cpu.bc());
+    cpu.set_hl(value);
 }
 
 fn ld_sp_u16(cpu: &mut Cpu) {
     cpu.sp = cpu.read_u16();
+}
+
+fn add_u16_u16(cpu: &mut Cpu, first: u16, second: u16) -> u16 {
+    let first = first as u32;
+    let second = second as u32;
+    let value = first.wrapping_add(second);
+
+    cpu.set_sub(false);
+    cpu.set_carry(value & 0x1000 == 0x1000);
+    cpu.set_half_carry((first ^ second ^ value) & 0x1000 == 0x1000);
+
+    value as u16
 }
