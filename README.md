@@ -15,8 +15,9 @@ A Game Boy emulator that is written in Rust 🦀.
 
 ### Emulators
 
-* [GitHub - binji/binjgb (Javascript)](https://github.com/binji/binjgb)
+* [GitHub - binji/binjgb (C)](https://github.com/binji/binjgb)
 * [GitHub - Rodrigodd/gameroy (Rust)](https://github.com/Rodrigodd/gameroy)
+* [GitHub - simias/gb-rs (Rust)](https://github.com/simias/gb-rs)
 * [GitHub - calvinbaart/gameboy (TypeScript)](https://github.com/calvinbaart/gameboy)
 
 ### Videos
