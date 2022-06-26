@@ -20,6 +20,10 @@ impl GameBoy {
         self.cpu.clock()
     }
 
+    pub fn cpu(&self) -> &Cpu {
+        &self.cpu
+    }
+
     pub fn load_boot(&mut self, path: &str) {
         let data = read_file(path);
         self.cpu.mmu().write_buffer(0x0000, &data);

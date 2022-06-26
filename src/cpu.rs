@@ -2,7 +2,7 @@ use crate::mmu::Mmu;
 
 pub const PREFIX: u8 = 0xcb;
 
-pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 208] = [
+pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     // 0x0 opcodes
     (nop, 4, "NOP"),
     (ld_bc_u16, 12, "LD BC, u16"),
@@ -16,7 +16,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 208] = [
     (add_hl_bc, 8, "ADD HL, BC"),
     (nop, 4, "NOP"),
     (nop, 4, "NOP"),
-    (nop, 4, "NOP"),
+    (inc_c, 4, "INC C"),
     (nop, 4, "NOP"),
     (ld_c_u8, 8, "LD C, u8"),
     (nop, 4, "NOP"),
@@ -208,6 +208,57 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 208] = [
     (nop, 4, "NOP"),
     (nop, 4, "NOP"),
     // 0xc opcodes
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    // 0xd opcodes
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    // 0xe opcodes
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (ld_mff00c_a, 8, "LD [FF00+C], A"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    // 0xf opcodes
     (nop, 4, "NOP"),
     (nop, 4, "NOP"),
     (nop, 4, "NOP"),
@@ -487,6 +538,11 @@ impl Cpu {
     }
 
     #[inline(always)]
+    pub fn pc(&self) -> u16 {
+        self.pc
+    }
+
+    #[inline(always)]
     fn af(&self) -> u16 {
         (self.a as u16) << 8 | self.f() as u16
     }
@@ -660,6 +716,16 @@ fn add_hl_bc(cpu: &mut Cpu) {
     cpu.set_hl(value);
 }
 
+fn inc_c(cpu: &mut Cpu) {
+    let value = cpu.c.wrapping_add(1);
+
+    cpu.set_sub(false);
+    cpu.set_zero(value == 0);
+    cpu.set_half_carry((value & 0xf) == 0xf);
+
+    cpu.c = value;
+}
+
 fn ld_c_u8(cpu: &mut Cpu) {
     let byte = cpu.read_u8();
     cpu.c = byte;
@@ -702,6 +768,10 @@ fn xor_a_a(cpu: &mut Cpu) {
     cpu.set_zero(cpu.a == 0);
     cpu.set_half_carry(false);
     cpu.set_carry(false);
+}
+
+fn ld_mff00c_a(cpu: &mut Cpu) {
+    cpu.mmu.write((0xff0c + cpu.c as u16), cpu.a);
 }
 
 fn bit_7_h(cpu: &mut Cpu) {
