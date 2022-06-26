@@ -1,5 +1,7 @@
 use crate::mmu::Mmu;
 
+pub const PREFIX: u8 = 0xcb;
+
 pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 208] = [
     // 0x0 opcodes
     (nop, 4, "NOP"),
@@ -36,7 +38,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 208] = [
     (nop, 4, "NOP"),
     (nop, 4, "NOP"),
     // 0x2 opcodes
-    (nop, 4, "NOP"),
+    (jr_nz_i8, 8, "JR NZ, i8"),
     (ld_hl_u16, 12, "LD HL, u16"),
     (nop, 4, "NOP"),
     (nop, 4, "NOP"),
@@ -224,6 +226,196 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 208] = [
     (nop, 4, "NOP"),
 ];
 
+pub const BITWISE: [(fn(&mut Cpu), u8, &'static str); 176] = [
+    // 0x0 opcodes
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    // 0x1 opcodes
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    // 0x2 opcodes
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    // 0x3 opcodes
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    // 0x4 opcodes
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    // 0x5 opcodes
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    // 0x6 opcodes
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    // 0x7 opcodes
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (bit_7_h, 8, "BIT 7, H"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    // 0x8 opcodes
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    // 0x9 opcodes
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    // 0xa opcodes
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+];
+
 pub struct Cpu {
     pc: u16,
     sp: u16,
@@ -264,18 +456,29 @@ impl Cpu {
     }
 
     pub fn clock(&mut self) {
+        let pc = self.pc;
+
         // fetches the current instruction and increments
         // the PC (program counter) accordingly
-        let opcode = self.mmu.read(self.pc);
-        self.pc += 1;
+        let mut opcode = self.mmu.read(self.pc);
+        self.pc = self.pc.wrapping_add(1);
 
-        let instruction = INSTRUCTIONS[opcode as usize];
+        let instruction: &(fn(&mut Cpu), u8, &str);
+
+        if opcode == PREFIX {
+            opcode = self.mmu.read(self.pc);
+            self.pc = self.pc.wrapping_add(1);
+            instruction = &BITWISE[opcode as usize];
+        } else {
+            instruction = &INSTRUCTIONS[opcode as usize];
+        }
+
         let (instruction_fn, instruction_size, instruction_str) = instruction;
 
-        println!("{} ({:#x})", instruction_str, opcode);
+        println!("{}\t({:#x})\t${:04x}", instruction_str, opcode, pc);
 
         instruction_fn(self);
-        self.clocks = self.clocks.wrapping_add(instruction_size as u32);
+        self.clocks = self.clocks.wrapping_add(*instruction_size as u32);
     }
 
     #[inline(always)]
@@ -457,6 +660,17 @@ fn add_hl_bc(cpu: &mut Cpu) {
     cpu.set_hl(value);
 }
 
+fn jr_nz_i8(cpu: &mut Cpu) {
+    let byte = cpu.read_u8() as i8;
+
+    if cpu.get_zero() {
+        return;
+    }
+
+    cpu.pc = (cpu.pc as i16).wrapping_add(byte as i16) as u16;
+    cpu.clocks += 4;
+}
+
 fn ld_hl_u16(cpu: &mut Cpu) {
     let word = cpu.read_u16();
     cpu.set_hl(word);
@@ -478,6 +692,23 @@ fn xor_a_a(cpu: &mut Cpu) {
     cpu.set_zero(cpu.a == 0);
     cpu.set_half_carry(false);
     cpu.set_carry(false);
+}
+
+fn bit_7_h(cpu: &mut Cpu) {
+    bit_h(cpu, 7);
+}
+
+/// Helper function to test one bit in a u8.
+/// Returns true if bit is 0.
+fn bit_zero(val: u8, bit: u8) -> bool {
+    (val & (1u8 << (bit as usize))) == 0
+}
+
+fn bit_h(cpu: &mut Cpu, bit: u8) {
+    println!("{}", cpu.h);
+    cpu.set_sub(false);
+    cpu.set_zero(bit_zero(cpu.h, bit));
+    cpu.set_half_carry(true);
 }
 
 fn add_u16_u16(cpu: &mut Cpu, first: u16, second: u16) -> u16 {

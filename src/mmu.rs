@@ -47,7 +47,7 @@ impl Mmu {
                 println!("WRITING TO RAM");
                 self.ram[(addr & 0x1fff) as usize] = value;
             }
-            _ => panic!("asdad"),
+            addr => panic!("Writing in unknown location 0x{:04x}", addr),
         }
     }
 
