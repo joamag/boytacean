@@ -69,7 +69,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 208] = [
     (nop, 4, "NOP"),
     (nop, 4, "NOP"),
     (nop, 4, "NOP"),
-    (nop, 4, "NOP"),
+    (ld_a_u8, 8, "LD A, u8"),
     (nop, 4, "NOP"),
     // 0x4 opcodes
     (nop, 4, "NOP"),
@@ -688,6 +688,11 @@ fn ld_sp_u16(cpu: &mut Cpu) {
 fn ld_mhld_a(cpu: &mut Cpu) {
     cpu.mmu.write(cpu.hl(), cpu.a);
     cpu.set_hl(cpu.hl().wrapping_sub(1));
+}
+
+fn ld_a_u8(cpu: &mut Cpu) {
+    let byte = cpu.read_u8();
+    cpu.a = byte;
 }
 
 fn xor_a_a(cpu: &mut Cpu) {

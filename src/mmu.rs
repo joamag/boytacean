@@ -47,6 +47,29 @@ impl Mmu {
                 println!("WRITING TO RAM");
                 self.ram[(addr & 0x1fff) as usize] = value;
             }
+            // Working RAM shadow
+            0xe000 => {
+                println!("WRITING TO RAM Shadow");
+                self.ram[(addr & 0x1fff) as usize] = value;
+            }
+            // Working RAM shadow, I/O, Zero-page RAM
+            0xf000 => match addr & 0x0f00 {
+                0x000 | 0x100 | 0x200 | 0x300 | 0x400 | 0x500 | 0x600 | 0x700 | 0x800 | 0x900
+                | 0xa00 | 0xb00 | 0xc00 | 0xd00 => {
+                    self.ram[(addr & 0x1fff) as usize] = value;
+                }
+                0xe00 => {
+                    println!("WRITING TO GPU OAM");
+                }
+                0xf00 => {
+                    if addr >= 0xff80 {
+                        println!("WRITING TO Zero page");
+                    } else {
+                        println!("WRITING TO IO control");
+                    }
+                }
+                addr => panic!("Writing in unknown location 0x{:04x}", addr),
+            },
             addr => panic!("Writing in unknown location 0x{:04x}", addr),
         }
     }
