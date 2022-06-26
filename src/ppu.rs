@@ -1,7 +1,7 @@
 pub const VRAM_SIZE: usize = 8192;
 
 pub struct Ppu {
-    vram: [u8; VRAM_SIZE],
+    pub vram: [u8; VRAM_SIZE],
 }
 
 impl Ppu {

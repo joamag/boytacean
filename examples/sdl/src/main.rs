@@ -7,4 +7,6 @@ fn main() {
     game_boy.clock();
     game_boy.clock();
     game_boy.clock();
+    game_boy.clock();
+    game_boy.clock();
 }

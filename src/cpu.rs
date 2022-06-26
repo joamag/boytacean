@@ -1,6 +1,6 @@
 use crate::mmu::Mmu;
 
-pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 176] = [
+pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 208] = [
     // 0x0 opcodes
     (nop, 4, "NOP"),
     (ld_bc_u16, 12, "LD BC, NN"),
@@ -37,7 +37,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 176] = [
     (nop, 4, "NOP"),
     // 0x2 opcodes
     (nop, 4, "NOP"),
-    (nop, 4, "NOP"),
+    (ld_hl_u16, 12, "LD HL, u16"),
     (nop, 4, "NOP"),
     (nop, 4, "NOP"),
     (nop, 4, "NOP"),
@@ -55,7 +55,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 176] = [
     // 0x3 opcodes
     (nop, 4, "NOP"),
     (ld_sp_u16, 12, "LD SP, NN"),
-    (nop, 4, "NOP"),
+    (ld_mhld_a, 8, "LD [HL]-, A"),
     (nop, 4, "NOP"),
     (nop, 4, "NOP"),
     (nop, 4, "NOP"),
@@ -188,6 +188,40 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 176] = [
     (nop, 4, "NOP"),
     (nop, 4, "NOP"),
     (xor_a_a, 4, "XOR A, A"),
+    // 0xb opcodes
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    // 0xc opcodes
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
+    (nop, 4, "NOP"),
 ];
 
 pub struct Cpu {
@@ -238,10 +272,10 @@ impl Cpu {
         let instruction = INSTRUCTIONS[opcode as usize];
         let (instruction_fn, instruction_size, instruction_str) = instruction;
 
+        println!("{} ({:#x})", instruction_str, opcode);
+
         instruction_fn(self);
         self.clocks = self.clocks.wrapping_add(instruction_size as u32);
-
-        println!("{} ({:#x})", instruction_str, opcode)
     }
 
     #[inline(always)]
@@ -423,12 +457,27 @@ fn add_hl_bc(cpu: &mut Cpu) {
     cpu.set_hl(value);
 }
 
+fn ld_hl_u16(cpu: &mut Cpu) {
+    let word = cpu.read_u16();
+    cpu.set_hl(word);
+}
+
 fn ld_sp_u16(cpu: &mut Cpu) {
     cpu.sp = cpu.read_u16();
 }
 
+fn ld_mhld_a(cpu: &mut Cpu) {
+    cpu.mmu.write(cpu.hl(), cpu.a);
+    cpu.set_hl(cpu.hl().wrapping_sub(1));
+}
+
 fn xor_a_a(cpu: &mut Cpu) {
-    cpu.a ^= cpu.a
+    cpu.a ^= cpu.a;
+
+    cpu.set_sub(false);
+    cpu.set_zero(cpu.a == 0);
+    cpu.set_half_carry(false);
+    cpu.set_carry(false);
 }
 
 fn add_u16_u16(cpu: &mut Cpu, first: u16, second: u16) -> u16 {
