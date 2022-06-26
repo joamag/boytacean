@@ -5,12 +5,12 @@ pub const PREFIX: u8 = 0xcb;
 pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 208] = [
     // 0x0 opcodes
     (nop, 4, "NOP"),
-    (ld_bc_u16, 12, "LD BC, NN"),
+    (ld_bc_u16, 12, "LD BC, u16"),
     (ld_mbc_a, 8, "LD [BC], A"),
     (inc_bc, 8, "INC BC"),
     (inc_b, 4, "INC B"),
     (dec_b, 4, "DEC B"),
-    (ld_b_u8, 8, "LD B, N"),
+    (ld_b_u8, 8, "LD B, u8"),
     (rlca, 4, "RLCA"),
     (ld_mu16_sp, 20, "LD [u16], SP"),
     (add_hl_bc, 8, "ADD HL, BC"),
@@ -18,7 +18,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 208] = [
     (nop, 4, "NOP"),
     (nop, 4, "NOP"),
     (nop, 4, "NOP"),
-    (nop, 4, "NOP"),
+    (ld_c_u8, 8, "LD C, u8"),
     (nop, 4, "NOP"),
     // 0x1 opcodes
     (nop, 4, "NOP"),
@@ -56,7 +56,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 208] = [
     (nop, 4, "NOP"),
     // 0x3 opcodes
     (nop, 4, "NOP"),
-    (ld_sp_u16, 12, "LD SP, NN"),
+    (ld_sp_u16, 12, "LD SP, u16"),
     (ld_mhld_a, 8, "LD [HL]-, A"),
     (nop, 4, "NOP"),
     (nop, 4, "NOP"),
@@ -658,6 +658,11 @@ fn ld_mu16_sp(cpu: &mut Cpu) {
 fn add_hl_bc(cpu: &mut Cpu) {
     let value = add_u16_u16(cpu, cpu.hl(), cpu.bc());
     cpu.set_hl(value);
+}
+
+fn ld_c_u8(cpu: &mut Cpu) {
+    let byte = cpu.read_u8();
+    cpu.c = byte;
 }
 
 fn jr_nz_i8(cpu: &mut Cpu) {
