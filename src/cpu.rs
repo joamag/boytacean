@@ -431,7 +431,7 @@ pub struct Cpu {
     half_carry: bool,
     carry: bool,
     mmu: Mmu,
-    clocks: u32,
+    ticks: u32,
 }
 
 impl Cpu {
@@ -451,7 +451,7 @@ impl Cpu {
             half_carry: false,
             carry: false,
             mmu: mmu,
-            clocks: 0,
+            ticks: 0,
         }
     }
 
@@ -475,10 +475,10 @@ impl Cpu {
 
         let (instruction_fn, instruction_size, instruction_str) = instruction;
 
-        println!("{}\t({:#x})\t${:04x}", instruction_str, opcode, pc);
+        println!("{}\t(0x{:02x})\t${:04x}", instruction_str, opcode, pc);
 
         instruction_fn(self);
-        self.clocks = self.clocks.wrapping_add(*instruction_size as u32);
+        self.ticks = self.ticks.wrapping_add(*instruction_size as u32);
     }
 
     #[inline(always)]
@@ -668,7 +668,7 @@ fn jr_nz_i8(cpu: &mut Cpu) {
     }
 
     cpu.pc = (cpu.pc as i16).wrapping_add(byte as i16) as u16;
-    cpu.clocks += 4;
+    cpu.ticks = cpu.ticks.wrapping_add(4);
 }
 
 fn ld_hl_u16(cpu: &mut Cpu) {
