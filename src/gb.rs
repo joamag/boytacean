@@ -1,8 +1,14 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{
+    cell::RefCell,
+    rc::{Rc, Weak},
+};
 
-use crate::{cpu::Cpu, mmu::Mmu, ppu::Ppu, util::read_file};
-
-pub type SharedMut<T> = Rc<RefCell<T>>;
+use crate::{
+    cpu::Cpu,
+    mmu::Mmu,
+    ppu::Ppu,
+    util::{read_file, SharedMut},
+};
 
 pub struct GameBoy {
     cpu: Cpu,
@@ -22,6 +28,14 @@ impl GameBoy {
 
     pub fn cpu(&self) -> &Cpu {
         &self.cpu
+    }
+
+    pub fn mmu(&mut self) -> &Mmu {
+        self.cpu.mmu()
+    }
+
+    pub fn ppu(&mut self) -> &Ppu {
+        self.mmu().ppu()
     }
 
     pub fn load_boot(&mut self, path: &str) {

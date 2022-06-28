@@ -29,6 +29,10 @@ impl Mmu {
         }
     }
 
+    pub fn ppu(&self) -> &Ppu {
+        &self.ppu
+    }
+
     pub fn read(&self, addr: u16) -> u8 {
         match addr & 0xf000 {
             // BIOS
@@ -45,8 +49,9 @@ impl Mmu {
                 if self.boot_active {
                     if addr < 0x0100 {
                         return self.boot[addr as usize];
-                    }
-                    //else if self @todo implementar isto
+                    } /*  else if self.cpu.as_ref().unwrap().borrow().pc() == 0x0100 {
+                          self.boot_active = false;
+                      }*/
                 }
                 self.rom[addr as usize]
             }
