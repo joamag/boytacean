@@ -22,7 +22,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (nop, 4, "NOP"),
     // 0x1 opcodes
     (nop, 4, "NOP"),
-    (nop, 4, "NOP"),
+    (ld_de_u16, 12, "LD DE, u16"),
     (nop, 4, "NOP"),
     (nop, 4, "NOP"),
     (nop, 4, "NOP"),
@@ -242,7 +242,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (nop, 4, "NOP"),
     (nop, 4, "NOP"),
     // 0xe opcodes
-    (nop, 4, "NOP"),
+    (ld_mff00u8_a, 12, "LD [FF00+u8], A"),
     (nop, 4, "NOP"),
     (ld_mff00c_a, 8, "LD [FF00+C], A"),
     (nop, 4, "NOP"),
@@ -731,6 +731,11 @@ fn ld_c_u8(cpu: &mut Cpu) {
     cpu.c = byte;
 }
 
+fn ld_de_u16(cpu: &mut Cpu) {
+    let word = cpu.read_u16();
+    cpu.set_de(word);
+}
+
 fn jr_nz_i8(cpu: &mut Cpu) {
     let byte = cpu.read_u8() as i8;
 
@@ -770,8 +775,13 @@ fn xor_a_a(cpu: &mut Cpu) {
     cpu.set_carry(false);
 }
 
+fn ld_mff00u8_a(cpu: &mut Cpu) {
+    let byte = cpu.read_u8();
+    cpu.mmu.write(0xff0c + byte as u16, cpu.a);
+}
+
 fn ld_mff00c_a(cpu: &mut Cpu) {
-    cpu.mmu.write((0xff0c + cpu.c as u16), cpu.a);
+    cpu.mmu.write(0xff0c + cpu.c as u16, cpu.a);
 }
 
 fn bit_7_h(cpu: &mut Cpu) {

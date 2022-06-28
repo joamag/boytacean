@@ -6,7 +6,7 @@ fn main() {
 
     for _ in 0..40000 {
         game_boy.clock();
-        if game_boy.cpu().pc() >= 0x0016 {
+        if game_boy.cpu().pc() >= 0x0023 {
             break;
         }
     }
