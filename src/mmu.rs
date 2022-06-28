@@ -81,7 +81,7 @@ impl Mmu {
                 }
                 0xf00 => {
                     if addr >= 0xff80 {
-                        self.ram[(addr & 0x7f) as usize]
+                        self.hram[(addr & 0x7f) as usize]
                     } else {
                         println!("WRITING TO IO control");
                         0x00
@@ -137,7 +137,6 @@ impl Mmu {
                 }
                 0xf00 => {
                     if addr >= 0xff80 {
-                        println!("WRITING TO Zero page");
                         self.hram[(addr & 0x7f) as usize] = value;
                     } else {
                         println!("WRITING TO IO control");

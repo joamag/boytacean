@@ -619,7 +619,7 @@ impl Cpu {
 
     #[inline(always)]
     fn push_byte(&mut self, byte: u8) {
-        self.sp -= 1;
+        self.sp = self.sp.wrapping_sub(1);
         self.mmu.write(self.sp, byte);
     }
 
@@ -632,7 +632,7 @@ impl Cpu {
     #[inline(always)]
     fn pop_byte(&mut self) -> u8 {
         let byte = self.mmu.read(self.sp);
-        self.sp += 1;
+        self.sp = self.sp.wrapping_add(1);
         byte
     }
 
