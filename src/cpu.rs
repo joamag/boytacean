@@ -221,7 +221,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (nop, 4, "NOP"),
     (nop, 4, "NOP"),
     (nop, 4, "NOP"),
-    (nop, 4, "NOP"),
+    (call_u16, 24, "CALL u16"),
     (nop, 4, "NOP"),
     (nop, 4, "NOP"),
     // 0xd opcodes
@@ -778,6 +778,12 @@ fn xor_a_a(cpu: &mut Cpu) {
     cpu.set_zero(cpu.a == 0);
     cpu.set_half_carry(false);
     cpu.set_carry(false);
+}
+
+fn call_u16(cpu: &mut Cpu) {
+    // @todo push stack and set the current PC
+    // to be able to jump
+    cpu.sp += 1;
 }
 
 fn ld_mff00u8_a(cpu: &mut Cpu) {
