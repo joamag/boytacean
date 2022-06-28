@@ -28,7 +28,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (nop, 4, "NOP"),
     (nop, 4, "NOP"),
     (nop, 4, "NOP"),
-    (nop, 4, "NOP"),
+    (rla, 4, "RLA"),
     (nop, 4, "NOP"),
     (nop, 4, "NOP"),
     (ld_a_mde, 8, "LD A, [DE]"),
@@ -208,8 +208,8 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (nop, 4, "NOP"),
     (nop, 4, "NOP"),
     // 0xc opcodes
-    (nop, 4, "NOP"),
-    (nop, 4, "NOP"),
+    (ret_nz, 8, "RET NZ"),
+    (pop_bc, 12, "POP BC"),
     (nop, 4, "NOP"),
     (nop, 4, "NOP"),
     (nop, 4, "NOP"),
@@ -297,7 +297,7 @@ pub const BITWISE: [(fn(&mut Cpu), u8, &'static str); 176] = [
     (nop, 4, "NOP"),
     // 0x1 opcodes
     (nop, 4, "NOP"),
-    (nop, 4, "NOP"),
+    (rl_c, 8, "RL C"),
     (nop, 4, "NOP"),
     (nop, 4, "NOP"),
     (nop, 4, "NOP"),
@@ -514,9 +514,10 @@ impl Cpu {
         let mut opcode = self.mmu.read(self.pc);
         self.pc = self.pc.wrapping_add(1);
 
+        let is_prefix = opcode == PREFIX;
         let instruction: &(fn(&mut Cpu), u8, &str);
 
-        if opcode == PREFIX {
+        if is_prefix {
             opcode = self.mmu.read(self.pc);
             self.pc = self.pc.wrapping_add(1);
             instruction = &BITWISE[opcode as usize];
@@ -526,7 +527,10 @@ impl Cpu {
 
         let (instruction_fn, instruction_size, instruction_str) = instruction;
 
-        println!("{}\t(0x{:02x})\t${:04x}", instruction_str, opcode, pc);
+        println!(
+            "{}\t(0x{:02x})\t${:04x} {}",
+            instruction_str, opcode, pc, is_prefix
+        );
 
         instruction_fn(self);
         self.ticks = self.ticks.wrapping_add(*instruction_size as u32);
@@ -614,7 +618,7 @@ impl Cpu {
     }
 
     #[inline(always)]
-    fn push_byte(&mut self, byte: u8){
+    fn push_byte(&mut self, byte: u8) {
         self.sp -= 1;
         self.mmu.write(self.sp, byte);
     }
@@ -623,6 +627,19 @@ impl Cpu {
     fn push_word(&mut self, word: u16) {
         self.push_byte((word >> 8) as u8);
         self.push_byte(word as u8);
+    }
+
+    #[inline(always)]
+    fn pop_byte(&mut self) -> u8 {
+        let byte = self.mmu.read(self.sp);
+        self.sp += 1;
+        byte
+    }
+
+    #[inline(always)]
+    fn pop_word(&mut self) -> u16 {
+        let word = self.pop_byte() as u16 | ((self.pop_byte() as u16) << 8);
+        word
     }
 
     #[inline(always)]
@@ -748,6 +765,18 @@ fn ld_de_u16(cpu: &mut Cpu) {
     cpu.set_de(word);
 }
 
+fn rla(cpu: &mut Cpu) {
+    let carry = cpu.get_carry();
+
+    cpu.set_carry(cpu.a & 0x80 == 0x80);
+
+    cpu.a = cpu.a << 1 | carry as u8;
+
+    cpu.set_sub(false);
+    cpu.set_zero(false);
+    cpu.set_half_carry(false);
+}
+
 fn ld_a_mde(cpu: &mut Cpu) {
     let byte = cpu.mmu.read(cpu.de());
     cpu.a = byte;
@@ -796,6 +825,20 @@ fn xor_a_a(cpu: &mut Cpu) {
     cpu.set_carry(false);
 }
 
+fn ret_nz(cpu: &mut Cpu) {
+    if cpu.get_zero() {
+        return;
+    }
+
+    cpu.pc = cpu.pop_word();
+    cpu.ticks = cpu.ticks.wrapping_add(12);
+}
+
+fn pop_bc(cpu: &mut Cpu) {
+    let word = cpu.pop_word();
+    cpu.set_bc(word);
+}
+
 fn push_bc(cpu: &mut Cpu) {
     cpu.push_word(cpu.bc());
 }
@@ -815,8 +858,29 @@ fn ld_mff00c_a(cpu: &mut Cpu) {
     cpu.mmu.write(0xff0c + cpu.c as u16, cpu.a);
 }
 
+fn rl_c(cpu: &mut Cpu) {
+    cpu.c = rl(cpu, cpu.c);
+}
+
 fn bit_7_h(cpu: &mut Cpu) {
     bit_h(cpu, 7);
+}
+
+/// Helper function that rotates (shifts) the given
+/// byte (probably from a register) and updates the
+/// proper flag registers.
+fn rl(cpu: &mut Cpu, byte: u8) -> u8 {
+    let carry = cpu.get_carry();
+
+    cpu.set_carry(byte & 0x80 == 0x80);
+
+    let result = (byte << 1) | carry as u8;
+
+    cpu.set_sub(false);
+    cpu.set_zero(result == 0);
+    cpu.set_half_carry(false);
+
+    result
 }
 
 /// Helper function to test one bit in a u8.
@@ -826,7 +890,6 @@ fn bit_zero(val: u8, bit: u8) -> bool {
 }
 
 fn bit_h(cpu: &mut Cpu, bit: u8) {
-    println!("{}", cpu.h);
     cpu.set_sub(false);
     cpu.set_zero(bit_zero(cpu.h, bit));
     cpu.set_half_carry(true);

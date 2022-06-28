@@ -26,8 +26,7 @@ impl GameBoy {
 
     pub fn load_boot(&mut self, path: &str) {
         let data = read_file(path);
-        self.cpu.mmu().write_buffer(0x0000, &data);
-        println!("LOADED BOOT")
+        self.cpu.mmu().write_boot(0x0000, &data);
     }
 
     pub fn load_boot_default(&mut self) {
