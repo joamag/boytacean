@@ -31,7 +31,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (nop, 4, "NOP"),
     (nop, 4, "NOP"),
     (nop, 4, "NOP"),
-    (nop, 4, "NOP"),
+    (ld_a_mde, 8, "LD A, [DE]"),
     (nop, 4, "NOP"),
     (nop, 4, "NOP"),
     (nop, 4, "NOP"),
@@ -734,6 +734,11 @@ fn ld_c_u8(cpu: &mut Cpu) {
 fn ld_de_u16(cpu: &mut Cpu) {
     let word = cpu.read_u16();
     cpu.set_de(word);
+}
+
+fn ld_a_mde(cpu: &mut Cpu) {
+    let byte = cpu.mmu.read(cpu.de());
+    cpu.a = byte;
 }
 
 fn jr_nz_i8(cpu: &mut Cpu) {
