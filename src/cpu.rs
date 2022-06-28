@@ -87,7 +87,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (nop, 4, "NOP"),
     (nop, 4, "NOP"),
     (nop, 4, "NOP"),
-    (nop, 4, "NOP"),
+    (ld_c_a, 4, "LD C, A"),
     // 0x5 opcodes
     (nop, 4, "NOP"),
     (nop, 4, "NOP"),
@@ -213,7 +213,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (nop, 4, "NOP"),
     (nop, 4, "NOP"),
     (nop, 4, "NOP"),
-    (nop, 4, "NOP"),
+    (push_bc, 16, "PUSH BC"),
     (nop, 4, "NOP"),
     (nop, 4, "NOP"),
     (nop, 4, "NOP"),
@@ -614,6 +614,18 @@ impl Cpu {
     }
 
     #[inline(always)]
+    fn push_byte(&mut self, byte: u8){
+        self.sp -= 1;
+        self.mmu.write(self.sp, byte);
+    }
+
+    #[inline(always)]
+    fn push_word(&mut self, word: u16) {
+        self.push_byte((word >> 8) as u8);
+        self.push_byte(word as u8);
+    }
+
+    #[inline(always)]
     fn get_zero(&self) -> bool {
         self.zero
     }
@@ -771,6 +783,10 @@ fn ld_a_u8(cpu: &mut Cpu) {
     cpu.a = byte;
 }
 
+fn ld_c_a(cpu: &mut Cpu) {
+    cpu.c = cpu.a;
+}
+
 fn xor_a_a(cpu: &mut Cpu) {
     cpu.a ^= cpu.a;
 
@@ -780,10 +796,14 @@ fn xor_a_a(cpu: &mut Cpu) {
     cpu.set_carry(false);
 }
 
+fn push_bc(cpu: &mut Cpu) {
+    cpu.push_word(cpu.bc());
+}
+
 fn call_u16(cpu: &mut Cpu) {
-    // @todo push stack and set the current PC
-    // to be able to jump
-    cpu.sp += 1;
+    let word = cpu.read_u16();
+    cpu.push_word(cpu.pc);
+    cpu.pc = word;
 }
 
 fn ld_mff00u8_a(cpu: &mut Cpu) {
