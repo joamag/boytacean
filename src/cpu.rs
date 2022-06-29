@@ -76,7 +76,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (nop, 4, "! UNIMP !"),
     (nop, 4, "! UNIMP !"),
     (nop, 4, "! UNIMP !"),
-    (nop, 4, "! UNIMP !"),
+    (ld_b_h, 4, "LD B, H"),
     (nop, 4, "! UNIMP !"),
     (nop, 4, "! UNIMP !"),
     (nop, 4, "! UNIMP !"),
@@ -259,7 +259,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (nop, 4, "! UNIMP !"),
     (nop, 4, "! UNIMP !"),
     // 0xf opcodes
-    (nop, 4, "! UNIMP !"),
+    (ld_a_mff00u8, 12, "LD A, [FF00+u8]"),
     (nop, 4, "! UNIMP !"),
     (nop, 4, "! UNIMP !"),
     (nop, 4, "! UNIMP !"),
@@ -871,6 +871,10 @@ fn ld_a_u8(cpu: &mut Cpu) {
     cpu.a = byte;
 }
 
+fn ld_b_h(cpu: &mut Cpu) {
+    cpu.b = cpu.h;
+}
+
 fn ld_c_a(cpu: &mut Cpu) {
     cpu.c = cpu.a;
 }
@@ -930,16 +934,21 @@ fn call_u16(cpu: &mut Cpu) {
 
 fn ld_mff00u8_a(cpu: &mut Cpu) {
     let byte = cpu.read_u8();
-    cpu.mmu.write(0xff0c + byte as u16, cpu.a);
+    cpu.mmu.write(0xff00 + byte as u16, cpu.a);
 }
 
 fn ld_mff00c_a(cpu: &mut Cpu) {
-    cpu.mmu.write(0xff0c + cpu.c as u16, cpu.a);
+    cpu.mmu.write(0xff00 + cpu.c as u16, cpu.a);
 }
 
 fn ld_mu16_a(cpu: &mut Cpu) {
     let word = cpu.read_u16();
     cpu.mmu.write(word, cpu.a);
+}
+
+fn ld_a_mff00u8(cpu: &mut Cpu) {
+    let byte = cpu.read_u8();
+    cpu.a = cpu.mmu.read(0xff00 + byte as u16);
 }
 
 fn cp_a_u8(cpu: &mut Cpu) {
