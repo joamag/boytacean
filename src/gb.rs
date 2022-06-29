@@ -1,14 +1,4 @@
-use std::{
-    cell::RefCell,
-    rc::{Rc, Weak},
-};
-
-use crate::{
-    cpu::Cpu,
-    mmu::Mmu,
-    ppu::Ppu,
-    util::{read_file, SharedMut},
-};
+use crate::{cpu::Cpu, mmu::Mmu, ppu::Ppu, util::read_file};
 
 pub struct GameBoy {
     cpu: Cpu,

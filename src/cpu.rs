@@ -40,7 +40,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     // 0x2 opcodes
     (jr_nz_i8, 8, "JR NZ, i8"),
     (ld_hl_u16, 12, "LD HL, u16"),
-    (ld_mhli_a, 8, "LD [HL]+, A"),
+    (ld_mhli_a, 8, "LD [HL+], A"),
     (inc_hl, 8, "INC HL"),
     (nop, 4, "! UNIMP !"),
     (nop, 4, "! UNIMP !"),
@@ -57,7 +57,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     // 0x3 opcodes
     (nop, 4, "! UNIMP !"),
     (ld_sp_u16, 12, "LD SP, u16"),
-    (ld_mhld_a, 8, "LD [HL]-, A"),
+    (ld_mhld_a, 8, "LD [HL-], A"),
     (nop, 4, "! UNIMP !"),
     (nop, 4, "! UNIMP !"),
     (nop, 4, "! UNIMP !"),
@@ -134,7 +134,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (nop, 4, "! UNIMP !"),
     (nop, 4, "! UNIMP !"),
     (nop, 4, "! UNIMP !"),
-    (nop, 4, "! UNIMP !"),
+    (ld_a_e, 4, "LD A, E"),
     (nop, 4, "! UNIMP !"),
     (nop, 4, "! UNIMP !"),
     (nop, 4, "! UNIMP !"),
@@ -827,6 +827,10 @@ fn ld_a_u8(cpu: &mut Cpu) {
 
 fn ld_c_a(cpu: &mut Cpu) {
     cpu.c = cpu.a;
+}
+
+fn ld_a_e(cpu: &mut Cpu) {
+    cpu.a = cpu.e;
 }
 
 fn xor_a_a(cpu: &mut Cpu) {
