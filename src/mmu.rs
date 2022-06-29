@@ -40,6 +40,9 @@ impl Mmu {
                 // in case the boot mode is active and the
                 // address is withing boot memory reads from it
                 if self.boot_active && addr <= 0x00fe {
+                    // if we're reading from this location we can
+                    // safely assume that we're exiting the boot
+                    // loading sequence and disable boot
                     if addr == 0x00fe {
                         self.boot_active = false;
                     }
