@@ -4,7 +4,6 @@ pub const BIOS_SIZE: usize = 256;
 pub const ROM_SIZE: usize = 32768;
 pub const RAM_SIZE: usize = 8192;
 pub const ERAM_SIZE: usize = 8192;
-pub const HRAM_SIZE: usize = 128;
 
 pub struct Mmu {
     ppu: Ppu,
@@ -13,7 +12,6 @@ pub struct Mmu {
     rom: [u8; ROM_SIZE],
     ram: [u8; RAM_SIZE],
     eram: [u8; RAM_SIZE],
-    hram: [u8; HRAM_SIZE],
 }
 
 impl Mmu {
@@ -25,7 +23,6 @@ impl Mmu {
             rom: [0u8; ROM_SIZE],
             ram: [0u8; RAM_SIZE],
             eram: [0u8; ERAM_SIZE],
-            hram: [0u8; HRAM_SIZE],
         }
     }
 
@@ -81,7 +78,7 @@ impl Mmu {
                 }
                 0xf00 => {
                     if addr >= 0xff80 {
-                        self.hram[(addr & 0x7f) as usize]
+                        self.ppu.hram[(addr & 0x7f) as usize]
                     } else {
                         println!("WRITING TO IO control");
                         0x00
@@ -137,7 +134,7 @@ impl Mmu {
                 }
                 0xf00 => {
                     if addr >= 0xff80 {
-                        self.hram[(addr & 0x7f) as usize] = value;
+                        self.ppu.hram[(addr & 0x7f) as usize] = value;
                     } else {
                         println!("WRITING TO IO control");
                     }
