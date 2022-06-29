@@ -4,7 +4,7 @@ fn main() {
     let mut game_boy = GameBoy::new();
     game_boy.load_boot_default();
 
-    for i in 0..24650 {
+    for i in 0..24700 {
         game_boy.clock();
         if game_boy.cpu().pc() >= 0x3032 {
             println!("{}", i);
