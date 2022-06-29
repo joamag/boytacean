@@ -46,7 +46,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (nop, 4, "! UNIMP !"),
     (nop, 4, "! UNIMP !"),
     (nop, 4, "! UNIMP !"),
-    (nop, 4, "! UNIMP !"),
+    (jr_z_i8, 8, "JR Z, i8"),
     (nop, 4, "! UNIMP !"),
     (nop, 4, "! UNIMP !"),
     (nop, 4, "! UNIMP !"),
@@ -814,6 +814,17 @@ fn ld_mhli_a(cpu: &mut Cpu) {
 
 fn inc_hl(cpu: &mut Cpu) {
     cpu.set_hl(cpu.hl().wrapping_add(1));
+}
+
+fn jr_z_i8(cpu: &mut Cpu) {
+    let byte = cpu.read_u8() as i8;
+
+    if !cpu.get_zero() {
+        return;
+    }
+
+    cpu.pc = (cpu.pc as i16).wrapping_add(byte as i16) as u16;
+    cpu.ticks = cpu.ticks.wrapping_add(4);
 }
 
 fn ld_sp_u16(cpu: &mut Cpu) {
