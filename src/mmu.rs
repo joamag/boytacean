@@ -78,10 +78,15 @@ impl Mmu {
                 }
                 0xf00 => {
                     if addr >= 0xff80 {
-                        self.ppu.hram[(addr & 0x7f) as usize]
+                        self.ppu.hram[(addr & 0x007f) as usize]
                     } else {
-                        println!("WRITING TO IO control");
-                        0x00
+                        match addr & 0x00f0 {
+                            0x40 | 0x50 | 0x60 | 0x70 => self.ppu.read(addr),
+                            _ => {
+                                println!("READING FROM Unknown IO control 0x{:04x}", addr);
+                                0x00
+                            }
+                        }
                     }
                 }
                 addr => panic!("Reading from unknown location 0x{:04x}", addr),
@@ -134,9 +139,16 @@ impl Mmu {
                 }
                 0xf00 => {
                     if addr >= 0xff80 {
-                        self.ppu.hram[(addr & 0x7f) as usize] = value;
+                        self.ppu.hram[(addr & 0x007f) as usize] = value;
                     } else {
-                        println!("WRITING TO IO control");
+                        match addr & 0x00f0 {
+                            0x40 | 0x50 | 0x60 | 0x70 => {
+                                self.ppu.write(addr, value);
+                            }
+                            _ => {
+                                println!("WRITING TO Unknown IO control 0x{:04x}", addr);
+                            }
+                        }
                     }
                 }
                 addr => panic!("Writing in unknown location 0x{:04x}", addr),
