@@ -273,7 +273,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (nop, 4, "! UNIMP !"),
     (nop, 4, "! UNIMP !"),
     (nop, 4, "! UNIMP !"),
-    (nop, 4, "! UNIMP !"),
+    (cp_a_u8, 8, "CP A, u8"),
     (nop, 4, "! UNIMP !"),
 ];
 
@@ -879,6 +879,11 @@ fn ld_mff00c_a(cpu: &mut Cpu) {
     cpu.mmu.write(0xff0c + cpu.c as u16, cpu.a);
 }
 
+fn cp_a_u8(cpu: &mut Cpu) {
+    let byte = cpu.read_u8();
+    sub_set_flags(cpu, cpu.a, byte);
+}
+
 fn rl_c(cpu: &mut Cpu) {
     cpu.c = rl(cpu, cpu.c);
 }
@@ -916,13 +921,30 @@ fn bit_h(cpu: &mut Cpu, bit: u8) {
     cpu.set_half_carry(true);
 }
 
+fn sub_set_flags(cpu: &mut Cpu, x: u8, y: u8) -> u8 {
+    // Check for borrow using 32bit arithmetics
+    let x = x as u32;
+    let y = y as u32;
+
+    let value = x.wrapping_sub(y);
+
+    let value_b = value as u8;
+
+    cpu.set_sub(true);
+    cpu.set_carry(value & 0x100 == 0x100);
+    cpu.set_zero(value_b == 0);
+    cpu.set_half_carry((x ^ y ^ value) & 0x10 == 0x10);
+    
+    value_b
+}
+
 fn add_u16_u16(cpu: &mut Cpu, first: u16, second: u16) -> u16 {
     let first = first as u32;
     let second = second as u32;
     let value = first.wrapping_add(second);
 
     cpu.set_sub(false);
-    cpu.set_carry(value & 0x1000 == 0x1000);
+    cpu.set_carry(value & 0x10000 == 0x10000);
     cpu.set_half_carry((first ^ second ^ value) & 0x1000 == 0x1000);
 
     value as u16
