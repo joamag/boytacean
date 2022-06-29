@@ -33,25 +33,17 @@ impl Mmu {
         &self.ppu
     }
 
-    pub fn read(&self, addr: u16) -> u8 {
+    pub fn read(&mut self, addr: u16) -> u8 {
         match addr & 0xf000 {
             // BIOS
             0x0000 => {
-                //@todo we still need to control if we're reading from boot
-                // if(MMU._inboot)
-                // {
-                // if(addr < 0x0100)
-                // return MMU._boot[addr];
-                // else if(Z80._r.pc == 0x0100)
-                // MMU._inboot = 0;
-                //}
-                //return MMU._rom[addr];
-                if self.boot_active {
-                    if addr < 0x0100 {
-                        return self.boot[addr as usize];
-                    } /*  else if self.cpu.as_ref().unwrap().borrow().pc() == 0x0100 {
-                          self.boot_active = false;
-                      }*/
+                // in case the boot mode is active and the
+                // address is withing boot memory reads from it
+                if self.boot_active && addr <= 0x00fe {
+                    if addr == 0x00fe {
+                        self.boot_active = false;
+                    }
+                    return self.boot[addr as usize];
                 }
                 self.rom[addr as usize]
             }
