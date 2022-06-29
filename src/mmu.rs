@@ -83,7 +83,7 @@ impl Mmu {
                         match addr & 0x00f0 {
                             0x40 | 0x50 | 0x60 | 0x70 => self.ppu.read(addr),
                             _ => {
-                                println!("READING FROM Unknown IO control 0x{:04x}", addr);
+                                println!("Reading from unknown IO control 0x{:04x}", addr);
                                 0x00
                             }
                         }
@@ -146,7 +146,7 @@ impl Mmu {
                                 self.ppu.write(addr, value);
                             }
                             _ => {
-                                println!("WRITING TO Unknown IO control 0x{:04x}", addr);
+                                println!("Writing to Unknown IO control 0x{:04x}", addr);
                             }
                         }
                     }
