@@ -35,7 +35,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (nop, 4, "! UNIMP !"),
     (nop, 4, "! UNIMP !"),
     (nop, 4, "! UNIMP !"),
-    (nop, 4, "! UNIMP !"),
+    (ld_e_u8, 8, "LD E, u8"),
     (nop, 4, "! UNIMP !"),
     // 0x2 opcodes
     (jr_nz_i8, 8, "JR NZ, i8"),
@@ -68,7 +68,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (nop, 4, "! UNIMP !"),
     (nop, 4, "! UNIMP !"),
     (nop, 4, "! UNIMP !"),
-    (nop, 4, "! UNIMP !"),
+    (dec_a, 4, "DEC A"),
     (ld_a_u8, 8, "LD A, u8"),
     (nop, 4, "! UNIMP !"),
     // 0x4 opcodes
@@ -786,6 +786,11 @@ fn ld_a_mde(cpu: &mut Cpu) {
     cpu.a = byte;
 }
 
+fn ld_e_u8(cpu: &mut Cpu) {
+    let byte = cpu.read_u8();
+    cpu.e = byte;
+}
+
 fn jr_nz_i8(cpu: &mut Cpu) {
     let byte = cpu.read_u8() as i8;
 
@@ -818,6 +823,16 @@ fn ld_sp_u16(cpu: &mut Cpu) {
 fn ld_mhld_a(cpu: &mut Cpu) {
     cpu.mmu.write(cpu.hl(), cpu.a);
     cpu.set_hl(cpu.hl().wrapping_sub(1));
+}
+
+fn dec_a(cpu: &mut Cpu) {
+    let value = cpu.a.wrapping_sub(1);
+
+    cpu.set_sub(true);
+    cpu.set_zero(value == 0);
+    cpu.set_half_carry((value & 0xf) == 0xf);
+
+    cpu.a = value;
 }
 
 fn ld_a_u8(cpu: &mut Cpu) {
@@ -934,7 +949,7 @@ fn sub_set_flags(cpu: &mut Cpu, x: u8, y: u8) -> u8 {
     cpu.set_carry(value & 0x100 == 0x100);
     cpu.set_zero(value_b == 0);
     cpu.set_half_carry((x ^ y ^ value) & 0x10 == 0x10);
-    
+
     value_b
 }
 
