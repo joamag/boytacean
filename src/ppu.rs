@@ -41,6 +41,8 @@ pub struct Ppu {
     bg_map: bool,
     bg_tile: bool,
     switch_lcd: bool,
+    /// The current execution mode of the PPU, should change
+    /// between states over the drawing of a frame.
     mode: PpuMode,
     /// Internal clock counter used to control the time in ticks
     /// spent in each of the PPU modes.
