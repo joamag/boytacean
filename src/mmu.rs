@@ -26,8 +26,8 @@ impl Mmu {
         }
     }
 
-    pub fn ppu(&self) -> &Ppu {
-        &self.ppu
+    pub fn ppu(&mut self) -> &mut Ppu {
+        &mut self.ppu
     }
 
     pub fn read(&mut self, addr: u16) -> u8 {

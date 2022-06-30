@@ -16,16 +16,16 @@ impl GameBoy {
         self.cpu.clock()
     }
 
-    pub fn cpu(&self) -> &Cpu {
-        &self.cpu
+    pub fn cpu(&mut self) -> &mut Cpu {
+        &mut self.cpu
     }
 
-    pub fn mmu(&mut self) -> &Mmu {
+    pub fn mmu(&mut self) -> &mut Mmu {
         self.cpu.mmu()
     }
 
-    pub fn ppu(&mut self) -> &Ppu {
-        self.mmu().ppu()
+    pub fn ppu(&mut self) -> &mut Ppu {
+        self.cpu.ppu()
     }
 
     pub fn load_boot(&mut self, path: &str) {

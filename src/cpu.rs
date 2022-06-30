@@ -1,4 +1,4 @@
-use crate::mmu::Mmu;
+use crate::{mmu::Mmu, ppu::Ppu};
 
 pub const PREFIX: u8 = 0xcb;
 
@@ -525,7 +525,7 @@ impl Cpu {
             instruction = &INSTRUCTIONS[opcode as usize];
         }
 
-        let (instruction_fn, instruction_size, instruction_str) = instruction;
+        let (instruction_fn, instruction_time, instruction_str) = instruction;
 
         println!(
             "{}\t(0x{:02x})\t${:04x} {}",
@@ -533,7 +533,11 @@ impl Cpu {
         );
 
         instruction_fn(self);
-        self.ticks = self.ticks.wrapping_add(*instruction_size as u32);
+        self.ticks = self.ticks.wrapping_add(*instruction_time as u32);
+
+        // calls the clock in the PPU to update its own
+        // execution lifecycle by one set of ticks
+        self.ppu().clock(*instruction_time);
     }
 
     #[inline(always)]
@@ -542,8 +546,23 @@ impl Cpu {
     }
 
     #[inline(always)]
+    pub fn ppu(&mut self) -> &mut Ppu {
+        self.mmu().ppu()
+    }
+
+    #[inline(always)]
+    pub fn ticks(&self) -> u32 {
+        self.ticks
+    }
+
+    #[inline(always)]
     pub fn pc(&self) -> u16 {
         self.pc
+    }
+
+    #[inline(always)]
+    pub fn sp(&self) -> u16 {
+        self.sp
     }
 
     #[inline(always)]
