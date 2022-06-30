@@ -1,5 +1,3 @@
-use crate::cpu::Cpu;
-
 pub const VRAM_SIZE: usize = 8192;
 pub const HRAM_SIZE: usize = 128;
 pub const PALETTE_SIZE: usize = 4;
