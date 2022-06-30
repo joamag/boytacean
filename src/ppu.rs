@@ -2,7 +2,15 @@ pub const VRAM_SIZE: usize = 8192;
 pub const HRAM_SIZE: usize = 128;
 pub const PALETTE_SIZE: usize = 4;
 pub const RGBA_SIZE: usize = 4;
+
+/// The number of tiles that can be store in Game Boy's
+/// VRAM memory according to specifications.
+pub const TILE_COUNT: usize = 384;
+
+/// The width of the Game Boy screen in pixels.
 pub const SCREEN_WIDTH: usize = 160;
+
+/// The height of the Game Boy screen in pixels.
 pub const SCREEN_HEIGHT: usize = 154;
 
 /// Represents the Game Boy PPU (Pixel Processing Unit) and controls
@@ -24,6 +32,10 @@ pub struct Ppu {
     /// the sprites are going to be stored.
     pub vram: [u8; VRAM_SIZE],
     pub hram: [u8; HRAM_SIZE],
+    /// The current set of processed tiles that are store in the
+    /// PPU related structures.
+    tiles: [[[u8; 8]; 8]; TILE_COUNT],
+    /// The palette of colors that is currently loaded in Game Boy.
     palette: [[u8; RGBA_SIZE]; PALETTE_SIZE],
     /// The scroll Y register that controls the Y offset
     /// of the background.
@@ -60,6 +72,7 @@ impl Ppu {
             frame_buffer: [0u8; SCREEN_WIDTH * SCREEN_HEIGHT],
             vram: [0u8; VRAM_SIZE],
             hram: [0u8; HRAM_SIZE],
+            tiles: [[[0u8; 8]; 8]; TILE_COUNT],
             palette: [[0u8; RGBA_SIZE]; PALETTE_SIZE],
             scy: 0x0,
             scx: 0x0,
@@ -162,6 +175,28 @@ impl Ppu {
                 }
             }
             addr => panic!("Writing in unknown PPU location 0x{:04x}", addr),
+        }
+    }
+
+    pub fn update_tile(&mut self, addr: u16, _value: u8) {
+        let addr = addr & 0x1ffe;
+        let tile_index = (addr >> 4) & 0x01ff;
+        let y = (addr >> 1) & 0x0007;
+
+        let mut mask;
+
+        for x in 0..8 {
+            mask = 1 << (7 - x);
+            self.tiles[tile_index as usize][y as usize][x as usize] =
+                if self.vram[addr as usize] & mask > 0 {
+                    0x1
+                } else {
+                    0x0
+                } | if self.vram[(addr + 1) as usize] & mask > 0 {
+                    0x2
+                } else {
+                    0x0
+                }
         }
     }
 

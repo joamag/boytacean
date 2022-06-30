@@ -113,6 +113,9 @@ impl Mmu {
             0x8000 | 0x9000 => {
                 println!("WRITING TO VRAM");
                 self.ppu.vram[(addr & 0x1fff) as usize] = value;
+                if addr < 0x9800 {
+                    self.ppu.update_tile(addr, value);
+                }
             }
             // External RAM (8k)
             0xa000 | 0xb000 => {
