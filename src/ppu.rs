@@ -92,8 +92,37 @@ impl Ppu {
                     self.mode = PpuMode::Hblank;
                 }
             }
-            PpuMode::Hblank => todo!(),
-            PpuMode::VBlank => todo!(),
+            PpuMode::Hblank => {
+                if self.mode_clock >= 204 {
+                    self.line += 1;
+
+                    // in case we've reached the end of the
+                    // screen we're now entering the v-blank
+                    if self.line == 143 {
+                        self.mode = PpuMode::VBlank;
+                        // self.drawData @todo implement this one
+                    } else {
+                        self.mode = PpuMode::OamRead;
+                    }
+
+                    self.mode_clock = 0;
+                }
+            }
+            PpuMode::VBlank => {
+                if self.mode_clock >= 456 {
+                    self.line += 1;
+
+                    // in case the end of v-blank has been reached then
+                    // we must jump again to the OAM read mode and reset
+                    // the scan line counter to the zero value
+                    if self.line == 153 {
+                        self.mode = PpuMode::OamRead;
+                        self.line = 0;
+                    }
+
+                    self.mode_clock = 0;
+                }
+            }
         }
     }
 
