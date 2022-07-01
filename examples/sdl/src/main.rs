@@ -5,13 +5,9 @@ fn main() {
     game_boy.load_boot_default();
 
     for i in 0..37000 {
-        // runs the CPU clock and determines the number of
-        // cycles that have advanced for that clock tick
-        let cycles = game_boy.clock();
-
-        // calls the clock in the PPU to update its own
-        // execution lifecycle by one set of ticks
-        game_boy.ppu_clock(cycles);
+        // runs the Game Boy clock, this operations should
+        // include the advance of both the CPU and the PPU
+        game_boy.clock();
 
         if game_boy.cpu().pc() >= 0x6032 {
             println!("{}", i);

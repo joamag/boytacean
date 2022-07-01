@@ -13,6 +13,12 @@ impl GameBoy {
     }
 
     pub fn clock(&mut self) -> u8 {
+        let cycles = self.cpu_clock();
+        self.ppu_clock(cycles);
+        cycles
+    }
+
+    pub fn cpu_clock(&mut self) -> u8 {
         self.cpu.clock()
     }
 
