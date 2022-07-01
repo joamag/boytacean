@@ -506,7 +506,7 @@ impl Cpu {
         }
     }
 
-    pub fn clock(&mut self) {
+    pub fn clock(&mut self) -> u8 {
         let pc = self.pc;
 
         // fetches the current instruction and increments
@@ -535,9 +535,9 @@ impl Cpu {
         instruction_fn(self);
         self.ticks = self.ticks.wrapping_add(*instruction_time as u32);
 
-        // calls the clock in the PPU to update its own
-        // execution lifecycle by one set of ticks
-        self.ppu().clock(*instruction_time);
+        // returns the number of cycles that the operation
+        // that has been executed has taken
+        *instruction_time
     }
 
     #[inline(always)]

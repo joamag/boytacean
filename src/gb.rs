@@ -12,8 +12,12 @@ impl GameBoy {
         GameBoy { cpu: cpu }
     }
 
-    pub fn clock(&mut self) {
+    pub fn clock(&mut self) -> u8 {
         self.cpu.clock()
+    }
+
+    pub fn ppu_clock(&mut self, cycles: u8) {
+        self.ppu().clock(cycles)
     }
 
     pub fn cpu(&mut self) -> &mut Cpu {

@@ -88,8 +88,8 @@ impl Ppu {
         }
     }
 
-    pub fn clock(&mut self, ticks: u8) {
-        self.mode_clock += ticks as u16;
+    pub fn clock(&mut self, cycles: u8) {
+        self.mode_clock += cycles as u16;
         match self.mode {
             PpuMode::OamRead => {
                 if self.mode_clock >= 204 {
