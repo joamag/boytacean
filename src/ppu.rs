@@ -178,6 +178,9 @@ impl Ppu {
         }
     }
 
+    /// Updates the tile structure with the value that has
+    /// just been written to a location on the VRAM associated
+    /// with tiles.
     pub fn update_tile(&mut self, addr: u16, _value: u8) {
         let addr = addr & 0x1ffe;
         let tile_index = (addr >> 4) & 0x01ff;
