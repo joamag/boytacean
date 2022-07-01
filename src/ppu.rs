@@ -1,23 +1,23 @@
 pub const VRAM_SIZE: usize = 8192;
 pub const HRAM_SIZE: usize = 128;
 pub const PALETTE_SIZE: usize = 4;
-pub const RGBA_SIZE: usize = 4;
+pub const RGB_SIZE: usize = 3;
 
 /// The number of tiles that can be store in Game Boy's
 /// VRAM memory according to specifications.
 pub const TILE_COUNT: usize = 384;
 
 /// The width of the Game Boy screen in pixels.
-pub const SCREEN_WIDTH: usize = 160;
+pub const DISPLAY_WIDTH: usize = 160;
 
 /// The height of the Game Boy screen in pixels.
-pub const SCREEN_HEIGHT: usize = 154;
+pub const DISPLAY_HEIGHT: usize = 154;
 
 /// Represents the Game Boy PPU (Pixel Processing Unit) and controls
 /// all of the logic behind the graphics processing and presentation.
 /// Should store both the VRAM and HRAM together with the internal
 /// graphic related registers.
-/// Outputs the screen as a RGBA 8 bit frame buffer.
+/// Outputs the screen as a RGB 8 bit frame buffer.
 ///
 /// # Basic usage
 /// ```rust
@@ -25,9 +25,9 @@ pub const SCREEN_HEIGHT: usize = 154;
 /// ppu.tick();
 /// ```
 pub struct Ppu {
-    /// The 8 bit based RGBA frame buffer with the
+    /// The 8 bit based RGB frame buffer with the
     /// processed set of pixels ready to be displayed on screen.
-    pub frame_buffer: Box<[u8; SCREEN_WIDTH * SCREEN_HEIGHT * RGBA_SIZE]>,
+    pub frame_buffer: Box<[u8; DISPLAY_WIDTH * DISPLAY_HEIGHT * RGB_SIZE]>,
     /// Video dedicated memory (VRAM) where both the tiles and
     /// the sprites are going to be stored.
     pub vram: [u8; VRAM_SIZE],
@@ -38,7 +38,7 @@ pub struct Ppu {
     /// PPU related structures.
     tiles: [[[u8; 8]; 8]; TILE_COUNT],
     /// The palette of colors that is currently loaded in Game Boy.
-    palette: [[u8; RGBA_SIZE]; PALETTE_SIZE],
+    palette: [[u8; RGB_SIZE]; PALETTE_SIZE],
     /// The scroll Y register that controls the Y offset
     /// of the background.
     scy: u8,
@@ -71,11 +71,11 @@ pub enum PpuMode {
 impl Ppu {
     pub fn new() -> Ppu {
         Ppu {
-            frame_buffer: Box::new([0u8; SCREEN_WIDTH * SCREEN_HEIGHT * RGBA_SIZE]),
+            frame_buffer: Box::new([0u8; DISPLAY_WIDTH * DISPLAY_HEIGHT * RGB_SIZE]),
             vram: [0u8; VRAM_SIZE],
             hram: [0u8; HRAM_SIZE],
             tiles: [[[0u8; 8]; 8]; TILE_COUNT],
-            palette: [[0u8; RGBA_SIZE]; PALETTE_SIZE],
+            palette: [[0u8; RGB_SIZE]; PALETTE_SIZE],
             scy: 0x0,
             scx: 0x0,
             line: 0x0,
@@ -168,10 +168,10 @@ impl Ppu {
             0x0047 => {
                 for index in 0..PALETTE_SIZE {
                     match (value >> (index * 2)) & 3 {
-                        0 => self.palette[index] = [255, 255, 255, 255],
-                        1 => self.palette[index] = [192, 192, 192, 255],
-                        2 => self.palette[index] = [96, 96, 96, 255],
-                        3 => self.palette[index] = [0, 0, 0, 255],
+                        0 => self.palette[index] = [255, 255, 255],
+                        1 => self.palette[index] = [192, 192, 192],
+                        2 => self.palette[index] = [96, 96, 96],
+                        3 => self.palette[index] = [0, 0, 0],
                         color_index => panic!("Invalid palette color index {:04x}", color_index),
                     }
                 }
@@ -225,10 +225,10 @@ impl Ppu {
         }
 
         // calculates the frame buffer offset position assuming the proper
-        // Game Boy screen width and RGBA pixel (4 bytes) size
-        let mut frame_offset = self.line as usize * SCREEN_WIDTH * RGBA_SIZE;
+        // Game Boy screen width and RGB pixel (3 bytes) size
+        let mut frame_offset = self.line as usize * DISPLAY_WIDTH * RGB_SIZE;
 
-        for _index in 0..SCREEN_WIDTH {
+        for _index in 0..DISPLAY_WIDTH {
             // in case the end of tile width has been reached then
             // a new tile must be retrieved for plotting
             if x == 8 {
@@ -257,9 +257,8 @@ impl Ppu {
             self.frame_buffer[frame_offset] = color[0];
             self.frame_buffer[frame_offset + 1] = color[1];
             self.frame_buffer[frame_offset + 2] = color[2];
-            self.frame_buffer[frame_offset + 3] = color[3];
 
-            frame_offset += RGBA_SIZE;
+            frame_offset += RGB_SIZE;
 
             // increments the current tile X position in drawing
             x += 1;

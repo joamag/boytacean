@@ -1,4 +1,4 @@
-# Boytacian
+# Boytacean
 
 A Game Boy emulator that is written in Rust 🦀.
 

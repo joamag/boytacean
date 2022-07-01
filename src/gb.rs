@@ -38,6 +38,10 @@ impl GameBoy {
         self.cpu.ppu()
     }
 
+    pub fn frame_buffer(&mut self) -> &Box<[u8; 73920]> {
+        &(self.ppu().frame_buffer)
+    }
+
     pub fn load_boot(&mut self, path: &str) {
         let data = read_file(path);
         self.cpu.mmu().write_boot(0x0000, &data);
