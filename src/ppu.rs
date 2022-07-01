@@ -17,7 +17,7 @@ pub const SCREEN_HEIGHT: usize = 154;
 /// all of the logic behind the graphics processing and presentation.
 /// Should store both the VRAM and HRAM together with the internal
 /// graphic related registers.
-/// Outputs the screen as a monochromatic 8 bit frame buffer.
+/// Outputs the screen as a RGBA 8 bit frame buffer.
 ///
 /// # Basic usage
 /// ```rust
@@ -25,9 +25,9 @@ pub const SCREEN_HEIGHT: usize = 154;
 /// ppu.tick();
 /// ```
 pub struct Ppu {
-    /// The 8 bit based monochromatic frame buffer with the
+    /// The 8 bit based RGBA frame buffer with the
     /// processed set of pixels ready to be displayed on screen.
-    pub frame_buffer: [u8; SCREEN_WIDTH * SCREEN_HEIGHT],
+    pub frame_buffer: [u8; SCREEN_WIDTH * SCREEN_HEIGHT * RGBA_SIZE],
     /// Video dedicated memory (VRAM) where both the tiles and
     /// the sprites are going to be stored.
     pub vram: [u8; VRAM_SIZE],
@@ -69,7 +69,7 @@ pub enum PpuMode {
 impl Ppu {
     pub fn new() -> Ppu {
         Ppu {
-            frame_buffer: [0u8; SCREEN_WIDTH * SCREEN_HEIGHT],
+            frame_buffer: [0u8; SCREEN_WIDTH * SCREEN_HEIGHT * RGBA_SIZE],
             vram: [0u8; VRAM_SIZE],
             hram: [0u8; HRAM_SIZE],
             tiles: [[[0u8; 8]; 8]; TILE_COUNT],
@@ -203,7 +203,62 @@ impl Ppu {
         }
     }
 
-    fn render_line(&self) {
-        //@todo implement the rendering of a line
+    fn render_line(&mut self) {
+        let mut map_offset: usize = if self.bg_map { 0x1c00 } else { 0x1800 };
+        map_offset += (((self.line + self.scy) & 0xff) >> 3) as usize;
+
+        // calculates the sprite line offset by using the SCX register
+        // shifted by 3 meaning as the tiles are 8x8
+        let mut line_offset: usize = (self.scx >> 3) as usize;
+
+        let y = ((self.scy + self.line) & 0x07) as usize;
+        let mut x = (self.scx & 0x07) as usize;
+
+        let mut frame_offset = self.line as usize * SCREEN_WIDTH * RGBA_SIZE;
+
+        let mut tile_index = self.vram[map_offset + line_offset] as usize;
+
+        // if the tile data set in use is #1, the
+        // indices are signed, calculates a real tile offset
+        if self.bg_tile && tile_index < 128 {
+            tile_index += 256;
+        }
+
+        for _index in 0..SCREEN_WIDTH {
+            // in case the end of tile width has been reached then
+            // a new tile must be retrieved for plotting
+            if x == 8 {
+                // resets the tile X position to the base value
+                // as a new tile is going to be drawn
+                x = 0;
+
+                // calculates the new line tile offset making sure that
+                // the maximum of 32 is not overflown
+                line_offset = (line_offset + 1) & 31;
+
+                // calculates the tile index nad makes sure the value
+                // takes into consideration the bg tile value
+                tile_index = self.vram[map_offset + line_offset] as usize;
+                if self.bg_tile && tile_index < 128 {
+                    tile_index += 256;
+                }
+            }
+
+            // obtains the current pixel data from the tile and
+            // re-maps it according to the current palette
+            let pixel = self.tiles[tile_index][y][x];
+            let color = self.palette[pixel as usize];
+
+            // set the color pixel in the frame buffer
+            self.frame_buffer[frame_offset] = color[0];
+            self.frame_buffer[frame_offset + 1] = color[1];
+            self.frame_buffer[frame_offset + 2] = color[2];
+            self.frame_buffer[frame_offset + 3] = color[3];
+
+            frame_offset += RGBA_SIZE;
+
+            // increments the current tile X position in drawing
+            x += 1;
+        }
     }
 }
