@@ -185,20 +185,20 @@ impl Ppu {
     /// just been written to a location on the VRAM associated
     /// with tiles.
     pub fn update_tile(&mut self, addr: u16, _value: u8) {
-        let addr = addr & 0x1ffe;
-        let tile_index = (addr >> 4) & 0x01ff;
-        let y = (addr >> 1) & 0x0007;
+        let addr = (addr & 0x1ffe) as usize;
+        let tile_index = ((addr >> 4) & 0x01ff) as usize;
+        let y = ((addr >> 1) & 0x0007) as usize;
 
         let mut mask;
 
         for x in 0..8 {
             mask = 1 << (7 - x);
-            self.tiles[tile_index as usize][y as usize][x as usize] =
-                if self.vram[addr as usize] & mask > 0 {
+            self.tiles[tile_index][y][x] =
+                if self.vram[addr] & mask > 0 {
                     0x1
                 } else {
                     0x0
-                } | if self.vram[(addr + 1) as usize] & mask > 0 {
+                } | if self.vram[addr + 1] & mask > 0 {
                     0x2
                 } else {
                     0x0
