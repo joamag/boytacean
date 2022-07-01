@@ -113,7 +113,8 @@ impl Ppu {
                     // screen we're now entering the v-blank
                     if self.line == 143 {
                         self.mode = PpuMode::VBlank;
-                        // self.drawData @todo implement this one
+                        // self.drawData
+                        // @todo implement this one
                     } else {
                         self.mode = PpuMode::OamRead;
                     }

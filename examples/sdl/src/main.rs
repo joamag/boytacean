@@ -1,5 +1,11 @@
-use boytacean::{gb::GameBoy, ppu::{DISPLAY_WIDTH, DISPLAY_HEIGHT}};
-use sdl2::{video::Window, pixels::PixelFormatEnum, VideoSubsystem, TimerSubsystem, EventPump};
+use boytacean::{
+    gb::GameBoy,
+    ppu::{DISPLAY_HEIGHT, DISPLAY_WIDTH},
+};
+use sdl2::{
+    pixels::PixelFormatEnum, video::Window, AudioSubsystem, EventPump, TimerSubsystem,
+    VideoSubsystem,
+};
 
 /// The base title to be used in the window.
 static TITLE: &'static str = "Boytacean";
@@ -8,6 +14,7 @@ pub struct Graphics {
     window: Window,
     video_subsystem: VideoSubsystem,
     timer_subsystem: TimerSubsystem,
+    audio_subsystem: AudioSubsystem,
     event_pump: EventPump,
 }
 
@@ -42,7 +49,8 @@ fn start_sdl() -> Graphics {
         window: window,
         video_subsystem: video_subsystem,
         timer_subsystem: timer_subsystem,
-        event_pump: event_pump
+        audio_subsystem: audio_subsystem,
+        event_pump: event_pump,
     }
 }
 
@@ -75,8 +83,7 @@ fn main() {
             break;
         }
 
-        while let Some(event) = graphics.event_pump.poll_event() {
-        }
+        while let Some(event) = graphics.event_pump.poll_event() {}
 
         let mut counter_ticks = 0u32;
 
@@ -106,6 +113,4 @@ fn main() {
 
         graphics.timer_subsystem.delay(17);
     }
-
-    //println!("{:?}", game_boy.frame_buffer().as_ref());
 }
