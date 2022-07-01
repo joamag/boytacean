@@ -31,6 +31,8 @@ pub struct Ppu {
     /// Video dedicated memory (VRAM) where both the tiles and
     /// the sprites are going to be stored.
     pub vram: [u8; VRAM_SIZE],
+    /// High RAM memory that should provide extra speed for regular
+    /// operations.
     pub hram: [u8; HRAM_SIZE],
     /// The current set of processed tiles that are store in the
     /// PPU related structures.
