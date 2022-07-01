@@ -27,7 +27,7 @@ pub const SCREEN_HEIGHT: usize = 154;
 pub struct Ppu {
     /// The 8 bit based RGBA frame buffer with the
     /// processed set of pixels ready to be displayed on screen.
-    pub frame_buffer: [u8; SCREEN_WIDTH * SCREEN_HEIGHT * RGBA_SIZE],
+    pub frame_buffer: Box<[u8; SCREEN_WIDTH * SCREEN_HEIGHT * RGBA_SIZE]>,
     /// Video dedicated memory (VRAM) where both the tiles and
     /// the sprites are going to be stored.
     pub vram: [u8; VRAM_SIZE],
@@ -69,7 +69,7 @@ pub enum PpuMode {
 impl Ppu {
     pub fn new() -> Ppu {
         Ppu {
-            frame_buffer: [0u8; SCREEN_WIDTH * SCREEN_HEIGHT * RGBA_SIZE],
+            frame_buffer: Box::new([0u8; SCREEN_WIDTH * SCREEN_HEIGHT * RGBA_SIZE]),
             vram: [0u8; VRAM_SIZE],
             hram: [0u8; HRAM_SIZE],
             tiles: [[[0u8; 8]; 8]; TILE_COUNT],
