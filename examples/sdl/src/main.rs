@@ -79,7 +79,7 @@ fn main() {
     let mut counter = 0;
 
     'main: loop {
-        if counter >= 7000000 {
+        if counter >= 700000000 {
             break;
         }
 

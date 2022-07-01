@@ -148,7 +148,7 @@ impl Mmu {
                                 self.ppu.write(addr, value);
                             }
                             _ => {
-                                println!("Writing to Unknown IO control 0x{:04x}", addr);
+                                println!("Writing to unknown IO control 0x{:04x}", addr);
                             }
                         }
                     }

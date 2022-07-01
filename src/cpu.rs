@@ -26,7 +26,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (noimpl, 4, "! UNIMP !"),
     (inc_de, 8, "INC DE"),
     (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (dec_d, 4, "DEC D"),
     (noimpl, 4, "! UNIMP !"),
     (rla, 4, "RLA"),
     (jr_i8, 12, "JR i8"),
@@ -157,7 +157,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     // 0x9 opcodes
-    (noimpl, 4, "! UNIMP !"),
+    (sub_a_b, 4, "SUB A, B"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
@@ -527,10 +527,16 @@ impl Cpu {
 
         let (instruction_fn, instruction_time, instruction_str) = instruction;
 
-        println!(
-            "{}\t(0x{:02x})\t${:04x} {}",
-            instruction_str, opcode, pc, is_prefix
-        );
+        if *instruction_str == "! UNIMP !" {
+            println!(
+                "{}\t(0x{:02x})\t${:04x} {}",
+                instruction_str, opcode, pc, is_prefix
+            );
+        }
+
+        if pc == 0x0080 {
+            println!("GOING TO PLAY BOOT SOUND");
+        }
 
         instruction_fn(self);
         self.ticks = self.ticks.wrapping_add(*instruction_time as u32);
@@ -802,6 +808,16 @@ fn inc_de(cpu: &mut Cpu) {
     cpu.set_de(cpu.de().wrapping_add(1));
 }
 
+fn dec_d(cpu: &mut Cpu) {
+    let value = cpu.d.wrapping_sub(1);
+
+    cpu.set_sub(true);
+    cpu.set_zero(value == 0);
+    cpu.set_half_carry((value & 0xf) == 0xf);
+
+    cpu.d = value;
+}
+
 fn rla(cpu: &mut Cpu) {
     let carry = cpu.get_carry();
 
@@ -942,6 +958,10 @@ fn ld_a_h(cpu: &mut Cpu) {
     cpu.a = cpu.h;
 }
 
+fn sub_a_b(cpu: &mut Cpu) {
+    cpu.a = sub_set_flags(cpu, cpu.a, cpu.b);
+}
+
 fn xor_a_a(cpu: &mut Cpu) {
     cpu.a ^= cpu.a;
 
@@ -1041,12 +1061,11 @@ fn bit_h(cpu: &mut Cpu, bit: u8) {
 }
 
 fn sub_set_flags(cpu: &mut Cpu, x: u8, y: u8) -> u8 {
-    // Check for borrow using 32bit arithmetics
+    // checks for borrow using 32bit arithmetics
     let x = x as u32;
     let y = y as u32;
 
     let value = x.wrapping_sub(y);
-
     let value_b = value as u8;
 
     cpu.set_sub(true);
