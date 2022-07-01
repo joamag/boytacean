@@ -13,6 +13,9 @@ pub const DISPLAY_WIDTH: usize = 160;
 /// The height of the Game Boy screen in pixels.
 pub const DISPLAY_HEIGHT: usize = 154;
 
+// The size of the RGB frame buffer in bytes.
+pub const FRAME_BUFFER_SIZE: usize = DISPLAY_WIDTH * DISPLAY_HEIGHT * RGB_SIZE;
+
 /// Represents the Game Boy PPU (Pixel Processing Unit) and controls
 /// all of the logic behind the graphics processing and presentation.
 /// Should store both the VRAM and HRAM together with the internal
@@ -27,7 +30,7 @@ pub const DISPLAY_HEIGHT: usize = 154;
 pub struct Ppu {
     /// The 8 bit based RGB frame buffer with the
     /// processed set of pixels ready to be displayed on screen.
-    pub frame_buffer: Box<[u8; DISPLAY_WIDTH * DISPLAY_HEIGHT * RGB_SIZE]>,
+    pub frame_buffer: Box<[u8; FRAME_BUFFER_SIZE]>,
     /// Video dedicated memory (VRAM) where both the tiles and
     /// the sprites are going to be stored.
     pub vram: [u8; VRAM_SIZE],

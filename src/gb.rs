@@ -1,4 +1,4 @@
-use crate::{cpu::Cpu, mmu::Mmu, ppu::Ppu, util::read_file};
+use crate::{cpu::Cpu, mmu::Mmu, ppu::{Ppu, FRAME_BUFFER_SIZE}, util::read_file};
 
 pub struct GameBoy {
     cpu: Cpu,
@@ -38,7 +38,7 @@ impl GameBoy {
         self.cpu.ppu()
     }
 
-    pub fn frame_buffer(&mut self) -> &Box<[u8; 73920]> {
+    pub fn frame_buffer(&mut self) -> &Box<[u8; FRAME_BUFFER_SIZE]> {
         &(self.ppu().frame_buffer)
     }
 
