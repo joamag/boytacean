@@ -214,15 +214,17 @@ impl Ppu {
         let y = ((self.scy + self.line) & 0x07) as usize;
         let mut x = (self.scx & 0x07) as usize;
 
-        let mut frame_offset = self.line as usize * SCREEN_WIDTH * RGBA_SIZE;
-
+        // calculates the index of the initial tile in drawing,
+        // if the tile data set in use is #1, the indices are
+        // signed, then calculates a real tile offset
         let mut tile_index = self.vram[map_offset + line_offset] as usize;
-
-        // if the tile data set in use is #1, the
-        // indices are signed, calculates a real tile offset
         if self.bg_tile && tile_index < 128 {
             tile_index += 256;
         }
+
+        // calculates the frame buffer offset position assuming the proper
+        // Game Boy screen width and RGBA pixel (4 bytes) size
+        let mut frame_offset = self.line as usize * SCREEN_WIDTH * RGBA_SIZE;
 
         for _index in 0..SCREEN_WIDTH {
             // in case the end of tile width has been reached then
