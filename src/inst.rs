@@ -196,7 +196,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (or_a_a, 4, "OR A, A"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
@@ -229,7 +229,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (sub_a_u8, 8, "SUB A, u8"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
@@ -868,6 +868,15 @@ fn or_a_c(cpu: &mut Cpu) {
     cpu.set_carry(false);
 }
 
+fn or_a_a(cpu: &mut Cpu) {
+    cpu.a |= cpu.a;
+
+    cpu.set_sub(false);
+    cpu.set_zero(cpu.a == 0);
+    cpu.set_half_carry(false);
+    cpu.set_carry(false);
+}
+
 fn cp_a_mhl(cpu: &mut Cpu) {
     let byte = cpu.mmu.read(cpu.hl());
     sub_set_flags(cpu, cpu.a, byte);
@@ -925,6 +934,11 @@ fn call_u16(cpu: &mut Cpu) {
 
 fn rst_08h(cpu: &mut Cpu) {
     rst(cpu, 0x0008);
+}
+
+fn sub_a_u8(cpu: &mut Cpu) {
+    let byte = cpu.read_u8();
+    cpu.a = sub_set_flags(cpu, cpu.a, byte);
 }
 
 fn ld_mff00u8_a(cpu: &mut Cpu) {
