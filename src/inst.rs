@@ -221,7 +221,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (noimpl, 4, "! UNIMP !"),
     (call_u16, 24, "CALL u16"),
     (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (rst_08h, 16, "RST 08h"),
     // 0xd opcodes
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
@@ -262,7 +262,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (noimpl, 4, "! UNIMP !"),
     (di, 4, "DI"),
     (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (push_af, 16, "PUSH AF"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
@@ -884,6 +884,10 @@ fn call_u16(cpu: &mut Cpu) {
     cpu.pc = word;
 }
 
+fn rst_08h(cpu: &mut Cpu) {
+    rst(cpu, 0x0008);
+}
+
 fn ld_mff00u8_a(cpu: &mut Cpu) {
     let byte = cpu.read_u8();
     cpu.mmu.write(0xff00 + byte as u16, cpu.a);
@@ -920,6 +924,10 @@ fn ld_a_mff00u8(cpu: &mut Cpu) {
 
 fn di(cpu: &mut Cpu) {
     cpu.disable_int();
+}
+
+fn push_af(cpu: &mut Cpu) {
+    cpu.push_word(cpu.af());
 }
 
 fn ei(cpu: &mut Cpu) {
