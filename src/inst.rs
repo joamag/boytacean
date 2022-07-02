@@ -130,7 +130,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (noimpl, 4, "! UNIMP !"),
     (ld_mhl_a, 8, "LD [HL], A"),
     (ld_a_b, 4, "LD A, B"),
-    (noimpl, 4, "! UNIMP !"),
+    (ld_a_c, 4, "LD A, C"),
     (noimpl, 4, "! UNIMP !"),
     (ld_a_e, 4, "LD A, E"),
     (ld_a_h, 4, "LD A, H"),
@@ -173,6 +173,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (noimpl, 4, "! UNIMP !"),
     // 0xa opcodes
     (noimpl, 4, "! UNIMP !"),
+    (and_a_c, 4, "AND A, C"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
@@ -180,8 +181,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (xor_a_c, 4, "XOR A, C"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
@@ -255,7 +255,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (rst_18h, 16, "RST 18h"),
     // 0xf opcodes
     (ld_a_mff00u8, 12, "LD A, [FF00+u8]"),
     (noimpl, 4, "! UNIMP !"),
@@ -272,7 +272,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (cp_a_u8, 8, "CP A, u8"),
-    (noimpl, 4, "! UNIMP !"),
+    (rst_38h, 16, "RST 38h"),
 ];
 
 pub const BITWISE: [(fn(&mut Cpu), u8, &'static str); 176] = [
@@ -753,6 +753,10 @@ fn ld_a_b(cpu: &mut Cpu) {
     cpu.a = cpu.b;
 }
 
+fn ld_a_c(cpu: &mut Cpu) {
+    cpu.a = cpu.c;
+}
+
 fn ld_a_e(cpu: &mut Cpu) {
     cpu.a = cpu.e;
 }
@@ -772,6 +776,24 @@ fn add_a_mhl(cpu: &mut Cpu) {
 
 fn sub_a_b(cpu: &mut Cpu) {
     cpu.a = sub_set_flags(cpu, cpu.a, cpu.b);
+}
+
+fn and_a_c(cpu: &mut Cpu) {
+    cpu.a &= cpu.c;
+
+    cpu.set_sub(false);
+    cpu.set_zero(cpu.a == 0);
+    cpu.set_half_carry(true);
+    cpu.set_carry(false);
+}
+
+fn xor_a_c(cpu: &mut Cpu) {
+    cpu.a ^= cpu.c;
+
+    cpu.set_sub(false);
+    cpu.set_zero(cpu.a == 0);
+    cpu.set_half_carry(false);
+    cpu.set_carry(false);
 }
 
 fn xor_a_a(cpu: &mut Cpu) {
@@ -864,6 +886,10 @@ fn ld_mu16_a(cpu: &mut Cpu) {
     cpu.mmu.write(word, cpu.a);
 }
 
+fn rst_18h(cpu: &mut Cpu) {
+    rst(cpu, 0x0018);
+}
+
 fn ld_a_mff00u8(cpu: &mut Cpu) {
     let byte = cpu.read_u8();
     cpu.a = cpu.mmu.read(0xff00 + byte as u16);
@@ -880,6 +906,10 @@ fn ei(cpu: &mut Cpu) {
 fn cp_a_u8(cpu: &mut Cpu) {
     let byte = cpu.read_u8();
     sub_set_flags(cpu, cpu.a, byte);
+}
+
+fn rst_38h(cpu: &mut Cpu) {
+    rst(cpu, 0x0038);
 }
 
 fn rl_c(cpu: &mut Cpu) {
@@ -972,4 +1002,12 @@ fn swap(cpu: &mut Cpu, value: u8) -> u8 {
     cpu.set_carry(false);
 
     (value << 4) | (value >> 4)
+}
+
+/// Helper function for RST instructions, pushes the
+/// current PC to the stack and jumps to the provided
+/// address.
+fn rst(cpu: &mut Cpu, addr: u16) {
+    cpu.push_word(cpu.pc);
+    cpu.pc = addr;
 }
