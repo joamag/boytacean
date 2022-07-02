@@ -32,7 +32,7 @@ impl Mmu {
 
     pub fn read(&mut self, addr: u16) -> u8 {
         match addr & 0xf000 {
-            // BIOS
+            // BOOT (256 B) + ROM0 (4 KB/16 KB)
             0x0000 => {
                 // in case the boot mode is active and the
                 // address is withing boot memory reads from it
@@ -47,21 +47,21 @@ impl Mmu {
                 }
                 self.rom[addr as usize]
             }
-            // ROM0
+            // ROM0 (12 KB/16 KB)
             0x1000 | 0x2000 | 0x3000 => self.rom[addr as usize],
-            // ROM1 (unbanked) (16k)
+            // ROM1 (unbanked) (16 KB)
             0x4000 | 0x5000 | 0x6000 | 0x7000 => self.rom[addr as usize],
-            // Graphics: VRAM (8k)
+            // Graphics: VRAM (8 KB)
             0x8000 | 0x9000 => {
                 println!("READING FROM VRAM");
                 self.ppu.vram[(addr & 0x1fff) as usize]
             }
-            // External RAM (8k)
+            // External RAM (8 KB)
             0xa000 | 0xb000 => {
                 println!("READING FROM ERAM");
                 self.eram[(addr & 0x1fff) as usize]
             }
-            // Working RAM (8k)
+            // Working RAM (8 KB)
             0xc000 | 0xd000 => self.ram[(addr & 0x1fff) as usize],
             // Working RAM shadow
             0xe000 => {
@@ -97,30 +97,30 @@ impl Mmu {
 
     pub fn write(&mut self, addr: u16, value: u8) {
         match addr & 0xf000 {
-            // BOOT
+            // BOOT (256 B) + ROM0 (4 KB/16 KB)
             0x0000 => {
                 println!("WRITING to BOOT")
             }
-            // ROM0
+            // ROM0 (12 KB/16 KB)
             0x1000 | 0x2000 | 0x3000 => {
                 println!("WRITING TO ROM 0");
             }
-            // ROM1 (unbanked) (16k)
+            // ROM1 (unbanked) (16 KB)
             0x4000 | 0x5000 | 0x6000 | 0x7000 => {
                 println!("WRITING TO ROM 1");
             }
-            // Graphics: VRAM (8k)
+            // Graphics: VRAM (8 KB)
             0x8000 | 0x9000 => {
                 self.ppu.vram[(addr & 0x1fff) as usize] = value;
                 if addr < 0x9800 {
                     self.ppu.update_tile(addr, value);
                 }
             }
-            // External RAM (8k)
+            // External RAM (8 KB)
             0xa000 | 0xb000 => {
                 println!("WRITING TO ERAM");
             }
-            // Working RAM (8k)
+            // Working RAM (8 KB)
             0xc000 | 0xd000 => {
                 println!("WRITING TO RAM");
                 self.ram[(addr & 0x1fff) as usize] = value;
@@ -165,5 +165,9 @@ impl Mmu {
 
     pub fn write_ram(&mut self, addr: u16, buffer: &[u8]) {
         self.ram[addr as usize..addr as usize + buffer.len()].clone_from_slice(buffer);
+    }
+
+    pub fn write_rom(&mut self, addr: u16, buffer: &[u8]) {
+        self.rom[addr as usize..addr as usize + buffer.len()].clone_from_slice(buffer);
     }
 }

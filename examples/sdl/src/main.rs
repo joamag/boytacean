@@ -75,6 +75,7 @@ fn main() {
 
     let mut game_boy = GameBoy::new();
     game_boy.load_boot_default();
+    game_boy.load_rom("C:/Users/joamag/Desktop/tetris.gb");
 
     let mut counter = 0;
 

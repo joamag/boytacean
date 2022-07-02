@@ -1,4 +1,9 @@
-use crate::{cpu::Cpu, mmu::Mmu, ppu::{Ppu, FRAME_BUFFER_SIZE}, util::read_file};
+use crate::{
+    cpu::Cpu,
+    mmu::Mmu,
+    ppu::{Ppu, FRAME_BUFFER_SIZE},
+    util::read_file,
+};
 
 pub struct GameBoy {
     cpu: Cpu,
@@ -40,6 +45,11 @@ impl GameBoy {
 
     pub fn frame_buffer(&mut self) -> &Box<[u8; FRAME_BUFFER_SIZE]> {
         &(self.ppu().frame_buffer)
+    }
+
+    pub fn load_rom(&mut self, path: &str) {
+        let data = read_file(path);
+        self.cpu.mmu().write_rom(0x0000, &data);
     }
 
     pub fn load_boot(&mut self, path: &str) {

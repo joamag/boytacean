@@ -163,7 +163,7 @@ impl Ppu {
         match addr & 0x00ff {
             0x0040 => {
                 self.switch_bg = value & 0x01 == 0x01;
-                self.bg_map = value & 0x08 == 0x08;
+                self.bg_map = value & 0x08 == 0x08; // @todo o buf pode estar aqui
                 self.bg_tile = value & 0x10 == 0x10;
                 self.switch_lcd = value & 0x80 == 0x80;
             }
@@ -196,12 +196,8 @@ impl Ppu {
 
         for x in 0..8 {
             mask = 1 << (7 - x);
-            self.tiles[tile_index][y][x] =
-                if self.vram[addr] & mask > 0 {
-                    0x1
-                } else {
-                    0x0
-                } | if self.vram[addr + 1] & mask > 0 {
+            self.tiles[tile_index][y][x] = if self.vram[addr] & mask > 0 { 0x1 } else { 0x0 }
+                | if self.vram[addr + 1] & mask > 0 {
                     0x2
                 } else {
                     0x0
@@ -217,6 +213,7 @@ impl Ppu {
         // shifted by 3 meaning as the tiles are 8x8
         let mut line_offset: usize = (self.scx >> 3) as usize;
 
+        // calculates both the current Y and X positions within the tiles
         let y = ((self.scy + self.line) & 0x07) as usize;
         let mut x = (self.scx & 0x07) as usize;
 
@@ -233,6 +230,23 @@ impl Ppu {
         let mut frame_offset = self.line as usize * DISPLAY_WIDTH * RGB_SIZE;
 
         for _index in 0..DISPLAY_WIDTH {
+            // obtains the current pixel data from the tile and
+            // re-maps it according to the current palette
+            let pixel = self.tiles[tile_index][y][x];
+            let color = self.palette[pixel as usize];
+
+            // set the color pixel in the frame buffer
+            self.frame_buffer[frame_offset] = color[0];
+            self.frame_buffer[frame_offset + 1] = color[1];
+            self.frame_buffer[frame_offset + 2] = color[2];
+
+            // increments the offset of the frame buffer by the
+            // size of an RGB pixel (which is 3 bytes)
+            frame_offset += RGB_SIZE;
+
+            // increments the current tile X position in drawing
+            x += 1;
+
             // in case the end of tile width has been reached then
             // a new tile must be retrieved for plotting
             if x == 8 {
@@ -251,21 +265,6 @@ impl Ppu {
                     tile_index += 256;
                 }
             }
-
-            // obtains the current pixel data from the tile and
-            // re-maps it according to the current palette
-            let pixel = self.tiles[tile_index][y][x];
-            let color = self.palette[pixel as usize];
-
-            // set the color pixel in the frame buffer
-            self.frame_buffer[frame_offset] = color[0];
-            self.frame_buffer[frame_offset + 1] = color[1];
-            self.frame_buffer[frame_offset + 2] = color[2];
-
-            frame_offset += RGB_SIZE;
-
-            // increments the current tile X position in drawing
-            x += 1;
         }
     }
 }
