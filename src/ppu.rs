@@ -11,7 +11,7 @@ pub const TILE_COUNT: usize = 384;
 pub const DISPLAY_WIDTH: usize = 160;
 
 /// The height of the Game Boy screen in pixels.
-pub const DISPLAY_HEIGHT: usize = 154;
+pub const DISPLAY_HEIGHT: usize = 144;
 
 // The size of the RGB frame buffer in bytes.
 pub const FRAME_BUFFER_SIZE: usize = DISPLAY_WIDTH * DISPLAY_HEIGHT * RGB_SIZE;
@@ -124,7 +124,7 @@ impl Ppu {
 
                     // in case we've reached the end of the
                     // screen we're now entering the v-blank
-                    if self.line == 143 {
+                    if self.line == 144 {
                         self.mode = PpuMode::VBlank;
                         // self.drawData
                         // @todo implement this one
@@ -142,7 +142,7 @@ impl Ppu {
                     // in case the end of v-blank has been reached then
                     // we must jump again to the OAM read mode and reset
                     // the scan line counter to the zero value
-                    if self.line == 153 {
+                    if self.line == 154 {
                         self.mode = PpuMode::OamRead;
                         self.line = 0;
                     }
@@ -245,6 +245,7 @@ impl Ppu {
         // calculates the frame buffer offset position assuming the proper
         // Game Boy screen width and RGB pixel (3 bytes) size
         let mut frame_offset = self.line as usize * DISPLAY_WIDTH * RGB_SIZE;
+
 
         for _index in 0..DISPLAY_WIDTH {
             // obtains the current pixel data from the tile and

@@ -112,6 +112,7 @@ fn main() {
         // information presented to the user
         canvas.present();
 
+        // @todo this must be improved with proper timestamps
         graphics.timer_subsystem.delay(17);
     }
 }
