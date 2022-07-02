@@ -209,7 +209,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (ret_nz, 8, "RET NZ"),
     (pop_bc, 12, "POP BC"),
     (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (jp_u16, 16, "JP u16"),
     (noimpl, 4, "! UNIMP !"),
     (push_bc, 16, "PUSH BC"),
     (noimpl, 4, "! UNIMP !"),
@@ -768,6 +768,11 @@ fn ret_nz(cpu: &mut Cpu) {
 fn pop_bc(cpu: &mut Cpu) {
     let word = cpu.pop_word();
     cpu.set_bc(word);
+}
+
+fn jp_u16(cpu: &mut Cpu) {
+    let word = cpu.read_u16();
+    cpu.pc = word;
 }
 
 fn push_bc(cpu: &mut Cpu) {
