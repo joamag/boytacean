@@ -73,6 +73,10 @@ impl Mmu {
                     } else {
                         match addr & 0x00f0 {
                             0x40 | 0x50 | 0x60 | 0x70 => self.ppu.read(addr),
+                            0x00 => {
+                                //@todo implement the gamepad as a controller
+                                0x00
+                            }
                             _ => {
                                 println!("Reading from unknown IO control 0x{:04x}", addr);
                                 0x00
@@ -90,15 +94,15 @@ impl Mmu {
         match addr & 0xf000 {
             // BOOT (256 B) + ROM0 (4 KB/16 KB)
             0x0000 => {
-                println!("WRITING to BOOT")
+                println!("Writing to BOOT")
             }
             // ROM0 (12 KB/16 KB)
             0x1000 | 0x2000 | 0x3000 => {
-                println!("WRITING TO ROM 0");
+                println!("Writing to ROM 0");
             }
             // ROM1 (Unbanked) (16 KB)
             0x4000 | 0x5000 | 0x6000 | 0x7000 => {
-                println!("WRITING TO ROM 1");
+                println!("Writing to ROM 1");
             }
             // Graphics: VRAM (8 KB)
             0x8000 | 0x9000 => {
@@ -133,8 +137,16 @@ impl Mmu {
                         self.ppu.hram[(addr & 0x007f) as usize] = value;
                     } else {
                         match addr & 0x00f0 {
-                            0x40 | 0x50 | 0x60 | 0x70 => {
+                            0x40 | 0x60 | 0x70 => {
                                 self.ppu.write(addr, value);
+                            }
+                            0x50 => {
+                                match addr & 0x00ff {
+                                    0x50 => self.boot_active = false,
+                                    _ => {
+                                        println!("Writing to unknown IO control 0x{:04x}", addr);
+                                    }
+                                }
                             }
                             _ => {
                                 println!("Writing to unknown IO control 0x{:04x}", addr);
