@@ -60,7 +60,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (ld_mhl_u8, 12, "LD [HL], u8 "),
-    (noimpl, 4, "! UNIMP !"),
+    (scf, 4, "SCF"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
@@ -246,7 +246,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (and_a_u8, 8, "AND A, u8"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
@@ -335,7 +335,7 @@ pub const BITWISE: [(fn(&mut Cpu), u8, &'static str); 176] = [
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (swap_a, 8, "SWAP A"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
@@ -703,6 +703,12 @@ fn ld_mhl_u8(cpu: &mut Cpu) {
     cpu.mmu.write(cpu.hl(), byte);
 }
 
+fn scf(cpu: &mut Cpu) {
+    cpu.set_sub(false);
+    cpu.set_half_carry(false);
+    cpu.set_carry(true);
+}
+
 fn dec_a(cpu: &mut Cpu) {
     let a = cpu.a;
     let value = a.wrapping_sub(1);
@@ -829,6 +835,17 @@ fn ld_mff00c_a(cpu: &mut Cpu) {
     cpu.mmu.write(0xff00 + cpu.c as u16, cpu.a);
 }
 
+fn and_a_u8(cpu: &mut Cpu) {
+    let byte = cpu.read_u8();
+
+    cpu.a &= byte;
+
+    cpu.set_sub(false);
+    cpu.set_zero(cpu.a == 0);
+    cpu.set_half_carry(true);
+    cpu.set_carry(false);
+}
+
 fn ld_mu16_a(cpu: &mut Cpu) {
     let word = cpu.read_u16();
     cpu.mmu.write(word, cpu.a);
@@ -854,6 +871,10 @@ fn cp_a_u8(cpu: &mut Cpu) {
 
 fn rl_c(cpu: &mut Cpu) {
     cpu.c = rl(cpu, cpu.c);
+}
+
+fn swap_a(cpu: &mut Cpu) {
+    cpu.a = swap(cpu, cpu.a)
 }
 
 fn bit_7_h(cpu: &mut Cpu) {
@@ -897,9 +918,9 @@ fn add_set_flags(cpu: &mut Cpu, first: u8, second: u8) -> u8 {
     let value_b = value as u8;
 
     cpu.set_sub(false);
-    cpu.set_carry(value & 0x100 == 0x100);
     cpu.set_zero(value_b == 0);
     cpu.set_half_carry((first ^ second ^ value) & 0x10 == 0x10);
+    cpu.set_carry(value & 0x100 == 0x100);
 
     value_b
 }
@@ -912,9 +933,9 @@ fn sub_set_flags(cpu: &mut Cpu, first: u8, second: u8) -> u8 {
     let value_b = value as u8;
 
     cpu.set_sub(true);
-    cpu.set_carry(value & 0x100 == 0x100);
     cpu.set_zero(value_b == 0);
     cpu.set_half_carry((first ^ second ^ value) & 0x10 == 0x10);
+    cpu.set_carry(value & 0x100 == 0x100);
 
     value_b
 }
@@ -925,8 +946,17 @@ fn add_u16_u16(cpu: &mut Cpu, first: u16, second: u16) -> u16 {
     let value = first.wrapping_add(second);
 
     cpu.set_sub(false);
-    cpu.set_carry(value & 0x10000 == 0x10000);
     cpu.set_half_carry((first ^ second ^ value) & 0x1000 == 0x1000);
+    cpu.set_carry(value & 0x10000 == 0x10000);
 
     value as u16
+}
+
+fn swap(cpu: &mut Cpu, value: u8) -> u8 {
+    cpu.set_sub(false);
+    cpu.set_zero(value == 0);
+    cpu.set_half_carry(false);
+    cpu.set_carry(false);
+
+    (value << 4) | (value >> 4)
 }
