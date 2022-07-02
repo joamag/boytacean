@@ -144,7 +144,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (add_a_mhl, 8, "ADD A, [HL]"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
@@ -733,6 +733,11 @@ fn ld_a_l(cpu: &mut Cpu) {
     cpu.a = cpu.l;
 }
 
+fn add_a_mhl(cpu: &mut Cpu) {
+    let byte = cpu.mmu.read(cpu.hl());
+    cpu.a = add_set_flags(cpu, cpu.a, byte);
+}
+
 fn sub_a_b(cpu: &mut Cpu) {
     cpu.a = sub_set_flags(cpu, cpu.a, cpu.b);
 }
@@ -840,18 +845,32 @@ fn bit_h(cpu: &mut Cpu, bit: u8) {
     cpu.set_half_carry(true);
 }
 
-fn sub_set_flags(cpu: &mut Cpu, x: u8, y: u8) -> u8 {
-    // checks for borrow using 32bit arithmetics
-    let x = x as u32;
-    let y = y as u32;
+fn add_set_flags(cpu: &mut Cpu, first: u8, second: u8) -> u8 {
+    let first = first as u32;
+    let second = second as u32;
 
-    let value = x.wrapping_sub(y);
+    let value = first.wrapping_add(second);
+    let value_b = value as u8;
+
+    cpu.set_sub(false);
+    cpu.set_carry(value & 0x100 == 0x100);
+    cpu.set_zero(value_b == 0);
+    cpu.set_half_carry((first ^ second ^ value) & 0x10 == 0x10);
+
+    value_b
+}
+
+fn sub_set_flags(cpu: &mut Cpu, first: u8, second: u8) -> u8 {
+    let first = first as u32;
+    let second = second as u32;
+
+    let value = first.wrapping_sub(second);
     let value_b = value as u8;
 
     cpu.set_sub(true);
     cpu.set_carry(value & 0x100 == 0x100);
     cpu.set_zero(value_b == 0);
-    cpu.set_half_carry((x ^ y ^ value) & 0x10 == 0x10);
+    cpu.set_half_carry((first ^ second ^ value) & 0x10 == 0x10);
 
     value_b
 }
