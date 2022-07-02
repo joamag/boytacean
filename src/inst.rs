@@ -53,7 +53,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (ld_l_u8, 8, "LD L, u8"),
     (cpl, 4, "CPL"),
     // 0x3 opcodes
-    (noimpl, 4, "! UNIMP !"),
+    (jr_nc_i8, 8, "JR NC, i8"),
     (ld_sp_u16, 12, "LD SP, u16"),
     (ld_mhld_a, 8, "LD [HL-], A"),
     (noimpl, 4, "! UNIMP !"),
@@ -210,7 +210,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (pop_bc, 12, "POP BC"),
     (noimpl, 4, "! UNIMP !"),
     (jp_u16, 16, "JP u16"),
-    (noimpl, 4, "! UNIMP !"),
+    (call_nz_u16, 12, "CALL NZ, u16"),
     (push_bc, 16, "PUSH BC"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
@@ -693,6 +693,17 @@ fn ld_sp_u16(cpu: &mut Cpu) {
     cpu.sp = cpu.read_u16();
 }
 
+fn jr_nc_i8(cpu: &mut Cpu) {
+    let byte = cpu.read_u8();
+
+    if cpu.get_carry() {
+        return;
+    }
+
+    cpu.pc = (cpu.pc as i16).wrapping_add(byte as i16) as u16;
+    cpu.ticks = cpu.ticks.wrapping_add(4);
+}
+
 fn ld_mhld_a(cpu: &mut Cpu) {
     cpu.mmu.write(cpu.hl(), cpu.a);
     cpu.set_hl(cpu.hl().wrapping_sub(1));
@@ -845,6 +856,18 @@ fn pop_bc(cpu: &mut Cpu) {
 fn jp_u16(cpu: &mut Cpu) {
     let word = cpu.read_u16();
     cpu.pc = word;
+}
+
+fn call_nz_u16(cpu: &mut Cpu) {
+    let word = cpu.read_u16();
+
+    if cpu.get_zero() {
+        return;
+    }
+
+    cpu.push_word(cpu.pc);
+    cpu.pc = word;
+    cpu.ticks = cpu.ticks.wrapping_add(12);
 }
 
 fn push_bc(cpu: &mut Cpu) {
