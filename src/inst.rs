@@ -228,7 +228,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (push_de, 16, "PUSH DE"),
     (sub_a_u8, 8, "SUB A, u8"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
@@ -934,6 +934,10 @@ fn call_u16(cpu: &mut Cpu) {
 
 fn rst_08h(cpu: &mut Cpu) {
     rst(cpu, 0x0008);
+}
+
+fn push_de(cpu: &mut Cpu) {
+    cpu.push_word(cpu.de());
 }
 
 fn sub_a_u8(cpu: &mut Cpu) {
