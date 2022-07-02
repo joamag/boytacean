@@ -48,7 +48,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (noimpl, 4, "! UNIMP !"),
     (ld_a_mhli, 8, "LD A, [HL+] "),
     (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (inc_l, 4, "INC L"),
     (noimpl, 4, "! UNIMP !"),
     (ld_l_u8, 8, "LD L, u8"),
     (cpl, 4, "CPL"),
@@ -267,7 +267,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (ld_a_mu16, 16, "LD A [u16]"),
     (ei, 4, "EI"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
@@ -701,6 +701,16 @@ fn ld_a_mhli(cpu: &mut Cpu) {
     cpu.set_hl(cpu.hl().wrapping_add(1));
 }
 
+fn inc_l(cpu: &mut Cpu) {
+    let value = cpu.l.wrapping_add(1);
+
+    cpu.set_sub(false);
+    cpu.set_zero(value == 0);
+    cpu.set_half_carry((value & 0xf) == 0xf);
+
+    cpu.l = value;
+}
+
 fn ld_l_u8(cpu: &mut Cpu) {
     let byte = cpu.read_u8();
     cpu.l = byte;
@@ -966,6 +976,12 @@ fn di(cpu: &mut Cpu) {
 
 fn push_af(cpu: &mut Cpu) {
     cpu.push_word(cpu.af());
+}
+
+fn ld_a_mu16(cpu: &mut Cpu) {
+    let word = cpu.read_u16();
+    let byte = cpu.mmu.read(word);
+    cpu.a = byte;
 }
 
 fn ei(cpu: &mut Cpu) {
