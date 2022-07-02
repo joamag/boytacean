@@ -32,7 +32,7 @@ pub struct Ppu {
     /// processed set of pixels ready to be displayed on screen.
     pub frame_buffer: Box<[u8; FRAME_BUFFER_SIZE]>,
     /// Video dedicated memory (VRAM) where both the tiles and
-    /// the sprites are going to be stored.
+    /// the sprites/objects are going to be stored.
     pub vram: [u8; VRAM_SIZE],
     /// High RAM memory that should provide extra speed for regular
     /// operations.
@@ -40,8 +40,13 @@ pub struct Ppu {
     /// The current set of processed tiles that are store in the
     /// PPU related structures.
     tiles: [[[u8; 8]; 8]; TILE_COUNT],
-    /// The palette of colors that is currently loaded in Game Boy.
+    /// The palette of colors that is currently loaded in Game Boy
+    /// and used for background (tiles).
     palette: [[u8; RGB_SIZE]; PALETTE_SIZE],
+    // The palette that is going to be used for sprites/objects #0.
+    palette_obj_0: [[u8; RGB_SIZE]; PALETTE_SIZE],
+    // The palette that is going to be used for sprites/objects #1.
+    palette_obj_1: [[u8; RGB_SIZE]; PALETTE_SIZE],
     /// The scroll Y register that controls the Y offset
     /// of the background.
     scy: u8,
@@ -52,10 +57,16 @@ pub struct Ppu {
     /// range between 0 (0x00) and 153 (0x99), representing
     /// the 154 lines plus 10 extra v-blank lines.
     line: u8,
+    /// The current execution mode of the PPU, should change
+    /// between states over the drawing of a frame.
+    mode: PpuMode,
+    /// Internal clock counter used to control the time in ticks
+    /// spent in each of the PPU modes.
+    mode_clock: u16,
     /// Controls if the background is going to be drawn to screen.
     switch_bg: bool,
-    /// Controls if the sprites are going to be drawn to screen.
-    switch_sprites: bool,
+    /// Controls if the sprites/objects are going to be drawn to screen.
+    switch_obj: bool,
     /// Controls the map that is going to be drawn to screen, the
     /// offset in VRAM will be adjusted according to this.
     bg_map: bool,
@@ -65,12 +76,10 @@ pub struct Ppu {
     /// Flag that controls if the LCD screen is ON and displaying
     /// content.
     switch_lcd: bool,
-    /// The current execution mode of the PPU, should change
-    /// between states over the drawing of a frame.
-    mode: PpuMode,
-    /// Internal clock counter used to control the time in ticks
-    /// spent in each of the PPU modes.
-    mode_clock: u16,
+    stat_hblank: bool,
+    stat_vblank: bool,
+    stat_oam: bool,
+    stat_lyc: bool,
 }
 
 pub enum PpuMode {
@@ -88,16 +97,22 @@ impl Ppu {
             hram: [0u8; HRAM_SIZE],
             tiles: [[[0u8; 8]; 8]; TILE_COUNT],
             palette: [[0u8; RGB_SIZE]; PALETTE_SIZE],
+            palette_obj_0: [[0u8; RGB_SIZE]; PALETTE_SIZE],
+            palette_obj_1: [[0u8; RGB_SIZE]; PALETTE_SIZE],
             scy: 0x0,
             scx: 0x0,
             line: 0x0,
+            mode: PpuMode::OamRead,
+            mode_clock: 0,
             switch_bg: false,
-            switch_sprites: false,
+            switch_obj: false,
             bg_map: false,
             bg_tile: false,
             switch_lcd: false,
-            mode: PpuMode::OamRead,
-            mode_clock: 0,
+            stat_hblank: false,
+            stat_vblank: false,
+            stat_oam: false,
+            stat_lyc: false,
         }
     }
 
@@ -105,7 +120,7 @@ impl Ppu {
         self.mode_clock += cycles as u16;
         match self.mode {
             PpuMode::OamRead => {
-                if self.mode_clock >= 204 {
+                if self.mode_clock >= 80 {
                     self.mode_clock = 0;
                     self.mode = PpuMode::VramRead;
                 }
@@ -157,10 +172,17 @@ impl Ppu {
         match addr & 0x00ff {
             0x0040 => {
                 let value = if self.switch_bg { 0x01 } else { 0x00 }
-                    | if self.switch_sprites { 0x02 } else { 0x00 }
+                    | if self.switch_obj { 0x02 } else { 0x00 }
                     | if self.bg_map { 0x08 } else { 0x00 }
                     | if self.bg_tile { 0x10 } else { 0x00 }
                     | if self.switch_lcd { 0x80 } else { 0x00 };
+                value
+            }
+            0x0041 => {
+                let value = if self.stat_hblank { 0x04 } else { 0x00 }
+                    | if self.stat_vblank { 0x08 } else { 0x00 }
+                    | if self.stat_oam { 0x10 } else { 0x00 }
+                    | if self.stat_lyc { 0x20 } else { 0x00 };
                 value
             }
             0x0042 => self.scy,
@@ -174,10 +196,16 @@ impl Ppu {
         match addr & 0x00ff {
             0x0040 => {
                 self.switch_bg = value & 0x01 == 0x01;
-                self.switch_sprites = value & 0x02 == 0x02;
+                self.switch_obj = value & 0x02 == 0x02;
                 self.bg_map = value & 0x08 == 0x08;
                 self.bg_tile = value & 0x10 == 0x10;
                 self.switch_lcd = value & 0x80 == 0x80;
+            }
+            0x0041 => {
+                self.stat_hblank = value & 0x04 == 0x04;
+                self.stat_vblank = value & 0x08 == 0x08;
+                self.stat_oam = value & 0x10 == 0x10;
+                self.stat_lyc = value & 0x20 == 0x20;
             }
             0x0042 => self.scy = value,
             0x0043 => self.scx = value,
@@ -188,6 +216,28 @@ impl Ppu {
                         1 => self.palette[index] = [192, 192, 192],
                         2 => self.palette[index] = [96, 96, 96],
                         3 => self.palette[index] = [0, 0, 0],
+                        color_index => panic!("Invalid palette color index {:04x}", color_index),
+                    }
+                }
+            }
+            0x0048 => {
+                for index in 0..PALETTE_SIZE {
+                    match (value >> (index * 2)) & 3 {
+                        0 => self.palette_obj_0[index] = [255, 255, 255],
+                        1 => self.palette_obj_0[index] = [192, 192, 192],
+                        2 => self.palette_obj_0[index] = [96, 96, 96],
+                        3 => self.palette_obj_0[index] = [0, 0, 0],
+                        color_index => panic!("Invalid palette color index {:04x}", color_index),
+                    }
+                }
+            }
+            0x0049 => {
+                for index in 0..PALETTE_SIZE {
+                    match (value >> (index * 2)) & 3 {
+                        0 => self.palette_obj_1[index] = [255, 255, 255],
+                        1 => self.palette_obj_1[index] = [192, 192, 192],
+                        2 => self.palette_obj_1[index] = [96, 96, 96],
+                        3 => self.palette_obj_1[index] = [0, 0, 0],
                         color_index => panic!("Invalid palette color index {:04x}", color_index),
                     }
                 }
@@ -245,7 +295,6 @@ impl Ppu {
         // calculates the frame buffer offset position assuming the proper
         // Game Boy screen width and RGB pixel (3 bytes) size
         let mut frame_offset = self.line as usize * DISPLAY_WIDTH * RGB_SIZE;
-
 
         for _index in 0..DISPLAY_WIDTH {
             // obtains the current pixel data from the tile and

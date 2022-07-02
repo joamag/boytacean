@@ -244,4 +244,14 @@ impl Cpu {
     pub fn set_carry(&mut self, value: bool) {
         self.carry = value;
     }
+
+    #[inline(always)]
+    pub fn enable_int(&mut self) {
+        // @todo implement this one
+    }
+
+    #[inline(always)]
+    pub fn disable_int(&mut self) {
+        // @todo implement this one
+    }
 }

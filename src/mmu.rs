@@ -64,7 +64,7 @@ impl Mmu {
                 0x000 | 0x100 | 0x200 | 0x300 | 0x400 | 0x500 | 0x600 | 0x700 | 0x800 | 0x900
                 | 0xa00 | 0xb00 | 0xc00 | 0xd00 => self.ram[(addr & 0x1fff) as usize],
                 0xe00 => {
-                    println!("READING FROM GPU OAM - NOT IMPLEMENTED");
+                    println!("READING FROM PPU OAM - NOT IMPLEMENTED");
                     0x00
                 }
                 0xf00 => {
@@ -126,7 +126,7 @@ impl Mmu {
                     self.ram[(addr & 0x1fff) as usize] = value;
                 }
                 0xe00 => {
-                    println!("WRITING TO GPU OAM");
+                    println!("WRITING TO PPU OAM");
                 }
                 0xf00 => {
                     if addr >= 0xff80 {

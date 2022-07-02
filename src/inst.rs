@@ -59,7 +59,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (ld_mhl_u8, 12, "LD [HL], u8 "),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
@@ -260,7 +260,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (ld_a_mff00u8, 12, "LD A, [FF00+u8]"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (di, 4, "DI"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
@@ -681,6 +681,11 @@ fn ld_mhld_a(cpu: &mut Cpu) {
     cpu.set_hl(cpu.hl().wrapping_sub(1));
 }
 
+fn ld_mhl_u8(cpu: &mut Cpu) {
+    let byte = cpu.read_u8();
+    cpu.mmu.write(cpu.hl(), byte);
+}
+
 fn dec_a(cpu: &mut Cpu) {
     let a = cpu.a;
     let value = a.wrapping_sub(1);
@@ -806,6 +811,10 @@ fn ld_mu16_a(cpu: &mut Cpu) {
 fn ld_a_mff00u8(cpu: &mut Cpu) {
     let byte = cpu.read_u8();
     cpu.a = cpu.mmu.read(0xff00 + byte as u16);
+}
+
+fn di(cpu: &mut Cpu) {
+    cpu.disable_int();
 }
 
 fn cp_a_u8(cpu: &mut Cpu) {
