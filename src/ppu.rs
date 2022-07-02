@@ -241,7 +241,13 @@ impl Ppu {
                         color_index => panic!("Invalid palette color index {:04x}", color_index),
                     }
                 }
-            },
+            }
+            0x004a => {
+                println!("Writing to $FF4A - WY (Window Y Position) (R/W)")
+            }
+            0x004b => {
+                println!("Writing to $FF4B - WX (Window X Position + 7) (R/W)")
+            }
             0x007f => (),
             addr => panic!("Writing in unknown PPU location 0x{:04x}", addr),
         }
