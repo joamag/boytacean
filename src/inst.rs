@@ -212,7 +212,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (jp_u16, 16, "JP u16"),
     (call_nz_u16, 12, "CALL NZ, u16"),
     (push_bc, 16, "PUSH BC"),
-    (noimpl, 4, "! UNIMP !"),
+    (add_a_u8, 8, "ADD A, u8"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (ret, 16, "RET"),
@@ -906,6 +906,11 @@ fn call_nz_u16(cpu: &mut Cpu) {
 
 fn push_bc(cpu: &mut Cpu) {
     cpu.push_word(cpu.bc());
+}
+
+fn add_a_u8(cpu: &mut Cpu) {
+    let byte = cpu.read_u8();
+    cpu.a = add_set_flags(cpu, cpu.a, byte);
 }
 
 fn ret(cpu: &mut Cpu) {
