@@ -538,6 +538,13 @@ impl Cpu {
             println!("GOING TO PLAY BOOT SOUND");
         }
 
+        if pc == 0x008f {
+            println!("GOING TO PLAY BOOT 0x00e0");
+        }
+
+        // calls the current instruction and increments the number of
+        // cycles executed by the instruction time of the instruction
+        // that has just been executed
         instruction_fn(self);
         self.ticks = self.ticks.wrapping_add(*instruction_time as u32);
 
@@ -738,11 +745,12 @@ fn inc_b(cpu: &mut Cpu) {
 }
 
 fn dec_b(cpu: &mut Cpu) {
-    let value = cpu.b.wrapping_sub(1);
+    let b = cpu.b;
+    let value = b.wrapping_sub(1);
 
     cpu.set_sub(true);
     cpu.set_zero(value == 0);
-    cpu.set_half_carry((value & 0xf) == 0xf);
+    cpu.set_half_carry((b & 0xf) == 0xf);
 
     cpu.b = value;
 }
@@ -785,11 +793,12 @@ fn inc_c(cpu: &mut Cpu) {
 }
 
 fn dec_c(cpu: &mut Cpu) {
-    let value = cpu.c.wrapping_sub(1);
+    let c = cpu.c;
+    let value = c.wrapping_sub(1);
 
     cpu.set_sub(true);
     cpu.set_zero(value == 0);
-    cpu.set_half_carry((value & 0xf) == 0xf);
+    cpu.set_half_carry((c & 0xf) == 0xf);
 
     cpu.c = value;
 }
@@ -809,11 +818,12 @@ fn inc_de(cpu: &mut Cpu) {
 }
 
 fn dec_d(cpu: &mut Cpu) {
-    let value = cpu.d.wrapping_sub(1);
+    let d = cpu.d;
+    let value = d.wrapping_sub(1);
 
     cpu.set_sub(true);
     cpu.set_zero(value == 0);
-    cpu.set_half_carry((value & 0xf) == 0xf);
+    cpu.set_half_carry((d & 0xf) == 0xf);
 
     cpu.d = value;
 }
@@ -841,11 +851,12 @@ fn ld_a_mde(cpu: &mut Cpu) {
 }
 
 fn dec_e(cpu: &mut Cpu) {
-    let value = cpu.e.wrapping_sub(1);
+    let e = cpu.e;
+    let value = e.wrapping_sub(1);
 
     cpu.set_sub(true);
     cpu.set_zero(value == 0);
-    cpu.set_half_carry((value & 0xf) == 0xf);
+    cpu.set_half_carry((e & 0xf) == 0xf);
 
     cpu.e = value;
 }
@@ -916,11 +927,12 @@ fn ld_mhld_a(cpu: &mut Cpu) {
 }
 
 fn dec_a(cpu: &mut Cpu) {
-    let value = cpu.a.wrapping_sub(1);
+    let a = cpu.a;
+    let value = a.wrapping_sub(1);
 
     cpu.set_sub(true);
     cpu.set_zero(value == 0);
-    cpu.set_half_carry((value & 0xf) == 0xf);
+    cpu.set_half_carry((a & 0xf) == 0xf);
 
     cpu.a = value;
 }
