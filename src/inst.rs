@@ -77,7 +77,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (ld_b_h, 4, "LD B, H"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (ld_b_a, 4, "LD B, A"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
@@ -189,7 +189,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (noimpl, 4, "! UNIMP !"),
     (xor_a_a, 4, "XOR A, A"),
     // 0xb opcodes
-    (noimpl, 4, "! UNIMP !"),
+    (or_a_b, 4, "OR A, B"),
     (or_a_c, 4, "OR A, C"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
@@ -729,6 +729,10 @@ fn ld_b_h(cpu: &mut Cpu) {
     cpu.b = cpu.h;
 }
 
+fn ld_b_a(cpu: &mut Cpu) {
+    cpu.b = cpu.a;
+}
+
 fn ld_c_a(cpu: &mut Cpu) {
     cpu.c = cpu.a;
 }
@@ -772,6 +776,15 @@ fn sub_a_b(cpu: &mut Cpu) {
 
 fn xor_a_a(cpu: &mut Cpu) {
     cpu.a ^= cpu.a;
+
+    cpu.set_sub(false);
+    cpu.set_zero(cpu.a == 0);
+    cpu.set_half_carry(false);
+    cpu.set_carry(false);
+}
+
+fn or_a_b(cpu: &mut Cpu) {
+    cpu.a |= cpu.b;
 
     cpu.set_sub(false);
     cpu.set_zero(cpu.a == 0);
