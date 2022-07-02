@@ -75,7 +75,7 @@ fn main() {
 
     let mut game_boy = GameBoy::new();
     game_boy.load_boot_default();
-    game_boy.load_rom("../../res/roms/firstwhite.gb");
+    game_boy.load_rom("../../res/roms/ld_r_r.gb");
 
     let mut counter = 0;
 

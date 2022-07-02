@@ -140,14 +140,12 @@ impl Mmu {
                             0x40 | 0x60 | 0x70 => {
                                 self.ppu.write(addr, value);
                             }
-                            0x50 => {
-                                match addr & 0x00ff {
-                                    0x50 => self.boot_active = false,
-                                    _ => {
-                                        println!("Writing to unknown IO control 0x{:04x}", addr);
-                                    }
+                            0x50 => match addr & 0x00ff {
+                                0x50 => self.boot_active = false,
+                                _ => {
+                                    println!("Writing to unknown IO control 0x{:04x}", addr);
                                 }
-                            }
+                            },
                             _ => {
                                 println!("Writing to unknown IO control 0x{:04x}", addr);
                             }

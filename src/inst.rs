@@ -21,9 +21,9 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     // 0x1 opcodes
     (noimpl, 4, "! UNIMP !"),
     (ld_de_u16, 12, "LD DE, u16"),
-    (noimpl, 4, "! UNIMP !"),
+    (ld_mde_a, 8, "LD [DE], A"),
     (inc_de, 8, "INC DE"),
-    (noimpl, 4, "! UNIMP !"),
+    (inc_d, 4, "INC D"),
     (dec_d, 4, "DEC D"),
     (ld_d_u8, 8, "LD D, u8"),
     (rla, 4, "RLA"),
@@ -31,7 +31,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (noimpl, 4, "! UNIMP !"),
     (ld_a_mde, 8, "LD A, [DE]"),
     (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (inc_e, 4, "INC E"),
     (dec_e, 4, "DEC E"),
     (ld_e_u8, 8, "LD E, u8"),
     (noimpl, 4, "! UNIMP !"),
@@ -241,11 +241,11 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (noimpl, 4, "! UNIMP !"),
     // 0xe opcodes
     (ld_mff00u8_a, 12, "LD [FF00+u8], A"),
-    (noimpl, 4, "! UNIMP !"),
+    (pop_hl, 12, "POP HL"),
     (ld_mff00c_a, 8, "LD [FF00+C], A"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (push_hl, 16, "PUSH HL"),
     (and_a_u8, 8, "AND A, u8"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
@@ -258,7 +258,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (rst_18h, 16, "RST 18h"),
     // 0xf opcodes
     (ld_a_mff00u8, 12, "LD A, [FF00+u8]"),
-    (noimpl, 4, "! UNIMP !"),
+    (pop_af, 12, "POP AF"),
     (noimpl, 4, "! UNIMP !"),
     (di, 4, "DI"),
     (noimpl, 4, "! UNIMP !"),
@@ -567,8 +567,22 @@ fn ld_de_u16(cpu: &mut Cpu) {
     cpu.set_de(word);
 }
 
+fn ld_mde_a(cpu: &mut Cpu) {
+    cpu.mmu.write(cpu.de(), cpu.a);
+}
+
 fn inc_de(cpu: &mut Cpu) {
     cpu.set_de(cpu.de().wrapping_add(1));
+}
+
+fn inc_d(cpu: &mut Cpu) {
+    let value = cpu.d.wrapping_add(1);
+
+    cpu.set_sub(false);
+    cpu.set_zero(value == 0);
+    cpu.set_half_carry((value & 0xf) == 0xf);
+
+    cpu.d = value;
 }
 
 fn dec_d(cpu: &mut Cpu) {
@@ -607,6 +621,16 @@ fn jr_i8(cpu: &mut Cpu) {
 fn ld_a_mde(cpu: &mut Cpu) {
     let byte = cpu.mmu.read(cpu.de());
     cpu.a = byte;
+}
+
+fn inc_e(cpu: &mut Cpu) {
+    let value = cpu.e.wrapping_add(1);
+
+    cpu.set_sub(false);
+    cpu.set_zero(value == 0);
+    cpu.set_half_carry((value & 0xf) == 0xf);
+
+    cpu.e = value;
 }
 
 fn dec_e(cpu: &mut Cpu) {
@@ -893,8 +917,17 @@ fn ld_mff00u8_a(cpu: &mut Cpu) {
     cpu.mmu.write(0xff00 + byte as u16, cpu.a);
 }
 
+fn pop_hl(cpu: &mut Cpu) {
+    let word = cpu.pop_word();
+    cpu.set_hl(word);
+}
+
 fn ld_mff00c_a(cpu: &mut Cpu) {
     cpu.mmu.write(0xff00 + cpu.c as u16, cpu.a);
+}
+
+fn push_hl(cpu: &mut Cpu) {
+    cpu.push_word(cpu.hl());
 }
 
 fn and_a_u8(cpu: &mut Cpu) {
@@ -920,6 +953,11 @@ fn rst_18h(cpu: &mut Cpu) {
 fn ld_a_mff00u8(cpu: &mut Cpu) {
     let byte = cpu.read_u8();
     cpu.a = cpu.mmu.read(0xff00 + byte as u16);
+}
+
+fn pop_af(cpu: &mut Cpu) {
+    let word = cpu.pop_word();
+    cpu.set_af(word);
 }
 
 fn di(cpu: &mut Cpu) {

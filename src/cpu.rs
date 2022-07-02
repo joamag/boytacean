@@ -138,6 +138,20 @@ impl Cpu {
     }
 
     #[inline(always)]
+    pub fn set_f(&mut self, value: u8) {
+        self.zero = value & 0x80 == 0x80;
+        self.sub = value & 0x40 == 0x40;
+        self.half_carry = value & 0x20 == 0x20;
+        self.carry = value & 0x10 == 0x10;
+    }
+
+    #[inline(always)]
+    pub fn set_af(&mut self, value: u16) {
+        self.a = (value >> 8) as u8;
+        self.set_f(value as u8);
+    }
+
+    #[inline(always)]
     pub fn set_bc(&mut self, value: u16) {
         self.b = (value >> 8) as u8;
         self.c = value as u8;
