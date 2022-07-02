@@ -52,9 +52,18 @@ pub struct Ppu {
     /// range between 0 (0x00) and 153 (0x99), representing
     /// the 154 lines plus 10 extra v-blank lines.
     line: u8,
+    /// Controls if the background is going to be drawn to screen.
     switch_bg: bool,
+    /// Controls if the sprites are going to be drawn to screen.
+    switch_sprites: bool,
+    /// Controls the map that is going to be drawn to screen, the
+    /// offset in VRAM will be adjusted according to this.
     bg_map: bool,
+    /// If the background tile set is active meaning that the
+    /// negative based indexes are going to be used.
     bg_tile: bool,
+    /// Flag that controls if the LCD screen is ON and displaying
+    /// content.
     switch_lcd: bool,
     /// The current execution mode of the PPU, should change
     /// between states over the drawing of a frame.
@@ -83,6 +92,7 @@ impl Ppu {
             scx: 0x0,
             line: 0x0,
             switch_bg: false,
+            switch_sprites: false,
             bg_map: false,
             bg_tile: false,
             switch_lcd: false,
@@ -147,6 +157,7 @@ impl Ppu {
         match addr & 0x00ff {
             0x0040 => {
                 let value = if self.switch_bg { 0x01 } else { 0x00 }
+                    | if self.switch_sprites { 0x02 } else { 0x00 }
                     | if self.bg_map { 0x08 } else { 0x00 }
                     | if self.bg_tile { 0x10 } else { 0x00 }
                     | if self.switch_lcd { 0x80 } else { 0x00 };
@@ -163,7 +174,8 @@ impl Ppu {
         match addr & 0x00ff {
             0x0040 => {
                 self.switch_bg = value & 0x01 == 0x01;
-                self.bg_map = value & 0x08 == 0x08; // @todo o buf pode estar aqui
+                self.switch_sprites = value & 0x02 == 0x02;
+                self.bg_map = value & 0x08 == 0x08;
                 self.bg_tile = value & 0x10 == 0x10;
                 self.switch_lcd = value & 0x80 == 0x80;
             }
@@ -265,6 +277,17 @@ impl Ppu {
                     tile_index += 256;
                 }
             }
+        }
+    }
+
+    /// Prints the tile data information to the stdout, this is
+    /// useful for debugging purposes.
+    pub fn draw_tile_stdout(&self, tile_index: usize) {
+        for y in 0..8 {
+            for x in 0..8 {
+                print!("{}", self.tiles[tile_index][y as usize][x as usize]);
+            }
+            print!("\n");
         }
     }
 }

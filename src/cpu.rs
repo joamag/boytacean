@@ -73,14 +73,6 @@ impl Cpu {
             );
         }
 
-        if pc == 0x0080 {
-            println!("GOING TO PLAY BOOT SOUND");
-        }
-
-        if pc == 0x00e9 {
-            println!("GOING TO PLAY BOOT 0x00ef");
-        }
-
         // calls the current instruction and increments the number of
         // cycles executed by the instruction time of the instruction
         // that has just been executed

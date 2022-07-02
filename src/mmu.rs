@@ -53,22 +53,19 @@ impl Mmu {
             0x4000 | 0x5000 | 0x6000 | 0x7000 => self.rom[addr as usize],
             // Graphics: VRAM (8 KB)
             0x8000 | 0x9000 => {
-                println!("READING FROM VRAM");
                 self.ppu.vram[(addr & 0x1fff) as usize]
             }
             // External RAM (8 KB)
             0xa000 | 0xb000 => {
-                println!("READING FROM ERAM");
                 self.eram[(addr & 0x1fff) as usize]
             }
             // Working RAM (8 KB)
             0xc000 | 0xd000 => self.ram[(addr & 0x1fff) as usize],
-            // Working RAM shadow
+            // Working RAM Shadow
             0xe000 => {
-                println!("READING FROM RAM Shadow");
                 self.ram[(addr & 0x1fff) as usize]
             }
-            // Working RAM shadow, I/O, Zero-page RAM
+            // Working RAM Shadow, I/O, Zero-page RAM
             0xf000 => match addr & 0x0f00 {
                 0x000 | 0x100 | 0x200 | 0x300 | 0x400 | 0x500 | 0x600 | 0x700 | 0x800 | 0x900
                 | 0xa00 | 0xb00 | 0xc00 | 0xd00 => self.ram[(addr & 0x1fff) as usize],
@@ -118,19 +115,17 @@ impl Mmu {
             }
             // External RAM (8 KB)
             0xa000 | 0xb000 => {
-                println!("WRITING TO ERAM");
+                self.eram[(addr & 0x1fff) as usize] = value;
             }
             // Working RAM (8 KB)
             0xc000 | 0xd000 => {
-                println!("WRITING TO RAM");
                 self.ram[(addr & 0x1fff) as usize] = value;
             }
-            // Working RAM shadow
+            // Working RAM Shadow
             0xe000 => {
-                println!("WRITING TO RAM Shadow");
                 self.ram[(addr & 0x1fff) as usize] = value;
             }
-            // Working RAM shadow, I/O, Zero-page RAM
+            // Working RAM Shadow, I/O, Zero-page RAM
             0xf000 => match addr & 0x0f00 {
                 0x000 | 0x100 | 0x200 | 0x300 | 0x400 | 0x500 | 0x600 | 0x700 | 0x800 | 0x900
                 | 0xa00 | 0xb00 | 0xc00 | 0xd00 => {
