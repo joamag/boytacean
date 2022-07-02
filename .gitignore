@@ -5,4 +5,5 @@ Cargo.lock
 /.idea
 
 /target
+/res/roms
 /examples/*/target

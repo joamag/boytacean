@@ -241,7 +241,8 @@ impl Ppu {
                         color_index => panic!("Invalid palette color index {:04x}", color_index),
                     }
                 }
-            }
+            },
+            0x007f => (),
             addr => panic!("Writing in unknown PPU location 0x{:04x}", addr),
         }
     }
