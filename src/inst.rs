@@ -129,12 +129,12 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (ld_mhl_a, 8, "LD [HL], A"),
-    (noimpl, 4, "! UNIMP !"),
+    (ld_a_b, 4, "LD A, B"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (ld_a_e, 4, "LD A, E"),
     (ld_a_h, 4, "LD A, H"),
-    (noimpl, 4, "! UNIMP !"),
+    (ld_a_l, 4, "LD A, L"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     // 0x8 opcodes
@@ -203,7 +203,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (cp_a_mhl, 8, "CP A, [HL]"),
     (noimpl, 4, "! UNIMP !"),
     // 0xc opcodes
     (ret_nz, 8, "RET NZ"),
@@ -717,12 +717,20 @@ fn ld_mhl_a(cpu: &mut Cpu) {
     cpu.mmu.write(cpu.hl(), cpu.a);
 }
 
+fn ld_a_b(cpu: &mut Cpu) {
+    cpu.a = cpu.b;
+}
+
 fn ld_a_e(cpu: &mut Cpu) {
     cpu.a = cpu.e;
 }
 
 fn ld_a_h(cpu: &mut Cpu) {
     cpu.a = cpu.h;
+}
+
+fn ld_a_l(cpu: &mut Cpu) {
+    cpu.a = cpu.l;
 }
 
 fn sub_a_b(cpu: &mut Cpu) {
@@ -736,6 +744,11 @@ fn xor_a_a(cpu: &mut Cpu) {
     cpu.set_zero(cpu.a == 0);
     cpu.set_half_carry(false);
     cpu.set_carry(false);
+}
+
+fn cp_a_mhl(cpu: &mut Cpu) {
+    let byte = cpu.mmu.read(cpu.hl());
+    sub_set_flags(cpu, cpu.a, byte);
 }
 
 fn ret_nz(cpu: &mut Cpu) {

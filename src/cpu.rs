@@ -77,8 +77,8 @@ impl Cpu {
             println!("GOING TO PLAY BOOT SOUND");
         }
 
-        if pc == 0x00e0 {
-            println!("GOING TO PLAY BOOT 0x00e0");
+        if pc == 0x00e9 {
+            println!("GOING TO PLAY BOOT 0x00ef");
         }
 
         // calls the current instruction and increments the number of
