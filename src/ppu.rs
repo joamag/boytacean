@@ -218,11 +218,16 @@ impl Ppu {
     }
 
     fn render_line(&mut self) {
+        // obtains the base address of the background map using the bg map flag
+        // that control which background map is going to be used
         let mut map_offset: usize = if self.bg_map { 0x1c00 } else { 0x1800 };
-        map_offset += (((self.line + self.scy) & 0xff) >> 3) as usize;
+
+        // increments the offset by the number of lines and the SCY (scroll Y)
+        // divided by 8 (as the tiles are 8x8 pixels)
+        map_offset += ((((self.line + self.scy) & 0xff) >> 3) as usize) * 32;
 
         // calculates the sprite line offset by using the SCX register
-        // shifted by 3 meaning as the tiles are 8x8
+        // shifted by 3 meaning that the tiles are 8x8
         let mut line_offset: usize = (self.scx >> 3) as usize;
 
         // calculates both the current Y and X positions within the tiles
@@ -233,7 +238,7 @@ impl Ppu {
         // if the tile data set in use is #1, the indices are
         // signed, then calculates a real tile offset
         let mut tile_index = self.vram[map_offset + line_offset] as usize;
-        if self.bg_tile && tile_index < 128 {
+        if !self.bg_tile && tile_index < 128 {
             tile_index += 256;
         }
 
@@ -273,7 +278,7 @@ impl Ppu {
                 // calculates the tile index nad makes sure the value
                 // takes into consideration the bg tile value
                 tile_index = self.vram[map_offset + line_offset] as usize;
-                if self.bg_tile && tile_index < 128 {
+                if !self.bg_tile && tile_index < 128 {
                     tile_index += 256;
                 }
             }

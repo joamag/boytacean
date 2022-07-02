@@ -49,22 +49,16 @@ impl Mmu {
             }
             // ROM0 (12 KB/16 KB)
             0x1000 | 0x2000 | 0x3000 => self.rom[addr as usize],
-            // ROM1 (unbanked) (16 KB)
+            // ROM1 (Unbanked) (16 KB)
             0x4000 | 0x5000 | 0x6000 | 0x7000 => self.rom[addr as usize],
             // Graphics: VRAM (8 KB)
-            0x8000 | 0x9000 => {
-                self.ppu.vram[(addr & 0x1fff) as usize]
-            }
+            0x8000 | 0x9000 => self.ppu.vram[(addr & 0x1fff) as usize],
             // External RAM (8 KB)
-            0xa000 | 0xb000 => {
-                self.eram[(addr & 0x1fff) as usize]
-            }
+            0xa000 | 0xb000 => self.eram[(addr & 0x1fff) as usize],
             // Working RAM (8 KB)
             0xc000 | 0xd000 => self.ram[(addr & 0x1fff) as usize],
             // Working RAM Shadow
-            0xe000 => {
-                self.ram[(addr & 0x1fff) as usize]
-            }
+            0xe000 => self.ram[(addr & 0x1fff) as usize],
             // Working RAM Shadow, I/O, Zero-page RAM
             0xf000 => match addr & 0x0f00 {
                 0x000 | 0x100 | 0x200 | 0x300 | 0x400 | 0x500 | 0x600 | 0x700 | 0x800 | 0x900
@@ -102,7 +96,7 @@ impl Mmu {
             0x1000 | 0x2000 | 0x3000 => {
                 println!("WRITING TO ROM 0");
             }
-            // ROM1 (unbanked) (16 KB)
+            // ROM1 (Unbanked) (16 KB)
             0x4000 | 0x5000 | 0x6000 | 0x7000 => {
                 println!("WRITING TO ROM 1");
             }
