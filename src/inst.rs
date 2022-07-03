@@ -214,13 +214,13 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (push_bc, 16, "PUSH BC"),
     (add_a_u8, 8, "ADD A, u8"),
     (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (ret_z, 8, "RET Z"),
     (ret, 16, "RET"),
     (jp_z_u16, 12, "JP Z, u16"),
     (noimpl, 4, "! UNIMP !"),
     (call_z_u16, 12, "CALL Z, u16"),
     (call_u16, 24, "CALL u16"),
-    (noimpl, 4, "! UNIMP !"),
+    (adc_a_u8, 8, "ADC A, u8 "),
     (rst_08h, 16, "RST 08h"),
     // 0xd opcodes
     (ret_nc, 8, "RET NC"),
@@ -1206,6 +1206,15 @@ fn add_a_u8(cpu: &mut Cpu) {
     cpu.a = add_set_flags(cpu, cpu.a, byte);
 }
 
+fn ret_z(cpu: &mut Cpu) {
+    if !cpu.get_zero() {
+        return;
+    }
+
+    cpu.pc = cpu.pop_word();
+    cpu.ticks = cpu.ticks.wrapping_add(12);
+}
+
 fn ret(cpu: &mut Cpu) {
     cpu.pc = cpu.pop_word();
 }
@@ -1237,6 +1246,11 @@ fn call_u16(cpu: &mut Cpu) {
     let word = cpu.read_u16();
     cpu.push_word(cpu.pc);
     cpu.pc = word;
+}
+
+fn adc_a_u8(cpu: &mut Cpu) {
+    let byte = cpu.read_u8();
+    cpu.a = add_carry_set_flags(cpu, cpu.a, byte);
 }
 
 fn rst_08h(cpu: &mut Cpu) {
@@ -1489,6 +1503,22 @@ fn add_set_flags(cpu: &mut Cpu, first: u8, second: u8) -> u8 {
     let second = second as u32;
 
     let result = first.wrapping_add(second);
+    let result_b = result as u8;
+
+    cpu.set_sub(false);
+    cpu.set_zero(result_b == 0);
+    cpu.set_half_carry((first ^ second ^ result) & 0x10 == 0x10);
+    cpu.set_carry(result & 0x100 == 0x100);
+
+    result_b
+}
+
+fn add_carry_set_flags(cpu: &mut Cpu, first: u8, second: u8) -> u8 {
+    let first = first as u32;
+    let second = second as u32;
+    let carry = cpu.get_carry() as u32;
+
+    let result = first.wrapping_add(second).wrapping_add(carry);
     let result_b = result as u8;
 
     cpu.set_sub(false);

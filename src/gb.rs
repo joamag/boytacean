@@ -1,6 +1,6 @@
 use crate::{
     cpu::Cpu,
-    data::{SGB_BOOT, DMG_BOOT},
+    data::{DMG_BOOT, SGB_BOOT},
     mmu::Mmu,
     ppu::{Ppu, FRAME_BUFFER_SIZE},
     util::read_file,
