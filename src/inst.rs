@@ -1473,7 +1473,7 @@ fn swap(cpu: &mut Cpu, value: u8) -> u8 {
 
 /// Helper function to shift an `u8` to the left and update CPU
 /// flags.
-fn sla(cpu: &mut Cpu, value: u8)  -> u8 {
+fn sla(cpu: &mut Cpu, value: u8) -> u8 {
     let result = value << 1;
 
     cpu.set_sub(false);

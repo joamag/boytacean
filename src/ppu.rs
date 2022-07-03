@@ -16,6 +16,10 @@ pub const DISPLAY_HEIGHT: usize = 144;
 // The size of the RGB frame buffer in bytes.
 pub const FRAME_BUFFER_SIZE: usize = DISPLAY_WIDTH * DISPLAY_HEIGHT * RGB_SIZE;
 
+// Defines the Game Boy pixel type as a buffer
+// with the size of RGB (3 bytes).
+pub type Pixel = [u8; RGB_SIZE];
+
 /// Represents the Game Boy PPU (Pixel Processing Unit) and controls
 /// all of the logic behind the graphics processing and presentation.
 /// Should store both the VRAM and HRAM together with the internal
@@ -42,11 +46,11 @@ pub struct Ppu {
     tiles: [[[u8; 8]; 8]; TILE_COUNT],
     /// The palette of colors that is currently loaded in Game Boy
     /// and used for background (tiles).
-    palette: [[u8; RGB_SIZE]; PALETTE_SIZE],
+    palette: [Pixel; PALETTE_SIZE],
     // The palette that is going to be used for sprites/objects #0.
-    palette_obj_0: [[u8; RGB_SIZE]; PALETTE_SIZE],
+    palette_obj_0: [Pixel; PALETTE_SIZE],
     // The palette that is going to be used for sprites/objects #1.
-    palette_obj_1: [[u8; RGB_SIZE]; PALETTE_SIZE],
+    palette_obj_1: [Pixel; PALETTE_SIZE],
     /// The scroll Y register that controls the Y offset
     /// of the background.
     scy: u8,
@@ -353,7 +357,7 @@ impl Ppu {
         }
     }
 
-    pub fn fill_frame_buffer(&mut self, color: [u8; RGB_SIZE]) {
+    pub fn fill_frame_buffer(&mut self, color: Pixel) {
         for index in (0..self.frame_buffer.len()).step_by(RGB_SIZE) {
             self.frame_buffer[index] = color[0];
             self.frame_buffer[index + 1] = color[1];
