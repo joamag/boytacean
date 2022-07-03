@@ -51,9 +51,9 @@ impl Mmu {
                 }
                 self.rom[addr as usize]
             }
-            // ROM0 (12 KB/16 KB)
+            // ROM 0 (12 KB/16 KB)
             0x1000 | 0x2000 | 0x3000 => self.rom[addr as usize],
-            // ROM1 (Unbanked) (16 KB)
+            // ROM 1 (Unbanked) (16 KB)
             0x4000 | 0x5000 | 0x6000 | 0x7000 => self.rom[addr as usize],
             // Graphics: VRAM (8 KB)
             0x8000 | 0x9000 => self.ppu.vram[(addr & 0x1fff) as usize],
@@ -99,15 +99,15 @@ impl Mmu {
             // BOOT (256 B) + ROM0 (4 KB/16 KB)
             0x0000 => {
                 self.rom[addr as usize] = value;
-                println!("Writing to BOOT at 0x{:04x}", addr)
+                panic!("Writing to BOOT at 0x{:04x}", addr)
             }
-            // ROM0 (12 KB/16 KB)
+            // ROM 0 (12 KB/16 KB)
             0x1000 | 0x2000 | 0x3000 => {
-                println!("Writing to ROM 0 at 0x{:04x}", addr);
+                panic!("Writing to ROM 0 at 0x{:04x}", addr);
             }
-            // ROM1 (Unbanked) (16 KB)
+            // ROM 1 (Unbanked) (16 KB)
             0x4000 | 0x5000 | 0x6000 | 0x7000 => {
-                println!("Writing to ROM 1 at 0x{:04x}", addr);
+                panic!("Writing to ROM 1 at 0x{:04x}", addr);
             }
             // Graphics: VRAM (8 KB)
             0x8000 | 0x9000 => {

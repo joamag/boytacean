@@ -19,7 +19,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (ld_c_u8, 8, "LD C, u8"),
     (noimpl, 4, "! UNIMP !"),
     // 0x1 opcodes
-    (noimpl, 4, "! UNIMP !"),
+    (stop, 4, "STOP"),
     (ld_de_u16, 12, "LD DE, u16"),
     (ld_mde_a, 8, "LD [DE], A"),
     (inc_de, 8, "INC DE"),
@@ -62,7 +62,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (ld_mhl_u8, 12, "LD [HL], u8 "),
     (scf, 4, "SCF"),
     (jr_c_i8, 8, "JR C, i8"),
-    (noimpl, 4, "! UNIMP !"),
+    (add_hl_sp, 8, "ADD HL, SP"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (inc_a, 4, "INC A"),
@@ -656,6 +656,10 @@ fn ld_c_u8(cpu: &mut Cpu) {
     cpu.c = byte;
 }
 
+fn stop(cpu: &mut Cpu) {
+    cpu.stop();
+}
+
 fn ld_de_u16(cpu: &mut Cpu) {
     let word = cpu.read_u16();
     cpu.set_de(word);
@@ -921,6 +925,11 @@ fn jr_c_i8(cpu: &mut Cpu) {
 
     cpu.pc = (cpu.pc as i16).wrapping_add(byte as i16) as u16;
     cpu.ticks = cpu.ticks.wrapping_add(4);
+}
+
+fn add_hl_sp(cpu: &mut Cpu) {
+    let value = add_u16_u16(cpu, cpu.hl(), cpu.sp());
+    cpu.set_hl(value);
 }
 
 fn inc_a(cpu: &mut Cpu) {

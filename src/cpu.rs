@@ -1,3 +1,5 @@
+use core::panic;
+
 use crate::{
     inst::{EXTENDED, INSTRUCTIONS},
     mmu::Mmu,
@@ -301,6 +303,11 @@ impl Cpu {
     #[inline(always)]
     pub fn halt(&mut self) {
         self.halted = true;
+    }
+
+    #[inline(always)]
+    pub fn stop(&mut self) {
+        panic!("STOP is not implemented");
     }
 
     #[inline(always)]
