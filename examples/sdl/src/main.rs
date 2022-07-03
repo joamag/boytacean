@@ -79,7 +79,7 @@ fn main() {
         .unwrap();
 
     let mut game_boy = GameBoy::new();
-    game_boy.load_boot_default();
+    game_boy.load_boot_static();
     game_boy.load_rom_file("../../res/roms/ld_r_r.gb");
     //game_boy.load_rom_file("../../res/roms/opus5.gb");
 

@@ -50,7 +50,7 @@ const KEYS: Record<string, number> = {
 };
 
 // @ts-ignore: ts(2580)
-const ROM_PATH = require("../../res/roms/pong.ch8");
+const ROM_PATH = require("../../res/roms/ld_r_r.gb");
 
 type State = {
     gameBoy: GameBoy;
@@ -288,7 +288,7 @@ const start = async ({
     // resets the Game Boy engine to restore it into
     // a valid state ready to be used
     //state.gameBoy.reset_hard(); @todo
-    state.gameBoy.load_boot_default();
+    state.gameBoy.load_boot_static();
     state.gameBoy.load_rom(romData);
 
     // updates the name of the currently selected engine
