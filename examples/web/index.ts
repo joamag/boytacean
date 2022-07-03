@@ -49,7 +49,7 @@ const KEYS: Record<string, number> = {
 };
 
 // @ts-ignore: ts(2580)
-const ROM_PATH = require("../../res/roms/ld_r_r.gb");
+const ROM_PATH = require("../../res/roms/tetris.gb");
 
 type State = {
     gameBoy: GameBoy;
@@ -180,7 +180,7 @@ const main = async () => {
                 await clearCanvas(undefined, {
                     // @ts-ignore: ts(2580)
                     image: require("./res/storm.png"),
-                    imageScale: 0.4
+                    imageScale: 0.2
                 });
 
                 await wasm();
