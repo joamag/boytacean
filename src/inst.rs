@@ -75,7 +75,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (ld_b_d, 4, "LD B, D"),
     (ld_b_e, 4, "LD B, E"),
     (ld_b_h, 4, "LD B, H"),
-    (noimpl, 4, "! UNIMP !"),
+    (ld_b_l, 4, "LD B, L"),
     (ld_b_mhl, 8, "LD B, [HL]"),
     (ld_b_a, 4, "LD B, A"),
     (ld_c_b, 4, "LD C, B"),
@@ -87,21 +87,21 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (ld_c_mhl, 8, "LD C, [HL]"),
     (ld_c_a, 4, "LD C, A"),
     // 0x5 opcodes
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (ld_d_b, 4, "LD D, B"),
+    (ld_d_c, 4, "LD D, C"),
+    (ld_d_d, 4, "LD D, D"),
+    (ld_d_e, 4, "LD D, E"),
+    (ld_d_h, 4, "LD D, H"),
+    (ld_d_l, 4, "LD D, L"),
     (ld_d_mhl, 8, "LD D, [HL]"),
     (ld_d_a, 4, "LD D, A"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (ld_e_b, 4, "LD E, B"),
+    (ld_e_c, 4, "LD E, C"),
+    (ld_e_d, 4, "LD E, D"),
+    (ld_e_e, 4, "LD E, E"),
+    (ld_e_h, 4, "LD E, H"),
     (ld_e_l, 4, "LD E, L"),
-    (noimpl, 4, "! UNIMP !"),
+    (ld_e_mhl, 8, "LD E, [HL]"),
     (ld_e_a, 4, "LD E, A"),
     // 0x6 opcodes
     (noimpl, 4, "! UNIMP !"),
@@ -124,7 +124,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (ld_mhl_b, 8, "LD [HL], B"),
     (ld_mhl_c, 8, "LD [HL], C"),
     (ld_mhl_d, 8, "LD [HL], D"),
-    (noimpl, 4, "! UNIMP !"),
+    (ld_mhl_e, 8, "LD [HL], E"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (halt, 4, "HALT"),
@@ -185,7 +185,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (xor_a_l, 4, "XOR A, L"),
     (xor_a_mhl, 8, "XOR A, [HL]"),
     (xor_a_a, 4, "XOR A, A"),
     // 0xb opcodes
@@ -969,6 +969,10 @@ fn ld_b_h(cpu: &mut Cpu) {
     cpu.b = cpu.h;
 }
 
+fn ld_b_l(cpu: &mut Cpu) {
+    cpu.b = cpu.l;
+}
+
 fn ld_b_mhl(cpu: &mut Cpu) {
     let byte = cpu.mmu.read(cpu.hl());
     cpu.b = byte;
@@ -1011,6 +1015,30 @@ fn ld_c_a(cpu: &mut Cpu) {
     cpu.c = cpu.a;
 }
 
+fn ld_d_b(cpu: &mut Cpu) {
+    cpu.d = cpu.b;
+}
+
+fn ld_d_c(cpu: &mut Cpu) {
+    cpu.d = cpu.c;
+}
+
+fn ld_d_d(cpu: &mut Cpu) {
+    cpu.d = cpu.d;
+}
+
+fn ld_d_e(cpu: &mut Cpu) {
+    cpu.d = cpu.e;
+}
+
+fn ld_d_h(cpu: &mut Cpu) {
+    cpu.d = cpu.h;
+}
+
+fn ld_d_l(cpu: &mut Cpu) {
+    cpu.d = cpu.l;
+}
+
 fn ld_d_mhl(cpu: &mut Cpu) {
     let byte = cpu.mmu.read(cpu.hl());
     cpu.d = byte;
@@ -1020,8 +1048,33 @@ fn ld_d_a(cpu: &mut Cpu) {
     cpu.d = cpu.a;
 }
 
+fn ld_e_b(cpu: &mut Cpu) {
+    cpu.e = cpu.b;
+}
+
+fn ld_e_c(cpu: &mut Cpu) {
+    cpu.e = cpu.c;
+}
+
+fn ld_e_d(cpu: &mut Cpu) {
+    cpu.e = cpu.d;
+}
+
+fn ld_e_e(cpu: &mut Cpu) {
+    cpu.e = cpu.e;
+}
+
+fn ld_e_h(cpu: &mut Cpu) {
+    cpu.e = cpu.h;
+}
+
 fn ld_e_l(cpu: &mut Cpu) {
     cpu.e = cpu.l;
+}
+
+fn ld_e_mhl(cpu: &mut Cpu) {
+    let byte = cpu.mmu.read(cpu.hl());
+    cpu.e = byte;
 }
 
 fn ld_e_a(cpu: &mut Cpu) {
@@ -1051,6 +1104,10 @@ fn ld_mhl_c(cpu: &mut Cpu) {
 
 fn ld_mhl_d(cpu: &mut Cpu) {
     cpu.mmu.write(cpu.hl(), cpu.d);
+}
+
+fn ld_mhl_e(cpu: &mut Cpu) {
+    cpu.mmu.write(cpu.hl(), cpu.e);
 }
 
 fn halt(cpu: &mut Cpu) {
@@ -1126,6 +1183,15 @@ fn and_a_c(cpu: &mut Cpu) {
 
 fn xor_a_c(cpu: &mut Cpu) {
     cpu.a ^= cpu.c;
+
+    cpu.set_sub(false);
+    cpu.set_zero(cpu.a == 0);
+    cpu.set_half_carry(false);
+    cpu.set_carry(false);
+}
+
+fn xor_a_l(cpu: &mut Cpu) {
+    cpu.a ^= cpu.l;
 
     cpu.set_sub(false);
     cpu.set_zero(cpu.a == 0);
