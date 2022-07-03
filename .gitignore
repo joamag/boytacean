@@ -5,5 +5,5 @@ Cargo.lock
 /.idea
 
 /target
-/res/roms
+/res/roms.prop
 /examples/*/target

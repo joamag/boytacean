@@ -1,0 +1,112 @@
+image: hivesolutions/ubuntu_dev
+
+variables:
+  NETLIFY_SITE_ID: boytacean
+  NETLIFY_AUTH_TOKEN: $NETLIFY_AUTH_TOKEN
+  CLOUDFLARE_API_TOKEN: $CLOUDFLARE_API_TOKEN
+  CRATES_TOKEN: $CRATES_TOKEN
+  NPM_TOKEN: $NPM_TOKEN
+
+stages:
+  - build
+  - deploy
+
+before_script:
+  - apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y -q pkg-config
+  - curl -sf -L https://static.rust-lang.org/rustup.sh | sh -s -- -y
+  - export PATH=$PATH:$HOME/.cargo/bin
+  - curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.1/install.sh | bash
+  - export NVM_DIR="$HOME/.nvm"
+  - \[ -s "$NVM_DIR/nvm.sh" \] && \. "$NVM_DIR/nvm.sh"
+  - \[ -s "$NVM_DIR/bash_completion" \] && \. "$NVM_DIR/bash_completion"
+  - nvm install stable
+
+build-rust:
+  stage: build
+  parallel:
+    matrix:
+      - RUST_VERSION: ["1.56.1", "1.60.0", "stable", "nightly"]
+  script:
+    - rustup toolchain install $RUST_VERSION
+    - rustup override set $RUST_VERSION
+    - rustc --version
+    - cargo build
+    - cargo build --release
+
+build-wasm:
+  stage: build
+  parallel:
+    matrix:
+      - RUST_VERSION: ["1.60.0"]
+  script:
+    - rustup toolchain install $RUST_VERSION
+    - rustup override set $RUST_VERSION
+    - rustc --version
+    - cargo install wasm-pack
+    - wasm-pack build --release --target=web --out-dir=examples/web/lib -- --features wasm
+    - cd examples/web && npm install && npm run build
+  artifacts:
+    paths:
+      - examples/web/dist
+      - examples/web/lib
+    expire_in: 1 day
+
+deploy-netlify-preview:
+  stage: deploy
+  script:
+    - cd examples/web/dist
+    - npm_config_yes=true npx --package=netlify-cli netlify deploy --dir=.
+  dependencies:
+    - build-wasm
+  only:
+    - master
+
+deploy-netlify-prod:
+  stage: deploy
+  script:
+    - cd examples/web/dist
+    - npm_config_yes=true npx --package=netlify-cli netlify deploy --dir=. --prod
+  dependencies:
+    - build-wasm
+  only:
+    - tags
+
+deploy-cloudfare-preview:
+  stage: deploy
+  script:
+    - cd examples/web/dist
+    - npm_config_yes=true npx wrangler pages publish . --project-name=boytacean --branch master
+  dependencies:
+    - build-wasm
+  only:
+    - master
+
+deploy-cloudfare-prod:
+  stage: deploy
+  script:
+    - cd examples/web/dist
+    - npm_config_yes=true npx wrangler pages publish . --project-name=boytacean --branch stable
+  dependencies:
+    - build-wasm
+  only:
+    - tags
+
+deploy-crates:
+  stage: deploy
+  script:
+    - cargo login $CRATES_TOKEN
+    - cargo publish --no-verify
+  dependencies:
+    - build-rust
+  only:
+    - tags
+
+deploy-npm:
+  stage: deploy
+  script:
+    - echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
+    - cd examples/web/lib && npm publish
+  dependencies:
+    - build-wasm
+  only:
+    - tags
