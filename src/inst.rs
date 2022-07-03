@@ -127,7 +127,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (halt, 4, "HALT"),
     (ld_mhl_a, 8, "LD [HL], A"),
     (ld_a_b, 4, "LD A, B"),
     (ld_a_c, 4, "LD A, C"),
@@ -135,7 +135,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (ld_a_e, 4, "LD A, E"),
     (ld_a_h, 4, "LD A, H"),
     (ld_a_l, 4, "LD A, L"),
-    (noimpl, 4, "! UNIMP !"),
+    (ld_a_mhl, 8, "LD A, [HL]"),
     (noimpl, 4, "! UNIMP !"),
     // 0x8 opcodes
     (noimpl, 4, "! UNIMP !"),
@@ -311,7 +311,7 @@ pub const EXTENDED: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     // 0x2 opcodes
-    (noimpl, 4, "! UNIMP !"),
+    (sla_b, 8, "SLA B"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
@@ -478,7 +478,7 @@ pub const EXTENDED: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (res_7_mhl, 16, "RES 7, [HL]"),
     (noimpl, 4, "! UNIMP !"),
     // 0xc opcodes
     (noimpl, 4, "! UNIMP !"),
@@ -974,6 +974,10 @@ fn ld_mhl_d(cpu: &mut Cpu) {
     cpu.mmu.write(cpu.hl(), cpu.d);
 }
 
+fn halt(cpu: &mut Cpu) {
+    cpu.halt();
+}
+
 fn ld_mhl_a(cpu: &mut Cpu) {
     cpu.mmu.write(cpu.hl(), cpu.a);
 }
@@ -1000,6 +1004,11 @@ fn ld_a_h(cpu: &mut Cpu) {
 
 fn ld_a_l(cpu: &mut Cpu) {
     cpu.a = cpu.l;
+}
+
+fn ld_a_mhl(cpu: &mut Cpu) {
+    let byte = cpu.mmu.read(cpu.hl());
+    cpu.a = byte;
 }
 
 fn add_a_c(cpu: &mut Cpu) {
@@ -1323,6 +1332,10 @@ fn rr_d(cpu: &mut Cpu) {
     cpu.d = rr(cpu, cpu.d);
 }
 
+fn sla_b(cpu: &mut Cpu) {
+    cpu.b = sla(cpu, cpu.b);
+}
+
 fn swap_a(cpu: &mut Cpu) {
     cpu.a = swap(cpu, cpu.a)
 }
@@ -1335,6 +1348,13 @@ fn bit_7_h(cpu: &mut Cpu) {
     bit_h(cpu, 7);
 }
 
+fn res_7_mhl(cpu: &mut Cpu) {
+    let hl = cpu.hl();
+    let byte = cpu.mmu.read(hl);
+    let value = res(byte, 7);
+    cpu.mmu.write(hl, value);
+}
+
 fn set_4_a(cpu: &mut Cpu) {
     cpu.a = set(cpu.a, 4);
 }
@@ -1342,6 +1362,11 @@ fn set_4_a(cpu: &mut Cpu) {
 /// Helper function to set one bit in a u8.
 fn set(value: u8, bit: u8) -> u8 {
     value | (1u8 << (bit as usize))
+}
+
+/// Helper function to clear one bit in a u8
+fn res(value: u8, bit: u8) -> u8 {
+    value & !(1u8 << (bit as usize))
 }
 
 /// Helper function that rotates (shifts) left the given
@@ -1439,6 +1464,19 @@ fn swap(cpu: &mut Cpu, value: u8) -> u8 {
     cpu.set_carry(false);
 
     (value << 4) | (value >> 4)
+}
+
+/// Helper function to shift an `u8` to the left and update CPU
+/// flags.
+fn sla(cpu: &mut Cpu, value: u8)  -> u8 {
+    let result = value << 1;
+
+    cpu.set_sub(false);
+    cpu.set_zero(result == 0);
+    cpu.set_half_carry(false);
+    cpu.set_carry(value & 0x80 != 0);
+
+    result
 }
 
 fn srl(cpu: &mut Cpu, value: u8) -> u8 {

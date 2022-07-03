@@ -20,6 +20,7 @@ pub struct Cpu {
     sub: bool,
     half_carry: bool,
     carry: bool,
+    halted: bool,
     pub mmu: Mmu,
     pub ticks: u32,
 }
@@ -66,12 +67,17 @@ impl Cpu {
             sub: false,
             half_carry: false,
             carry: false,
+            halted: false,
             mmu: mmu,
             ticks: 0,
         }
     }
 
     pub fn clock(&mut self) -> u8 {
+        if self.halted {
+            return 4;
+        }
+
         let pc = self.pc;
 
         if pc >= 0x8000 && pc < 0x9fff {
@@ -288,6 +294,11 @@ impl Cpu {
     #[inline(always)]
     pub fn set_carry(&mut self, value: bool) {
         self.carry = value;
+    }
+
+    #[inline(always)]
+    pub fn halt(&mut self) {
+        self.halted = true;
     }
 
     #[inline(always)]
