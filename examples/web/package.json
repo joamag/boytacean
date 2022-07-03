@@ -1,0 +1,24 @@
+{
+    "name": "boytacean-web",
+    "version": "0.1.0",
+    "description": "The web version of Boytacean",
+    "repository": {
+        "type": "git",
+        "url": "git+https://gitlab.stage.hive.pt/joamag/boytacean.git"
+    },
+    "license": "Apache-2.0",
+    "scripts": {
+        "build": "parcel build index.html",
+        "dev": "parcel index.html",
+        "pretty": "prettier --config .prettierrc \"./**/*.{ts,json}\" --write",
+        "start": "npm run build",
+        "watch": "parcel watch index.html"
+    },
+    "source": "index.ts",
+    "devDependencies": {
+        "@parcel/transformer-typescript-tsc": "^2.6.1",
+        "parcel": "^2.6.1",
+        "prettier": "^2.7.1",
+        "typescript": "^4.5.5"
+    }
+}

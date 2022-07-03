@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>Boytacean</title>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <meta name="description" content="Game Boy emulator written in Rust 🦀." />
+    <meta name="viewport"
+        content="width=device-width, user-scalable=yes, initial-scale=1, minimum-scale=1, maximum-scale=5" />
+    <link rel="icon" href="res/icon.png" />
+    <link rel="stylesheet" href="index.css" />
+</head>
+
+<body>
+    <div class="main">
+        <div class="side-left">
+            <div id="canvas-container" class="canvas-container">
+                <span id="canvas-close" class="magnify-button canvas-close">
+                    <img class="large" src="res/minimise.svg" alt="minimise" />
+                </span>
+                <div class="canvas-frame">
+                    <canvas id="chip-canvas" class="canvas" width="640" height="320"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="side-right">
+            <h1>Boytacean <a id="version" href="https://gitlab.stage.hive.pt/joamag/boytacean/-/blob/master/CHANGELOG.md" target="_blank"></a> <img class="logo-image" src="res/thunder.png" alt="thunder" />
+            </h1>
+            <div class="separator"></div>
+            <div id="section-narrative" class="section">
+                <p>This is a <a href="https://en.wikipedia.org/wiki/Game_Boy" target="_blank">Game Boy</a> emulator built using
+                    the <a href="https://www.rust-lang.org" target="_blank">Rust Programming Language</a> and is running
+                    inside this browser with the help of <a href="https://webassembly.org/" target="_blank">WebAssembly</a>.
+                </p>
+                <p>You can check the source code of it at <a href="https://gitlab.stage.hive.pt/joamag/boytacean"
+                        target="_blank">GitLab</a>.</p>
+                <p>TIP: Drag and Drop ROM files to the Browser to load the ROM.</p>
+            </div>
+            <div id="separator-narrative"  class="separator"></div>
+            <div id="section-keyboard" class="section" style="display: none;">
+                <div id="keyboard" class="keyboard">
+                    <div class="keyboard-line">
+                        <span class="key">1</span>
+                        <span class="key">2</span>
+                        <span class="key">3</span>
+                        <span class="key">4</span>
+                    </div>
+                    <div class="keyboard-line">
+                        <span class="key">Q</span>
+                        <span class="key">W</span>
+                        <span class="key">E</span>
+                        <span class="key">R</span>
+                    </div>
+                    <div class="keyboard-line">
+                        <span class="key">A</span>
+                        <span class="key">S</span>
+                        <span class="key">D</span>
+                        <span class="key">F</span>
+                    </div>
+                    <div class="keyboard-line">
+                        <span class="key">Z</span>
+                        <span class="key">X</span>
+                        <span class="key">C</span>
+                        <span class="key">V</span>
+                    </div>
+                </div>
+            </div>
+            <div id="separator-keyboard" class="separator" style="display: none;"></div>
+            <div id="section-diag" class="section">
+                <dl class="diag">
+                    <dt>Engine</dt>
+                    <dd id="engine" class="tiny-button">-</dd>
+                    <dt>ROM</dt>
+                    <dd id="rom-name">-</dd>
+                    <dt>ROM Size</dt>
+                    <dd><span id="rom-size">-</span> bytes</dd>
+                    <dt>CPU Frequency</dt>
+                    <dd>
+                        <span id="logic-frequency-minus" class="tiny-button">-</span>
+                        <span id="logic-frequency">-</span> Hz
+                        <span id="logic-frequency-plus" class="tiny-button">+</span></dd>
+                    <dt>Framerate</dt>
+                    <dd><span id="fps-count">-</span> fps</dd>
+                </dl>
+            </div>
+            <div id="separator-diag" class="separator"></div>
+            <div class="section">
+                <div class="button-area">
+                    <span id="button-pause" class="tiny-button border padded">
+                        <img src="res/pause.svg" alt="pause" /><span>Pause</span>
+                    </span>
+                    <span id="button-reset" class="tiny-button border padded">
+                        <img src="res/reset.svg" alt="reset" /><span>Reset</span>
+                    </span>
+                    <span id="button-benchmark" class="tiny-button border padded">
+                        <img src="res/bolt.svg" alt="bolt" /><span>Benchmark</span>
+                    </span>
+                    <span id="button-fullscreen" class="tiny-button border padded">
+                        <img src="res/maximise.svg" alt="maximise" /><span>Fullscreen</span>
+                    </span>
+                    <span id="button-keyboard" class="tiny-button border padded">
+                        <img src="res/dialpad.svg" alt="info" /><span>Keyboard</span>
+                    </span>
+                    <span id="button-information" class="tiny-button border padded enabled">
+                        <img src="res/info.svg" alt="info" /><span>Information</span>
+                    </span>
+                    <span id="button-debug" class="tiny-button border padded">
+                        <img src="res/bug.svg" alt="bug" /><span>Debug</span>
+                    </span>
+                    <span id="button-theme" class="tiny-button border padded">
+                        <img src="res/marker.svg" alt="marker" /><span>Theme</span>
+                    </span>
+                    <span id="button-upload" class="tiny-button border padded file">
+                        <img src="res/upload.svg" alt="upload" /><span>Upload ROM</span>
+                        <input type="file" id="button-upload-file" name="button-upload-file" accept=".ch8">
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="toast-container">
+        <div id="toast" class="toast"></div>
+    </div>
+</body>
+<div id="modal-container" class="modal-container">
+    <div id="modal" class="modal">
+        <div class="modal-top-buttons">
+            <span id="modal-close" class="tiny-button rounded no-text">
+                <img class="medium" src="res/close.svg" alt="close" />
+            </span>
+        </div>
+        <h2 id="modal-title" class="modal-title"></h2>
+        <p id="modal-text" class="modal-text"></p>
+        <div class="modal-buttons">
+            <span id="modal-cancel" class="tiny-button red border padded-large">Cancel</span>
+            <span id="modal-confirm" class="tiny-button border padded-large">Confirm</span>
+        </div>
+    </div>
+</div>
+<div id="overlay" class="overlay">
+    <div class="overlay-container">
+        <div class="overlay-text">
+            Drag to load ROM <span id="rom-name"></span>
+        </div>
+        <div class="overlay-image">
+            <img src="res/sunglasses.png" alt="sunglasses" />
+        </div>
+    </div>
+</div>
+<div id="footer-background" class="footer-background"></div>
+<div id="footer" class="footer">
+    Built with ❤️ by <a href="https://joao.me" target="_blank">João Magalhães</a>
+</div>
+<script type="module" src="index.ts"></script>
+</body>
+
+</html>

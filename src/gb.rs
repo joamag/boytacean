@@ -37,18 +37,30 @@ impl GameBoy {
         self.ppu().clock(cycles)
     }
 
-    pub fn load_rom(&mut self, path: &str) {
-        let data = read_file(path);
-        self.cpu.mmu().write_rom(0x0000, &data);
+    pub fn load_rom(&mut self, data: &[u8]) {
+        self.cpu.mmu().write_rom(0x0000, data);
     }
 
-    pub fn load_boot(&mut self, path: &str) {
+    pub fn load_rom_file(&mut self, path: &str) {
         let data = read_file(path);
-        self.cpu.mmu().write_boot(0x0000, &data);
+        self.load_rom(&data);
+    }
+
+    pub fn load_boot(&mut self, data: &[u8]) {
+        self.cpu.mmu().write_boot(0x0000, data);
+    }
+
+    pub fn load_boot_file(&mut self, path: &str) {
+        let data = read_file(path);
+        self.load_boot(&data);
     }
 
     pub fn load_boot_default(&mut self) {
-        self.load_boot("./res/dmg_rom.bin");
+        self.load_boot_file("./res/dmg_rom.bin");
+    }
+
+    pub fn frame_buffer_eager(&mut self) -> Vec<u8> {
+        self.frame_buffer().to_vec()
     }
 }
 

@@ -1,0 +1,19 @@
+{
+    "compilerOptions": {
+        "module": "es2015",
+        "moduleResolution": "node",
+        "resolveJsonModule": true,
+        "allowSyntheticDefaultImports": true,
+        "target": "es6",
+        "noImplicitAny": true,
+        "sourceMap": true,
+        "outDir": ".",
+        "baseUrl": ".",
+        "lib": ["es2015", "dom"],
+        "paths": {
+            "*": ["node_modules/*", "src/types/*"]
+        }
+    },
+    "include": ["**/*"],
+    "exclude": []
+}
