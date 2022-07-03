@@ -1,6 +1,6 @@
 use crate::{
     cpu::Cpu,
-    data::SGB_BOOT,
+    data::{SGB_BOOT, DMG_BOOT},
     mmu::Mmu,
     ppu::{Ppu, FRAME_BUFFER_SIZE},
     util::read_file,
@@ -68,7 +68,11 @@ impl GameBoy {
         self.load_boot_file("./res/boot/dmg_boot.bin");
     }
 
-    pub fn load_boot_static(&mut self) {
+    pub fn load_boot_dmg(&mut self) {
+        self.load_boot(&DMG_BOOT);
+    }
+
+    pub fn load_boot_sgb(&mut self) {
         self.load_boot(&SGB_BOOT);
     }
 

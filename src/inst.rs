@@ -12,7 +12,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (rlca, 4, "RLCA"),
     (ld_mu16_sp, 20, "LD [u16], SP"),
     (add_hl_bc, 8, "ADD HL, BC"),
-    (noimpl, 4, "! UNIMP !"),
+    (ld_a_mbc, 8, "LD A, [BC]"),
     (dec_bc, 8, "DEC BC"),
     (inc_c, 4, "INC C"),
     (dec_c, 4, "DEC C"),
@@ -78,12 +78,12 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (noimpl, 4, "! UNIMP !"),
     (ld_b_mhl, 8, "LD B, [HL]"),
     (ld_b_a, 4, "LD B, A"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (ld_c_b, 4, "LD C, B"),
+    (ld_c_c, 4, "LD C, C"),
+    (ld_c_d, 4, "LD C, D"),
+    (ld_c_e, 4, "LD C, E"),
+    (ld_c_h, 4, "LD C, H"),
+    (ld_c_l, 4, "LD C, L"),
     (ld_c_mhl, 8, "LD C, [HL]"),
     (ld_c_a, 4, "LD C, A"),
     // 0x5 opcodes
@@ -617,6 +617,11 @@ fn add_hl_bc(cpu: &mut Cpu) {
     cpu.set_hl(value);
 }
 
+fn ld_a_mbc(cpu: &mut Cpu) {
+    let byte = cpu.mmu.read(cpu.bc());
+    cpu.a = byte;
+}
+
 fn dec_bc(cpu: &mut Cpu) {
     cpu.set_bc(cpu.bc().wrapping_sub(1));
 }
@@ -946,6 +951,30 @@ fn ld_b_mhl(cpu: &mut Cpu) {
 
 fn ld_b_a(cpu: &mut Cpu) {
     cpu.b = cpu.a;
+}
+
+fn ld_c_b(cpu: &mut Cpu) {
+    cpu.c = cpu.b;
+}
+
+fn ld_c_c(cpu: &mut Cpu) {
+    cpu.c = cpu.c;
+}
+
+fn ld_c_d(cpu: &mut Cpu) {
+    cpu.c = cpu.d;
+}
+
+fn ld_c_e(cpu: &mut Cpu) {
+    cpu.c = cpu.e;
+}
+
+fn ld_c_h(cpu: &mut Cpu) {
+    cpu.c = cpu.h;
+}
+
+fn ld_c_l(cpu: &mut Cpu) {
+    cpu.c = cpu.l;
 }
 
 fn ld_c_mhl(cpu: &mut Cpu) {
