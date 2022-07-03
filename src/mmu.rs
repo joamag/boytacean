@@ -30,6 +30,10 @@ impl Mmu {
         &mut self.ppu
     }
 
+    pub fn boot_active(&self) -> bool {
+        self.boot_active
+    }
+
     pub fn read(&mut self, addr: u16) -> u8 {
         match addr & 0xf000 {
             // BOOT (256 B) + ROM0 (4 KB/16 KB)
@@ -74,9 +78,9 @@ impl Mmu {
                         match addr & 0x00f0 {
                             0x40 | 0x50 | 0x60 | 0x70 => self.ppu.read(addr),
                             0x00 => {
-                                //@todo implement the gamepad as a controller
+                                println!("Reading from Game Pad control 0x{:04x}", addr);
                                 0x00
-                            }
+                            },
                             _ => {
                                 println!("Reading from unknown IO control 0x{:04x}", addr);
                                 0x00
@@ -141,6 +145,9 @@ impl Mmu {
                             0x40 | 0x60 | 0x70 => {
                                 self.ppu.write(addr, value);
                             }
+                            0x00 => {
+                                println!("Writing to Game Pad, timer, etc. control 0x{:04x} := 0x{:02x}", addr, value);
+                            },
                             0x50 => match addr & 0x00ff {
                                 0x50 => self.boot_active = false,
                                 _ => {
