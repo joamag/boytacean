@@ -80,7 +80,7 @@ impl Mmu {
                             0x00 => {
                                 println!("Reading from Game Pad control 0x{:04x}", addr);
                                 0x00
-                            },
+                            }
                             _ => {
                                 println!("Reading from unknown IO control 0x{:04x}", addr);
                                 0x00
@@ -129,39 +129,41 @@ impl Mmu {
                 self.ram[(addr & 0x1fff) as usize] = value;
             }
             // Working RAM Shadow, I/O, Zero-page RAM
-            0xf000 => match addr & 0x0f00 {
-                0x000 | 0x100 | 0x200 | 0x300 | 0x400 | 0x500 | 0x600 | 0x700 | 0x800 | 0x900
-                | 0xa00 | 0xb00 | 0xc00 | 0xd00 => {
-                    self.ram[(addr & 0x1fff) as usize] = value;
-                }
-                0xe00 => {
-                    println!("Writing to PPU OAM at 0x{:04x}", addr);
-                }
-                0xf00 => {
-                    if addr >= 0xff80 {
-                        self.ppu.hram[(addr & 0x007f) as usize] = value;
-                    } else {
-                        match addr & 0x00f0 {
-                            0x40 | 0x60 | 0x70 => {
-                                self.ppu.write(addr, value);
-                            }
-                            0x00 => {
-                                println!("Writing to Game Pad, timer, etc. control 0x{:04x} := 0x{:02x}", addr, value);
-                            },
-                            0x50 => match addr & 0x00ff {
-                                0x50 => self.boot_active = false,
+            0xf000 => {
+                match addr & 0x0f00 {
+                    0x000 | 0x100 | 0x200 | 0x300 | 0x400 | 0x500 | 0x600 | 0x700 | 0x800
+                    | 0x900 | 0xa00 | 0xb00 | 0xc00 | 0xd00 => {
+                        self.ram[(addr & 0x1fff) as usize] = value;
+                    }
+                    0xe00 => {
+                        println!("Writing to PPU OAM at 0x{:04x}", addr);
+                    }
+                    0xf00 => {
+                        if addr >= 0xff80 {
+                            self.ppu.hram[(addr & 0x007f) as usize] = value;
+                        } else {
+                            match addr & 0x00f0 {
+                                0x40 | 0x60 | 0x70 => {
+                                    self.ppu.write(addr, value);
+                                }
+                                0x00 => {
+                                    println!("Writing to Game Pad, timer, etc. control 0x{:04x} := 0x{:02x}", addr, value);
+                                }
+                                0x50 => match addr & 0x00ff {
+                                    0x50 => self.boot_active = false,
+                                    _ => {
+                                        println!("Writing to unknown IO control 0x{:04x}", addr);
+                                    }
+                                },
                                 _ => {
                                     println!("Writing to unknown IO control 0x{:04x}", addr);
                                 }
-                            },
-                            _ => {
-                                println!("Writing to unknown IO control 0x{:04x}", addr);
                             }
                         }
                     }
+                    addr => panic!("Writing in unknown location 0x{:04x}", addr),
                 }
-                addr => panic!("Writing in unknown location 0x{:04x}", addr),
-            },
+            }
             addr => panic!("Writing in unknown location 0x{:04x}", addr),
         }
     }
