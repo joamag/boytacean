@@ -5,11 +5,17 @@ use crate::{
     util::read_file,
 };
 
+#[cfg(feature = "wasm")]
+use wasm_bindgen::prelude::*;
+
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
 pub struct GameBoy {
     cpu: Cpu,
 }
 
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
 impl GameBoy {
+    #[cfg_attr(feature = "wasm", wasm_bindgen(constructor))]
     pub fn new() -> GameBoy {
         let ppu = Ppu::new();
         let mmu = Mmu::new(ppu);
@@ -31,6 +37,22 @@ impl GameBoy {
         self.ppu().clock(cycles)
     }
 
+    pub fn load_rom(&mut self, path: &str) {
+        let data = read_file(path);
+        self.cpu.mmu().write_rom(0x0000, &data);
+    }
+
+    pub fn load_boot(&mut self, path: &str) {
+        let data = read_file(path);
+        self.cpu.mmu().write_boot(0x0000, &data);
+    }
+
+    pub fn load_boot_default(&mut self) {
+        self.load_boot("./res/dmg_rom.bin");
+    }
+}
+
+impl GameBoy {
     pub fn cpu(&mut self) -> &mut Cpu {
         &mut self.cpu
     }
@@ -45,19 +67,5 @@ impl GameBoy {
 
     pub fn frame_buffer(&mut self) -> &Box<[u8; FRAME_BUFFER_SIZE]> {
         &(self.ppu().frame_buffer)
-    }
-
-    pub fn load_rom(&mut self, path: &str) {
-        let data = read_file(path);
-        self.cpu.mmu().write_rom(0x0000, &data);
-    }
-
-    pub fn load_boot(&mut self, path: &str) {
-        let data = read_file(path);
-        self.cpu.mmu().write_boot(0x0000, &data);
-    }
-
-    pub fn load_boot_default(&mut self) {
-        self.load_boot("./res/dmg_rom.bin");
     }
 }

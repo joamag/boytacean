@@ -2,6 +2,25 @@
 
 A Game Boy emulator that is written in Rust 🦀.
 
+## Build
+
+### WASM for Node.js
+
+```bash
+cargo install wasm-pack
+wasm-pack build --release --target=nodejs -- --features wasm
+```
+
+### WASM for Web
+
+```bash
+cargo install wasm-pack
+wasm-pack build --release --target=web --out-dir=examples/web/lib -- --features wasm
+cd examples/web
+npm install && npm run build
+cd dist && python3 -m http.server
+```
+
 ## Inspiration
 
 ### Documentation
