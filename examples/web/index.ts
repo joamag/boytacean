@@ -1,7 +1,6 @@
 import { default as wasm, GameBoy } from "./lib/boytacean.js";
 import info from "./package.json";
 
-const PIXEL_SET_COLOR = 0x50cb93ff;
 const PIXEL_UNSET_COLOR = 0x1b1a17ff;
 
 const LOGIC_HZ = 600;
@@ -11,8 +10,8 @@ const IDLE_HZ = 10;
 
 const FREQUENCY_DELTA = 60;
 
-const DISPLAY_WIDTH = 64;
-const DISPLAY_HEIGHT = 32;
+const DISPLAY_WIDTH = 160;
+const DISPLAY_HEIGHT = 144;
 const DISPLAY_RATIO = DISPLAY_WIDTH / DISPLAY_HEIGHT;
 
 const SAMPLE_RATE = 2;
@@ -207,10 +206,6 @@ const tick = (currentTime: number) => {
     // reached the flush of the "tick" logic is skiped
     if (currentTime < state.nextTickTime) return;
 
-    // initializes the flag that is going to control is a beep
-    // is going to be issued
-    let beepFlag = false;
-
     // calculates the number of ticks that have elapsed since the
     // last draw operation, this is critical to be able to properly
     // operate the clock of the CPU in frame drop situations
@@ -221,14 +216,19 @@ const tick = (currentTime: number) => {
     );
     ticks = Math.max(ticks, 1);
 
-    const ratioLogic = (state.logicFrequency / state.visualFrequency) * ticks;
-    for (let i = 0; i < ratioLogic; i++) {
-        state.gameBoy.clock();
-    }
+    let counterTicks = 0;
 
-    // in case the beep flag is active issue a sound during a bried
-    // period, to notify the user about a certain event
-    if (beepFlag) beep();
+    while (true) {
+        // limits the number of ticks to the typical number
+        // of ticks required to do a complete PPU draw
+        if (counterTicks >= 70224) {
+            break;
+        }
+
+        // runs the Game Boy clock, this operations should
+        // include the advance of both the CPU and the PPU
+        counterTicks += state.gameBoy.clock();
+    }
 
     // updates the canvas object with the new
     // visual information coming in
@@ -662,11 +662,15 @@ const initCanvas = async () => {
 };
 
 const updateCanvas = (pixels: Uint8Array) => {
-    for (let i = 0; i < pixels.length; i++) {
-        state.videoBuff.setUint32(
-            i * 4,
-            pixels[i] ? PIXEL_SET_COLOR : PIXEL_UNSET_COLOR
-        ); //@todo must take into consideration that these are RGB pixels
+    let offset = 0;
+    for (let index = 0; index < pixels.length; index += 3) {
+        const color =
+            (pixels[index] << 24) |
+            (pixels[index + 1] << 16) |
+            (pixels[index + 2] << 8) |
+            0xff;
+        state.videoBuff.setUint32(offset, color);
+        offset += 4;
     }
     state.canvasCtx.putImageData(state.image, 0, 0);
     state.canvasScaledCtx.drawImage(state.canvas, 0, 0);
@@ -885,11 +889,6 @@ const fetchRom = async (romPath: string): Promise<[string, Uint8Array]> => {
     // returns both the name of the ROM and the data
     // contents as a byte array
     return [romName, romData];
-};
-
-const beep = async () => {
-    sound.muted = false;
-    await sound.play();
 };
 
 (async () => {
