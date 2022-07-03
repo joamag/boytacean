@@ -197,14 +197,14 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (noimpl, 4, "! UNIMP !"),
     (or_a_mhl, 8, "OR A, [HL]"),
     (or_a_a, 4, "OR A, A"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (cp_a_b, 4, "CP A, B"),
+    (cp_a_c, 4, "CP A, C"),
+    (cp_a_d, 4, "CP A, D"),
+    (cp_a_e, 4, "CP A, E"),
+    (cp_a_h, 4, "CP A, H"),
+    (cp_a_l, 4, "CP A, L"),
     (cp_a_mhl, 8, "CP A, [HL]"),
-    (noimpl, 4, "! UNIMP !"),
+    (cp_a_a, 4, "CP A, A"),
     // 0xc opcodes
     (ret_nz, 8, "RET NZ"),
     (pop_bc, 12, "POP BC"),
@@ -1320,9 +1320,37 @@ fn or_a_a(cpu: &mut Cpu) {
     cpu.set_carry(false);
 }
 
+fn cp_a_b(cpu: &mut Cpu) {
+    sub_set_flags(cpu, cpu.a, cpu.b);
+}
+
+fn cp_a_c(cpu: &mut Cpu) {
+    sub_set_flags(cpu, cpu.a, cpu.c);
+}
+
+fn cp_a_d(cpu: &mut Cpu) {
+    sub_set_flags(cpu, cpu.a, cpu.d);
+}
+
+fn cp_a_e(cpu: &mut Cpu) {
+    sub_set_flags(cpu, cpu.a, cpu.e);
+}
+
+fn cp_a_h(cpu: &mut Cpu) {
+    sub_set_flags(cpu, cpu.a, cpu.h);
+}
+
+fn cp_a_l(cpu: &mut Cpu) {
+    sub_set_flags(cpu, cpu.a, cpu.l);
+}
+
 fn cp_a_mhl(cpu: &mut Cpu) {
     let byte = cpu.mmu.read(cpu.hl());
     sub_set_flags(cpu, cpu.a, byte);
+}
+
+fn cp_a_a(cpu: &mut Cpu) {
+    sub_set_flags(cpu, cpu.a, cpu.a);
 }
 
 fn ret_nz(cpu: &mut Cpu) {

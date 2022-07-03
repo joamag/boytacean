@@ -79,11 +79,11 @@ fn main() {
         .unwrap();
 
     let mut game_boy = GameBoy::new();
-    game_boy.load_boot_sgb();
+    game_boy.load_boot_dmg();
     //game_boy.load_rom_file("../../res/roms/firstwhite.gb");
     //game_boy.load_rom_file("../../res/roms/opus5.gb");
-    game_boy.load_rom_file("../../res/roms/ld_r_r.gb");
-    //game_boy.load_rom_file("../../res/roms/opus5.gb");
+    //game_boy.load_rom_file("../../res/roms/ld_r_r.gb");
+    game_boy.load_rom_file("../../res/roms/special.gb");
 
     let mut counter = 0;
 
