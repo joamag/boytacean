@@ -223,7 +223,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (noimpl, 4, "! UNIMP !"),
     (rst_08h, 16, "RST 08h"),
     // 0xd opcodes
-    (noimpl, 4, "! UNIMP !"),
+    (ret_nc, 8, "RET NC"),
     (pop_de, 12, "POP DE"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
@@ -1178,6 +1178,15 @@ fn call_u16(cpu: &mut Cpu) {
 
 fn rst_08h(cpu: &mut Cpu) {
     rst(cpu, 0x0008);
+}
+
+fn ret_nc(cpu: &mut Cpu) {
+    if cpu.get_carry() {
+        return;
+    }
+
+    cpu.pc = cpu.pop_word();
+    cpu.ticks = cpu.ticks.wrapping_add(12);
 }
 
 fn pop_de(cpu: &mut Cpu) {
