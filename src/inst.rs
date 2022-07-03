@@ -34,22 +34,22 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (inc_e, 4, "INC E"),
     (dec_e, 4, "DEC E"),
     (ld_e_u8, 8, "LD E, u8"),
-    (noimpl, 4, "! UNIMP !"),
+    (rra, 4, "RRA"),
     // 0x2 opcodes
     (jr_nz_i8, 8, "JR NZ, i8"),
     (ld_hl_u16, 12, "LD HL, u16"),
     (ld_mhli_a, 8, "LD [HL+], A"),
     (inc_hl, 8, "INC HL"),
     (inc_h, 4, "INC H"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (dec_h, 4, "DEC H"),
+    (ld_h_u8, 8, "LD H, u8"),
     (noimpl, 4, "! UNIMP !"),
     (jr_z_i8, 8, "JR Z, i8"),
     (noimpl, 4, "! UNIMP !"),
     (ld_a_mhli, 8, "LD A, [HL+] "),
     (noimpl, 4, "! UNIMP !"),
     (inc_l, 4, "INC L"),
-    (noimpl, 4, "! UNIMP !"),
+    (dec_l, 4, "DEC L"),
     (ld_l_u8, 8, "LD L, u8"),
     (cpl, 4, "CPL"),
     // 0x3 opcodes
@@ -61,7 +61,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (noimpl, 4, "! UNIMP !"),
     (ld_mhl_u8, 12, "LD [HL], u8 "),
     (scf, 4, "SCF"),
-    (noimpl, 4, "! UNIMP !"),
+    (jr_c_i8, 8, "JR C, i8"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
@@ -76,7 +76,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (noimpl, 4, "! UNIMP !"),
     (ld_b_h, 4, "LD B, H"),
     (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (ld_b_mhl, 8, "LD B, [HL]"),
     (ld_b_a, 4, "LD B, A"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
@@ -84,7 +84,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (ld_c_mhl, 8, "LD C, [HL]"),
     (ld_c_a, 4, "LD C, A"),
     // 0x5 opcodes
     (noimpl, 4, "! UNIMP !"),
@@ -93,7 +93,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (ld_d_mhl, 8, "LD D, [HL]"),
     (ld_d_a, 4, "LD D, A"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
@@ -102,7 +102,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (ld_e_a, 4, "LD E, A"),
     // 0x6 opcodes
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
@@ -121,9 +121,9 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     // 0x7 opcodes
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (ld_mhl_b, 8, "LD [HL], B"),
+    (ld_mhl_c, 8, "LD [HL], C"),
+    (ld_mhl_d, 8, "LD [HL], D"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
@@ -131,7 +131,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (ld_mhl_a, 8, "LD [HL], A"),
     (ld_a_b, 4, "LD A, B"),
     (ld_a_c, 4, "LD A, C"),
-    (noimpl, 4, "! UNIMP !"),
+    (ld_a_d, 4, "LD A, D"),
     (ld_a_e, 4, "LD A, E"),
     (ld_a_h, 4, "LD A, H"),
     (ld_a_l, 4, "LD A, L"),
@@ -186,7 +186,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (xor_a_mhl, 8, "XOR A, [HL]"),
     (xor_a_a, 4, "XOR A, A"),
     // 0xb opcodes
     (or_a_b, 4, "OR A, B"),
@@ -254,7 +254,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (xor_a_u8, 8, "XOR A, u8"),
     (rst_18h, 16, "RST 18h"),
     // 0xf opcodes
     (ld_a_mff00u8, 12, "LD A, [FF00+u8]"),
@@ -275,7 +275,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (rst_38h, 16, "RST 38h"),
 ];
 
-pub const BITWISE: [(fn(&mut Cpu), u8, &'static str); 176] = [
+pub const EXTENDED: [(fn(&mut Cpu), u8, &'static str); 176] = [
     // 0x0 opcodes
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
@@ -303,8 +303,8 @@ pub const BITWISE: [(fn(&mut Cpu), u8, &'static str); 176] = [
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (rr_c, 8, "RR C"),
+    (rr_d, 8, "RR D"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
@@ -336,7 +336,7 @@ pub const BITWISE: [(fn(&mut Cpu), u8, &'static str); 176] = [
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (swap_a, 8, "SWAP A"),
-    (noimpl, 4, "! UNIMP !"),
+    (srl_b, 8, "SRL B"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
@@ -649,6 +649,18 @@ fn ld_e_u8(cpu: &mut Cpu) {
     cpu.e = byte;
 }
 
+fn rra(cpu: &mut Cpu) {
+    let carry = cpu.get_carry();
+
+    cpu.set_carry(cpu.a & 0x01 == 0x01);
+
+    cpu.a = cpu.a >> 1 | ((carry as u8) << 7);
+
+    cpu.set_sub(false);
+    cpu.set_zero(false);
+    cpu.set_half_carry(false);
+}
+
 fn jr_nz_i8(cpu: &mut Cpu) {
     let byte = cpu.read_u8() as i8;
 
@@ -684,6 +696,22 @@ fn inc_h(cpu: &mut Cpu) {
     cpu.h = value;
 }
 
+fn dec_h(cpu: &mut Cpu) {
+    let h = cpu.h;
+    let value = h.wrapping_sub(1);
+
+    cpu.set_sub(true);
+    cpu.set_zero(value == 0);
+    cpu.set_half_carry((h & 0xf) == 0xf);
+
+    cpu.h = value;
+}
+
+fn ld_h_u8(cpu: &mut Cpu) {
+    let byte = cpu.read_u8();
+    cpu.h = byte;
+}
+
 fn jr_z_i8(cpu: &mut Cpu) {
     let byte = cpu.read_u8() as i8;
 
@@ -707,6 +735,17 @@ fn inc_l(cpu: &mut Cpu) {
     cpu.set_sub(false);
     cpu.set_zero(value == 0);
     cpu.set_half_carry((value & 0xf) == 0xf);
+
+    cpu.l = value;
+}
+
+fn dec_l(cpu: &mut Cpu) {
+    let l = cpu.l;
+    let value = l.wrapping_sub(1);
+
+    cpu.set_sub(true);
+    cpu.set_zero(value == 0);
+    cpu.set_half_carry((l & 0xf) == 0xf);
 
     cpu.l = value;
 }
@@ -754,6 +793,17 @@ fn scf(cpu: &mut Cpu) {
     cpu.set_carry(true);
 }
 
+fn jr_c_i8(cpu: &mut Cpu) {
+    let byte = cpu.read_u8();
+
+    if !cpu.get_carry() {
+        return;
+    }
+
+    cpu.pc = (cpu.pc as i16).wrapping_add(byte as i16) as u16;
+    cpu.ticks = cpu.ticks.wrapping_add(4);
+}
+
 fn dec_a(cpu: &mut Cpu) {
     let a = cpu.a;
     let value = a.wrapping_sub(1);
@@ -774,20 +824,51 @@ fn ld_b_h(cpu: &mut Cpu) {
     cpu.b = cpu.h;
 }
 
+fn ld_b_mhl(cpu: &mut Cpu) {
+    let byte = cpu.mmu.read(cpu.hl());
+    cpu.b = byte;
+}
+
 fn ld_b_a(cpu: &mut Cpu) {
     cpu.b = cpu.a;
+}
+
+fn ld_c_mhl(cpu: &mut Cpu) {
+    let byte = cpu.mmu.read(cpu.hl());
+    cpu.c = byte;
 }
 
 fn ld_c_a(cpu: &mut Cpu) {
     cpu.c = cpu.a;
 }
 
+fn ld_d_mhl(cpu: &mut Cpu) {
+    let byte = cpu.mmu.read(cpu.hl());
+    cpu.d = byte;
+}
+
 fn ld_d_a(cpu: &mut Cpu) {
     cpu.d = cpu.a;
 }
 
+fn ld_e_a(cpu: &mut Cpu) {
+    cpu.e = cpu.a;
+}
+
 fn ld_h_a(cpu: &mut Cpu) {
     cpu.h = cpu.a;
+}
+
+fn ld_mhl_b(cpu: &mut Cpu) {
+    cpu.mmu.write(cpu.hl(), cpu.b);
+}
+
+fn ld_mhl_c(cpu: &mut Cpu) {
+    cpu.mmu.write(cpu.hl(), cpu.c);
+}
+
+fn ld_mhl_d(cpu: &mut Cpu) {
+    cpu.mmu.write(cpu.hl(), cpu.d);
 }
 
 fn ld_mhl_a(cpu: &mut Cpu) {
@@ -800,6 +881,10 @@ fn ld_a_b(cpu: &mut Cpu) {
 
 fn ld_a_c(cpu: &mut Cpu) {
     cpu.a = cpu.c;
+}
+
+fn ld_a_d(cpu: &mut Cpu) {
+    cpu.a = cpu.d;
 }
 
 fn ld_a_e(cpu: &mut Cpu) {
@@ -834,6 +919,16 @@ fn and_a_c(cpu: &mut Cpu) {
 
 fn xor_a_c(cpu: &mut Cpu) {
     cpu.a ^= cpu.c;
+
+    cpu.set_sub(false);
+    cpu.set_zero(cpu.a == 0);
+    cpu.set_half_carry(false);
+    cpu.set_carry(false);
+}
+
+fn xor_a_mhl(cpu: &mut Cpu) {
+    let byte = cpu.mmu.read(cpu.hl());
+    cpu.a ^= byte;
 
     cpu.set_sub(false);
     cpu.set_zero(cpu.a == 0);
@@ -979,6 +1074,16 @@ fn ld_mu16_a(cpu: &mut Cpu) {
     cpu.mmu.write(word, cpu.a);
 }
 
+fn xor_a_u8(cpu: &mut Cpu) {
+    let byte = cpu.read_u8();
+    cpu.a ^= byte;
+
+    cpu.set_sub(false);
+    cpu.set_zero(cpu.a == 0);
+    cpu.set_half_carry(false);
+    cpu.set_carry(false);
+}
+
 fn rst_18h(cpu: &mut Cpu) {
     rst(cpu, 0x0018);
 }
@@ -1024,23 +1129,52 @@ fn rl_c(cpu: &mut Cpu) {
     cpu.c = rl(cpu, cpu.c);
 }
 
+fn rr_c(cpu: &mut Cpu) {
+    cpu.c = rr(cpu, cpu.c);
+}
+
+fn rr_d(cpu: &mut Cpu) {
+    cpu.d = rr(cpu, cpu.d);
+}
+
 fn swap_a(cpu: &mut Cpu) {
     cpu.a = swap(cpu, cpu.a)
+}
+
+fn srl_b(cpu: &mut Cpu) {
+    cpu.b = srl(cpu, cpu.b);
 }
 
 fn bit_7_h(cpu: &mut Cpu) {
     bit_h(cpu, 7);
 }
 
-/// Helper function that rotates (shifts) the given
+/// Helper function that rotates (shifts) left the given
 /// byte (probably from a register) and updates the
 /// proper flag registers.
-fn rl(cpu: &mut Cpu, byte: u8) -> u8 {
+fn rl(cpu: &mut Cpu, value: u8) -> u8 {
     let carry = cpu.get_carry();
 
-    cpu.set_carry(byte & 0x80 == 0x80);
+    cpu.set_carry(value & 0x80 == 0x80);
 
-    let result = (byte << 1) | carry as u8;
+    let result = (value << 1) | carry as u8;
+
+    cpu.set_sub(false);
+    cpu.set_zero(result == 0);
+    cpu.set_half_carry(false);
+
+    result
+}
+
+/// Helper function that rotates (shifts) right the given
+/// byte (probably from a register) and updates the
+/// proper flag registers.
+fn rr(cpu: &mut Cpu, value: u8) -> u8 {
+    let carry = cpu.get_carry();
+
+    cpu.set_carry(value & 0x01 == 0x01);
+
+    let result = (value >> 1) | ((carry as u8) << 7);
 
     cpu.set_sub(false);
     cpu.set_zero(result == 0);
@@ -1110,6 +1244,17 @@ fn swap(cpu: &mut Cpu, value: u8) -> u8 {
     cpu.set_carry(false);
 
     (value << 4) | (value >> 4)
+}
+
+fn srl(cpu: &mut Cpu, value: u8) -> u8 {
+    let result = value >> 1;
+
+    cpu.set_sub(false);
+    cpu.set_zero(result == 0);
+    cpu.set_half_carry(false);
+    cpu.set_carry(value & 0x01 == 0x01);
+
+    result
 }
 
 /// Helper function for RST instructions, pushes the

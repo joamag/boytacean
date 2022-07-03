@@ -1,5 +1,5 @@
 use crate::{
-    inst::{BITWISE, INSTRUCTIONS},
+    inst::{EXTENDED, INSTRUCTIONS},
     mmu::Mmu,
     ppu::Ppu,
 };
@@ -26,6 +26,24 @@ pub struct Cpu {
 
 impl Cpu {
     pub fn new(mmu: Mmu) -> Cpu {
+        let mut implemented = 0;
+        let mut implemented_ext = 0;
+
+        for instruction in INSTRUCTIONS {
+            if instruction.2 != "! UNIMP !" {
+                implemented += 1;
+            }
+        }
+
+        for instruction in EXTENDED {
+            if instruction.2 != "! UNIMP !" {
+                implemented_ext += 1;
+            }
+        }
+
+        println!("Implemented {}/{} instructions", implemented, INSTRUCTIONS.len());
+        println!("Implemented {}/{} extended instructions", implemented_ext, EXTENDED.len());
+
         Cpu {
             pc: 0x0,
             sp: 0x0,
@@ -59,7 +77,7 @@ impl Cpu {
         if is_prefix {
             opcode = self.mmu.read(self.pc);
             self.pc = self.pc.wrapping_add(1);
-            instruction = &BITWISE[opcode as usize];
+            instruction = &EXTENDED[opcode as usize];
         } else {
             instruction = &INSTRUCTIONS[opcode as usize];
         }
