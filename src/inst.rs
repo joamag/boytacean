@@ -1385,42 +1385,42 @@ fn add_set_flags(cpu: &mut Cpu, first: u8, second: u8) -> u8 {
     let first = first as u32;
     let second = second as u32;
 
-    let value = first.wrapping_add(second);
-    let value_b = value as u8;
+    let result = first.wrapping_add(second);
+    let result_b = result as u8;
 
     cpu.set_sub(false);
-    cpu.set_zero(value_b == 0);
-    cpu.set_half_carry((first ^ second ^ value) & 0x10 == 0x10);
-    cpu.set_carry(value & 0x100 == 0x100);
+    cpu.set_zero(result_b == 0);
+    cpu.set_half_carry((first ^ second ^ result) & 0x10 == 0x10);
+    cpu.set_carry(result & 0x100 == 0x100);
 
-    value_b
+    result_b
 }
 
 fn sub_set_flags(cpu: &mut Cpu, first: u8, second: u8) -> u8 {
     let first = first as u32;
     let second = second as u32;
 
-    let value = first.wrapping_sub(second);
-    let value_b = value as u8;
+    let result = first.wrapping_sub(second);
+    let result_b = result as u8;
 
     cpu.set_sub(true);
-    cpu.set_zero(value_b == 0);
-    cpu.set_half_carry((first ^ second ^ value) & 0x10 == 0x10);
-    cpu.set_carry(value & 0x100 == 0x100);
+    cpu.set_zero(result_b == 0);
+    cpu.set_half_carry((first ^ second ^ result) & 0x10 == 0x10);
+    cpu.set_carry(result & 0x100 == 0x100);
 
-    value_b
+    result_b
 }
 
 fn add_u16_u16(cpu: &mut Cpu, first: u16, second: u16) -> u16 {
     let first = first as u32;
     let second = second as u32;
-    let value = first.wrapping_add(second);
+    let result = first.wrapping_add(second);
 
     cpu.set_sub(false);
-    cpu.set_half_carry((first ^ second ^ value) & 0x1000 == 0x1000);
-    cpu.set_carry(value & 0x10000 == 0x10000);
+    cpu.set_half_carry((first ^ second ^ result) & 0x1000 == 0x1000);
+    cpu.set_carry(result & 0x10000 == 0x10000);
 
-    value as u16
+    result as u16
 }
 
 fn swap(cpu: &mut Cpu, value: u8) -> u8 {
