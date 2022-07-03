@@ -94,15 +94,16 @@ impl Mmu {
         match addr & 0xf000 {
             // BOOT (256 B) + ROM0 (4 KB/16 KB)
             0x0000 => {
-                println!("Writing to BOOT")
+                self.rom[addr as usize] = value;
+                println!("Writing to BOOT at 0x{:04x}", addr)
             }
             // ROM0 (12 KB/16 KB)
             0x1000 | 0x2000 | 0x3000 => {
-                println!("Writing to ROM 0");
+                println!("Writing to ROM 0 at 0x{:04x}", addr);
             }
             // ROM1 (Unbanked) (16 KB)
             0x4000 | 0x5000 | 0x6000 | 0x7000 => {
-                println!("Writing to ROM 1");
+                println!("Writing to ROM 1 at 0x{:04x}", addr);
             }
             // Graphics: VRAM (8 KB)
             0x8000 | 0x9000 => {

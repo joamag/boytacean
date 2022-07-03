@@ -49,7 +49,7 @@ const KEYS: Record<string, number> = {
 };
 
 // @ts-ignore: ts(2580)
-const ROM_PATH = require("../../res/roms/tetris.gb");
+const ROM_PATH = require("../../res/roms/firstwhite.gb");
 
 type State = {
     gameBoy: GameBoy;
