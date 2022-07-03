@@ -58,7 +58,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (ld_mhld_a, 8, "LD [HL-], A"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (dec_mhl, 12, "DEC [HL]"),
     (ld_mhl_u8, 12, "LD [HL], u8 "),
     (scf, 4, "SCF"),
     (jr_c_i8, 8, "JR C, i8"),
@@ -118,7 +118,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (ld_l_mhl, 8, "LD L, [HL]"),
     (noimpl, 4, "! UNIMP !"),
     // 0x7 opcodes
     (ld_mhl_b, 8, "LD [HL], B"),
@@ -195,7 +195,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (or_a_mhl, 8, "OR A, [HL]"),
     (or_a_a, 4, "OR A, A"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
@@ -885,6 +885,17 @@ fn ld_mhld_a(cpu: &mut Cpu) {
     cpu.set_hl(cpu.hl().wrapping_sub(1));
 }
 
+fn dec_mhl(cpu: &mut Cpu) {
+    let byte = cpu.mmu.read(cpu.hl());
+    let value = byte.wrapping_sub(1);
+
+    cpu.set_sub(true);
+    cpu.set_zero(value == 0);
+    cpu.set_half_carry((byte & 0xf) == 0xf);
+
+    cpu.mmu.write(cpu.hl(), value);
+}
+
 fn ld_mhl_u8(cpu: &mut Cpu) {
     let byte = cpu.read_u8();
     cpu.mmu.write(cpu.hl(), byte);
@@ -1012,6 +1023,11 @@ fn ld_h_a(cpu: &mut Cpu) {
     cpu.h = cpu.a;
 }
 
+fn ld_l_mhl(cpu: &mut Cpu) {
+    let byte = cpu.mmu.read(cpu.hl());
+    cpu.l = byte;
+}
+
 fn ld_mhl_b(cpu: &mut Cpu) {
     cpu.mmu.write(cpu.hl(), cpu.b);
 }
@@ -1134,6 +1150,16 @@ fn or_a_b(cpu: &mut Cpu) {
 
 fn or_a_c(cpu: &mut Cpu) {
     cpu.a |= cpu.c;
+
+    cpu.set_sub(false);
+    cpu.set_zero(cpu.a == 0);
+    cpu.set_half_carry(false);
+    cpu.set_carry(false);
+}
+
+fn or_a_mhl(cpu: &mut Cpu) {
+    let byte = cpu.mmu.read(cpu.hl());
+    cpu.a |= byte;
 
     cpu.set_sub(false);
     cpu.set_zero(cpu.a == 0);
