@@ -45,7 +45,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (ld_h_u8, 8, "LD H, u8"),
     (noimpl, 4, "! UNIMP !"),
     (jr_z_i8, 8, "JR Z, i8"),
-    (noimpl, 4, "! UNIMP !"),
+    (add_hl_hl, 8, "ADD HL, HL"),
     (ld_a_mhli, 8, "LD A, [HL+] "),
     (noimpl, 4, "! UNIMP !"),
     (inc_l, 4, "INC L"),
@@ -100,7 +100,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (ld_e_l, 4, "LD E, L"),
     (noimpl, 4, "! UNIMP !"),
     (ld_e_a, 4, "LD E, A"),
     // 0x6 opcodes
@@ -119,7 +119,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (ld_l_mhl, 8, "LD L, [HL]"),
-    (noimpl, 4, "! UNIMP !"),
+    (ld_l_a, 4, "LD L, A"),
     // 0x7 opcodes
     (ld_mhl_b, 8, "LD [HL], B"),
     (ld_mhl_c, 8, "LD [HL], C"),
@@ -249,7 +249,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (and_a_u8, 8, "AND A, u8"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (jp_hl, 4, "JP HL"),
     (ld_mu16_a, 16, "LD [u16], A"),
     (illegal, 4, "ILLEGAL"),
     (illegal, 4, "ILLEGAL"),
@@ -305,7 +305,7 @@ pub const EXTENDED: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (noimpl, 4, "! UNIMP !"),
     (rr_c, 8, "RR C"),
     (rr_d, 8, "RR D"),
-    (noimpl, 4, "! UNIMP !"),
+    (rr_e, 8, "RR E"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
@@ -826,6 +826,11 @@ fn jr_z_i8(cpu: &mut Cpu) {
     cpu.ticks = cpu.ticks.wrapping_add(4);
 }
 
+fn add_hl_hl(cpu: &mut Cpu) {
+    let value = add_u16_u16(cpu, cpu.hl(), cpu.hl());
+    cpu.set_hl(value);
+}
+
 fn ld_a_mhli(cpu: &mut Cpu) {
     let byte = cpu.mmu.read(cpu.hl());
     cpu.a = byte;
@@ -1015,6 +1020,10 @@ fn ld_d_a(cpu: &mut Cpu) {
     cpu.d = cpu.a;
 }
 
+fn ld_e_l(cpu: &mut Cpu) {
+    cpu.e = cpu.l;
+}
+
 fn ld_e_a(cpu: &mut Cpu) {
     cpu.e = cpu.a;
 }
@@ -1026,6 +1035,10 @@ fn ld_h_a(cpu: &mut Cpu) {
 fn ld_l_mhl(cpu: &mut Cpu) {
     let byte = cpu.mmu.read(cpu.hl());
     cpu.l = byte;
+}
+
+fn ld_l_a(cpu: &mut Cpu) {
+    cpu.l = cpu.a;
 }
 
 fn ld_mhl_b(cpu: &mut Cpu) {
@@ -1363,6 +1376,10 @@ fn and_a_u8(cpu: &mut Cpu) {
     cpu.set_carry(false);
 }
 
+fn jp_hl(cpu: &mut Cpu) {
+    cpu.pc = cpu.hl();
+}
+
 fn ld_mu16_a(cpu: &mut Cpu) {
     let word = cpu.read_u16();
     cpu.mmu.write(word, cpu.a);
@@ -1429,6 +1446,10 @@ fn rr_c(cpu: &mut Cpu) {
 
 fn rr_d(cpu: &mut Cpu) {
     cpu.d = rr(cpu, cpu.d);
+}
+
+fn rr_e(cpu: &mut Cpu) {
+    cpu.e = rr(cpu, cpu.e);
 }
 
 fn sla_b(cpu: &mut Cpu) {

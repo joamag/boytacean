@@ -83,6 +83,7 @@ fn main() {
     //game_boy.load_rom_file("../../res/roms/firstwhite.gb");
     //game_boy.load_rom_file("../../res/roms/opus5.gb");
     game_boy.load_rom_file("../../res/roms/ld_r_r.gb");
+    //game_boy.load_rom_file("../../res/roms/opus5.gb");
 
     let mut counter = 0;
 
