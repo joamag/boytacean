@@ -65,7 +65,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (inc_a, 4, "INC A"),
     (dec_a, 4, "DEC A"),
     (ld_a_u8, 8, "LD A, u8"),
     (noimpl, 4, "! UNIMP !"),
@@ -73,7 +73,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (ld_b_b, 4, "LD B, B"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (ld_b_e, 4, "LD B, E"),
     (ld_b_h, 4, "LD B, H"),
     (noimpl, 4, "! UNIMP !"),
     (ld_b_mhl, 8, "LD B, [HL]"),
@@ -139,9 +139,9 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (noimpl, 4, "! UNIMP !"),
     // 0x8 opcodes
     (noimpl, 4, "! UNIMP !"),
+    (add_a_c, 4, "ADD A, C"),
     (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (add_a_e, 4, "ADD A, E"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (add_a_mhl, 8, "ADD A, [HL]"),
@@ -162,7 +162,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (sub_a_a, 4, "SUB A, A"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
@@ -208,7 +208,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     // 0xc opcodes
     (ret_nz, 8, "RET NZ"),
     (pop_bc, 12, "POP BC"),
-    (noimpl, 4, "! UNIMP !"),
+    (jp_nz_u16, 12, "JP NZ, u16"),
     (jp_u16, 16, "JP u16"),
     (call_nz_u16, 12, "CALL NZ, u16"),
     (push_bc, 16, "PUSH BC"),
@@ -216,9 +216,9 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (ret, 16, "RET"),
+    (jp_z_u16, 12, "JP Z, u16"),
     (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (call_z_u16, 12, "CALL Z, u16"),
     (call_u16, 24, "CALL u16"),
     (noimpl, 4, "! UNIMP !"),
     (rst_08h, 16, "RST 08h"),
@@ -233,9 +233,9 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
+    (jp_c_u16, 12, "JP C, u16"),
     (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (call_c_u16, 12, "CALL C, u16"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
@@ -275,7 +275,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (rst_38h, 16, "RST 38h"),
 ];
 
-pub const EXTENDED: [(fn(&mut Cpu), u8, &'static str); 176] = [
+pub const EXTENDED: [(fn(&mut Cpu), u8, &'static str); 256] = [
     // 0x0 opcodes
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
@@ -447,6 +447,91 @@ pub const EXTENDED: [(fn(&mut Cpu), u8, &'static str); 176] = [
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     // 0xa opcodes
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    // 0xb opcodes
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    // 0xc opcodes
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    // 0xd opcodes
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    // 0xe opcodes
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (set_4_a, 8, "SET 4, A"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    (noimpl, 4, "! UNIMP !"),
+    // 0xf opcodes
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
@@ -804,6 +889,16 @@ fn jr_c_i8(cpu: &mut Cpu) {
     cpu.ticks = cpu.ticks.wrapping_add(4);
 }
 
+fn inc_a(cpu: &mut Cpu) {
+    let value = cpu.a.wrapping_add(1);
+
+    cpu.set_sub(false);
+    cpu.set_zero(value == 0);
+    cpu.set_half_carry((value & 0xf) == 0xf);
+
+    cpu.a = value;
+}
+
 fn dec_a(cpu: &mut Cpu) {
     let a = cpu.a;
     let value = a.wrapping_sub(1);
@@ -822,6 +917,10 @@ fn ld_a_u8(cpu: &mut Cpu) {
 
 fn ld_b_b(cpu: &mut Cpu) {
     cpu.b = cpu.b;
+}
+
+fn ld_b_e(cpu: &mut Cpu) {
+    cpu.b = cpu.e;
 }
 
 fn ld_b_h(cpu: &mut Cpu) {
@@ -903,6 +1002,14 @@ fn ld_a_l(cpu: &mut Cpu) {
     cpu.a = cpu.l;
 }
 
+fn add_a_c(cpu: &mut Cpu) {
+    cpu.a = add_set_flags(cpu, cpu.a, cpu.c);
+}
+
+fn add_a_e(cpu: &mut Cpu) {
+    cpu.a = add_set_flags(cpu, cpu.a, cpu.e);
+}
+
 fn add_a_mhl(cpu: &mut Cpu) {
     let byte = cpu.mmu.read(cpu.hl());
     cpu.a = add_set_flags(cpu, cpu.a, byte);
@@ -910,6 +1017,10 @@ fn add_a_mhl(cpu: &mut Cpu) {
 
 fn sub_a_b(cpu: &mut Cpu) {
     cpu.a = sub_set_flags(cpu, cpu.a, cpu.b);
+}
+
+fn sub_a_a(cpu: &mut Cpu) {
+    cpu.a = sub_set_flags(cpu, cpu.a, cpu.a);
 }
 
 fn and_a_c(cpu: &mut Cpu) {
@@ -995,6 +1106,17 @@ fn pop_bc(cpu: &mut Cpu) {
     cpu.set_bc(word);
 }
 
+fn jp_nz_u16(cpu: &mut Cpu) {
+    let word = cpu.read_u16();
+
+    if cpu.get_zero() {
+        return;
+    }
+
+    cpu.pc = word;
+    cpu.ticks = cpu.ticks.wrapping_add(4);
+}
+
 fn jp_u16(cpu: &mut Cpu) {
     let word = cpu.read_u16();
     cpu.pc = word;
@@ -1025,6 +1147,29 @@ fn ret(cpu: &mut Cpu) {
     cpu.pc = cpu.pop_word();
 }
 
+fn jp_z_u16(cpu: &mut Cpu) {
+    let word = cpu.read_u16();
+
+    if !cpu.get_zero() {
+        return;
+    }
+
+    cpu.pc = word;
+    cpu.ticks = cpu.ticks.wrapping_add(4);
+}
+
+fn call_z_u16(cpu: &mut Cpu) {
+    let word = cpu.read_u16();
+
+    if !cpu.get_zero() {
+        return;
+    }
+
+    cpu.push_word(cpu.pc);
+    cpu.pc = word;
+    cpu.ticks = cpu.ticks.wrapping_add(12);
+}
+
 fn call_u16(cpu: &mut Cpu) {
     let word = cpu.read_u16();
     cpu.push_word(cpu.pc);
@@ -1047,6 +1192,29 @@ fn push_de(cpu: &mut Cpu) {
 fn sub_a_u8(cpu: &mut Cpu) {
     let byte = cpu.read_u8();
     cpu.a = sub_set_flags(cpu, cpu.a, byte);
+}
+
+fn jp_c_u16(cpu: &mut Cpu) {
+    let word = cpu.read_u16();
+
+    if !cpu.get_carry() {
+        return;
+    }
+
+    cpu.pc = word;
+    cpu.ticks = cpu.ticks.wrapping_add(4);
+}
+
+fn call_c_u16(cpu: &mut Cpu) {
+    let word = cpu.read_u16();
+
+    if !cpu.get_carry() {
+        return;
+    }
+
+    cpu.push_word(cpu.pc);
+    cpu.pc = word;
+    cpu.ticks = cpu.ticks.wrapping_add(12);
 }
 
 fn ld_mff00u8_a(cpu: &mut Cpu) {
@@ -1156,6 +1324,15 @@ fn srl_b(cpu: &mut Cpu) {
 
 fn bit_7_h(cpu: &mut Cpu) {
     bit_h(cpu, 7);
+}
+
+fn set_4_a(cpu: &mut Cpu) {
+    cpu.a = set(cpu.a, 4);
+}
+
+/// Helper function to set one bit in a u8.
+fn set(value: u8, bit: u8) -> u8 {
+    value | (1u8 << (bit as usize))
 }
 
 /// Helper function that rotates (shifts) left the given

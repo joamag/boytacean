@@ -3,8 +3,8 @@ use boytacean::{
     ppu::{DISPLAY_HEIGHT, DISPLAY_WIDTH},
 };
 use sdl2::{
-    pixels::PixelFormatEnum, video::Window, AudioSubsystem, EventPump, TimerSubsystem,
-    VideoSubsystem,
+    event::Event, pixels::PixelFormatEnum, video::Window, AudioSubsystem, EventPump,
+    TimerSubsystem, VideoSubsystem,
 };
 
 /// The base title to be used in the window.
@@ -76,6 +76,7 @@ fn main() {
     let mut game_boy = GameBoy::new();
     game_boy.load_boot_default();
     game_boy.load_rom("../../res/roms/ld_r_r.gb");
+    //game_boy.load_rom("../../res/roms/opus5.gb");
 
     let mut counter = 0;
 
@@ -84,7 +85,12 @@ fn main() {
             break;
         }
 
-        while let Some(event) = graphics.event_pump.poll_event() {}
+        while let Some(event) = graphics.event_pump.poll_event() {
+            match event {
+                Event::Quit { .. } => break 'main,
+                _ => (),
+            }
+        }
 
         let mut counter_ticks = 0u32;
 

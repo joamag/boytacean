@@ -41,8 +41,16 @@ impl Cpu {
             }
         }
 
-        println!("Implemented {}/{} instructions", implemented, INSTRUCTIONS.len());
-        println!("Implemented {}/{} extended instructions", implemented_ext, EXTENDED.len());
+        println!(
+            "Implemented {}/{} instructions",
+            implemented,
+            INSTRUCTIONS.len()
+        );
+        println!(
+            "Implemented {}/{} extended instructions",
+            implemented_ext,
+            EXTENDED.len()
+        );
 
         Cpu {
             pc: 0x0,
