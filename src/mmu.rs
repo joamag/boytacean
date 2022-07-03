@@ -131,7 +131,7 @@ impl Mmu {
                     self.ram[(addr & 0x1fff) as usize] = value;
                 }
                 0xe00 => {
-                    println!("Writing to PPU OAM");
+                    println!("Writing to PPU OAM at 0x{:04x}", addr);
                 }
                 0xf00 => {
                     if addr >= 0xff80 {

@@ -74,6 +74,10 @@ impl Cpu {
     pub fn clock(&mut self) -> u8 {
         let pc = self.pc;
 
+        if pc >= 0x8000 && pc < 0x9fff {
+            panic!("Invalid PC area at 0x{:04x}", pc);
+        }
+
         // fetches the current instruction and increments
         // the PC (program counter) accordingly
         let mut opcode = self.mmu.read(self.pc);
@@ -92,12 +96,12 @@ impl Cpu {
 
         let (instruction_fn, instruction_time, instruction_str) = instruction;
 
-        if *instruction_str == "! UNIMP !" {
+        //if *instruction_str == "! UNIMP !" {
             println!(
                 "{}\t(0x{:02x})\t${:04x} {}",
                 instruction_str, opcode, pc, is_prefix
             );
-        }
+        //}
 
         // calls the current instruction and increments the number of
         // cycles executed by the instruction time of the instruction
