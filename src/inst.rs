@@ -104,20 +104,20 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (ld_e_mhl, 8, "LD E, [HL]"),
     (ld_e_a, 4, "LD E, A"),
     // 0x6 opcodes
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (ld_h_b, 4, "LD H, B"),
+    (ld_h_c, 4, "LD H, C"),
+    (ld_h_d, 4, "LD H, D"),
+    (ld_h_e, 4, "LD H, E"),
+    (ld_h_h, 4, "LD H, H"),
+    (ld_h_l, 4, "LD H, L"),
+    (ld_h_mhl, 8, "LD H, [HL]"),
     (ld_h_a, 4, "LD H, A"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (ld_l_b, 4, "LD L, B"),
+    (ld_l_c, 4, "LD L, C"),
+    (ld_l_d, 4, "LD L, D"),
+    (ld_l_e, 4, "LD L, E"),
+    (ld_l_h, 4, "LD L, H"),
+    (ld_l_l, 4, "LD L, L"),
     (ld_l_mhl, 8, "LD L, [HL]"),
     (ld_l_a, 4, "LD L, A"),
     // 0x7 opcodes
@@ -125,8 +125,8 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (ld_mhl_c, 8, "LD [HL], C"),
     (ld_mhl_d, 8, "LD [HL], D"),
     (ld_mhl_e, 8, "LD [HL], E"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (ld_mhl_h, 8, "LD [HL], H"),
+    (ld_mhl_l, 8, "LD [HL], L"),
     (halt, 4, "HALT"),
     (ld_mhl_a, 8, "LD [HL], A"),
     (ld_a_b, 4, "LD A, B"),
@@ -136,7 +136,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (ld_a_h, 4, "LD A, H"),
     (ld_a_l, 4, "LD A, L"),
     (ld_a_mhl, 8, "LD A, [HL]"),
-    (noimpl, 4, "! UNIMP !"),
+    (ld_a_a, 4, "LD A, A"),
     // 0x8 opcodes
     (add_a_b, 4, "ADD A, B"),
     (add_a_c, 4, "ADD A, C"),
@@ -1081,8 +1081,61 @@ fn ld_e_a(cpu: &mut Cpu) {
     cpu.e = cpu.a;
 }
 
+fn ld_h_b(cpu: &mut Cpu) {
+    cpu.h = cpu.b;
+}
+
+fn ld_h_c(cpu: &mut Cpu) {
+    cpu.h = cpu.c;
+}
+
+fn ld_h_d(cpu: &mut Cpu) {
+    cpu.h = cpu.d;
+}
+
+fn ld_h_e(cpu: &mut Cpu) {
+    cpu.h = cpu.e;
+}
+
+fn ld_h_h(cpu: &mut Cpu) {
+    cpu.h = cpu.h;
+}
+
+fn ld_h_l(cpu: &mut Cpu) {
+    cpu.h = cpu.l;
+}
+
+fn ld_h_mhl(cpu: &mut Cpu) {
+    let byte = cpu.mmu.read(cpu.hl());
+    cpu.h = byte;
+}
+
 fn ld_h_a(cpu: &mut Cpu) {
     cpu.h = cpu.a;
+}
+
+fn ld_l_b(cpu: &mut Cpu) {
+    cpu.l = cpu.b;
+}
+
+fn ld_l_c(cpu: &mut Cpu) {
+    cpu.l = cpu.c;
+}
+
+fn ld_l_d(cpu: &mut Cpu) {
+    cpu.l = cpu.d;
+}
+
+fn ld_l_e(cpu: &mut Cpu) {
+    cpu.l = cpu.e;
+}
+
+fn ld_l_h(cpu: &mut Cpu) {
+    cpu.l = cpu.h;
+}
+
+fn ld_l_l(cpu: &mut Cpu) {
+    cpu.l = cpu.l;
 }
 
 fn ld_l_mhl(cpu: &mut Cpu) {
@@ -1108,6 +1161,14 @@ fn ld_mhl_d(cpu: &mut Cpu) {
 
 fn ld_mhl_e(cpu: &mut Cpu) {
     cpu.mmu.write(cpu.hl(), cpu.e);
+}
+
+fn ld_mhl_h(cpu: &mut Cpu) {
+    cpu.mmu.write(cpu.hl(), cpu.h);
+}
+
+fn ld_mhl_l(cpu: &mut Cpu) {
+    cpu.mmu.write(cpu.hl(), cpu.l);
 }
 
 fn halt(cpu: &mut Cpu) {
@@ -1145,6 +1206,10 @@ fn ld_a_l(cpu: &mut Cpu) {
 fn ld_a_mhl(cpu: &mut Cpu) {
     let byte = cpu.mmu.read(cpu.hl());
     cpu.a = byte;
+}
+
+fn ld_a_a(cpu: &mut Cpu) {
+    cpu.a = cpu.a;
 }
 
 fn add_a_b(cpu: &mut Cpu) {
