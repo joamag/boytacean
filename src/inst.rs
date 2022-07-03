@@ -70,7 +70,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (ld_a_u8, 8, "LD A, u8"),
     (noimpl, 4, "! UNIMP !"),
     // 0x4 opcodes
-    (noimpl, 4, "! UNIMP !"),
+    (ld_b_b, 4, "LD B, B"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
@@ -224,7 +224,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (rst_08h, 16, "RST 08h"),
     // 0xd opcodes
     (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (pop_de, 12, "POP DE"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
@@ -820,6 +820,10 @@ fn ld_a_u8(cpu: &mut Cpu) {
     cpu.a = byte;
 }
 
+fn ld_b_b(cpu: &mut Cpu) {
+    cpu.b = cpu.b;
+}
+
 fn ld_b_h(cpu: &mut Cpu) {
     cpu.b = cpu.h;
 }
@@ -1029,6 +1033,11 @@ fn call_u16(cpu: &mut Cpu) {
 
 fn rst_08h(cpu: &mut Cpu) {
     rst(cpu, 0x0008);
+}
+
+fn pop_de(cpu: &mut Cpu) {
+    let word = cpu.pop_word();
+    cpu.set_de(word);
 }
 
 fn push_de(cpu: &mut Cpu) {
