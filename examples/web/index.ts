@@ -699,8 +699,8 @@ const clearCanvas = async (
             img.src = image;
         });
         const [imgWidth, imgHeight] = [
-            img.width * imageScale,
-            img.height * imageScale
+            img.width * imageScale * window.devicePixelRatio,
+            img.height * imageScale * window.devicePixelRatio
         ];
         const [x0, y0] = [
             state.canvasScaled.width / 2 - imgWidth / 2,
