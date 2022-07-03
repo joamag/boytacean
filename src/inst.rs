@@ -28,7 +28,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (ld_d_u8, 8, "LD D, u8"),
     (rla, 4, "RLA"),
     (jr_i8, 12, "JR i8"),
-    (noimpl, 4, "! UNIMP !"),
+    (add_hl_de, 8, "ADD HL, DE"),
     (ld_a_mde, 8, "LD A, [DE]"),
     (dec_de, 8, "DEC DE"),
     (inc_e, 4, "INC E"),
@@ -226,7 +226,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (ret_nc, 8, "RET NC"),
     (pop_de, 12, "POP DE"),
     (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (illegal, 4, "ILLEGAL"),
     (noimpl, 4, "! UNIMP !"),
     (push_de, 16, "PUSH DE"),
     (sub_a_u8, 8, "SUB A, u8"),
@@ -234,26 +234,26 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (noimpl, 4, "! UNIMP !"),
     (reti, 16, "RETI"),
     (jp_c_u16, 12, "JP C, u16"),
-    (noimpl, 4, "! UNIMP !"),
+    (illegal, 4, "ILLEGAL"),
     (call_c_u16, 12, "CALL C, u16"),
-    (noimpl, 4, "! UNIMP !"),
+    (illegal, 4, "ILLEGAL"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     // 0xe opcodes
     (ld_mff00u8_a, 12, "LD [FF00+u8], A"),
     (pop_hl, 12, "POP HL"),
     (ld_mff00c_a, 8, "LD [FF00+C], A"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (illegal, 4, "ILLEGAL"),
+    (illegal, 4, "ILLEGAL"),
     (push_hl, 16, "PUSH HL"),
     (and_a_u8, 8, "AND A, u8"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (ld_mu16_a, 16, "LD [u16], A"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (illegal, 4, "ILLEGAL"),
+    (illegal, 4, "ILLEGAL"),
+    (illegal, 4, "ILLEGAL"),
     (xor_a_u8, 8, "XOR A, u8"),
     (rst_18h, 16, "RST 18h"),
     // 0xf opcodes
@@ -261,7 +261,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (pop_af, 12, "POP AF"),
     (noimpl, 4, "! UNIMP !"),
     (di, 4, "DI"),
-    (noimpl, 4, "! UNIMP !"),
+    (illegal, 4, "ILLEGAL"),
     (push_af, 16, "PUSH AF"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
@@ -269,8 +269,8 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (noimpl, 4, "! UNIMP !"),
     (ld_a_mu16, 16, "LD A [u16]"),
     (ei, 4, "EI"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (illegal, 4, "ILLEGAL"),
+    (illegal, 4, "ILLEGAL"),
     (cp_a_u8, 8, "CP A, u8"),
     (rst_38h, 16, "RST 38h"),
 ];
@@ -556,6 +556,10 @@ fn noimpl(_cpu: &mut Cpu) {
     todo!("Instruction not implemented");
 }
 
+fn illegal(_cpu: &mut Cpu) {
+    panic!("Illegal instruction");
+}
+
 fn ld_bc_u16(cpu: &mut Cpu) {
     let word = cpu.read_u16();
     cpu.set_bc(word);
@@ -706,6 +710,11 @@ fn rla(cpu: &mut Cpu) {
 fn jr_i8(cpu: &mut Cpu) {
     let byte = cpu.read_u8() as i8;
     cpu.pc = (cpu.pc as i16).wrapping_add(byte as i16) as u16;
+}
+
+fn add_hl_de(cpu: &mut Cpu) {
+    let value = add_u16_u16(cpu, cpu.hl(), cpu.de());
+    cpu.set_hl(value);
 }
 
 fn ld_a_mde(cpu: &mut Cpu) {
