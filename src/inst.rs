@@ -232,7 +232,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (sub_a_u8, 8, "SUB A, u8"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (reti, 16, "RETI"),
     (jp_c_u16, 12, "JP C, u16"),
     (noimpl, 4, "! UNIMP !"),
     (call_c_u16, 12, "CALL C, u16"),
@@ -1210,6 +1210,11 @@ fn push_de(cpu: &mut Cpu) {
 fn sub_a_u8(cpu: &mut Cpu) {
     let byte = cpu.read_u8();
     cpu.a = sub_set_flags(cpu, cpu.a, byte);
+}
+
+fn reti(cpu: &mut Cpu) {
+    cpu.pc = cpu.pop_word();
+    cpu.enable_int();
 }
 
 fn jp_c_u16(cpu: &mut Cpu) {
