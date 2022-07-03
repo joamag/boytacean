@@ -30,7 +30,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (jr_i8, 12, "JR i8"),
     (noimpl, 4, "! UNIMP !"),
     (ld_a_mde, 8, "LD A, [DE]"),
-    (noimpl, 4, "! UNIMP !"),
+    (dec_de, 8, "DEC DE"),
     (inc_e, 4, "INC E"),
     (dec_e, 4, "DEC E"),
     (ld_e_u8, 8, "LD E, u8"),
@@ -71,8 +71,8 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (noimpl, 4, "! UNIMP !"),
     // 0x4 opcodes
     (ld_b_b, 4, "LD B, B"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (ld_b_c, 4, "LD B, C"),
+    (ld_b_d, 4, "LD B, D"),
     (ld_b_e, 4, "LD B, E"),
     (ld_b_h, 4, "LD B, H"),
     (noimpl, 4, "! UNIMP !"),
@@ -138,7 +138,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (ld_a_mhl, 8, "LD A, [HL]"),
     (noimpl, 4, "! UNIMP !"),
     // 0x8 opcodes
-    (noimpl, 4, "! UNIMP !"),
+    (add_a_b, 4, "ADD A, B"),
     (add_a_c, 4, "ADD A, C"),
     (noimpl, 4, "! UNIMP !"),
     (add_a_e, 4, "ADD A, E"),
@@ -347,7 +347,7 @@ pub const EXTENDED: [(fn(&mut Cpu), u8, &'static str); 256] = [
     // 0x4 opcodes
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (bit_0_d, 8, "BIT 0, D"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
@@ -708,6 +708,10 @@ fn ld_a_mde(cpu: &mut Cpu) {
     cpu.a = byte;
 }
 
+fn dec_de(cpu: &mut Cpu) {
+    cpu.set_de(cpu.de().wrapping_sub(1));
+}
+
 fn inc_e(cpu: &mut Cpu) {
     let value = cpu.e.wrapping_add(1);
 
@@ -919,6 +923,14 @@ fn ld_b_b(cpu: &mut Cpu) {
     cpu.b = cpu.b;
 }
 
+fn ld_b_c(cpu: &mut Cpu) {
+    cpu.b = cpu.c;
+}
+
+fn ld_b_d(cpu: &mut Cpu) {
+    cpu.b = cpu.d;
+}
+
 fn ld_b_e(cpu: &mut Cpu) {
     cpu.b = cpu.e;
 }
@@ -1009,6 +1021,10 @@ fn ld_a_l(cpu: &mut Cpu) {
 fn ld_a_mhl(cpu: &mut Cpu) {
     let byte = cpu.mmu.read(cpu.hl());
     cpu.a = byte;
+}
+
+fn add_a_b(cpu: &mut Cpu) {
+    cpu.a = add_set_flags(cpu, cpu.a, cpu.b);
 }
 
 fn add_a_c(cpu: &mut Cpu) {
@@ -1349,6 +1365,10 @@ fn srl_b(cpu: &mut Cpu) {
     cpu.b = srl(cpu, cpu.b);
 }
 
+fn bit_0_d(cpu: &mut Cpu) {
+    bit_d(cpu, 0);
+}
+
 fn bit_7_h(cpu: &mut Cpu) {
     bit_h(cpu, 7);
 }
@@ -1412,6 +1432,12 @@ fn rr(cpu: &mut Cpu, value: u8) -> u8 {
 /// Returns true if bit is 0.
 fn bit_zero(val: u8, bit: u8) -> bool {
     (val & (1u8 << (bit as usize))) == 0
+}
+
+fn bit_d(cpu: &mut Cpu, bit: u8) {
+    cpu.set_sub(false);
+    cpu.set_zero(bit_zero(cpu.d, bit));
+    cpu.set_half_carry(true);
 }
 
 fn bit_h(cpu: &mut Cpu, bit: u8) {
