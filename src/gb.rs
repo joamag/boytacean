@@ -25,6 +25,9 @@ pub const BOOT_DATA: [u8; 256] = [
     6, 25, 120, 134, 35, 5, 32, 251, 134, 32, 254, 62, 1, 224, 80,
 ];
 
+/// Top level structure that abstracts the usage of the
+/// Game Boy system under the Boytacean emulator.
+/// Should serve as the main entry-point API.
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 pub struct GameBoy {
     cpu: Cpu,
