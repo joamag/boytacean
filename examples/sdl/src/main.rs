@@ -3,8 +3,8 @@ use boytacean::{
     ppu::{DISPLAY_HEIGHT, DISPLAY_WIDTH},
 };
 use sdl2::{
-    event::Event, pixels::PixelFormatEnum, video::Window, AudioSubsystem, EventPump,
-    TimerSubsystem, VideoSubsystem,
+    event::Event, image::LoadSurface, pixels::PixelFormatEnum, surface::Surface, video::Window,
+    AudioSubsystem, EventPump, TimerSubsystem, VideoSubsystem,
 };
 
 /// The base title to be used in the window.
@@ -56,6 +56,11 @@ fn start_sdl() -> Graphics {
 
 fn main() {
     let mut graphics = start_sdl();
+
+    // updates the icon of the window to reflect the image
+    // and style of the emulator
+    let surface = Surface::from_file("./res/icon.png").unwrap();
+    graphics.window.set_icon(&surface);
 
     let mut canvas = graphics.window.into_canvas().accelerated().build().unwrap();
     canvas.clear();
