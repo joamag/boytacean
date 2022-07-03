@@ -80,6 +80,8 @@ impl Cpu {
 
         let pc = self.pc;
 
+        //@todo maybe remove this option as it may
+        // spend valuable resources
         if pc >= 0x8000 && pc < 0x9fff {
             panic!("Invalid PC area at 0x{:04x}", pc);
         }

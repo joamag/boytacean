@@ -25,7 +25,7 @@ pub const FRAME_BUFFER_SIZE: usize = DISPLAY_WIDTH * DISPLAY_HEIGHT * RGB_SIZE;
 /// # Basic usage
 /// ```rust
 /// let ppu = Ppu::new();
-/// ppu.tick();
+/// ppu.clock();
 /// ```
 pub struct Ppu {
     /// The 8 bit based RGB frame buffer with the
@@ -82,11 +82,12 @@ pub struct Ppu {
     stat_lyc: bool,
 }
 
+#[derive(Clone, Copy)]
 pub enum PpuMode {
-    OamRead,
-    VramRead,
-    Hblank,
-    VBlank,
+    Hblank = 0,
+    VBlank = 1,
+    OamRead = 2,
+    VramRead = 3,
 }
 
 impl Ppu {
@@ -117,7 +118,14 @@ impl Ppu {
     }
 
     pub fn clock(&mut self, cycles: u8) {
+        if !self.switch_lcd {
+            return;
+        }
+
+        // increments the current mode clock by the provided amount
+        // of CPU cycles (probably coming from a previous CPU clock)
         self.mode_clock += cycles as u16;
+
         match self.mode {
             PpuMode::OamRead => {
                 if self.mode_clock >= 80 {
@@ -127,7 +135,9 @@ impl Ppu {
             }
             PpuMode::VramRead => {
                 if self.mode_clock >= 172 {
-                    self.render_line();
+                    if self.switch_bg {
+                        self.render_line();
+                    }
 
                     self.mode_clock = 0;
                     self.mode = PpuMode::Hblank;
@@ -182,7 +192,8 @@ impl Ppu {
                 let value = if self.stat_hblank { 0x04 } else { 0x00 }
                     | if self.stat_vblank { 0x08 } else { 0x00 }
                     | if self.stat_oam { 0x10 } else { 0x00 }
-                    | if self.stat_lyc { 0x20 } else { 0x00 };
+                    | if self.stat_lyc { 0x20 } else { 0x00 }
+                    | self.mode as u8;
                 value
             }
             0x0042 => self.scy,
@@ -339,6 +350,14 @@ impl Ppu {
                     tile_index += 256;
                 }
             }
+        }
+    }
+
+    pub fn fill_frame_buffer(&mut self, color: [u8; RGB_SIZE]) {
+        for index in (0..self.frame_buffer.len()).step_by(RGB_SIZE) {
+            self.frame_buffer[index] = color[0];
+            self.frame_buffer[index + 1] = color[1];
+            self.frame_buffer[index + 2] = color[2];
         }
     }
 
