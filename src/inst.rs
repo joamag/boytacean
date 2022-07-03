@@ -852,7 +852,7 @@ fn ld_sp_u16(cpu: &mut Cpu) {
 }
 
 fn jr_nc_i8(cpu: &mut Cpu) {
-    let byte = cpu.read_u8();
+    let byte = cpu.read_u8() as i8;
 
     if cpu.get_carry() {
         return;
@@ -879,7 +879,7 @@ fn scf(cpu: &mut Cpu) {
 }
 
 fn jr_c_i8(cpu: &mut Cpu) {
-    let byte = cpu.read_u8();
+    let byte = cpu.read_u8() as i8;
 
     if !cpu.get_carry() {
         return;

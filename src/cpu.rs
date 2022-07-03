@@ -96,7 +96,8 @@ impl Cpu {
 
         let (instruction_fn, instruction_time, instruction_str) = instruction;
 
-        if !self.mmu.boot_active() || *instruction_str == "! UNIMP !" {
+        // if !self.mmu.boot_active() {
+        if *instruction_str == "! UNIMP !" {
             println!(
                 "{}\t(0x{:02x})\t${:04x} {}",
                 instruction_str, opcode, pc, is_prefix
