@@ -94,9 +94,9 @@ pub struct Ppu {
     stat_lyc: bool,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum PpuMode {
-    Hblank = 0,
+    HBlank = 0,
     VBlank = 1,
     OamRead = 2,
     VramRead = 3,
@@ -156,10 +156,10 @@ impl Ppu {
                     }
 
                     self.mode_clock = 0;
-                    self.mode = PpuMode::Hblank;
+                    self.mode = PpuMode::HBlank;
                 }
             }
-            PpuMode::Hblank => {
+            PpuMode::HBlank => {
                 if self.mode_clock >= 204 {
                     self.ly += 1;
 
@@ -395,5 +395,14 @@ impl Ppu {
             }
             print!("\n");
         }
+    }
+
+    /// Obtains the current level of the LCD interrupt by
+    /// checking the current PPU state in various sections.
+    fn interrupt_level(&self) -> bool {
+        self.stat_lyc && self.lyc == self.ly
+            || self.stat_oam && self.mode == PpuMode::OamRead
+            || self.stat_vblank && self.mode == PpuMode::VBlank
+            || self.stat_vblank && self.mode == PpuMode::HBlank
     }
 }
