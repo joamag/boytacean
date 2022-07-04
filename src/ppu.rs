@@ -212,7 +212,8 @@ impl Ppu {
                     | if self.stat_vblank { 0x08 } else { 0x00 }
                     | if self.stat_oam { 0x10 } else { 0x00 }
                     | if self.stat_lyc { 0x20 } else { 0x00 }
-                    | self.mode as u8;
+                    | if self.lyc == self.line { 0x04 } else { 0x00 }
+                    | (self.mode as u8 & 0x03);
                 value
             }
             0x0042 => self.scy,
