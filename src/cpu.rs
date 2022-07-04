@@ -80,6 +80,8 @@ impl Cpu {
             return 4;
         }
 
+        // gathers the PC (program counter) reference that
+        // is going to be used in the fetching phase
         let pc = self.pc;
 
         //@todo maybe remove this option as it may
@@ -107,12 +109,12 @@ impl Cpu {
         let (instruction_fn, instruction_time, instruction_str) = instruction;
 
         // if !self.mmu.boot_active() {
-        if *instruction_str == "! UNIMP !" {
-            println!(
-                "{}\t(0x{:02x})\t${:04x} {}",
-                instruction_str, opcode, pc, is_prefix
-            );
-        }
+        //if *instruction_str == "! UNIMP !" {
+        println!(
+            "{}\t(0x{:02x})\t${:04x} {}",
+            instruction_str, opcode, pc, is_prefix
+        );
+        //}
 
         // calls the current instruction and increments the number of
         // cycles executed by the instruction time of the instruction

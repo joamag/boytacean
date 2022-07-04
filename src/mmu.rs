@@ -98,13 +98,13 @@ impl Mmu {
         match addr & 0xf000 {
             // BOOT (256 B) + ROM0 (4 KB/16 KB)
             0x0000 => {
-                self.rom[addr as usize] = value;
-                panic!("Writing to BOOT at 0x{:04x}", addr)
+                println!("Writing to ROM 0 at 0x{:04x}", addr)
             }
             // ROM 0 (12 KB/16 KB)
-            0x1000 | 0x2000 | 0x3000 => {
-                panic!("Writing to ROM 0 at 0x{:04x}", addr);
-            }
+            0x1000 | 0x2000 | 0x3000 => match addr {
+                0x2000 => (),
+                _ => panic!("Writing to ROM 0 at 0x{:04x}", addr),
+            },
             // ROM 1 (Unbanked) (16 KB)
             0x4000 | 0x5000 | 0x6000 | 0x7000 => {
                 panic!("Writing to ROM 1 at 0x{:04x}", addr);

@@ -79,7 +79,7 @@ fn main() {
         .unwrap();
 
     let mut game_boy = GameBoy::new();
-    game_boy.load_boot_dmg();
+    game_boy.load_boot_sgb();
     game_boy.load_rom_file("../../res/roms.prop/tetris.gb");
     //game_boy.load_rom_file("../../res/roms/firstwhite.gb");
     //game_boy.load_rom_file("../../res/roms/opus5.gb");

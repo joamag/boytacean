@@ -140,20 +140,20 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     // 0x8 opcodes
     (add_a_b, 4, "ADD A, B"),
     (add_a_c, 4, "ADD A, C"),
-    (noimpl, 4, "! UNIMP !"),
+    (add_a_d, 4, "ADD A, D"),
     (add_a_e, 4, "ADD A, E"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (add_a_h, 4, "ADD A, H"),
+    (add_a_l, 4, "ADD A, L"),
     (add_a_mhl, 8, "ADD A, [HL]"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (add_a_a, 4, "ADD A, A"),
+    (add_a_b, 4, "ADD A, B"),
+    (add_a_c, 4, "ADD A, C"),
+    (add_a_d, 4, "ADD A, D"),
+    (add_a_e, 4, "ADD A, E"),
+    (add_a_h, 4, "ADD A, H"),
+    (add_a_l, 4, "ADD A, L"),
+    (add_a_mhl, 8, "ADD A, [HL]"),
+    (add_a_a, 4, "ADD A, A"),
     // 0x9 opcodes
     (sub_a_b, 4, "SUB A, B"),
     (noimpl, 4, "! UNIMP !"),
@@ -238,7 +238,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (call_c_u16, 12, "CALL C, u16"),
     (illegal, 4, "ILLEGAL"),
     (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (rst_18h, 16, "RST 18h"),
     // 0xe opcodes
     (ld_mff00u8_a, 12, "LD [FF00+u8], A"),
     (pop_hl, 12, "POP HL"),
@@ -255,7 +255,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (illegal, 4, "ILLEGAL"),
     (illegal, 4, "ILLEGAL"),
     (xor_a_u8, 8, "XOR A, u8"),
-    (rst_18h, 16, "RST 18h"),
+    (rst_28h, 16, "RST 28h"),
     // 0xf opcodes
     (ld_a_mff00u8, 12, "LD A, [FF00+u8]"),
     (pop_af, 12, "POP AF"),
@@ -1229,13 +1229,29 @@ fn add_a_c(cpu: &mut Cpu) {
     cpu.a = add_set_flags(cpu, cpu.a, cpu.c);
 }
 
+fn add_a_d(cpu: &mut Cpu) {
+    cpu.a = add_set_flags(cpu, cpu.a, cpu.d);
+}
+
 fn add_a_e(cpu: &mut Cpu) {
     cpu.a = add_set_flags(cpu, cpu.a, cpu.e);
+}
+
+fn add_a_h(cpu: &mut Cpu) {
+    cpu.a = add_set_flags(cpu, cpu.a, cpu.h);
+}
+
+fn add_a_l(cpu: &mut Cpu) {
+    cpu.a = add_set_flags(cpu, cpu.a, cpu.l);
 }
 
 fn add_a_mhl(cpu: &mut Cpu) {
     let byte = cpu.mmu.read(cpu.hl());
     cpu.a = add_set_flags(cpu, cpu.a, byte);
+}
+
+fn add_a_a(cpu: &mut Cpu) {
+    cpu.a = add_set_flags(cpu, cpu.a, cpu.a);
 }
 
 fn sub_a_b(cpu: &mut Cpu) {
@@ -1524,6 +1540,10 @@ fn call_c_u16(cpu: &mut Cpu) {
     cpu.ticks = cpu.ticks.wrapping_add(12);
 }
 
+fn rst_18h(cpu: &mut Cpu) {
+    rst(cpu, 0x0018);
+}
+
 fn ld_mff00u8_a(cpu: &mut Cpu) {
     let byte = cpu.read_u8();
     cpu.mmu.write(0xff00 + byte as u16, cpu.a);
@@ -1572,8 +1592,8 @@ fn xor_a_u8(cpu: &mut Cpu) {
     cpu.set_carry(false);
 }
 
-fn rst_18h(cpu: &mut Cpu) {
-    rst(cpu, 0x0018);
+fn rst_28h(cpu: &mut Cpu) {
+    rst(cpu, 0x0028);
 }
 
 fn ld_a_mff00u8(cpu: &mut Cpu) {
