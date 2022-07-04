@@ -80,13 +80,19 @@ fn main() {
 
     let mut game_boy = GameBoy::new();
     game_boy.load_boot_sgb();
+
     //game_boy.load_rom_file("../../res/roms.prop/tetris.gb");
     //game_boy.load_rom_file("../../res/roms.prop/alleyway.gb");
-    game_boy.load_rom_file("../../res/roms/07-jr,jp,call,ret,rst.gb");
+    
     //game_boy.load_rom_file("../../res/roms/firstwhite.gb");
     //game_boy.load_rom_file("../../res/roms/opus5.gb");
     //game_boy.load_rom_file("../../res/roms/ld_r_r.gb");
     //game_boy.load_rom_file("../../res/roms/special.gb");
+
+    game_boy.load_rom_file("../../res/roms/paradius/cpu/03-op sp,hl.gb");
+    //game_boy.load_rom_file("../../res/roms/paradius/cpu/04-op r,imm.gb"); // PASSED
+    //game_boy.load_rom_file("../../res/roms/paradius/cpu/06-ld r,r.gb"); // PASSED
+    //game_boy.load_rom_file("../../res/roms/paradius/cpu/07-jr,jp,call,ret,rst.gb"); // PASSED
 
     let mut counter = 0;
 
