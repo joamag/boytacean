@@ -57,13 +57,13 @@ pub struct Ppu {
     /// The scroll X register that controls the X offset
     /// of the background.
     scx: u8,
-    // The line compare register that is going to be used
-    // in the STATE and associated interrupts.
-    lyc: u8,
     /// The current scan line in processing, should
     /// range between 0 (0x00) and 153 (0x99), representing
     /// the 154 lines plus 10 extra v-blank lines.
-    line: u8,
+    ly: u8,
+    // The line compare register that is going to be used
+    // in the STATE and associated interrupts.
+    lyc: u8,
     /// The current execution mode of the PPU, should change
     /// between states over the drawing of a frame.
     mode: PpuMode,
@@ -114,8 +114,8 @@ impl Ppu {
             palette_obj_1: [[0u8; RGB_SIZE]; PALETTE_SIZE],
             scy: 0x0,
             scx: 0x0,
+            ly: 0x0,
             lyc: 0x0,
-            line: 0x0,
             mode: PpuMode::OamRead,
             mode_clock: 0,
             switch_bg: false,
@@ -161,11 +161,11 @@ impl Ppu {
             }
             PpuMode::Hblank => {
                 if self.mode_clock >= 204 {
-                    self.line += 1;
+                    self.ly += 1;
 
                     // in case we've reached the end of the
                     // screen we're now entering the v-blank
-                    if self.line == 144 {
+                    if self.ly == 144 {
                         self.mode = PpuMode::VBlank;
                         // self.drawData
                         // @todo implement this one
@@ -178,14 +178,14 @@ impl Ppu {
             }
             PpuMode::VBlank => {
                 if self.mode_clock >= 456 {
-                    self.line += 1;
+                    self.ly += 1;
 
                     // in case the end of v-blank has been reached then
                     // we must jump again to the OAM read mode and reset
                     // the scan line counter to the zero value
-                    if self.line == 154 {
+                    if self.ly == 154 {
                         self.mode = PpuMode::OamRead;
-                        self.line = 0;
+                        self.ly = 0;
                     }
 
                     self.mode_clock = 0;
@@ -212,13 +212,13 @@ impl Ppu {
                     | if self.stat_vblank { 0x08 } else { 0x00 }
                     | if self.stat_oam { 0x10 } else { 0x00 }
                     | if self.stat_lyc { 0x20 } else { 0x00 }
-                    | if self.lyc == self.line { 0x04 } else { 0x00 }
+                    | if self.lyc == self.ly { 0x04 } else { 0x00 }
                     | (self.mode as u8 & 0x03);
                 value
             }
             0x0042 => self.scy,
             0x0043 => self.scx,
-            0x0044 => self.line,
+            0x0044 => self.ly,
             0x0045 => self.lyc,
             addr => panic!("Reading from unknown PPU location 0x{:04x}", addr),
         }
@@ -317,14 +317,14 @@ impl Ppu {
 
         // increments the offset by the number of lines and the SCY (scroll Y)
         // divided by 8 (as the tiles are 8x8 pixels)
-        map_offset += ((((self.line + self.scy) & 0xff) >> 3) as usize) * 32;
+        map_offset += ((((self.ly + self.scy) & 0xff) >> 3) as usize) * 32;
 
         // calculates the sprite line offset by using the SCX register
         // shifted by 3 meaning that the tiles are 8x8
         let mut line_offset: usize = (self.scx >> 3) as usize;
 
         // calculates both the current Y and X positions within the tiles
-        let y = ((self.scy + self.line) & 0x07) as usize;
+        let y = ((self.scy + self.ly) & 0x07) as usize;
         let mut x = (self.scx & 0x07) as usize;
 
         // calculates the index of the initial tile in drawing,
@@ -337,7 +337,7 @@ impl Ppu {
 
         // calculates the frame buffer offset position assuming the proper
         // Game Boy screen width and RGB pixel (3 bytes) size
-        let mut frame_offset = self.line as usize * DISPLAY_WIDTH * RGB_SIZE;
+        let mut frame_offset = self.ly as usize * DISPLAY_WIDTH * RGB_SIZE;
 
         for _index in 0..DISPLAY_WIDTH {
             // obtains the current pixel data from the tile and
