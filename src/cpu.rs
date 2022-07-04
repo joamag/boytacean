@@ -28,7 +28,7 @@ pub struct Cpu {
 }
 
 impl Cpu {
-    pub fn new(mmu: Mmu) -> Cpu {
+    pub fn new(mmu: Mmu) -> Self {
         let mut implemented = 0;
         let mut implemented_ext = 0;
 
@@ -55,7 +55,7 @@ impl Cpu {
             EXTENDED.len()
         );
 
-        Cpu {
+        Self {
             pc: 0x0,
             sp: 0x0,
             a: 0x0,

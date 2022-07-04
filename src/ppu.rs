@@ -95,8 +95,8 @@ pub enum PpuMode {
 }
 
 impl Ppu {
-    pub fn new() -> Ppu {
-        Ppu {
+    pub fn new() -> Self {
+        Self {
             frame_buffer: Box::new([0u8; DISPLAY_WIDTH * DISPLAY_HEIGHT * RGB_SIZE]),
             vram: [0u8; VRAM_SIZE],
             hram: [0u8; HRAM_SIZE],

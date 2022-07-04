@@ -2,6 +2,7 @@ use crate::{
     cpu::Cpu,
     data::{DMG_BOOT, SGB_BOOT},
     mmu::Mmu,
+    pad::Pad,
     ppu::{Ppu, FRAME_BUFFER_SIZE},
     util::read_file,
 };
@@ -20,11 +21,12 @@ pub struct GameBoy {
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 impl GameBoy {
     #[cfg_attr(feature = "wasm", wasm_bindgen(constructor))]
-    pub fn new() -> GameBoy {
+    pub fn new() -> Self {
+        let pad = Pad::new();
         let ppu = Ppu::new();
-        let mmu = Mmu::new(ppu);
+        let mmu = Mmu::new(ppu, pad);
         let cpu = Cpu::new(mmu);
-        GameBoy { cpu: cpu }
+        Self { cpu: cpu }
     }
 
     pub fn pc(&self) -> u16 {
