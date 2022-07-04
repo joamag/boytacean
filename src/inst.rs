@@ -213,7 +213,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (call_nz_u16, 12, "CALL NZ, u16"),
     (push_bc, 16, "PUSH BC"),
     (add_a_u8, 8, "ADD A, u8"),
-    (noimpl, 4, "! UNIMP !"),
+    (rst_00h, 16, "RST 00h"),
     (ret_z, 8, "RET Z"),
     (ret, 16, "RET"),
     (jp_z_u16, 12, "JP Z, u16"),
@@ -225,12 +225,12 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     // 0xd opcodes
     (ret_nc, 8, "RET NC"),
     (pop_de, 12, "POP DE"),
-    (noimpl, 4, "! UNIMP !"),
+    (jp_nc_u16, 12, "JP NC, u16"),
     (illegal, 4, "ILLEGAL"),
-    (noimpl, 4, "! UNIMP !"),
+    (call_nc_u16, 12, "CALL NC, u16 "),
     (push_de, 16, "PUSH DE"),
     (sub_a_u8, 8, "SUB A, u8"),
-    (noimpl, 4, "! UNIMP !"),
+    (rst_10h, 16, "RST 10h"),
     (ret_c, 8, "RET C"),
     (reti, 16, "RETI"),
     (jp_c_u16, 12, "JP C, u16"),
@@ -247,7 +247,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (illegal, 4, "ILLEGAL"),
     (push_hl, 16, "PUSH HL"),
     (and_a_u8, 8, "AND A, u8"),
-    (noimpl, 4, "! UNIMP !"),
+    (rst_20h, 16, "RST 20h"),
     (noimpl, 4, "! UNIMP !"),
     (jp_hl, 4, "JP HL"),
     (ld_mu16_a, 16, "LD [u16], A"),
@@ -264,9 +264,9 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (illegal, 4, "ILLEGAL"),
     (push_af, 16, "PUSH AF"),
     (noimpl, 4, "! UNIMP !"),
+    (rst_30h, 16, "RST 30h"),
     (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (ld_sp_hl, 8, "LD SP, HL"),
     (ld_a_mu16, 16, "LD A [u16]"),
     (ei, 4, "EI"),
     (illegal, 4, "ILLEGAL"),
@@ -1493,6 +1493,10 @@ fn add_a_u8(cpu: &mut Cpu) {
     cpu.a = add_set_flags(cpu, cpu.a, byte);
 }
 
+fn rst_00h(cpu: &mut Cpu) {
+    rst(cpu, 0x0000);
+}
+
 fn ret_z(cpu: &mut Cpu) {
     if !cpu.get_zero() {
         return;
@@ -1558,6 +1562,29 @@ fn pop_de(cpu: &mut Cpu) {
     cpu.set_de(word);
 }
 
+fn jp_nc_u16(cpu: &mut Cpu) {
+    let word = cpu.read_u16();
+
+    if cpu.get_carry() {
+        return;
+    }
+
+    cpu.pc = word;
+    cpu.ticks = cpu.ticks.wrapping_add(4);
+}
+
+fn call_nc_u16(cpu: &mut Cpu) {
+    let word = cpu.read_u16();
+
+    if cpu.get_carry() {
+        return;
+    }
+
+    cpu.push_word(cpu.pc);
+    cpu.pc = word;
+    cpu.ticks = cpu.ticks.wrapping_add(12);
+}
+
 fn push_de(cpu: &mut Cpu) {
     cpu.push_word(cpu.de());
 }
@@ -1565,6 +1592,10 @@ fn push_de(cpu: &mut Cpu) {
 fn sub_a_u8(cpu: &mut Cpu) {
     let byte = cpu.read_u8();
     cpu.a = sub_set_flags(cpu, cpu.a, byte);
+}
+
+fn rst_10h(cpu: &mut Cpu) {
+    rst(cpu, 0x0010);
 }
 
 fn ret_c(cpu: &mut Cpu) {
@@ -1637,6 +1668,10 @@ fn and_a_u8(cpu: &mut Cpu) {
     cpu.set_carry(false);
 }
 
+fn rst_20h(cpu: &mut Cpu) {
+    rst(cpu, 0x0020);
+}
+
 fn jp_hl(cpu: &mut Cpu) {
     cpu.pc = cpu.hl();
 }
@@ -1676,6 +1711,14 @@ fn di(cpu: &mut Cpu) {
 
 fn push_af(cpu: &mut Cpu) {
     cpu.push_word(cpu.af());
+}
+
+fn rst_30h(cpu: &mut Cpu) {
+    rst(cpu, 0x0030);
+}
+
+fn ld_sp_hl(cpu: &mut Cpu) {
+    cpu.sp = cpu.hl();
 }
 
 fn ld_a_mu16(cpu: &mut Cpu) {
