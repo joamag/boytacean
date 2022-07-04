@@ -237,7 +237,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (illegal, 4, "ILLEGAL"),
     (call_c_u16, 12, "CALL C, u16"),
     (illegal, 4, "ILLEGAL"),
-    (noimpl, 4, "! UNIMP !"),
+    (sbc_a_u8, 8, "SBC A, u8"),
     (rst_18h, 16, "RST 18h"),
     // 0xe opcodes
     (ld_mff00u8_a, 12, "LD [FF00+u8], A"),
@@ -318,7 +318,7 @@ pub const EXTENDED: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (sla_a, 8, "SLA A"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
@@ -512,7 +512,7 @@ pub const EXTENDED: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (set_3_mhl, 16, "SET 3, [HL]"),
     (noimpl, 4, "! UNIMP !"),
     // 0xe opcodes
     (noimpl, 4, "! UNIMP !"),
@@ -1635,6 +1635,11 @@ fn call_c_u16(cpu: &mut Cpu) {
     cpu.ticks = cpu.ticks.wrapping_add(12);
 }
 
+fn sbc_a_u8(cpu: &mut Cpu) {
+    let byte = cpu.read_u8();
+    cpu.a = sub_carry_set_flags(cpu, cpu.a, byte);
+}
+
 fn rst_18h(cpu: &mut Cpu) {
     rst(cpu, 0x0018);
 }
@@ -1760,6 +1765,10 @@ fn sla_b(cpu: &mut Cpu) {
     cpu.b = sla(cpu, cpu.b);
 }
 
+fn sla_a(cpu: &mut Cpu) {
+    cpu.a = sla(cpu, cpu.a);
+}
+
 fn swap_a(cpu: &mut Cpu) {
     cpu.a = swap(cpu, cpu.a)
 }
@@ -1784,6 +1793,13 @@ fn res_7_mhl(cpu: &mut Cpu) {
     let hl = cpu.hl();
     let byte = cpu.mmu.read(hl);
     let value = res(byte, 7);
+    cpu.mmu.write(hl, value);
+}
+
+fn set_3_mhl(cpu: &mut Cpu) {
+    let hl = cpu.hl();
+    let byte = cpu.mmu.read(hl);
+    let value = set(byte, 3);
     cpu.mmu.write(hl, value);
 }
 
@@ -1889,6 +1905,22 @@ fn sub_set_flags(cpu: &mut Cpu, first: u8, second: u8) -> u8 {
     let second = second as u32;
 
     let result = first.wrapping_sub(second);
+    let result_b = result as u8;
+
+    cpu.set_sub(true);
+    cpu.set_zero(result_b == 0);
+    cpu.set_half_carry((first ^ second ^ result) & 0x10 == 0x10);
+    cpu.set_carry(result & 0x100 == 0x100);
+
+    result_b
+}
+
+fn sub_carry_set_flags(cpu: &mut Cpu, first: u8, second: u8) -> u8 {
+    let first = first as u32;
+    let second = second as u32;
+    let carry = cpu.get_carry() as u32;
+
+    let result = first.wrapping_sub(second).wrapping_sub(carry);
     let result_b = result as u8;
 
     cpu.set_sub(true);

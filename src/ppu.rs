@@ -57,6 +57,9 @@ pub struct Ppu {
     /// The scroll X register that controls the X offset
     /// of the background.
     scx: u8,
+    // The line compare register that is going to be used
+    // in the STATE and associated interrupts.
+    lyc: u8,
     /// The current scan line in processing, should
     /// range between 0 (0x00) and 153 (0x99), representing
     /// the 154 lines plus 10 extra v-blank lines.
@@ -111,6 +114,7 @@ impl Ppu {
             palette_obj_1: [[0u8; RGB_SIZE]; PALETTE_SIZE],
             scy: 0x0,
             scx: 0x0,
+            lyc: 0x0,
             line: 0x0,
             mode: PpuMode::OamRead,
             mode_clock: 0,
@@ -214,6 +218,7 @@ impl Ppu {
             0x0042 => self.scy,
             0x0043 => self.scx,
             0x0044 => self.line,
+            0x0045 => self.lyc,
             addr => panic!("Reading from unknown PPU location 0x{:04x}", addr),
         }
     }
@@ -238,6 +243,7 @@ impl Ppu {
             }
             0x0042 => self.scy = value,
             0x0043 => self.scx = value,
+            0x0045 => self.lyc = value,
             0x0047 => {
                 for index in 0..PALETTE_SIZE {
                     match (value >> (index * 2)) & 3 {
