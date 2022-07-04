@@ -172,14 +172,14 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     // 0xa opcodes
-    (noimpl, 4, "! UNIMP !"),
+    (and_a_b, 4, "AND A, B"),
     (and_a_c, 4, "AND A, C"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (and_a_d, 4, "AND A, D"),
+    (and_a_e, 4, "AND A, E"),
+    (and_a_h, 4, "AND A, H"),
+    (and_a_l, 4, "AND A, L"),
+    (and_a_mhl, 4, "AND A, [HL]"),
+    (and_a_a, 4, "AND A, A"),
     (noimpl, 4, "! UNIMP !"),
     (xor_a_c, 4, "XOR A, C"),
     (noimpl, 4, "! UNIMP !"),
@@ -420,7 +420,7 @@ pub const EXTENDED: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (res_0_a, 8, "RES 0, A"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
@@ -1262,8 +1262,72 @@ fn sub_a_a(cpu: &mut Cpu) {
     cpu.a = sub_set_flags(cpu, cpu.a, cpu.a);
 }
 
+fn and_a_b(cpu: &mut Cpu) {
+    cpu.a &= cpu.b;
+
+    cpu.set_sub(false);
+    cpu.set_zero(cpu.a == 0);
+    cpu.set_half_carry(true);
+    cpu.set_carry(false);
+}
+
 fn and_a_c(cpu: &mut Cpu) {
     cpu.a &= cpu.c;
+
+    cpu.set_sub(false);
+    cpu.set_zero(cpu.a == 0);
+    cpu.set_half_carry(true);
+    cpu.set_carry(false);
+}
+
+fn and_a_d(cpu: &mut Cpu) {
+    cpu.a &= cpu.d;
+
+    cpu.set_sub(false);
+    cpu.set_zero(cpu.a == 0);
+    cpu.set_half_carry(true);
+    cpu.set_carry(false);
+}
+
+fn and_a_e(cpu: &mut Cpu) {
+    cpu.a &= cpu.e;
+
+    cpu.set_sub(false);
+    cpu.set_zero(cpu.a == 0);
+    cpu.set_half_carry(true);
+    cpu.set_carry(false);
+}
+
+fn and_a_h(cpu: &mut Cpu) {
+    cpu.a &= cpu.h;
+
+    cpu.set_sub(false);
+    cpu.set_zero(cpu.a == 0);
+    cpu.set_half_carry(true);
+    cpu.set_carry(false);
+}
+
+fn and_a_l(cpu: &mut Cpu) {
+    cpu.a &= cpu.l;
+
+    cpu.set_sub(false);
+    cpu.set_zero(cpu.a == 0);
+    cpu.set_half_carry(true);
+    cpu.set_carry(false);
+}
+
+fn and_a_mhl(cpu: &mut Cpu) {
+    let byte = cpu.mmu.read(cpu.hl());
+    cpu.a &= byte;
+
+    cpu.set_sub(false);
+    cpu.set_zero(cpu.a == 0);
+    cpu.set_half_carry(true);
+    cpu.set_carry(false);
+}
+
+fn and_a_a(cpu: &mut Cpu) {
+    cpu.a &= cpu.a;
 
     cpu.set_sub(false);
     cpu.set_zero(cpu.a == 0);
@@ -1667,6 +1731,10 @@ fn bit_0_d(cpu: &mut Cpu) {
 
 fn bit_7_h(cpu: &mut Cpu) {
     bit_h(cpu, 7);
+}
+
+fn res_0_a(cpu: &mut Cpu) {
+    cpu.a = res(cpu.a, 0);
 }
 
 fn res_7_mhl(cpu: &mut Cpu) {
