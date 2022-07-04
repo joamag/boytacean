@@ -71,12 +71,17 @@ pub struct Ppu {
     switch_bg: bool,
     /// Controls if the sprites/objects are going to be drawn to screen.
     switch_obj: bool,
+    /// Defines the size in pixels of the object (false=8x8, true=8x16).
+    obj_size: bool,
     /// Controls the map that is going to be drawn to screen, the
     /// offset in VRAM will be adjusted according to this.
     bg_map: bool,
     /// If the background tile set is active meaning that the
     /// negative based indexes are going to be used.
     bg_tile: bool,
+    // Controls if the window is meant to be drawn.
+    switch_window: bool,
+    window_map: bool,
     /// Flag that controls if the LCD screen is ON and displaying
     /// content.
     switch_lcd: bool,
@@ -111,8 +116,11 @@ impl Ppu {
             mode_clock: 0,
             switch_bg: false,
             switch_obj: false,
+            obj_size: false,
             bg_map: false,
             bg_tile: false,
+            switch_window: false,
+            window_map: false,
             switch_lcd: false,
             stat_hblank: false,
             stat_vblank: false,
@@ -187,8 +195,11 @@ impl Ppu {
             0x0040 => {
                 let value = if self.switch_bg { 0x01 } else { 0x00 }
                     | if self.switch_obj { 0x02 } else { 0x00 }
+                    | if self.obj_size { 0x02 } else { 0x00 }
                     | if self.bg_map { 0x08 } else { 0x00 }
                     | if self.bg_tile { 0x10 } else { 0x00 }
+                    | if self.switch_window { 0x20 } else { 0x00 }
+                    | if self.window_map { 0x40 } else { 0x00 }
                     | if self.switch_lcd { 0x80 } else { 0x00 };
                 value
             }
@@ -212,8 +223,11 @@ impl Ppu {
             0x0040 => {
                 self.switch_bg = value & 0x01 == 0x01;
                 self.switch_obj = value & 0x02 == 0x02;
+                self.obj_size = value & 0x04 == 0x04;
                 self.bg_map = value & 0x08 == 0x08;
                 self.bg_tile = value & 0x10 == 0x10;
+                self.switch_window = value & 0x20 == 0x20;
+                self.window_map = value & 0x40 == 0x40;
                 self.switch_lcd = value & 0x80 == 0x80;
             }
             0x0041 => {
