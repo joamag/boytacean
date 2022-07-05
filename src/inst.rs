@@ -46,11 +46,11 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (inc_h, 4, "INC H"),
     (dec_h, 4, "DEC H"),
     (ld_h_u8, 8, "LD H, u8"),
-    (noimpl, 4, "! UNIMP !"),
+    (daa, 4, "DAA"),
     (jr_z_i8, 8, "JR Z, i8"),
     (add_hl_hl, 8, "ADD HL, HL"),
     (ld_a_mhli, 8, "LD A, [HL+] "),
-    (noimpl, 4, "! UNIMP !"),
+    (dec_hl, 8, "DEC HL"),
     (inc_l, 4, "INC L"),
     (dec_l, 4, "DEC L"),
     (ld_l_u8, 8, "LD L, u8"),
@@ -66,7 +66,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (scf, 4, "SCF"),
     (jr_c_i8, 8, "JR C, i8"),
     (add_hl_sp, 8, "ADD HL, SP"),
-    (noimpl, 4, "! UNIMP !"),
+    (ld_a_mhld, 8, "LD A, [HL-]"),
     (dec_sp, 8, "DEC SP"),
     (inc_a, 4, "INC A"),
     (dec_a, 4, "DEC A"),
@@ -286,7 +286,7 @@ pub const EXTENDED: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (rlc_e, 8, "RLC E"),
     (rlc_h, 8, "RLC H"),
     (rlc_l, 8, "RLC L"),
-    (noimpl, 4, "! UNIMP !"),
+    (rlc_mhl, 16, "RLC [HL]"),
     (rlc_a, 8, "RLC A"),
     (rrc_b, 8, "RRC B"),
     (rrc_c, 8, "RRC C"),
@@ -839,6 +839,40 @@ fn ld_h_u8(cpu: &mut Cpu) {
     cpu.h = byte;
 }
 
+fn daa(cpu: &mut Cpu) {
+    let a = cpu.a;
+    let mut adjust = 0;
+
+    if cpu.get_half_carry() {
+        adjust |= 0x06;
+    }
+
+    if cpu.get_carry() {
+        // Yes, we have to adjust it.
+        adjust |= 0x60;
+    }
+
+    let res = if cpu.get_sub() {
+        a.wrapping_sub(adjust)
+    } else {
+        if a & 0x0F > 0x09 {
+            adjust |= 0x06;
+        }
+
+        if a > 0x99 {
+            adjust |= 0x60;
+        }
+
+        a.wrapping_add(adjust)
+    };
+
+    cpu.a = res;
+
+    cpu.set_zero(res == 0);
+    cpu.set_half_carry(false);
+    cpu.set_carry(adjust & 0x60 == 0x60);
+}
+
 fn jr_z_i8(cpu: &mut Cpu) {
     let byte = cpu.read_u8() as i8;
 
@@ -859,6 +893,10 @@ fn ld_a_mhli(cpu: &mut Cpu) {
     let byte = cpu.mmu.read(cpu.hl());
     cpu.a = byte;
     cpu.set_hl(cpu.hl().wrapping_add(1));
+}
+
+fn dec_hl(cpu: &mut Cpu) {
+    cpu.set_hl(cpu.hl().wrapping_sub(1));
 }
 
 fn inc_l(cpu: &mut Cpu) {
@@ -966,6 +1004,12 @@ fn jr_c_i8(cpu: &mut Cpu) {
 fn add_hl_sp(cpu: &mut Cpu) {
     let value = add_u16_u16(cpu, cpu.hl(), cpu.sp());
     cpu.set_hl(value);
+}
+
+fn ld_a_mhld(cpu: &mut Cpu) {
+    let byte = cpu.mmu.read(cpu.hl());
+    cpu.a = byte;
+    cpu.set_hl(cpu.hl().wrapping_sub(1));
 }
 
 fn dec_sp(cpu: &mut Cpu) {
@@ -2006,6 +2050,13 @@ fn rlc_h(cpu: &mut Cpu) {
 
 fn rlc_l(cpu: &mut Cpu) {
     cpu.l = rlc(cpu, cpu.l);
+}
+
+fn rlc_mhl(cpu: &mut Cpu) {
+    let hl = cpu.hl();
+    let byte = cpu.mmu.read(hl);
+    let result = rlc(cpu, byte);
+    cpu.mmu.write(hl, result);
 }
 
 fn rlc_a(cpu: &mut Cpu) {
