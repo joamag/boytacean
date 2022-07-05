@@ -220,7 +220,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (ret_z, 8, "RET Z"),
     (ret, 16, "RET"),
     (jp_z_u16, 12, "JP Z, u16"),
-    (noimpl, 4, "! UNIMP !"),
+    (illegal, 4, "ILLEGAL"),
     (call_z_u16, 12, "CALL Z, u16"),
     (call_u16, 24, "CALL u16"),
     (adc_a_u8, 8, "ADC A, u8 "),
@@ -268,7 +268,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (push_af, 16, "PUSH AF"),
     (or_a_u8, 8, "OR A, u8"),
     (rst_30h, 16, "RST 30h"),
-    (noimpl, 4, "! UNIMP !"),
+    (ld_hl_spi8, 12, "LD HL, SP+i8"),
     (ld_sp_hl, 8, "LD SP, HL"),
     (ld_a_mu16, 16, "LD A [u16]"),
     (ei, 4, "EI"),
@@ -2003,6 +2003,21 @@ fn or_a_u8(cpu: &mut Cpu) {
 
 fn rst_30h(cpu: &mut Cpu) {
     rst(cpu, 0x0030);
+}
+
+fn ld_hl_spi8(cpu: &mut Cpu) {
+    let sp = cpu.sp as i32;
+    let byte = cpu.read_u8() as i8;
+    let byte_i32 = byte as i32;
+
+    let result = sp.wrapping_add(byte_i32);
+
+    cpu.set_sub(false);
+    cpu.set_zero(false);
+    cpu.set_half_carry((sp ^ byte_i32 ^ result) & 0x10 == 0x10);
+    cpu.set_carry((sp ^ byte_i32 ^ result) & 0x100 == 0x100);
+
+    cpu.set_hl(result as u16);
 }
 
 fn ld_sp_hl(cpu: &mut Cpu) {
