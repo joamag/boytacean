@@ -77,7 +77,8 @@ pub struct Ppu {
     /// Defines the size in pixels of the object (false=8x8, true=8x16).
     obj_size: bool,
     /// Controls the map that is going to be drawn to screen, the
-    /// offset in VRAM will be adjusted according to this.
+    /// offset in VRAM will be adjusted according to this
+    /// (false=0x9800, true=0x9c000).
     bg_map: bool,
     /// If the background tile set is active meaning that the
     /// negative based indexes are going to be used.

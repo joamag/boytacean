@@ -100,7 +100,13 @@ fn main() {
     //game_boy.load_rom_file("../../res/roms/paradius/cpu/09-op r,r.gb"); // NO FINISH
     //game_boy.load_rom_file("../../res/roms/paradius/cpu/11-op a,(hl).gb"); // NO FINISH
 
+    let mut counter = 0u32;
+
     'main: loop {
+        // increments the counter that will keep track
+        // on the number of visual ticks since beginning
+        counter = counter.wrapping_add(1);
+
         while let Some(event) = graphics.event_pump.poll_event() {
             match event {
                 Event::Quit { .. } => break 'main,

@@ -101,6 +101,13 @@ impl Cpu {
                 self.push_word(pc);
                 self.pc = 0x40;
                 self.mmu.ppu().ack_vblank();
+
+                // in case the CPU is currently halted waiting
+                // for an interrupt, releases it
+                if self.halted {
+                    self.halted = false;
+                }
+
                 return 16;
             }
         }
