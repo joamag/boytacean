@@ -18,6 +18,7 @@ pub struct Cpu {
     pub e: u8,
     pub h: u8,
     pub l: u8,
+    ime: bool,
     zero: bool,
     sub: bool,
     half_carry: bool,
@@ -65,6 +66,7 @@ impl Cpu {
             e: 0x0,
             h: 0x0,
             l: 0x0,
+            ime: false,
             zero: false,
             sub: false,
             half_carry: false,
@@ -88,6 +90,19 @@ impl Cpu {
         // spend valuable resources
         if pc >= 0x8000 && pc < 0x9fff {
             panic!("Invalid PC area at 0x{:04x}", pc);
+        }
+
+        if self.ime {
+            // @todo aggregate all of this interrupts in the MMU
+            if self.mmu.ppu().int_vblank() {
+                println!("VAI FAZER HANDLING VBLANK");
+                let pc = self.pc;
+                self.disable_int();
+                self.push_word(pc);
+                self.pc = 0x40;
+                self.mmu.ppu().ack_vblank();
+                return 16;
+            }
         }
 
         // fetches the current instruction and increments
@@ -313,11 +328,11 @@ impl Cpu {
 
     #[inline(always)]
     pub fn enable_int(&mut self) {
-        // @todo implement this one
+        self.ime = true;
     }
 
     #[inline(always)]
     pub fn disable_int(&mut self) {
-        // @todo implement this one
+        self.ime = false;
     }
 }

@@ -152,7 +152,17 @@ impl Mmu {
                                 _ => println!("Writing to unknown IO control 0x{:04x}", addr),
                             },
                             0x40 | 0x60 | 0x70 => {
-                                self.ppu.write(addr, value);
+                                match addr & 0x00ff {
+                                    0x0046 => {
+                                        // @todo must increment the cycle count by 160
+                                        // and make this a separated dma.rs file
+                                        println!("GOING TO START DMA transfer to 0x{:x}00", value);
+                                        let data = self.read_many((value as u16) << 8, 160);
+                                        self.write_many(0xfe00, &data);
+                                        println!("FINISHED DMA transfer")
+                                    }
+                                    _ => self.ppu.write(addr, value),
+                                }
                             }
                             0x50 => match addr & 0x00ff {
                                 0x50 => self.boot_active = false,
@@ -166,6 +176,23 @@ impl Mmu {
             },
             addr => panic!("Writing in unknown location 0x{:04x}", addr),
         }
+    }
+
+    pub fn write_many(&mut self, addr: u16, data: &Vec<u8>) {
+        for index in 0..data.len() {
+            self.write(addr + index as u16, data[index])
+        }
+    }
+
+    pub fn read_many(&mut self, addr: u16, count: u16) -> Vec<u8> {
+        let mut data: Vec<u8> = vec![];
+
+        for index in 0..count {
+            let byte = self.read(addr + index);
+            data.push(byte);
+        }
+
+        return data;
     }
 
     pub fn write_boot(&mut self, addr: u16, buffer: &[u8]) {

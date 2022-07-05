@@ -84,6 +84,8 @@ pub struct Ppu {
     bg_tile: bool,
     // Controls if the window is meant to be drawn.
     switch_window: bool,
+    // Controls the offset of the map that is going to be drawn
+    // for the window section of the screen.
     window_map: bool,
     /// Flag that controls if the LCD screen is ON and displaying
     /// content.
@@ -92,6 +94,9 @@ pub struct Ppu {
     stat_vblank: bool,
     stat_oam: bool,
     stat_lyc: bool,
+    // Boolean value set when the V-Blank interrupt should be handled
+    // by the next CPU clock.
+    int_vblank: bool,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -130,6 +135,7 @@ impl Ppu {
             stat_vblank: false,
             stat_oam: false,
             stat_lyc: false,
+            int_vblank: false,
         }
     }
 
@@ -166,6 +172,7 @@ impl Ppu {
                     // in case we've reached the end of the
                     // screen we're now entering the v-blank
                     if self.ly == 144 {
+                        self.int_vblank = true;
                         self.mode = PpuMode::VBlank;
                         // self.drawData
                         // @todo implement this one
@@ -289,6 +296,33 @@ impl Ppu {
         }
     }
 
+    pub fn fill_frame_buffer(&mut self, color: Pixel) {
+        for index in (0..self.frame_buffer.len()).step_by(RGB_SIZE) {
+            self.frame_buffer[index] = color[0];
+            self.frame_buffer[index + 1] = color[1];
+            self.frame_buffer[index + 2] = color[2];
+        }
+    }
+
+    pub fn int_vblank(&self) -> bool {
+        self.int_vblank
+    }
+
+    pub fn ack_vblank(&mut self) {
+        self.int_vblank = false;
+    }
+
+    /// Prints the tile data information to the stdout, this is
+    /// useful for debugging purposes.
+    pub fn draw_tile_stdout(&self, tile_index: usize) {
+        for y in 0..8 {
+            for x in 0..8 {
+                print!("{}", self.tiles[tile_index][y as usize][x as usize]);
+            }
+            print!("\n");
+        }
+    }
+
     /// Updates the tile structure with the value that has
     /// just been written to a location on the VRAM associated
     /// with tiles.
@@ -375,25 +409,6 @@ impl Ppu {
                     tile_index += 256;
                 }
             }
-        }
-    }
-
-    pub fn fill_frame_buffer(&mut self, color: Pixel) {
-        for index in (0..self.frame_buffer.len()).step_by(RGB_SIZE) {
-            self.frame_buffer[index] = color[0];
-            self.frame_buffer[index + 1] = color[1];
-            self.frame_buffer[index + 2] = color[2];
-        }
-    }
-
-    /// Prints the tile data information to the stdout, this is
-    /// useful for debugging purposes.
-    pub fn draw_tile_stdout(&self, tile_index: usize) {
-        for y in 0..8 {
-            for x in 0..8 {
-                print!("{}", self.tiles[tile_index][y as usize][x as usize]);
-            }
-            print!("\n");
         }
     }
 
