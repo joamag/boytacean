@@ -1,6 +1,6 @@
 use crate::{
     cpu::Cpu,
-    data::{DMG_BOOT, SGB_BOOT},
+    data::{DMG_BOOT, DMG_BOOTIX, MGB_BOOTIX, SGB_BOOT},
     mmu::Mmu,
     pad::Pad,
     ppu::{Ppu, FRAME_BUFFER_SIZE},
@@ -62,7 +62,6 @@ impl GameBoy {
 
     pub fn load_boot_file(&mut self, path: &str) {
         let data = read_file(path);
-        println!("{:?}", data);
         self.load_boot(&data);
     }
 
@@ -72,6 +71,14 @@ impl GameBoy {
 
     pub fn load_boot_sgb_f(&mut self) {
         self.load_boot_file("./res/boot/sgb_boot.bin");
+    }
+
+    pub fn load_boot_dmg_bootix_f(&mut self) {
+        self.load_boot_file("./res/boot/dmg_bootix.bin");
+    }
+
+    pub fn load_boot_mgb_bootix_f(&mut self) {
+        self.load_boot_file("./res/boot/mgb_bootix.bin");
     }
 
     pub fn load_boot_default(&mut self) {
@@ -84,6 +91,14 @@ impl GameBoy {
 
     pub fn load_boot_sgb(&mut self) {
         self.load_boot(&SGB_BOOT);
+    }
+
+    pub fn load_boot_dmg_bootix(&mut self) {
+        self.load_boot(&DMG_BOOTIX);
+    }
+
+    pub fn load_boot_mgb_bootix(&mut self) {
+        self.load_boot(&MGB_BOOTIX);
     }
 
     pub fn frame_buffer_eager(&mut self) -> Vec<u8> {
