@@ -309,18 +309,18 @@ pub const EXTENDED: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (rr_c, 8, "RR C"),
     (rr_d, 8, "RR D"),
     (rr_e, 8, "RR E"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (rr_h, 8, "RR H"),
+    (rr_l, 8, "RR L"),
+    (rr_mhl, 16, "RR [HL]"),
+    (rr_a, 8, "RR A"),
     // 0x2 opcodes
     (sla_b, 8, "SLA B"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (sla_c, 8, "SLA C"),
+    (sla_d, 8, "SLA D"),
+    (sla_e, 8, "SLA E"),
+    (sla_h, 8, "SLA H"),
+    (sla_l, 8, "SLA L"),
+    (sla_mhl, 16, "SLA [HL]"),
     (sla_a, 8, "SLA A"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
@@ -2164,8 +2164,54 @@ fn rr_e(cpu: &mut Cpu) {
     cpu.e = rr(cpu, cpu.e);
 }
 
+fn rr_h(cpu: &mut Cpu) {
+    cpu.h = rr(cpu, cpu.h);
+}
+
+fn rr_l(cpu: &mut Cpu) {
+    cpu.l = rr(cpu, cpu.l);
+}
+
+fn rr_mhl(cpu: &mut Cpu) {
+    let hl = cpu.hl();
+    let byte = cpu.mmu.read(hl);
+    let result = rr(cpu, byte);
+    cpu.mmu.write(hl, result);
+}
+
+fn rr_a(cpu: &mut Cpu) {
+    cpu.l = rr(cpu, cpu.a);
+}
+
 fn sla_b(cpu: &mut Cpu) {
     cpu.b = sla(cpu, cpu.b);
+}
+
+fn sla_c(cpu: &mut Cpu) {
+    cpu.c = sla(cpu, cpu.c);
+}
+
+fn sla_d(cpu: &mut Cpu) {
+    cpu.d = sla(cpu, cpu.d);
+}
+
+fn sla_e(cpu: &mut Cpu) {
+    cpu.e = sla(cpu, cpu.e);
+}
+
+fn sla_h(cpu: &mut Cpu) {
+    cpu.h = sla(cpu, cpu.h);
+}
+
+fn sla_l(cpu: &mut Cpu) {
+    cpu.l = sla(cpu, cpu.l);
+}
+
+fn sla_mhl(cpu: &mut Cpu) {
+    let hl = cpu.hl();
+    let byte = cpu.mmu.read(hl);
+    let result = sla(cpu, byte);
+    cpu.mmu.write(hl, result);
 }
 
 fn sla_a(cpu: &mut Cpu) {
