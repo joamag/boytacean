@@ -66,8 +66,16 @@ impl GameBoy {
         self.load_boot(&data);
     }
 
-    pub fn load_boot_default(&mut self) {
+    pub fn load_boot_dmg_f(&mut self) {
         self.load_boot_file("./res/boot/dmg_boot.bin");
+    }
+
+    pub fn load_boot_sgb_f(&mut self) {
+        self.load_boot_file("./res/boot/sgb_boot.bin");
+    }
+
+    pub fn load_boot_default(&mut self) {
+        self.load_boot_dmg_f();
     }
 
     pub fn load_boot_dmg(&mut self) {
