@@ -294,18 +294,18 @@ pub const EXTENDED: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (rrc_e, 8, "RRC E"),
     (rrc_h, 8, "RRC H"),
     (rrc_l, 8, "RRC L"),
-    (noimpl, 4, "! UNIMP !"),
+    (rrc_mhl, 16, "RRC [HL]"),
     (rrc_a, 8, "RRC A"),
     // 0x1 opcodes
-    (noimpl, 4, "! UNIMP !"),
+    (rl_b, 8, "RL B"),
     (rl_c, 8, "RL C"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (rl_d, 8, "RL D"),
+    (rl_e, 8, "RL E"),
+    (rl_h, 8, "RL H"),
+    (rl_l, 8, "RL L"),
+    (rl_mhl, 16, "RL [HL]"),
+    (rl_a, 8, "RL A"),
+    (rr_b, 8, "RR B"),
     (rr_c, 8, "RR C"),
     (rr_d, 8, "RR D"),
     (rr_e, 8, "RR E"),
@@ -2087,12 +2087,54 @@ fn rrc_l(cpu: &mut Cpu) {
     cpu.l = rrc(cpu, cpu.l);
 }
 
+fn rrc_mhl(cpu: &mut Cpu) {
+    let hl = cpu.hl();
+    let byte = cpu.mmu.read(hl);
+    let result = rrc(cpu, byte);
+    cpu.mmu.write(hl, result);
+}
+
 fn rrc_a(cpu: &mut Cpu) {
     cpu.l = rrc(cpu, cpu.a);
 }
 
+fn rl_b(cpu: &mut Cpu) {
+    cpu.b = rl(cpu, cpu.b);
+}
+
 fn rl_c(cpu: &mut Cpu) {
     cpu.c = rl(cpu, cpu.c);
+}
+
+fn rl_d(cpu: &mut Cpu) {
+    cpu.d = rl(cpu, cpu.d);
+}
+
+fn rl_e(cpu: &mut Cpu) {
+    cpu.e = rl(cpu, cpu.e);
+}
+
+fn rl_h(cpu: &mut Cpu) {
+    cpu.h = rl(cpu, cpu.h);
+}
+
+fn rl_l(cpu: &mut Cpu) {
+    cpu.l = rl(cpu, cpu.l);
+}
+
+fn rl_mhl(cpu: &mut Cpu) {
+    let hl = cpu.hl();
+    let byte = cpu.mmu.read(hl);
+    let result = rl(cpu, byte);
+    cpu.mmu.write(hl, result);
+}
+
+fn rl_a(cpu: &mut Cpu) {
+    cpu.a = rl(cpu, cpu.a);
+}
+
+fn rr_b(cpu: &mut Cpu) {
+    cpu.b = rr(cpu, cpu.b);
 }
 
 fn rr_c(cpu: &mut Cpu) {
