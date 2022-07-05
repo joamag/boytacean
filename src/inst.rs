@@ -288,14 +288,14 @@ pub const EXTENDED: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (rlc_l, 8, "RLC L"),
     (noimpl, 4, "! UNIMP !"),
     (rlc_a, 8, "RLC A"),
+    (rrc_b, 8, "RRC B"),
+    (rrc_c, 8, "RRC C"),
+    (rrc_d, 8, "RRC D"),
+    (rrc_e, 8, "RRC E"),
+    (rrc_h, 8, "RRC H"),
+    (rrc_l, 8, "RRC L"),
     (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (rrc_a, 8, "RRC A"),
     // 0x1 opcodes
     (noimpl, 4, "! UNIMP !"),
     (rl_c, 8, "RL C"),
@@ -2012,6 +2012,34 @@ fn rlc_a(cpu: &mut Cpu) {
     cpu.a = rlc(cpu, cpu.a);
 }
 
+fn rrc_b(cpu: &mut Cpu) {
+    cpu.b = rrc(cpu, cpu.b);
+}
+
+fn rrc_c(cpu: &mut Cpu) {
+    cpu.c = rrc(cpu, cpu.c);
+}
+
+fn rrc_d(cpu: &mut Cpu) {
+    cpu.d = rrc(cpu, cpu.d);
+}
+
+fn rrc_e(cpu: &mut Cpu) {
+    cpu.e = rrc(cpu, cpu.e);
+}
+
+fn rrc_h(cpu: &mut Cpu) {
+    cpu.h = rrc(cpu, cpu.h);
+}
+
+fn rrc_l(cpu: &mut Cpu) {
+    cpu.l = rrc(cpu, cpu.l);
+}
+
+fn rrc_a(cpu: &mut Cpu) {
+    cpu.l = rrc(cpu, cpu.a);
+}
+
 fn rl_c(cpu: &mut Cpu) {
     cpu.c = rl(cpu, cpu.c);
 }
@@ -2122,6 +2150,18 @@ fn rr(cpu: &mut Cpu, value: u8) -> u8 {
     cpu.set_carry(value & 0x01 == 0x01);
 
     let result = (value >> 1) | ((carry as u8) << 7);
+
+    cpu.set_sub(false);
+    cpu.set_zero(result == 0);
+    cpu.set_half_carry(false);
+
+    result
+}
+
+fn rrc(cpu: &mut Cpu, value: u8) -> u8 {
+    cpu.set_carry(value & 0x01 == 0x01);
+
+    let result = (value >> 1) | (value << 7);
 
     cpu.set_sub(false);
     cpu.set_zero(result == 0);
