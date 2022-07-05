@@ -1,3 +1,6 @@
+use core::fmt;
+use std::fmt::{Display, Formatter};
+
 pub const VRAM_SIZE: usize = 8192;
 pub const HRAM_SIZE: usize = 128;
 pub const PALETTE_SIZE: usize = 4;
@@ -19,6 +22,36 @@ pub const FRAME_BUFFER_SIZE: usize = DISPLAY_WIDTH * DISPLAY_HEIGHT * RGB_SIZE;
 // Defines the Game Boy pixel type as a buffer
 // with the size of RGB (3 bytes).
 pub type Pixel = [u8; RGB_SIZE];
+
+/// Represents a tile within the Game Boy context,
+/// should contain the pixel buffer of the tile.
+#[derive(Clone, Copy, PartialEq)]
+pub struct Tile {
+    pub buffer: [u8; 64],
+}
+
+impl Tile {
+    pub fn get(&self, x: usize, y: usize) -> u8 {
+        self.buffer[y * 8 + x]
+    }
+
+    pub fn set(&mut self, x: usize, y: usize, value: u8) {
+        self.buffer[y * 8 + x] = value;
+    }
+}
+
+impl Display for Tile {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let mut buffer = String::new();
+        for y in 0..8 {
+            for x in 0..8 {
+                buffer.push_str(format!("{}", self.get(x, y)).as_str());
+            }
+            buffer.push_str("\n");
+        }
+        write!(f, "{}", buffer)
+    }
+}
 
 /// Represents the Game Boy PPU (Pixel Processing Unit) and controls
 /// all of the logic behind the graphics processing and presentation.
@@ -43,7 +76,7 @@ pub struct Ppu {
     pub hram: [u8; HRAM_SIZE],
     /// The current set of processed tiles that are store in the
     /// PPU related structures.
-    tiles: [[[u8; 8]; 8]; TILE_COUNT],
+    tiles: [Tile; TILE_COUNT],
     /// The palette of colors that is currently loaded in Game Boy
     /// and used for background (tiles).
     palette: [Pixel; PALETTE_SIZE],
@@ -114,7 +147,7 @@ impl Ppu {
             frame_buffer: Box::new([0u8; DISPLAY_WIDTH * DISPLAY_HEIGHT * RGB_SIZE]),
             vram: [0u8; VRAM_SIZE],
             hram: [0u8; HRAM_SIZE],
-            tiles: [[[0u8; 8]; 8]; TILE_COUNT],
+            tiles: [Tile { buffer: [0u8; 64] }; TILE_COUNT],
             palette: [[0u8; RGB_SIZE]; PALETTE_SIZE],
             palette_obj_0: [[0u8; RGB_SIZE]; PALETTE_SIZE],
             palette_obj_1: [[0u8; RGB_SIZE]; PALETTE_SIZE],
@@ -297,12 +330,8 @@ impl Ppu {
         }
     }
 
-    pub fn fill_frame_buffer(&mut self, color: Pixel) {
-        for index in (0..self.frame_buffer.len()).step_by(RGB_SIZE) {
-            self.frame_buffer[index] = color[0];
-            self.frame_buffer[index + 1] = color[1];
-            self.frame_buffer[index + 2] = color[2];
-        }
+    pub fn tiles(&self) -> Vec<Tile> {
+        self.tiles.to_vec()
     }
 
     pub fn int_vblank(&self) -> bool {
@@ -313,15 +342,21 @@ impl Ppu {
         self.int_vblank = false;
     }
 
+    /// Fills the frame buffer with pixels of the provided color,
+    /// this method must represent the fastest way of achieving
+    /// the fill background with color operation.
+    pub fn fill_frame_buffer(&mut self, color: Pixel) {
+        for index in (0..self.frame_buffer.len()).step_by(RGB_SIZE) {
+            self.frame_buffer[index] = color[0];
+            self.frame_buffer[index + 1] = color[1];
+            self.frame_buffer[index + 2] = color[2];
+        }
+    }
+
     /// Prints the tile data information to the stdout, this is
     /// useful for debugging purposes.
-    pub fn draw_tile_stdout(&self, tile_index: usize) {
-        for y in 0..8 {
-            for x in 0..8 {
-                print!("{}", self.tiles[tile_index][y as usize][x as usize]);
-            }
-            print!("\n");
-        }
+    pub fn print_tile_stdout(&self, tile_index: usize) {
+        println!("{}", self.tiles[tile_index]);
     }
 
     /// Updates the tile structure with the value that has
@@ -336,12 +371,16 @@ impl Ppu {
 
         for x in 0..8 {
             mask = 1 << (7 - x);
-            self.tiles[tile_index][y][x] = if self.vram[addr] & mask > 0 { 0x1 } else { 0x0 }
-                | if self.vram[addr + 1] & mask > 0 {
-                    0x2
-                } else {
-                    0x0
-                }
+            self.tiles[tile_index].set(
+                x,
+                y,
+                if self.vram[addr] & mask > 0 { 0x1 } else { 0x0 }
+                    | if self.vram[addr + 1] & mask > 0 {
+                        0x2
+                    } else {
+                        0x0
+                    },
+            );
         }
     }
 
@@ -377,7 +416,7 @@ impl Ppu {
         for _index in 0..DISPLAY_WIDTH {
             // obtains the current pixel data from the tile and
             // re-maps it according to the current palette
-            let pixel = self.tiles[tile_index][y][x];
+            let pixel = self.tiles[tile_index].get(x, y);
             let color = self.palette[pixel as usize];
 
             // set the color pixel in the frame buffer
