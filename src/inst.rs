@@ -1,3 +1,6 @@
+use core::time;
+use std::thread;
+
 use crate::cpu::Cpu;
 
 pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
@@ -17,7 +20,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (inc_c, 4, "INC C"),
     (dec_c, 4, "DEC C"),
     (ld_c_u8, 8, "LD C, u8"),
-    (noimpl, 4, "! UNIMP !"),
+    (rrca, 4, "RRCA"),
     // 0x1 opcodes
     (stop, 4, "STOP"),
     (ld_de_u16, 12, "LD DE, u16"),
@@ -68,7 +71,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (inc_a, 4, "INC A"),
     (dec_a, 4, "DEC A"),
     (ld_a_u8, 8, "LD A, u8"),
-    (noimpl, 4, "! UNIMP !"),
+    (ccf, 4, "CCF"),
     // 0x4 opcodes
     (ld_b_b, 4, "LD B, B"),
     (ld_b_c, 4, "LD B, C"),
@@ -146,31 +149,31 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (add_a_l, 4, "ADD A, L"),
     (add_a_mhl, 8, "ADD A, [HL]"),
     (add_a_a, 4, "ADD A, A"),
-    (add_a_b, 4, "ADD A, B"),
-    (add_a_c, 4, "ADD A, C"),
-    (add_a_d, 4, "ADD A, D"),
-    (add_a_e, 4, "ADD A, E"),
-    (add_a_h, 4, "ADD A, H"),
-    (add_a_l, 4, "ADD A, L"),
-    (add_a_mhl, 8, "ADD A, [HL]"),
-    (add_a_a, 4, "ADD A, A"),
+    (adc_a_b, 4, "ADC A, B"),
+    (adc_a_c, 4, "ADC A, C"),
+    (adc_a_d, 4, "ADC A, D"),
+    (adc_a_e, 4, "ADC A, E"),
+    (adc_a_h, 4, "ADC A, H"),
+    (adc_a_l, 4, "ADC A, L"),
+    (adc_a_mhl, 8, "ADC A, [HL]"),
+    (adc_a_a, 4, "ADC A, A"),
     // 0x9 opcodes
     (sub_a_b, 4, "SUB A, B"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (sub_a_c, 4, "SUB A, C"),
+    (sub_a_d, 4, "SUB A, D"),
+    (sub_a_e, 4, "SUB A, E"),
+    (sub_a_h, 4, "SUB A, H"),
+    (sub_a_l, 4, "SUB A, L"),
+    (sub_a_mhl, 8, "SUB A, [HL]"),
     (sub_a_a, 4, "SUB A, A"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (sbc_a_b, 4, "SBC A, B"),
+    (sbc_a_c, 4, "SBC A, C"),
+    (sbc_a_d, 4, "SBC A, D"),
+    (sbc_a_e, 4, "SBC A, E"),
+    (sbc_a_h, 4, "SBC A, H"),
+    (sbc_a_l, 4, "SBC A, L"),
+    (sbc_a_mhl, 8, "SBC A, [HL]"),
+    (sbc_a_a, 4, "SBC A, A"),
     // 0xa opcodes
     (and_a_b, 4, "AND A, B"),
     (and_a_c, 4, "AND A, C"),
@@ -180,21 +183,21 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (and_a_l, 4, "AND A, L"),
     (and_a_mhl, 4, "AND A, [HL]"),
     (and_a_a, 4, "AND A, A"),
-    (noimpl, 4, "! UNIMP !"),
+    (xor_a_b, 4, "XOR A, B"),
     (xor_a_c, 4, "XOR A, C"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (xor_a_d, 4, "XOR A, D"),
+    (xor_a_e, 4, "XOR A, E"),
+    (xor_a_h, 4, "XOR A, H"),
     (xor_a_l, 4, "XOR A, L"),
     (xor_a_mhl, 8, "XOR A, [HL]"),
     (xor_a_a, 4, "XOR A, A"),
     // 0xb opcodes
     (or_a_b, 4, "OR A, B"),
     (or_a_c, 4, "OR A, C"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (or_a_d, 4, "OR A, D"),
+    (or_a_e, 4, "OR A, E"),
+    (or_a_h, 4, "OR A, H"),
+    (or_a_l, 4, "OR A, L"),
     (or_a_mhl, 8, "OR A, [HL]"),
     (or_a_a, 4, "OR A, A"),
     (cp_a_b, 4, "CP A, B"),
@@ -248,7 +251,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (push_hl, 16, "PUSH HL"),
     (and_a_u8, 8, "AND A, u8"),
     (rst_20h, 16, "RST 20h"),
-    (noimpl, 4, "! UNIMP !"),
+    (add_sp_i8, 16, "ADD SP, i8"),
     (jp_hl, 4, "JP HL"),
     (ld_mu16_a, 16, "LD [u16], A"),
     (illegal, 4, "ILLEGAL"),
@@ -259,7 +262,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     // 0xf opcodes
     (ld_a_mff00u8, 12, "LD A, [FF00+u8]"),
     (pop_af, 12, "POP AF"),
-    (noimpl, 4, "! UNIMP !"),
+    (ld_a_mff00c, 8, "LD A, [FF00+C]"),
     (di, 4, "DI"),
     (illegal, 4, "ILLEGAL"),
     (push_af, 16, "PUSH AF"),
@@ -277,14 +280,14 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
 
 pub const EXTENDED: [(fn(&mut Cpu), u8, &'static str); 256] = [
     // 0x0 opcodes
+    (rlc_b, 8, "RLC B"),
+    (rlc_c, 8, "RLC C"),
+    (rlc_d, 8, "RLC D"),
+    (rlc_e, 8, "RLC E"),
+    (rlc_h, 8, "RLC H"),
+    (rlc_l, 8, "RLC L"),
     (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (rlc_a, 8, "RLC A"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
@@ -553,6 +556,8 @@ pub const EXTENDED: [(fn(&mut Cpu), u8, &'static str); 256] = [
 fn nop(_cpu: &mut Cpu) {}
 
 fn noimpl(_cpu: &mut Cpu) {
+    let ten_millis = time::Duration::from_millis(10000);
+    thread::sleep(ten_millis); // @todo remove this hack
     todo!("Instruction not implemented");
 }
 
@@ -574,11 +579,12 @@ fn inc_bc(cpu: &mut Cpu) {
 }
 
 fn inc_b(cpu: &mut Cpu) {
-    let value = cpu.b.wrapping_add(1);
+    let b = cpu.b;
+    let value = b.wrapping_add(1);
 
     cpu.set_sub(false);
     cpu.set_zero(value == 0);
-    cpu.set_half_carry((value & 0xf) == 0xf);
+    cpu.set_half_carry((b & 0xf) == 0xf);
 
     cpu.b = value;
 }
@@ -631,11 +637,12 @@ fn dec_bc(cpu: &mut Cpu) {
 }
 
 fn inc_c(cpu: &mut Cpu) {
+    let c = cpu.c;
     let value = cpu.c.wrapping_add(1);
 
     cpu.set_sub(false);
     cpu.set_zero(value == 0);
-    cpu.set_half_carry((value & 0xf) == 0xf);
+    cpu.set_half_carry((c & 0xf) == 0xf);
 
     cpu.c = value;
 }
@@ -656,6 +663,16 @@ fn ld_c_u8(cpu: &mut Cpu) {
     cpu.c = byte;
 }
 
+fn rrca(cpu: &mut Cpu) {
+    let carry = cpu.a & 0x1;
+    cpu.a = (cpu.a >> 1) | (carry << 7);
+
+    cpu.set_sub(false);
+    cpu.set_zero(false);
+    cpu.set_half_carry(false);
+    cpu.set_carry(carry != 0x0);
+}
+
 fn stop(cpu: &mut Cpu) {
     cpu.stop();
 }
@@ -674,11 +691,12 @@ fn inc_de(cpu: &mut Cpu) {
 }
 
 fn inc_d(cpu: &mut Cpu) {
-    let value = cpu.d.wrapping_add(1);
+    let d = cpu.d;
+    let value = d.wrapping_add(1);
 
     cpu.set_sub(false);
     cpu.set_zero(value == 0);
-    cpu.set_half_carry((value & 0xf) == 0xf);
+    cpu.set_half_carry((d & 0xf) == 0xf);
 
     cpu.d = value;
 }
@@ -731,11 +749,12 @@ fn dec_de(cpu: &mut Cpu) {
 }
 
 fn inc_e(cpu: &mut Cpu) {
+    let e = cpu.e;
     let value = cpu.e.wrapping_add(1);
 
     cpu.set_sub(false);
     cpu.set_zero(value == 0);
-    cpu.set_half_carry((value & 0xf) == 0xf);
+    cpu.set_half_carry((e & 0xf) == 0xf);
 
     cpu.e = value;
 }
@@ -794,11 +813,12 @@ fn inc_hl(cpu: &mut Cpu) {
 }
 
 fn inc_h(cpu: &mut Cpu) {
+    let h = cpu.h;
     let value = cpu.h.wrapping_add(1);
 
     cpu.set_sub(false);
     cpu.set_zero(value == 0);
-    cpu.set_half_carry((value & 0xf) == 0xf);
+    cpu.set_half_carry((h & 0xf) == 0xf);
 
     cpu.h = value;
 }
@@ -842,11 +862,12 @@ fn ld_a_mhli(cpu: &mut Cpu) {
 }
 
 fn inc_l(cpu: &mut Cpu) {
-    let value = cpu.l.wrapping_add(1);
+    let l = cpu.l;
+    let value = l.wrapping_add(1);
 
     cpu.set_sub(false);
     cpu.set_zero(value == 0);
-    cpu.set_half_carry((value & 0xf) == 0xf);
+    cpu.set_half_carry((l & 0xf) == 0xf);
 
     cpu.l = value;
 }
@@ -857,7 +878,7 @@ fn dec_l(cpu: &mut Cpu) {
 
     cpu.set_sub(true);
     cpu.set_zero(value == 0);
-    cpu.set_half_carry((l & 0xf) == 0xf);
+    cpu.set_half_carry((l & 0xf) == 0x0);
 
     cpu.l = value;
 }
@@ -952,11 +973,12 @@ fn dec_sp(cpu: &mut Cpu) {
 }
 
 fn inc_a(cpu: &mut Cpu) {
-    let value = cpu.a.wrapping_add(1);
+    let a = cpu.a;
+    let value = a.wrapping_add(1);
 
     cpu.set_sub(false);
     cpu.set_zero(value == 0);
-    cpu.set_half_carry((value & 0xf) == 0xf);
+    cpu.set_half_carry((a & 0xf) == 0xf);
 
     cpu.a = value;
 }
@@ -975,6 +997,12 @@ fn dec_a(cpu: &mut Cpu) {
 fn ld_a_u8(cpu: &mut Cpu) {
     let byte = cpu.read_u8();
     cpu.a = byte;
+}
+
+fn ccf(cpu: &mut Cpu) {
+    cpu.set_sub(false);
+    cpu.set_half_carry(false);
+    cpu.set_carry(!cpu.get_carry());
 }
 
 fn ld_b_b(cpu: &mut Cpu) {
@@ -1273,12 +1301,103 @@ fn add_a_a(cpu: &mut Cpu) {
     cpu.a = add_set_flags(cpu, cpu.a, cpu.a);
 }
 
+fn adc_a_b(cpu: &mut Cpu) {
+    cpu.a = add_carry_set_flags(cpu, cpu.a, cpu.b);
+}
+
+fn adc_a_c(cpu: &mut Cpu) {
+    cpu.a = add_carry_set_flags(cpu, cpu.a, cpu.c);
+}
+
+fn adc_a_d(cpu: &mut Cpu) {
+    cpu.a = add_carry_set_flags(cpu, cpu.a, cpu.d);
+}
+
+fn adc_a_e(cpu: &mut Cpu) {
+    cpu.a = add_carry_set_flags(cpu, cpu.a, cpu.e);
+}
+
+fn adc_a_h(cpu: &mut Cpu) {
+    cpu.a = add_carry_set_flags(cpu, cpu.a, cpu.h);
+}
+
+fn adc_a_l(cpu: &mut Cpu) {
+    cpu.a = add_carry_set_flags(cpu, cpu.a, cpu.l);
+}
+
+fn adc_a_mhl(cpu: &mut Cpu) {
+    let byte = cpu.mmu.read(cpu.hl());
+    cpu.a = add_carry_set_flags(cpu, cpu.a, byte);
+}
+
+fn adc_a_a(cpu: &mut Cpu) {
+    cpu.a = add_carry_set_flags(cpu, cpu.a, cpu.a);
+}
+
 fn sub_a_b(cpu: &mut Cpu) {
     cpu.a = sub_set_flags(cpu, cpu.a, cpu.b);
 }
 
+fn sub_a_c(cpu: &mut Cpu) {
+    cpu.a = sub_set_flags(cpu, cpu.a, cpu.c);
+}
+
+fn sub_a_d(cpu: &mut Cpu) {
+    cpu.a = sub_set_flags(cpu, cpu.a, cpu.d);
+}
+
+fn sub_a_e(cpu: &mut Cpu) {
+    cpu.a = sub_set_flags(cpu, cpu.a, cpu.e);
+}
+
+fn sub_a_h(cpu: &mut Cpu) {
+    cpu.a = sub_set_flags(cpu, cpu.a, cpu.h);
+}
+
+fn sub_a_l(cpu: &mut Cpu) {
+    cpu.a = sub_set_flags(cpu, cpu.a, cpu.l);
+}
+
+fn sub_a_mhl(cpu: &mut Cpu) {
+    let byte = cpu.mmu.read(cpu.hl());
+    cpu.a = sub_set_flags(cpu, cpu.a, byte);
+}
+
 fn sub_a_a(cpu: &mut Cpu) {
     cpu.a = sub_set_flags(cpu, cpu.a, cpu.a);
+}
+
+fn sbc_a_b(cpu: &mut Cpu) {
+    cpu.a = sub_carry_set_flags(cpu, cpu.a, cpu.b);
+}
+
+fn sbc_a_c(cpu: &mut Cpu) {
+    cpu.a = sub_carry_set_flags(cpu, cpu.a, cpu.c);
+}
+
+fn sbc_a_d(cpu: &mut Cpu) {
+    cpu.a = sub_carry_set_flags(cpu, cpu.a, cpu.d);
+}
+
+fn sbc_a_e(cpu: &mut Cpu) {
+    cpu.a = sub_carry_set_flags(cpu, cpu.a, cpu.e);
+}
+
+fn sbc_a_h(cpu: &mut Cpu) {
+    cpu.a = sub_carry_set_flags(cpu, cpu.a, cpu.h);
+}
+
+fn sbc_a_l(cpu: &mut Cpu) {
+    cpu.a = sub_carry_set_flags(cpu, cpu.a, cpu.l);
+}
+
+fn sbc_a_mhl(cpu: &mut Cpu) {
+    let byte = cpu.mmu.read(cpu.hl());
+    cpu.a = sub_carry_set_flags(cpu, cpu.a, byte);
+}
+
+fn sbc_a_a(cpu: &mut Cpu) {
+    cpu.a = sub_carry_set_flags(cpu, cpu.a, cpu.a);
 }
 
 fn and_a_b(cpu: &mut Cpu) {
@@ -1354,8 +1473,44 @@ fn and_a_a(cpu: &mut Cpu) {
     cpu.set_carry(false);
 }
 
+fn xor_a_b(cpu: &mut Cpu) {
+    cpu.a ^= cpu.b;
+
+    cpu.set_sub(false);
+    cpu.set_zero(cpu.a == 0);
+    cpu.set_half_carry(false);
+    cpu.set_carry(false);
+}
+
 fn xor_a_c(cpu: &mut Cpu) {
     cpu.a ^= cpu.c;
+
+    cpu.set_sub(false);
+    cpu.set_zero(cpu.a == 0);
+    cpu.set_half_carry(false);
+    cpu.set_carry(false);
+}
+
+fn xor_a_d(cpu: &mut Cpu) {
+    cpu.a ^= cpu.d;
+
+    cpu.set_sub(false);
+    cpu.set_zero(cpu.a == 0);
+    cpu.set_half_carry(false);
+    cpu.set_carry(false);
+}
+
+fn xor_a_e(cpu: &mut Cpu) {
+    cpu.a ^= cpu.e;
+
+    cpu.set_sub(false);
+    cpu.set_zero(cpu.a == 0);
+    cpu.set_half_carry(false);
+    cpu.set_carry(false);
+}
+
+fn xor_a_h(cpu: &mut Cpu) {
+    cpu.a ^= cpu.h;
 
     cpu.set_sub(false);
     cpu.set_zero(cpu.a == 0);
@@ -1402,6 +1557,42 @@ fn or_a_b(cpu: &mut Cpu) {
 
 fn or_a_c(cpu: &mut Cpu) {
     cpu.a |= cpu.c;
+
+    cpu.set_sub(false);
+    cpu.set_zero(cpu.a == 0);
+    cpu.set_half_carry(false);
+    cpu.set_carry(false);
+}
+
+fn or_a_d(cpu: &mut Cpu) {
+    cpu.a |= cpu.d;
+
+    cpu.set_sub(false);
+    cpu.set_zero(cpu.a == 0);
+    cpu.set_half_carry(false);
+    cpu.set_carry(false);
+}
+
+fn or_a_e(cpu: &mut Cpu) {
+    cpu.a |= cpu.e;
+
+    cpu.set_sub(false);
+    cpu.set_zero(cpu.a == 0);
+    cpu.set_half_carry(false);
+    cpu.set_carry(false);
+}
+
+fn or_a_h(cpu: &mut Cpu) {
+    cpu.a |= cpu.h;
+
+    cpu.set_sub(false);
+    cpu.set_zero(cpu.a == 0);
+    cpu.set_half_carry(false);
+    cpu.set_carry(false);
+}
+
+fn or_a_l(cpu: &mut Cpu) {
+    cpu.a |= cpu.l;
 
     cpu.set_sub(false);
     cpu.set_zero(cpu.a == 0);
@@ -1696,6 +1887,21 @@ fn rst_20h(cpu: &mut Cpu) {
     rst(cpu, 0x0020);
 }
 
+fn add_sp_i8(cpu: &mut Cpu) {
+    let sp = cpu.sp as i32;
+    let byte = cpu.read_u8() as i8;
+    let byte_i32 = byte as i32;
+
+    let result = sp.wrapping_add(byte_i32);
+
+    cpu.set_sub(false);
+    cpu.set_zero(false);
+    cpu.set_half_carry((sp ^ byte_i32 ^ result) & 0x10 == 0x10);
+    cpu.set_carry((sp ^ byte_i32 ^ result) & 0x100 == 0x100);
+
+    cpu.sp = result as u16;
+}
+
 fn jp_hl(cpu: &mut Cpu) {
     cpu.pc = cpu.hl();
 }
@@ -1727,6 +1933,10 @@ fn ld_a_mff00u8(cpu: &mut Cpu) {
 fn pop_af(cpu: &mut Cpu) {
     let word = cpu.pop_word();
     cpu.set_af(word);
+}
+
+fn ld_a_mff00c(cpu: &mut Cpu) {
+    cpu.a = cpu.mmu.read(0xff00 + cpu.c as u16);
 }
 
 fn di(cpu: &mut Cpu) {
@@ -1772,6 +1982,34 @@ fn cp_a_u8(cpu: &mut Cpu) {
 
 fn rst_38h(cpu: &mut Cpu) {
     rst(cpu, 0x0038);
+}
+
+fn rlc_b(cpu: &mut Cpu) {
+    cpu.b = rlc(cpu, cpu.b);
+}
+
+fn rlc_c(cpu: &mut Cpu) {
+    cpu.c = rlc(cpu, cpu.c);
+}
+
+fn rlc_d(cpu: &mut Cpu) {
+    cpu.d = rlc(cpu, cpu.d);
+}
+
+fn rlc_e(cpu: &mut Cpu) {
+    cpu.e = rlc(cpu, cpu.e);
+}
+
+fn rlc_h(cpu: &mut Cpu) {
+    cpu.h = rlc(cpu, cpu.h);
+}
+
+fn rlc_l(cpu: &mut Cpu) {
+    cpu.l = rlc(cpu, cpu.l);
+}
+
+fn rlc_a(cpu: &mut Cpu) {
+    cpu.a = rlc(cpu, cpu.a);
 }
 
 fn rl_c(cpu: &mut Cpu) {
@@ -1855,6 +2093,18 @@ fn rl(cpu: &mut Cpu, value: u8) -> u8 {
     cpu.set_carry(value & 0x80 == 0x80);
 
     let result = (value << 1) | carry as u8;
+
+    cpu.set_sub(false);
+    cpu.set_zero(result == 0);
+    cpu.set_half_carry(false);
+
+    result
+}
+
+fn rlc(cpu: &mut Cpu, value: u8) -> u8 {
+    cpu.set_carry(value & 0x80 == 0x80);
+
+    let result = (value << 1) | (value >> 7);
 
     cpu.set_sub(false);
     cpu.set_zero(result == 0);
