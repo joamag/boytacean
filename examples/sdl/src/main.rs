@@ -78,6 +78,8 @@ fn main() {
         )
         .unwrap();
 
+    // creates a new Game Boy instance and loads both the boot ROM
+    // and the initial game ROM to "start the engine"
     let mut game_boy = GameBoy::new();
     game_boy.load_boot_sgb();
 
@@ -85,11 +87,11 @@ fn main() {
     //game_boy.load_rom_file("../../res/roms.prop/alleyway.gb");
 
     //game_boy.load_rom_file("../../res/roms/firstwhite.gb");
-    //game_boy.load_rom_file("../../res/roms/opus5.gb");
+    game_boy.load_rom_file("../../res/roms/opus5.gb");
     //game_boy.load_rom_file("../../res/roms/special.gb");
 
     //game_boy.load_rom_file("../../res/roms/paradius/cpu/01-special.gb"); // PASSED
-    game_boy.load_rom_file("../../res/roms/paradius/cpu/02-interrupts.gb"); // NO FINISH
+    //game_boy.load_rom_file("../../res/roms/paradius/cpu/02-interrupts.gb"); // NO FINISH
     //game_boy.load_rom_file("../../res/roms/paradius/cpu/03-op sp,hl.gb"); // NO FINISH
     //game_boy.load_rom_file("../../res/roms/paradius/cpu/04-op r,imm.gb"); // PASSED
     //game_boy.load_rom_file("../../res/roms/paradius/cpu/05-op rp.gb"); // PASSED
@@ -99,13 +101,7 @@ fn main() {
     //game_boy.load_rom_file("../../res/roms/paradius/cpu/09-op r,r.gb"); // NO FINISH
     //game_boy.load_rom_file("../../res/roms/paradius/cpu/11-op a,(hl).gb"); // NO FINISH
 
-    let mut counter = 0;
-
     'main: loop {
-        if counter >= 700000000 {
-            break;
-        }
-
         while let Some(event) = graphics.event_pump.poll_event() {
             match event {
                 Event::Quit { .. } => break 'main,
@@ -127,8 +123,8 @@ fn main() {
             counter_ticks += game_boy.clock() as u32;
         }
 
-        counter += counter_ticks;
-
+        // obtains the frame buffer of the Game Boy PPU and uses it
+        // to update the stream texture, copying it then to the canvas
         let frame_buffer = game_boy.frame_buffer().as_ref();
         texture
             .update(None, frame_buffer, DISPLAY_WIDTH as usize * 3)
