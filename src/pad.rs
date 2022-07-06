@@ -73,7 +73,7 @@ impl Pad {
                     PadSelection::Action
                 }
             }
-            addr => panic!("Reading from unknown Pad location 0x{:04x}", addr),
+            addr => panic!("Writing to unknown Pad location 0x{:04x}", addr),
         }
     }
 }

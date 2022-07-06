@@ -1,5 +1,8 @@
 use core::fmt;
-use std::fmt::{Display, Formatter};
+use std::{
+    borrow::BorrowMut,
+    fmt::{Display, Formatter},
+};
 
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
@@ -381,8 +384,16 @@ impl Ppu {
         }
     }
 
-    pub fn tiles(&self) -> [Tile; TILE_COUNT] {
-        self.tiles
+    pub fn vram(&self) -> &[u8; VRAM_SIZE] {
+        &self.vram
+    }
+
+    pub fn hram(&self) -> &[u8; HRAM_SIZE] {
+        &self.hram
+    }
+
+    pub fn tiles(&self) -> &[Tile; TILE_COUNT] {
+        &self.tiles
     }
 
     pub fn palette(&self) -> Palette {
@@ -428,13 +439,14 @@ impl Ppu {
     pub fn update_tile(&mut self, addr: u16, _value: u8) {
         let addr = (addr & 0x1ffe) as usize;
         let tile_index = ((addr >> 4) & 0x01ff) as usize;
+        let tile = self.tiles[tile_index].borrow_mut();
         let y = ((addr >> 1) & 0x0007) as usize;
 
         let mut mask;
 
         for x in 0..8 {
             mask = 1 << (7 - x);
-            self.tiles[tile_index].set(
+            tile.set(
                 x,
                 y,
                 if self.vram[addr] & mask > 0 { 0x1 } else { 0x0 }

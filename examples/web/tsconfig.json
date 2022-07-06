@@ -9,7 +9,7 @@
         "sourceMap": true,
         "outDir": ".",
         "baseUrl": ".",
-        "lib": ["es2015", "dom"],
+        "lib": ["es2017", "dom"],
         "paths": {
             "*": ["node_modules/*", "src/types/*"]
         }

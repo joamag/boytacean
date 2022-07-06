@@ -111,6 +111,14 @@ impl GameBoy {
         self.load_boot_dmg_bootix();
     }
 
+    pub fn vram_eager(&mut self) -> Vec<u8> {
+        self.ppu().vram().to_vec()
+    }
+
+    pub fn hram_eager(&mut self) -> Vec<u8> {
+        self.ppu().vram().to_vec()
+    }
+
     pub fn frame_buffer_eager(&mut self) -> Vec<u8> {
         self.frame_buffer().to_vec()
     }

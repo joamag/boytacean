@@ -544,9 +544,7 @@ const registerButtons = () => {
                 const pixels = state.gameBoy.get_tile_buffer(index);
                 const line = Math.floor(index / 16);
                 const column = index % 16;
-                console.info(`${canvasTiles.width}`);
                 let offset = ((line * canvasTiles.width * 8) + (column * 8)) * PixelFormat.RGBA;
-                console.info(`${offset}`);
                 let counter = 0;
                 for (let index = 0; index < pixels.length; index += format) {
                     const color =
@@ -569,6 +567,16 @@ const registerButtons = () => {
 
             for (let index = 0; index < 256; index++) {
                 drawSprite(index);
+            }
+
+            const vram = state.gameBoy.vram_eager();
+            const step = 16;
+            for (let index = 0; index < vram.length; index += step) {
+                let line = `${(index + 0x8000).toString(16).padStart(4, "0")}`;
+                for (let j = 0; j < step; j++) {
+                    line += ` ${vram[index + j].toString(16).padStart(2, "0")}`;
+                }
+                console.info(line);
             }
         }
     });
