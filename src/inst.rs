@@ -322,14 +322,14 @@ pub const EXTENDED: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (sla_l, 8, "SLA L"),
     (sla_mhl, 16, "SLA [HL]"),
     (sla_a, 8, "SLA A"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (sra_b, 8, "SRA B"),
+    (sra_c, 8, "SRA C"),
+    (sra_d, 8, "SRA D"),
+    (sra_e, 8, "SRA E"),
+    (sra_h, 8, "SRA H"),
+    (sra_l, 8, "SRA L"),
+    (sra_mhl, 16, "SRA [HL]"),
+    (sra_a, 8, "SRA A"),
     // 0x3 opcodes
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
@@ -2218,6 +2218,41 @@ fn sla_a(cpu: &mut Cpu) {
     cpu.a = sla(cpu, cpu.a);
 }
 
+fn sra_b(cpu: &mut Cpu) {
+    cpu.b = sra(cpu, cpu.b);
+}
+
+fn sra_c(cpu: &mut Cpu) {
+    cpu.c = sra(cpu, cpu.c);
+}
+
+fn sra_d(cpu: &mut Cpu) {
+    cpu.d = sra(cpu, cpu.d);
+}
+
+fn sra_e(cpu: &mut Cpu) {
+    cpu.e = sra(cpu, cpu.e);
+}
+
+fn sra_h(cpu: &mut Cpu) {
+    cpu.h = sra(cpu, cpu.h);
+}
+
+fn sra_l(cpu: &mut Cpu) {
+    cpu.l = sra(cpu, cpu.l);
+}
+
+fn sra_mhl(cpu: &mut Cpu) {
+    let hl = cpu.hl();
+    let byte = cpu.mmu.read(hl);
+    let result = sra(cpu, byte);
+    cpu.mmu.write(hl, result);
+}
+
+fn sra_a(cpu: &mut Cpu) {
+    cpu.a = sra(cpu, cpu.a);
+}
+
 fn swap_a(cpu: &mut Cpu) {
     cpu.a = swap(cpu, cpu.a)
 }
@@ -2777,7 +2812,18 @@ fn sla(cpu: &mut Cpu, value: u8) -> u8 {
     cpu.set_sub(false);
     cpu.set_zero(result == 0);
     cpu.set_half_carry(false);
-    cpu.set_carry(value & 0x80 != 0);
+    cpu.set_carry(value & 0x80 == 0x80);
+
+    result
+}
+
+fn sra(cpu: &mut Cpu, value: u8) -> u8 {
+    let result = (value >> 1) | (value & 0x80);
+
+    cpu.set_sub(false);
+    cpu.set_zero(result == 0);
+    cpu.set_half_carry(false);
+    cpu.set_carry(value & 0x01 == 0x01);
 
     result
 }

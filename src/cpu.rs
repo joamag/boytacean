@@ -98,10 +98,6 @@ impl Cpu {
     }
 
     pub fn clock(&mut self) -> u8 {
-        if self.halted {
-            return 4;
-        }
-
         // gathers the PC (program counter) reference that
         // is going to be used in the fetching phase
         let pc = self.pc;
@@ -115,11 +111,14 @@ impl Cpu {
         if self.ime {
             // @todo aggregate all of this interrupts in the MMU
             if (self.mmu.ie & 0x01 == 0x01) && self.mmu.ppu().int_vblank() {
-                println!("Going to run V-Blank interrupt handler");
-                let pc = self.pc;
+                println!("Going to run V-Blank interrupt handler (0x40)");
+
                 self.disable_int();
                 self.push_word(pc);
                 self.pc = 0x40;
+
+                // acknowledges that the V-Blank interrupt has been
+                // properly handled
                 self.mmu.ppu().ack_vblank();
 
                 // in case the CPU is currently halted waiting
@@ -130,6 +129,13 @@ impl Cpu {
 
                 return 16;
             }
+        }
+
+        // in case the CPU is currently in the halted state
+        // returns the control flow immediately with the associated
+        // number of cycles estimated for the halted execution
+        if self.halted {
+            return 4;
         }
 
         // fetches the current instruction and increments
@@ -151,6 +157,9 @@ impl Cpu {
         let (instruction_fn, instruction_time, instruction_str) = instruction;
 
         if *instruction_str == "! UNIMP !" || *instruction_str == "HALT" {
+            if *instruction_str == "HALT" {
+                println!("Waiting for {:x} in HALT", self.mmu.ie);
+            }
             println!(
                 "{}\t(0x{:02x})\t${:04x} {}",
                 instruction_str, opcode, pc, is_prefix
