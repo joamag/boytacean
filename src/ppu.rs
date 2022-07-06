@@ -453,6 +453,12 @@ impl Ppu {
         }
     }
 
+    /// Clears the current frame buffer, setting the background color
+    /// for all the pixels in the frame buffer.
+    pub fn clear_frame_buffer(&mut self) {
+        self.fill_frame_buffer([255, 255, 255]);
+    }
+
     /// Prints the tile data information to the stdout, this is
     /// useful for debugging purposes.
     pub fn print_tile_stdout(&self, tile_index: usize) {

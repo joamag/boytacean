@@ -149,7 +149,7 @@ impl Cpu {
 
         let (instruction_fn, instruction_time, instruction_str) = instruction;
 
-        if *instruction_str == "! UNIMP !" {
+        if *instruction_str == "! UNIMP !" || *instruction_str == "HALT" {
             println!(
                 "{}\t(0x{:02x})\t${:04x} {}",
                 instruction_str, opcode, pc, is_prefix
@@ -175,6 +175,11 @@ impl Cpu {
     #[inline(always)]
     pub fn ppu(&mut self) -> &mut Ppu {
         self.mmu().ppu()
+    }
+
+    #[inline(always)]
+    pub fn halted(&self) -> bool {
+        self.halted
     }
 
     #[inline(always)]
