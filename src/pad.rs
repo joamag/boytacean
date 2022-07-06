@@ -37,26 +37,26 @@ impl Pad {
                 let mut value;
                 match self.selection {
                     PadSelection::Action => {
-                        value = if self.a { 0x01 } else { 0x00 }
-                            | if self.b { 0x02 } else { 0x00 }
-                            | if self.select { 0x04 } else { 0x00 }
-                            | if self.start { 0x08 } else { 0x00 }
+                        value = if self.a { 0x00 } else { 0x01 }
+                            | if self.b { 0x00 } else { 0x02 }
+                            | if self.select { 0x00 } else { 0x04 }
+                            | if self.start { 0x00 } else { 0x08 }
                     }
                     PadSelection::Direction => {
-                        value = if self.right { 0x01 } else { 0x00 }
-                            | if self.left { 0x02 } else { 0x00 }
-                            | if self.up { 0x04 } else { 0x00 }
-                            | if self.down { 0x08 } else { 0x00 }
+                        value = if self.right { 0x00 } else { 0x01 }
+                            | if self.left { 0x00 } else { 0x02 }
+                            | if self.up { 0x00 } else { 0x04 }
+                            | if self.down { 0x00 } else { 0x08 }
                     }
                 }
                 value |= if self.selection == PadSelection::Direction {
-                    0x00
-                } else {
                     0x10
-                } | if self.selection == PadSelection::Action {
-                    0x00
                 } else {
+                    0x00
+                } | if self.selection == PadSelection::Action {
                     0x20
+                } else {
+                    0x00
                 };
                 value
             }

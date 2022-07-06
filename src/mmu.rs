@@ -13,6 +13,10 @@ pub struct Mmu {
     rom: [u8; ROM_SIZE],
     ram: [u8; RAM_SIZE],
     eram: [u8; RAM_SIZE],
+
+    /// Registers that controls the interrupts that are considered
+    /// to be enabled and should be triggered.
+    pub ie: u8,
 }
 
 impl Mmu {
@@ -25,6 +29,7 @@ impl Mmu {
             rom: [0u8; ROM_SIZE],
             ram: [0u8; RAM_SIZE],
             eram: [0u8; ERAM_SIZE],
+            ie: 0x0,
         }
     }
 
@@ -77,12 +82,11 @@ impl Mmu {
             0xf000 => match addr & 0x0f00 {
                 0x000 | 0x100 | 0x200 | 0x300 | 0x400 | 0x500 | 0x600 | 0x700 | 0x800 | 0x900
                 | 0xa00 | 0xb00 | 0xc00 | 0xd00 => self.ram[(addr & 0x1fff) as usize],
-                0xe00 => {
-                    println!("Reading from PPU OAM - NOT IMPLEMENTED");
-                    0x00
-                }
+                0xe00 => self.ppu.oam[(addr & 0x009f) as usize],
                 0xf00 => {
-                    if addr >= 0xff80 {
+                    if addr == 0xffff {
+                        self.ie
+                    } else if addr >= 0xff80 {
                         self.ppu.hram[(addr & 0x007f) as usize]
                     } else {
                         match addr & 0x00f0 {
@@ -147,11 +151,11 @@ impl Mmu {
                 | 0xa00 | 0xb00 | 0xc00 | 0xd00 => {
                     self.ram[(addr & 0x1fff) as usize] = value;
                 }
-                0xe00 => {
-                    println!("Writing to PPU OAM at 0x{:04x}", addr);
-                }
+                0xe00 => self.ppu.oam[(addr & 0x009f) as usize] = value,
                 0xf00 => {
-                    if addr >= 0xff80 {
+                    if addr == 0xffff {
+                        self.ie = value;
+                    } else if addr >= 0xff80 {
                         self.ppu.hram[(addr & 0x007f) as usize] = value;
                     } else {
                         match addr & 0x00f0 {

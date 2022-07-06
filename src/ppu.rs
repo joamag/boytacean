@@ -9,6 +9,7 @@ use wasm_bindgen::prelude::*;
 
 pub const VRAM_SIZE: usize = 8192;
 pub const HRAM_SIZE: usize = 128;
+pub const OAM_SIZE: usize = 260;
 pub const PALETTE_SIZE: usize = 4;
 pub const RGB_SIZE: usize = 3;
 
@@ -99,6 +100,9 @@ pub struct Ppu {
     /// High RAM memory that should provide extra speed for regular
     /// operations.
     pub hram: [u8; HRAM_SIZE],
+    /// OAM RAM (Sprite Attribute Table ) used for the storage of the
+    /// sprite attributes for each of the 40 sprites of the Game Boy.
+    pub oam: [u8; OAM_SIZE],
     /// The current set of processed tiles that are store in the
     /// PPU related structures.
     tiles: [Tile; TILE_COUNT],
@@ -172,6 +176,7 @@ impl Ppu {
             frame_buffer: Box::new([0u8; DISPLAY_WIDTH * DISPLAY_HEIGHT * RGB_SIZE]),
             vram: [0u8; VRAM_SIZE],
             hram: [0u8; HRAM_SIZE],
+            oam: [0u8; OAM_SIZE],
             tiles: [Tile { buffer: [0u8; 64] }; TILE_COUNT],
             palette: [[0u8; RGB_SIZE]; PALETTE_SIZE],
             palette_obj_0: [[0u8; RGB_SIZE]; PALETTE_SIZE],

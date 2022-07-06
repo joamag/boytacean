@@ -113,8 +113,8 @@ impl Cpu {
 
         if self.ime {
             // @todo aggregate all of this interrupts in the MMU
-            if self.mmu.ppu().int_vblank() {
-                println!("VAI FAZER HANDLING VBLANK");
+            if (self.mmu.ie & 0x01 == 0x01) && self.mmu.ppu().int_vblank() {
+                println!("Going to run V-Blank interrupt handler");
                 let pc = self.pc;
                 self.disable_int();
                 self.push_word(pc);
