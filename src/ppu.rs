@@ -94,69 +94,92 @@ pub struct Ppu {
     /// The 8 bit based RGB frame buffer with the
     /// processed set of pixels ready to be displayed on screen.
     pub frame_buffer: Box<[u8; FRAME_BUFFER_SIZE]>,
+
     /// Video dedicated memory (VRAM) where both the tiles and
     /// the sprites/objects are going to be stored.
     pub vram: [u8; VRAM_SIZE],
+
     /// High RAM memory that should provide extra speed for regular
     /// operations.
     pub hram: [u8; HRAM_SIZE],
+
     /// OAM RAM (Sprite Attribute Table ) used for the storage of the
     /// sprite attributes for each of the 40 sprites of the Game Boy.
     pub oam: [u8; OAM_SIZE],
+
     /// The current set of processed tiles that are store in the
     /// PPU related structures.
     tiles: [Tile; TILE_COUNT],
+
     /// The palette of colors that is currently loaded in Game Boy
     /// and used for background (tiles).
     palette: Palette,
+
     // The palette that is going to be used for sprites/objects #0.
     palette_obj_0: Palette,
+
     // The palette that is going to be used for sprites/objects #1.
     palette_obj_1: Palette,
+
     /// The scroll Y register that controls the Y offset
     /// of the background.
     scy: u8,
+
     /// The scroll X register that controls the X offset
     /// of the background.
     scx: u8,
+
     /// The current scan line in processing, should
     /// range between 0 (0x00) and 153 (0x99), representing
     /// the 154 lines plus 10 extra v-blank lines.
     ly: u8,
+
     // The line compare register that is going to be used
     // in the STATE and associated interrupts.
     lyc: u8,
+
     /// The current execution mode of the PPU, should change
     /// between states over the drawing of a frame.
     mode: PpuMode,
+
     /// Internal clock counter used to control the time in ticks
     /// spent in each of the PPU modes.
     mode_clock: u16,
+
     /// Controls if the background is going to be drawn to screen.
     switch_bg: bool,
+
     /// Controls if the sprites/objects are going to be drawn to screen.
     switch_obj: bool,
+
     /// Defines the size in pixels of the object (false=8x8, true=8x16).
     obj_size: bool,
+
     /// Controls the map that is going to be drawn to screen, the
     /// offset in VRAM will be adjusted according to this
     /// (false=0x9800, true=0x9c000).
     bg_map: bool,
+
     /// If the background tile set is active meaning that the
     /// negative based indexes are going to be used.
     bg_tile: bool,
+
     // Controls if the window is meant to be drawn.
     switch_window: bool,
+
     // Controls the offset of the map that is going to be drawn
     // for the window section of the screen.
     window_map: bool,
+
     /// Flag that controls if the LCD screen is ON and displaying
     /// content.
     switch_lcd: bool,
+
     stat_hblank: bool,
     stat_vblank: bool,
     stat_oam: bool,
     stat_lyc: bool,
+
     // Boolean value set when the V-Blank interrupt should be handled
     // by the next CPU clock.
     int_vblank: bool,
