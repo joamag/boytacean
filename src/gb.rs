@@ -29,6 +29,12 @@ impl GameBoy {
         Self { cpu: cpu }
     }
 
+    pub fn reset(&mut self) {
+        self.ppu().reset();
+        self.mmu().reset();
+        self.cpu.reset();
+    }
+
     pub fn pc(&self) -> u16 {
         self.cpu.pc()
     }
@@ -111,6 +117,11 @@ impl GameBoy {
 
     pub fn get_tile(&mut self, index: usize) -> Tile {
         self.ppu().tiles()[index]
+    }
+
+    pub fn get_tile_buffer(&mut self, index: usize) -> Vec<u8> {
+        let tile = self.get_tile(index);
+        tile.palette_buffer(self.ppu().palette())
     }
 }
 

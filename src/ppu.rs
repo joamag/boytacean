@@ -26,6 +26,10 @@ pub const FRAME_BUFFER_SIZE: usize = DISPLAY_WIDTH * DISPLAY_HEIGHT * RGB_SIZE;
 // with the size of RGB (3 bytes).
 pub type Pixel = [u8; RGB_SIZE];
 
+/// Defines a type that represents a color palette
+/// within the Game Boy context.
+pub type Palette = [Pixel; PALETTE_SIZE];
+
 /// Represents a tile within the Game Boy context,
 /// should contain the pixel buffer of the tile.
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
@@ -34,6 +38,7 @@ pub struct Tile {
     buffer: [u8; 64],
 }
 
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
 impl Tile {
     pub fn get(&self, x: usize, y: usize) -> u8 {
         self.buffer[y * 8 + x]
@@ -45,6 +50,15 @@ impl Tile {
 
     pub fn buffer(&self) -> Vec<u8> {
         self.buffer.to_vec()
+    }
+}
+
+impl Tile {
+    pub fn palette_buffer(&self, palette: Palette) -> Vec<u8> {
+        self.buffer
+            .iter()
+            .flat_map(|p| palette[*p as usize])
+            .collect()
     }
 }
 
@@ -87,11 +101,11 @@ pub struct Ppu {
     tiles: [Tile; TILE_COUNT],
     /// The palette of colors that is currently loaded in Game Boy
     /// and used for background (tiles).
-    palette: [Pixel; PALETTE_SIZE],
+    palette: Palette,
     // The palette that is going to be used for sprites/objects #0.
-    palette_obj_0: [Pixel; PALETTE_SIZE],
+    palette_obj_0: Palette,
     // The palette that is going to be used for sprites/objects #1.
-    palette_obj_1: [Pixel; PALETTE_SIZE],
+    palette_obj_1: Palette,
     /// The scroll Y register that controls the Y offset
     /// of the background.
     scy: u8,
@@ -179,6 +193,35 @@ impl Ppu {
             stat_lyc: false,
             int_vblank: false,
         }
+    }
+
+    pub fn reset(&mut self) {
+        self.frame_buffer = Box::new([0u8; DISPLAY_WIDTH * DISPLAY_HEIGHT * RGB_SIZE]);
+        self.vram = [0u8; VRAM_SIZE];
+        self.hram = [0u8; HRAM_SIZE];
+        self.tiles = [Tile { buffer: [0u8; 64] }; TILE_COUNT];
+        self.palette = [[0u8; RGB_SIZE]; PALETTE_SIZE];
+        self.palette_obj_0 = [[0u8; RGB_SIZE]; PALETTE_SIZE];
+        self.palette_obj_1 = [[0u8; RGB_SIZE]; PALETTE_SIZE];
+        self.scy = 0x0;
+        self.scx = 0x0;
+        self.ly = 0x0;
+        self.lyc = 0x0;
+        self.mode = PpuMode::OamRead;
+        self.mode_clock = 0;
+        self.switch_bg = false;
+        self.switch_obj = false;
+        self.obj_size = false;
+        self.bg_map = false;
+        self.bg_tile = false;
+        self.switch_window = false;
+        self.window_map = false;
+        self.switch_lcd = false;
+        self.stat_hblank = false;
+        self.stat_vblank = false;
+        self.stat_oam = false;
+        self.stat_lyc = false;
+        self.int_vblank = false;
     }
 
     pub fn clock(&mut self, cycles: u8) {
@@ -340,6 +383,18 @@ impl Ppu {
 
     pub fn tiles(&self) -> [Tile; TILE_COUNT] {
         self.tiles
+    }
+
+    pub fn palette(&self) -> Palette {
+        self.palette
+    }
+
+    pub fn palette_obj_0(&self) -> Palette {
+        self.palette_obj_0
+    }
+
+    pub fn palette_obj_1(&self) -> Palette {
+        self.palette_obj_1
     }
 
     pub fn int_vblank(&self) -> bool {

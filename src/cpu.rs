@@ -77,6 +77,25 @@ impl Cpu {
         }
     }
 
+    pub fn reset(&mut self) {
+        self.pc = 0x0;
+        self.sp = 0x0;
+        self.a = 0x0;
+        self.b = 0x0;
+        self.c = 0x0;
+        self.d = 0x0;
+        self.e = 0x0;
+        self.h = 0x0;
+        self.l = 0x0;
+        self.ime = false;
+        self.zero = false;
+        self.sub = false;
+        self.half_carry = false;
+        self.carry = false;
+        self.halted = false;
+        self.ticks = 0;
+    }
+
     pub fn clock(&mut self) -> u8 {
         if self.halted {
             return 4;

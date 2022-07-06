@@ -28,6 +28,14 @@ impl Mmu {
         }
     }
 
+    pub fn reset(&mut self) {
+        self.boot_active = true;
+        self.boot = [0u8; BIOS_SIZE];
+        self.rom = [0u8; ROM_SIZE];
+        self.ram = [0u8; RAM_SIZE];
+        self.eram = [0u8; ERAM_SIZE];
+    }
+
     pub fn ppu(&mut self) -> &mut Ppu {
         &mut self.ppu
     }
@@ -159,7 +167,7 @@ impl Mmu {
                                         println!("GOING TO START DMA transfer to 0x{:x}00", value);
                                         let data = self.read_many((value as u16) << 8, 160);
                                         self.write_many(0xfe00, &data);
-                                        println!("FINISHED DMA transfer")
+                                        println!("FINISHED DMA transfer");
                                     }
                                     _ => self.ppu.write(addr, value),
                                 }

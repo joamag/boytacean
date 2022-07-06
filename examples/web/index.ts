@@ -301,7 +301,7 @@ const start = async ({
 
     // resets the Game Boy engine to restore it into
     // a valid state ready to be used
-    //state.gameBoy.reset_hard(); @todo
+    state.gameBoy.reset();
     state.gameBoy.load_boot_static();
     state.gameBoy.load_rom(romData);
 
@@ -533,6 +533,43 @@ const registerButtons = () => {
             sectionNarrative.style.display = "none";
             separatorNarrative.style.display = "none";
             buttonDebug.classList.add("enabled");
+
+            const canvasTiles = document.getElementById("canvas-tiles") as HTMLCanvasElement;
+            const canvasTilesCtx = canvasTiles.getContext("2d");
+
+            const canvasImage = canvasTilesCtx.createImageData(canvasTiles.width, canvasTiles.height);
+            const videoBuff = new DataView(canvasImage.data.buffer);
+
+            const drawSprite = (index: number, format: PixelFormat = PixelFormat.RGB) => {
+                const pixels = state.gameBoy.get_tile_buffer(index);
+                const line = Math.floor(index / 16);
+                const column = index % 16;
+                console.info(`${canvasTiles.width}`);
+                let offset = ((line * canvasTiles.width * 8) + (column * 8)) * PixelFormat.RGBA;
+                console.info(`${offset}`);
+                let counter = 0;
+                for (let index = 0; index < pixels.length; index += format) {
+                    const color =
+                        (pixels[index] << 24) |
+                        (pixels[index + 1] << 16) |
+                        (pixels[index + 2] << 8) |
+                        (format == PixelFormat.RGBA ? pixels[index + 3] : 0xff);
+                    videoBuff.setUint32(offset, color);
+                    
+                    counter++;
+                    if (counter == 8) {
+                        counter = 0;
+                        offset += (canvasTiles.width - 7) * PixelFormat.RGBA;
+                    } else {
+                        offset += PixelFormat.RGBA;
+                    }
+                }
+                canvasTilesCtx.putImageData(canvasImage, 0, 0);
+            }
+
+            for (let index = 0; index < 256; index++) {
+                drawSprite(index);
+            }
         }
     });
 
@@ -698,7 +735,7 @@ const initCanvas = async () => {
     state.videoBuff = new DataView(state.image.data.buffer);
 };
 
-const updateCanvas = (pixels: Uint8Array, format: PixelFormat) => {
+const updateCanvas = (pixels: Uint8Array, format: PixelFormat = PixelFormat.RGB) => {
     let offset = 0;
     for (let index = 0; index < pixels.length; index += format) {
         const color =
@@ -726,7 +763,7 @@ const clearCanvas = async (
     );
 
     // in case an image was requested then uses that to load
-    // an image at the center of the screen
+    // an image at the center of the screen properly scaled
     if (image) {
         const img = await new Promise<HTMLImageElement>((resolve) => {
             const img = new Image();
