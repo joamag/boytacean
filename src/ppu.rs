@@ -27,7 +27,7 @@ pub type Pixel = [u8; RGB_SIZE];
 /// should contain the pixel buffer of the tile.
 #[derive(Clone, Copy, PartialEq)]
 pub struct Tile {
-    pub buffer: [u8; 64],
+    buffer: [u8; 64],
 }
 
 impl Tile {
@@ -37,6 +37,10 @@ impl Tile {
 
     pub fn set(&mut self, x: usize, y: usize, value: u8) {
         self.buffer[y * 8 + x] = value;
+    }
+
+    pub fn buffer(&self) -> Vec<u8> {
+        self.buffer.to_vec()
     }
 }
 
