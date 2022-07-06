@@ -82,7 +82,7 @@ impl GameBoy {
     }
 
     pub fn load_boot_default(&mut self) {
-        self.load_boot_dmg_f();
+        self.load_boot_dmg_bootix_f();
     }
 
     pub fn load_boot_dmg(&mut self) {
@@ -99,6 +99,10 @@ impl GameBoy {
 
     pub fn load_boot_mgb_bootix(&mut self) {
         self.load_boot(&MGB_BOOTIX);
+    }
+
+    pub fn load_boot_static(&mut self) {
+        self.load_boot_dmg_bootix();
     }
 
     pub fn frame_buffer_eager(&mut self) -> Vec<u8> {

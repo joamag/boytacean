@@ -81,7 +81,7 @@ fn main() {
     // creates a new Game Boy instance and loads both the boot ROM
     // and the initial game ROM to "start the engine"
     let mut game_boy = GameBoy::new();
-    game_boy.load_boot_dmg_bootix();
+    game_boy.load_boot_static();
 
     game_boy.load_rom_file("../../res/roms.prop/tetris.gb");
     //game_boy.load_rom_file("../../res/roms.prop/alleyway.gb");
@@ -107,6 +107,8 @@ fn main() {
         // on the number of visual ticks since beginning
         counter = counter.wrapping_add(1);
 
+        // obtains an event from the SDL sub-system to be
+        // processed under the current emulation context
         while let Some(event) = graphics.event_pump.poll_event() {
             match event {
                 Event::Quit { .. } => break 'main,
