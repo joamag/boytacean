@@ -412,9 +412,9 @@ pub const EXTENDED: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (bit_7_h, 8, "BIT 7, H"),
+    (bit_7_l, 8, "BIT 7, L"),
     (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (bit_7_a, 8, "BIT 7, A"),
     // 0x8 opcodes
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
@@ -2234,6 +2234,14 @@ fn bit_7_h(cpu: &mut Cpu) {
     bit_h(cpu, 7);
 }
 
+fn bit_7_l(cpu: &mut Cpu) {
+    bit_l(cpu, 7);
+}
+
+fn bit_7_a(cpu: &mut Cpu) {
+    bit_a(cpu, 7);
+}
+
 fn res_0_a(cpu: &mut Cpu) {
     cpu.a = res(cpu.a, 0);
 }
@@ -2339,6 +2347,18 @@ fn bit_d(cpu: &mut Cpu, bit: u8) {
 fn bit_h(cpu: &mut Cpu, bit: u8) {
     cpu.set_sub(false);
     cpu.set_zero(bit_zero(cpu.h, bit));
+    cpu.set_half_carry(true);
+}
+
+fn bit_l(cpu: &mut Cpu, bit: u8) {
+    cpu.set_sub(false);
+    cpu.set_zero(bit_zero(cpu.l, bit));
+    cpu.set_half_carry(true);
+}
+
+fn bit_a(cpu: &mut Cpu, bit: u8) {
+    cpu.set_sub(false);
+    cpu.set_zero(bit_zero(cpu.a, bit));
     cpu.set_half_carry(true);
 }
 
