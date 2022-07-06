@@ -348,81 +348,81 @@ pub const EXTENDED: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     // 0x4 opcodes
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (bit_0_b, 8, "BIT 0, B"),
+    (bit_0_c, 8, "BIT 0, C"),
     (bit_0_d, 8, "BIT 0, D"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (bit_0_e, 8, "BIT 0, E"),
+    (bit_0_h, 8, "BIT 0, H"),
+    (bit_0_l, 8, "BIT 0, L"),
+    (bit_0_mhl, 12, "BIT 0, [HL]"),
+    (bit_0_a, 8, "BIT 0, A"),
+    (bit_1_b, 8, "BIT 1, B"),
+    (bit_1_c, 8, "BIT 1, C"),
+    (bit_1_d, 8, "BIT 1, D"),
+    (bit_1_e, 8, "BIT 1, E"),
+    (bit_1_h, 8, "BIT 1, H"),
+    (bit_1_l, 8, "BIT 1, L"),
+    (bit_1_mhl, 12, "BIT 1, [HL]"),
+    (bit_1_a, 8, "BIT 1, A"),
     // 0x5 opcodes
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (bit_2_b, 8, "BIT 2, B"),
+    (bit_2_c, 8, "BIT 2, C"),
+    (bit_2_d, 8, "BIT 2, D"),
+    (bit_2_e, 8, "BIT 2, E"),
+    (bit_2_h, 8, "BIT 2, H"),
+    (bit_2_l, 8, "BIT 2, L"),
+    (bit_2_mhl, 12, "BIT 2, [HL]"),
+    (bit_2_a, 8, "BIT 2, A"),
+    (bit_3_b, 8, "BIT 3, B"),
+    (bit_3_c, 8, "BIT 3, C"),
+    (bit_3_d, 8, "BIT 3, D"),
+    (bit_3_e, 8, "BIT 3, E"),
+    (bit_3_h, 8, "BIT 3, H"),
+    (bit_3_l, 8, "BIT 3, L"),
+    (bit_3_mhl, 12, "BIT 3, [HL]"),
+    (bit_3_a, 8, "BIT 3, A"),
     // 0x6 opcodes
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (bit_4_b, 8, "BIT 4, B"),
+    (bit_4_c, 8, "BIT 4, C"),
+    (bit_4_d, 8, "BIT 4, D"),
+    (bit_4_e, 8, "BIT 4, E"),
+    (bit_4_h, 8, "BIT 4, H"),
+    (bit_4_l, 8, "BIT 4, L"),
+    (bit_4_mhl, 12, "BIT 4, [HL]"),
+    (bit_4_a, 8, "BIT 4, A"),
+    (bit_5_b, 8, "BIT 5, B"),
+    (bit_5_c, 8, "BIT 5, C"),
+    (bit_5_d, 8, "BIT 5, D"),
+    (bit_5_e, 8, "BIT 5, E"),
+    (bit_5_h, 8, "BIT 5, H"),
+    (bit_5_l, 8, "BIT 5, L"),
+    (bit_5_mhl, 12, "BIT 5, [HL]"),
+    (bit_5_a, 8, "BIT 5, A"),
     // 0x7 opcodes
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (bit_6_b, 8, "BIT 6, B"),
+    (bit_6_c, 8, "BIT 6, C"),
+    (bit_6_d, 8, "BIT 6, D"),
+    (bit_6_e, 8, "BIT 6, E"),
+    (bit_6_h, 8, "BIT 6, H"),
+    (bit_6_l, 8, "BIT 6, L"),
+    (bit_6_mhl, 12, "BIT 6, [HL]"),
+    (bit_6_a, 8, "BIT 6, A"),
+    (bit_7_b, 8, "BIT 7, B"),
+    (bit_7_c, 8, "BIT 7, C"),
+    (bit_7_d, 8, "BIT 7, D"),
+    (bit_7_e, 8, "BIT 7, E"),
     (bit_7_h, 8, "BIT 7, H"),
     (bit_7_l, 8, "BIT 7, L"),
-    (noimpl, 4, "! UNIMP !"),
+    (bit_7_mhl, 12, "BIT 7, [HL]"),
     (bit_7_a, 8, "BIT 7, A"),
     // 0x8 opcodes
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (res_0_b, 8, "RES 0, B"),
+    (res_0_c, 8, "RES 0, C"),
+    (res_0_d, 8, "RES 0, D"),
+    (res_0_e, 8, "RES 0, E"),
+    (res_0_h, 8, "RES 0, H"),
+    (res_0_l, 8, "RES 0, L"),
+    (res_0_mhl, 16, "RES 0, A"),
     (res_0_a, 8, "RES 0, A"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
@@ -475,14 +475,14 @@ pub const EXTENDED: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (res_7_mhl, 16, "RES 7, [HL]"),
-    (noimpl, 4, "! UNIMP !"),
+    (res_7_b, 8, "RES 7, B"),
+    (res_7_c, 8, "RES 7, C"),
+    (res_7_d, 8, "RES 7, D"),
+    (res_7_e, 8, "RES 7, E"),
+    (res_7_h, 8, "RES 7, H"),
+    (res_7_l, 8, "RES 7, L"),
+    (res_7_mhl, 16, "RES 7, A"),
+    (res_7_a, 8, "RES 7, A"),
     // 0xc opcodes
     (noimpl, 4, "! UNIMP !"),
     (noimpl, 4, "! UNIMP !"),
@@ -2226,8 +2226,244 @@ fn srl_b(cpu: &mut Cpu) {
     cpu.b = srl(cpu, cpu.b);
 }
 
+fn bit_0_b(cpu: &mut Cpu) {
+    bit_b(cpu, 0);
+}
+
+fn bit_0_c(cpu: &mut Cpu) {
+    bit_c(cpu, 0);
+}
+
 fn bit_0_d(cpu: &mut Cpu) {
     bit_d(cpu, 0);
+}
+
+fn bit_0_e(cpu: &mut Cpu) {
+    bit_e(cpu, 0);
+}
+
+fn bit_0_h(cpu: &mut Cpu) {
+    bit_h(cpu, 0);
+}
+
+fn bit_0_l(cpu: &mut Cpu) {
+    bit_l(cpu, 0);
+}
+
+fn bit_0_mhl(cpu: &mut Cpu) {
+    bit_mhl(cpu, 0);
+}
+
+fn bit_0_a(cpu: &mut Cpu) {
+    bit_a(cpu, 0);
+}
+
+fn bit_1_b(cpu: &mut Cpu) {
+    bit_b(cpu, 1);
+}
+
+fn bit_1_c(cpu: &mut Cpu) {
+    bit_c(cpu, 1);
+}
+
+fn bit_1_d(cpu: &mut Cpu) {
+    bit_d(cpu, 1);
+}
+
+fn bit_1_e(cpu: &mut Cpu) {
+    bit_e(cpu, 1);
+}
+
+fn bit_1_h(cpu: &mut Cpu) {
+    bit_h(cpu, 1);
+}
+
+fn bit_1_l(cpu: &mut Cpu) {
+    bit_l(cpu, 1);
+}
+
+fn bit_1_mhl(cpu: &mut Cpu) {
+    bit_mhl(cpu, 1);
+}
+
+fn bit_1_a(cpu: &mut Cpu) {
+    bit_a(cpu, 1);
+}
+
+fn bit_2_b(cpu: &mut Cpu) {
+    bit_b(cpu, 2);
+}
+
+fn bit_2_c(cpu: &mut Cpu) {
+    bit_c(cpu, 2);
+}
+
+fn bit_2_d(cpu: &mut Cpu) {
+    bit_d(cpu, 2);
+}
+
+fn bit_2_e(cpu: &mut Cpu) {
+    bit_e(cpu, 2);
+}
+
+fn bit_2_h(cpu: &mut Cpu) {
+    bit_h(cpu, 2);
+}
+
+fn bit_2_l(cpu: &mut Cpu) {
+    bit_l(cpu, 2);
+}
+
+fn bit_2_mhl(cpu: &mut Cpu) {
+    bit_mhl(cpu, 2);
+}
+
+fn bit_2_a(cpu: &mut Cpu) {
+    bit_a(cpu, 2);
+}
+
+fn bit_3_b(cpu: &mut Cpu) {
+    bit_b(cpu, 3);
+}
+
+fn bit_3_c(cpu: &mut Cpu) {
+    bit_c(cpu, 3);
+}
+
+fn bit_3_d(cpu: &mut Cpu) {
+    bit_d(cpu, 3);
+}
+
+fn bit_3_e(cpu: &mut Cpu) {
+    bit_e(cpu, 3);
+}
+
+fn bit_3_h(cpu: &mut Cpu) {
+    bit_h(cpu, 3);
+}
+
+fn bit_3_l(cpu: &mut Cpu) {
+    bit_l(cpu, 3);
+}
+
+fn bit_3_mhl(cpu: &mut Cpu) {
+    bit_mhl(cpu, 3);
+}
+
+fn bit_3_a(cpu: &mut Cpu) {
+    bit_a(cpu, 3);
+}
+
+fn bit_4_b(cpu: &mut Cpu) {
+    bit_b(cpu, 4);
+}
+
+fn bit_4_c(cpu: &mut Cpu) {
+    bit_c(cpu, 4);
+}
+
+fn bit_4_d(cpu: &mut Cpu) {
+    bit_d(cpu, 4);
+}
+
+fn bit_4_e(cpu: &mut Cpu) {
+    bit_e(cpu, 4);
+}
+
+fn bit_4_h(cpu: &mut Cpu) {
+    bit_h(cpu, 4);
+}
+
+fn bit_4_l(cpu: &mut Cpu) {
+    bit_l(cpu, 4);
+}
+
+fn bit_4_mhl(cpu: &mut Cpu) {
+    bit_mhl(cpu, 4);
+}
+
+fn bit_4_a(cpu: &mut Cpu) {
+    bit_a(cpu, 4);
+}
+
+fn bit_5_b(cpu: &mut Cpu) {
+    bit_b(cpu, 5);
+}
+
+fn bit_5_c(cpu: &mut Cpu) {
+    bit_c(cpu, 5);
+}
+
+fn bit_5_d(cpu: &mut Cpu) {
+    bit_d(cpu, 5);
+}
+
+fn bit_5_e(cpu: &mut Cpu) {
+    bit_e(cpu, 5);
+}
+
+fn bit_5_h(cpu: &mut Cpu) {
+    bit_h(cpu, 5);
+}
+
+fn bit_5_l(cpu: &mut Cpu) {
+    bit_l(cpu, 5);
+}
+
+fn bit_5_mhl(cpu: &mut Cpu) {
+    bit_mhl(cpu, 5);
+}
+
+fn bit_5_a(cpu: &mut Cpu) {
+    bit_a(cpu, 5);
+}
+
+fn bit_6_b(cpu: &mut Cpu) {
+    bit_b(cpu, 6);
+}
+
+fn bit_6_c(cpu: &mut Cpu) {
+    bit_c(cpu, 6);
+}
+
+fn bit_6_d(cpu: &mut Cpu) {
+    bit_d(cpu, 6);
+}
+
+fn bit_6_e(cpu: &mut Cpu) {
+    bit_e(cpu, 6);
+}
+
+fn bit_6_h(cpu: &mut Cpu) {
+    bit_h(cpu, 6);
+}
+
+fn bit_6_l(cpu: &mut Cpu) {
+    bit_l(cpu, 6);
+}
+
+fn bit_6_mhl(cpu: &mut Cpu) {
+    bit_mhl(cpu, 6);
+}
+
+fn bit_6_a(cpu: &mut Cpu) {
+    bit_a(cpu, 6);
+}
+
+fn bit_7_b(cpu: &mut Cpu) {
+    bit_b(cpu, 7);
+}
+
+fn bit_7_c(cpu: &mut Cpu) {
+    bit_c(cpu, 7);
+}
+
+fn bit_7_d(cpu: &mut Cpu) {
+    bit_d(cpu, 7);
+}
+
+fn bit_7_e(cpu: &mut Cpu) {
+    bit_e(cpu, 7);
 }
 
 fn bit_7_h(cpu: &mut Cpu) {
@@ -2238,12 +2474,71 @@ fn bit_7_l(cpu: &mut Cpu) {
     bit_l(cpu, 7);
 }
 
+fn bit_7_mhl(cpu: &mut Cpu) {
+    bit_mhl(cpu, 7);
+}
+
 fn bit_7_a(cpu: &mut Cpu) {
     bit_a(cpu, 7);
 }
 
+fn res_0_b(cpu: &mut Cpu) {
+    cpu.b = res(cpu.b, 0);
+}
+
+fn res_0_c(cpu: &mut Cpu) {
+    cpu.c = res(cpu.c, 0);
+}
+
+fn res_0_d(cpu: &mut Cpu) {
+    cpu.d = res(cpu.d, 0);
+}
+
+fn res_0_e(cpu: &mut Cpu) {
+    cpu.e = res(cpu.e, 0);
+}
+
+fn res_0_h(cpu: &mut Cpu) {
+    cpu.h = res(cpu.h, 0);
+}
+
+fn res_0_l(cpu: &mut Cpu) {
+    cpu.l = res(cpu.l, 0);
+}
+
+fn res_0_mhl(cpu: &mut Cpu) {
+    let hl = cpu.hl();
+    let byte = cpu.mmu.read(hl);
+    let value = res(byte, 0);
+    cpu.mmu.write(hl, value);
+}
+
 fn res_0_a(cpu: &mut Cpu) {
     cpu.a = res(cpu.a, 0);
+}
+
+fn res_7_b(cpu: &mut Cpu) {
+    cpu.b = res(cpu.b, 7);
+}
+
+fn res_7_c(cpu: &mut Cpu) {
+    cpu.c = res(cpu.c, 7);
+}
+
+fn res_7_d(cpu: &mut Cpu) {
+    cpu.d = res(cpu.d, 7);
+}
+
+fn res_7_e(cpu: &mut Cpu) {
+    cpu.e = res(cpu.e, 7);
+}
+
+fn res_7_h(cpu: &mut Cpu) {
+    cpu.h = res(cpu.h, 7);
+}
+
+fn res_7_l(cpu: &mut Cpu) {
+    cpu.l = res(cpu.l, 7);
 }
 
 fn res_7_mhl(cpu: &mut Cpu) {
@@ -2251,6 +2546,10 @@ fn res_7_mhl(cpu: &mut Cpu) {
     let byte = cpu.mmu.read(hl);
     let value = res(byte, 7);
     cpu.mmu.write(hl, value);
+}
+
+fn res_7_a(cpu: &mut Cpu) {
+    cpu.a = res(cpu.a, 7);
 }
 
 fn set_3_mhl(cpu: &mut Cpu) {
@@ -2338,9 +2637,33 @@ fn bit_zero(val: u8, bit: u8) -> bool {
     (val & (1u8 << (bit as usize))) == 0
 }
 
+fn bit_a(cpu: &mut Cpu, bit: u8) {
+    cpu.set_sub(false);
+    cpu.set_zero(bit_zero(cpu.a, bit));
+    cpu.set_half_carry(true);
+}
+
+fn bit_b(cpu: &mut Cpu, bit: u8) {
+    cpu.set_sub(false);
+    cpu.set_zero(bit_zero(cpu.b, bit));
+    cpu.set_half_carry(true);
+}
+
+fn bit_c(cpu: &mut Cpu, bit: u8) {
+    cpu.set_sub(false);
+    cpu.set_zero(bit_zero(cpu.c, bit));
+    cpu.set_half_carry(true);
+}
+
 fn bit_d(cpu: &mut Cpu, bit: u8) {
     cpu.set_sub(false);
     cpu.set_zero(bit_zero(cpu.d, bit));
+    cpu.set_half_carry(true);
+}
+
+fn bit_e(cpu: &mut Cpu, bit: u8) {
+    cpu.set_sub(false);
+    cpu.set_zero(bit_zero(cpu.e, bit));
     cpu.set_half_carry(true);
 }
 
@@ -2356,9 +2679,10 @@ fn bit_l(cpu: &mut Cpu, bit: u8) {
     cpu.set_half_carry(true);
 }
 
-fn bit_a(cpu: &mut Cpu, bit: u8) {
+fn bit_mhl(cpu: &mut Cpu, bit: u8) {
+    let byte = cpu.read_u8();
     cpu.set_sub(false);
-    cpu.set_zero(bit_zero(cpu.a, bit));
+    cpu.set_zero(bit_zero(byte, bit));
     cpu.set_half_carry(true);
 }
 
