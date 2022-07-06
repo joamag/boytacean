@@ -290,8 +290,6 @@ impl Ppu {
                     if self.ly == 144 {
                         self.int_vblank = true;
                         self.mode = PpuMode::VBlank;
-                        // self.drawData
-                        // @todo implement this one
                     } else {
                         self.mode = PpuMode::OamRead;
                     }

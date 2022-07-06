@@ -16,6 +16,17 @@ pub enum PadSelection {
     Direction,
 }
 
+pub enum PadKey {
+    Up,
+    Down,
+    Left,
+    Right,
+    Start,
+    Select,
+    A,
+    B,
+}
+
 impl Pad {
     pub fn new() -> Self {
         Self {

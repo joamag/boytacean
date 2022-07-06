@@ -1,8 +1,8 @@
 [package]
 name = "boytacean"
+description = "A Game Boy emulator that is written in Rust."
 version = "0.1.0"
 authors = ["João Magalhães <joamag@gmail.com>"]
-description = "Game Boy in Rust"
 license = "Apache"
 keywords = ["gameboy", "emulator", "rust"]
 edition = "2018"

@@ -1,4 +1,4 @@
-import { default as wasm, GameBoy } from "./lib/boytacean.js";
+import { BootRom, default as wasm, GameBoy } from "./lib/boytacean.js";
 import info from "./package.json";
 
 const PIXEL_UNSET_COLOR = 0x1b1a17ff;
@@ -302,7 +302,7 @@ const start = async ({
     // resets the Game Boy engine to restore it into
     // a valid state ready to be used
     state.gameBoy.reset();
-    state.gameBoy.load_boot_static();
+    state.gameBoy.load_boot_default();
     state.gameBoy.load_rom(romData);
 
     // updates the name of the currently selected engine
@@ -534,17 +534,27 @@ const registerButtons = () => {
             separatorNarrative.style.display = "none";
             buttonDebug.classList.add("enabled");
 
-            const canvasTiles = document.getElementById("canvas-tiles") as HTMLCanvasElement;
+            const canvasTiles = document.getElementById(
+                "canvas-tiles"
+            ) as HTMLCanvasElement;
             const canvasTilesCtx = canvasTiles.getContext("2d");
 
-            const canvasImage = canvasTilesCtx.createImageData(canvasTiles.width, canvasTiles.height);
+            const canvasImage = canvasTilesCtx.createImageData(
+                canvasTiles.width,
+                canvasTiles.height
+            );
             const videoBuff = new DataView(canvasImage.data.buffer);
 
-            const drawSprite = (index: number, format: PixelFormat = PixelFormat.RGB) => {
+            const drawSprite = (
+                index: number,
+                format: PixelFormat = PixelFormat.RGB
+            ) => {
                 const pixels = state.gameBoy.get_tile_buffer(index);
                 const line = Math.floor(index / 16);
                 const column = index % 16;
-                let offset = ((line * canvasTiles.width * 8) + (column * 8)) * PixelFormat.RGBA;
+                let offset =
+                    (line * canvasTiles.width * 8 + column * 8) *
+                    PixelFormat.RGBA;
                 let counter = 0;
                 for (let index = 0; index < pixels.length; index += format) {
                     const color =
@@ -553,7 +563,7 @@ const registerButtons = () => {
                         (pixels[index + 2] << 8) |
                         (format == PixelFormat.RGBA ? pixels[index + 3] : 0xff);
                     videoBuff.setUint32(offset, color);
-                    
+
                     counter++;
                     if (counter == 8) {
                         counter = 0;
@@ -563,7 +573,7 @@ const registerButtons = () => {
                     }
                 }
                 canvasTilesCtx.putImageData(canvasImage, 0, 0);
-            }
+            };
 
             for (let index = 0; index < 256; index++) {
                 drawSprite(index);
@@ -743,7 +753,10 @@ const initCanvas = async () => {
     state.videoBuff = new DataView(state.image.data.buffer);
 };
 
-const updateCanvas = (pixels: Uint8Array, format: PixelFormat = PixelFormat.RGB) => {
+const updateCanvas = (
+    pixels: Uint8Array,
+    format: PixelFormat = PixelFormat.RGB
+) => {
     let offset = 0;
     for (let index = 0; index < pixels.length; index += format) {
         const color =

@@ -81,7 +81,7 @@ fn main() {
     // creates a new Game Boy instance and loads both the boot ROM
     // and the initial game ROM to "start the engine"
     let mut game_boy = GameBoy::new();
-    game_boy.load_boot_static();
+    game_boy.load_boot_default();
 
     game_boy.load_rom_file("../../res/roms.prop/tetris.gb");
     //game_boy.load_rom_file("../../res/roms.prop/alleyway.gb");

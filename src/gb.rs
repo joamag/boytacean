@@ -1,6 +1,6 @@
 use crate::{
     cpu::Cpu,
-    data::{DMG_BOOT, DMG_BOOTIX, MGB_BOOTIX, SGB_BOOT},
+    data::{BootRom, DMG_BOOT, DMG_BOOTIX, MGB_BOOTIX, SGB_BOOT},
     mmu::Mmu,
     pad::Pad,
     ppu::{Ppu, Tile, FRAME_BUFFER_SIZE},
@@ -66,49 +66,35 @@ impl GameBoy {
         self.cpu.mmu().write_boot(0x0000, data);
     }
 
-    pub fn load_boot_file(&mut self, path: &str) {
+    pub fn load_boot_path(&mut self, path: &str) {
         let data = read_file(path);
         self.load_boot(&data);
     }
 
-    pub fn load_boot_dmg_f(&mut self) {
-        self.load_boot_file("./res/boot/dmg_boot.bin");
+    pub fn load_boot_file(&mut self, boot_rom: BootRom) {
+        match boot_rom {
+            BootRom::Dmg => self.load_boot_path("./res/boot/dmg_boot.bin"),
+            BootRom::Sgb => self.load_boot_path("./res/boot/sgb_boot.bin"),
+            BootRom::DmgBootix => self.load_boot_path("./res/boot/dmg_bootix.bin"),
+            BootRom::MgbBootix => self.load_boot_path("./res/boot/mgb_bootix.bin"),
+        }
     }
 
-    pub fn load_boot_sgb_f(&mut self) {
-        self.load_boot_file("./res/boot/sgb_boot.bin");
+    pub fn load_boot_default_f(&mut self) {
+        self.load_boot_file(BootRom::DmgBootix);
     }
 
-    pub fn load_boot_dmg_bootix_f(&mut self) {
-        self.load_boot_file("./res/boot/dmg_bootix.bin");
-    }
-
-    pub fn load_boot_mgb_bootix_f(&mut self) {
-        self.load_boot_file("./res/boot/mgb_bootix.bin");
+    pub fn load_boot_static(&mut self, boot_rom: BootRom) {
+        match boot_rom {
+            BootRom::Dmg => self.load_boot(&DMG_BOOT),
+            BootRom::Sgb => self.load_boot(&SGB_BOOT),
+            BootRom::DmgBootix => self.load_boot(&DMG_BOOTIX),
+            BootRom::MgbBootix => self.load_boot(&MGB_BOOTIX),
+        }
     }
 
     pub fn load_boot_default(&mut self) {
-        self.load_boot_dmg_bootix_f();
-    }
-
-    pub fn load_boot_dmg(&mut self) {
-        self.load_boot(&DMG_BOOT);
-    }
-
-    pub fn load_boot_sgb(&mut self) {
-        self.load_boot(&SGB_BOOT);
-    }
-
-    pub fn load_boot_dmg_bootix(&mut self) {
-        self.load_boot(&DMG_BOOTIX);
-    }
-
-    pub fn load_boot_mgb_bootix(&mut self) {
-        self.load_boot(&MGB_BOOTIX);
-    }
-
-    pub fn load_boot_static(&mut self) {
-        self.load_boot_dmg_bootix();
+        self.load_boot_static(BootRom::DmgBootix);
     }
 
     pub fn vram_eager(&mut self) -> Vec<u8> {

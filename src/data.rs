@@ -1,3 +1,14 @@
+#[cfg(feature = "wasm")]
+use wasm_bindgen::prelude::*;
+
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
+pub enum BootRom {
+    Dmg,
+    Sgb,
+    DmgBootix,
+    MgbBootix,
+}
+
 /// Static data corresponding to the DMG boot ROM
 /// allows freely using the emulator without external dependency.
 pub const DMG_BOOT: [u8; 256] = [
