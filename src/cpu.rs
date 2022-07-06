@@ -3,6 +3,7 @@ use core::panic;
 use crate::{
     inst::{EXTENDED, INSTRUCTIONS},
     mmu::Mmu,
+    pad::Pad,
     ppu::Ppu,
 };
 
@@ -175,6 +176,11 @@ impl Cpu {
     #[inline(always)]
     pub fn ppu(&mut self) -> &mut Ppu {
         self.mmu().ppu()
+    }
+
+    #[inline(always)]
+    pub fn pad(&mut self) -> &mut Pad {
+        self.mmu().pad()
     }
 
     #[inline(always)]

@@ -1,3 +1,6 @@
+#[cfg(feature = "wasm")]
+use wasm_bindgen::prelude::*;
+
 pub struct Pad {
     down: bool,
     up: bool,
@@ -16,6 +19,7 @@ pub enum PadSelection {
     Direction,
 }
 
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
 pub enum PadKey {
     Up,
     Down,
@@ -85,6 +89,32 @@ impl Pad {
                 }
             }
             addr => panic!("Writing to unknown Pad location 0x{:04x}", addr),
+        }
+    }
+
+    pub fn key_press(&mut self, key: PadKey) {
+        match key {
+            PadKey::Up => self.up = true,
+            PadKey::Down => self.down = true,
+            PadKey::Left => self.left = true,
+            PadKey::Right => self.right = true,
+            PadKey::Start => self.start = true,
+            PadKey::Select => self.select = true,
+            PadKey::A => self.a = true,
+            PadKey::B => self.b = true,
+        }
+    }
+
+    pub fn key_lift(&mut self, key: PadKey) {
+        match key {
+            PadKey::Up => self.up = false,
+            PadKey::Down => self.down = false,
+            PadKey::Left => self.left = false,
+            PadKey::Right => self.right = false,
+            PadKey::Start => self.start = false,
+            PadKey::Select => self.select = false,
+            PadKey::A => self.a = false,
+            PadKey::B => self.b = false,
         }
     }
 }

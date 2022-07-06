@@ -45,6 +45,10 @@ impl Mmu {
         &mut self.ppu
     }
 
+    pub fn pad(&mut self) -> &mut Pad {
+        &mut self.pad
+    }
+
     pub fn boot_active(&self) -> bool {
         self.boot_active
     }

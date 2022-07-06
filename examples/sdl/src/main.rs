@@ -1,10 +1,11 @@
 use boytacean::{
     gb::GameBoy,
+    pad::PadKey,
     ppu::{DISPLAY_HEIGHT, DISPLAY_WIDTH},
 };
 use sdl2::{
-    event::Event, image::LoadSurface, pixels::PixelFormatEnum, surface::Surface, video::Window,
-    AudioSubsystem, EventPump, TimerSubsystem, VideoSubsystem,
+    event::Event, image::LoadSurface, keyboard::Keycode, pixels::PixelFormatEnum, surface::Surface,
+    video::Window, AudioSubsystem, EventPump, TimerSubsystem, VideoSubsystem,
 };
 
 /// The base title to be used in the window.
@@ -112,6 +113,17 @@ fn main() {
         while let Some(event) = graphics.event_pump.poll_event() {
             match event {
                 Event::Quit { .. } => break 'main,
+
+                Event::KeyDown {
+                    keycode: Some(keycode),
+                    ..
+                } => game_boy.key_press(key_to_pad(keycode)),
+
+                Event::KeyUp {
+                    keycode: Some(keycode),
+                    ..
+                } => game_boy.key_lift(key_to_pad(keycode)),
+
                 _ => (),
             }
         }
@@ -144,5 +156,19 @@ fn main() {
 
         // @todo this must be improved with proper timestamps
         graphics.timer_subsystem.delay(17);
+    }
+}
+
+fn key_to_pad(keycode: Keycode) -> PadKey {
+    match keycode {
+        Keycode::Up => PadKey::Up,
+        Keycode::Down => PadKey::Down,
+        Keycode::Left => PadKey::Left,
+        Keycode::Right => PadKey::Right,
+        Keycode::Space => PadKey::Start,
+        Keycode::Return => PadKey::Select,
+        Keycode::A => PadKey::A,
+        Keycode::S => PadKey::B,
+        _ => PadKey::A,
     }
 }

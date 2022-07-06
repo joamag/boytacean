@@ -2,7 +2,7 @@ use crate::{
     cpu::Cpu,
     data::{BootRom, DMG_BOOT, DMG_BOOTIX, MGB_BOOTIX, SGB_BOOT},
     mmu::Mmu,
-    pad::Pad,
+    pad::{Pad, PadKey},
     ppu::{Ppu, Tile, FRAME_BUFFER_SIZE},
     util::read_file,
 };
@@ -33,6 +33,14 @@ impl GameBoy {
         self.ppu().reset();
         self.mmu().reset();
         self.cpu.reset();
+    }
+
+    pub fn key_press(&mut self, key: PadKey) {
+        self.pad().key_press(key);
+    }
+
+    pub fn key_lift(&mut self, key: PadKey) {
+        self.pad().key_lift(key);
     }
 
     pub fn pc(&self) -> u16 {
@@ -130,6 +138,10 @@ impl GameBoy {
 
     pub fn ppu(&mut self) -> &mut Ppu {
         self.cpu.ppu()
+    }
+
+    pub fn pad(&mut self) -> &mut Pad {
+        self.cpu.pad()
     }
 
     pub fn frame_buffer(&mut self) -> &Box<[u8; FRAME_BUFFER_SIZE]> {
