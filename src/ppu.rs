@@ -1,6 +1,9 @@
 use core::fmt;
 use std::fmt::{Display, Formatter};
 
+#[cfg(feature = "wasm")]
+use wasm_bindgen::prelude::*;
+
 pub const VRAM_SIZE: usize = 8192;
 pub const HRAM_SIZE: usize = 128;
 pub const PALETTE_SIZE: usize = 4;
@@ -25,6 +28,7 @@ pub type Pixel = [u8; RGB_SIZE];
 
 /// Represents a tile within the Game Boy context,
 /// should contain the pixel buffer of the tile.
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
 #[derive(Clone, Copy, PartialEq)]
 pub struct Tile {
     buffer: [u8; 64],
@@ -334,8 +338,8 @@ impl Ppu {
         }
     }
 
-    pub fn tiles(&self) -> Vec<Tile> {
-        self.tiles.to_vec()
+    pub fn tiles(&self) -> [Tile; TILE_COUNT] {
+        self.tiles
     }
 
     pub fn int_vblank(&self) -> bool {

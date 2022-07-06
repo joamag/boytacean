@@ -1,5 +1,7 @@
 @import url("https://fonts.googleapis.com/css2?family=VT323&display=swap");
 
+@import url("./debug.css");
+
 * {
     box-sizing: border-box;
     -o-box-sizing: border-box;

@@ -51,6 +51,13 @@ const KEYS: Record<string, number> = {
 // @ts-ignore: ts(2580)
 const ROM_PATH = require("../../res/roms/firstwhite.gb");
 
+// Enumeration that describes the multiple pixel
+// formats and the associated byte size.
+enum PixelFormat {
+    RGB = 3,
+    RGBA = 4
+}
+
 type State = {
     gameBoy: GameBoy;
     engine: string;
@@ -232,7 +239,7 @@ const tick = (currentTime: number) => {
 
     // updates the canvas object with the new
     // visual information coming in
-    updateCanvas(state.gameBoy.frame_buffer_eager());
+    updateCanvas(state.gameBoy.frame_buffer_eager(), PixelFormat.RGB);
 
     // increments the number of frames rendered in the current
     // section, this value is going to be used to calculate FPS
@@ -255,6 +262,13 @@ const tick = (currentTime: number) => {
     state.nextTickTime += (1000 / state.visualFrequency) * ticks;
 };
 
+/**
+ * Starts the current machine, setting the internal structure in
+ * a proper state to start drwaing and receiving input.
+ *
+ * @param options The options that are going to be used in the
+ * starting of the machine.
+ */
 const start = async ({
     engine = "neo",
     restore = true,
@@ -499,6 +513,29 @@ const registerButtons = () => {
         }
     });
 
+    const buttonDebug = document.getElementById("button-debug");
+    buttonDebug.addEventListener("click", () => {
+        const sectionDebug = document.getElementById("section-debug");
+        const separatorDebug = document.getElementById("separator-debug");
+        const sectionNarrative = document.getElementById("section-narrative");
+        const separatorNarrative = document.getElementById(
+            "separator-narrative"
+        );
+        if (buttonDebug.classList.contains("enabled")) {
+            sectionDebug.style.display = "none";
+            separatorDebug.style.display = "none";
+            sectionNarrative.style.display = "block";
+            separatorNarrative.style.display = "block";
+            buttonDebug.classList.remove("enabled");
+        } else {
+            sectionDebug.style.display = "block";
+            separatorDebug.style.display = "block";
+            sectionNarrative.style.display = "none";
+            separatorNarrative.style.display = "none";
+            buttonDebug.classList.add("enabled");
+        }
+    });
+
     const buttonInformation = document.getElementById("button-information");
     buttonInformation.addEventListener("click", () => {
         const sectionDiag = document.getElementById("section-diag");
@@ -640,7 +677,7 @@ const initCanvas = async () => {
     state.canvasCtx = state.canvas.getContext("2d");
 
     state.canvasScaled = document.getElementById(
-        "chip-canvas"
+        "engine-canvas"
     ) as HTMLCanvasElement;
     state.canvasScaled.width =
         state.canvasScaled.width * window.devicePixelRatio;
@@ -661,16 +698,16 @@ const initCanvas = async () => {
     state.videoBuff = new DataView(state.image.data.buffer);
 };
 
-const updateCanvas = (pixels: Uint8Array) => {
+const updateCanvas = (pixels: Uint8Array, format: PixelFormat) => {
     let offset = 0;
-    for (let index = 0; index < pixels.length; index += 3) {
+    for (let index = 0; index < pixels.length; index += format) {
         const color =
             (pixels[index] << 24) |
             (pixels[index + 1] << 16) |
             (pixels[index + 2] << 8) |
-            0xff;
+            (format == PixelFormat.RGBA ? pixels[index + 3] : 0xff);
         state.videoBuff.setUint32(offset, color);
-        offset += 4;
+        offset += PixelFormat.RGBA;
     }
     state.canvasCtx.putImageData(state.image, 0, 0);
     state.canvasScaledCtx.drawImage(state.canvas, 0, 0);
@@ -838,15 +875,15 @@ const maximize = () => {
 
 const minimize = () => {
     const canvasContainer = document.getElementById("canvas-container");
-    const chipCanvas = document.getElementById("chip-canvas");
+    const engineCanvas = document.getElementById("engine-canvas");
     canvasContainer.classList.remove("fullscreen");
-    chipCanvas.style.width = null;
-    chipCanvas.style.height = null;
+    engineCanvas.style.width = null;
+    engineCanvas.style.height = null;
     window.removeEventListener("resize", crop);
 };
 
 const crop = () => {
-    const chipCanvas = document.getElementById("chip-canvas");
+    const engineCanvas = document.getElementById("engine-canvas");
 
     // calculates the window ratio as this is fundamental to
     // determine the proper way to crop the fulscreen
@@ -855,13 +892,13 @@ const crop = () => {
     // in case the window is wider (more horizontal than the base ratio)
     // this means that we must crop horizontaly
     if (windowRatio > DISPLAY_RATIO) {
-        chipCanvas.style.width = `${
+        engineCanvas.style.width = `${
             window.innerWidth * (DISPLAY_RATIO / windowRatio)
         }px`;
-        chipCanvas.style.height = `${window.innerHeight}px`;
+        engineCanvas.style.height = `${window.innerHeight}px`;
     } else {
-        chipCanvas.style.width = `${window.innerWidth}px`;
-        chipCanvas.style.height = `${
+        engineCanvas.style.width = `${window.innerWidth}px`;
+        engineCanvas.style.height = `${
             window.innerHeight * (windowRatio / DISPLAY_RATIO)
         }px`;
     }

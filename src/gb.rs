@@ -3,7 +3,7 @@ use crate::{
     data::{DMG_BOOT, DMG_BOOTIX, MGB_BOOTIX, SGB_BOOT},
     mmu::Mmu,
     pad::Pad,
-    ppu::{Ppu, FRAME_BUFFER_SIZE},
+    ppu::{Ppu, Tile, FRAME_BUFFER_SIZE},
     util::read_file,
 };
 
@@ -107,6 +107,10 @@ impl GameBoy {
 
     pub fn frame_buffer_eager(&mut self) -> Vec<u8> {
         self.frame_buffer().to_vec()
+    }
+
+    pub fn get_tile(&mut self, index: usize) -> Tile {
+        self.ppu().tiles()[index]
     }
 }
 
