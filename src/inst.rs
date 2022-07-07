@@ -484,73 +484,73 @@ pub const EXTENDED: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (res_7_mhl, 16, "RES 7, A"),
     (res_7_a, 8, "RES 7, A"),
     // 0xc opcodes
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (set_0_b, 8, "SET 0, B"),
+    (set_0_c, 8, "SET 0, C"),
+    (set_0_d, 8, "SET 0, D"),
+    (set_0_e, 8, "SET 0, E"),
+    (set_0_h, 8, "SET 0, H"),
+    (set_0_l, 8, "SET 0, L"),
+    (set_0_mhl, 16, "SET 0, [HL]"),
+    (set_0_a, 8, "SET 0, A"),
+    (set_1_b, 8, "SET 1, B"),
+    (set_1_c, 8, "SET 1, C"),
+    (set_1_d, 8, "SET 1, D"),
+    (set_1_e, 8, "SET 1, E"),
+    (set_1_h, 8, "SET 1, H"),
+    (set_1_l, 8, "SET 1, L"),
+    (set_1_mhl, 16, "SET 1, [HL]"),
+    (set_1_a, 8, "SET 1, A"),
     // 0xd opcodes
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (set_2_b, 8, "SET 2, B"),
+    (set_2_c, 8, "SET 2, C"),
+    (set_2_d, 8, "SET 2, D"),
+    (set_2_e, 8, "SET 2, E"),
+    (set_2_h, 8, "SET 2, H"),
+    (set_2_l, 8, "SET 2, L"),
+    (set_2_mhl, 16, "SET 2, [HL]"),
+    (set_2_a, 8, "SET 2, A"),
+    (set_3_b, 8, "SET 3, B"),
+    (set_3_c, 8, "SET 3, C"),
+    (set_3_d, 8, "SET 3, D"),
+    (set_3_e, 8, "SET 3, E"),
+    (set_3_h, 8, "SET 3, H"),
+    (set_3_l, 8, "SET 3, L"),
     (set_3_mhl, 16, "SET 3, [HL]"),
-    (noimpl, 4, "! UNIMP !"),
+    (set_3_a, 8, "SET 3, A"),
     // 0xe opcodes
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (set_4_b, 8, "SET 4, B"),
+    (set_4_c, 8, "SET 4, C"),
+    (set_4_d, 8, "SET 4, D"),
+    (set_4_e, 8, "SET 4, E"),
+    (set_4_h, 8, "SET 4, H"),
+    (set_4_l, 8, "SET 4, L"),
+    (set_4_mhl, 16, "SET 4, [HL]"),
     (set_4_a, 8, "SET 4, A"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (set_5_b, 8, "SET 5, B"),
+    (set_5_c, 8, "SET 5, C"),
+    (set_5_d, 8, "SET 5, D"),
+    (set_5_e, 8, "SET 5, E"),
+    (set_5_h, 8, "SET 5, H"),
+    (set_5_l, 8, "SET 5, L"),
+    (set_5_mhl, 16, "SET 5, [HL]"),
+    (set_5_a, 8, "SET 5, A"),
     // 0xf opcodes
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (set_6_b, 8, "SET 6, B"),
+    (set_6_c, 8, "SET 6, C"),
+    (set_6_d, 8, "SET 6, D"),
+    (set_6_e, 8, "SET 6, E"),
+    (set_6_h, 8, "SET 6, H"),
+    (set_6_l, 8, "SET 6, L"),
+    (set_6_mhl, 16, "SET 6, [HL]"),
+    (set_6_a, 8, "SET 6, A"),
+    (set_7_b, 8, "SET 7, B"),
+    (set_7_c, 8, "SET 7, C"),
+    (set_7_d, 8, "SET 7, D"),
+    (set_7_e, 8, "SET 7, E"),
+    (set_7_h, 8, "SET 7, H"),
+    (set_7_l, 8, "SET 7, L"),
+    (set_7_mhl, 16, "SET 7, [HL]"),
+    (set_7_a, 8, "SET 7, A"),
 ];
 
 fn nop(_cpu: &mut Cpu) {}
@@ -2587,6 +2587,135 @@ fn res_7_a(cpu: &mut Cpu) {
     cpu.a = res(cpu.a, 7);
 }
 
+fn set_0_b(cpu: &mut Cpu) {
+    cpu.b = set(cpu.b, 0);
+}
+
+fn set_0_c(cpu: &mut Cpu) {
+    cpu.c = set(cpu.c, 0);
+}
+
+fn set_0_d(cpu: &mut Cpu) {
+    cpu.d = set(cpu.d, 0);
+}
+
+fn set_0_e(cpu: &mut Cpu) {
+    cpu.e = set(cpu.e, 0);
+}
+
+fn set_0_h(cpu: &mut Cpu) {
+    cpu.h = set(cpu.h, 0);
+}
+
+fn set_0_l(cpu: &mut Cpu) {
+    cpu.l = set(cpu.l, 0);
+}
+
+fn set_0_mhl(cpu: &mut Cpu) {
+    let hl = cpu.hl();
+    let byte = cpu.mmu.read(hl);
+    let value = set(byte, 0);
+    cpu.mmu.write(hl, value);
+}
+
+fn set_0_a(cpu: &mut Cpu) {
+    cpu.a = set(cpu.a, 0);
+}
+
+fn set_1_b(cpu: &mut Cpu) {
+    cpu.b = set(cpu.b, 1);
+}
+
+fn set_1_c(cpu: &mut Cpu) {
+    cpu.c = set(cpu.c, 1);
+}
+
+fn set_1_d(cpu: &mut Cpu) {
+    cpu.d = set(cpu.d, 1);
+}
+
+fn set_1_e(cpu: &mut Cpu) {
+    cpu.e = set(cpu.e, 1);
+}
+
+fn set_1_h(cpu: &mut Cpu) {
+    cpu.h = set(cpu.h, 1);
+}
+
+fn set_1_l(cpu: &mut Cpu) {
+    cpu.l = set(cpu.l, 1);
+}
+
+fn set_1_mhl(cpu: &mut Cpu) {
+    let hl = cpu.hl();
+    let byte = cpu.mmu.read(hl);
+    let value = set(byte, 1);
+    cpu.mmu.write(hl, value);
+}
+
+fn set_1_a(cpu: &mut Cpu) {
+    cpu.a = set(cpu.a, 1);
+}
+
+fn set_2_b(cpu: &mut Cpu) {
+    cpu.b = set(cpu.b, 2);
+}
+
+fn set_2_c(cpu: &mut Cpu) {
+    cpu.c = set(cpu.c, 2);
+}
+
+fn set_2_d(cpu: &mut Cpu) {
+    cpu.d = set(cpu.d, 2);
+}
+
+fn set_2_e(cpu: &mut Cpu) {
+    cpu.e = set(cpu.e, 2);
+}
+
+fn set_2_h(cpu: &mut Cpu) {
+    cpu.h = set(cpu.h, 2);
+}
+
+fn set_2_l(cpu: &mut Cpu) {
+    cpu.l = set(cpu.l, 2);
+}
+
+fn set_2_mhl(cpu: &mut Cpu) {
+    let hl = cpu.hl();
+    let byte = cpu.mmu.read(hl);
+    let value = set(byte, 2);
+    cpu.mmu.write(hl, value);
+}
+
+fn set_2_a(cpu: &mut Cpu) {
+    cpu.a = set(cpu.a, 2);
+}
+
+fn set_3_b(cpu: &mut Cpu) {
+    cpu.b = set(cpu.b, 3);
+}
+
+fn set_3_c(cpu: &mut Cpu) {
+    cpu.c = set(cpu.c, 3);
+}
+
+fn set_3_d(cpu: &mut Cpu) {
+    cpu.d = set(cpu.d, 3);
+}
+
+fn set_3_e(cpu: &mut Cpu) {
+    cpu.e = set(cpu.e, 3);
+}
+
+fn set_3_h(cpu: &mut Cpu) {
+    cpu.h = set(cpu.h, 3);
+}
+
+fn set_3_l(cpu: &mut Cpu) {
+    cpu.l = set(cpu.l, 3);
+}
+
 fn set_3_mhl(cpu: &mut Cpu) {
     let hl = cpu.hl();
     let byte = cpu.mmu.read(hl);
@@ -2594,10 +2723,149 @@ fn set_3_mhl(cpu: &mut Cpu) {
     cpu.mmu.write(hl, value);
 }
 
+fn set_3_a(cpu: &mut Cpu) {
+    cpu.a = set(cpu.a, 3);
+}
+
+fn set_4_b(cpu: &mut Cpu) {
+    cpu.b = set(cpu.b, 4);
+}
+
+fn set_4_c(cpu: &mut Cpu) {
+    cpu.c = set(cpu.c, 4);
+}
+
+fn set_4_d(cpu: &mut Cpu) {
+    cpu.d = set(cpu.d, 4);
+}
+
+fn set_4_e(cpu: &mut Cpu) {
+    cpu.e = set(cpu.e, 4);
+}
+
+fn set_4_h(cpu: &mut Cpu) {
+    cpu.h = set(cpu.h, 4);
+}
+
+fn set_4_l(cpu: &mut Cpu) {
+    cpu.l = set(cpu.l, 4);
+}
+
+fn set_4_mhl(cpu: &mut Cpu) {
+    let hl = cpu.hl();
+    let byte = cpu.mmu.read(hl);
+    let value = set(byte, 4);
+    cpu.mmu.write(hl, value);
+}
+
 fn set_4_a(cpu: &mut Cpu) {
     cpu.a = set(cpu.a, 4);
 }
 
+fn set_5_b(cpu: &mut Cpu) {
+    cpu.b = set(cpu.b, 5);
+}
+
+fn set_5_c(cpu: &mut Cpu) {
+    cpu.c = set(cpu.c, 5);
+}
+
+fn set_5_d(cpu: &mut Cpu) {
+    cpu.d = set(cpu.d, 5);
+}
+
+fn set_5_e(cpu: &mut Cpu) {
+    cpu.e = set(cpu.e, 5);
+}
+
+fn set_5_h(cpu: &mut Cpu) {
+    cpu.h = set(cpu.h, 5);
+}
+
+fn set_5_l(cpu: &mut Cpu) {
+    cpu.l = set(cpu.l, 5);
+}
+
+fn set_5_mhl(cpu: &mut Cpu) {
+    let hl = cpu.hl();
+    let byte = cpu.mmu.read(hl);
+    let value = set(byte, 5);
+    cpu.mmu.write(hl, value);
+}
+
+fn set_5_a(cpu: &mut Cpu) {
+    cpu.a = set(cpu.a, 5);
+}
+
+fn set_6_b(cpu: &mut Cpu) {
+    cpu.b = set(cpu.b, 6);
+}
+
+fn set_6_c(cpu: &mut Cpu) {
+    cpu.c = set(cpu.c, 6);
+}
+
+fn set_6_d(cpu: &mut Cpu) {
+    cpu.d = set(cpu.d, 6);
+}
+
+fn set_6_e(cpu: &mut Cpu) {
+    cpu.e = set(cpu.e, 6);
+}
+
+fn set_6_h(cpu: &mut Cpu) {
+    cpu.h = set(cpu.h, 6);
+}
+
+fn set_6_l(cpu: &mut Cpu) {
+    cpu.l = set(cpu.l, 6);
+}
+
+fn set_6_mhl(cpu: &mut Cpu) {
+    let hl = cpu.hl();
+    let byte = cpu.mmu.read(hl);
+    let value = set(byte, 6);
+    cpu.mmu.write(hl, value);
+}
+
+fn set_6_a(cpu: &mut Cpu) {
+    cpu.a = set(cpu.a, 6);
+}
+
+fn set_7_b(cpu: &mut Cpu) {
+    cpu.b = set(cpu.b, 7);
+}
+
+fn set_7_c(cpu: &mut Cpu) {
+    cpu.c = set(cpu.c, 7);
+}
+
+fn set_7_d(cpu: &mut Cpu) {
+    cpu.d = set(cpu.d, 7);
+}
+
+fn set_7_e(cpu: &mut Cpu) {
+    cpu.e = set(cpu.e, 7);
+}
+
+fn set_7_h(cpu: &mut Cpu) {
+    cpu.h = set(cpu.h, 7);
+}
+
+fn set_7_l(cpu: &mut Cpu) {
+    cpu.l = set(cpu.l, 7);
+}
+
+fn set_7_mhl(cpu: &mut Cpu) {
+    let hl = cpu.hl();
+    let byte = cpu.mmu.read(hl);
+    let value = set(byte, 7);
+    cpu.mmu.write(hl, value);
+}
+
+fn set_7_a(cpu: &mut Cpu) {
+    cpu.a = set(cpu.a, 7);
+}
 /// Helper function to set one bit in a u8.
 fn set(value: u8, bit: u8) -> u8 {
     value | (1u8 << (bit as usize))
