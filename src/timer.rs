@@ -27,21 +27,22 @@ impl Timer {
 
     pub fn clock(&mut self, cycles: u8) {
         self.div_clock += cycles as u16;
-        self.tima_clock += cycles as u16;
-
         if self.div_clock >= 256 {
             self.div = self.div.wrapping_add(1);
             self.div_clock = self.div_clock - 256;
         }
 
-        if self.tima_enabled && self.tima_clock >= self.tima_ratio {
-            if self.tima == 0xff {
-                self.int_tima = true;
-                self.tima = self.tma;
-            }
+        if self.tima_enabled {
+            self.tima_clock += cycles as u16;
+            if self.tima_clock >= self.tima_ratio {
+                if self.tima == 0xff {
+                    self.int_tima = true;
+                    self.tima = self.tma;
+                }
 
-            self.tima = self.tima.wrapping_add(1);
-            self.tima_clock = self.tima_clock - self.tima_ratio;
+                self.tima = self.tima.wrapping_add(1);
+                self.tima_clock = self.tima_clock - self.tima_ratio;
+            }
         }
     }
 
@@ -84,6 +85,6 @@ impl Timer {
     }
 
     pub fn ack_tima(&mut self) {
-        self.int_tima = false;
+        self.set_int_tima(false);
     }
 }
