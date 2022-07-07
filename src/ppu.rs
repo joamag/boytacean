@@ -105,7 +105,7 @@ pub struct ObjectData {
     palette: u8,
     xflip: bool,
     yflip: bool,
-    prio: bool,
+    priority: bool,
     index: u8,
 }
 
@@ -257,7 +257,7 @@ impl Ppu {
                 palette: 0,
                 xflip: false,
                 yflip: false,
-                prio: false,
+                priority: false,
                 index: 0,
             }; OBJ_COUNT],
             palette: [[0u8; RGB_SIZE]; PALETTE_SIZE],
@@ -567,7 +567,7 @@ impl Ppu {
                 obj.palette = if value & 0x10 == 0x10 { 1 } else { 0 };
                 obj.xflip = if value & 0x20 == 0x20 { true } else { false };
                 obj.yflip = if value & 0x40 == 0x40 { true } else { false };
-                obj.prio = if value & 0x80 == 0x80 { false } else { true };
+                obj.priority = if value & 0x80 == 0x80 { false } else { true };
                 obj.index = obj_index as u8;
             }
             _ => (),
@@ -704,7 +704,7 @@ impl Ppu {
                 if is_contained {
                     // the object is only considered visible if it's a priority
                     // or if the underlying pixel is transparent (zero value)
-                    let is_visible = obj.prio || self.color_buffer[color_offset] == 0;
+                    let is_visible = obj.priority || self.color_buffer[color_offset] == 0;
                     if is_visible {
                         // obtains the current pixel data from the tile row and
                         // re-maps it according to the object palette
