@@ -4,7 +4,7 @@ use crate::{
     inst::{EXTENDED, INSTRUCTIONS},
     mmu::Mmu,
     pad::Pad,
-    ppu::Ppu,
+    ppu::Ppu, timer::Timer,
 };
 
 pub const PREFIX: u8 = 0xcb;
@@ -190,6 +190,11 @@ impl Cpu {
     #[inline(always)]
     pub fn pad(&mut self) -> &mut Pad {
         self.mmu().pad()
+    }
+    
+    #[inline(always)]
+    pub fn timer(&mut self) -> &mut Timer {
+        self.mmu().timer()
     }
 
     #[inline(always)]

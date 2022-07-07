@@ -34,7 +34,7 @@ fn start_sdl() -> Graphics {
 
     // creates the system window that is going to be used to
     // show the emulator and sets it to the central are o screen
-    let mut window = video_subsystem
+    let window = video_subsystem
         .window(
             TITLE,
             2 as u32 * DISPLAY_WIDTH as u32, //@todo check screen scale

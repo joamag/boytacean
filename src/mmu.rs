@@ -1,4 +1,4 @@
-use crate::{pad::Pad, ppu::Ppu};
+use crate::{pad::Pad, ppu::Ppu, timer::Timer};
 
 pub const BIOS_SIZE: usize = 256;
 pub const ROM_SIZE: usize = 32768;
@@ -6,24 +6,29 @@ pub const RAM_SIZE: usize = 8192;
 pub const ERAM_SIZE: usize = 8192;
 
 pub struct Mmu {
+    /// Register that controls the interrupts that are considered
+    /// to be enabled and should be triggered.
+    pub ie: u8,
+
+    /// Reference to the PPU (Pixel Processing Unit) that is going
+    /// to be used both for VRAM reading/writing and to forward
+    /// some of the access operations.
     ppu: Ppu,
     pad: Pad,
+    timer: Timer,
     boot_active: bool,
     boot: [u8; BIOS_SIZE],
     rom: [u8; ROM_SIZE],
     ram: [u8; RAM_SIZE],
     eram: [u8; RAM_SIZE],
-
-    /// Registers that controls the interrupts that are considered
-    /// to be enabled and should be triggered.
-    pub ie: u8,
 }
 
 impl Mmu {
-    pub fn new(ppu: Ppu, pad: Pad) -> Self {
+    pub fn new(ppu: Ppu, pad: Pad, timer: Timer) -> Self {
         Self {
             ppu: ppu,
             pad: pad,
+            timer: timer,
             boot_active: true,
             boot: [0u8; BIOS_SIZE],
             rom: [0u8; ROM_SIZE],
@@ -47,6 +52,10 @@ impl Mmu {
 
     pub fn pad(&mut self) -> &mut Pad {
         &mut self.pad
+    }
+
+    pub fn timer(&mut self) -> &mut Timer {
+        &mut self.timer
     }
 
     pub fn boot_active(&self) -> bool {

@@ -327,22 +327,22 @@ impl Ppu {
         match self.mode {
             PpuMode::OamRead => {
                 if self.mode_clock >= 80 {
-                    self.mode_clock = 0;
                     self.mode = PpuMode::VramRead;
+                    self.mode_clock = self.mode_clock - 80;
                 }
             }
             PpuMode::VramRead => {
                 if self.mode_clock >= 172 {
                     self.render_line();
 
-                    self.mode_clock = 0;
                     self.mode = PpuMode::HBlank;
+                    self.mode_clock = self.mode_clock - 172;
                 }
             }
             PpuMode::HBlank => {
                 if self.mode_clock >= 204 {
                     // increments the register that holds the
-                    // information about the current line in drawign
+                    // information about the current line in drawing
                     self.ly += 1;
 
                     // in case we've reached the end of the
@@ -354,7 +354,7 @@ impl Ppu {
                         self.mode = PpuMode::OamRead;
                     }
 
-                    self.mode_clock = 0;
+                    self.mode_clock = self.mode_clock - 204;
                 }
             }
             PpuMode::VBlank => {
@@ -369,7 +369,7 @@ impl Ppu {
                         self.ly = 0;
                     }
 
-                    self.mode_clock = 0;
+                    self.mode_clock = self.mode_clock - 456;
                 }
             }
         }
@@ -711,7 +711,7 @@ impl Ppu {
                         let pixel = tile_row[if obj.xflip { 7 - x } else { x }];
                         let color = palette[pixel as usize];
 
-                        // set the color pixel in the frame buffer
+                        // sets the color pixel in the frame buffer
                         self.frame_buffer[frame_offset] = color[0];
                         self.frame_buffer[frame_offset + 1] = color[1];
                         self.frame_buffer[frame_offset + 2] = color[2];

@@ -4,7 +4,7 @@ use crate::{
     mmu::Mmu,
     pad::{Pad, PadKey},
     ppu::{Ppu, Tile, FRAME_BUFFER_SIZE},
-    util::read_file,
+    util::read_file, timer::Timer,
 };
 
 #[cfg(feature = "wasm")]
@@ -22,9 +22,10 @@ pub struct GameBoy {
 impl GameBoy {
     #[cfg_attr(feature = "wasm", wasm_bindgen(constructor))]
     pub fn new() -> Self {
-        let pad = Pad::new();
         let ppu = Ppu::new();
-        let mmu = Mmu::new(ppu, pad);
+        let pad = Pad::new();
+        let timer = Timer::new();
+        let mmu = Mmu::new(ppu, pad, timer);
         let cpu = Cpu::new(mmu);
         Self { cpu: cpu }
     }
@@ -142,6 +143,10 @@ impl GameBoy {
 
     pub fn pad(&mut self) -> &mut Pad {
         self.cpu.pad()
+    }
+
+    pub fn timer(&mut self) -> &mut Timer {
+        self.cpu.timer()
     }
 
     pub fn frame_buffer(&mut self) -> &Box<[u8; FRAME_BUFFER_SIZE]> {
