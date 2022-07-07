@@ -4,7 +4,8 @@ use crate::{
     inst::{EXTENDED, INSTRUCTIONS},
     mmu::Mmu,
     pad::Pad,
-    ppu::Ppu, timer::Timer,
+    ppu::Ppu,
+    timer::Timer,
 };
 
 pub const PREFIX: u8 = 0xcb;
@@ -129,6 +130,27 @@ impl Cpu {
 
                 return 16;
             }
+
+            // @todo aggregate the handling of these interrupts
+            if (self.mmu.ie & 0x04 == 0x04) && self.mmu.timer().int_tima() {
+                println!("Going to run Timer interrupt handler (0x50)");
+
+                self.disable_int();
+                self.push_word(pc);
+                self.pc = 0x50;
+
+                // acknowledges that the timer interrupt has been
+                // properly handled
+                self.mmu.timer().ack_tima();
+
+                // in case the CPU is currently halted waiting
+                // for an interrupt, releases it
+                if self.halted {
+                    self.halted = false;
+                }
+
+                return 16;
+            }
         }
 
         // in case the CPU is currently in the halted state
@@ -191,7 +213,7 @@ impl Cpu {
     pub fn pad(&mut self) -> &mut Pad {
         self.mmu().pad()
     }
-    
+
     #[inline(always)]
     pub fn timer(&mut self) -> &mut Timer {
         self.mmu().timer()

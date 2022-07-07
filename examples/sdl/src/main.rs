@@ -84,7 +84,8 @@ fn main() {
     let mut game_boy = GameBoy::new();
     game_boy.load_boot_default();
 
-    game_boy.load_rom_file("../../res/roms.prop/tetris.gb");
+    //game_boy.load_rom_file("../../res/roms.prop/tetris.gb");
+    game_boy.load_rom_file("../../res/roms.prop/dr_mario.gb");
     //game_boy.load_rom_file("../../res/roms.prop/alleyway.gb");
 
     //game_boy.load_rom_file("../../res/roms/firstwhite.gb");

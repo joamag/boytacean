@@ -96,28 +96,30 @@ impl Mmu {
                 0x000 | 0x100 | 0x200 | 0x300 | 0x400 | 0x500 | 0x600 | 0x700 | 0x800 | 0x900
                 | 0xa00 | 0xb00 | 0xc00 | 0xd00 => self.ram[(addr & 0x1fff) as usize],
                 0xe00 => self.ppu.oam[(addr & 0x009f) as usize],
-                0xf00 => {
-                    if addr == 0xffff {
-                        self.ie
-                    } else if addr >= 0xff80 {
-                        self.ppu.hram[(addr & 0x007f) as usize]
-                    } else {
-                        match addr & 0x00f0 {
-                            0x00 => match addr & 0x00ff {
-                                0x00 => self.pad.read(addr),
-                                _ => {
-                                    println!("Reading from unknown IO control 0x{:04x}", addr);
-                                    0x00
-                                }
-                            },
-                            0x40 | 0x50 | 0x60 | 0x70 => self.ppu.read(addr),
+                0xf00 => match addr & 0x00ff {
+                    0x0f => {
+                        let value = if self.ppu.int_vblank() { 0x01 } else { 0x00 }
+                            | if self.timer.int_tima() { 0x04 } else { 0x00 };
+                        value
+                    }
+                    0x80..=0xfe => self.ppu.hram[(addr & 0x007f) as usize],
+                    0xff => self.ie,
+                    _ => match addr & 0x00f0 {
+                        0x00 => match addr & 0x00ff {
+                            0x00 => self.pad.read(addr),
+                            0x04..=0x07 => self.timer.read(addr),
                             _ => {
                                 println!("Reading from unknown IO control 0x{:04x}", addr);
                                 0x00
                             }
+                        },
+                        0x40 | 0x50 | 0x60 | 0x70 => self.ppu.read(addr),
+                        _ => {
+                            println!("Reading from unknown IO control 0x{:04x}", addr);
+                            0x00
                         }
-                    }
-                }
+                    },
+                },
                 addr => panic!("Reading from unknown location 0x{:04x}", addr),
             },
             addr => panic!("Reading from unknown location 0x{:04x}", addr),
@@ -168,15 +170,18 @@ impl Mmu {
                     self.ppu.oam[(addr & 0x009f) as usize] = value;
                     self.ppu.update_object(addr, value);
                 }
-                0xf00 => {
-                    if addr == 0xffff {
-                        self.ie = value;
-                    } else if addr >= 0xff80 {
-                        self.ppu.hram[(addr & 0x007f) as usize] = value;
-                    } else {
+                0xf00 => match addr & 0x00ff {
+                    0x0f => {
+                        self.ppu.set_int_vblank(value & 0x01 == 0x01);
+                        self.timer.set_int_tima(value & 0x04 == 0x04);
+                    }
+                    0x80..=0xfe => self.ppu.hram[(addr & 0x007f) as usize] = value,
+                    0xff => self.ie = value,
+                    _ => {
                         match addr & 0x00f0 {
                             0x00 => match addr & 0x00ff {
                                 0x00 => self.pad.write(addr, value),
+                                0x04..=0x07 => self.timer.write(addr, value),
                                 _ => println!("Writing to unknown IO control 0x{:04x}", addr),
                             },
                             0x40 | 0x60 | 0x70 => {
@@ -198,7 +203,7 @@ impl Mmu {
                             _ => println!("Writing to unknown IO control 0x{:04x}", addr),
                         }
                     }
-                }
+                },
                 addr => panic!("Writing in unknown location 0x{:04x}", addr),
             },
             addr => panic!("Writing in unknown location 0x{:04x}", addr),

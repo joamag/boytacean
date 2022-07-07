@@ -498,6 +498,10 @@ impl Ppu {
         self.int_vblank
     }
 
+    pub fn set_int_vblank(&mut self, value: bool) {
+        self.int_vblank = value;
+    }
+
     pub fn ack_vblank(&mut self) {
         self.int_vblank = false;
     }
@@ -705,10 +709,10 @@ impl Ppu {
                     // the object is only considered visible if it's a priority
                     // or if the underlying pixel is transparent (zero value)
                     let is_visible = obj.priority || self.color_buffer[color_offset] == 0;
-                    if is_visible {
+                    let pixel = tile_row[if obj.xflip { 7 - x } else { x }];
+                    if is_visible && pixel != 0 {
                         // obtains the current pixel data from the tile row and
                         // re-maps it according to the object palette
-                        let pixel = tile_row[if obj.xflip { 7 - x } else { x }];
                         let color = palette[pixel as usize];
 
                         // sets the color pixel in the frame buffer
