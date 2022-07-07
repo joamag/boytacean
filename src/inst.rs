@@ -424,57 +424,57 @@ pub const EXTENDED: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (res_0_l, 8, "RES 0, L"),
     (res_0_mhl, 16, "RES 0, A"),
     (res_0_a, 8, "RES 0, A"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (res_1_b, 8, "RES 1, B"),
+    (res_1_c, 8, "RES 1, C"),
+    (res_1_d, 8, "RES 1, D"),
+    (res_1_e, 8, "RES 1, E"),
+    (res_1_h, 8, "RES 1, H"),
+    (res_1_l, 8, "RES 1, L"),
+    (res_1_mhl, 16, "RES 1, A"),
+    (res_1_a, 8, "RES 1, A"),
     // 0x9 opcodes
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (res_2_b, 8, "RES 2, B"),
+    (res_2_c, 8, "RES 2, C"),
+    (res_2_d, 8, "RES 2, D"),
+    (res_2_e, 8, "RES 2, E"),
+    (res_2_h, 8, "RES 2, H"),
+    (res_2_l, 8, "RES 2, L"),
+    (res_2_mhl, 16, "RES 2, A"),
+    (res_2_a, 8, "RES 2, A"),
+    (res_3_b, 8, "RES 3, B"),
+    (res_3_c, 8, "RES 3, C"),
+    (res_3_d, 8, "RES 3, D"),
+    (res_3_e, 8, "RES 3, E"),
+    (res_3_h, 8, "RES 3, H"),
+    (res_3_l, 8, "RES 3, L"),
+    (res_3_mhl, 16, "RES 3, A"),
+    (res_3_a, 8, "RES 3, A"),
     // 0xa opcodes
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (res_4_b, 8, "RES 4, B"),
+    (res_4_c, 8, "RES 4, C"),
+    (res_4_d, 8, "RES 4, D"),
+    (res_4_e, 8, "RES 4, E"),
+    (res_4_h, 8, "RES 4, H"),
+    (res_4_l, 8, "RES 4, L"),
+    (res_4_mhl, 16, "RES 4, A"),
+    (res_4_a, 8, "RES 4, A"),
+    (res_5_b, 8, "RES 5, B"),
+    (res_5_c, 8, "RES 5, C"),
+    (res_5_d, 8, "RES 5, D"),
+    (res_5_e, 8, "RES 5, E"),
+    (res_5_h, 8, "RES 5, H"),
+    (res_5_l, 8, "RES 5, L"),
+    (res_5_mhl, 16, "RES 5, A"),
+    (res_5_a, 8, "RES 5, A"),
     // 0xb opcodes
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (res_6_b, 8, "RES 6, B"),
+    (res_6_c, 8, "RES 6, C"),
+    (res_6_d, 8, "RES 6, D"),
+    (res_6_e, 8, "RES 6, E"),
+    (res_6_h, 8, "RES 6, H"),
+    (res_6_l, 8, "RES 6, L"),
+    (res_6_mhl, 16, "RES 6, A"),
+    (res_6_a, 8, "RES 6, A"),
     (res_7_b, 8, "RES 7, B"),
     (res_7_c, 8, "RES 7, C"),
     (res_7_d, 8, "RES 7, D"),
@@ -2550,6 +2550,216 @@ fn res_0_mhl(cpu: &mut Cpu) {
 
 fn res_0_a(cpu: &mut Cpu) {
     cpu.a = res(cpu.a, 0);
+}
+
+fn res_1_b(cpu: &mut Cpu) {
+    cpu.b = res(cpu.b, 1);
+}
+
+fn res_1_c(cpu: &mut Cpu) {
+    cpu.c = res(cpu.c, 1);
+}
+
+fn res_1_d(cpu: &mut Cpu) {
+    cpu.d = res(cpu.d, 1);
+}
+
+fn res_1_e(cpu: &mut Cpu) {
+    cpu.e = res(cpu.e, 1);
+}
+
+fn res_1_h(cpu: &mut Cpu) {
+    cpu.h = res(cpu.h, 1);
+}
+
+fn res_1_l(cpu: &mut Cpu) {
+    cpu.l = res(cpu.l, 1);
+}
+
+fn res_1_mhl(cpu: &mut Cpu) {
+    let hl = cpu.hl();
+    let byte = cpu.mmu.read(hl);
+    let value = res(byte, 1);
+    cpu.mmu.write(hl, value);
+}
+
+fn res_1_a(cpu: &mut Cpu) {
+    cpu.a = res(cpu.a, 1);
+}
+
+fn res_2_b(cpu: &mut Cpu) {
+    cpu.b = res(cpu.b, 2);
+}
+
+fn res_2_c(cpu: &mut Cpu) {
+    cpu.c = res(cpu.c, 2);
+}
+
+fn res_2_d(cpu: &mut Cpu) {
+    cpu.d = res(cpu.d, 2);
+}
+
+fn res_2_e(cpu: &mut Cpu) {
+    cpu.e = res(cpu.e, 2);
+}
+
+fn res_2_h(cpu: &mut Cpu) {
+    cpu.h = res(cpu.h, 2);
+}
+
+fn res_2_l(cpu: &mut Cpu) {
+    cpu.l = res(cpu.l, 2);
+}
+
+fn res_2_mhl(cpu: &mut Cpu) {
+    let hl = cpu.hl();
+    let byte = cpu.mmu.read(hl);
+    let value = res(byte, 2);
+    cpu.mmu.write(hl, value);
+}
+
+fn res_2_a(cpu: &mut Cpu) {
+    cpu.a = res(cpu.a, 2);
+}
+
+fn res_3_b(cpu: &mut Cpu) {
+    cpu.b = res(cpu.b, 3);
+}
+
+fn res_3_c(cpu: &mut Cpu) {
+    cpu.c = res(cpu.c, 3);
+}
+
+fn res_3_d(cpu: &mut Cpu) {
+    cpu.d = res(cpu.d, 3);
+}
+
+fn res_3_e(cpu: &mut Cpu) {
+    cpu.e = res(cpu.e, 3);
+}
+
+fn res_3_h(cpu: &mut Cpu) {
+    cpu.h = res(cpu.h, 3);
+}
+
+fn res_3_l(cpu: &mut Cpu) {
+    cpu.l = res(cpu.l, 3);
+}
+
+fn res_3_mhl(cpu: &mut Cpu) {
+    let hl = cpu.hl();
+    let byte = cpu.mmu.read(hl);
+    let value = res(byte, 3);
+    cpu.mmu.write(hl, value);
+}
+
+fn res_3_a(cpu: &mut Cpu) {
+    cpu.a = res(cpu.a, 3);
+}
+
+fn res_4_b(cpu: &mut Cpu) {
+    cpu.b = res(cpu.b, 4);
+}
+
+fn res_4_c(cpu: &mut Cpu) {
+    cpu.c = res(cpu.c, 4);
+}
+
+fn res_4_d(cpu: &mut Cpu) {
+    cpu.d = res(cpu.d, 4);
+}
+
+fn res_4_e(cpu: &mut Cpu) {
+    cpu.e = res(cpu.e, 4);
+}
+
+fn res_4_h(cpu: &mut Cpu) {
+    cpu.h = res(cpu.h, 4);
+}
+
+fn res_4_l(cpu: &mut Cpu) {
+    cpu.l = res(cpu.l, 4);
+}
+
+fn res_4_mhl(cpu: &mut Cpu) {
+    let hl = cpu.hl();
+    let byte = cpu.mmu.read(hl);
+    let value = res(byte, 4);
+    cpu.mmu.write(hl, value);
+}
+
+fn res_4_a(cpu: &mut Cpu) {
+    cpu.a = res(cpu.a, 4);
+}
+
+fn res_5_b(cpu: &mut Cpu) {
+    cpu.b = res(cpu.b, 5);
+}
+
+fn res_5_c(cpu: &mut Cpu) {
+    cpu.c = res(cpu.c, 5);
+}
+
+fn res_5_d(cpu: &mut Cpu) {
+    cpu.d = res(cpu.d, 5);
+}
+
+fn res_5_e(cpu: &mut Cpu) {
+    cpu.e = res(cpu.e, 5);
+}
+
+fn res_5_h(cpu: &mut Cpu) {
+    cpu.h = res(cpu.h, 5);
+}
+
+fn res_5_l(cpu: &mut Cpu) {
+    cpu.l = res(cpu.l, 5);
+}
+
+fn res_5_mhl(cpu: &mut Cpu) {
+    let hl = cpu.hl();
+    let byte = cpu.mmu.read(hl);
+    let value = res(byte, 5);
+    cpu.mmu.write(hl, value);
+}
+
+fn res_5_a(cpu: &mut Cpu) {
+    cpu.a = res(cpu.a, 5);
+}
+
+fn res_6_b(cpu: &mut Cpu) {
+    cpu.b = res(cpu.b, 6);
+}
+
+fn res_6_c(cpu: &mut Cpu) {
+    cpu.c = res(cpu.c, 6);
+}
+
+fn res_6_d(cpu: &mut Cpu) {
+    cpu.d = res(cpu.d, 6);
+}
+
+fn res_6_e(cpu: &mut Cpu) {
+    cpu.e = res(cpu.e, 6);
+}
+
+fn res_6_h(cpu: &mut Cpu) {
+    cpu.h = res(cpu.h, 6);
+}
+
+fn res_6_l(cpu: &mut Cpu) {
+    cpu.l = res(cpu.l, 6);
+}
+
+fn res_6_mhl(cpu: &mut Cpu) {
+    let hl = cpu.hl();
+    let byte = cpu.mmu.read(hl);
+    let value = res(byte, 6);
+    cpu.mmu.write(hl, value);
+}
+
+fn res_6_a(cpu: &mut Cpu) {
+    cpu.a = res(cpu.a, 6);
 }
 
 fn res_7_b(cpu: &mut Cpu) {
