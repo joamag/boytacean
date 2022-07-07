@@ -9,8 +9,6 @@ pub enum BootRom {
     MgbBootix,
 }
 
-/// Static data corresponding to the DMG boot ROM
-/// allows freely using the emulator without external dependency.
 pub const DMG_BOOT: [u8; 256] = [
     49, 254, 255, 175, 33, 255, 159, 50, 203, 124, 32, 251, 33, 38, 255, 14, 17, 62, 128, 50, 226,
     12, 62, 243, 226, 50, 62, 119, 119, 62, 252, 224, 71, 17, 4, 1, 33, 16, 128, 26, 205, 149, 0,

@@ -327,22 +327,22 @@ impl Ppu {
         match self.mode {
             PpuMode::OamRead => {
                 if self.mode_clock >= 80 {
-                    self.mode_clock = 0;
                     self.mode = PpuMode::VramRead;
+                    self.mode_clock = self.mode_clock - 80;
                 }
             }
             PpuMode::VramRead => {
                 if self.mode_clock >= 172 {
                     self.render_line();
 
-                    self.mode_clock = 0;
                     self.mode = PpuMode::HBlank;
+                    self.mode_clock = self.mode_clock - 172;
                 }
             }
             PpuMode::HBlank => {
                 if self.mode_clock >= 204 {
                     // increments the register that holds the
-                    // information about the current line in drawign
+                    // information about the current line in drawing
                     self.ly += 1;
 
                     // in case we've reached the end of the
@@ -354,7 +354,7 @@ impl Ppu {
                         self.mode = PpuMode::OamRead;
                     }
 
-                    self.mode_clock = 0;
+                    self.mode_clock = self.mode_clock - 204;
                 }
             }
             PpuMode::VBlank => {
@@ -369,7 +369,7 @@ impl Ppu {
                         self.ly = 0;
                     }
 
-                    self.mode_clock = 0;
+                    self.mode_clock = self.mode_clock - 456;
                 }
             }
         }
@@ -496,6 +496,10 @@ impl Ppu {
 
     pub fn int_vblank(&self) -> bool {
         self.int_vblank
+    }
+
+    pub fn set_int_vblank(&mut self, value: bool) {
+        self.int_vblank = value;
     }
 
     pub fn ack_vblank(&mut self) {
@@ -705,13 +709,13 @@ impl Ppu {
                     // the object is only considered visible if it's a priority
                     // or if the underlying pixel is transparent (zero value)
                     let is_visible = obj.priority || self.color_buffer[color_offset] == 0;
-                    if is_visible {
+                    let pixel = tile_row[if obj.xflip { 7 - x } else { x }];
+                    if is_visible && pixel != 0 {
                         // obtains the current pixel data from the tile row and
                         // re-maps it according to the object palette
-                        let pixel = tile_row[if obj.xflip { 7 - x } else { x }];
                         let color = palette[pixel as usize];
 
-                        // set the color pixel in the frame buffer
+                        // sets the color pixel in the frame buffer
                         self.frame_buffer[frame_offset] = color[0];
                         self.frame_buffer[frame_offset + 1] = color[1];
                         self.frame_buffer[frame_offset + 2] = color[2];

@@ -5,4 +5,5 @@ pub mod inst;
 pub mod mmu;
 pub mod pad;
 pub mod ppu;
+pub mod timer;
 pub mod util;

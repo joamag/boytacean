@@ -34,7 +34,7 @@ fn start_sdl() -> Graphics {
 
     // creates the system window that is going to be used to
     // show the emulator and sets it to the central are o screen
-    let mut window = video_subsystem
+    let window = video_subsystem
         .window(
             TITLE,
             2 as u32 * DISPLAY_WIDTH as u32, //@todo check screen scale
@@ -84,7 +84,8 @@ fn main() {
     let mut game_boy = GameBoy::new();
     game_boy.load_boot_default();
 
-    game_boy.load_rom_file("../../res/roms.prop/tetris.gb");
+    //game_boy.load_rom_file("../../res/roms.prop/tetris.gb");
+    game_boy.load_rom_file("../../res/roms.prop/dr_mario.gb");
     //game_boy.load_rom_file("../../res/roms.prop/alleyway.gb");
 
     //game_boy.load_rom_file("../../res/roms/firstwhite.gb");
