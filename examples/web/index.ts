@@ -1,4 +1,4 @@
-import { BootRom, default as wasm, GameBoy } from "./lib/boytacean.js";
+import { default as wasm, GameBoy, PadKey } from "./lib/boytacean.js";
 import info from "./package.json";
 
 const PIXEL_UNSET_COLOR = 0x1b1a17ff;
@@ -30,22 +30,14 @@ const BACKGROUNDS = [
 ];
 
 const KEYS: Record<string, number> = {
-    "1": 0x01,
-    "2": 0x02,
-    "3": 0x03,
-    "4": 0x0c,
-    q: 0x04,
-    w: 0x05,
-    e: 0x06,
-    r: 0x0d,
-    a: 0x07,
-    s: 0x08,
-    d: 0x09,
-    f: 0x0e,
-    z: 0x0a,
-    x: 0x00,
-    c: 0x0b,
-    v: 0x0f
+    ArrowUp: PadKey.Up,
+    ArrowDown: PadKey.Down,
+    ArrowLeft: PadKey.Left,
+    ArrowRight: PadKey.Right,
+    Enter: PadKey.Start,
+    " ": PadKey.Select,
+    a: PadKey.A,
+    s: PadKey.B
 };
 
 // @ts-ignore: ts(2580)
@@ -393,7 +385,7 @@ const registerKeys = () => {
     document.addEventListener("keydown", (event) => {
         const keyCode = KEYS[event.key];
         if (keyCode !== undefined) {
-            //state.gameBoy.key_press_ws(keyCode); @todo
+            state.gameBoy.key_press(keyCode);
             return;
         }
 
@@ -415,7 +407,7 @@ const registerKeys = () => {
     document.addEventListener("keyup", (event) => {
         const keyCode = KEYS[event.key];
         if (keyCode !== undefined) {
-            //state.gameBoy.key_lift_ws(keyCode); @todo
+            state.gameBoy.key_lift(keyCode);
             return;
         }
     });

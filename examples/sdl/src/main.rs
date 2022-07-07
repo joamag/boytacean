@@ -171,6 +171,6 @@ fn key_to_pad(keycode: Keycode) -> PadKey {
         Keycode::Space => PadKey::Select,
         Keycode::A => PadKey::A,
         Keycode::S => PadKey::B,
-        _ => PadKey::A,
+        _ => PadKey::A, //@todo this does not make sence, make it an Option
     }
 }
