@@ -130,9 +130,8 @@ impl Cpu {
 
                 return 16;
             }
-
             // @todo aggregate the handling of these interrupts
-            if (self.mmu.ie & 0x04 == 0x04) && self.mmu.timer().int_tima() {
+            else if (self.mmu.ie & 0x04 == 0x04) && self.mmu.timer().int_tima() {
                 println!("Going to run Timer interrupt handler (0x50)");
 
                 self.disable_int();

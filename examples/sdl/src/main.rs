@@ -85,14 +85,14 @@ fn main() {
     game_boy.load_boot_default();
 
     //game_boy.load_rom_file("../../res/roms.prop/tetris.gb");
-    game_boy.load_rom_file("../../res/roms.prop/dr_mario.gb");
+    //game_boy.load_rom_file("../../res/roms.prop/dr_mario.gb");
     //game_boy.load_rom_file("../../res/roms.prop/alleyway.gb");
 
     //game_boy.load_rom_file("../../res/roms/firstwhite.gb");
     //game_boy.load_rom_file("../../res/roms/opus5.gb");
 
     //game_boy.load_rom_file("../../res/roms/paradius/cpu/01-special.gb"); // PASSED
-    //game_boy.load_rom_file("../../res/roms/paradius/cpu/02-interrupts.gb");
+    game_boy.load_rom_file("../../res/roms/paradius/cpu/02-interrupts.gb");
     //game_boy.load_rom_file("../../res/roms/paradius/cpu/03-op sp,hl.gb"); // PASSED
     //game_boy.load_rom_file("../../res/roms/paradius/cpu/04-op r,imm.gb"); // PASSED
     //game_boy.load_rom_file("../../res/roms/paradius/cpu/05-op rp.gb"); // PASSED
