@@ -118,12 +118,18 @@ fn main() {
                 Event::KeyDown {
                     keycode: Some(keycode),
                     ..
-                } => game_boy.key_press(key_to_pad(keycode)),
+                } => match key_to_pad(keycode) {
+                    Some(key) => game_boy.key_press(key),
+                    None => (),
+                },
 
                 Event::KeyUp {
                     keycode: Some(keycode),
                     ..
-                } => game_boy.key_lift(key_to_pad(keycode)),
+                } => match key_to_pad(keycode) {
+                    Some(key) => game_boy.key_lift(key),
+                    None => (),
+                },
 
                 _ => (),
             }
@@ -160,17 +166,17 @@ fn main() {
     }
 }
 
-fn key_to_pad(keycode: Keycode) -> PadKey {
+fn key_to_pad(keycode: Keycode) -> Option<PadKey> {
     match keycode {
-        Keycode::Up => PadKey::Up,
-        Keycode::Down => PadKey::Down,
-        Keycode::Left => PadKey::Left,
-        Keycode::Right => PadKey::Right,
-        Keycode::Return => PadKey::Start,
-        Keycode::Return2 => PadKey::Start,
-        Keycode::Space => PadKey::Select,
-        Keycode::A => PadKey::A,
-        Keycode::S => PadKey::B,
-        _ => PadKey::A, //@todo this does not make sence, make it an Option
+        Keycode::Up => Some(PadKey::Up),
+        Keycode::Down => Some(PadKey::Down),
+        Keycode::Left => Some(PadKey::Left),
+        Keycode::Right => Some(PadKey::Right),
+        Keycode::Return => Some(PadKey::Start),
+        Keycode::Return2 => Some(PadKey::Start),
+        Keycode::Space => Some(PadKey::Select),
+        Keycode::A => Some(PadKey::A),
+        Keycode::S => Some(PadKey::B),
+        _ => None,
     }
 }

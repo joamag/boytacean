@@ -58,14 +58,17 @@ impl Tile {
         self.buffer[y * TILE_WIDTH + x] = value;
     }
 
-    pub fn get_row(&self, y: usize) -> &[u8] {
-        &self.buffer[y * TILE_WIDTH..(y + 1) * TILE_WIDTH]
-    }
-
     pub fn buffer(&self) -> Vec<u8> {
         self.buffer.to_vec()
     }
 }
+
+impl Tile {
+    pub fn get_row(&self, y: usize) -> &[u8] {
+        &self.buffer[y * TILE_WIDTH..(y + 1) * TILE_WIDTH]
+    }
+}
+
 
 impl Tile {
     pub fn palette_buffer(&self, palette: Palette) -> Vec<u8> {
