@@ -316,10 +316,6 @@ impl Ppu {
     }
 
     pub fn clock(&mut self, cycles: u8) {
-        if !self.switch_lcd {
-            return;
-        }
-
         // increments the current mode clock by the provided amount
         // of CPU cycles (probably coming from a previous CPU clock)
         self.mode_clock += cycles as u16;
@@ -416,6 +412,13 @@ impl Ppu {
                 self.switch_window = value & 0x20 == 0x20;
                 self.window_map = value & 0x40 == 0x40;
                 self.switch_lcd = value & 0x80 == 0x80;
+
+                // in case the LCD is off takes the opportunity
+                // to clear the screen, this is the expected
+                // behaviour for this specific situation
+                if !self.switch_lcd {
+                    self.clear_frame_buffer();
+                }
             }
             0x0041 => {
                 self.stat_hblank = value & 0x04 == 0x04;
@@ -579,6 +582,9 @@ impl Ppu {
     }
 
     fn render_line(&mut self) {
+        if !self.switch_lcd {
+            return;
+        }
         if self.switch_bg {
             self.render_background();
         }

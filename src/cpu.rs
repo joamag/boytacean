@@ -109,6 +109,14 @@ impl Cpu {
             panic!("Invalid PC area at 0x{:04x}", pc);
         }
 
+        // @todo this is so bad, need to improve this by an order
+        // of magnitude
+        if self.halted {
+            if ((self.mmu.ie & 0x01 == 0x01) && self.mmu.ppu().int_vblank()) || ((self.mmu.ie & 0x04 == 0x04) && self.mmu.timer().int_tima()) {
+                self.halted = false;
+            }
+        }
+
         if self.ime {
             // @todo aggregate all of this interrupts in the MMU
             if (self.mmu.ie & 0x01 == 0x01) && self.mmu.ppu().int_vblank() {
@@ -179,7 +187,7 @@ impl Cpu {
 
         if *instruction_str == "! UNIMP !" || *instruction_str == "HALT" {
             if *instruction_str == "HALT" {
-                println!("Waiting for 0x{:02x} in HALT", self.mmu.ie);
+                println!("HALT with IE=0x{:02x} IME={}", self.mmu.ie, self.ime);
             }
             println!(
                 "{}\t(0x{:02x})\t${:04x} {}",
