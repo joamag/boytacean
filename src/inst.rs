@@ -331,22 +331,22 @@ pub const EXTENDED: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (sra_mhl, 16, "SRA [HL]"),
     (sra_a, 8, "SRA A"),
     // 0x3 opcodes
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (swap_b, 8, "SWAP B"),
+    (swap_c, 8, "SWAP C"),
+    (swap_d, 8, "SWAP D"),
+    (swap_e, 8, "SWAP E"),
+    (swap_h, 8, "SWAP H"),
+    (swap_l, 8, "SWAP L"),
+    (swap_mhl, 16, "SWAP [HL]"),
     (swap_a, 8, "SWAP A"),
     (srl_b, 8, "SRL B"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
-    (noimpl, 4, "! UNIMP !"),
+    (srl_c, 8, "SRL B"),
+    (srl_d, 8, "SRL D"),
+    (srl_e, 8, "SRL E"),
+    (srl_h, 8, "SRL H"),
+    (srl_l, 8, "SRL L"),
+    (srl_mhl, 16, "SRL [HL]"),
+    (srl_a, 8, "SRL A"),
     // 0x4 opcodes
     (bit_0_b, 8, "BIT 0, B"),
     (bit_0_c, 8, "BIT 0, C"),
@@ -2110,7 +2110,7 @@ fn rrc_mhl(cpu: &mut Cpu) {
 }
 
 fn rrc_a(cpu: &mut Cpu) {
-    cpu.l = rrc(cpu, cpu.a);
+    cpu.a = rrc(cpu, cpu.a);
 }
 
 fn rl_b(cpu: &mut Cpu) {
@@ -2180,7 +2180,7 @@ fn rr_mhl(cpu: &mut Cpu) {
 }
 
 fn rr_a(cpu: &mut Cpu) {
-    cpu.l = rr(cpu, cpu.a);
+    cpu.a = rr(cpu, cpu.a);
 }
 
 fn sla_b(cpu: &mut Cpu) {
@@ -2253,12 +2253,74 @@ fn sra_a(cpu: &mut Cpu) {
     cpu.a = sra(cpu, cpu.a);
 }
 
+fn swap_b(cpu: &mut Cpu) {
+    cpu.b = swap(cpu, cpu.b)
+}
+
+fn swap_c(cpu: &mut Cpu) {
+    cpu.c = swap(cpu, cpu.c)
+}
+
+fn swap_d(cpu: &mut Cpu) {
+    cpu.d = swap(cpu, cpu.d)
+}
+
+fn swap_e(cpu: &mut Cpu) {
+    cpu.e = swap(cpu, cpu.e)
+}
+
+fn swap_h(cpu: &mut Cpu) {
+    cpu.h = swap(cpu, cpu.h)
+}
+
+fn swap_l(cpu: &mut Cpu) {
+    cpu.l = swap(cpu, cpu.l)
+}
+
+fn swap_mhl(cpu: &mut Cpu) {
+    let hl = cpu.hl();
+    let byte = cpu.mmu.read(hl);
+    let result = swap(cpu, byte);
+    cpu.mmu.write(hl, result);
+}
+
 fn swap_a(cpu: &mut Cpu) {
     cpu.a = swap(cpu, cpu.a)
 }
 
 fn srl_b(cpu: &mut Cpu) {
     cpu.b = srl(cpu, cpu.b);
+}
+
+fn srl_c(cpu: &mut Cpu) {
+    cpu.c = srl(cpu, cpu.c);
+}
+
+fn srl_d(cpu: &mut Cpu) {
+    cpu.d = srl(cpu, cpu.d);
+}
+
+fn srl_e(cpu: &mut Cpu) {
+    cpu.e = srl(cpu, cpu.e);
+}
+
+fn srl_h(cpu: &mut Cpu) {
+    cpu.h = srl(cpu, cpu.h);
+}
+
+fn srl_l(cpu: &mut Cpu) {
+    cpu.l = srl(cpu, cpu.l);
+}
+
+fn srl_mhl(cpu: &mut Cpu) {
+    let hl = cpu.hl();
+    let byte = cpu.mmu.read(hl);
+    let result = srl(cpu, byte);
+    cpu.mmu.write(hl, result);
+}
+
+fn srl_a(cpu: &mut Cpu) {
+    cpu.a = srl(cpu, cpu.a);
 }
 
 fn bit_0_b(cpu: &mut Cpu) {
@@ -3193,7 +3255,7 @@ fn bit_l(cpu: &mut Cpu, bit: u8) {
 }
 
 fn bit_mhl(cpu: &mut Cpu, bit: u8) {
-    let byte = cpu.read_u8();
+    let byte = cpu.mmu.read(cpu.hl());
     cpu.set_sub(false);
     cpu.set_zero(bit_zero(byte, bit));
     cpu.set_half_carry(true);
