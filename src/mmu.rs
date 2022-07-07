@@ -155,7 +155,10 @@ impl Mmu {
                 | 0xa00 | 0xb00 | 0xc00 | 0xd00 => {
                     self.ram[(addr & 0x1fff) as usize] = value;
                 }
-                0xe00 => self.ppu.oam[(addr & 0x009f) as usize] = value,
+                0xe00 => {
+                    self.ppu.oam[(addr & 0x009f) as usize] = value;
+                    self.ppu.update_object(addr, value);
+                }
                 0xf00 => {
                     if addr == 0xffff {
                         self.ie = value;
@@ -172,10 +175,9 @@ impl Mmu {
                                     0x0046 => {
                                         // @todo must increment the cycle count by 160
                                         // and make this a separated dma.rs file
-                                        println!("GOING TO START DMA transfer to 0x{:x}00", value);
+                                        println!("Going to start DMA transfer to 0x{:x}00", value);
                                         let data = self.read_many((value as u16) << 8, 160);
                                         self.write_many(0xfe00, &data);
-                                        println!("FINISHED DMA transfer");
                                     }
                                     _ => self.ppu.write(addr, value),
                                 }

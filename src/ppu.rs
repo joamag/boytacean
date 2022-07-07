@@ -12,10 +12,16 @@ pub const HRAM_SIZE: usize = 128;
 pub const OAM_SIZE: usize = 260;
 pub const PALETTE_SIZE: usize = 4;
 pub const RGB_SIZE: usize = 3;
+pub const TILE_WIDTH: usize = 8;
+pub const TILE_HEIGHT: usize = 8;
 
 /// The number of tiles that can be store in Game Boy's
 /// VRAM memory according to specifications.
 pub const TILE_COUNT: usize = 384;
+
+/// The number of objects/sprites that can be handled at
+/// the same time by the Game Boy.
+pub const OBJ_COUNT: usize = 40;
 
 /// The width of the Game Boy screen in pixels.
 pub const DISPLAY_WIDTH: usize = 160;
@@ -23,11 +29,16 @@ pub const DISPLAY_WIDTH: usize = 160;
 /// The height of the Game Boy screen in pixels.
 pub const DISPLAY_HEIGHT: usize = 144;
 
-// The size of the RGB frame buffer in bytes.
+/// The size to be used by the buffer of colors
+/// for the Game Boy screen the values there should
+/// range from 0 to 3.
+pub const COLOR_BUFFER_SIZE: usize = DISPLAY_WIDTH * DISPLAY_HEIGHT;
+
+/// The size of the RGB frame buffer in bytes.
 pub const FRAME_BUFFER_SIZE: usize = DISPLAY_WIDTH * DISPLAY_HEIGHT * RGB_SIZE;
 
-// Defines the Game Boy pixel type as a buffer
-// with the size of RGB (3 bytes).
+/// Defines the Game Boy pixel type as a buffer
+/// with the size of RGB (3 bytes).
 pub type Pixel = [u8; RGB_SIZE];
 
 /// Defines a type that represents a color palette
@@ -45,15 +56,21 @@ pub struct Tile {
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 impl Tile {
     pub fn get(&self, x: usize, y: usize) -> u8 {
-        self.buffer[y * 8 + x]
+        self.buffer[y * TILE_WIDTH + x]
     }
 
     pub fn set(&mut self, x: usize, y: usize, value: u8) {
-        self.buffer[y * 8 + x] = value;
+        self.buffer[y * TILE_WIDTH + x] = value;
     }
 
     pub fn buffer(&self) -> Vec<u8> {
         self.buffer.to_vec()
+    }
+}
+
+impl Tile {
+    pub fn get_row(&self, y: usize) -> &[u8] {
+        &self.buffer[y * TILE_WIDTH..(y + 1) * TILE_WIDTH]
     }
 }
 
@@ -79,6 +96,29 @@ impl Display for Tile {
     }
 }
 
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
+#[derive(Clone, Copy, PartialEq)]
+pub struct ObjectData {
+    x: i16,
+    y: i16,
+    tile: u8,
+    palette: u8,
+    xflip: bool,
+    yflip: bool,
+    priority: bool,
+    index: u8,
+}
+
+impl Display for ObjectData {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Index => {} X => {} Y => {} Tile => {}",
+            self.index, self.x, self.y, self.tile
+        )
+    }
+}
+
 /// Represents the Game Boy PPU (Pixel Processing Unit) and controls
 /// all of the logic behind the graphics processing and presentation.
 /// Should store both the VRAM and HRAM together with the internal
@@ -91,6 +131,10 @@ impl Display for Tile {
 /// ppu.clock();
 /// ```
 pub struct Ppu {
+    /// The color buffer that is going to store the colors
+    /// (from 0 to 3) for all the pixels in the screen.
+    pub color_buffer: Box<[u8; COLOR_BUFFER_SIZE]>,
+
     /// The 8 bit based RGB frame buffer with the
     /// processed set of pixels ready to be displayed on screen.
     pub frame_buffer: Box<[u8; FRAME_BUFFER_SIZE]>,
@@ -110,6 +154,10 @@ pub struct Ppu {
     /// The current set of processed tiles that are store in the
     /// PPU related structures.
     tiles: [Tile; TILE_COUNT],
+
+    /// The meta information about the sprites/objects that are going
+    /// to be drawn to the screen,
+    obj_data: [ObjectData; OBJ_COUNT],
 
     /// The palette of colors that is currently loaded in Game Boy
     /// and used for background (tiles).
@@ -196,11 +244,22 @@ pub enum PpuMode {
 impl Ppu {
     pub fn new() -> Self {
         Self {
-            frame_buffer: Box::new([0u8; DISPLAY_WIDTH * DISPLAY_HEIGHT * RGB_SIZE]),
+            color_buffer: Box::new([0u8; COLOR_BUFFER_SIZE]),
+            frame_buffer: Box::new([0u8; FRAME_BUFFER_SIZE]),
             vram: [0u8; VRAM_SIZE],
             hram: [0u8; HRAM_SIZE],
             oam: [0u8; OAM_SIZE],
             tiles: [Tile { buffer: [0u8; 64] }; TILE_COUNT],
+            obj_data: [ObjectData {
+                x: 0,
+                y: 0,
+                tile: 0,
+                palette: 0,
+                xflip: false,
+                yflip: false,
+                priority: false,
+                index: 0,
+            }; OBJ_COUNT],
             palette: [[0u8; RGB_SIZE]; PALETTE_SIZE],
             palette_obj_0: [[0u8; RGB_SIZE]; PALETTE_SIZE],
             palette_obj_1: [[0u8; RGB_SIZE]; PALETTE_SIZE],
@@ -227,7 +286,8 @@ impl Ppu {
     }
 
     pub fn reset(&mut self) {
-        self.frame_buffer = Box::new([0u8; DISPLAY_WIDTH * DISPLAY_HEIGHT * RGB_SIZE]);
+        self.color_buffer = Box::new([0u8; COLOR_BUFFER_SIZE]);
+        self.frame_buffer = Box::new([0u8; FRAME_BUFFER_SIZE]);
         self.vram = [0u8; VRAM_SIZE];
         self.hram = [0u8; HRAM_SIZE];
         self.tiles = [Tile { buffer: [0u8; 64] }; TILE_COUNT];
@@ -273,9 +333,7 @@ impl Ppu {
             }
             PpuMode::VramRead => {
                 if self.mode_clock >= 172 {
-                    if self.switch_bg {
-                        self.render_line();
-                    }
+                    self.render_line();
 
                     self.mode_clock = 0;
                     self.mode = PpuMode::HBlank;
@@ -283,6 +341,8 @@ impl Ppu {
             }
             PpuMode::HBlank => {
                 if self.mode_clock >= 204 {
+                    // increments the register that holds the
+                    // information about the current line in drawign
                     self.ly += 1;
 
                     // in case we've reached the end of the
@@ -446,6 +506,7 @@ impl Ppu {
     /// this method must represent the fastest way of achieving
     /// the fill background with color operation.
     pub fn fill_frame_buffer(&mut self, color: Pixel) {
+        self.color_buffer.fill(0);
         for index in (0..self.frame_buffer.len()).step_by(RGB_SIZE) {
             self.frame_buffer[index] = color[0];
             self.frame_buffer[index + 1] = color[1];
@@ -476,7 +537,7 @@ impl Ppu {
 
         let mut mask;
 
-        for x in 0..8 {
+        for x in 0..TILE_WIDTH {
             mask = 1 << (7 - x);
             tile.set(
                 x,
@@ -491,7 +552,38 @@ impl Ppu {
         }
     }
 
+    pub fn update_object(&mut self, addr: u16, value: u8) {
+        let addr = (addr & 0x01ff) as usize;
+        let obj_index = addr >> 2;
+        if obj_index >= OBJ_COUNT {
+            return;
+        }
+        let mut obj = self.obj_data[obj_index].borrow_mut();
+        match addr & 0x03 {
+            0x00 => obj.y = value as i16 - 16,
+            0x01 => obj.x = value as i16 - 8,
+            0x02 => obj.tile = value,
+            0x03 => {
+                obj.palette = if value & 0x10 == 0x10 { 1 } else { 0 };
+                obj.xflip = if value & 0x20 == 0x20 { true } else { false };
+                obj.yflip = if value & 0x40 == 0x40 { true } else { false };
+                obj.priority = if value & 0x80 == 0x80 { false } else { true };
+                obj.index = obj_index as u8;
+            }
+            _ => (),
+        }
+    }
+
     fn render_line(&mut self) {
+        if self.switch_bg {
+            self.render_background();
+        }
+        if self.switch_obj {
+            self.render_objects();
+        }
+    }
+
+    fn render_background(&mut self) {
         // obtains the base address of the background map using the bg map flag
         // that control which background map is going to be used
         let mut map_offset: usize = if self.bg_map { 0x1c00 } else { 0x1800 };
@@ -516,6 +608,10 @@ impl Ppu {
             tile_index += 256;
         }
 
+        // calculates the offset that is going to be used in the update of the color buffer
+        // which stores Game Boy colors from 0 to 3
+        let mut color_offset = self.ly as usize * DISPLAY_WIDTH;
+
         // calculates the frame buffer offset position assuming the proper
         // Game Boy screen width and RGB pixel (3 bytes) size
         let mut frame_offset = self.ly as usize * DISPLAY_WIDTH * RGB_SIZE;
@@ -526,10 +622,16 @@ impl Ppu {
             let pixel = self.tiles[tile_index].get(x, y);
             let color = self.palette[pixel as usize];
 
+            // updates the pixel in the color buffer
+            self.color_buffer[color_offset] = pixel;
+
             // set the color pixel in the frame buffer
             self.frame_buffer[frame_offset] = color[0];
             self.frame_buffer[frame_offset + 1] = color[1];
             self.frame_buffer[frame_offset + 2] = color[2];
+
+            // increments the color offset by one
+            color_offset += 1;
 
             // increments the offset of the frame buffer by the
             // size of an RGB pixel (which is 3 bytes)
@@ -540,7 +642,7 @@ impl Ppu {
 
             // in case the end of tile width has been reached then
             // a new tile must be retrieved for plotting
-            if x == 8 {
+            if x == TILE_WIDTH {
                 // resets the tile X position to the base value
                 // as a new tile is going to be drawn
                 x = 0;
@@ -555,6 +657,74 @@ impl Ppu {
                 if !self.bg_tile && tile_index < 128 {
                     tile_index += 256;
                 }
+            }
+        }
+    }
+
+    fn render_objects(&mut self) {
+        for index in 0..OBJ_COUNT {
+            // obtains the meta data of the object that is currently
+            // under iteration to be checked for drawing
+            let obj = self.obj_data[index];
+
+            // verifies if the sprite is currently located at the
+            // current line that is going to be drawn and skips it
+            // in case it's not
+            let is_contained =
+                (obj.y <= self.ly as i16) && ((obj.y + TILE_HEIGHT as i16) > self.ly as i16);
+            if !is_contained {
+                continue;
+            }
+
+            let palette = if obj.palette == 0 {
+                self.palette_obj_0
+            } else {
+                self.palette_obj_1
+            };
+
+            let mut color_offset = self.ly as usize * DISPLAY_WIDTH + obj.x as usize;
+
+            // calculates the offset in the frame buffer for the sprite
+            // that is going to be drawn, this is going to be the starting
+            // point for the draw operation to be performed
+            let mut frame_offset = (self.ly as usize * DISPLAY_WIDTH + obj.x as usize) * RGB_SIZE;
+
+            let tile_offset = self.ly as i16 - obj.y;
+
+            let tile_row: &[u8];
+            if obj.yflip {
+                tile_row = self.tiles[obj.tile as usize].get_row((7 - tile_offset) as usize);
+            } else {
+                tile_row = self.tiles[obj.tile as usize].get_row((tile_offset) as usize);
+            }
+
+            for x in 0..TILE_WIDTH {
+                let is_contained =
+                    (obj.x + x as i16 >= 0) && ((obj.x + x as i16) < DISPLAY_WIDTH as i16);
+                if is_contained {
+                    // the object is only considered visible if it's a priority
+                    // or if the underlying pixel is transparent (zero value)
+                    let is_visible = obj.priority || self.color_buffer[color_offset] == 0;
+                    if is_visible {
+                        // obtains the current pixel data from the tile row and
+                        // re-maps it according to the object palette
+                        let pixel = tile_row[if obj.xflip { 7 - x } else { x }];
+                        let color = palette[pixel as usize];
+
+                        // set the color pixel in the frame buffer
+                        self.frame_buffer[frame_offset] = color[0];
+                        self.frame_buffer[frame_offset + 1] = color[1];
+                        self.frame_buffer[frame_offset + 2] = color[2];
+                    }
+                }
+
+                // increment the color offset by one as this represents
+                // the advance of one color pixel
+                color_offset += 1;
+
+                // increments the offset of the frame buffer by the
+                // size of an RGB pixel (which is 3 bytes)
+                frame_offset += RGB_SIZE;
             }
         }
     }

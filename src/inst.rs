@@ -555,12 +555,6 @@ pub const EXTENDED: [(fn(&mut Cpu), u8, &'static str); 256] = [
 
 fn nop(_cpu: &mut Cpu) {}
 
-fn noimpl(_cpu: &mut Cpu) {
-    let ten_millis = time::Duration::from_millis(10000);
-    thread::sleep(ten_millis); // @todo remove this hack
-    todo!("Instruction not implemented");
-}
-
 fn illegal(_cpu: &mut Cpu) {
     panic!("Illegal instruction");
 }
