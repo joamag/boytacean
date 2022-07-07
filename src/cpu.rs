@@ -180,7 +180,7 @@ impl Cpu {
 
         if *instruction_str == "! UNIMP !" || *instruction_str == "HALT" {
             if *instruction_str == "HALT" {
-                println!("Waiting for {:x} in HALT", self.mmu.ie);
+                println!("Waiting for 0x{:02x} in HALT", self.mmu.ie);
             }
             println!(
                 "{}\t(0x{:02x})\t${:04x} {}",
