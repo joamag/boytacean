@@ -12,10 +12,16 @@ pub const HRAM_SIZE: usize = 128;
 pub const OAM_SIZE: usize = 260;
 pub const PALETTE_SIZE: usize = 4;
 pub const RGB_SIZE: usize = 3;
+pub const TILE_WIDTH: usize = 8;
+pub const TILE_HEIGHT: usize = 8;
 
 /// The number of tiles that can be store in Game Boy's
 /// VRAM memory according to specifications.
 pub const TILE_COUNT: usize = 384;
+
+/// The number of objects/sprites that can be handled at
+/// the same time by the Game Boy.
+pub const OBJ_COUNT: usize = 40;
 
 /// The width of the Game Boy screen in pixels.
 pub const DISPLAY_WIDTH: usize = 160;
@@ -43,13 +49,30 @@ pub struct Tile {
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
+#[derive(Clone, Copy, PartialEq)]
+pub struct ObjectData {
+    x: i16,
+    y: i16,
+    tile: u8,
+    palette: u8,
+    xflip: bool,
+    yflip: bool,
+    prio: u8,
+    num: u8,
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
 impl Tile {
     pub fn get(&self, x: usize, y: usize) -> u8 {
-        self.buffer[y * 8 + x]
+        self.buffer[y * TILE_WIDTH + x]
     }
 
     pub fn set(&mut self, x: usize, y: usize, value: u8) {
-        self.buffer[y * 8 + x] = value;
+        self.buffer[y * TILE_WIDTH + x] = value;
+    }
+
+    pub fn get_row(&self, y: usize) -> &[u8] {
+        &self.buffer[y * TILE_WIDTH..(y + 1) * TILE_WIDTH]
     }
 
     pub fn buffer(&self) -> Vec<u8> {
@@ -110,6 +133,10 @@ pub struct Ppu {
     /// The current set of processed tiles that are store in the
     /// PPU related structures.
     tiles: [Tile; TILE_COUNT],
+
+    /// The meta information about the sprites/objects that are going
+    /// to be drawn to the screen,
+    obj_data: [ObjectData; OBJ_COUNT],
 
     /// The palette of colors that is currently loaded in Game Boy
     /// and used for background (tiles).
@@ -201,6 +228,16 @@ impl Ppu {
             hram: [0u8; HRAM_SIZE],
             oam: [0u8; OAM_SIZE],
             tiles: [Tile { buffer: [0u8; 64] }; TILE_COUNT],
+            obj_data: [ObjectData {
+                x: 0,
+                y: 0,
+                tile: 0,
+                palette: 0,
+                xflip: false,
+                yflip: false,
+                prio: 0,
+                num: 0,
+            }; OBJ_COUNT],
             palette: [[0u8; RGB_SIZE]; PALETTE_SIZE],
             palette_obj_0: [[0u8; RGB_SIZE]; PALETTE_SIZE],
             palette_obj_1: [[0u8; RGB_SIZE]; PALETTE_SIZE],
@@ -273,9 +310,7 @@ impl Ppu {
             }
             PpuMode::VramRead => {
                 if self.mode_clock >= 172 {
-                    if self.switch_bg {
-                        self.render_line();
-                    }
+                    self.render_line();
 
                     self.mode_clock = 0;
                     self.mode = PpuMode::HBlank;
@@ -283,6 +318,8 @@ impl Ppu {
             }
             PpuMode::HBlank => {
                 if self.mode_clock >= 204 {
+                    // increments the register that holds the
+                    // information about the current line in drawign
                     self.ly += 1;
 
                     // in case we've reached the end of the
@@ -476,7 +513,7 @@ impl Ppu {
 
         let mut mask;
 
-        for x in 0..8 {
+        for x in 0..TILE_WIDTH {
             mask = 1 << (7 - x);
             tile.set(
                 x,
@@ -491,7 +528,37 @@ impl Ppu {
         }
     }
 
+    pub fn update_object(&mut self, addr: u16, value: u8) {
+        let addr = (addr & 0x01ff) as usize;
+        let obj_index = addr >> 2;
+        if obj_index >= OBJ_COUNT {
+            return;
+        }
+        let mut obj_data = self.obj_data[obj_index];
+        match addr & 0x03 {
+            0x00 => obj_data.y = value as i16 - 16,
+            0x01 => obj_data.x = value as i16 - 16,
+            0x02 => obj_data.tile = value,
+            0x03 => {
+                obj_data.palette = if value & 0x10 == 0x10 { 1 } else { 0 };
+                obj_data.xflip = if value & 0x20 == 0x20 { true } else { false };
+                obj_data.yflip = if value & 0x40 == 0x40 { true } else { false };
+                obj_data.prio = if value & 0x80 == 0x80 { 1 } else { 0 };
+            }
+            _ => (),
+        }
+    }
+
     fn render_line(&mut self) {
+        if self.switch_bg {
+            self.render_background();
+        }
+        if self.switch_obj {
+            self.render_objects();
+        }
+    }
+
+    fn render_background(&mut self) {
         // obtains the base address of the background map using the bg map flag
         // that control which background map is going to be used
         let mut map_offset: usize = if self.bg_map { 0x1c00 } else { 0x1800 };
@@ -540,7 +607,7 @@ impl Ppu {
 
             // in case the end of tile width has been reached then
             // a new tile must be retrieved for plotting
-            if x == 8 {
+            if x == TILE_WIDTH {
                 // resets the tile X position to the base value
                 // as a new tile is going to be drawn
                 x = 0;
@@ -555,6 +622,63 @@ impl Ppu {
                 if !self.bg_tile && tile_index < 128 {
                     tile_index += 256;
                 }
+            }
+        }
+    }
+
+    fn render_objects(&mut self) {
+        for index in 0..OBJ_COUNT {
+            let obj_data = self.obj_data[index];
+
+            // verifies if the sprite is currently located at the
+            // current line that is going to be drawn and skips it
+            // in case it's not
+            let is_contained = (obj_data.y <= self.ly as i16)
+                && ((obj_data.y + TILE_HEIGHT as i16) > self.ly as i16);
+            if !is_contained {
+                continue;
+            }
+
+            let palette = if obj_data.palette == 0 {
+                self.palette_obj_0
+            } else {
+                self.palette_obj_1
+            };
+
+            // calculates the offset in the frame buffer for the sprite
+            // that is going to be drawn, this is going to be the starting
+            // point for the draw operation to be performed
+            let mut frame_offset = (self.ly as usize * DISPLAY_WIDTH + obj_data.x as usize) * RGB_SIZE;
+
+            let tile_offset = self.ly as i16 - obj_data.y;
+
+            let tile_row: &[u8];
+            if obj_data.yflip {
+                tile_row =
+                    self.tiles[obj_data.tile as usize].get_row((7 - tile_offset) as usize);
+            } else {
+                tile_row = self.tiles[obj_data.tile as usize].get_row((tile_offset) as usize);
+            }
+
+            for x in 0..TILE_WIDTH {
+                let is_contained = (obj_data.x + x as i16 >= 0) && ((obj_data.x + x as i16) < DISPLAY_WIDTH as i16);
+                if !is_contained {
+                    continue;
+                }
+
+                //let is_visible = obj_data.prio || !scanrow[obj.x + x] // @todo must implement scanrown latter
+
+                // obtains the current pixel data from the tile row and
+                // re-maps it according to the object palette
+                let pixel = tile_row[x];
+                let color = palette[pixel as usize];
+
+                // set the color pixel in the frame buffer
+                self.frame_buffer[frame_offset] = color[0];
+                self.frame_buffer[frame_offset + 1] = color[1];
+                self.frame_buffer[frame_offset + 2] = color[2];
+
+                frame_offset += RGB_SIZE;
             }
         }
     }

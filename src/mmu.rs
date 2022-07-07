@@ -155,7 +155,10 @@ impl Mmu {
                 | 0xa00 | 0xb00 | 0xc00 | 0xd00 => {
                     self.ram[(addr & 0x1fff) as usize] = value;
                 }
-                0xe00 => self.ppu.oam[(addr & 0x009f) as usize] = value,
+                0xe00 => {
+                    self.ppu.oam[(addr & 0x009f) as usize] = value;
+                    self.ppu.update_object(addr, value);
+                }
                 0xf00 => {
                     if addr == 0xffff {
                         self.ie = value;
