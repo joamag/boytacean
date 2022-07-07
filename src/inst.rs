@@ -1,6 +1,3 @@
-use core::time;
-use std::thread;
-
 use crate::cpu::Cpu;
 
 pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
