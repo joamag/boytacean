@@ -84,14 +84,14 @@ fn main() {
     let mut game_boy = GameBoy::new();
     game_boy.load_boot_default();
 
-    //game_boy.load_rom_file("../../res/roms.prop/tetris.gb");
+    game_boy.load_rom_file("../../res/roms.prop/tetris.gb");
     //game_boy.load_rom_file("../../res/roms.prop/alleyway.gb");
 
     //game_boy.load_rom_file("../../res/roms/firstwhite.gb");
     //game_boy.load_rom_file("../../res/roms/opus5.gb");
 
     //game_boy.load_rom_file("../../res/roms/paradius/cpu/01-special.gb"); // PASSED
-    game_boy.load_rom_file("../../res/roms/paradius/cpu/02-interrupts.gb");
+    //game_boy.load_rom_file("../../res/roms/paradius/cpu/02-interrupts.gb");
     //game_boy.load_rom_file("../../res/roms/paradius/cpu/03-op sp,hl.gb"); // PASSED
     //game_boy.load_rom_file("../../res/roms/paradius/cpu/04-op r,imm.gb"); // PASSED
     //game_boy.load_rom_file("../../res/roms/paradius/cpu/05-op rp.gb"); // PASSED
@@ -166,8 +166,9 @@ fn key_to_pad(keycode: Keycode) -> PadKey {
         Keycode::Down => PadKey::Down,
         Keycode::Left => PadKey::Left,
         Keycode::Right => PadKey::Right,
-        Keycode::Space => PadKey::Start,
-        Keycode::Return => PadKey::Select,
+        Keycode::Return => PadKey::Start,
+        Keycode::Return2 => PadKey::Start,
+        Keycode::Space => PadKey::Select,
         Keycode::A => PadKey::A,
         Keycode::S => PadKey::B,
         _ => PadKey::A,

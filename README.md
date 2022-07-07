@@ -31,6 +31,7 @@ cd dist && python3 -m http.server
 * [POKEGB: a gameboy emulator that only plays Pokémon blue](https://binji.github.io/posts/pokegb)
 * [Game Boy CPU Opcodes](https://izik1.github.io/gbops)
 * [Codeslinger - Game Boy](http://www.codeslinger.co.uk/pages/projects/gameboy.html)
+* [Game Boy hardware database](https://gbhwdb.gekkio.fi)
 
 ### ROMs
 
@@ -41,6 +42,7 @@ cd dist && python3 -m http.server
 * [GitHub - binji/binjgb (C)](https://github.com/binji/binjgb)
 * [GitHub - Rodrigodd/gameroy (Rust)](https://github.com/Rodrigodd/gameroy)
 * [GitHub - simias/gb-rs (Rust)](https://github.com/simias/gb-rs)
+* [GitHub - RubenG123/frosty (Rust)](https://github.com/RubenG123/frosty)
 * [GitHub - calvinbaart/gameboy (TypeScript)](https://github.com/calvinbaart/gameboy)
 
 ### Videos
