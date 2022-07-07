@@ -49,19 +49,6 @@ pub struct Tile {
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
-#[derive(Clone, Copy, PartialEq)]
-pub struct ObjectData {
-    x: i16,
-    y: i16,
-    tile: u8,
-    palette: u8,
-    xflip: bool,
-    yflip: bool,
-    prio: u8,
-    num: u8,
-}
-
-#[cfg_attr(feature = "wasm", wasm_bindgen)]
 impl Tile {
     pub fn get(&self, x: usize, y: usize) -> u8 {
         self.buffer[y * TILE_WIDTH + x]
@@ -99,6 +86,29 @@ impl Display for Tile {
             buffer.push_str("\n");
         }
         write!(f, "{}", buffer)
+    }
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
+#[derive(Clone, Copy, PartialEq)]
+pub struct ObjectData {
+    x: i16,
+    y: i16,
+    tile: u8,
+    palette: u8,
+    xflip: bool,
+    yflip: bool,
+    prio: u8,
+    index: u8,
+}
+
+impl Display for ObjectData {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Index => {} X => {} Y => {} Tile => {}",
+            self.index, self.x, self.y, self.tile
+        )
     }
 }
 
@@ -236,7 +246,7 @@ impl Ppu {
                 xflip: false,
                 yflip: false,
                 prio: 0,
-                num: 0,
+                index: 0,
             }; OBJ_COUNT],
             palette: [[0u8; RGB_SIZE]; PALETTE_SIZE],
             palette_obj_0: [[0u8; RGB_SIZE]; PALETTE_SIZE],
@@ -534,16 +544,17 @@ impl Ppu {
         if obj_index >= OBJ_COUNT {
             return;
         }
-        let mut obj_data = self.obj_data[obj_index];
+        let mut obj = self.obj_data[obj_index].borrow_mut();
         match addr & 0x03 {
-            0x00 => obj_data.y = value as i16 - 16,
-            0x01 => obj_data.x = value as i16 - 16,
-            0x02 => obj_data.tile = value,
+            0x00 => obj.y = value as i16 - 16,
+            0x01 => obj.x = value as i16 - 8,
+            0x02 => obj.tile = value,
             0x03 => {
-                obj_data.palette = if value & 0x10 == 0x10 { 1 } else { 0 };
-                obj_data.xflip = if value & 0x20 == 0x20 { true } else { false };
-                obj_data.yflip = if value & 0x40 == 0x40 { true } else { false };
-                obj_data.prio = if value & 0x80 == 0x80 { 1 } else { 0 };
+                obj.palette = if value & 0x10 == 0x10 { 1 } else { 0 };
+                obj.xflip = if value & 0x20 == 0x20 { true } else { false };
+                obj.yflip = if value & 0x40 == 0x40 { true } else { false };
+                obj.prio = if value & 0x80 == 0x80 { 1 } else { 0 };
+                obj.index = obj_index as u8;
             }
             _ => (),
         }
@@ -628,18 +639,20 @@ impl Ppu {
 
     fn render_objects(&mut self) {
         for index in 0..OBJ_COUNT {
-            let obj_data = self.obj_data[index];
+            // obtains the meta data of the object that is currently
+            // under iteration to be checked for drawing
+            let obj = self.obj_data[index];
 
             // verifies if the sprite is currently located at the
             // current line that is going to be drawn and skips it
             // in case it's not
-            let is_contained = (obj_data.y <= self.ly as i16)
-                && ((obj_data.y + TILE_HEIGHT as i16) > self.ly as i16);
+            let is_contained =
+                (obj.y <= self.ly as i16) && ((obj.y + TILE_HEIGHT as i16) > self.ly as i16);
             if !is_contained {
                 continue;
             }
 
-            let palette = if obj_data.palette == 0 {
+            let palette = if obj.palette == 0 {
                 self.palette_obj_0
             } else {
                 self.palette_obj_1
@@ -648,20 +661,20 @@ impl Ppu {
             // calculates the offset in the frame buffer for the sprite
             // that is going to be drawn, this is going to be the starting
             // point for the draw operation to be performed
-            let mut frame_offset = (self.ly as usize * DISPLAY_WIDTH + obj_data.x as usize) * RGB_SIZE;
+            let mut frame_offset = (self.ly as usize * DISPLAY_WIDTH + obj.x as usize) * RGB_SIZE;
 
-            let tile_offset = self.ly as i16 - obj_data.y;
+            let tile_offset = self.ly as i16 - obj.y;
 
             let tile_row: &[u8];
-            if obj_data.yflip {
-                tile_row =
-                    self.tiles[obj_data.tile as usize].get_row((7 - tile_offset) as usize);
+            if obj.yflip {
+                tile_row = self.tiles[obj.tile as usize].get_row((7 - tile_offset) as usize);
             } else {
-                tile_row = self.tiles[obj_data.tile as usize].get_row((tile_offset) as usize);
+                tile_row = self.tiles[obj.tile as usize].get_row((tile_offset) as usize);
             }
 
             for x in 0..TILE_WIDTH {
-                let is_contained = (obj_data.x + x as i16 >= 0) && ((obj_data.x + x as i16) < DISPLAY_WIDTH as i16);
+                let is_contained =
+                    (obj.x + x as i16 >= 0) && ((obj.x + x as i16) < DISPLAY_WIDTH as i16);
                 if !is_contained {
                     continue;
                 }
@@ -678,6 +691,8 @@ impl Ppu {
                 self.frame_buffer[frame_offset + 1] = color[1];
                 self.frame_buffer[frame_offset + 2] = color[2];
 
+                // increments the offset of the frame buffer by the
+                // size of an RGB pixel (which is 3 bytes)
                 frame_offset += RGB_SIZE;
             }
         }
