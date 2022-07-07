@@ -503,7 +503,7 @@ impl Ppu {
     }
 
     pub fn ack_vblank(&mut self) {
-        self.int_vblank = false;
+        self.set_int_vblank(false);
     }
 
     /// Fills the frame buffer with pixels of the provided color,
