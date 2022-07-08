@@ -113,7 +113,7 @@ impl Display for ObjectData {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "Index => {} X => {} Y => {} Tile => {}",
+            "Index => {}\nX => {}\nY => {}\nTile => {}",
             self.index, self.x, self.y, self.tile
         )
     }
