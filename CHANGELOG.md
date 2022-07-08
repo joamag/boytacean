@@ -9,12 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-* Support for sprite drawing, works with Tetris
-* Support for timers
+*
 
 ### Changed
 
 *
+
+### Fixed
+
+*
+
+## [0.1.0] - 2022-07-08
+
+### Added
+
+* Support for sprite drawing, works with Tetris
+* Support for timers
+* Initial working version 🥳
 
 ### Fixed
 
