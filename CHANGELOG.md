@@ -17,6 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+*
+
+## [0.1.1] - 2022-07-08
+
+### Fixed
+
 * License name in the `Cargo.toml` file
 
 ## [0.1.0] - 2022-07-08
