@@ -3,7 +3,7 @@ name = "boytacean"
 description = "A Game Boy emulator that is written in Rust."
 version = "0.1.0"
 authors = ["João Magalhães <joamag@gmail.com>"]
-license = "Apache"
+license = "Apache-2.0"
 keywords = ["gameboy", "emulator", "rust"]
 edition = "2018"
 
