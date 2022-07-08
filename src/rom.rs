@@ -1,6 +1,8 @@
 use core::fmt;
 use std::fmt::{Display, Formatter};
 
+pub const BANK_SIZE: usize = 16384;
+
 pub struct Rom {
     data: Vec<u8>,
 }
@@ -82,6 +84,12 @@ impl Rom {
 
     pub fn data(&self) -> &Vec<u8> {
         &self.data
+    }
+
+    pub fn get_bank(&self, index: u8) -> &[u8] {
+        let start = index as usize * BANK_SIZE;
+        let end = (index + 1) as usize * BANK_SIZE;
+        &self.data[start..end]
     }
 
     pub fn title(&self) -> &str {

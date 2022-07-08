@@ -1,4 +1,4 @@
-use crate::{pad::Pad, ppu::Ppu, timer::Timer};
+use crate::{pad::Pad, ppu::Ppu, timer::Timer, rom::Rom};
 
 pub const BIOS_SIZE: usize = 256;
 pub const ROM_SIZE: usize = 32768;
@@ -251,6 +251,7 @@ impl Mmu {
 }
 
 struct Mbc1 {
+    rom: Rom,
     rom_bank: u8,
 }
 
