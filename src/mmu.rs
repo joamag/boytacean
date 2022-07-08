@@ -79,18 +79,25 @@ impl Mmu {
                 }
                 self.rom[addr as usize]
             }
+
             // ROM 0 (12 KB/16 KB)
             0x1000 | 0x2000 | 0x3000 => self.rom[addr as usize],
+
             // ROM 1 (Unbanked) (16 KB)
             0x4000 | 0x5000 | 0x6000 | 0x7000 => self.rom[addr as usize],
+
             // Graphics: VRAM (8 KB)
             0x8000 | 0x9000 => self.ppu.vram[(addr & 0x1fff) as usize],
+
             // External RAM (8 KB)
             0xa000 | 0xb000 => self.eram[(addr & 0x1fff) as usize],
+
             // Working RAM (8 KB)
             0xc000 | 0xd000 => self.ram[(addr & 0x1fff) as usize],
+
             // Working RAM Shadow
             0xe000 => self.ram[(addr & 0x1fff) as usize],
+
             // Working RAM Shadow, I/O, Zero-page RAM
             0xf000 => match addr & 0x0f00 {
                 0x000 | 0x100 | 0x200 | 0x300 | 0x400 | 0x500 | 0x600 | 0x700 | 0x800 | 0x900
@@ -122,6 +129,7 @@ impl Mmu {
                 },
                 addr => panic!("Reading from unknown location 0x{:04x}", addr),
             },
+
             addr => panic!("Reading from unknown location 0x{:04x}", addr),
         }
     }
@@ -129,18 +137,19 @@ impl Mmu {
     pub fn write(&mut self, addr: u16, value: u8) {
         match addr & 0xf000 {
             // BOOT (256 B) + ROM0 (4 KB/16 KB)
-            0x0000 => {
-                println!("Writing to ROM 0 at 0x{:04x}", addr)
-            }
+            0x0000 => println!("Writing to ROM 0 at 0x{:04x}", addr),
+
             // ROM 0 (12 KB/16 KB)
             0x1000 | 0x2000 | 0x3000 => match addr {
                 0x2000 => (),
                 _ => panic!("Writing to ROM 0 at 0x{:04x}", addr),
             },
+
             // ROM 1 (Unbanked) (16 KB)
             0x4000 | 0x5000 | 0x6000 | 0x7000 => {
                 panic!("Writing to ROM 1 at 0x{:04x}", addr);
             }
+
             // Graphics: VRAM (8 KB)
             0x8000 | 0x9000 => {
                 self.ppu.vram[(addr & 0x1fff) as usize] = value;
@@ -148,18 +157,18 @@ impl Mmu {
                     self.ppu.update_tile(addr, value);
                 }
             }
+
             // External RAM (8 KB)
             0xa000 | 0xb000 => {
                 self.eram[(addr & 0x1fff) as usize] = value;
             }
+
             // Working RAM (8 KB)
-            0xc000 | 0xd000 => {
-                self.ram[(addr & 0x1fff) as usize] = value;
-            }
+            0xc000 | 0xd000 => self.ram[(addr & 0x1fff) as usize] = value,
+
             // Working RAM Shadow
-            0xe000 => {
-                self.ram[(addr & 0x1fff) as usize] = value;
-            }
+            0xe000 => self.ram[(addr & 0x1fff) as usize] = value,
+
             // Working RAM Shadow, I/O, Zero-page RAM
             0xf000 => match addr & 0x0f00 {
                 0x000 | 0x100 | 0x200 | 0x300 | 0x400 | 0x500 | 0x600 | 0x700 | 0x800 | 0x900
@@ -206,6 +215,7 @@ impl Mmu {
                 },
                 addr => panic!("Writing in unknown location 0x{:04x}", addr),
             },
+
             addr => panic!("Writing in unknown location 0x{:04x}", addr),
         }
     }
@@ -238,4 +248,16 @@ impl Mmu {
     pub fn write_rom(&mut self, addr: u16, buffer: &[u8]) {
         self.rom[addr as usize..addr as usize + buffer.len()].clone_from_slice(buffer);
     }
+}
+
+struct Mbc1 {
+    rom_bank: u8,
+}
+
+impl Mbc1 {
+    pub fn read(&mut self, addr: u16) -> u8 {
+        0x00
+    }
+
+    pub fn write(&mut self, addr: u16, value: u8) {}
 }
