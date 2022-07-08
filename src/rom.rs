@@ -14,11 +14,63 @@ pub enum RomType {
     Unknown = 0xff,
 }
 
+impl Display for RomType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let str = match self {
+            RomType::RomOnly => "ROM Only",
+            RomType::Mbc1 => "MBC 1",
+            RomType::Mbc1Ram => "MBC 1 + RAM",
+            RomType::Mbc1RamBattery => "MBC 1 + RAM + Battery",
+            RomType::Mbc2 => "MBC 2",
+            RomType::Mbc2Battery => "MBC 2 + RAM",
+            RomType::Unknown => "Unknown",
+        };
+        write!(f, "{}", str)
+    }
+}
+
 pub enum RomSize {
-    Size32K = 32,
-    Size64K = 64,
-    Size128K = 128,
-    SizeUnknown = 0,
+    Size32K,
+    Size64K,
+    Size128K,
+    SizeUnknown,
+}
+
+impl Display for RomSize {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let str = match self {
+            RomSize::Size32K => "32 KB",
+            RomSize::Size64K => "64 KB",
+            RomSize::Size128K => "128 KB",
+            RomSize::SizeUnknown => "Unknown",
+        };
+        write!(f, "{}", str)
+    }
+}
+
+pub enum RamSize {
+    NoRam,
+    Unused,
+    Size8K,
+    Size32K,
+    Size64K,
+    Size128K,
+    SizeUnknown,
+}
+
+impl Display for RamSize {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let str = match self {
+            RamSize::NoRam => "No RAM",
+            RamSize::Unused => "Unused",
+            RamSize::Size8K => "8 KB",
+            RamSize::Size32K => "32 KB",
+            RamSize::Size128K => "128 KB",
+            RamSize::Size64K => "64 KB",
+            RamSize::SizeUnknown => "Unknown",
+        };
+        write!(f, "{}", str)
+    }
 }
 
 impl Rom {
@@ -48,12 +100,24 @@ impl Rom {
         }
     }
 
-    pub fn size(&self) -> RomSize {
+    pub fn rom_size(&self) -> RomSize {
         match self.data[0x0148] {
             0x00 => RomSize::Size32K,
             0x01 => RomSize::Size64K,
             0x02 => RomSize::Size128K,
             _ => RomSize::SizeUnknown,
+        }
+    }
+
+    pub fn ram_size(&self) -> RamSize {
+        match self.data[0x0148] {
+            0x00 => RamSize::NoRam,
+            0x01 => RamSize::Unused,
+            0x02 => RamSize::Size8K,
+            0x03 => RamSize::Size32K,
+            0x04 => RamSize::Size128K,
+            0x05 => RamSize::Size64K,
+            _ => RamSize::SizeUnknown,
         }
     }
 }
@@ -62,10 +126,11 @@ impl Display for Rom {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "Name => {}\nType => {}\nSize => {}",
+            "Name => {}\nType => {}\nROM Size => {}\nRAM Size => {}",
             self.title(),
-            self.rom_type() as u8,
-            self.size() as u32
+            self.rom_type(),
+            self.rom_size(),
+            self.ram_size()
         )
     }
 }
