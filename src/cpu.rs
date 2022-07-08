@@ -112,7 +112,9 @@ impl Cpu {
         // @todo this is so bad, need to improve this by an order
         // of magnitude
         if self.halted {
-            if ((self.mmu.ie & 0x01 == 0x01) && self.mmu.ppu().int_vblank()) || ((self.mmu.ie & 0x04 == 0x04) && self.mmu.timer().int_tima()) {
+            if ((self.mmu.ie & 0x01 == 0x01) && self.mmu.ppu().int_vblank())
+                || ((self.mmu.ie & 0x04 == 0x04) && self.mmu.timer().int_tima())
+            {
                 self.halted = false;
             }
         }
