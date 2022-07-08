@@ -260,5 +260,6 @@ impl Mbc1 {
         0x00
     }
 
-    pub fn write(&mut self, addr: u16, value: u8) {}
+    pub fn write(&mut self, addr: u16, value: u8) {
+    }
 }

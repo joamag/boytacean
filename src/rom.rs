@@ -35,6 +35,10 @@ pub enum RomSize {
     Size32K,
     Size64K,
     Size128K,
+    Size256K,
+    Size512K,
+    Size1M,
+    Size2M,
     SizeUnknown,
 }
 
@@ -44,6 +48,10 @@ impl Display for RomSize {
             RomSize::Size32K => "32 KB",
             RomSize::Size64K => "64 KB",
             RomSize::Size128K => "128 KB",
+            RomSize::Size256K => "256 KB",
+            RomSize::Size512K => "512 KB",
+            RomSize::Size1M => "1 MB",
+            RomSize::Size2M => "2 MB",
             RomSize::SizeUnknown => "Unknown",
         };
         write!(f, "{}", str)
@@ -113,6 +121,10 @@ impl Rom {
             0x00 => RomSize::Size32K,
             0x01 => RomSize::Size64K,
             0x02 => RomSize::Size128K,
+            0x03 => RomSize::Size256K,
+            0x04 => RomSize::Size512K,
+            0x05 => RomSize::Size1M,
+            0x06 => RomSize::Size2M,
             _ => RomSize::SizeUnknown,
         }
     }
