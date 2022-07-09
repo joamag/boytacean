@@ -12,6 +12,7 @@ crate-type = ["cdylib", "rlib"]
 
 [features]
 wasm = ["wasm-bindgen"]
+debug = []
 
 [dependencies]
 wasm-bindgen = { version = "0.2", optional = true }

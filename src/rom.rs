@@ -1,9 +1,11 @@
 use core::fmt;
 use std::fmt::{Display, Formatter};
 
-pub struct Rom {
-    data: Vec<u8>,
-}
+use crate::debugln;
+
+pub const BANK_SIZE: usize = 16384;
+pub const ERAM_SIZE: usize = 8192;
+
 pub enum RomType {
     RomOnly = 0x00,
     Mbc1 = 0x01,
@@ -33,7 +35,30 @@ pub enum RomSize {
     Size32K,
     Size64K,
     Size128K,
+    Size256K,
+    Size512K,
+    Size1M,
+    Size2M,
+    Size4M,
+    Size8M,
     SizeUnknown,
+}
+
+impl RomSize {
+    pub fn rom_banks(&self) -> u16 {
+        match self {
+            RomSize::Size32K => 2,
+            RomSize::Size64K => 4,
+            RomSize::Size128K => 8,
+            RomSize::Size256K => 16,
+            RomSize::Size512K => 32,
+            RomSize::Size1M => 64,
+            RomSize::Size2M => 128,
+            RomSize::Size4M => 256,
+            RomSize::Size8M => 512,
+            RomSize::SizeUnknown => 0,
+        }
+    }
 }
 
 impl Display for RomSize {
@@ -42,6 +67,12 @@ impl Display for RomSize {
             RomSize::Size32K => "32 KB",
             RomSize::Size64K => "64 KB",
             RomSize::Size128K => "128 KB",
+            RomSize::Size256K => "256 KB",
+            RomSize::Size512K => "512 KB",
+            RomSize::Size1M => "1 MB",
+            RomSize::Size2M => "2 MB",
+            RomSize::Size4M => "4 MB",
+            RomSize::Size8M => "8 MB",
             RomSize::SizeUnknown => "Unknown",
         };
         write!(f, "{}", str)
@@ -73,23 +104,84 @@ impl Display for RamSize {
     }
 }
 
-impl Rom {
-    pub fn from_data(data: &[u8]) -> Self {
+pub struct Cartridge {
+    /// The complete data of the ROM cartridge, should
+    /// include the complete set o ROM banks.
+    rom_data: Vec<u8>,
+
+    /// The base RAM that is going to be used to store
+    /// temporary data for basic cartridges.
+    ram_data: [u8; ERAM_SIZE],
+
+    /// The MBC (Memory Bank Controller) to be used for
+    /// RAM and ROM access on the current cartridge.
+    mbc: &'static Mbc,
+
+    /// The offset address to the ROM bank (#1) that is
+    /// currently in use by the ROM cartridge.
+    rom_offset: usize,
+
+    /// The index of the bank that is currently selected
+    /// for the ROM bank #1.
+    rom_bank: u8,
+}
+
+impl Cartridge {
+    pub fn new() -> Self {
         Self {
-            data: data.to_vec(),
+            rom_data: vec![],
+            ram_data: [0u8; ERAM_SIZE],
+            mbc: &NO_MBC,
+            rom_offset: 0x4000,
+            rom_bank: 0x01,
+        }
+    }
+
+    pub fn from_data(data: &[u8]) -> Self {
+        let mut cartridge = Cartridge::new();
+        cartridge.set_data(data);
+        cartridge
+    }
+
+    pub fn read(&self, addr: u16) -> u8 {
+        match addr & 0xf000 {
+            0x0000 | 0x1000 | 0x2000 | 0x3000 | 0x4000 | 0x5000 | 0x6000 | 0x7000 => {
+                (self.mbc.read_rom)(self, addr)
+            }
+            0xa000 | 0xb000 => (self.mbc.read_ram)(self, addr),
+            _ => {
+                debugln!("Reading from unknown Cartridge control 0x{:04x}", addr);
+                0x00
+            }
+        }
+    }
+
+    pub fn write(&mut self, addr: u16, value: u8) {
+        match addr & 0xf000 {
+            0x0000 | 0x1000 | 0x2000 | 0x3000 | 0x4000 | 0x5000 | 0x6000 | 0x7000 => {
+                (self.mbc.write_rom)(self, addr, value)
+            }
+            0xa000 | 0xb000 => (self.mbc.write_ram)(self, addr, value),
+            _ => debugln!("Writing to unknown Cartridge address 0x{:04x}", addr),
         }
     }
 
     pub fn data(&self) -> &Vec<u8> {
-        &self.data
+        &self.rom_data
+    }
+
+    pub fn get_bank(&self, index: u8) -> &[u8] {
+        let start = index as usize * BANK_SIZE;
+        let end = (index + 1) as usize * BANK_SIZE;
+        &self.rom_data[start..end]
     }
 
     pub fn title(&self) -> &str {
-        std::str::from_utf8(&self.data[0x0134..0x0143]).unwrap()
+        std::str::from_utf8(&self.rom_data[0x0134..0x0143]).unwrap()
     }
 
     pub fn rom_type(&self) -> RomType {
-        match self.data[0x0147] {
+        match self.rom_data[0x0147] {
             0x00 => RomType::RomOnly,
             0x01 => RomType::Mbc1,
             0x02 => RomType::Mbc1Ram,
@@ -101,16 +193,22 @@ impl Rom {
     }
 
     pub fn rom_size(&self) -> RomSize {
-        match self.data[0x0148] {
+        match self.rom_data[0x0148] {
             0x00 => RomSize::Size32K,
             0x01 => RomSize::Size64K,
             0x02 => RomSize::Size128K,
+            0x03 => RomSize::Size256K,
+            0x04 => RomSize::Size512K,
+            0x05 => RomSize::Size1M,
+            0x06 => RomSize::Size2M,
+            0x07 => RomSize::Size4M,
+            0x08 => RomSize::Size8M,
             _ => RomSize::SizeUnknown,
         }
     }
 
     pub fn ram_size(&self) -> RamSize {
-        match self.data[0x0148] {
+        match self.rom_data[0x0148] {
             0x00 => RamSize::NoRam,
             0x01 => RamSize::Unused,
             0x02 => RamSize::Size8K,
@@ -120,9 +218,35 @@ impl Rom {
             _ => RamSize::SizeUnknown,
         }
     }
+
+    pub fn get_mbc(&self) -> &'static Mbc {
+        match self.rom_type() {
+            RomType::RomOnly => &NO_MBC,
+            RomType::Mbc1 => &MBC1,
+            RomType::Mbc1Ram => &MBC1,
+            RomType::Mbc1RamBattery => &MBC1,
+            _ => &NO_MBC,
+        }
+    }
+
+    pub fn set_rom_bank(&mut self, rom_bank: u8) {
+        self.rom_bank = rom_bank;
+        self.rom_offset = rom_bank as usize * BANK_SIZE;
+    }
+
+    fn set_data(&mut self, data: &[u8]) {
+        self.rom_data = data.to_vec();
+        self.rom_offset = 0x4000;
+        self.rom_bank = 0x01;
+        self.set_mbc();
+    }
+
+    fn set_mbc(&mut self) {
+        self.mbc = self.get_mbc();
+    }
 }
 
-impl Display for Rom {
+impl Display for Cartridge {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -134,3 +258,63 @@ impl Display for Rom {
         )
     }
 }
+
+pub struct Mbc {
+    pub name: &'static str,
+    pub read_rom: fn(rom: &Cartridge, addr: u16) -> u8,
+    pub write_rom: fn(rom: &mut Cartridge, addr: u16, value: u8),
+    pub read_ram: fn(rom: &Cartridge, addr: u16) -> u8,
+    pub write_ram: fn(rom: &mut Cartridge, addr: u16, value: u8),
+}
+
+pub static NO_MBC: Mbc = Mbc {
+    name: "No MBC",
+    read_rom: |rom: &Cartridge, addr: u16| -> u8 { rom.rom_data[addr as usize] },
+    write_rom: |_rom: &mut Cartridge, addr: u16, _value: u8| {
+        match addr {
+            // ignores this address as Tetris and some other games write
+            // to this address for some reason (probably MBC1 compatibility)
+            0x2000 => (),
+            _ => panic!("Writing in unknown Cartridge ROM location 0x{:04x}", addr),
+        };
+    },
+    read_ram: |rom: &Cartridge, addr: u16| -> u8 { rom.ram_data[(addr & 0x1fff) as usize] },
+    write_ram: |rom: &mut Cartridge, addr: u16, value: u8| {
+        rom.ram_data[(addr & 0x1fff) as usize] = value;
+    },
+};
+
+pub static MBC1: Mbc = Mbc {
+    name: "MBC1",
+    read_rom: |rom: &Cartridge, addr: u16| -> u8 {
+        match addr & 0xf000 {
+            0x0000 | 0x1000 | 0x2000 | 0x3000 => rom.rom_data[addr as usize],
+            0x4000 | 0x5000 | 0x6000 | 0x7000 => {
+                rom.rom_data[rom.rom_offset + (addr - 0x4000) as usize]
+            }
+            _ => panic!("Reading from unknown Cartridge ROM location 0x{:04x}", addr),
+        }
+    },
+    write_rom: |rom: &mut Cartridge, addr: u16, value: u8| {
+        match addr & 0xf000 {
+            0x0000 | 0x1000 => {
+                // @todo RAM enable
+            }
+            0x2000 | 0x3000 => {
+                // @todo this is slow and must be pre-computed in cartridge
+                let mut rom_bank = value & (rom.rom_size().rom_banks() * 2 - 1) as u8;
+                if rom_bank == 0 {
+                    rom_bank = 1;
+                }
+                rom.set_rom_bank(rom_bank);
+            }
+            0x6000 | 0x7000 => {}
+            _ => panic!("Writing to unknown Cartridge ROM location 0x{:04x}", addr),
+        }
+    },
+    read_ram: |rom: &Cartridge, addr: u16| -> u8 { rom.ram_data[(addr & 0x1fff) as usize] },
+    write_ram: |rom: &mut Cartridge, addr: u16, value: u8| {
+        debugln!("Writing to ERAM at 0x{:04x}", addr);
+        rom.ram_data[(addr & 0x1fff) as usize] = value;
+    },
+};

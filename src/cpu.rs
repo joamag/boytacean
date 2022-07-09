@@ -1,6 +1,7 @@
 use core::panic;
 
 use crate::{
+    debugln,
     inst::{EXTENDED, INSTRUCTIONS},
     mmu::Mmu,
     pad::Pad,
@@ -47,12 +48,12 @@ impl Cpu {
             }
         }
 
-        println!(
+        debugln!(
             "Implemented {}/{} instructions",
             implemented,
             INSTRUCTIONS.len()
         );
-        println!(
+        debugln!(
             "Implemented {}/{} extended instructions",
             implemented_ext,
             EXTENDED.len()
@@ -113,6 +114,7 @@ impl Cpu {
         // of magnitude
         if self.halted {
             if ((self.mmu.ie & 0x01 == 0x01) && self.mmu.ppu().int_vblank())
+                || ((self.mmu.ie & 0x02 == 0x02) && self.mmu.ppu().int_stat())
                 || ((self.mmu.ie & 0x04 == 0x04) && self.mmu.timer().int_tima())
             {
                 self.halted = false;
@@ -122,7 +124,7 @@ impl Cpu {
         if self.ime {
             // @todo aggregate all of this interrupts in the MMU
             if (self.mmu.ie & 0x01 == 0x01) && self.mmu.ppu().int_vblank() {
-                println!("Going to run V-Blank interrupt handler (0x40)");
+                debugln!("Going to run V-Blank interrupt handler (0x40)");
 
                 self.disable_int();
                 self.push_word(pc);
@@ -141,8 +143,28 @@ impl Cpu {
                 return 16;
             }
             // @todo aggregate the handling of these interrupts
+            else if (self.mmu.ie & 0x02 == 0x02) && self.mmu.ppu().int_stat() {
+                debugln!("Going to run LCD STAT interrupt handler (0x48)");
+
+                self.disable_int();
+                self.push_word(pc);
+                self.pc = 0x48;
+
+                // acknowledges that the STAT interrupt has been
+                // properly handled
+                self.mmu.ppu().ack_stat();
+
+                // in case the CPU is currently halted waiting
+                // for an interrupt, releases it
+                if self.halted {
+                    self.halted = false;
+                }
+
+                return 16;
+            }
+            // @todo aggregate the handling of these interrupts
             else if (self.mmu.ie & 0x04 == 0x04) && self.mmu.timer().int_tima() {
-                println!("Going to run Timer interrupt handler (0x50)");
+                debugln!("Going to run Timer interrupt handler (0x50)");
 
                 self.disable_int();
                 self.push_word(pc);
@@ -189,11 +211,14 @@ impl Cpu {
 
         if *instruction_str == "! UNIMP !" || *instruction_str == "HALT" {
             if *instruction_str == "HALT" {
-                println!("HALT with IE=0x{:02x} IME={}", self.mmu.ie, self.ime);
+                debugln!("HALT with IE=0x{:02x} IME={}", self.mmu.ie, self.ime);
             }
-            println!(
+            debugln!(
                 "{}\t(0x{:02x})\t${:04x} {}",
-                instruction_str, opcode, pc, is_prefix
+                instruction_str,
+                opcode,
+                pc,
+                is_prefix
             );
         }
 

@@ -1,9 +1,7 @@
-use crate::{pad::Pad, ppu::Ppu, timer::Timer};
+use crate::{debugln, pad::Pad, ppu::Ppu, rom::Cartridge, timer::Timer};
 
-pub const BIOS_SIZE: usize = 256;
-pub const ROM_SIZE: usize = 32768;
+pub const BOOT_SIZE: usize = 256;
 pub const RAM_SIZE: usize = 8192;
-pub const ERAM_SIZE: usize = 8192;
 
 pub struct Mmu {
     /// Register that controls the interrupts that are considered
@@ -14,13 +12,20 @@ pub struct Mmu {
     /// to be used both for VRAM reading/writing and to forward
     /// some of the access operations.
     ppu: Ppu,
+
+    /// Reference to the Game Pad structure that is going to control
+    /// the I/O access to this device.
     pad: Pad,
+
     timer: Timer,
+
+    /// The cartridge ROM that is currently loaded into the system,
+    /// going to be used to access ROM and external RAM banks.
+    rom: Cartridge,
+
     boot_active: bool,
-    boot: [u8; BIOS_SIZE],
-    rom: [u8; ROM_SIZE],
+    boot: [u8; BOOT_SIZE],
     ram: [u8; RAM_SIZE],
-    eram: [u8; RAM_SIZE],
 }
 
 impl Mmu {
@@ -29,21 +34,19 @@ impl Mmu {
             ppu: ppu,
             pad: pad,
             timer: timer,
+            rom: Cartridge::new(),
             boot_active: true,
-            boot: [0u8; BIOS_SIZE],
-            rom: [0u8; ROM_SIZE],
+            boot: [0u8; BOOT_SIZE],
             ram: [0u8; RAM_SIZE],
-            eram: [0u8; ERAM_SIZE],
             ie: 0x0,
         }
     }
 
     pub fn reset(&mut self) {
+        self.rom = Cartridge::new();
         self.boot_active = true;
-        self.boot = [0u8; BIOS_SIZE];
-        self.rom = [0u8; ROM_SIZE];
+        self.boot = [0u8; BOOT_SIZE];
         self.ram = [0u8; RAM_SIZE];
-        self.eram = [0u8; ERAM_SIZE];
     }
 
     pub fn ppu(&mut self) -> &mut Ppu {
@@ -77,20 +80,27 @@ impl Mmu {
                     }
                     return self.boot[addr as usize];
                 }
-                self.rom[addr as usize]
+                self.rom.read(addr)
             }
+
             // ROM 0 (12 KB/16 KB)
-            0x1000 | 0x2000 | 0x3000 => self.rom[addr as usize],
+            0x1000 | 0x2000 | 0x3000 => self.rom.read(addr),
+
             // ROM 1 (Unbanked) (16 KB)
-            0x4000 | 0x5000 | 0x6000 | 0x7000 => self.rom[addr as usize],
+            0x4000 | 0x5000 | 0x6000 | 0x7000 => self.rom.read(addr),
+
             // Graphics: VRAM (8 KB)
             0x8000 | 0x9000 => self.ppu.vram[(addr & 0x1fff) as usize],
+
             // External RAM (8 KB)
-            0xa000 | 0xb000 => self.eram[(addr & 0x1fff) as usize],
+            0xa000 | 0xb000 => self.rom.read(addr),
+
             // Working RAM (8 KB)
             0xc000 | 0xd000 => self.ram[(addr & 0x1fff) as usize],
+
             // Working RAM Shadow
             0xe000 => self.ram[(addr & 0x1fff) as usize],
+
             // Working RAM Shadow, I/O, Zero-page RAM
             0xf000 => match addr & 0x0f00 {
                 0x000 | 0x100 | 0x200 | 0x300 | 0x400 | 0x500 | 0x600 | 0x700 | 0x800 | 0x900
@@ -109,19 +119,20 @@ impl Mmu {
                             0x00 => self.pad.read(addr),
                             0x04..=0x07 => self.timer.read(addr),
                             _ => {
-                                println!("Reading from unknown IO control 0x{:04x}", addr);
+                                debugln!("Reading from unknown IO control 0x{:04x}", addr);
                                 0x00
                             }
                         },
                         0x40 | 0x50 | 0x60 | 0x70 => self.ppu.read(addr),
                         _ => {
-                            println!("Reading from unknown IO control 0x{:04x}", addr);
+                            debugln!("Reading from unknown IO control 0x{:04x}", addr);
                             0x00
                         }
                     },
                 },
                 addr => panic!("Reading from unknown location 0x{:04x}", addr),
             },
+
             addr => panic!("Reading from unknown location 0x{:04x}", addr),
         }
     }
@@ -129,18 +140,14 @@ impl Mmu {
     pub fn write(&mut self, addr: u16, value: u8) {
         match addr & 0xf000 {
             // BOOT (256 B) + ROM0 (4 KB/16 KB)
-            0x0000 => {
-                println!("Writing to ROM 0 at 0x{:04x}", addr)
-            }
+            0x0000 => self.rom.write(addr, value),
+
             // ROM 0 (12 KB/16 KB)
-            0x1000 | 0x2000 | 0x3000 => match addr {
-                0x2000 => (),
-                _ => panic!("Writing to ROM 0 at 0x{:04x}", addr),
-            },
+            0x1000 | 0x2000 | 0x3000 => self.rom.write(addr, value),
+
             // ROM 1 (Unbanked) (16 KB)
-            0x4000 | 0x5000 | 0x6000 | 0x7000 => {
-                panic!("Writing to ROM 1 at 0x{:04x}", addr);
-            }
+            0x4000 | 0x5000 | 0x6000 | 0x7000 => self.rom.write(addr, value),
+
             // Graphics: VRAM (8 KB)
             0x8000 | 0x9000 => {
                 self.ppu.vram[(addr & 0x1fff) as usize] = value;
@@ -148,18 +155,16 @@ impl Mmu {
                     self.ppu.update_tile(addr, value);
                 }
             }
+
             // External RAM (8 KB)
-            0xa000 | 0xb000 => {
-                self.eram[(addr & 0x1fff) as usize] = value;
-            }
+            0xa000 | 0xb000 => self.rom.write(addr, value),
+
             // Working RAM (8 KB)
-            0xc000 | 0xd000 => {
-                self.ram[(addr & 0x1fff) as usize] = value;
-            }
+            0xc000 | 0xd000 => self.ram[(addr & 0x1fff) as usize] = value,
+
             // Working RAM Shadow
-            0xe000 => {
-                self.ram[(addr & 0x1fff) as usize] = value;
-            }
+            0xe000 => self.ram[(addr & 0x1fff) as usize] = value,
+
             // Working RAM Shadow, I/O, Zero-page RAM
             0xf000 => match addr & 0x0f00 {
                 0x000 | 0x100 | 0x200 | 0x300 | 0x400 | 0x500 | 0x600 | 0x700 | 0x800 | 0x900
@@ -173,6 +178,7 @@ impl Mmu {
                 0xf00 => match addr & 0x00ff {
                     0x0f => {
                         self.ppu.set_int_vblank(value & 0x01 == 0x01);
+                        self.ppu.set_int_stat(value & 0x02 == 0x02);
                         self.timer.set_int_tima(value & 0x04 == 0x04);
                     }
                     0x80..=0xfe => self.ppu.hram[(addr & 0x007f) as usize] = value,
@@ -182,14 +188,14 @@ impl Mmu {
                             0x00 => match addr & 0x00ff {
                                 0x00 => self.pad.write(addr, value),
                                 0x04..=0x07 => self.timer.write(addr, value),
-                                _ => println!("Writing to unknown IO control 0x{:04x}", addr),
+                                _ => debugln!("Writing to unknown IO control 0x{:04x}", addr),
                             },
                             0x40 | 0x60 | 0x70 => {
                                 match addr & 0x00ff {
                                     0x0046 => {
                                         // @todo must increment the cycle count by 160
                                         // and make this a separated dma.rs file
-                                        println!("Going to start DMA transfer to 0x{:x}00", value);
+                                        debugln!("Going to start DMA transfer to 0x{:x}00", value);
                                         let data = self.read_many((value as u16) << 8, 160);
                                         self.write_many(0xfe00, &data);
                                     }
@@ -198,15 +204,16 @@ impl Mmu {
                             }
                             0x50 => match addr & 0x00ff {
                                 0x50 => self.boot_active = false,
-                                _ => println!("Writing to unknown IO control 0x{:04x}", addr),
+                                _ => debugln!("Writing to unknown IO control 0x{:04x}", addr),
                             },
-                            _ => println!("Writing to unknown IO control 0x{:04x}", addr),
+                            _ => debugln!("Writing to unknown IO control 0x{:04x}", addr),
                         }
                     }
                 },
-                addr => panic!("Writing in unknown location 0x{:04x}", addr),
+                addr => panic!("Writing to unknown location 0x{:04x}", addr),
             },
-            addr => panic!("Writing in unknown location 0x{:04x}", addr),
+
+            addr => panic!("Writing to unknown location 0x{:04x}", addr),
         }
     }
 
@@ -235,7 +242,7 @@ impl Mmu {
         self.ram[addr as usize..addr as usize + buffer.len()].clone_from_slice(buffer);
     }
 
-    pub fn write_rom(&mut self, addr: u16, buffer: &[u8]) {
-        self.rom[addr as usize..addr as usize + buffer.len()].clone_from_slice(buffer);
+    pub fn set_rom(&mut self, rom: Cartridge) {
+        self.rom = rom;
     }
 }
