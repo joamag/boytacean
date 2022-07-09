@@ -4,7 +4,7 @@ use crate::{
     mmu::Mmu,
     pad::{Pad, PadKey},
     ppu::{Ppu, Tile, FRAME_BUFFER_SIZE},
-    rom::Rom,
+    rom::Cartridge,
     timer::Timer,
     util::read_file,
 };
@@ -70,9 +70,8 @@ impl GameBoy {
     }
 
     pub fn load_rom(&mut self, data: &[u8]) {
-        let rom = Rom::from_data(data);
-        println!("{}", rom);
-        self.cpu.mmu().write_rom(0x0000, data);
+        let rom = Cartridge::from_data(data);
+        self.mmu().set_rom(rom);
     }
 
     pub fn load_rom_file(&mut self, path: &str) {

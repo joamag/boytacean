@@ -1,7 +1,6 @@
-use crate::{pad::Pad, ppu::Ppu, timer::Timer, rom::Rom};
+use crate::{pad::Pad, ppu::Ppu, rom::Cartridge, timer::Timer};
 
-pub const BIOS_SIZE: usize = 256;
-pub const ROM_SIZE: usize = 32768;
+pub const BOOT_SIZE: usize = 256;
 pub const RAM_SIZE: usize = 8192;
 pub const ERAM_SIZE: usize = 8192;
 
@@ -14,11 +13,19 @@ pub struct Mmu {
     /// to be used both for VRAM reading/writing and to forward
     /// some of the access operations.
     ppu: Ppu,
+
+    /// Reference to the Game Pad structure that is going to control
+    /// the I/O access to this device.
     pad: Pad,
+
     timer: Timer,
+
+    /// The cartridge ROM that is currently loaded into the system,
+    /// going to be used to access ROM and external RAM banks.
+    rom: Cartridge,
+
     boot_active: bool,
-    boot: [u8; BIOS_SIZE],
-    rom: [u8; ROM_SIZE],
+    boot: [u8; BOOT_SIZE],
     ram: [u8; RAM_SIZE],
     eram: [u8; RAM_SIZE],
 }
@@ -29,9 +36,9 @@ impl Mmu {
             ppu: ppu,
             pad: pad,
             timer: timer,
+            rom: Cartridge::new(),
             boot_active: true,
-            boot: [0u8; BIOS_SIZE],
-            rom: [0u8; ROM_SIZE],
+            boot: [0u8; BOOT_SIZE],
             ram: [0u8; RAM_SIZE],
             eram: [0u8; ERAM_SIZE],
             ie: 0x0,
@@ -39,9 +46,9 @@ impl Mmu {
     }
 
     pub fn reset(&mut self) {
+        self.rom = Cartridge::new();
         self.boot_active = true;
-        self.boot = [0u8; BIOS_SIZE];
-        self.rom = [0u8; ROM_SIZE];
+        self.boot = [0u8; BOOT_SIZE];
         self.ram = [0u8; RAM_SIZE];
         self.eram = [0u8; ERAM_SIZE];
     }
@@ -77,14 +84,14 @@ impl Mmu {
                     }
                     return self.boot[addr as usize];
                 }
-                self.rom[addr as usize]
+                self.rom.read(addr)
             }
 
             // ROM 0 (12 KB/16 KB)
-            0x1000 | 0x2000 | 0x3000 => self.rom[addr as usize],
+            0x1000 | 0x2000 | 0x3000 => self.rom.read(addr),
 
             // ROM 1 (Unbanked) (16 KB)
-            0x4000 | 0x5000 | 0x6000 | 0x7000 => self.rom[addr as usize],
+            0x4000 | 0x5000 | 0x6000 | 0x7000 => self.rom.read(addr),
 
             // Graphics: VRAM (8 KB)
             0x8000 | 0x9000 => self.ppu.vram[(addr & 0x1fff) as usize],
@@ -245,21 +252,7 @@ impl Mmu {
         self.ram[addr as usize..addr as usize + buffer.len()].clone_from_slice(buffer);
     }
 
-    pub fn write_rom(&mut self, addr: u16, buffer: &[u8]) {
-        self.rom[addr as usize..addr as usize + buffer.len()].clone_from_slice(buffer);
-    }
-}
-
-struct Mbc1 {
-    rom: Rom,
-    rom_bank: u8,
-}
-
-impl Mbc1 {
-    pub fn read(&mut self, addr: u16) -> u8 {
-        0x00
-    }
-
-    pub fn write(&mut self, addr: u16, value: u8) {
+    pub fn set_rom(&mut self, rom: Cartridge) {
+        self.rom = rom;
     }
 }

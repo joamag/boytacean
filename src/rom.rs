@@ -3,9 +3,6 @@ use std::fmt::{Display, Formatter};
 
 pub const BANK_SIZE: usize = 16384;
 
-pub struct Rom {
-    data: Vec<u8>,
-}
 pub enum RomType {
     RomOnly = 0x00,
     Mbc1 = 0x01,
@@ -83,11 +80,41 @@ impl Display for RamSize {
     }
 }
 
-impl Rom {
-    pub fn from_data(data: &[u8]) -> Self {
+pub struct Cartridge {
+    /// The complete data of the ROM cartridge, should
+    /// include the complete set o ROM banks.
+    data: Vec<u8>,
+
+    /// The offset address to the ROM bank (#1) that is
+    /// currently in use by the ROM cartridge.
+    rom_offset: u16,
+
+    /// The MBC (Memory Bank Controller) to be used for
+    /// RAM and ROM access on the current cartridge.
+    mbc: &'static Mbc,
+}
+
+impl Cartridge {
+    pub fn new() -> Self {
         Self {
-            data: data.to_vec(),
+            data: vec![],
+            rom_offset: 0x0000,
+            mbc: &NO_MBC,
         }
+    }
+
+    pub fn from_data(data: &[u8]) -> Self {
+        let mut cartridge = Cartridge::new();
+        cartridge.set_data(data);
+        cartridge
+    }
+
+    pub fn read(&self, addr: u16) -> u8 {
+        (self.mbc.read)(self, addr)
+    }
+
+    pub fn write(&self, addr: u16, value: u8) {
+        (self.mbc.write)(self, addr, value)
     }
 
     pub fn data(&self) -> &Vec<u8> {
@@ -140,9 +167,25 @@ impl Rom {
             _ => RamSize::SizeUnknown,
         }
     }
+
+    fn set_data(&mut self, data: &[u8]) {
+        self.data = data.to_vec();
+        self.rom_offset = 0x0000;
+        self.set_mbc();
+    }
+
+    fn set_mbc(&self) -> &'static Mbc {
+        match self.rom_type() {
+            RomType::RomOnly => &NO_MBC,
+            RomType::Mbc1 => &MBC1,
+            RomType::Mbc1Ram => &MBC1,
+            RomType::Mbc1RamBattery => &MBC1,
+            _ => &NO_MBC,
+        }
+    }
 }
 
-impl Display for Rom {
+impl Display for Cartridge {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -154,3 +197,23 @@ impl Display for Rom {
         )
     }
 }
+
+pub struct Mbc {
+    pub name: &'static str,
+    pub read: fn(rom: &Cartridge, addr: u16) -> u8,
+    pub write: fn(rom: &Cartridge, addr: u16, value: u8),
+}
+
+pub static NO_MBC: Mbc = Mbc {
+    name: "No MBC",
+    read: |rom: &Cartridge, addr: u16| -> u8 { rom.data[addr as usize] },
+    write: |_rom: &Cartridge, addr: u16, _value: u8| {
+        println!("Writing to ROM at 0x{:04x}", addr);
+    },
+};
+
+pub static MBC1: Mbc = Mbc {
+    name: "MBC1",
+    read: |rom: &Cartridge, addr: u16| -> u8 { 0x00 },
+    write: |rom: &Cartridge, addr: u16, value: u8| {},
+};
