@@ -78,6 +78,12 @@ p {
     display: none;
     position: absolute;
     right: 22px;
+    user-select: none;
+    -o-user-select: none;
+    -ms-user-select: none;
+    -moz-user-select: none;
+    -khtml-user-select: none;
+    -webkit-user-select: none;
 }
 
 .main > .side-left .canvas-container > .canvas-close > img {
