@@ -284,6 +284,13 @@ pub static MBC1: Mbc = Mbc {
                 }
                 rom.set_rom_bank(rom_bank);
             }
+            0x6000 | 0x7000 => {
+                let mut rom_bank = value & 0x1f;
+                if rom_bank == 0 {
+                    rom_bank = 1;
+                }
+                rom.set_rom_bank(rom_bank);
+            }
             _ => panic!("Writing to unknown Cartridge ROM location 0x{:04x}", addr),
         }
     },
