@@ -2,11 +2,15 @@ use boytacean::{
     gb::GameBoy,
     pad::PadKey,
     ppu::{DISPLAY_HEIGHT, DISPLAY_WIDTH},
+    util::read_file,
 };
 use sdl2::{
-    event::Event, image::LoadSurface, keyboard::Keycode, pixels::PixelFormatEnum, surface::Surface,
-    video::Window, AudioSubsystem, EventPump, TimerSubsystem, VideoSubsystem,
+    event::Event, image::LoadSurface, keyboard::Keycode, pixels::PixelFormatEnum, rwops::RWops,
+    surface::Surface, sys::image, video::Window, AudioSubsystem, EventPump, TimerSubsystem,
+    VideoSubsystem,
 };
+
+pub mod data;
 
 /// The base title to be used in the window.
 static TITLE: &'static str = "Boytacean";
@@ -55,13 +59,20 @@ fn start_sdl() -> Graphics {
     }
 }
 
+pub fn surface_from_bytes(bytes: &[u8]) -> Surface {
+    unsafe {
+        let rw_ops = RWops::from_bytes(bytes).unwrap();
+        let raw_surface = image::IMG_Load_RW(rw_ops.raw(), 0);
+        Surface::from_ll(raw_surface)
+    }
+}
+
 fn main() {
     let mut graphics = start_sdl();
 
     // updates the icon of the window to reflect the image
     // and style of the emulator
-    let surface = Surface::from_file("./res/icon.png").unwrap();
-    graphics.window.set_icon(&surface);
+    graphics.window.set_icon(surface_from_bytes(&data::ICON));
 
     let mut canvas = graphics.window.into_canvas().accelerated().build().unwrap();
     canvas.clear();
