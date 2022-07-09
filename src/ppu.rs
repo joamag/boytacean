@@ -4,8 +4,6 @@ use std::{
     fmt::{Display, Formatter},
 };
 
-use crate::debugln;
-
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
 

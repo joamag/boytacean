@@ -33,32 +33,6 @@ pub struct Cpu {
 
 impl Cpu {
     pub fn new(mmu: Mmu) -> Self {
-        let mut implemented = 0;
-        let mut implemented_ext = 0;
-
-        for instruction in INSTRUCTIONS {
-            if instruction.2 != "! UNIMP !" {
-                implemented += 1;
-            }
-        }
-
-        for instruction in EXTENDED {
-            if instruction.2 != "! UNIMP !" {
-                implemented_ext += 1;
-            }
-        }
-
-        debugln!(
-            "Implemented {}/{} instructions",
-            implemented,
-            INSTRUCTIONS.len()
-        );
-        debugln!(
-            "Implemented {}/{} extended instructions",
-            implemented_ext,
-            EXTENDED.len()
-        );
-
         Self {
             pc: 0x0,
             sp: 0x0,
