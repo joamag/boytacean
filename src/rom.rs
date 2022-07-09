@@ -298,7 +298,8 @@ pub static MBC1: Mbc = Mbc {
     write_rom: |rom: &mut Cartridge, addr: u16, value: u8| {
         match addr & 0xf000 {
             0x0000 | 0x1000 => {
-                // @todo RAM enable
+                println!("RAM ENABLE {}", value);
+                //@todo RAM ENABLE
             }
             0x2000 | 0x3000 => {
                 // @todo this is slow and must be pre-computed in cartridge
@@ -308,7 +309,12 @@ pub static MBC1: Mbc = Mbc {
                 }
                 rom.set_rom_bank(rom_bank);
             }
-            0x6000 | 0x7000 => {}
+            0x4000 | 0x5000 => {
+                println!("SETTING UPPER BITS {}", value);
+            }
+            0x6000 | 0x7000 => {
+                println!("SETTING MODE {}", value);
+            }
             _ => panic!("Writing to unknown Cartridge ROM location 0x{:04x}", addr),
         }
     },

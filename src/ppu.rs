@@ -4,6 +4,8 @@ use std::{
     fmt::{Display, Formatter},
 };
 
+use crate::debugln;
+
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
 
@@ -473,10 +475,10 @@ impl Ppu {
                 }
             }
             0x004a => {
-                println!("Writing to $FF4A - WY (Window Y Position) (R/W)")
+                debugln!("Writing to $FF4A - WY (Window Y Position) (R/W)")
             }
             0x004b => {
-                println!("Writing to $FF4B - WX (Window X Position + 7) (R/W)")
+                debugln!("Writing to $FF4B - WX (Window X Position + 7) (R/W)")
             }
             0x007f => (),
             addr => panic!("Writing in unknown PPU location 0x{:04x}", addr),
