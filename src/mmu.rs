@@ -1,8 +1,7 @@
-use crate::{pad::Pad, ppu::Ppu, rom::Cartridge, timer::Timer};
+use crate::{debugln, pad::Pad, ppu::Ppu, rom::Cartridge, timer::Timer};
 
 pub const BOOT_SIZE: usize = 256;
 pub const RAM_SIZE: usize = 8192;
-pub const ERAM_SIZE: usize = 8192;
 
 pub struct Mmu {
     /// Register that controls the interrupts that are considered
@@ -27,7 +26,6 @@ pub struct Mmu {
     boot_active: bool,
     boot: [u8; BOOT_SIZE],
     ram: [u8; RAM_SIZE],
-    eram: [u8; RAM_SIZE],
 }
 
 impl Mmu {
@@ -40,7 +38,6 @@ impl Mmu {
             boot_active: true,
             boot: [0u8; BOOT_SIZE],
             ram: [0u8; RAM_SIZE],
-            eram: [0u8; ERAM_SIZE],
             ie: 0x0,
         }
     }
@@ -50,7 +47,6 @@ impl Mmu {
         self.boot_active = true;
         self.boot = [0u8; BOOT_SIZE];
         self.ram = [0u8; RAM_SIZE];
-        self.eram = [0u8; ERAM_SIZE];
     }
 
     pub fn ppu(&mut self) -> &mut Ppu {
@@ -97,7 +93,7 @@ impl Mmu {
             0x8000 | 0x9000 => self.ppu.vram[(addr & 0x1fff) as usize],
 
             // External RAM (8 KB)
-            0xa000 | 0xb000 => self.eram[(addr & 0x1fff) as usize],
+            0xa000 | 0xb000 => self.rom.read(addr),
 
             // Working RAM (8 KB)
             0xc000 | 0xd000 => self.ram[(addr & 0x1fff) as usize],
@@ -123,13 +119,13 @@ impl Mmu {
                             0x00 => self.pad.read(addr),
                             0x04..=0x07 => self.timer.read(addr),
                             _ => {
-                                println!("Reading from unknown IO control 0x{:04x}", addr);
+                                debugln!("Reading from unknown IO control 0x{:04x}", addr);
                                 0x00
                             }
                         },
                         0x40 | 0x50 | 0x60 | 0x70 => self.ppu.read(addr),
                         _ => {
-                            println!("Reading from unknown IO control 0x{:04x}", addr);
+                            debugln!("Reading from unknown IO control 0x{:04x}", addr);
                             0x00
                         }
                     },
@@ -144,18 +140,13 @@ impl Mmu {
     pub fn write(&mut self, addr: u16, value: u8) {
         match addr & 0xf000 {
             // BOOT (256 B) + ROM0 (4 KB/16 KB)
-            0x0000 => println!("Writing to ROM 0 at 0x{:04x}", addr),
+            0x0000 => self.rom.write(addr, value),
 
             // ROM 0 (12 KB/16 KB)
-            0x1000 | 0x2000 | 0x3000 => match addr {
-                0x2000 => (),
-                _ => panic!("Writing to ROM 0 at 0x{:04x}", addr),
-            },
+            0x1000 | 0x2000 | 0x3000 => self.rom.write(addr, value),
 
             // ROM 1 (Unbanked) (16 KB)
-            0x4000 | 0x5000 | 0x6000 | 0x7000 => {
-                panic!("Writing to ROM 1 at 0x{:04x}", addr);
-            }
+            0x4000 | 0x5000 | 0x6000 | 0x7000 => self.rom.write(addr, value),
 
             // Graphics: VRAM (8 KB)
             0x8000 | 0x9000 => {
@@ -166,9 +157,7 @@ impl Mmu {
             }
 
             // External RAM (8 KB)
-            0xa000 | 0xb000 => {
-                self.eram[(addr & 0x1fff) as usize] = value;
-            }
+            0xa000 | 0xb000 => self.rom.write(addr, value),
 
             // Working RAM (8 KB)
             0xc000 | 0xd000 => self.ram[(addr & 0x1fff) as usize] = value,
@@ -198,14 +187,14 @@ impl Mmu {
                             0x00 => match addr & 0x00ff {
                                 0x00 => self.pad.write(addr, value),
                                 0x04..=0x07 => self.timer.write(addr, value),
-                                _ => println!("Writing to unknown IO control 0x{:04x}", addr),
+                                _ => debugln!("Writing to unknown IO control 0x{:04x}", addr),
                             },
                             0x40 | 0x60 | 0x70 => {
                                 match addr & 0x00ff {
                                     0x0046 => {
                                         // @todo must increment the cycle count by 160
                                         // and make this a separated dma.rs file
-                                        println!("Going to start DMA transfer to 0x{:x}00", value);
+                                        debugln!("Going to start DMA transfer to 0x{:x}00", value);
                                         let data = self.read_many((value as u16) << 8, 160);
                                         self.write_many(0xfe00, &data);
                                     }
@@ -214,16 +203,16 @@ impl Mmu {
                             }
                             0x50 => match addr & 0x00ff {
                                 0x50 => self.boot_active = false,
-                                _ => println!("Writing to unknown IO control 0x{:04x}", addr),
+                                _ => debugln!("Writing to unknown IO control 0x{:04x}", addr),
                             },
-                            _ => println!("Writing to unknown IO control 0x{:04x}", addr),
+                            _ => debugln!("Writing to unknown IO control 0x{:04x}", addr),
                         }
                     }
                 },
-                addr => panic!("Writing in unknown location 0x{:04x}", addr),
+                addr => panic!("Writing to unknown location 0x{:04x}", addr),
             },
 
-            addr => panic!("Writing in unknown location 0x{:04x}", addr),
+            addr => panic!("Writing to unknown location 0x{:04x}", addr),
         }
     }
 

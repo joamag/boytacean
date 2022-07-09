@@ -1,6 +1,7 @@
 use core::panic;
 
 use crate::{
+    debugln,
     inst::{EXTENDED, INSTRUCTIONS},
     mmu::Mmu,
     pad::Pad,
@@ -47,12 +48,12 @@ impl Cpu {
             }
         }
 
-        println!(
+        debugln!(
             "Implemented {}/{} instructions",
             implemented,
             INSTRUCTIONS.len()
         );
-        println!(
+        debugln!(
             "Implemented {}/{} extended instructions",
             implemented_ext,
             EXTENDED.len()
@@ -122,7 +123,7 @@ impl Cpu {
         if self.ime {
             // @todo aggregate all of this interrupts in the MMU
             if (self.mmu.ie & 0x01 == 0x01) && self.mmu.ppu().int_vblank() {
-                println!("Going to run V-Blank interrupt handler (0x40)");
+                debugln!("Going to run V-Blank interrupt handler (0x40)");
 
                 self.disable_int();
                 self.push_word(pc);
@@ -142,7 +143,7 @@ impl Cpu {
             }
             // @todo aggregate the handling of these interrupts
             else if (self.mmu.ie & 0x04 == 0x04) && self.mmu.timer().int_tima() {
-                println!("Going to run Timer interrupt handler (0x50)");
+                debugln!("Going to run Timer interrupt handler (0x50)");
 
                 self.disable_int();
                 self.push_word(pc);
@@ -189,11 +190,14 @@ impl Cpu {
 
         if *instruction_str == "! UNIMP !" || *instruction_str == "HALT" {
             if *instruction_str == "HALT" {
-                println!("HALT with IE=0x{:02x} IME={}", self.mmu.ie, self.ime);
+                debugln!("HALT with IE=0x{:02x} IME={}", self.mmu.ie, self.ime);
             }
-            println!(
+            debugln!(
                 "{}\t(0x{:02x})\t${:04x} {}",
-                instruction_str, opcode, pc, is_prefix
+                instruction_str,
+                opcode,
+                pc,
+                is_prefix
             );
         }
 

@@ -2,6 +2,7 @@ pub mod cpu;
 pub mod data;
 pub mod gb;
 pub mod inst;
+pub mod macros;
 pub mod mmu;
 pub mod pad;
 pub mod ppu;
