@@ -1,16 +1,14 @@
+pub mod data;
+
 use boytacean::{
     gb::GameBoy,
     pad::PadKey,
     ppu::{DISPLAY_HEIGHT, DISPLAY_WIDTH},
-    util::read_file,
 };
 use sdl2::{
-    event::Event, image::LoadSurface, keyboard::Keycode, pixels::PixelFormatEnum, rwops::RWops,
-    surface::Surface, sys::image, video::Window, AudioSubsystem, EventPump, TimerSubsystem,
-    VideoSubsystem,
+    event::Event, keyboard::Keycode, pixels::PixelFormatEnum, rwops::RWops, surface::Surface,
+    sys::image, video::Window, AudioSubsystem, EventPump, TimerSubsystem, VideoSubsystem,
 };
-
-pub mod data;
 
 /// The base title to be used in the window.
 static TITLE: &'static str = "Boytacean";
@@ -72,7 +70,8 @@ fn main() {
 
     // updates the icon of the window to reflect the image
     // and style of the emulator
-    graphics.window.set_icon(surface_from_bytes(&data::ICON));
+    let surface = surface_from_bytes(&data::ICON);
+    graphics.window.set_icon(&surface);
 
     let mut canvas = graphics.window.into_canvas().accelerated().build().unwrap();
     canvas.clear();
@@ -99,7 +98,8 @@ fn main() {
     //game_boy.load_rom_file("../../res/roms.prop/dr_mario.gb");
     //game_boy.load_rom_file("../../res/roms.prop/alleyway.gb");
     //game_boy.load_rom_file("../../res/roms.prop/super_mario.gb");
-    game_boy.load_rom_file("../../res/roms.prop/super_mario_2.gb");
+    let rom = game_boy.load_rom_file("../../res/roms.prop/super_mario_2.gb");
+    println!("{}", rom);
 
     //game_boy.load_rom_file("../../res/roms/firstwhite.gb");
     //game_boy.load_rom_file("../../res/roms/opus5.gb");

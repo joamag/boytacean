@@ -242,6 +242,10 @@ impl Mmu {
         self.ram[addr as usize..addr as usize + buffer.len()].clone_from_slice(buffer);
     }
 
+    pub fn rom(&mut self) -> &mut Cartridge {
+        &mut self.rom
+    }
+
     pub fn set_rom(&mut self, rom: Cartridge) {
         self.rom = rom;
     }

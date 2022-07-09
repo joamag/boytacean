@@ -69,14 +69,15 @@ impl GameBoy {
         self.timer().clock(cycles)
     }
 
-    pub fn load_rom(&mut self, data: &[u8]) {
+    pub fn load_rom(&mut self, data: &[u8]) -> &Cartridge {
         let rom = Cartridge::from_data(data);
         self.mmu().set_rom(rom);
+        self.mmu().rom()
     }
 
-    pub fn load_rom_file(&mut self, path: &str) {
+    pub fn load_rom_file(&mut self, path: &str) -> &Cartridge {
         let data = read_file(path);
-        self.load_rom(&data);
+        self.load_rom(&data)
     }
 
     pub fn load_boot(&mut self, data: &[u8]) {
