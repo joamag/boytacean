@@ -114,6 +114,7 @@ impl Cpu {
         // of magnitude
         if self.halted {
             if ((self.mmu.ie & 0x01 == 0x01) && self.mmu.ppu().int_vblank())
+                || ((self.mmu.ie & 0x02 == 0x02) && self.mmu.ppu().int_stat())
                 || ((self.mmu.ie & 0x04 == 0x04) && self.mmu.timer().int_tima())
             {
                 self.halted = false;
@@ -132,6 +133,26 @@ impl Cpu {
                 // acknowledges that the V-Blank interrupt has been
                 // properly handled
                 self.mmu.ppu().ack_vblank();
+
+                // in case the CPU is currently halted waiting
+                // for an interrupt, releases it
+                if self.halted {
+                    self.halted = false;
+                }
+
+                return 16;
+            }
+            // @todo aggregate the handling of these interrupts
+            else if (self.mmu.ie & 0x02 == 0x02) && self.mmu.ppu().int_stat() {
+                debugln!("Going to run LCD STAT interrupt handler (0x48)");
+
+                self.disable_int();
+                self.push_word(pc);
+                self.pc = 0x48;
+
+                // acknowledges that the STAT interrupt has been
+                // properly handled
+                self.mmu.ppu().ack_stat();
 
                 // in case the CPU is currently halted waiting
                 // for an interrupt, releases it

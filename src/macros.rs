@@ -11,5 +11,5 @@ macro_rules! debugln {
 macro_rules! debugln {
     ($($rest:tt)*) => {
         ()
-    }
+    };
 }

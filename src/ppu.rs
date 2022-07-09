@@ -231,8 +231,12 @@ pub struct Ppu {
     stat_lyc: bool,
 
     // Boolean value set when the V-Blank interrupt should be handled
-    // by the next CPU clock.
+    // by the next CPU clock operation.
     int_vblank: bool,
+
+    // Boolean value when the LCD STAT interrupt should be handled by
+    // the next CPU clock operation.
+    int_stat: bool,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -284,6 +288,7 @@ impl Ppu {
             stat_oam: false,
             stat_lyc: false,
             int_vblank: false,
+            int_stat: false,
         }
     }
 
@@ -315,6 +320,7 @@ impl Ppu {
         self.stat_oam = false;
         self.stat_lyc = false;
         self.int_vblank = false;
+        self.int_stat = false;
     }
 
     pub fn clock(&mut self, cycles: u8) {
@@ -326,7 +332,8 @@ impl Ppu {
             PpuMode::OamRead => {
                 if self.mode_clock >= 80 {
                     self.mode = PpuMode::VramRead;
-                    self.mode_clock = self.mode_clock - 80;
+                    self.mode_clock -= 80;
+                    self.update_stat()
                 }
             }
             PpuMode::VramRead => {
@@ -334,7 +341,8 @@ impl Ppu {
                     self.render_line();
 
                     self.mode = PpuMode::HBlank;
-                    self.mode_clock = self.mode_clock - 172;
+                    self.mode_clock -= 172;
+                    self.update_stat()
                 }
             }
             PpuMode::HBlank => {
@@ -352,7 +360,8 @@ impl Ppu {
                         self.mode = PpuMode::OamRead;
                     }
 
-                    self.mode_clock = self.mode_clock - 204;
+                    self.mode_clock -= 204;
+                    self.update_stat()
                 }
             }
             PpuMode::VBlank => {
@@ -367,7 +376,8 @@ impl Ppu {
                         self.ly = 0;
                     }
 
-                    self.mode_clock = self.mode_clock - 456;
+                    self.mode_clock -= 456;
+                    self.update_stat()
                 }
             }
         }
@@ -387,10 +397,10 @@ impl Ppu {
                 value
             }
             0x0041 => {
-                let value = if self.stat_hblank { 0x04 } else { 0x00 }
-                    | if self.stat_vblank { 0x08 } else { 0x00 }
-                    | if self.stat_oam { 0x10 } else { 0x00 }
-                    | if self.stat_lyc { 0x20 } else { 0x00 }
+                let value = if self.stat_hblank { 0x08 } else { 0x00 }
+                    | if self.stat_vblank { 0x10 } else { 0x00 }
+                    | if self.stat_oam { 0x20 } else { 0x00 }
+                    | if self.stat_lyc { 0x40 } else { 0x00 }
                     | if self.lyc == self.ly { 0x04 } else { 0x00 }
                     | (self.mode as u8 & 0x03);
                 value
@@ -423,10 +433,10 @@ impl Ppu {
                 }
             }
             0x0041 => {
-                self.stat_hblank = value & 0x04 == 0x04;
-                self.stat_vblank = value & 0x08 == 0x08;
-                self.stat_oam = value & 0x10 == 0x10;
-                self.stat_lyc = value & 0x20 == 0x20;
+                self.stat_hblank = value & 0x08 == 0x08;
+                self.stat_vblank = value & 0x10 == 0x10;
+                self.stat_oam = value & 0x20 == 0x20;
+                self.stat_lyc = value & 0x40 == 0x40;
             }
             0x0042 => self.scy = value,
             0x0043 => self.scx = value,
@@ -465,10 +475,10 @@ impl Ppu {
                 }
             }
             0x004a => {
-                debugln!("Writing to $FF4A - WY (Window Y Position) (R/W)")
+                println!("Writing to $FF4A - WY (Window Y Position) (R/W)")
             }
             0x004b => {
-                debugln!("Writing to $FF4B - WX (Window X Position + 7) (R/W)")
+                println!("Writing to $FF4B - WX (Window X Position + 7) (R/W)")
             }
             0x007f => (),
             addr => panic!("Writing in unknown PPU location 0x{:04x}", addr),
@@ -509,6 +519,18 @@ impl Ppu {
 
     pub fn ack_vblank(&mut self) {
         self.set_int_vblank(false);
+    }
+
+    pub fn int_stat(&self) -> bool {
+        self.int_stat
+    }
+
+    pub fn set_int_stat(&mut self, value: bool) {
+        self.int_stat = value;
+    }
+
+    pub fn ack_stat(&mut self) {
+        self.set_int_stat(false);
     }
 
     /// Fills the frame buffer with pixels of the provided color,
@@ -596,13 +618,19 @@ impl Ppu {
     }
 
     fn render_background(&mut self) {
+        // calculates the row offset for the tile by using the current line
+        // index an the SCY (scroll Y) divided by 8 (as the tiles are 8x8 pixels),
+        // on top of that ensures that the result is modulus 32 meaning that the
+        // drawing wraps around the Y axis
+        let row_offset = (((self.ly + self.scy) & 0xff) >> 3) % 32;
+
         // obtains the base address of the background map using the bg map flag
         // that control which background map is going to be used
         let mut map_offset: usize = if self.bg_map { 0x1c00 } else { 0x1800 };
 
-        // increments the offset by the number of lines and the SCY (scroll Y)
-        // divided by 8 (as the tiles are 8x8 pixels)
-        map_offset += ((((self.ly + self.scy) & 0xff) >> 3) as usize) * 32;
+        // increments the map offset by the row offset multiplied by the number
+        // of tiles in each row (32)
+        map_offset += row_offset as usize * 32;
 
         // calculates the sprite line offset by using the SCX register
         // shifted by 3 meaning that the tiles are 8x8
@@ -661,7 +689,7 @@ impl Ppu {
 
                 // calculates the new line tile offset making sure that
                 // the maximum of 32 is not overflown
-                line_offset = (line_offset + 1) & 31;
+                line_offset = (line_offset + 1) % 32;
 
                 // calculates the tile index nad makes sure the value
                 // takes into consideration the bg tile value
@@ -741,9 +769,15 @@ impl Ppu {
         }
     }
 
-    /// Obtains the current level of the LCD interrupt by
+    fn update_stat(&mut self) {
+        if self.stat_level() {
+            self.int_stat = true;
+        }
+    }
+
+    /// Obtains the current level of the LCD STAT interrupt by
     /// checking the current PPU state in various sections.
-    fn interrupt_level(&self) -> bool {
+    fn stat_level(&self) -> bool {
         self.stat_lyc && self.lyc == self.ly
             || self.stat_oam && self.mode == PpuMode::OamRead
             || self.stat_vblank && self.mode == PpuMode::VBlank

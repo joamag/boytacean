@@ -39,7 +39,26 @@ pub enum RomSize {
     Size512K,
     Size1M,
     Size2M,
+    Size4M,
+    Size8M,
     SizeUnknown,
+}
+
+impl RomSize {
+    pub fn rom_banks(&self) -> u16 {
+        match self {
+            RomSize::Size32K => 2,
+            RomSize::Size64K => 4,
+            RomSize::Size128K => 8,
+            RomSize::Size256K => 16,
+            RomSize::Size512K => 32,
+            RomSize::Size1M => 64,
+            RomSize::Size2M => 128,
+            RomSize::Size4M => 256,
+            RomSize::Size8M => 512,
+            RomSize::SizeUnknown => 0,
+        }
+    }
 }
 
 impl Display for RomSize {
@@ -52,6 +71,8 @@ impl Display for RomSize {
             RomSize::Size512K => "512 KB",
             RomSize::Size1M => "1 MB",
             RomSize::Size2M => "2 MB",
+            RomSize::Size4M => "4 MB",
+            RomSize::Size8M => "8 MB",
             RomSize::SizeUnknown => "Unknown",
         };
         write!(f, "{}", str)
@@ -180,6 +201,8 @@ impl Cartridge {
             0x04 => RomSize::Size512K,
             0x05 => RomSize::Size1M,
             0x06 => RomSize::Size2M,
+            0x07 => RomSize::Size4M,
+            0x08 => RomSize::Size8M,
             _ => RomSize::SizeUnknown,
         }
     }
@@ -278,24 +301,20 @@ pub static MBC1: Mbc = Mbc {
                 // @todo RAM enable
             }
             0x2000 | 0x3000 => {
-                let mut rom_bank = value & 0x1f;
+                // @todo this is slow and must be pre-computed in cartridge
+                let mut rom_bank = value & (rom.rom_size().rom_banks() * 2 - 1) as u8;
                 if rom_bank == 0 {
                     rom_bank = 1;
                 }
                 rom.set_rom_bank(rom_bank);
             }
-            0x6000 | 0x7000 => {
-                let mut rom_bank = value & 0x1f;
-                if rom_bank == 0 {
-                    rom_bank = 1;
-                }
-                rom.set_rom_bank(rom_bank);
-            }
+            0x6000 | 0x7000 => {}
             _ => panic!("Writing to unknown Cartridge ROM location 0x{:04x}", addr),
         }
     },
-    read_ram: |rom: &Cartridge, addr: u16| -> u8 { 0x00 },
-    write_ram: |_rom: &mut Cartridge, addr: u16, _value: u8| {
+    read_ram: |rom: &Cartridge, addr: u16| -> u8 { rom.ram_data[(addr & 0x1fff) as usize] },
+    write_ram: |rom: &mut Cartridge, addr: u16, value: u8| {
         debugln!("Writing to ERAM at 0x{:04x}", addr);
+        rom.ram_data[(addr & 0x1fff) as usize] = value;
     },
 };

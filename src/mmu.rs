@@ -178,6 +178,7 @@ impl Mmu {
                 0xf00 => match addr & 0x00ff {
                     0x0f => {
                         self.ppu.set_int_vblank(value & 0x01 == 0x01);
+                        self.ppu.set_int_stat(value & 0x02 == 0x02);
                         self.timer.set_int_tima(value & 0x04 == 0x04);
                     }
                     0x80..=0xfe => self.ppu.hram[(addr & 0x007f) as usize] = value,
