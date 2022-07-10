@@ -661,7 +661,7 @@ fn rrca(cpu: &mut Cpu) {
     cpu.set_sub(false);
     cpu.set_zero(false);
     cpu.set_half_carry(false);
-    cpu.set_carry(carry != 0x0);
+    cpu.set_carry(carry == 0x1);
 }
 
 fn stop(cpu: &mut Cpu) {
@@ -769,7 +769,7 @@ fn ld_e_u8(cpu: &mut Cpu) {
 fn rra(cpu: &mut Cpu) {
     let carry = cpu.get_carry();
 
-    cpu.set_carry(cpu.a & 0x01 == 0x01);
+    cpu.set_carry((cpu.a & 0x1) == 0x1);
 
     cpu.a = cpu.a >> 1 | ((carry as u8) << 7);
 
@@ -846,7 +846,7 @@ fn daa(cpu: &mut Cpu) {
     let res = if cpu.get_sub() {
         a.wrapping_sub(adjust)
     } else {
-        if a & 0x0F > 0x09 {
+        if a & 0x0f > 0x09 {
             adjust |= 0x06;
         }
 
@@ -3145,7 +3145,7 @@ fn res(value: u8, bit: u8) -> u8 {
 fn rl(cpu: &mut Cpu, value: u8) -> u8 {
     let carry = cpu.get_carry();
 
-    cpu.set_carry(value & 0x80 == 0x80);
+    cpu.set_carry((value & 0x80) == 0x80);
 
     let result = (value << 1) | carry as u8;
 
@@ -3157,7 +3157,7 @@ fn rl(cpu: &mut Cpu, value: u8) -> u8 {
 }
 
 fn rlc(cpu: &mut Cpu, value: u8) -> u8 {
-    cpu.set_carry(value & 0x80 == 0x80);
+    cpu.set_carry((value & 0x80) == 0x80);
 
     let result = (value << 1) | (value >> 7);
 
@@ -3174,7 +3174,7 @@ fn rlc(cpu: &mut Cpu, value: u8) -> u8 {
 fn rr(cpu: &mut Cpu, value: u8) -> u8 {
     let carry = cpu.get_carry();
 
-    cpu.set_carry(value & 0x01 == 0x01);
+    cpu.set_carry((value & 0x1) == 0x1);
 
     let result = (value >> 1) | ((carry as u8) << 7);
 
@@ -3186,7 +3186,7 @@ fn rr(cpu: &mut Cpu, value: u8) -> u8 {
 }
 
 fn rrc(cpu: &mut Cpu, value: u8) -> u8 {
-    cpu.set_carry(value & 0x01 == 0x01);
+    cpu.set_carry((value & 0x1) == 0x1);
 
     let result = (value >> 1) | (value << 7);
 
@@ -3262,7 +3262,7 @@ fn add_set_flags(cpu: &mut Cpu, first: u8, second: u8) -> u8 {
     cpu.set_sub(false);
     cpu.set_zero(result_b == 0);
     cpu.set_half_carry((first ^ second ^ result) & 0x10 == 0x10);
-    cpu.set_carry(result & 0x100 == 0x100);
+    cpu.set_carry((result & 0x100) == 0x100);
 
     result_b
 }
@@ -3278,7 +3278,7 @@ fn add_carry_set_flags(cpu: &mut Cpu, first: u8, second: u8) -> u8 {
     cpu.set_sub(false);
     cpu.set_zero(result_b == 0);
     cpu.set_half_carry((first ^ second ^ result) & 0x10 == 0x10);
-    cpu.set_carry(result & 0x100 == 0x100);
+    cpu.set_carry((result & 0x100) == 0x100);
 
     result_b
 }
@@ -3293,7 +3293,7 @@ fn sub_set_flags(cpu: &mut Cpu, first: u8, second: u8) -> u8 {
     cpu.set_sub(true);
     cpu.set_zero(result_b == 0);
     cpu.set_half_carry((first ^ second ^ result) & 0x10 == 0x10);
-    cpu.set_carry(result & 0x100 == 0x100);
+    cpu.set_carry((result & 0x100) == 0x100);
 
     result_b
 }
@@ -3309,7 +3309,7 @@ fn sub_carry_set_flags(cpu: &mut Cpu, first: u8, second: u8) -> u8 {
     cpu.set_sub(true);
     cpu.set_zero(result_b == 0);
     cpu.set_half_carry((first ^ second ^ result) & 0x10 == 0x10);
-    cpu.set_carry(result & 0x100 == 0x100);
+    cpu.set_carry((result & 0x100) == 0x100);
 
     result_b
 }
@@ -3321,7 +3321,7 @@ fn add_u16_u16(cpu: &mut Cpu, first: u16, second: u16) -> u16 {
 
     cpu.set_sub(false);
     cpu.set_half_carry((first ^ second ^ result) & 0x1000 == 0x1000);
-    cpu.set_carry(result & 0x10000 == 0x10000);
+    cpu.set_carry((result & 0x10000) == 0x10000);
 
     result as u16
 }
@@ -3343,7 +3343,7 @@ fn sla(cpu: &mut Cpu, value: u8) -> u8 {
     cpu.set_sub(false);
     cpu.set_zero(result == 0);
     cpu.set_half_carry(false);
-    cpu.set_carry(value & 0x80 == 0x80);
+    cpu.set_carry((value & 0x80) == 0x80);
 
     result
 }
@@ -3354,7 +3354,7 @@ fn sra(cpu: &mut Cpu, value: u8) -> u8 {
     cpu.set_sub(false);
     cpu.set_zero(result == 0);
     cpu.set_half_carry(false);
-    cpu.set_carry(value & 0x01 == 0x01);
+    cpu.set_carry((value & 0x1) == 0x1);
 
     result
 }
@@ -3365,7 +3365,7 @@ fn srl(cpu: &mut Cpu, value: u8) -> u8 {
     cpu.set_sub(false);
     cpu.set_zero(result == 0);
     cpu.set_half_carry(false);
-    cpu.set_carry(value & 0x01 == 0x01);
+    cpu.set_carry((value & 0x1) == 0x1);
 
     result
 }
