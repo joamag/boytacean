@@ -110,7 +110,9 @@ impl Mmu {
                 0xf00 => match addr & 0x00ff {
                     0x0f => {
                         let value = if self.ppu.int_vblank() { 0x01 } else { 0x00 }
-                            | if self.timer.int_tima() { 0x04 } else { 0x00 };
+                            | if self.ppu.int_stat() { 0x02 } else { 0x00 }
+                            | if self.timer.int_tima() { 0x04 } else { 0x00 }
+                            | if self.pad.int_pad() { 0x10 } else { 0x00 };
                         value
                     }
                     0x80..=0xfe => self.ppu.hram[(addr & 0x007f) as usize],
@@ -181,6 +183,7 @@ impl Mmu {
                         self.ppu.set_int_vblank(value & 0x01 == 0x01);
                         self.ppu.set_int_stat(value & 0x02 == 0x02);
                         self.timer.set_int_tima(value & 0x04 == 0x04);
+                        self.pad.set_int_pad(value & 0x10 == 0x10);
                     }
                     0x80..=0xfe => self.ppu.hram[(addr & 0x007f) as usize] = value,
                     0xff => self.ie = value,
