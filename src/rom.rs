@@ -349,10 +349,12 @@ pub static MBC1: Mbc = Mbc {
                 rom.set_rom_bank(rom_bank);
             }
             0x4000 | 0x5000 => {
-                println!("SETTING UPPER BITS {}", value);
+                let ram_bank = value & 0x03;
+                rom.set_ram_bank(ram_bank);
             }
+            // ROM mode selection
             0x6000 | 0x7000 => {
-                println!("SETTING MODE {}", value);
+                debugln!("SETTING MODE {}", value);
             }
             _ => panic!("Writing to unknown Cartridge ROM location 0x{:04x}", addr),
         }
