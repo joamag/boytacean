@@ -159,14 +159,14 @@ fn main() {
     //let rom = game_boy.load_rom_file("../../res/roms.prop/dr_mario.gb");
     //let rom = game_boy.load_rom_file("../../res/roms.prop/alleyway.gb");
     //let rom = game_boy.load_rom_file("../../res/roms.prop/super_mario.gb");
-    let rom = game_boy.load_rom_file("../../res/roms.prop/super_mario_2.gb");
+    //let rom = game_boy.load_rom_file("../../res/roms.prop/super_mario_2.gb");
 
     //let rom = game_boy.load_rom_file("../../res/roms/firstwhite.gb");
     //let rom = game_boy.load_rom_file("../../res/roms/opus5.gb");
 
-    //let rom = game_boy.load_rom_file("../../res/roms/paradius/cpu/cpu_instrs.gb"); // CRASHED
+    //let rom = game_boy.load_rom_file("../../res/roms/paradius/cpu/cpu_instrs.gb"); // PASSED
     //let rom = game_boy.load_rom_file("../../res/roms/paradius/interrupt_time/interrupt_time.gb"); // FAILED
-    //let rom = game_boy.load_rom_file("../../res/roms/paradius/instr_timing/instr_timing.gb"); // FAILED
+    let rom = game_boy.load_rom_file("../../res/roms/paradius/instr_timing/instr_timing.gb"); // FAILED
     //let rom = game_boy.load_rom_file("../../res/roms/paradius/mem_timing/mem_timing.gb"); // NO FINISH
     //let rom = game_boy.load_rom_file("../../res/roms/paradius/cpu/01-special.gb"); // PASSED
     //let rom = game_boy.load_rom_file("../../res/roms/paradius/cpu/02-interrupts.gb"); // PASSED

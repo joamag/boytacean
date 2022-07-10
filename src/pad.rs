@@ -1,6 +1,8 @@
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
 
+use crate::warnln;
+
 #[derive(Clone, Copy, PartialEq)]
 pub enum PadSelection {
     Action,
@@ -77,7 +79,10 @@ impl Pad {
                 };
                 value
             }
-            addr => panic!("Reading from unknown Pad location 0x{:04x}", addr),
+            _ => {
+                warnln!("Reading from unknown Pad location 0x{:04x}", addr);
+                0xff
+            }
         }
     }
 
@@ -90,7 +95,7 @@ impl Pad {
                     PadSelection::Action
                 }
             }
-            addr => panic!("Writing to unknown Pad location 0x{:04x}", addr),
+            _ => warnln!("Writing to unknown Pad location 0x{:04x}", addr),
         }
     }
 

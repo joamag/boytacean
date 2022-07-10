@@ -7,6 +7,8 @@ use std::{
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
 
+use crate::warnln;
+
 pub const VRAM_SIZE: usize = 8192;
 pub const HRAM_SIZE: usize = 128;
 pub const OAM_SIZE: usize = 260;
@@ -419,7 +421,10 @@ impl Ppu {
             0x0045 => self.lyc,
             0x004a => self.wy,
             0x004b => self.wx,
-            addr => panic!("Reading from unknown PPU location 0x{:04x}", addr),
+            _ => {
+                warnln!("Reading from unknown PPU location 0x{:04x}", addr);
+                0xff
+            }
         }
     }
 
@@ -487,7 +492,7 @@ impl Ppu {
             0x004a => self.wy = value,
             0x004b => self.wx = value,
             0x007f => (),
-            addr => panic!("Writing in unknown PPU location 0x{:04x}", addr),
+            _ => warnln!("Writing in unknown PPU location 0x{:04x}", addr),
         }
     }
 
