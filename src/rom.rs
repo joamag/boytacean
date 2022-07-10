@@ -1,5 +1,8 @@
 use core::fmt;
-use std::fmt::{Display, Formatter};
+use std::{
+    cmp::max,
+    fmt::{Display, Formatter},
+};
 
 use crate::debugln;
 
@@ -257,6 +260,8 @@ impl Cartridge {
         self.ram_offset = 0x0000;
         self.set_mbc();
         self.allocate_ram();
+        self.set_rom_bank(1);
+        self.set_ram_bank(0);
     }
 
     fn set_mbc(&mut self) {
@@ -264,7 +269,8 @@ impl Cartridge {
     }
 
     fn allocate_ram(&mut self) {
-        self.ram_data = vec![0; self.ram_size().ram_banks() as usize * RAM_BANK_SIZE]
+        let ram_banks = max(self.ram_size().ram_banks(), 1);
+        self.ram_data = vec![0; ram_banks as usize * RAM_BANK_SIZE];
     }
 }
 
@@ -320,11 +326,12 @@ pub static MBC1: Mbc = Mbc {
     write_rom: |rom: &mut Cartridge, addr: u16, value: u8| {
         match addr & 0xf000 {
             0x0000 | 0x1000 => {
-                debugln!("RAM enable => {}", value);
+                println!("RAM enable => {}", value);
             }
             0x2000 | 0x3000 => {
                 // @todo this is slow and must be pre-computed in cartridge
-                let mut rom_bank = value & (rom.rom_size().rom_banks() * 2 - 1) as u8;
+                let mut rom_bank = value & 0x1f;
+                rom_bank = rom_bank & (rom.rom_size().rom_banks() * 2 - 1) as u8;
                 if rom_bank == 0 {
                     rom_bank = 1;
                 }
