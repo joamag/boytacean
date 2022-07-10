@@ -47,6 +47,7 @@ impl Mmu {
         self.boot_active = true;
         self.boot = [0u8; BOOT_SIZE];
         self.ram = [0u8; RAM_SIZE];
+        self.ie = 0x0;
     }
 
     pub fn ppu(&mut self) -> &mut Ppu {

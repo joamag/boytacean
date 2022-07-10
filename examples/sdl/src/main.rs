@@ -97,6 +97,12 @@ impl Emulator {
                         None => (),
                     },
 
+                    Event::DropFile { filename, .. } => {
+                        self.system.reset();
+                        self.system.load_boot_default();
+                        self.system.load_rom_file(&filename);
+                    }
+
                     _ => (),
                 }
             }

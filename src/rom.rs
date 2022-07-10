@@ -314,7 +314,7 @@ pub static NO_MBC: Mbc = Mbc {
             // ignores this address as Tetris and some other games write
             // to this address for some reason (probably MBC1 compatibility)
             0x2000 => (),
-            _ => panic!("Writing in unknown Cartridge ROM location 0x{:04x}", addr),
+            _ => panic!("Writing to unknown Cartridge ROM location 0x{:04x}", addr),
         };
     },
     read_ram: |rom: &Cartridge, addr: u16| -> u8 { rom.ram_data[(addr & 0x1fff) as usize] },
