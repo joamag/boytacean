@@ -9,14 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-* Support for drag and drop loading in SDL
-* SDL fixes related to timing
-* Support for drawing windows
-* Initial experimental support for MBC3 (for Pokemon Red/Blue)
+*
 
 ### Changed
 
 *
+
+### Fixed
+
+*
+
+## [0.2.0] - 2022-07-10
+
+### Added
+
+* Support for drag and drop loading in SDL
+* SDL fixes related to timing
+* Support for drawing windows
+* Initial experimental support for MBC3 (for Pokemon Red/Blue)
 
 ### Fixed
 
