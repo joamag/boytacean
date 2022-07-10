@@ -31,7 +31,7 @@ impl Timer {
         self.div_clock += cycles as u16;
         if self.div_clock >= 256 {
             self.div = self.div.wrapping_add(1);
-            self.div_clock = self.div_clock - 256;
+            self.div_clock -= 256;
         }
 
         if self.tima_enabled {
@@ -43,7 +43,7 @@ impl Timer {
                 }
 
                 self.tima = self.tima.wrapping_add(1);
-                self.tima_clock = self.tima_clock - self.tima_ratio;
+                self.tima_clock -= self.tima_ratio;
             }
         }
     }
@@ -75,7 +75,7 @@ impl Timer {
                     0x03 => self.tima_ratio = 256,
                     value => panic!("Invalid TAC value 0x{:02x}", value),
                 }
-                self.tima_enabled = value & 0x04 == 0x04;
+                self.tima_enabled = (value & 0x04) == 0x04;
             }
             _ => warnln!("Writing to unknown Timer location 0x{:04x}", addr),
         }

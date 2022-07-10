@@ -31,7 +31,7 @@ pub struct Pad {
     b: bool,
     a: bool,
     selection: PadSelection,
-    int_pad: bool
+    int_pad: bool,
 }
 
 impl Pad {
