@@ -1,3 +1,5 @@
+use crate::warnln;
+
 pub struct Timer {
     div: u8,
     tima: u8,
@@ -52,7 +54,10 @@ impl Timer {
             0x05 => self.tima,
             0x06 => self.tma,
             0x07 => self.tac,
-            addr => panic!("Reding from unknown Timer location 0x{:04x}", addr),
+            _ => {
+                warnln!("Reding from unknown Timer location 0x{:04x}", addr);
+                0xff
+            }
         }
     }
 
@@ -72,7 +77,7 @@ impl Timer {
                 }
                 self.tima_enabled = value & 0x04 == 0x04;
             }
-            addr => panic!("Writing to unknown Timer location 0x{:04x}", addr),
+            _ => panic!("Writing to unknown Timer location 0x{:04x}", addr),
         }
     }
 
