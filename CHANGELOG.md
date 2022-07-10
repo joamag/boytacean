@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 * Timer related issue, made test on inst timing pass
+* Clear first frame issue, with `first_frame` flag
 
 ## [0.1.1] - 2022-07-08
 

@@ -159,9 +159,9 @@ fn main() {
     //let rom = game_boy.load_rom_file("../../res/roms.prop/dr_mario.gb");
     //let rom = game_boy.load_rom_file("../../res/roms.prop/alleyway.gb");
     //let rom = game_boy.load_rom_file("../../res/roms.prop/super_mario.gb");
-    //let rom = game_boy.load_rom_file("../../res/roms.prop/super_mario_2.gb");
+    let rom = game_boy.load_rom_file("../../res/roms.prop/super_mario_2.gb");
 
-    let rom = game_boy.load_rom_file("../../res/roms/firstwhite.gb");
+    //let rom = game_boy.load_rom_file("../../res/roms/firstwhite.gb");
     //let rom = game_boy.load_rom_file("../../res/roms/opus5.gb");
 
     //let rom = game_boy.load_rom_file("../../res/roms/paradius/cpu/cpu_instrs.gb"); // PASSED

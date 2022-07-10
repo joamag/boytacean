@@ -165,10 +165,10 @@ pub struct Ppu {
     /// and used for background (tiles).
     palette: Palette,
 
-    // The palette that is going to be used for sprites/objects #0.
+    /// The palette that is going to be used for sprites/objects #0.
     palette_obj_0: Palette,
 
-    // The palette that is going to be used for sprites/objects #1.
+    /// The palette that is going to be used for sprites/objects #1.
     palette_obj_1: Palette,
 
     /// The scroll Y register that controls the Y offset
@@ -192,8 +192,8 @@ pub struct Ppu {
     /// the 154 lines plus 10 extra v-blank lines.
     ly: u8,
 
-    // The line compare register that is going to be used
-    // in the STATE and associated interrupts.
+    /// The line compare register that is going to be used
+    /// in the STATE and associated interrupts.
     lyc: u8,
 
     /// The current execution mode of the PPU, should change
@@ -222,28 +222,32 @@ pub struct Ppu {
     /// negative based indexes are going to be used.
     bg_tile: bool,
 
-    // Controls if the window is meant to be drawn.
+    /// Controls if the window is meant to be drawn.
     switch_window: bool,
 
-    // Controls the offset of the map that is going to be drawn
-    // for the window section of the screen.
+    /// Controls the offset of the map that is going to be drawn
+    /// for the window section of the screen.
     window_map: bool,
 
     /// Flag that controls if the LCD screen is ON and displaying
     /// content.
     switch_lcd: bool,
 
+    /// Flag that controls if the frame currently in rendering is the
+    /// first one, preventing actions.
+    first_frame: bool,
+
     stat_hblank: bool,
     stat_vblank: bool,
     stat_oam: bool,
     stat_lyc: bool,
 
-    // Boolean value set when the V-Blank interrupt should be handled
-    // by the next CPU clock operation.
+    /// Boolean value set when the V-Blank interrupt should be handled
+    /// by the next CPU clock operation.
     int_vblank: bool,
 
-    // Boolean value when the LCD STAT interrupt should be handled by
-    // the next CPU clock operation.
+    /// Boolean value when the LCD STAT interrupt should be handled by
+    /// the next CPU clock operation.
     int_stat: bool,
 }
 
@@ -293,6 +297,7 @@ impl Ppu {
             switch_window: false,
             window_map: false,
             switch_lcd: false,
+            first_frame: true,
             stat_hblank: false,
             stat_vblank: false,
             stat_oam: false,
@@ -390,6 +395,7 @@ impl Ppu {
                     if self.ly == 154 {
                         self.mode = PpuMode::OamRead;
                         self.ly = 0;
+                        self.first_frame = false;
                     }
 
                     self.mode_clock -= 456;
@@ -450,13 +456,12 @@ impl Ppu {
                 // to clear the screen, this is the expected
                 // behaviour for this specific situation
                 if !self.switch_lcd {
-                    self.mode = PpuMode::HBlank;
+                    self.mode = PpuMode::OamRead;
                     self.mode_clock = 0;
                     self.ly = 0;
                     self.int_vblank = false;
                     self.int_stat = false;
-                    self.clear_frame_buffer();
-                } else {
+                    self.first_frame = true;
                     self.clear_frame_buffer();
                 }
             }
@@ -630,6 +635,9 @@ impl Ppu {
     }
 
     fn render_line(&mut self) {
+        if self.first_frame {
+            return;
+        }
         if self.switch_bg {
             self.render_map(self.bg_map, self.scx, self.scy, 0, 0);
         }
