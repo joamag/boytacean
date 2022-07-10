@@ -157,13 +157,15 @@ fn main() {
     game_boy.load_boot_default();
 
     //let rom = game_boy.load_rom_file("../../res/roms.prop/tetris.gb");
-    //let rom = game_boy.load_rom_file("../../res/roms.prop/dr_mario.gb");
+    let rom = game_boy.load_rom_file("../../res/roms.prop/dr_mario.gb");
     //let rom = game_boy.load_rom_file("../../res/roms.prop/alleyway.gb");
     //let rom = game_boy.load_rom_file("../../res/roms.prop/super_mario.gb");
     //let rom = game_boy.load_rom_file("../../res/roms.prop/super_mario_2.gb");
     //let rom = game_boy.load_rom_file("../../res/roms.prop/pokemon_red.gb");
-    let rom = game_boy.load_rom_file("../../res/roms.prop/pokemon_yellow.gb");
+    //let rom = game_boy.load_rom_file("../../res/roms.prop/pokemon_yellow.gb");
     //let rom = game_boy.load_rom_file("../../res/roms.prop/zelda.gb");
+    //let rom = game_boy.load_rom_file("../../res/roms.prop/django.gb");
+    //let rom = game_boy.load_rom_file("../../res/roms.prop/2048.gb");
 
     //let rom = game_boy.load_rom_file("../../res/roms/firstwhite.gb");
     //let rom = game_boy.load_rom_file("../../res/roms/opus5.gb");

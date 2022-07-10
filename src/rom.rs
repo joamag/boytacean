@@ -548,11 +548,7 @@ pub static MBC5: Mbc = Mbc {
             }
             // ROM bank selection
             0x2000 => {
-                let mut rom_bank = value & 0xff;
-                rom_bank = rom_bank & (rom.rom_bank_count * 2 - 1) as u8;
-                if rom_bank == 0 {
-                    rom_bank = 1;
-                }
+                let rom_bank = value & 0xff;
                 rom.set_rom_bank(rom_bank);
             }
             // RAM bank selection
