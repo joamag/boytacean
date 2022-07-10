@@ -769,6 +769,9 @@ impl Ppu {
         }
     }
 
+    /// Runs an update operation on the LCD STAT interrupt meaning
+    /// that the flag that control will be updated in case the conditions
+    /// required for the LCD STAT interrupt to be triggered are met.
     fn update_stat(&mut self) {
         if self.stat_level() {
             self.int_stat = true;

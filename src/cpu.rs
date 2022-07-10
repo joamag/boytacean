@@ -114,7 +114,7 @@ impl Cpu {
                     self.halted = false;
                 }
 
-                return 16;
+                return 20;
             }
             // @todo aggregate the handling of these interrupts
             else if (self.mmu.ie & 0x02 == 0x02) && self.mmu.ppu().int_stat() {
@@ -134,7 +134,7 @@ impl Cpu {
                     self.halted = false;
                 }
 
-                return 16;
+                return 20;
             }
             // @todo aggregate the handling of these interrupts
             else if (self.mmu.ie & 0x04 == 0x04) && self.mmu.timer().int_tima() {
@@ -154,7 +154,7 @@ impl Cpu {
                     self.halted = false;
                 }
 
-                return 16;
+                return 20;
             }
         }
 
