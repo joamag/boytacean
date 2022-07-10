@@ -443,7 +443,9 @@ pub static MBC1: Mbc = Mbc {
             }
             // ROM mode selection
             0x6000 | 0x7000 => {
-                unimplemented!("ROM mode selection for MBC1 is not implemented");
+                if value == 0x1 && rom.rom_bank_count > 32 {
+                    unimplemented!("Advanced ROM banking mode for MBC1 is not implemented");
+                }
             }
             _ => panic!("Writing to unknown Cartridge ROM location 0x{:04x}", addr),
         }
