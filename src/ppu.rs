@@ -456,7 +456,7 @@ impl Ppu {
                 // to clear the screen, this is the expected
                 // behaviour for this specific situation
                 if !self.switch_lcd {
-                    self.mode = PpuMode::OamRead;
+                    self.mode = PpuMode::HBlank;
                     self.mode_clock = 0;
                     self.ly = 0;
                     self.int_vblank = false;

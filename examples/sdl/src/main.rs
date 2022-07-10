@@ -69,7 +69,8 @@ impl Emulator {
         // iteration cycle
         let mut counter = 0u32;
 
-        // the main loop to execute the multiple machine clocks
+        // the main loop to execute the multiple machine clocks, in
+        // theory the emulator should keep an infinite loop here
         'main: loop {
             // increments the counter that will keep track
             // on the number of visual ticks since beginning
@@ -160,7 +161,8 @@ fn main() {
     //let rom = game_boy.load_rom_file("../../res/roms.prop/alleyway.gb");
     //let rom = game_boy.load_rom_file("../../res/roms.prop/super_mario.gb");
     //let rom = game_boy.load_rom_file("../../res/roms.prop/super_mario_2.gb");
-    let rom = game_boy.load_rom_file("../../res/roms.prop/pokemon_red.gb");
+    //let rom = game_boy.load_rom_file("../../res/roms.prop/pokemon_red.gb");
+    let rom = game_boy.load_rom_file("../../res/roms.prop/zelda.gb");
 
     //let rom = game_boy.load_rom_file("../../res/roms/firstwhite.gb");
     //let rom = game_boy.load_rom_file("../../res/roms/opus5.gb");
