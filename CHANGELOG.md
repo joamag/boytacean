@@ -9,12 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-* Support for 8x16 sprites
-* Support for MBC5, think Pokemon Yellow
+*
 
 ### Changed
 
 *
+
+### Fixed
+
+*
+
+## [0.3.0] - 2022-07-11
+
+### Added
+
+* Support for 8x16 sprites
+* Support for MBC5, think Pokemon Yellow
 
 ### Fixed
 
