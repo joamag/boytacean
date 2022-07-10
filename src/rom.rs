@@ -149,6 +149,10 @@ pub struct Cartridge {
     /// The offset address to the ERAM bank that is
     /// currently in use by the ROM cartridge.
     ram_offset: usize,
+
+    /// If the RAM access ia enabled, this flag allows
+    /// control of memory access to avoid corruption.
+    ram_enabled: bool,
 }
 
 impl Cartridge {
@@ -159,6 +163,7 @@ impl Cartridge {
             mbc: &NO_MBC,
             rom_offset: 0x4000,
             ram_offset: 0x0000,
+            ram_enabled: false,
         }
     }
 
@@ -317,9 +322,9 @@ pub static NO_MBC: Mbc = Mbc {
             _ => panic!("Writing to unknown Cartridge ROM location 0x{:04x}", addr),
         };
     },
-    read_ram: |rom: &Cartridge, addr: u16| -> u8 { rom.ram_data[(addr & 0x1fff) as usize] },
+    read_ram: |rom: &Cartridge, addr: u16| -> u8 { rom.ram_data[(addr - 0xa000) as usize] },
     write_ram: |rom: &mut Cartridge, addr: u16, value: u8| {
-        rom.ram_data[(addr & 0x1fff) as usize] = value;
+        rom.ram_data[(addr - 0xa000) as usize] = value;
     },
 };
 
@@ -336,9 +341,11 @@ pub static MBC1: Mbc = Mbc {
     },
     write_rom: |rom: &mut Cartridge, addr: u16, value: u8| {
         match addr & 0xf000 {
+            // RAM enabled flag
             0x0000 | 0x1000 => {
-                println!("RAM enable => {}", value);
+                rom.ram_enabled = (value & 0x0f) == 0x0a;
             }
+            // ROM bank selection 5 lower bits
             0x2000 | 0x3000 => {
                 let mut rom_bank = value & 0x1f;
                 // @todo this is slow and must be pre-computed in cartridge
@@ -348,6 +355,7 @@ pub static MBC1: Mbc = Mbc {
                 }
                 rom.set_rom_bank(rom_bank);
             }
+            // RAM bank selection and ROM bank selection upper bits
             0x4000 | 0x5000 => {
                 let ram_bank = value & 0x03;
                 rom.set_ram_bank(ram_bank);
@@ -360,9 +368,16 @@ pub static MBC1: Mbc = Mbc {
         }
     },
     read_ram: |rom: &Cartridge, addr: u16| -> u8 {
+        if !rom.ram_enabled {
+            return 0xff;
+        }
         rom.ram_data[rom.ram_offset + (addr - 0xa000) as usize]
     },
     write_ram: |rom: &mut Cartridge, addr: u16, value: u8| {
+        if !rom.ram_enabled {
+            debugln!("Attempt to write to ERAM while write protect is active");
+            return;
+        }
         rom.ram_data[rom.ram_offset + (addr - 0xa000) as usize] = value;
     },
 };
