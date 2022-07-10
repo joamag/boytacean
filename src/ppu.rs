@@ -16,6 +16,7 @@ pub const PALETTE_SIZE: usize = 4;
 pub const RGB_SIZE: usize = 3;
 pub const TILE_WIDTH: usize = 8;
 pub const TILE_HEIGHT: usize = 8;
+pub const TILE_DOUBLE_HEIGHT: usize = 16;
 
 /// The number of tiles that can be store in Game Boy's
 /// VRAM memory according to specifications.
@@ -410,7 +411,7 @@ impl Ppu {
             0x0040 => {
                 let value = if self.switch_bg { 0x01 } else { 0x00 }
                     | if self.switch_obj { 0x02 } else { 0x00 }
-                    | if self.obj_size { 0x02 } else { 0x00 }
+                    | if self.obj_size { 0x04 } else { 0x00 }
                     | if self.bg_map { 0x08 } else { 0x00 }
                     | if self.bg_tile { 0x10 } else { 0x00 }
                     | if self.switch_window { 0x20 } else { 0x00 }
@@ -642,7 +643,7 @@ impl Ppu {
             self.render_map(self.bg_map, self.scx, self.scy, 0, 0);
         }
         if self.switch_window {
-            self.render_map(self.window_map, 0, 0, self.wx - 7, self.wy);
+            self.render_map(self.window_map, 0, 0, self.wx, self.wy);
         }
         if self.switch_obj {
             self.render_objects();
@@ -704,7 +705,7 @@ impl Ppu {
             // in case the current pixel to be drawn for the line
             // is visible within the window draws it an increments
             // the X coordinate of the tile
-            if index as u8 >= wx {
+            if index as i16 >= wx as i16 - 7 {
                 // obtains the current pixel data from the tile and
                 // re-maps it according to the current palette
                 let pixel = self.tiles[tile_index].get(x, y);
@@ -757,11 +758,17 @@ impl Ppu {
             // under iteration to be checked for drawing
             let obj = self.obj_data[index];
 
+            let obj_height = if self.obj_size {
+                TILE_DOUBLE_HEIGHT
+            } else {
+                TILE_HEIGHT
+            };
+
             // verifies if the sprite is currently located at the
             // current line that is going to be drawn and skips it
             // in case it's not
             let is_contained =
-                (obj.y <= self.ly as i16) && ((obj.y + TILE_HEIGHT as i16) > self.ly as i16);
+                (obj.y <= self.ly as i16) && ((obj.y + obj_height as i16) > self.ly as i16);
             if !is_contained {
                 continue;
             }
@@ -779,13 +786,37 @@ impl Ppu {
             // point for the draw operation to be performed
             let mut frame_offset = (self.ly as usize * DISPLAY_WIDTH + obj.x as usize) * RGB_SIZE;
 
-            let tile_offset = self.ly as i16 - obj.y;
+            // the relative title offset should range from 0 to 7 in 8x8
+            // objects and from 0 to 15 in 8x16 objects
+            let mut tile_offset = self.ly as i16 - obj.y;
+
+            // saves some space for the reference to the tile that
+            // is going to be used in the current operation
+            let tile: &Tile;
+
+            // in case we're facing a 8x16 object and we must
+            // differentiate between the handling of the top tile
+            // and the bottom tile through bitwise manipulation
+            // of the tile index
+            if self.obj_size {
+                if tile_offset < 8 {
+                    tile = &self.tiles[obj.tile as usize & 0xfe];
+                } else {
+                    tile = &self.tiles[obj.tile as usize | 0x01];
+                    tile_offset = tile_offset - 8;
+                }
+            }
+            // otherwise we're facing a 8x8 sprite and we should grab
+            // the tile directly from the object's tile index
+            else {
+                tile = &self.tiles[obj.tile as usize];
+            }
 
             let tile_row: &[u8];
             if obj.yflip {
-                tile_row = self.tiles[obj.tile as usize].get_row((7 - tile_offset) as usize);
+                tile_row = tile.get_row((7 - tile_offset) as usize);
             } else {
-                tile_row = self.tiles[obj.tile as usize].get_row((tile_offset) as usize);
+                tile_row = tile.get_row((tile_offset) as usize);
             }
 
             for x in 0..TILE_WIDTH {

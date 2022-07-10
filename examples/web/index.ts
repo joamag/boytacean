@@ -541,9 +541,18 @@ const registerButtons = () => {
             );
             const videoBuff = new DataView(canvasImage.data.buffer);
 
-            const drawSprite = (
+            /**
+             * Draws the tile at the given index to the proper
+             * vertical offset in the given context and buffer.
+             * 
+             * @param index The index of the sprite to be drawn.
+             * @param format The pixel format of the sprite.
+             */
+            const drawTile = (
                 index: number,
-                format: PixelFormat = PixelFormat.RGB
+                context: CanvasRenderingContext2D,
+                buffer: DataView,
+                format: PixelFormat = PixelFormat.RGB,
             ) => {
                 const pixels = state.gameBoy.get_tile_buffer(index);
                 const line = Math.floor(index / 16);
@@ -558,7 +567,7 @@ const registerButtons = () => {
                         (pixels[index + 1] << 16) |
                         (pixels[index + 2] << 8) |
                         (format == PixelFormat.RGBA ? pixels[index + 3] : 0xff);
-                    videoBuff.setUint32(offset, color);
+                    buffer.setUint32(offset, color);
 
                     counter++;
                     if (counter == 8) {
@@ -568,11 +577,11 @@ const registerButtons = () => {
                         offset += PixelFormat.RGBA;
                     }
                 }
-                canvasTilesCtx.putImageData(canvasImage, 0, 0);
+                context.putImageData(canvasImage, 0, 0);
             };
 
-            for (let index = 0; index < 256; index++) {
-                drawSprite(index);
+            for (let index = 0; index < 384; index++) {
+                drawTile(index, canvasTilesCtx, videoBuff);
             }
 
             const vram = state.gameBoy.vram_eager();
