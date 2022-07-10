@@ -29,14 +29,14 @@ impl Timer {
 
     pub fn clock(&mut self, cycles: u8) {
         self.div_clock += cycles as u16;
-        if self.div_clock >= 256 {
+        while self.div_clock >= 256 {
             self.div = self.div.wrapping_add(1);
             self.div_clock -= 256;
         }
 
         if self.tima_enabled {
             self.tima_clock += cycles as u16;
-            if self.tima_clock >= self.tima_ratio {
+            while self.tima_clock >= self.tima_ratio {
                 if self.tima == 0xff {
                     self.int_tima = true;
                     self.tima = self.tma;
