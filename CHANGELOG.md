@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-*
+* Issue with MBC1 and Advanced ROM Banking Mode
 
 ## [0.2.0] - 2022-07-10
 
