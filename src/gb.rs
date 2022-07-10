@@ -69,17 +69,6 @@ impl GameBoy {
         self.timer().clock(cycles)
     }
 
-    pub fn load_rom(&mut self, data: &[u8]) -> &Cartridge {
-        let rom = Cartridge::from_data(data);
-        self.mmu().set_rom(rom);
-        self.mmu().rom()
-    }
-
-    pub fn load_rom_file(&mut self, path: &str) -> &Cartridge {
-        let data = read_file(path);
-        self.load_rom(&data)
-    }
-
     pub fn load_boot(&mut self, data: &[u8]) {
         self.cpu.mmu().write_boot(0x0000, data);
     }
@@ -160,5 +149,23 @@ impl GameBoy {
 
     pub fn frame_buffer(&mut self) -> &Box<[u8; FRAME_BUFFER_SIZE]> {
         &(self.ppu().frame_buffer)
+    }
+
+    pub fn load_rom(&mut self, data: &[u8]) -> &Cartridge {
+        let rom = Cartridge::from_data(data);
+        self.mmu().set_rom(rom);
+        self.mmu().rom()
+    }
+
+    pub fn load_rom_file(&mut self, path: &str) -> &Cartridge {
+        let data = read_file(path);
+        self.load_rom(&data)
+    }
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
+impl GameBoy {
+    pub fn load_rom_ws(&mut self, data: &[u8]) -> Cartridge {
+        self.load_rom(data).clone()
     }
 }

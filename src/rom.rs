@@ -6,9 +6,13 @@ use std::{
 
 use crate::debugln;
 
+#[cfg(feature = "wasm")]
+use wasm_bindgen::prelude::*;
+
 pub const ROM_BANK_SIZE: usize = 16384;
 pub const RAM_BANK_SIZE: usize = 8192;
 
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
 pub enum RomType {
     RomOnly = 0x00,
     Mbc1 = 0x01,
@@ -34,6 +38,7 @@ impl Display for RomType {
     }
 }
 
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
 pub enum RomSize {
     Size32K,
     Size64K,
@@ -82,6 +87,7 @@ impl Display for RomSize {
     }
 }
 
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
 pub enum RamSize {
     NoRam,
     Unused,
@@ -121,6 +127,8 @@ impl Display for RamSize {
     }
 }
 
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
+#[derive(Clone)]
 pub struct Cartridge {
     /// The complete data of the ROM cartridge, should
     /// include the complete set o ROM banks.
@@ -193,8 +201,48 @@ impl Cartridge {
         &self.rom_data[start..end]
     }
 
-    pub fn title(&self) -> &str {
-        std::str::from_utf8(&self.rom_data[0x0134..0x0143]).unwrap()
+    pub fn get_mbc(&self) -> &'static Mbc {
+        match self.rom_type() {
+            RomType::RomOnly => &NO_MBC,
+            RomType::Mbc1 => &MBC1,
+            RomType::Mbc1Ram => &MBC1,
+            RomType::Mbc1RamBattery => &MBC1,
+            _ => &NO_MBC,
+        }
+    }
+
+    pub fn set_rom_bank(&mut self, rom_bank: u8) {
+        self.rom_offset = rom_bank as usize * ROM_BANK_SIZE;
+    }
+
+    pub fn set_ram_bank(&mut self, ram_bank: u8) {
+        self.ram_offset = ram_bank as usize * RAM_BANK_SIZE;
+    }
+
+    fn set_data(&mut self, data: &[u8]) {
+        self.rom_data = data.to_vec();
+        self.rom_offset = 0x4000;
+        self.ram_offset = 0x0000;
+        self.set_mbc();
+        self.allocate_ram();
+        self.set_rom_bank(1);
+        self.set_ram_bank(0);
+    }
+
+    fn set_mbc(&mut self) {
+        self.mbc = self.get_mbc();
+    }
+
+    fn allocate_ram(&mut self) {
+        let ram_banks = max(self.ram_size().ram_banks(), 1);
+        self.ram_data = vec![0u8; ram_banks as usize * RAM_BANK_SIZE];
+    }
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
+impl Cartridge {
+    pub fn title(&self) -> String {
+        String::from(std::str::from_utf8(&self.rom_data[0x0134..0x0143]).unwrap())
     }
 
     pub fn rom_type(&self) -> RomType {
@@ -234,43 +282,6 @@ impl Cartridge {
             0x05 => RamSize::Size64K,
             _ => RamSize::SizeUnknown,
         }
-    }
-
-    pub fn get_mbc(&self) -> &'static Mbc {
-        match self.rom_type() {
-            RomType::RomOnly => &NO_MBC,
-            RomType::Mbc1 => &MBC1,
-            RomType::Mbc1Ram => &MBC1,
-            RomType::Mbc1RamBattery => &MBC1,
-            _ => &NO_MBC,
-        }
-    }
-
-    pub fn set_rom_bank(&mut self, rom_bank: u8) {
-        self.rom_offset = rom_bank as usize * ROM_BANK_SIZE;
-    }
-
-    pub fn set_ram_bank(&mut self, ram_bank: u8) {
-        self.ram_offset = ram_bank as usize * RAM_BANK_SIZE;
-    }
-
-    fn set_data(&mut self, data: &[u8]) {
-        self.rom_data = data.to_vec();
-        self.rom_offset = 0x4000;
-        self.ram_offset = 0x0000;
-        self.set_mbc();
-        self.allocate_ram();
-        self.set_rom_bank(1);
-        self.set_ram_bank(0);
-    }
-
-    fn set_mbc(&mut self) {
-        self.mbc = self.get_mbc();
-    }
-
-    fn allocate_ram(&mut self) {
-        let ram_banks = max(self.ram_size().ram_banks(), 1);
-        self.ram_data = vec![0; ram_banks as usize * RAM_BANK_SIZE];
     }
 }
 
@@ -329,8 +340,8 @@ pub static MBC1: Mbc = Mbc {
                 println!("RAM enable => {}", value);
             }
             0x2000 | 0x3000 => {
-                // @todo this is slow and must be pre-computed in cartridge
                 let mut rom_bank = value & 0x1f;
+                // @todo this is slow and must be pre-computed in cartridge
                 rom_bank = rom_bank & (rom.rom_size().rom_banks() * 2 - 1) as u8;
                 if rom_bank == 0 {
                     rom_bank = 1;

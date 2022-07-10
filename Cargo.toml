@@ -4,6 +4,7 @@ description = "A Game Boy emulator that is written in Rust."
 version = "0.1.1"
 authors = ["João Magalhães <joamag@gmail.com>"]
 license = "Apache-2.0"
+repository = "https://gitlab.stage.hive.pt/joamag/boytacean"
 keywords = ["gameboy", "emulator", "rust"]
 edition = "2018"
 

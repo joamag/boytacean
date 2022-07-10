@@ -104,20 +104,21 @@ fn main() {
     //game_boy.load_rom_file("../../res/roms/opus5.gb");
 
     //let rom = game_boy.load_rom_file("../../res/roms/paradius/cpu/cpu_instrs.gb"); // CRASHED
-    let rom = game_boy.load_rom_file("../../res/roms/paradius/interrupt_time/interrupt_time.gb"); // CRASHED
-                                                                                                  //let rom = game_boy.load_rom_file("../../res/roms/paradius/cpu/01-special.gb"); // PASSED
-                                                                                                  //let rom = game_boy.load_rom_file("../../res/roms/paradius/cpu/02-interrupts.gb"); // PASSED
-                                                                                                  //let rom = game_boy.load_rom_file("../../res/roms/paradius/cpu/03-op sp,hl.gb"); // PASSED
-                                                                                                  //let rom = game_boy.load_rom_file("../../res/roms/paradius/cpu/04-op r,imm.gb"); // PASSED
-                                                                                                  //let rom = game_boy.load_rom_file("../../res/roms/paradius/cpu/05-op rp.gb"); // PASSED
-                                                                                                  //let rom = game_boy.load_rom_file("../../res/roms/paradius/cpu/06-ld r,r.gb"); // PASSED
-                                                                                                  //let rom = game_boy.load_rom_file("../../res/roms/paradius/cpu/07-jr,jp,call,ret,rst.gb"); // PASSED
-                                                                                                  //let rom = game_boy.load_rom_file("../../res/roms/paradius/cpu/08-misc instrs.gb");  // PASSED
-                                                                                                  //let rom = game_boy.load_rom_file("../../res/roms/paradius/cpu/09-op r,r.gb"); // PASSED
-                                                                                                  //let rom = game_boy.load_rom_file("../../res/roms/paradius/cpu/10-bit ops.gb"); //
-                                                                                                  //let rom = game_boy.load_rom_file("../../res/roms/paradius/cpu/11-op a,(hl).gb"); //let rom  PASSED
+    //let rom = game_boy.load_rom_file("../../res/roms/paradius/interrupt_time/interrupt_time.gb"); // FAILED
+    let rom = game_boy.load_rom_file("../../res/roms/paradius/instr_timing/instr_timing.gb"); // FAILED
+    //let rom = game_boy.load_rom_file("../../res/roms/paradius/cpu/01-special.gb"); // PASSED
+    //let rom = game_boy.load_rom_file("../../res/roms/paradius/cpu/02-interrupts.gb"); // PASSED
+    //let rom = game_boy.load_rom_file("../../res/roms/paradius/cpu/03-op sp,hl.gb"); // PASSED
+    //let rom = game_boy.load_rom_file("../../res/roms/paradius/cpu/04-op r,imm.gb"); // PASSED
+    //let rom = game_boy.load_rom_file("../../res/roms/paradius/cpu/05-op rp.gb"); // PASSED
+    //let rom = game_boy.load_rom_file("../../res/roms/paradius/cpu/06-ld r,r.gb"); // PASSED
+    //let rom = game_boy.load_rom_file("../../res/roms/paradius/cpu/07-jr,jp,call,ret,rst.gb"); // PASSED
+    //let rom = game_boy.load_rom_file("../../res/roms/paradius/cpu/08-misc instrs.gb");  // PASSED
+    //let rom = game_boy.load_rom_file("../../res/roms/paradius/cpu/09-op r,r.gb"); // PASSED
+    //let rom = game_boy.load_rom_file("../../res/roms/paradius/cpu/10-bit ops.gb"); //
+    //let rom = game_boy.load_rom_file("../../res/roms/paradius/cpu/11-op a,(hl).gb"); //let rom  PASSED
 
-    println!("ROM Information:\n{}", rom);
+    println!("==== Cartridge ====\n{}\n===================", rom);
 
     let mut counter = 0u32;
 

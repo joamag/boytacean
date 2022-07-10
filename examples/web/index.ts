@@ -295,7 +295,11 @@ const start = async ({
     // a valid state ready to be used
     state.gameBoy.reset();
     state.gameBoy.load_boot_default();
-    state.gameBoy.load_rom(romData);
+    const cartridge = state.gameBoy.load_rom_ws(romData);
+
+    // updates the ROM name in case there's extra information
+    // comming from the cartridge
+    romName = cartridge.title() ? cartridge.title() : romName;
 
     // updates the name of the currently selected engine
     // to the one that has been provided (logic change)

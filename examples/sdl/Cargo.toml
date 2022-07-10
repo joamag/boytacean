@@ -9,6 +9,7 @@ edition = "2018"
 
 [dependencies.boytacean]
 path = "../.."
+features = ["debug"]
 
 [dependencies.sdl2]
 version = "0.35"
