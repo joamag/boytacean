@@ -77,7 +77,7 @@ impl Timer {
                 }
                 self.tima_enabled = value & 0x04 == 0x04;
             }
-            _ => panic!("Writing to unknown Timer location 0x{:04x}", addr),
+            _ => warnln!("Writing to unknown Timer location 0x{:04x}", addr),
         }
     }
 
