@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * Support for drag and drop loading in SDL
 * SDL fixes related to timing
+* Support for drawing windows
 
 ### Changed
 
