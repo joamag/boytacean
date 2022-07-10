@@ -4,7 +4,7 @@ use std::{
     fmt::{Display, Formatter},
 };
 
-use crate::debugln;
+use crate::{debugln, warnln};
 
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
@@ -267,6 +267,12 @@ impl Cartridge {
             RomType::Mbc3 => &MBC3,
             RomType::Mbc3Ram => &MBC3,
             RomType::Mbc3RamBattery => &MBC3,
+            RomType::Mbc5 => &MBC5,
+            RomType::Mbc5Ram => &MBC5,
+            RomType::Mbc5RamBattery => &MBC5,
+            RomType::Mbc5Rumble => &MBC5,
+            RomType::Mbc5RumbleRam => &MBC5,
+            RomType::Mbc5RumbleRamBattery => &MBC5,
             rom_type => panic!("No MBC controller available for {}", rom_type),
         }
     }
@@ -418,7 +424,10 @@ pub static MBC1: Mbc = Mbc {
             0x4000 | 0x5000 | 0x6000 | 0x7000 => {
                 rom.rom_data[rom.rom_offset + (addr - 0x4000) as usize]
             }
-            _ => panic!("Reading from unknown Cartridge ROM location 0x{:04x}", addr),
+            _ => {
+                warnln!("Reading from unknown Cartridge ROM location 0x{:04x}", addr);
+                0xff
+            }
         }
     },
     write_rom: |rom: &mut Cartridge, addr: u16, value: u8| {
@@ -447,7 +456,7 @@ pub static MBC1: Mbc = Mbc {
                     unimplemented!("Advanced ROM banking mode for MBC1 is not implemented");
                 }
             }
-            _ => panic!("Writing to unknown Cartridge ROM location 0x{:04x}", addr),
+            _ => warnln!("Writing to unknown Cartridge ROM location 0x{:04x}", addr),
         }
     },
     read_ram: |rom: &Cartridge, addr: u16| -> u8 {
@@ -473,7 +482,10 @@ pub static MBC3: Mbc = Mbc {
             0x4000 | 0x5000 | 0x6000 | 0x7000 => {
                 rom.rom_data[rom.rom_offset + (addr - 0x4000) as usize]
             }
-            _ => panic!("Reading from unknown Cartridge ROM location 0x{:04x}", addr),
+            _ => {
+                warnln!("Reading from unknown Cartridge ROM location 0x{:04x}", addr);
+                0xff
+            }
         }
     },
     write_rom: |rom: &mut Cartridge, addr: u16, value: u8| {
@@ -496,7 +508,59 @@ pub static MBC3: Mbc = Mbc {
                 let ram_bank = value & 0x03;
                 rom.set_ram_bank(ram_bank);
             }
-            _ => panic!("Writing to unknown Cartridge ROM location 0x{:04x}", addr),
+            _ => warnln!("Writing to unknown Cartridge ROM location 0x{:04x}", addr),
+        }
+    },
+    read_ram: |rom: &Cartridge, addr: u16| -> u8 {
+        if !rom.ram_enabled {
+            return 0xff;
+        }
+        rom.ram_data[rom.ram_offset + (addr - 0xa000) as usize]
+    },
+    write_ram: |rom: &mut Cartridge, addr: u16, value: u8| {
+        if !rom.ram_enabled {
+            debugln!("Attempt to write to ERAM while write protect is active");
+            return;
+        }
+        rom.ram_data[rom.ram_offset + (addr - 0xa000) as usize] = value;
+    },
+};
+
+pub static MBC5: Mbc = Mbc {
+    name: "MBC5",
+    read_rom: |rom: &Cartridge, addr: u16| -> u8 {
+        match addr & 0xf000 {
+            0x0000 | 0x1000 | 0x2000 | 0x3000 => rom.rom_data[addr as usize],
+            0x4000 | 0x5000 | 0x6000 | 0x7000 => {
+                rom.rom_data[rom.rom_offset + (addr - 0x4000) as usize]
+            }
+            _ => {
+                warnln!("Reading from unknown Cartridge ROM location 0x{:04x}", addr);
+                0xff
+            }
+        }
+    },
+    write_rom: |rom: &mut Cartridge, addr: u16, value: u8| {
+        match addr & 0xf000 {
+            // RAM enabled flag
+            0x0000 | 0x1000 => {
+                rom.ram_enabled = (value & 0x0f) == 0x0a;
+            }
+            // ROM bank selection
+            0x2000 => {
+                let mut rom_bank = value & 0xff;
+                rom_bank = rom_bank & (rom.rom_bank_count * 2 - 1) as u8;
+                if rom_bank == 0 {
+                    rom_bank = 1;
+                }
+                rom.set_rom_bank(rom_bank);
+            }
+            // RAM bank selection
+            0x4000 | 0x5000 => {
+                let ram_bank = value & 0x0f;
+                rom.set_ram_bank(ram_bank);
+            }
+            _ => warnln!("Writing to unknown Cartridge ROM location 0x{:04x}", addr),
         }
     },
     read_ram: |rom: &Cartridge, addr: u16| -> u8 {

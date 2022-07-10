@@ -172,6 +172,10 @@ pub struct Ppu {
     /// The palette that is going to be used for sprites/objects #1.
     palette_obj_1: Palette,
 
+    /// The complete set of palettes in binary data so that they can
+    /// bre read if required by the system.
+    palettes: [u8; 3],
+
     /// The scroll Y register that controls the Y offset
     /// of the background.
     scy: u8,
@@ -282,6 +286,7 @@ impl Ppu {
             palette: [[0u8; RGB_SIZE]; PALETTE_SIZE],
             palette_obj_0: [[0u8; RGB_SIZE]; PALETTE_SIZE],
             palette_obj_1: [[0u8; RGB_SIZE]; PALETTE_SIZE],
+            palettes: [0u8; 3],
             scy: 0x0,
             scx: 0x0,
             wy: 0x0,
@@ -317,6 +322,7 @@ impl Ppu {
         self.palette = [[0u8; RGB_SIZE]; PALETTE_SIZE];
         self.palette_obj_0 = [[0u8; RGB_SIZE]; PALETTE_SIZE];
         self.palette_obj_1 = [[0u8; RGB_SIZE]; PALETTE_SIZE];
+        self.palettes = [0u8; 3];
         self.scy = 0x0;
         self.scx = 0x0;
         self.ly = 0x0;
@@ -432,8 +438,13 @@ impl Ppu {
             0x0043 => self.scx,
             0x0044 => self.ly,
             0x0045 => self.lyc,
+            0x0047 => self.palettes[0],
+            0x0048 => self.palettes[1],
+            0x0049 => self.palettes[2],
             0x004a => self.wy,
             0x004b => self.wx,
+            // VBK - CGB Mode Only
+            0x004f => 0xff,
             _ => {
                 warnln!("Reading from unknown PPU location 0x{:04x}", addr);
                 0xff
@@ -485,6 +496,7 @@ impl Ppu {
                         color_index => panic!("Invalid palette color index {:04x}", color_index),
                     }
                 }
+                self.palettes[0] = value;
             }
             0x0048 => {
                 for index in 0..PALETTE_SIZE {
@@ -496,6 +508,7 @@ impl Ppu {
                         color_index => panic!("Invalid palette color index {:04x}", color_index),
                     }
                 }
+                self.palettes[1] = value;
             }
             0x0049 => {
                 for index in 0..PALETTE_SIZE {
@@ -507,9 +520,12 @@ impl Ppu {
                         color_index => panic!("Invalid palette color index {:04x}", color_index),
                     }
                 }
+                self.palettes[2] = value;
             }
             0x004a => self.wy = value,
             0x004b => self.wx = value,
+            // VBK - CGB Mode Only
+            0x004f => (),
             0x007f => (),
             _ => warnln!("Writing in unknown PPU location 0x{:04x}", addr),
         }
