@@ -1,18 +1,6 @@
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
 
-pub struct Pad {
-    down: bool,
-    up: bool,
-    left: bool,
-    right: bool,
-    start: bool,
-    select: bool,
-    b: bool,
-    a: bool,
-    selection: PadSelection,
-}
-
 #[derive(Clone, Copy, PartialEq)]
 pub enum PadSelection {
     Action,
@@ -31,6 +19,19 @@ pub enum PadKey {
     B,
 }
 
+pub struct Pad {
+    down: bool,
+    up: bool,
+    left: bool,
+    right: bool,
+    start: bool,
+    select: bool,
+    b: bool,
+    a: bool,
+    selection: PadSelection,
+    int_pad: bool
+}
+
 impl Pad {
     pub fn new() -> Self {
         Self {
@@ -43,6 +44,7 @@ impl Pad {
             b: false,
             a: false,
             selection: PadSelection::Action,
+            int_pad: false,
         }
     }
 
@@ -103,6 +105,10 @@ impl Pad {
             PadKey::A => self.a = true,
             PadKey::B => self.b = true,
         }
+
+        // signals that a JoyPad interrupt is pending to be
+        // handled as a key pressed has been done
+        self.int_pad = true;
     }
 
     pub fn key_lift(&mut self, key: PadKey) {
@@ -116,5 +122,17 @@ impl Pad {
             PadKey::A => self.a = false,
             PadKey::B => self.b = false,
         }
+    }
+
+    pub fn int_pad(&self) -> bool {
+        self.int_pad
+    }
+
+    pub fn set_int_pad(&mut self, value: bool) {
+        self.int_pad = value;
+    }
+
+    pub fn ack_pad(&mut self) {
+        self.set_int_pad(false);
     }
 }

@@ -4,8 +4,6 @@ use std::{
     fmt::{Display, Formatter},
 };
 
-use crate::debugln;
-
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
 
@@ -179,6 +177,14 @@ pub struct Ppu {
     /// of the background.
     scx: u8,
 
+    /// The top most Y coordinate of the window,
+    /// going to be used while drawing the window.
+    wy: u8,
+
+    /// The top most X coordinate of the window plus 7,
+    /// going to be used while drawing the window.
+    wx: u8,
+
     /// The current scan line in processing, should
     /// range between 0 (0x00) and 153 (0x99), representing
     /// the 154 lines plus 10 extra v-blank lines.
@@ -271,6 +277,8 @@ impl Ppu {
             palette_obj_1: [[0u8; RGB_SIZE]; PALETTE_SIZE],
             scy: 0x0,
             scx: 0x0,
+            wy: 0x0,
+            wx: 0x0,
             ly: 0x0,
             lyc: 0x0,
             mode: PpuMode::OamRead,
@@ -409,6 +417,8 @@ impl Ppu {
             0x0043 => self.scx,
             0x0044 => self.ly,
             0x0045 => self.lyc,
+            0x004a => self.wy,
+            0x004b => self.wx,
             addr => panic!("Reading from unknown PPU location 0x{:04x}", addr),
         }
     }
@@ -474,12 +484,8 @@ impl Ppu {
                     }
                 }
             }
-            0x004a => {
-                debugln!("Writing to $FF4A - WY (Window Y Position) (R/W)")
-            }
-            0x004b => {
-                debugln!("Writing to $FF4B - WX (Window X Position + 7) (R/W)")
-            }
+            0x004a => self.wy = value,
+            0x004b => self.wx = value,
             0x007f => (),
             addr => panic!("Writing in unknown PPU location 0x{:04x}", addr),
         }
@@ -610,23 +616,37 @@ impl Ppu {
             return;
         }
         if self.switch_bg {
-            self.render_background();
+            self.render_map(self.bg_map, self.scx, self.scy, 0, 0);
+        }
+        if self.switch_window {
+            self.render_map(self.window_map, 0, 0, self.wx - 7, self.wy);
         }
         if self.switch_obj {
             self.render_objects();
         }
     }
 
-    fn render_background(&mut self) {
+    fn render_map(&mut self, map: bool, scx: u8, scy: u8, wx: u8, wy: u8) {
+        // in case the target window Y position has not yet been reached
+        // then there's nothing to be done, returns control flow immediately
+        if self.ly < wy {
+            return;
+        }
+
+        // calculates the LD (line delta) useful for draw operations where the window
+        // is repositioned, as the current line for tile calculus is different from
+        // the one currently in drawing
+        let ld = self.ly - wy;
+
         // calculates the row offset for the tile by using the current line
-        // index an the SCY (scroll Y) divided by 8 (as the tiles are 8x8 pixels),
+        // index and the DY (scroll Y) divided by 8 (as the tiles are 8x8 pixels),
         // on top of that ensures that the result is modulus 32 meaning that the
         // drawing wraps around the Y axis
-        let row_offset = (((self.ly + self.scy) & 0xff) >> 3) % 32;
+        let row_offset = (((ld + scy) & 0xff) >> 3) % 32;
 
         // obtains the base address of the background map using the bg map flag
         // that control which background map is going to be used
-        let mut map_offset: usize = if self.bg_map { 0x1c00 } else { 0x1800 };
+        let mut map_offset: usize = if map { 0x1c00 } else { 0x1800 };
 
         // increments the map offset by the row offset multiplied by the number
         // of tiles in each row (32)
@@ -634,11 +654,7 @@ impl Ppu {
 
         // calculates the sprite line offset by using the SCX register
         // shifted by 3 meaning that the tiles are 8x8
-        let mut line_offset: usize = (self.scx >> 3) as usize;
-
-        // calculates both the current Y and X positions within the tiles
-        let y = ((self.scy + self.ly) & 0x07) as usize;
-        let mut x = (self.scx & 0x07) as usize;
+        let mut line_offset: usize = (scx >> 3) as usize;
 
         // calculates the index of the initial tile in drawing,
         // if the tile data set in use is #1, the indices are
@@ -656,48 +672,59 @@ impl Ppu {
         // Game Boy screen width and RGB pixel (3 bytes) size
         let mut frame_offset = self.ly as usize * DISPLAY_WIDTH * RGB_SIZE;
 
-        for _index in 0..DISPLAY_WIDTH {
-            // obtains the current pixel data from the tile and
-            // re-maps it according to the current palette
-            let pixel = self.tiles[tile_index].get(x, y);
-            let color = self.palette[pixel as usize];
+        // calculates both the current Y and X positions within the tiles
+        // using the bitwise and operation as an effective modulus 8
+        let y = ((ld + scy) & 0x07) as usize;
+        let mut x = (scx & 0x07) as usize;
 
-            // updates the pixel in the color buffer
-            self.color_buffer[color_offset] = pixel;
+        for index in 0..DISPLAY_WIDTH {
+            // in case the current pixel to be drawn for the line
+            // is visible within the window draws it an increments
+            // the X coordinate of the tile
+            if index as u8 >= wx {
+                // obtains the current pixel data from the tile and
+                // re-maps it according to the current palette
+                let pixel = self.tiles[tile_index].get(x, y);
+                let color = self.palette[pixel as usize];
 
-            // set the color pixel in the frame buffer
-            self.frame_buffer[frame_offset] = color[0];
-            self.frame_buffer[frame_offset + 1] = color[1];
-            self.frame_buffer[frame_offset + 2] = color[2];
+                // updates the pixel in the color buffer
+                self.color_buffer[color_offset] = pixel;
 
-            // increments the color offset by one
+                // set the color pixel in the frame buffer
+                self.frame_buffer[frame_offset] = color[0];
+                self.frame_buffer[frame_offset + 1] = color[1];
+                self.frame_buffer[frame_offset + 2] = color[2];
+
+                // increments the current tile X position in drawing
+                x += 1;
+
+                // in case the end of tile width has been reached then
+                // a new tile must be retrieved for plotting
+                if x == TILE_WIDTH {
+                    // resets the tile X position to the base value
+                    // as a new tile is going to be drawn
+                    x = 0;
+
+                    // calculates the new line tile offset making sure that
+                    // the maximum of 32 is not overflown
+                    line_offset = (line_offset + 1) % 32;
+
+                    // calculates the tile index and makes sure the value
+                    // takes into consideration the bg tile value
+                    tile_index = self.vram[map_offset + line_offset] as usize;
+                    if !self.bg_tile && tile_index < 128 {
+                        tile_index += 256;
+                    }
+                }
+            }
+
+            // increments the color offset by one, representing
+            // the drawing og one pixel
             color_offset += 1;
 
             // increments the offset of the frame buffer by the
             // size of an RGB pixel (which is 3 bytes)
             frame_offset += RGB_SIZE;
-
-            // increments the current tile X position in drawing
-            x += 1;
-
-            // in case the end of tile width has been reached then
-            // a new tile must be retrieved for plotting
-            if x == TILE_WIDTH {
-                // resets the tile X position to the base value
-                // as a new tile is going to be drawn
-                x = 0;
-
-                // calculates the new line tile offset making sure that
-                // the maximum of 32 is not overflown
-                line_offset = (line_offset + 1) % 32;
-
-                // calculates the tile index nad makes sure the value
-                // takes into consideration the bg tile value
-                tile_index = self.vram[map_offset + line_offset] as usize;
-                if !self.bg_tile && tile_index < 128 {
-                    tile_index += 256;
-                }
-            }
         }
     }
 

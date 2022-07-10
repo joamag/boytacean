@@ -90,6 +90,7 @@ impl Cpu {
             if ((self.mmu.ie & 0x01 == 0x01) && self.mmu.ppu().int_vblank())
                 || ((self.mmu.ie & 0x02 == 0x02) && self.mmu.ppu().int_stat())
                 || ((self.mmu.ie & 0x04 == 0x04) && self.mmu.timer().int_tima())
+                || ((self.mmu.ie & 0x10 == 0x10) && self.mmu.pad().int_pad())
             {
                 self.halted = false;
             }
@@ -147,6 +148,26 @@ impl Cpu {
                 // acknowledges that the timer interrupt has been
                 // properly handled
                 self.mmu.timer().ack_tima();
+
+                // in case the CPU is currently halted waiting
+                // for an interrupt, releases it
+                if self.halted {
+                    self.halted = false;
+                }
+
+                return 20;
+            }
+            // @todo aggregate the handling of these interrupts
+            else if (self.mmu.ie & 0x10 == 0x10) && self.mmu.pad().int_pad() {
+                debugln!("Going to run JoyPad interrupt handler (0x60)");
+
+                self.disable_int();
+                self.push_word(pc);
+                self.pc = 0x60;
+
+                // acknowledges that the pad interrupt has been
+                // properly handled
+                self.mmu.pad().ack_pad();
 
                 // in case the CPU is currently halted waiting
                 // for an interrupt, releases it
