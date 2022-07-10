@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-*
+* Timer related issue, made test on inst timing pass
 
 ## [0.1.1] - 2022-07-08
 

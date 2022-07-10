@@ -37,12 +37,19 @@ impl Timer {
         if self.tima_enabled {
             self.tima_clock += cycles as u16;
             while self.tima_clock >= self.tima_ratio {
+                // in case TIMA value overflows must set the
+                // interrupt and update the TIMA value to
+                // the TMA one (reset operation)
                 if self.tima == 0xff {
                     self.int_tima = true;
                     self.tima = self.tma;
                 }
+                // otherwise uses the normal add operation
+                // and increments the TIMA value by one
+                else {
+                    self.tima = self.tima.wrapping_add(1);
+                }
 
-                self.tima = self.tima.wrapping_add(1);
                 self.tima_clock -= self.tima_ratio;
             }
         }

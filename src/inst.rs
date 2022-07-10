@@ -178,7 +178,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (and_a_e, 4, "AND A, E"),
     (and_a_h, 4, "AND A, H"),
     (and_a_l, 4, "AND A, L"),
-    (and_a_mhl, 4, "AND A, [HL]"),
+    (and_a_mhl, 8, "AND A, [HL]"),
     (and_a_a, 4, "AND A, A"),
     (xor_a_b, 4, "XOR A, B"),
     (xor_a_c, 4, "XOR A, C"),
@@ -786,7 +786,7 @@ fn jr_nz_i8(cpu: &mut Cpu) {
     }
 
     cpu.pc = (cpu.pc as i16).wrapping_add(byte as i16) as u16;
-    cpu.ticks = cpu.ticks.wrapping_add(4);
+    cpu.cycles = cpu.cycles.wrapping_add(4);
 }
 
 fn ld_hl_u16(cpu: &mut Cpu) {
@@ -872,7 +872,7 @@ fn jr_z_i8(cpu: &mut Cpu) {
     }
 
     cpu.pc = (cpu.pc as i16).wrapping_add(byte as i16) as u16;
-    cpu.ticks = cpu.ticks.wrapping_add(4);
+    cpu.cycles = cpu.cycles.wrapping_add(4);
 }
 
 fn add_hl_hl(cpu: &mut Cpu) {
@@ -936,7 +936,7 @@ fn jr_nc_i8(cpu: &mut Cpu) {
     }
 
     cpu.pc = (cpu.pc as i16).wrapping_add(byte as i16) as u16;
-    cpu.ticks = cpu.ticks.wrapping_add(4);
+    cpu.cycles = cpu.cycles.wrapping_add(4);
 }
 
 fn ld_mhld_a(cpu: &mut Cpu) {
@@ -989,7 +989,7 @@ fn jr_c_i8(cpu: &mut Cpu) {
     }
 
     cpu.pc = (cpu.pc as i16).wrapping_add(byte as i16) as u16;
-    cpu.ticks = cpu.ticks.wrapping_add(4);
+    cpu.cycles = cpu.cycles.wrapping_add(4);
 }
 
 fn add_hl_sp(cpu: &mut Cpu) {
@@ -1693,7 +1693,7 @@ fn ret_nz(cpu: &mut Cpu) {
     }
 
     cpu.pc = cpu.pop_word();
-    cpu.ticks = cpu.ticks.wrapping_add(12);
+    cpu.cycles = cpu.cycles.wrapping_add(12);
 }
 
 fn pop_bc(cpu: &mut Cpu) {
@@ -1709,7 +1709,7 @@ fn jp_nz_u16(cpu: &mut Cpu) {
     }
 
     cpu.pc = word;
-    cpu.ticks = cpu.ticks.wrapping_add(4);
+    cpu.cycles = cpu.cycles.wrapping_add(4);
 }
 
 fn jp_u16(cpu: &mut Cpu) {
@@ -1726,7 +1726,7 @@ fn call_nz_u16(cpu: &mut Cpu) {
 
     cpu.push_word(cpu.pc);
     cpu.pc = word;
-    cpu.ticks = cpu.ticks.wrapping_add(12);
+    cpu.cycles = cpu.cycles.wrapping_add(12);
 }
 
 fn push_bc(cpu: &mut Cpu) {
@@ -1748,7 +1748,7 @@ fn ret_z(cpu: &mut Cpu) {
     }
 
     cpu.pc = cpu.pop_word();
-    cpu.ticks = cpu.ticks.wrapping_add(12);
+    cpu.cycles = cpu.cycles.wrapping_add(12);
 }
 
 fn ret(cpu: &mut Cpu) {
@@ -1763,7 +1763,7 @@ fn jp_z_u16(cpu: &mut Cpu) {
     }
 
     cpu.pc = word;
-    cpu.ticks = cpu.ticks.wrapping_add(4);
+    cpu.cycles = cpu.cycles.wrapping_add(4);
 }
 
 fn call_z_u16(cpu: &mut Cpu) {
@@ -1775,7 +1775,7 @@ fn call_z_u16(cpu: &mut Cpu) {
 
     cpu.push_word(cpu.pc);
     cpu.pc = word;
-    cpu.ticks = cpu.ticks.wrapping_add(12);
+    cpu.cycles = cpu.cycles.wrapping_add(12);
 }
 
 fn call_u16(cpu: &mut Cpu) {
@@ -1799,7 +1799,7 @@ fn ret_nc(cpu: &mut Cpu) {
     }
 
     cpu.pc = cpu.pop_word();
-    cpu.ticks = cpu.ticks.wrapping_add(12);
+    cpu.cycles = cpu.cycles.wrapping_add(12);
 }
 
 fn pop_de(cpu: &mut Cpu) {
@@ -1815,7 +1815,7 @@ fn jp_nc_u16(cpu: &mut Cpu) {
     }
 
     cpu.pc = word;
-    cpu.ticks = cpu.ticks.wrapping_add(4);
+    cpu.cycles = cpu.cycles.wrapping_add(4);
 }
 
 fn call_nc_u16(cpu: &mut Cpu) {
@@ -1827,7 +1827,7 @@ fn call_nc_u16(cpu: &mut Cpu) {
 
     cpu.push_word(cpu.pc);
     cpu.pc = word;
-    cpu.ticks = cpu.ticks.wrapping_add(12);
+    cpu.cycles = cpu.cycles.wrapping_add(12);
 }
 
 fn push_de(cpu: &mut Cpu) {
@@ -1849,7 +1849,7 @@ fn ret_c(cpu: &mut Cpu) {
     }
 
     cpu.pc = cpu.pop_word();
-    cpu.ticks = cpu.ticks.wrapping_add(12);
+    cpu.cycles = cpu.cycles.wrapping_add(12);
 }
 
 fn reti(cpu: &mut Cpu) {
@@ -1865,7 +1865,7 @@ fn jp_c_u16(cpu: &mut Cpu) {
     }
 
     cpu.pc = word;
-    cpu.ticks = cpu.ticks.wrapping_add(4);
+    cpu.cycles = cpu.cycles.wrapping_add(4);
 }
 
 fn call_c_u16(cpu: &mut Cpu) {
@@ -1877,7 +1877,7 @@ fn call_c_u16(cpu: &mut Cpu) {
 
     cpu.push_word(cpu.pc);
     cpu.pc = word;
-    cpu.ticks = cpu.ticks.wrapping_add(12);
+    cpu.cycles = cpu.cycles.wrapping_add(12);
 }
 
 fn sbc_a_u8(cpu: &mut Cpu) {

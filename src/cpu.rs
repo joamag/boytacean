@@ -28,7 +28,10 @@ pub struct Cpu {
     carry: bool,
     halted: bool,
     pub mmu: Mmu,
-    pub ticks: u32,
+
+    /// Temporary counter used to control the number of cycles
+    /// taken by the current or last CPU operation.
+    pub cycles: u8,
 }
 
 impl Cpu {
@@ -50,7 +53,7 @@ impl Cpu {
             carry: false,
             halted: false,
             mmu: mmu,
-            ticks: 0,
+            cycles: 0,
         }
     }
 
@@ -70,7 +73,7 @@ impl Cpu {
         self.half_carry = false;
         self.carry = false;
         self.halted = false;
-        self.ticks = 0;
+        self.cycles = 0;
     }
 
     pub fn clock(&mut self) -> u8 {
@@ -192,25 +195,25 @@ impl Cpu {
         self.pc = self.pc.wrapping_add(1);
 
         let is_prefix = opcode == PREFIX;
-        let instruction: &(fn(&mut Cpu), u8, &str);
+        let inst: &(fn(&mut Cpu), u8, &str);
 
         if is_prefix {
             opcode = self.mmu.read(self.pc);
             self.pc = self.pc.wrapping_add(1);
-            instruction = &EXTENDED[opcode as usize];
+            inst = &EXTENDED[opcode as usize];
         } else {
-            instruction = &INSTRUCTIONS[opcode as usize];
+            inst = &INSTRUCTIONS[opcode as usize];
         }
 
-        let (instruction_fn, instruction_time, instruction_str) = instruction;
+        let (inst_fn, inst_time, inst_str) = inst;
 
-        if *instruction_str == "! UNIMP !" || *instruction_str == "HALT" {
-            if *instruction_str == "HALT" {
+        if *inst_str == "! UNIMP !" || *inst_str == "HALT" {
+            if *inst_str == "HALT" {
                 debugln!("HALT with IE=0x{:02x} IME={}", self.mmu.ie, self.ime);
             }
             debugln!(
                 "{}\t(0x{:02x})\t${:04x} {}",
-                instruction_str,
+                inst_str,
                 opcode,
                 pc,
                 is_prefix
@@ -220,12 +223,13 @@ impl Cpu {
         // calls the current instruction and increments the number of
         // cycles executed by the instruction time of the instruction
         // that has just been executed
-        instruction_fn(self);
-        self.ticks = self.ticks.wrapping_add(*instruction_time as u32);
+        self.cycles = 0;
+        inst_fn(self);
+        self.cycles = self.cycles.wrapping_add(*inst_time);
 
         // returns the number of cycles that the operation
         // that has been executed has taken
-        *instruction_time
+        self.cycles
     }
 
     #[inline(always)]
@@ -254,8 +258,8 @@ impl Cpu {
     }
 
     #[inline(always)]
-    pub fn ticks(&self) -> u32 {
-        self.ticks
+    pub fn cycles(&self) -> u8 {
+        self.cycles
     }
 
     #[inline(always)]
