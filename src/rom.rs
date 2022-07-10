@@ -186,6 +186,11 @@ pub struct Cartridge {
     /// RAM and ROM access on the current cartridge.
     mbc: &'static Mbc,
 
+    /// The number of ROM banks (of 8KB) that are available
+    /// to the current cartridge, this is a computed value
+    /// to allow improved performance.
+    rom_bank_count: u16,
+
     /// The offset address to the ROM bank (#1) that is
     /// currently in use by the ROM cartridge.
     rom_offset: usize,
@@ -205,6 +210,7 @@ impl Cartridge {
             rom_data: vec![],
             ram_data: vec![],
             mbc: &NO_MBC,
+            rom_bank_count: 0,
             rom_offset: 0x4000,
             ram_offset: 0x0000,
             ram_enabled: false,
@@ -256,6 +262,11 @@ impl Cartridge {
             RomType::Mbc1 => &MBC1,
             RomType::Mbc1Ram => &MBC1,
             RomType::Mbc1RamBattery => &MBC1,
+            RomType::Mbc3TimerBattery => &MBC3,
+            RomType::Mbc3TimerRamBattery => &MBC3,
+            RomType::Mbc3 => &MBC3,
+            RomType::Mbc3Ram => &MBC3,
+            RomType::Mbc3RamBattery => &MBC3,
             rom_type => panic!("No MBC controller available for {}", rom_type),
         }
     }
@@ -273,6 +284,7 @@ impl Cartridge {
         self.rom_offset = 0x4000;
         self.ram_offset = 0x0000;
         self.set_mbc();
+        self.set_computed();
         self.allocate_ram();
         self.set_rom_bank(1);
         self.set_ram_bank(0);
@@ -280,6 +292,10 @@ impl Cartridge {
 
     fn set_mbc(&mut self) {
         self.mbc = self.get_mbc();
+    }
+
+    fn set_computed(&mut self) {
+        self.rom_bank_count = self.rom_size().rom_banks();
     }
 
     fn allocate_ram(&mut self) {
@@ -414,8 +430,7 @@ pub static MBC1: Mbc = Mbc {
             // ROM bank selection 5 lower bits
             0x2000 | 0x3000 => {
                 let mut rom_bank = value & 0x1f;
-                // @todo this is slow and must be pre-computed in cartridge
-                rom_bank = rom_bank & (rom.rom_size().rom_banks() * 2 - 1) as u8;
+                rom_bank = rom_bank & (rom.rom_bank_count * 2 - 1) as u8;
                 if rom_bank == 0 {
                     rom_bank = 1;
                 }
@@ -428,7 +443,56 @@ pub static MBC1: Mbc = Mbc {
             }
             // ROM mode selection
             0x6000 | 0x7000 => {
-                debugln!("SETTING MODE {}", value);
+                unimplemented!("ROM mode selection for MBC1 is not implemented");
+            }
+            _ => panic!("Writing to unknown Cartridge ROM location 0x{:04x}", addr),
+        }
+    },
+    read_ram: |rom: &Cartridge, addr: u16| -> u8 {
+        if !rom.ram_enabled {
+            return 0xff;
+        }
+        rom.ram_data[rom.ram_offset + (addr - 0xa000) as usize]
+    },
+    write_ram: |rom: &mut Cartridge, addr: u16, value: u8| {
+        if !rom.ram_enabled {
+            debugln!("Attempt to write to ERAM while write protect is active");
+            return;
+        }
+        rom.ram_data[rom.ram_offset + (addr - 0xa000) as usize] = value;
+    },
+};
+
+pub static MBC3: Mbc = Mbc {
+    name: "MBC3",
+    read_rom: |rom: &Cartridge, addr: u16| -> u8 {
+        match addr & 0xf000 {
+            0x0000 | 0x1000 | 0x2000 | 0x3000 => rom.rom_data[addr as usize],
+            0x4000 | 0x5000 | 0x6000 | 0x7000 => {
+                rom.rom_data[rom.rom_offset + (addr - 0x4000) as usize]
+            }
+            _ => panic!("Reading from unknown Cartridge ROM location 0x{:04x}", addr),
+        }
+    },
+    write_rom: |rom: &mut Cartridge, addr: u16, value: u8| {
+        match addr & 0xf000 {
+            // RAM enabled flag
+            0x0000 | 0x1000 => {
+                rom.ram_enabled = (value & 0x0f) == 0x0a;
+            }
+            // ROM bank selection
+            0x2000 | 0x3000 => {
+                let mut rom_bank = value & 0x7f;
+                rom_bank = rom_bank & (rom.rom_bank_count * 2 - 1) as u8;
+                if rom_bank == 0 {
+                    rom_bank = 1;
+                }
+                rom.set_rom_bank(rom_bank);
+            }
+            // RAM bank selection
+            0x4000 | 0x5000 => {
+                let ram_bank = value & 0x03;
+                rom.set_ram_bank(ram_bank);
             }
             _ => panic!("Writing to unknown Cartridge ROM location 0x{:04x}", addr),
         }
