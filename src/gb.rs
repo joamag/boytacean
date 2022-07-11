@@ -12,6 +12,9 @@ use crate::{
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
 
+#[cfg(feature = "wasm")]
+use std::panic::{set_hook, take_hook, PanicInfo};
+
 /// Top level structure that abstracts the usage of the
 /// Game Boy system under the Boytacean emulator.
 /// Should serve as the main entry-point API.
@@ -183,9 +186,30 @@ impl GameBoy {
     }
 }
 
+#[cfg(feature = "wasm")]
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 impl GameBoy {
+    pub fn set_panic_hook_ws() {
+        let prev = take_hook();
+        set_hook(Box::new(move |info| {
+            hook_impl(info);
+            prev(info);
+        }));
+    }
     pub fn load_rom_ws(&mut self, data: &[u8]) -> Cartridge {
         self.load_rom(data).clone()
     }
+}
+
+#[cfg(feature = "wasm")]
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(js_namespace = window)]
+    fn panic(s: &str);
+}
+
+#[cfg(feature = "wasm")]
+pub fn hook_impl(info: &PanicInfo) {
+    let msg = info.to_string();
+    panic(msg.as_str());
 }

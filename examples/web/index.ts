@@ -1,4 +1,4 @@
-import { default as wasm, GameBoy, PadKey, PpuMode } from "./lib/boytacean.js";
+import { default as _wasm, GameBoy, PadKey, PpuMode } from "./lib/boytacean.js";
 import info from "./package.json";
 
 const PIXEL_UNSET_COLOR = 0x1b1a17ff;
@@ -114,6 +114,15 @@ const sound = ((data = SOUND_DATA, volume = 0.2) => {
     sound.muted = true;
     return sound;
 })();
+
+const wasm = async () => {
+    await _wasm();
+    GameBoy.set_panic_hook_ws();
+};
+
+(window as any).panic = (message: string) => {
+    console.error(message);
+};
 
 const main = async () => {
     // initializes the WASM module, this is required
