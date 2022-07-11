@@ -242,6 +242,11 @@ pub struct Ppu {
     /// first one, preventing actions.
     first_frame: bool,
 
+    /// Almost unique identifier of the frame that can be used to debug
+    /// and uniquely identify the frame that is currently ind drawing,
+    /// the identifier wraps on the u16 edges.
+    frame_index: u16,
+
     stat_hblank: bool,
     stat_vblank: bool,
     stat_oam: bool,
@@ -256,6 +261,7 @@ pub struct Ppu {
     int_stat: bool,
 }
 
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
 #[derive(Clone, Copy, PartialEq)]
 pub enum PpuMode {
     HBlank = 0,
@@ -304,6 +310,7 @@ impl Ppu {
             window_map: false,
             switch_lcd: false,
             first_frame: false,
+            frame_index: 0,
             stat_hblank: false,
             stat_vblank: false,
             stat_oam: false,
@@ -338,6 +345,7 @@ impl Ppu {
         self.window_map = false;
         self.switch_lcd = false;
         self.first_frame = false;
+        self.frame_index = 0;
         self.stat_hblank = false;
         self.stat_vblank = false;
         self.stat_oam = false;
@@ -404,6 +412,7 @@ impl Ppu {
                         self.mode = PpuMode::OamRead;
                         self.ly = 0;
                         self.first_frame = false;
+                        self.frame_index = self.frame_index.wrapping_add(1);
                     }
 
                     self.mode_clock -= 456;
@@ -554,6 +563,18 @@ impl Ppu {
 
     pub fn palette_obj_1(&self) -> Palette {
         self.palette_obj_1
+    }
+
+    pub fn ly(&self) -> u8 {
+        self.ly
+    }
+
+    pub fn mode(&self) -> PpuMode {
+        self.mode
+    }
+
+    pub fn frame_index(&self) -> u16 {
+        self.frame_index
     }
 
     pub fn int_vblank(&self) -> bool {

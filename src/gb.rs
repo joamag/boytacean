@@ -3,7 +3,7 @@ use crate::{
     data::{BootRom, DMG_BOOT, DMG_BOOTIX, MGB_BOOTIX, SGB_BOOT},
     mmu::Mmu,
     pad::{Pad, PadKey},
-    ppu::{Ppu, Tile, FRAME_BUFFER_SIZE},
+    ppu::{Ppu, PpuMode, Tile, FRAME_BUFFER_SIZE},
     rom::Cartridge,
     timer::Timer,
     util::read_file,
@@ -48,6 +48,18 @@ impl GameBoy {
 
     pub fn pc(&self) -> u16 {
         self.cpu.pc()
+    }
+
+    pub fn ppu_ly(&mut self) -> u8 {
+        self.ppu().ly()
+    }
+
+    pub fn ppu_mode(&mut self) -> PpuMode {
+        self.ppu().mode()
+    }
+
+    pub fn ppu_frame(&mut self) -> u16 {
+        self.ppu().frame_index()
     }
 
     pub fn clock(&mut self) -> u8 {

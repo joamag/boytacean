@@ -1,4 +1,4 @@
-import { default as wasm, GameBoy, PadKey } from "./lib/boytacean.js";
+import { default as wasm, GameBoy, PadKey, PpuMode } from "./lib/boytacean.js";
 import info from "./package.json";
 
 const PIXEL_UNSET_COLOR = 0x1b1a17ff;
@@ -41,7 +41,7 @@ const KEYS: Record<string, number> = {
 };
 
 // @ts-ignore: ts(2580)
-const ROM_PATH = require("../../res/roms/firstwhite.gb");
+const ROM_PATH = require("../../res/roms/20y.gb");
 
 // Enumeration that describes the multiple pixel
 // formats and the associated byte size.
@@ -217,6 +217,8 @@ const tick = (currentTime: number) => {
 
     let counterTicks = 0;
 
+    let lastFrame = -1;
+
     while (true) {
         // limits the number of ticks to the typical number
         // of ticks required to do a complete PPU draw
@@ -227,11 +229,20 @@ const tick = (currentTime: number) => {
         // runs the Game Boy clock, this operations should
         // include the advance of both the CPU and the PPU
         counterTicks += state.gameBoy.clock();
-    }
 
-    // updates the canvas object with the new
-    // visual information coming in
-    updateCanvas(state.gameBoy.frame_buffer_eager(), PixelFormat.RGB);
+        // in case the current PPU mode is VBlank and the
+        // fram is different from the previously rendered
+        // one then it's time to update the canvas
+        if (
+            state.gameBoy.ppu_mode() == PpuMode.VBlank &&
+            state.gameBoy.ppu_frame() != lastFrame
+        ) {
+            // updates the canvas object with the new
+            // visual information coming in
+            updateCanvas(state.gameBoy.frame_buffer_eager(), PixelFormat.RGB);
+            lastFrame = state.gameBoy.ppu_frame();
+        }
+    }
 
     // increments the number of frames rendered in the current
     // section, this value is going to be used to calculate FPS
@@ -544,7 +555,7 @@ const registerButtons = () => {
             /**
              * Draws the tile at the given index to the proper
              * vertical offset in the given context and buffer.
-             * 
+             *
              * @param index The index of the sprite to be drawn.
              * @param format The pixel format of the sprite.
              */
@@ -552,7 +563,7 @@ const registerButtons = () => {
                 index: number,
                 context: CanvasRenderingContext2D,
                 buffer: DataView,
-                format: PixelFormat = PixelFormat.RGB,
+                format: PixelFormat = PixelFormat.RGB
             ) => {
                 const pixels = state.gameBoy.get_tile_buffer(index);
                 const line = Math.floor(index / 16);

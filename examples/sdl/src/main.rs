@@ -43,7 +43,10 @@ impl Emulator {
 
     pub fn load_rom(&mut self, path: &str) {
         let rom = self.system.load_rom_file(path);
-        println!("==== Cartridge ====\n{}\n===================", rom);
+        println!(
+            "========= Cartridge =========\n{}\n=============================\n",
+            rom
+        );
     }
 
     pub fn run(&mut self) {
