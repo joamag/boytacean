@@ -39,6 +39,7 @@ cd dist && python3 -m http.server
 
 ### Emulators
 
+* [GitHub - LIJI32/SameBoy (C)](https://github.com/LIJI32/SameBoy)
 * [GitHub - binji/binjgb (C)](https://github.com/binji/binjgb)
 * [GitHub - Rodrigodd/gameroy (Rust)](https://github.com/Rodrigodd/gameroy)
 * [GitHub - simias/gb-rs (Rust)](https://github.com/simias/gb-rs)
