@@ -4,14 +4,22 @@ pub mod util;
 use boytacean::{
     gb::GameBoy,
     pad::PadKey,
-    ppu::{DISPLAY_HEIGHT, DISPLAY_WIDTH},
+    ppu::{PpuMode, DISPLAY_HEIGHT, DISPLAY_WIDTH},
 };
 use sdl2::{event::Event, keyboard::Keycode, pixels::PixelFormatEnum};
 use util::Graphics;
 
 use crate::util::surface_from_bytes;
 
-const VISUAL_HZ: u32 = 60;
+/// The ration at which the logic of the Game Boy is
+/// going to be run, increasing this value will provide
+/// better emulator accuracy, please keep in mind that
+/// the PPU will keep running at the same speed.
+const LOGIC_RATIO: f32 = 2.0;
+
+/// The scale at which the screen is going to be drawn
+/// meaning the ratio between Game Boy resolution and
+/// the window size to be displayed.
 const SCREEN_SCALE: f32 = 2.0;
 
 /// The base title to be used in the window.
@@ -20,7 +28,7 @@ static TITLE: &'static str = "Boytacean";
 pub struct Emulator {
     system: GameBoy,
     graphics: Graphics,
-    visual_frequency: u32,
+    logic_ratio: f32,
     next_tick_time: f32,
     next_tick_time_i: u32,
 }
@@ -35,7 +43,7 @@ impl Emulator {
                 DISPLAY_HEIGHT as u32,
                 screen_scale,
             ),
-            visual_frequency: VISUAL_HZ,
+            logic_ratio: LOGIC_RATIO,
             next_tick_time: 0.0,
             next_tick_time_i: 0,
         }
@@ -114,36 +122,48 @@ impl Emulator {
 
             let current_time = self.graphics.timer_subsystem.ticks();
 
-            let mut counter_ticks = 0u32;
+            let mut counter_cycles = 0u32;
+            let mut last_frame = 0xffffu16;
 
             if current_time >= self.next_tick_time_i {
+                let cycle_limit = (GameBoy::LCD_CYCLES as f32 / self.logic_ratio as f32) as u32;
+
                 loop {
                     // limits the number of ticks to the typical number
-                    // of ticks required to do a complete PPU draw
-                    if counter_ticks >= 70224 {
+                    // of cycles expected for the current logic cycle
+                    if counter_cycles >= cycle_limit {
                         break;
                     }
 
                     // runs the Game Boy clock, this operations should
                     // include the advance of both the CPU and the PPU
-                    counter_ticks += self.system.clock() as u32;
+                    counter_cycles += self.system.clock() as u32;
+
+                    if self.system.ppu_mode() == PpuMode::VBlank
+                        && self.system.ppu_frame() != last_frame
+                    {
+                        // obtains the frame buffer of the Game Boy PPU and uses it
+                        // to update the stream texture, copying it then to the canvas
+                        let frame_buffer = self.system.frame_buffer().as_ref();
+                        texture
+                            .update(None, frame_buffer, DISPLAY_WIDTH as usize * 3)
+                            .unwrap();
+                        self.graphics.canvas.copy(&texture, None, None).unwrap();
+
+                        // presents the canvas effectively updating the screen
+                        // information presented to the user
+                        self.graphics.canvas.present();
+
+                        last_frame = self.system.ppu_frame();
+                    }
                 }
 
-                // obtains the frame buffer of the Game Boy PPU and uses it
-                // to update the stream texture, copying it then to the canvas
-                let frame_buffer = self.system.frame_buffer().as_ref();
-                texture
-                    .update(None, frame_buffer, DISPLAY_WIDTH as usize * 3)
-                    .unwrap();
-                self.graphics.canvas.copy(&texture, None, None).unwrap();
-
-                // presents the canvas effectively updating the screen
-                // information presented to the user
-                self.graphics.canvas.present();
+                let logic_frequency =
+                    GameBoy::CPU_FREQ as f32 / GameBoy::LCD_CYCLES as f32 * self.logic_ratio;
 
                 // updates the next update time reference to the current
                 // time so that it can be used from game loop control
-                self.next_tick_time += 1000.0 / self.visual_frequency as f32;
+                self.next_tick_time += 1000.0 / logic_frequency as f32;
                 self.next_tick_time_i = self.next_tick_time.ceil() as u32;
             }
 

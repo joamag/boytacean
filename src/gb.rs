@@ -38,35 +38,19 @@ impl GameBoy {
         self.cpu.reset();
     }
 
+    pub fn clock(&mut self) -> u8 {
+        let cycles = self.cpu_clock();
+        self.ppu_clock(cycles);
+        self.timer_clock(cycles);
+        cycles
+    }
+
     pub fn key_press(&mut self, key: PadKey) {
         self.pad().key_press(key);
     }
 
     pub fn key_lift(&mut self, key: PadKey) {
         self.pad().key_lift(key);
-    }
-
-    pub fn pc(&self) -> u16 {
-        self.cpu.pc()
-    }
-
-    pub fn ppu_ly(&mut self) -> u8 {
-        self.ppu().ly()
-    }
-
-    pub fn ppu_mode(&mut self) -> PpuMode {
-        self.ppu().mode()
-    }
-
-    pub fn ppu_frame(&mut self) -> u16 {
-        self.ppu().frame_index()
-    }
-
-    pub fn clock(&mut self) -> u8 {
-        let cycles = self.cpu_clock();
-        self.ppu_clock(cycles);
-        self.timer_clock(cycles);
-        cycles
     }
 
     pub fn cpu_clock(&mut self) -> u8 {
@@ -81,30 +65,24 @@ impl GameBoy {
         self.timer().clock(cycles)
     }
 
+    pub fn ppu_ly(&mut self) -> u8 {
+        self.ppu().ly()
+    }
+
+    pub fn ppu_mode(&mut self) -> PpuMode {
+        self.ppu().mode()
+    }
+
+    pub fn ppu_frame(&mut self) -> u16 {
+        self.ppu().frame_index()
+    }
+
     pub fn boot(&mut self) {
         self.cpu.boot();
     }
 
     pub fn load_boot(&mut self, data: &[u8]) {
         self.cpu.mmu().write_boot(0x0000, data);
-    }
-
-    pub fn load_boot_path(&mut self, path: &str) {
-        let data = read_file(path);
-        self.load_boot(&data);
-    }
-
-    pub fn load_boot_file(&mut self, boot_rom: BootRom) {
-        match boot_rom {
-            BootRom::Dmg => self.load_boot_path("./res/boot/dmg_boot.bin"),
-            BootRom::Sgb => self.load_boot_path("./res/boot/sgb_boot.bin"),
-            BootRom::DmgBootix => self.load_boot_path("./res/boot/dmg_bootix.bin"),
-            BootRom::MgbBootix => self.load_boot_path("./res/boot/mgb_bootix.bin"),
-        }
-    }
-
-    pub fn load_boot_default_f(&mut self) {
-        self.load_boot_file(BootRom::DmgBootix);
     }
 
     pub fn load_boot_static(&mut self, boot_rom: BootRom) {
@@ -143,6 +121,14 @@ impl GameBoy {
 }
 
 impl GameBoy {
+    /// The logical frequency of the Game Boy
+    /// CPU in hz.
+    pub const CPU_FREQ: u32 = 4194304;
+
+    /// The cycles taken to run a complete frame
+    /// loop in the Game Boy's PPU (in CPU cycles).
+    pub const LCD_CYCLES: u32 = 70224;
+
     pub fn cpu(&mut self) -> &mut Cpu {
         &mut self.cpu
     }
@@ -165,6 +151,24 @@ impl GameBoy {
 
     pub fn frame_buffer(&mut self) -> &Box<[u8; FRAME_BUFFER_SIZE]> {
         &(self.ppu().frame_buffer)
+    }
+
+    pub fn load_boot_path(&mut self, path: &str) {
+        let data = read_file(path);
+        self.load_boot(&data);
+    }
+
+    pub fn load_boot_file(&mut self, boot_rom: BootRom) {
+        match boot_rom {
+            BootRom::Dmg => self.load_boot_path("./res/boot/dmg_boot.bin"),
+            BootRom::Sgb => self.load_boot_path("./res/boot/sgb_boot.bin"),
+            BootRom::DmgBootix => self.load_boot_path("./res/boot/dmg_bootix.bin"),
+            BootRom::MgbBootix => self.load_boot_path("./res/boot/mgb_bootix.bin"),
+        }
+    }
+
+    pub fn load_boot_default_f(&mut self) {
+        self.load_boot_file(BootRom::DmgBootix);
     }
 
     pub fn load_rom(&mut self, data: &[u8]) -> &Cartridge {

@@ -215,20 +215,20 @@ const tick = (currentTime: number) => {
     );
     ticks = Math.max(ticks, 1);
 
-    let counterTicks = 0;
+    let counterCycles = 0;
 
     let lastFrame = -1;
 
     while (true) {
-        // limits the number of ticks to the typical number
-        // of ticks required to do a complete PPU draw
-        if (counterTicks >= 70224) {
+        // limits the number of cycles to the typical number
+        // of cycles required to do a complete PPU draw
+        if (counterCycles >= 70224) {
             break;
         }
 
         // runs the Game Boy clock, this operations should
         // include the advance of both the CPU and the PPU
-        counterTicks += state.gameBoy.clock();
+        counterCycles += state.gameBoy.clock();
 
         // in case the current PPU mode is VBlank and the
         // fram is different from the previously rendered
