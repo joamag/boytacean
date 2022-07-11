@@ -129,6 +129,10 @@ const main = async () => {
     // ROM retrieved from a remote data source
     await start({ loadRom: true });
 
+    // the counter that controls the overflowing cycles
+    // from tick to tick operation
+    let pending = 0;
+
     // runs the sequence as an infinite loop, running
     // the associated CPU cycles accordingly
     while (true) {
@@ -146,7 +150,7 @@ const main = async () => {
         let currentTime = new Date().getTime();
 
         try {
-            tick(currentTime);
+            pending = tick(currentTime, pending);
         } catch (err) {
             // sets the default error message to be displayed
             // to the user
@@ -200,10 +204,10 @@ const main = async () => {
     }
 };
 
-const tick = (currentTime: number) => {
+const tick = (currentTime: number, pending: number, cycles: number = 70224) => {
     // in case the time to draw the next frame has not been
     // reached the flush of the "tick" logic is skiped
-    if (currentTime < state.nextTickTime) return;
+    if (currentTime < state.nextTickTime) return pending;
 
     // calculates the number of ticks that have elapsed since the
     // last draw operation, this is critical to be able to properly
@@ -215,14 +219,16 @@ const tick = (currentTime: number) => {
     );
     ticks = Math.max(ticks, 1);
 
-    let counterCycles = 0;
+    // initializes the counter of cycles with the pending number
+    // of cycles coming from the previous tick
+    let counterCycles = pending;
 
     let lastFrame = -1;
 
     while (true) {
-        // limits the number of cycles to the typical number
-        // of cycles required to do a complete PPU draw
-        if (counterCycles >= 70224) {
+        // limits the number of cycles to the provided
+        // cycle value passed as a parameter
+        if (counterCycles >= cycles) {
             break;
         }
 
@@ -263,6 +269,10 @@ const tick = (currentTime: number) => {
     // updates the next update time reference to the, so that it
     // can be used to control the game loop
     state.nextTickTime += (1000 / state.visualFrequency) * ticks;
+
+    // calculates the new number of pending (overflow) cycles
+    // that are going to be added to the next iteration
+    return counterCycles - cycles;
 };
 
 /**
