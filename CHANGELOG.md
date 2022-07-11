@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 * Improved drawing speed at the SDL example
+* Better handling of `panic!()` in web version
 
 ### Fixed
 
