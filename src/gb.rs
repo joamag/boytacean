@@ -69,6 +69,10 @@ impl GameBoy {
         self.timer().clock(cycles)
     }
 
+    pub fn boot(&mut self) {
+        self.cpu.boot();
+    }
+
     pub fn load_boot(&mut self, data: &[u8]) {
         self.cpu.mmu().write_boot(0x0000, data);
     }

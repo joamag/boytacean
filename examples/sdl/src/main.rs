@@ -158,7 +158,7 @@ fn main() {
     game_boy.load_boot_default();
 
     let mut emulator = Emulator::new(game_boy, SCREEN_SCALE);
-    emulator.load_rom("../../res/roms.prop/dr_mario.gb");
+    emulator.load_rom("../../res/roms.prop/super_mario.gb");
     emulator.run();
 }
 

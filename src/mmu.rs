@@ -17,13 +17,19 @@ pub struct Mmu {
     /// the I/O access to this device.
     pad: Pad,
 
+    /// The timer controller to be used as part of the I/O access
+    /// that is memory mapped.
     timer: Timer,
 
     /// The cartridge ROM that is currently loaded into the system,
     /// going to be used to access ROM and external RAM banks.
     rom: Cartridge,
 
+    /// Flag that control the access to the boot section in the
+    /// 0x0000-0x00fe memory area, this flag should be unset after
+    /// the bool sequence has been finished.
     boot_active: bool,
+
     boot: [u8; BOOT_SIZE],
     ram: [u8; RAM_SIZE],
 }
@@ -64,6 +70,10 @@ impl Mmu {
 
     pub fn boot_active(&self) -> bool {
         self.boot_active
+    }
+
+    pub fn set_boot_active(&mut self, value: bool) {
+        self.boot_active = value;
     }
 
     pub fn read(&mut self, addr: u16) -> u8 {

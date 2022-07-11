@@ -76,6 +76,31 @@ impl Cpu {
         self.cycles = 0;
     }
 
+    /// Sets the CPU registers and some of the memory space to the
+    /// state expected after the Game Boy boot ROM executes, using
+    /// these values its possible to skip the boot loading process.
+    pub fn boot(&mut self) {
+        self.pc = 0x0100;
+        self.sp = 0xfffe;
+        self.a = 0x01;
+        self.b = 0xff;
+        self.c = 0x13;
+        self.d = 0x00;
+        self.e = 0xc1;
+        self.h = 0x84;
+        self.l = 0x03;
+        self.zero = false;
+        self.sub = false;
+        self.half_carry = false;
+        self.carry = false;
+
+        // updates part of the MMU state, disabling the
+        // boot memory overlap and setting the LCD control
+        // register to enabled (required by some ROMs)
+        self.mmu.set_boot_active(false);
+        self.mmu.write(0xff40, 0x91);
+    }
+
     pub fn clock(&mut self) -> u8 {
         // gathers the PC (program counter) reference that
         // is going to be used in the fetching phase

@@ -303,7 +303,7 @@ impl Ppu {
             switch_window: false,
             window_map: false,
             switch_lcd: false,
-            first_frame: true,
+            first_frame: false,
             stat_hblank: false,
             stat_vblank: false,
             stat_oam: false,
@@ -337,6 +337,7 @@ impl Ppu {
         self.switch_window = false;
         self.window_map = false;
         self.switch_lcd = false;
+        self.first_frame = false;
         self.stat_hblank = false;
         self.stat_vblank = false;
         self.stat_oam = false;
