@@ -106,8 +106,7 @@ impl Cpu {
         // is going to be used in the fetching phase
         let pc = self.pc;
 
-        //@todo maybe remove this option as it may
-        // spend valuable resources
+        #[cfg(feature = "debug")]
         if pc >= 0x8000 && pc < 0x9fff {
             panic!("Invalid PC area at 0x{:04x}", pc);
         }
