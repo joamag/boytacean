@@ -870,9 +870,7 @@ impl Ppu {
     /// that the flag that control will be updated in case the conditions
     /// required for the LCD STAT interrupt to be triggered are met.
     fn update_stat(&mut self) {
-        if self.stat_level() {
-            self.int_stat = true;
-        }
+        self.int_stat = self.stat_level();
     }
 
     /// Obtains the current level of the LCD STAT interrupt by
@@ -881,6 +879,6 @@ impl Ppu {
         self.stat_lyc && self.lyc == self.ly
             || self.stat_oam && self.mode == PpuMode::OamRead
             || self.stat_vblank && self.mode == PpuMode::VBlank
-            || self.stat_vblank && self.mode == PpuMode::HBlank
+            || self.stat_hblank && self.mode == PpuMode::HBlank
     }
 }

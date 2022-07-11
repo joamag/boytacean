@@ -41,6 +41,11 @@ impl Emulator {
         }
     }
 
+    pub fn load_rom(&mut self, path: &str) {
+        let rom = self.system.load_rom_file(path);
+        println!("==== Cartridge ====\n{}\n===================", rom);
+    }
+
     pub fn run(&mut self) {
         // updates the icon of the window to reflect the image
         // and style of the emulator
@@ -81,7 +86,6 @@ impl Emulator {
             while let Some(event) = self.graphics.event_pump.poll_event() {
                 match event {
                     Event::Quit { .. } => break 'main,
-
                     Event::KeyDown {
                         keycode: Some(keycode),
                         ..
@@ -89,7 +93,6 @@ impl Emulator {
                         Some(key) => self.system.key_press(key),
                         None => (),
                     },
-
                     Event::KeyUp {
                         keycode: Some(keycode),
                         ..
@@ -97,13 +100,11 @@ impl Emulator {
                         Some(key) => self.system.key_lift(key),
                         None => (),
                     },
-
                     Event::DropFile { filename, .. } => {
                         self.system.reset();
                         self.system.load_boot_default();
-                        self.system.load_rom_file(&filename);
+                        self.load_rom(&filename);
                     }
-
                     _ => (),
                 }
             }
@@ -156,38 +157,8 @@ fn main() {
     let mut game_boy = GameBoy::new();
     game_boy.load_boot_default();
 
-    //let rom = game_boy.load_rom_file("../../res/roms.prop/tetris.gb");
-    let rom = game_boy.load_rom_file("../../res/roms.prop/dr_mario.gb");
-    //let rom = game_boy.load_rom_file("../../res/roms.prop/alleyway.gb");
-    //let rom = game_boy.load_rom_file("../../res/roms.prop/super_mario.gb");
-    //let rom = game_boy.load_rom_file("../../res/roms.prop/super_mario_2.gb");
-    //let rom = game_boy.load_rom_file("../../res/roms.prop/pokemon_red.gb");
-    //let rom = game_boy.load_rom_file("../../res/roms.prop/pokemon_yellow.gb");
-    //let rom = game_boy.load_rom_file("../../res/roms.prop/zelda.gb");
-    //let rom = game_boy.load_rom_file("../../res/roms.prop/django.gb");
-    //let rom = game_boy.load_rom_file("../../res/roms.prop/2048.gb");
-
-    //let rom = game_boy.load_rom_file("../../res/roms/firstwhite.gb");
-    //let rom = game_boy.load_rom_file("../../res/roms/opus5.gb");
-
-    //let rom = game_boy.load_rom_file("../../res/roms/paradius/cpu/cpu_instrs.gb"); // PASSED
-    //let rom = game_boy.load_rom_file("../../res/roms/paradius/interrupt_time/interrupt_time.gb"); // FAILED
-    //let rom = game_boy.load_rom_file("../../res/roms/paradius/instr_timing/instr_timing.gb"); // PASSED
-    //let rom = game_boy.load_rom_file("../../res/roms/paradius/mem_timing/mem_timing.gb"); // FAILED
-    //let rom = game_boy.load_rom_file("../../res/roms/paradius/cpu/01-special.gb"); // PASSED
-    //let rom = game_boy.load_rom_file("../../res/roms/paradius/cpu/02-interrupts.gb"); // PASSED
-    //let rom = game_boy.load_rom_file("../../res/roms/paradius/cpu/03-op sp,hl.gb"); // PASSED
-    //let rom = game_boy.load_rom_file("../../res/roms/paradius/cpu/04-op r,imm.gb"); // PASSED
-    //let rom = game_boy.load_rom_file("../../res/roms/paradius/cpu/05-op rp.gb"); // PASSED
-    //let rom = game_boy.load_rom_file("../../res/roms/paradius/cpu/06-ld r,r.gb"); // PASSED
-    //let rom = game_boy.load_rom_file("../../res/roms/paradius/cpu/07-jr,jp,call,ret,rst.gb"); // PASSED
-    //let rom = game_boy.load_rom_file("../../res/roms/paradius/cpu/08-misc instrs.gb");  // PASSED
-    //let rom = game_boy.load_rom_file("../../res/roms/paradius/cpu/09-op r,r.gb"); // PASSED
-    //let rom = game_boy.load_rom_file("../../res/roms/paradius/cpu/10-bit ops.gb"); // PASSED
-    //let rom = game_boy.load_rom_file("../../res/roms/paradius/cpu/11-op a,(hl).gb"); // PASSED
-    println!("==== Cartridge ====\n{}\n===================", rom);
-
     let mut emulator = Emulator::new(game_boy, SCREEN_SCALE);
+    emulator.load_rom("../../res/roms.prop/dr_mario.gb");
     emulator.run();
 }
 
