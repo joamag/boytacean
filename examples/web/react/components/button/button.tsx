@@ -13,7 +13,7 @@ export const Button: FC<ButtonProps> = ({
     text,
     size = "small",
     style = ["simple", "border"],
-    onClick = undefined
+    onClick
 }) => {
     const classes = () => ["button", size, ...style].join(" ");
     const _onClick = () => (onClick ? onClick() : undefined);
