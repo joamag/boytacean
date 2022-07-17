@@ -205,11 +205,11 @@ impl GameBoy {
 #[wasm_bindgen]
 extern "C" {
     #[wasm_bindgen(js_namespace = window)]
-    fn panic(s: &str);
+    fn panic(message: &str);
 }
 
 #[cfg(feature = "wasm")]
 pub fn hook_impl(info: &PanicInfo) {
-    let msg = info.to_string();
-    panic(msg.as_str());
+    let message = info.to_string();
+    panic(message.as_str());
 }
