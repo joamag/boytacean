@@ -2,20 +2,26 @@ import React, { FC } from "react";
 
 import "./button.css";
 
-export const Button: FC<{ text: string; size?: string; style?: string[] }> = ({
+type ButtonProps = {
+    text: string;
+    size?: string;
+    style?: string[];
+    onClick?: () => void;
+};
+
+export const Button: FC<ButtonProps> = ({
     text,
     size = "small",
-    style = ["simple", "border"]
+    style = ["simple", "border"],
+    onClick = undefined
 }) => {
-    const onClick = () => {
-        alert("Hello World");
-    };
-
     const classes = () => ["button", size, ...style].join(" ");
-
+    const _onClick = () => (onClick ? onClick() : undefined);
     return (
-        <span className={classes()} onClick={onClick}>
+        <span className={classes()} onClick={_onClick}>
             {text}
         </span>
     );
 };
+
+export default Button;
