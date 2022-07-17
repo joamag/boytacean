@@ -7,6 +7,5 @@ const install = (Vue: App) => {
 };
 
 export * from "./components";
-export { Boytacean } from "./app.vue";
 
 export default install;

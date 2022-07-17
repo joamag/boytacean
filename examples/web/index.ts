@@ -3,8 +3,6 @@ import Boytacean from "./vue/app.vue";
 import { default as _wasm, GameBoy, PadKey, PpuMode } from "./lib/boytacean.js";
 import info from "./package.json";
 
-console.info(Boytacean);
-
 const PIXEL_UNSET_COLOR = 0x1b1a17ff;
 
 const LOGIC_HZ = 600;
@@ -13,7 +11,7 @@ const TIMER_HZ = 60;
 const IDLE_HZ = 10;
 
 const FREQUENCY_DELTA = 60;
-
+ 
 const DISPLAY_WIDTH = 160;
 const DISPLAY_HEIGHT = 144;
 const DISPLAY_RATIO = DISPLAY_WIDTH / DISPLAY_HEIGHT;

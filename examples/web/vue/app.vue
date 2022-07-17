@@ -9,7 +9,7 @@
 }
 </style>
 
-<script>
+<script lang="ts">
 export const Boytacean = {
     data() {
         return {
