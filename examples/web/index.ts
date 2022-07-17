@@ -1,5 +1,5 @@
-import { createApp } from "vue";
-import Boytacean from "./vue/app.vue";
+import { startApp } from "./react/app";
+
 import { default as _wasm, GameBoy, PadKey, PpuMode } from "./lib/boytacean.js";
 import info from "./package.json";
 
@@ -11,7 +11,7 @@ const TIMER_HZ = 60;
 const IDLE_HZ = 10;
 
 const FREQUENCY_DELTA = 60;
- 
+
 const DISPLAY_WIDTH = 160;
 const DISPLAY_HEIGHT = 144;
 const DISPLAY_RATIO = DISPLAY_WIDTH / DISPLAY_HEIGHT;
@@ -1099,9 +1099,7 @@ const wasm = async () => {
 };
 
 (async () => {
-    (globalThis as any).__VUE_OPTIONS_API__ = true;
-    (globalThis as any).__VUE_PROD_DEVTOOLS__ = false;
-    createApp(Boytacean).mount("#app");
+    startApp("app");
 
     const emulator = new Emulator();
     await emulator.main();
