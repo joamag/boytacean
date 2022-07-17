@@ -1,7 +1,9 @@
 import { createApp } from "vue";
-import App from "./vue/app.vue";
+import Boytacean from "./vue/app.vue";
 import { default as _wasm, GameBoy, PadKey, PpuMode } from "./lib/boytacean.js";
 import info from "./package.json";
+
+console.info(Boytacean);
 
 const PIXEL_UNSET_COLOR = 0x1b1a17ff;
 
@@ -1101,8 +1103,7 @@ const wasm = async () => {
 (async () => {
     (globalThis as any).__VUE_OPTIONS_API__ = true;
     (globalThis as any).__VUE_PROD_DEVTOOLS__ = false;
-
-    createApp(App).mount("#app");
+    createApp(Boytacean).mount("#app");
 
     const emulator = new Emulator();
     await emulator.main();

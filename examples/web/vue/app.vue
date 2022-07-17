@@ -1,5 +1,5 @@
 <template>
-    <div v-bind:class="'hello'" v-on:click="() => count++">Hello This {{ name }} {{ count}}!</div>
+    <div v-bind:class="'hello'" v-on:click="() => count++">Hello {{ name }} {{ count}}!</div>
 </template>
 
 <style scoped>
@@ -10,7 +10,7 @@
 </style>
 
 <script>
-export const App = {
+export const Boytacean = {
     data() {
         return {
             name: "Vue",
@@ -19,5 +19,5 @@ export const App = {
     }
 };
 
-export default App;
+export default Boytacean;
 </script>
