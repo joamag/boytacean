@@ -1,16 +1,20 @@
 .button {
-    font-size: 12px;
     cursor: pointer;
+    display: inline-block;
 }
 
-.button.tiny {
+.button.small {
+    font-size: 14px;
+    line-height: 24px;
+}
+
+.button.simple {
     border-radius: 96px 96px 96px 96px;
     -o-border-radius: 96px 96px 96px 96px;
     -ms-border-radius: 96px 96px 96px 96px;
     -moz-border-radius: 96px 96px 96px 96px;
     -khtml-border-radius: 96px 96px 96px 96px;
     -webkit-border-radius: 96px 96px 96px 96px;
-    display: inline-block;
     padding: 0px 8px 0px 8px;
     user-select: none;
     -o-user-select: none;
@@ -20,71 +24,71 @@
     -webkit-user-select: none;
 }
 
-.button.tiny.border {
+.button.simple.border {
     border: 1px solid #ffffff;
 }
 
-.button.tiny.padded {
+.button.simple.padded {
     padding: 4px 10px 4px 10px;
 }
 
-.button.tiny.padded-large {
+.button.simple.padded-large {
     padding: 4px 14px 4px 14px;
 }
 
-.button.tiny.rounded {
+.button.simple.rounded {
     padding: 6px 6px 6px 6px;
 }
 
-.button.tiny.enabled {
+.button.simple.enabled {
     background-color: #50cb93;
 }
 
-.button.tiny.file {
+.button.simple.file {
     position: relative;
 }
 
-.button.tiny:hover {
+.button.simple:hover {
     background-color: #50cb93;
 }
 
-.button.tiny.red:hover {
+.button.simple.red:hover {
     background-color: #e63946;
 }
 
-.button.tiny:active {
+.button.simple:active {
     background-color: #2a9d8f;
 }
 
-.button.tiny.red:active {
+.button.simple.red:active {
     background-color: #bf2a37;
 }
 
-.button.tiny > img {
+.button.simple > img {
     margin-right: 6px;
     margin-top: 2px;
     vertical-align: top;
     width: 13px;
 }
 
-.button.tiny > img.medium {
+.button.simple > img.medium {
     width: 20px;
 }
 
-.button.tiny > img.large {
+.button.simple > img.large {
     width: 28px;
 }
 
-.button.tiny > img.very-large {
+.button.simple > img.very-large {
     width: 38px;
 }
 
-.button.tiny.no-text > img {
+.button.simple.no-text > img {
     margin-right: 0px;
     margin-top: 0px;
 }
 
-.button.tiny.file > input[type="file"] {
+.button.simple.file > input[type="file"] {
     cursor: pointer;
     height: 100%;
     left: 0px;
@@ -100,6 +104,6 @@
     width: 100%;
 }
 
-.button.tiny.file > input[type="file"]::-webkit-file-upload-button {
+.button.simple.file > input[type="file"]::-webkit-file-upload-button {
     cursor: pointer;
 }

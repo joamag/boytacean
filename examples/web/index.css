@@ -473,12 +473,12 @@ p {
     -webkit-user-select: none;
 }
 
-.modal-container > .modal .modal-buttons > .button.tiny {
+.modal-container > .modal .modal-buttons > .button.simple {
     margin-right: 12px;
     min-width: 120px;
 }
 
-.modal-container > .modal .modal-buttons > .button.tiny:last-child {
+.modal-container > .modal .modal-buttons > .button.simple:last-child {
     margin-right: 0px;
 }
 
