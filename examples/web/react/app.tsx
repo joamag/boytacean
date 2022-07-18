@@ -10,13 +10,18 @@ export const App = () => {
     const getText = () => `Hello World ${count}`;
     const onClick = () => setCount(count + 1);
     const pairs = () => [
-        <Pair key="tobias" name={"Tobias"} value={`Count ${count}`}></Pair>,
-        <Pair key="matias" name={"Matias"} value={"3"}></Pair>
+        <Pair key="tobias" name={"Tobias"} value={`Count ${count}`} />,
+        <Pair key="matias" name={"Matias"} value={"3"} />,
+        <Pair
+            key="button"
+            name={"Button"}
+            valueNode={<Button text="NEO" size={"large"} style={["simple"]} />}
+        />
     ];
     return (
         <>
             <Button text={getText()} onClick={onClick} />
-            <Info pairs={pairs()}></Info>
+            <Info pairs={pairs()} />
         </>
     );
 };

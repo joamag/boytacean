@@ -1,10 +1,11 @@
-import React, { FC } from "react";
+import React, { FC, ReactNode } from "react";
 
 import "./pair.css";
 
 type PairProps = {
     name: string;
     value?: string;
+    valueNode?: ReactNode;
     style?: string[];
     onNameClick?: () => void;
     onValueClick?: () => void;
@@ -13,6 +14,7 @@ type PairProps = {
 export const Pair: FC<PairProps> = ({
     name,
     value,
+    valueNode,
     style = [],
     onNameClick,
     onValueClick
@@ -26,7 +28,7 @@ export const Pair: FC<PairProps> = ({
                 {name}
             </dt>
             <dd className={classes()} onClick={_onValueClick}>
-                {value ?? ""}
+                {valueNode ?? value ?? ""}
             </dd>
         </>
     );
