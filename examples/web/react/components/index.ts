@@ -1,2 +1,3 @@
 export * from "./button/button";
-export * from "./tuple/tuple";
+export * from "./info/info";
+export * from "./pair/pair";

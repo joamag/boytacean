@@ -1,8 +1,8 @@
 import React, { FC } from "react";
 
-import "./tuple.css";
+import "./pair.css";
 
-type TupleProps = {
+type PairProps = {
     key: string;
     value?: string;
     style?: string[];
@@ -10,14 +10,14 @@ type TupleProps = {
     onValueClick?: () => void;
 };
 
-export const Tuple: FC<TupleProps> = ({
+export const Pair: FC<PairProps> = ({
     key,
     value,
     style = [],
     onKeyClick,
     onValueClick
 }) => {
-    const classes = () => ["table-entry", ...style].join(" ");
+    const classes = () => ["pair", ...style].join(" ");
     const _onKeyClick = () => (onKeyClick ? onKeyClick() : undefined);
     const _onValueClick = () => (onValueClick ? onValueClick() : undefined);
     return (
@@ -32,4 +32,4 @@ export const Tuple: FC<TupleProps> = ({
     );
 };
 
-export default Tuple;
+export default Pair;
