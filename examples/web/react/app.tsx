@@ -10,8 +10,8 @@ export const App = () => {
     const getText = () => `Hello World ${count}`;
     const onClick = () => setCount(count + 1);
     const pairs = () => [
-        <Pair key="tobias" name={"Tobias"} value="2"></Pair>,
-        <Pair key="matias" name={"Matias"} value="3"></Pair>
+        <Pair key="tobias" name={"Tobias"} value={`count`}></Pair>,
+        <Pair key="matias" name={"Matias"} value={"3"}></Pair>
     ];
     return (
         <>
