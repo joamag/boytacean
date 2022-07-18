@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import ReactDOM from "react-dom/client";
 
-import { Button } from "./components";
+import { Button, Info, Pair } from "./components";
 
 import "./app.css";
 
@@ -9,7 +9,16 @@ export const App = () => {
     const [count, setCount] = useState(0);
     const getText = () => `Hello World ${count}`;
     const onClick = () => setCount(count + 1);
-    return <Button text={getText()} onClick={onClick} />;
+    const pairs = () => [
+        <Pair key="tobias" name={"Tobias"} value="2"></Pair>,
+        <Pair key="matias" name={"Matias"} value="3"></Pair>
+    ];
+    return (
+        <>
+            <Button text={getText()} onClick={onClick} />
+            <Info pairs={pairs()}></Info>
+        </>
+    );
 };
 
 export const startApp = (element: string) => {

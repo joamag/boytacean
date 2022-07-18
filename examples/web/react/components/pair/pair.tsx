@@ -3,27 +3,27 @@ import React, { FC } from "react";
 import "./pair.css";
 
 type PairProps = {
-    key: string;
+    name: string;
     value?: string;
     style?: string[];
-    onKeyClick?: () => void;
+    onNameClick?: () => void;
     onValueClick?: () => void;
 };
 
 export const Pair: FC<PairProps> = ({
-    key,
+    name,
     value,
     style = [],
-    onKeyClick,
+    onNameClick,
     onValueClick
 }) => {
     const classes = () => ["pair", ...style].join(" ");
-    const _onKeyClick = () => (onKeyClick ? onKeyClick() : undefined);
+    const _onNameClick = () => (onNameClick ? onNameClick() : undefined);
     const _onValueClick = () => (onValueClick ? onValueClick() : undefined);
     return (
         <>
-            <dt className={classes()} onClick={_onKeyClick}>
-                {key}
+            <dt className={classes()} onClick={_onNameClick}>
+                {name}
             </dt>
             <dd className={classes()} onClick={_onValueClick}>
                 {value ?? ""}
