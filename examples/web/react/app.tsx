@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import ReactDOM from "react-dom/client";
 
-import { Button, Info, Pair } from "./components";
+import { Button, ButtonSwitch, Info, Pair } from "./components";
 
 import "./app.css";
 
@@ -15,7 +15,14 @@ export const App = () => {
         <Pair
             key="button"
             name={"Button"}
-            valueNode={<Button text="NEO" size={"large"} style={["simple"]} />}
+            valueNode={
+                <ButtonSwitch
+                    options={["NEO", "CLASSIC"]}
+                    size={"large"}
+                    style={["simple"]}
+                    onChange={(v) => alert(v)}
+                />
+            }
         />
     ];
     return (
