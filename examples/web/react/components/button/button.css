@@ -66,8 +66,7 @@
 
 .button.simple > img {
     margin-right: 6px;
-    margin-top: 2px;
-    vertical-align: top;
+    vertical-align: middle;
     width: 13px;
 }
 
@@ -81,6 +80,11 @@
 
 .button.simple > img.very-large {
     width: 38px;
+}
+
+.button.simple > span {
+    vertical-align: middle;
+    display: inline-block;
 }
 
 .button.simple.no-text > img {

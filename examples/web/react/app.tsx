@@ -28,6 +28,12 @@ export const App = () => {
     return (
         <>
             <Button text={getText()} onClick={onClick} />
+            <Button
+                text={getText()}
+                image={require("../res/pause.svg")}
+                imageAlt="tobias"
+                onClick={onClick}
+            />
             <Info pairs={pairs()} />
         </>
     );
