@@ -3,6 +3,8 @@ import { startApp } from "./react/app";
 import { default as _wasm, GameBoy, PadKey, PpuMode } from "./lib/boytacean.js";
 import info from "./package.json";
 
+declare const require: any;
+
 const PIXEL_UNSET_COLOR = 0x1b1a17ff;
 
 const LOGIC_HZ = 600;
@@ -48,6 +50,11 @@ enum PixelFormat {
     RGBA = 4
 }
 
+/**
+ * Top level class that controls the emulator behaviour
+ * and "joins" all the elements together to bring input/output
+ * of the associated machine.
+ */
 class Emulator {
     /**
      * The Game Boy engine (probably coming from WASM) that
