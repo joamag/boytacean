@@ -39,7 +39,6 @@ const KEYS: Record<string, number> = {
     s: PadKey.B
 };
 
-// @ts-ignore: ts(2580)
 const ROM_PATH = require("../../res/roms/20y.gb");
 
 // Enumeration that describes the multiple pixel
@@ -153,7 +152,6 @@ class Emulator {
                 // also sets the default color on screen to indicate the issue
                 if (isPanic) {
                     await this.clearCanvas(undefined, {
-                        // @ts-ignore: ts(2580)
                         image: require("./res/storm.png"),
                         imageScale: 0.2
                     });
@@ -335,7 +333,6 @@ class Emulator {
             id: "diag:tobias"
         }).mount(".diag");
 
-        // @ts-ignore: ts(2580)
         Button.create("Tobias", require("./res/close.svg"))
             .bind("click", () => alert("Hello World"))
             .mount(".button-area");*/
@@ -974,7 +971,6 @@ class Emulator {
         const img = buttonPause.getElementsByTagName("img")[0];
         const span = buttonPause.getElementsByTagName("span")[0];
         buttonPause.classList.add("enabled");
-        // @ts-ignore: ts(2580)
         img.src = require("./res/play.svg");
         span.textContent = "Resume";
     }
@@ -986,7 +982,6 @@ class Emulator {
         const img = buttonPause.getElementsByTagName("img")[0];
         const span = buttonPause.getElementsByTagName("span")[0];
         buttonPause.classList.remove("enabled");
-        // @ts-ignore: ts(2580)
         img.src = require("./res/pause.svg");
         span.textContent = "Pause";
     }
