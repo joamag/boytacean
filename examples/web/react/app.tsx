@@ -22,7 +22,12 @@ export const App = () => {
             key="button-tobias"
             name={"Button Increment"}
             valueNode={
-                <ButtonIncrement value={200} delta={100} suffix={"Hz"} />
+                <ButtonIncrement
+                    value={200}
+                    delta={100}
+                    min={0}
+                    suffix={"Hz"}
+                />
             }
         />,
         <Pair

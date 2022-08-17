@@ -6,22 +6,28 @@ import "./button-increment.css";
 type ButtonIncrementProps = {
     value: number;
     delta?: number;
+    min?: number;
+    max?: number;
     prefix?: string;
     suffix?: string;
     size?: string;
     style?: string[];
     onClick?: () => void;
+    onBeforeChange?: (value: number) => boolean;
     onChange?: (value: number) => void;
 };
 
 export const ButtonIncrement: FC<ButtonIncrementProps> = ({
     value,
     delta = 1,
+    min,
+    max,
     prefix,
     suffix,
     size = "medium",
     style = ["simple", "border"],
     onClick,
+    onBeforeChange,
     onChange
 }) => {
     const [valueState, setValue] = useState(value);
@@ -31,11 +37,19 @@ export const ButtonIncrement: FC<ButtonIncrementProps> = ({
     };
     const _onMinusClick = () => {
         const valueNew = valueState - delta;
+        if (onBeforeChange) {
+            if (!onBeforeChange(valueNew)) return;
+        }
+        if (min !== undefined && valueNew < min) return;
         setValue(valueNew);
         if (onChange) onChange(valueNew);
     };
     const _onPlusClick = () => {
         const valueNew = valueState + delta;
+        if (onBeforeChange) {
+            if (!onBeforeChange(valueNew)) return;
+        }
+        if (max !== undefined && valueNew > max) return;
         setValue(valueNew);
         if (onChange) onChange(valueNew);
     };
