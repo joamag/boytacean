@@ -1,7 +1,13 @@
 import React, { useState } from "react";
 import ReactDOM from "react-dom/client";
 
-import { Button, ButtonSwitch, Info, Pair } from "./components";
+import {
+    Button,
+    ButtonIncrement,
+    ButtonSwitch,
+    Info,
+    Pair
+} from "./components";
 
 import "./app.css";
 
@@ -13,8 +19,13 @@ export const App = () => {
         <Pair key="tobias" name={"Tobias"} value={`Count ${count}`} />,
         <Pair key="matias" name={"Matias"} value={"3"} />,
         <Pair
-            key="button"
-            name={"Button"}
+            key="button-tobias"
+            name={"Button Increment"}
+            valueNode={<ButtonIncrement value={200} delta={100} />}
+        />,
+        <Pair
+            key="button-cpu"
+            name={"Button Switch"}
             valueNode={
                 <ButtonSwitch
                     options={["NEO", "CLASSIC"]}
