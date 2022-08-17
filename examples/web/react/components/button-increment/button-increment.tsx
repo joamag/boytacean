@@ -6,6 +6,8 @@ import "./button-increment.css";
 type ButtonIncrementProps = {
     value: number;
     delta?: number;
+    prefix?: string;
+    suffix?: string;
     size?: string;
     style?: string[];
     onClick?: () => void;
@@ -15,6 +17,8 @@ type ButtonIncrementProps = {
 export const ButtonIncrement: FC<ButtonIncrementProps> = ({
     value,
     delta = 1,
+    prefix,
+    suffix,
     size = "medium",
     style = ["simple", "border"],
     onClick,
@@ -43,7 +47,9 @@ export const ButtonIncrement: FC<ButtonIncrementProps> = ({
                 style={["simple"]}
                 onClick={_onMinusClick}
             />
+            {prefix && <span className="prefix">{prefix}</span>}
             <span className="value">{valueState}</span>
+            {suffix && <span className="suffix">{suffix}</span>}
             <Button
                 text={"+"}
                 size={size}

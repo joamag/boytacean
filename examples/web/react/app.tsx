@@ -21,7 +21,9 @@ export const App = () => {
         <Pair
             key="button-tobias"
             name={"Button Increment"}
-            valueNode={<ButtonIncrement value={200} delta={100} />}
+            valueNode={
+                <ButtonIncrement value={200} delta={100} suffix={"Hz"} />
+            }
         />,
         <Pair
             key="button-cpu"

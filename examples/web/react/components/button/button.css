@@ -84,8 +84,8 @@
 }
 
 .button.simple > span {
-    vertical-align: middle;
     display: inline-block;
+    vertical-align: middle;
 }
 
 .button.simple.no-text > img {
