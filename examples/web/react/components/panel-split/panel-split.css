@@ -1,0 +1,17 @@
+.panel-split {
+    display: flex;
+}
+
+.panel-split > .side-left {
+    text-align: center;
+    flex: 1 0;
+    justify-content: center;
+    display: flex;
+}
+
+.panel-split > .side-right {
+    max-width: 100%;
+    min-width: 580px;
+    flex: 0;
+    padding: 0px 24px 0px 24px;
+}
