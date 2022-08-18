@@ -3,15 +3,15 @@
 }
 
 .panel-split > .side-left {
-    text-align: center;
+    display: flex;
     flex: 1 0;
     justify-content: center;
-    display: flex;
+    text-align: center;
 }
 
 .panel-split > .side-right {
+    flex: 0;
     max-width: 100%;
     min-width: 580px;
-    flex: 0;
     padding: 0px 24px 0px 24px;
 }

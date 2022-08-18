@@ -7,6 +7,7 @@ import {
     ButtonSwitch,
     Info,
     Pair,
+    PanelSplit,
     Section
 } from "./components";
 
@@ -18,47 +19,49 @@ export const App = () => {
     const onClick = () => setCount(count + 1);
     return (
         <>
-            <Section>
-                <Button text={getText()} onClick={onClick} />
-                <Button
-                    text={getText()}
-                    image={require("../res/pause.svg")}
-                    imageAlt="tobias"
-                    onClick={onClick}
-                />
-                <Info>
-                    <Pair
-                        key="tobias"
-                        name={"Tobias"}
-                        value={`Count ${count}`}
+            <PanelSplit>
+                <Section>
+                    <Button text={getText()} onClick={onClick} />
+                    <Button
+                        text={getText()}
+                        image={require("../res/pause.svg")}
+                        imageAlt="tobias"
+                        onClick={onClick}
                     />
-                    <Pair key="matias" name={"Matias"} value={"3"} />
-                    <Pair
-                        key="button-tobias"
-                        name={"Button Increment"}
-                        valueNode={
-                            <ButtonIncrement
-                                value={200}
-                                delta={100}
-                                min={0}
-                                suffix={"Hz"}
-                            />
-                        }
-                    />
-                    <Pair
-                        key="button-cpu"
-                        name={"Button Switch"}
-                        valueNode={
-                            <ButtonSwitch
-                                options={["NEO", "CLASSIC"]}
-                                size={"large"}
-                                style={["simple"]}
-                                onChange={(v) => alert(v)}
-                            />
-                        }
-                    />
-                </Info>
-            </Section>
+                    <Info>
+                        <Pair
+                            key="tobias"
+                            name={"Tobias"}
+                            value={`Count ${count}`}
+                        />
+                        <Pair key="matias" name={"Matias"} value={"3"} />
+                        <Pair
+                            key="button-tobias"
+                            name={"Button Increment"}
+                            valueNode={
+                                <ButtonIncrement
+                                    value={200}
+                                    delta={100}
+                                    min={0}
+                                    suffix={"Hz"}
+                                />
+                            }
+                        />
+                        <Pair
+                            key="button-cpu"
+                            name={"Button Switch"}
+                            valueNode={
+                                <ButtonSwitch
+                                    options={["NEO", "CLASSIC"]}
+                                    size={"large"}
+                                    style={["simple"]}
+                                    onChange={(v) => alert(v)}
+                                />
+                            }
+                        />
+                    </Info>
+                </Section>
+            </PanelSplit>
         </>
     );
 };
