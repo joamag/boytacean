@@ -3,7 +3,7 @@ import React, { FC, ReactNode } from "react";
 import "./info.css";
 
 type InfoProps = {
-    pairs?: ReactNode[];
+    children?: ReactNode;
     style?: string[];
 };
 
@@ -18,9 +18,9 @@ type InfoProps = {
  * to build the info pairs.
  * @returns The info component with the associated pairs.
  */
-export const Info: FC<InfoProps> = ({ pairs = [], style = [] }) => {
+export const Info: FC<InfoProps> = ({ children = [], style = [] }) => {
     const classes = () => ["info", ...style].join(" ");
-    return <dl className={classes()}>{pairs}</dl>;
+    return <dl className={classes()}>{children}</dl>;
 };
 
 export default Info;
