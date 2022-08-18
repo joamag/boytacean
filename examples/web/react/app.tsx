@@ -8,7 +8,8 @@ import {
     Info,
     Pair,
     PanelSplit,
-    Section
+    Section,
+    Title
 } from "./components";
 
 import "./app.css";
@@ -19,7 +20,13 @@ export const App = () => {
     const onClick = () => setCount(count + 1);
     return (
         <>
-            <PanelSplit>
+            <PanelSplit left={<div>This is the left panel</div>}>
+                <Title
+                    text="Boytacean"
+                    version="0.3.0"
+                    versionUrl="https://gitlab.stage.hive.pt/joamag/boytacean/-/blob/master/CHANGELOG.md"
+                    iconSrc={require("../res/thunder.png")}
+                ></Title>
                 <Section>
                     <Button text={getText()} onClick={onClick} />
                     <Button
