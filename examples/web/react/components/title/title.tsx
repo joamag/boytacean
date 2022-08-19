@@ -23,7 +23,9 @@ export const Title: FC<TitleProps> = ({
         <h1 className={classes()}>
             {text}
             {version && (
-                <Link href={versionUrl} target="_blank">{version}</Link>
+                <Link href={versionUrl} target="_blank">
+                    {version}
+                </Link>
             )}
             {iconSrc && <img className="icon" src={iconSrc} alt="icon" />}
         </h1>

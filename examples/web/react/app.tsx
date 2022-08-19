@@ -6,8 +6,10 @@ import {
     ButtonIncrement,
     ButtonSwitch,
     Info,
+    Link,
     Pair,
     PanelSplit,
+    Paragraph,
     Section,
     Title
 } from "./components";
@@ -27,6 +29,40 @@ export const App = () => {
                     versionUrl="https://gitlab.stage.hive.pt/joamag/boytacean/-/blob/master/CHANGELOG.md"
                     iconSrc={require("../res/thunder.png")}
                 ></Title>
+                <Section>
+                    <Paragraph>
+                        This is a{" "}
+                        <Link
+                            href="https://en.wikipedia.org/wiki/Game_Boy"
+                            target="_blank"
+                        >
+                            Game Boy
+                        </Link>{" "}
+                        emulator built using the{" "}
+                        <Link href="https://www.rust-lang.org" target="_blank">
+                            Rust Programming Language
+                        </Link>{" "}
+                        and is running inside this browser with the help of{" "}
+                        <Link href="https://webassembly.org/" target="_blank">
+                            WebAssembly
+                        </Link>
+                        .
+                    </Paragraph>
+                    <Paragraph>
+                        You can check the source code of it at{" "}
+                        <Link
+                            href="https://gitlab.stage.hive.pt/joamag/boytacean"
+                            target="_blank"
+                        >
+                            GitLab
+                        </Link>
+                        .
+                    </Paragraph>
+                    <Paragraph>
+                        TIP: Drag and Drop ROM files to the Browser to load the
+                        ROM.
+                    </Paragraph>
+                </Section>
                 <Section>
                     <Button text={getText()} onClick={onClick} />
                     <Button

@@ -5,5 +5,6 @@ export * from "./info/info";
 export * from "./link/link";
 export * from "./pair/pair";
 export * from "./panel-split/panel-split";
+export * from "./paragraph/paragraph";
 export * from "./section/section";
 export * from "./title/title";
