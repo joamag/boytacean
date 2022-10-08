@@ -202,6 +202,11 @@ pub struct Cartridge {
     /// to allow improved performance.
     rom_bank_count: u16,
 
+    /// The number of RAM banks (of 8KB) that are available
+    /// to the current cartridge, this is a computed value
+    /// to allow improved performance.
+    ram_bank_count: u16,
+
     /// The offset address to the ROM bank (#1) that is
     /// currently in use by the ROM cartridge.
     rom_offset: usize,
@@ -222,6 +227,7 @@ impl Cartridge {
             ram_data: vec![],
             mbc: &NO_MBC,
             rom_bank_count: 0,
+            ram_bank_count: 0,
             rom_offset: 0x4000,
             ram_offset: 0x0000,
             ram_enabled: false,
@@ -313,6 +319,7 @@ impl Cartridge {
 
     fn set_computed(&mut self) {
         self.rom_bank_count = self.rom_size().rom_banks();
+        self.ram_bank_count = self.ram_size().ram_banks();
     }
 
     fn allocate_ram(&mut self) {
@@ -473,6 +480,9 @@ pub static MBC1: Mbc = Mbc {
             // RAM bank selection and ROM bank selection upper bits
             0x4000 | 0x5000 => {
                 let ram_bank = value & 0x03;
+                if ram_bank as u16 >= rom.ram_bank_count {
+                    return;
+                }
                 rom.set_ram_bank(ram_bank);
             }
             // ROM mode selection
@@ -532,6 +542,9 @@ pub static MBC3: Mbc = Mbc {
             // RAM bank selection
             0x4000 | 0x5000 => {
                 let ram_bank = value & 0x03;
+                if ram_bank as u16 >= rom.ram_bank_count {
+                    return;
+                }
                 rom.set_ram_bank(ram_bank);
             }
             _ => warnln!("Writing to unknown Cartridge ROM location 0x{:04x}", addr),
@@ -581,6 +594,9 @@ pub static MBC5: Mbc = Mbc {
             // RAM bank selection
             0x4000 | 0x5000 => {
                 let ram_bank = value & 0x0f;
+                if ram_bank as u16 >= rom.ram_bank_count {
+                    return;
+                }
                 rom.set_ram_bank(ram_bank);
             }
             _ => warnln!("Writing to unknown Cartridge ROM location 0x{:04x}", addr),

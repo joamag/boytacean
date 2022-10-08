@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * Issue related to STAT interrupt and H-Blank
 * Issue related to overflow in sprite drawing
+* Issue related to the RAM bank selection in some of the MBCs
 
 ## [0.3.0] - 2022-07-11
 
