@@ -5,6 +5,7 @@ import {
     Button,
     ButtonIncrement,
     ButtonSwitch,
+    Footer,
     Info,
     Link,
     Pair,
@@ -22,6 +23,9 @@ export const App = () => {
     const onClick = () => setCount(count + 1);
     return (
         <>
+            <Footer>
+                Built with ❤️ by <a href="https://joao.me" target="_blank">João Magalhães</a>
+            </Footer>
             <PanelSplit left={<div>This is the left panel</div>}>
                 <Title
                     text="Boytacean"
