@@ -89,6 +89,16 @@ deploy-cloudfare-stable:
   dependencies:
     - build-wasm
   only:
+    - stable
+
+deploy-cloudfare-prod:
+  stage: deploy
+  script:
+    - cd examples/web/dist
+    - npm_config_yes=true npx wrangler pages publish . --project-name=boytacean --branch prod
+  dependencies:
+    - build-wasm
+  only:
     - tags
 
 deploy-crates:
