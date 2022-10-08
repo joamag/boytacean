@@ -704,7 +704,7 @@ impl Ppu {
         // index and the DY (scroll Y) divided by 8 (as the tiles are 8x8 pixels),
         // on top of that ensures that the result is modulus 32 meaning that the
         // drawing wraps around the Y axis
-        let row_offset = (((ld + scy) & 0xff) >> 3) % 32;
+        let row_offset = (((ld as usize + scy as usize) & 0xff) >> 3) % 32;
 
         // obtains the base address of the background map using the bg map flag
         // that control which background map is going to be used
@@ -736,7 +736,7 @@ impl Ppu {
 
         // calculates both the current Y and X positions within the tiles
         // using the bitwise and operation as an effective modulus 8
-        let y = ((ld + scy) & 0x07) as usize;
+        let y = (ld as usize + scy as usize) & 0x07;
         let mut x = (scx & 0x07) as usize;
 
         for index in 0..DISPLAY_WIDTH {
@@ -749,7 +749,8 @@ impl Ppu {
                 let pixel = self.tiles[tile_index].get(x, y);
                 let color = self.palette[pixel as usize];
 
-                // updates the pixel in the color buffer
+                // updates the pixel in the color buffer, which stores
+                // the raw pixel color information (unmapped)
                 self.color_buffer[color_offset] = pixel;
 
                 // set the color pixel in the frame buffer
@@ -817,12 +818,16 @@ impl Ppu {
                 self.palette_obj_1
             };
 
-            let mut color_offset = self.ly as usize * DISPLAY_WIDTH + obj.x as usize;
+            // calculates the offset in the color buffer (raw color information
+            // from 0 to 3) for the sprit that is going to be drawn, this value
+            // is kept as a signed integer to allow proper negative number math
+            let mut color_offset = self.ly as i32 * DISPLAY_WIDTH as i32 + obj.x as i32;
 
             // calculates the offset in the frame buffer for the sprite
             // that is going to be drawn, this is going to be the starting
             // point for the draw operation to be performed
-            let mut frame_offset = (self.ly as usize * DISPLAY_WIDTH + obj.x as usize) * RGB_SIZE;
+            let mut frame_offset =
+                (self.ly as i32 * DISPLAY_WIDTH as i32 + obj.x as i32) * RGB_SIZE as i32;
 
             // the relative title offset should range from 0 to 7 in 8x8
             // objects and from 0 to 15 in 8x16 objects
@@ -863,7 +868,7 @@ impl Ppu {
                 if is_contained {
                     // the object is only considered visible if it's a priority
                     // or if the underlying pixel is transparent (zero value)
-                    let is_visible = obj.priority || self.color_buffer[color_offset] == 0;
+                    let is_visible = obj.priority || self.color_buffer[color_offset as usize] == 0;
                     let pixel = tile_row[if obj.xflip { 7 - x } else { x }];
                     if is_visible && pixel != 0 {
                         // obtains the current pixel data from the tile row and
@@ -871,9 +876,9 @@ impl Ppu {
                         let color = palette[pixel as usize];
 
                         // sets the color pixel in the frame buffer
-                        self.frame_buffer[frame_offset] = color[0];
-                        self.frame_buffer[frame_offset + 1] = color[1];
-                        self.frame_buffer[frame_offset + 2] = color[2];
+                        self.frame_buffer[frame_offset as usize] = color[0];
+                        self.frame_buffer[frame_offset as usize + 1] = color[1];
+                        self.frame_buffer[frame_offset as usize + 2] = color[2];
                     }
                 }
 
@@ -883,7 +888,7 @@ impl Ppu {
 
                 // increments the offset of the frame buffer by the
                 // size of an RGB pixel (which is 3 bytes)
-                frame_offset += RGB_SIZE;
+                frame_offset += RGB_SIZE as i32;
             }
         }
     }
