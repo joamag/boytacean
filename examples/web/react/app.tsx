@@ -110,7 +110,12 @@ export const App = () => {
 };
 
 export const startApp = (element: string) => {
-    const root = ReactDOM.createRoot(document.getElementById(element)!);
+    const elementRef = document.getElementById(element);
+    if (!elementRef) {
+        return;
+    }
+
+    const root = ReactDOM.createRoot(elementRef);
     root.render(<App />);
 };
 
