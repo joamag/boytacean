@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { FC, useEffect, useState } from "react";
 import ReactDOM from "react-dom/client";
 
 import {
@@ -17,14 +17,29 @@ import {
 
 import "./app.css";
 
-export const App = () => {
+type AppProps = {
+    backgrounds?: string[];
+};
+
+export const App: FC<AppProps> = ({ backgrounds = ["264653"] }) => {
     const [count, setCount] = useState(0);
+    const [backgroundIndex, setBackgroundIndex] = useState(0);
     const getText = () => `Hello World ${count}`;
+    const getBackground = () => backgrounds[backgroundIndex];
     const onClick = () => setCount(count + 1);
+    const onThemeClick = () => {
+        setBackgroundIndex((backgroundIndex + 1) % backgrounds.length);
+    };
+    useEffect(() => {
+        document.body.style.backgroundColor = `#${getBackground()}`;
+    });
     return (
-        <>
-            <Footer>
-                Built with ❤️ by <a href="https://joao.me" target="_blank">João Magalhães</a>
+        <div className="app">
+            <Footer color={getBackground()}>
+                Built with ❤️ by{" "}
+                <a href="https://joao.me" target="_blank">
+                    João Magalhães
+                </a>
             </Footer>
             <PanelSplit left={<div>This is the left panel</div>}>
                 <Title
@@ -75,6 +90,12 @@ export const App = () => {
                         imageAlt="tobias"
                         onClick={onClick}
                     />
+                    <Button
+                        text={"Theme"}
+                        image={require("../res/marker.svg")}
+                        imageAlt="marker"
+                        onClick={onThemeClick}
+                    />
                     <Info>
                         <Pair
                             key="tobias"
@@ -109,18 +130,18 @@ export const App = () => {
                     </Info>
                 </Section>
             </PanelSplit>
-        </>
+        </div>
     );
 };
 
-export const startApp = (element: string) => {
+export const startApp = (element: string, backgrounds: string[]) => {
     const elementRef = document.getElementById(element);
     if (!elementRef) {
         return;
     }
 
     const root = ReactDOM.createRoot(elementRef);
-    root.render(<App />);
+    root.render(<App backgrounds={backgrounds} />);
 };
 
 export default App;

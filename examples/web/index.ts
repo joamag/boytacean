@@ -81,7 +81,6 @@ class Emulator {
     private videoBuff: DataView | null = null;
     private toastTimeout: number | null = null;
     private paused: boolean = false;
-    private background_index: number = 0;
     private nextTickTime: number = 0;
     private fps: number = 0;
     private frameStart: number = new Date().getTime();
@@ -666,14 +665,6 @@ class Emulator {
             }
         });
 
-        const buttonTheme = document.getElementById("button-theme")!;
-        buttonTheme.addEventListener("click", () => {
-            this.background_index =
-                (this.background_index + 1) % BACKGROUNDS.length;
-            const background = BACKGROUNDS[this.background_index];
-            this.setBackground(background);
-        });
-
         const buttonUploadFile = document.getElementById(
             "button-upload-file"
         ) as HTMLInputElement;
@@ -788,8 +779,6 @@ class Emulator {
     }
 
     async initBase() {
-        const background = BACKGROUNDS[this.background_index];
-        this.setBackground(background);
         this.setVersion(info.version);
     }
 
@@ -957,13 +946,6 @@ class Emulator {
         //Component.get<KeyValue>("diag:framerate").value = `${value} FPS`;
     }
 
-    setBackground(value: string) {
-        document.body.style.backgroundColor = `#${value}`;
-        document.getElementById(
-            "footer-background"
-        )!.style.backgroundColor = `#${value}f2`;
-    }
-
     toggleRunning() {
         if (this.paused) {
             this.resume();
@@ -1101,7 +1083,7 @@ const wasm = async () => {
 };
 
 (async () => {
-    startApp("app");
+    startApp("app", BACKGROUNDS);
 
     const emulator = new Emulator();
     await emulator.main();
