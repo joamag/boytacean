@@ -45,9 +45,9 @@ pub enum RomType {
     Unknown = 0xef,
 }
 
-impl Display for RomType {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let str = match self {
+impl RomType {
+    pub fn description(&self) -> &'static str {
+        match self {
             RomType::RomOnly => "ROM Only",
             RomType::Mbc1 => "MBC1",
             RomType::Mbc1Ram => "MBC1 + RAM",
@@ -77,8 +77,13 @@ impl Display for RomType {
             RomType::HuC3 => "HuC3",
             RomType::HuC1RamBattery => "HuC1 + RAM + BATTERY",
             RomType::Unknown => "Unknown",
-        };
-        write!(f, "{}", str)
+        }
+    }
+}
+
+impl Display for RomType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.description())
     }
 }
 
@@ -97,6 +102,21 @@ pub enum RomSize {
 }
 
 impl RomSize {
+    pub fn description(&self) -> &'static str {
+        match self {
+            RomSize::Size32K => "32 KB",
+            RomSize::Size64K => "64 KB",
+            RomSize::Size128K => "128 KB",
+            RomSize::Size256K => "256 KB",
+            RomSize::Size512K => "512 KB",
+            RomSize::Size1M => "1 MB",
+            RomSize::Size2M => "2 MB",
+            RomSize::Size4M => "4 MB",
+            RomSize::Size8M => "8 MB",
+            RomSize::SizeUnknown => "Unknown",
+        }
+    }
+
     pub fn rom_banks(&self) -> u16 {
         match self {
             RomSize::Size32K => 2,
@@ -115,19 +135,7 @@ impl RomSize {
 
 impl Display for RomSize {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let str = match self {
-            RomSize::Size32K => "32 KB",
-            RomSize::Size64K => "64 KB",
-            RomSize::Size128K => "128 KB",
-            RomSize::Size256K => "256 KB",
-            RomSize::Size512K => "512 KB",
-            RomSize::Size1M => "1 MB",
-            RomSize::Size2M => "2 MB",
-            RomSize::Size4M => "4 MB",
-            RomSize::Size8M => "8 MB",
-            RomSize::SizeUnknown => "Unknown",
-        };
-        write!(f, "{}", str)
+        write!(f, "{}", self.description())
     }
 }
 
@@ -143,6 +151,18 @@ pub enum RamSize {
 }
 
 impl RamSize {
+    pub fn description(&self) -> &'static str {
+        match self {
+            RamSize::NoRam => "No RAM",
+            RamSize::Unused => "Unused",
+            RamSize::Size8K => "8 KB",
+            RamSize::Size32K => "32 KB",
+            RamSize::Size128K => "128 KB",
+            RamSize::Size64K => "64 KB",
+            RamSize::SizeUnknown => "Unknown",
+        }
+    }
+
     pub fn ram_banks(&self) -> u16 {
         match self {
             RamSize::NoRam => 0,
@@ -158,16 +178,7 @@ impl RamSize {
 
 impl Display for RamSize {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let str = match self {
-            RamSize::NoRam => "No RAM",
-            RamSize::Unused => "Unused",
-            RamSize::Size8K => "8 KB",
-            RamSize::Size32K => "32 KB",
-            RamSize::Size128K => "128 KB",
-            RamSize::Size64K => "64 KB",
-            RamSize::SizeUnknown => "Unknown",
-        };
-        write!(f, "{}", str)
+        write!(f, "{}", self.description())
     }
 }
 
@@ -375,6 +386,18 @@ impl Cartridge {
             0x05 => RamSize::Size64K,
             _ => RamSize::SizeUnknown,
         }
+    }
+
+    pub fn rom_type_s(&self) -> String {
+        String::from(self.rom_type().description())
+    }
+
+    pub fn rom_size_s(&self) -> String {
+        String::from(self.rom_size().description())
+    }
+
+    pub fn ram_size_s(&self) -> String {
+        String::from(self.ram_size().description())
     }
 }
 

@@ -1,0 +1,9 @@
+.title > .link {
+    margin-left: 14px;
+}
+
+.title > .icon {
+    margin-left: 14px;
+    vertical-align: middle;
+    width: 32px;
+}

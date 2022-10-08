@@ -1,0 +1,29 @@
+.info {
+    font-size: 24px;
+    vertical-align: top;
+}
+
+.info > dt {
+    clear: both;
+    float: left;
+    margin-top: 12px;
+}
+
+.info > dt:first-of-type {
+    margin-top: 0px;
+}
+
+.info > dd {
+    float: right;
+    margin-top: 12px;
+}
+
+.info > dd:first-of-type {
+    margin-top: 0px;
+}
+
+.info::after {
+    clear: both;
+    content: '';
+    display: block;
+}

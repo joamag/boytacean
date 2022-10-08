@@ -308,108 +308,6 @@ p {
     -webkit-transform: scale(1.0, 1.0);
 }
 
-.tiny-button {
-    border-radius: 96px 96px 96px 96px;
-    -o-border-radius: 96px 96px 96px 96px;
-    -ms-border-radius: 96px 96px 96px 96px;
-    -moz-border-radius: 96px 96px 96px 96px;
-    -khtml-border-radius: 96px 96px 96px 96px;
-    -webkit-border-radius: 96px 96px 96px 96px;
-    cursor: pointer;
-    display: inline-block;
-    padding: 0px 8px 0px 8px;
-    user-select: none;
-    -o-user-select: none;
-    -ms-user-select: none;
-    -moz-user-select: none;
-    -khtml-user-select: none;
-    -webkit-user-select: none;
-}
-
-.tiny-button.border {
-    border: 1px solid #ffffff;
-}
-
-.tiny-button.padded {
-    padding: 4px 10px 4px 10px;
-}
-
-.tiny-button.padded-large {
-    padding: 4px 14px 4px 14px;
-}
-
-.tiny-button.rounded {
-    padding: 6px 6px 6px 6px;
-}
-
-.tiny-button.enabled {
-    background-color: #50cb93;
-}
-
-.tiny-button.file {
-    position: relative;
-}
-
-.tiny-button:hover {
-    background-color: #50cb93;
-}
-
-.tiny-button.red:hover {
-    background-color: #e63946;
-}
-
-.tiny-button:active {
-    background-color: #2a9d8f;
-}
-
-.tiny-button.red:active {
-    background-color: #bf2a37;
-}
-
-.tiny-button > img {
-    margin-right: 6px;
-    margin-top: 2px;
-    vertical-align: top;
-    width: 13px;
-}
-
-.tiny-button > img.medium {
-    width: 20px;
-}
-
-.tiny-button > img.large {
-    width: 28px;
-}
-
-.tiny-button > img.very-large {
-    width: 38px;
-}
-
-.tiny-button.no-text > img {
-    margin-right: 0px;
-    margin-top: 0px;
-}
-
-.tiny-button.file > input[type="file"] {
-    cursor: pointer;
-    height: 100%;
-    left: 0px;
-    opacity: 0;
-    -o-opacity: 0;
-    -ms-opacity: 0;
-    -moz-opacity: 0;
-    -khtml-opacity: 0;
-    -webkit-opacity: 0;
-    position: absolute;
-    top: 0px;
-    vertical-align: top;
-    width: 100%;
-}
-
-.tiny-button.file > input[type="file"]::-webkit-file-upload-button {
-    cursor: pointer;
-}
-
 .overlay {
     align-items: center;
     background-color: rgba(80, 203, 147, 0.95);
@@ -575,12 +473,12 @@ p {
     -webkit-user-select: none;
 }
 
-.modal-container > .modal .modal-buttons > .tiny-button {
+.modal-container > .modal .modal-buttons > .button.simple {
     margin-right: 12px;
     min-width: 120px;
 }
 
-.modal-container > .modal .modal-buttons > .tiny-button:last-child {
+.modal-container > .modal .modal-buttons > .button.simple:last-child {
     margin-right: 0px;
 }
 

@@ -3,6 +3,9 @@ use sdl2::{
     AudioSubsystem, EventPump, TimerSubsystem, VideoSubsystem,
 };
 
+/// Structure that provide the complete set of Graphics
+/// and Sound syb-system ready to be used by the overall
+/// emulator infrastructure.
 pub struct Graphics {
     pub canvas: Canvas<Window>,
     pub video_subsystem: VideoSubsystem,
