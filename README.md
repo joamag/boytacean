@@ -10,6 +10,7 @@ A Game Boy emulator that is written in Rust 🦀.
 | --------- | ------- | ---------------------------------------------------------------- |
 | Cloudfare | `True`  | [boytacean.pages.dev](https://boytacean.pages.dev)               |
 | Cloudfare | `True`  | [prod.boytacean.pages.dev](https://prod.boytacean.pages.dev)     |
+| Cloudfare | `True`  | [stable.boytacean.pages.dev](https://stable.boytacean.pages.dev) |
 | Cloudfare | `False` | [master.boytacean.pages.dev](https://master.boytacean.pages.dev) |
 
 ## Build
