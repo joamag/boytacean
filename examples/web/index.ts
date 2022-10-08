@@ -1,4 +1,4 @@
-import { startApp } from "./react/app";
+import { Emulator, startApp } from "./react/app";
 
 import { default as _wasm, GameBoy, PadKey, PpuMode } from "./lib/boytacean.js";
 import info from "./package.json";
@@ -55,7 +55,7 @@ enum PixelFormat {
  * and "joins" all the elements together to bring input/output
  * of the associated machine.
  */
-class Emulator {
+class GameboyEmulator implements Emulator {
     /**
      * The Game Boy engine (probably coming from WASM) that
      * is going to be used for the emulation.
@@ -1083,8 +1083,7 @@ const wasm = async () => {
 };
 
 (async () => {
-    startApp("app", BACKGROUNDS);
-
-    const emulator = new Emulator();
+    const emulator = new GameboyEmulator();
+    startApp("app", emulator, BACKGROUNDS);
     await emulator.main();
 })();

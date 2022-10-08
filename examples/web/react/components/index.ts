@@ -1,4 +1,5 @@
 export * from "./button/button";
+export * from "./button-container/button-container";
 export * from "./button-increment/button-increment";
 export * from "./button-switch/button-switch";
 export * from "./footer/footer";

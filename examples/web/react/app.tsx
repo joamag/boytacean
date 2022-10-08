@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 
 import {
     Button,
+    ButtonContainer,
     ButtonIncrement,
     ButtonSwitch,
     Footer,
@@ -17,11 +18,16 @@ import {
 
 import "./app.css";
 
+export interface Emulator {
+    reset(): void;
+}
+
 type AppProps = {
+    emulator: Emulator;
     backgrounds?: string[];
 };
 
-export const App: FC<AppProps> = ({ backgrounds = ["264653"] }) => {
+export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
     const [count, setCount] = useState(0);
     const [backgroundIndex, setBackgroundIndex] = useState(0);
     const getText = () => `Hello World ${count}`;
@@ -29,6 +35,9 @@ export const App: FC<AppProps> = ({ backgrounds = ["264653"] }) => {
     const onClick = () => setCount(count + 1);
     const onThemeClick = () => {
         setBackgroundIndex((backgroundIndex + 1) % backgrounds.length);
+    };
+    const onResetClick = () => {
+        emulator.reset();
     };
     useEffect(() => {
         document.body.style.backgroundColor = `#${getBackground()}`;
@@ -83,19 +92,27 @@ export const App: FC<AppProps> = ({ backgrounds = ["264653"] }) => {
                     </Paragraph>
                 </Section>
                 <Section>
-                    <Button text={getText()} onClick={onClick} />
-                    <Button
-                        text={getText()}
-                        image={require("../res/pause.svg")}
-                        imageAlt="tobias"
-                        onClick={onClick}
-                    />
-                    <Button
-                        text={"Theme"}
-                        image={require("../res/marker.svg")}
-                        imageAlt="marker"
-                        onClick={onThemeClick}
-                    />
+                    <ButtonContainer>
+                        <Button text={getText()} onClick={onClick} />
+                        <Button
+                            text={getText()}
+                            image={require("../res/pause.svg")}
+                            imageAlt="tobias"
+                            onClick={onClick}
+                        />
+                        <Button
+                            text={"Reset"}
+                            image={require("../res/reset.svg")}
+                            imageAlt="reset"
+                            onClick={onResetClick}
+                        />
+                        <Button
+                            text={"Theme"}
+                            image={require("../res/marker.svg")}
+                            imageAlt="marker"
+                            onClick={onThemeClick}
+                        />
+                    </ButtonContainer>
                     <Info>
                         <Pair
                             key="tobias"
@@ -134,14 +151,18 @@ export const App: FC<AppProps> = ({ backgrounds = ["264653"] }) => {
     );
 };
 
-export const startApp = (element: string, backgrounds: string[]) => {
+export const startApp = (
+    element: string,
+    emulator: Emulator,
+    backgrounds: string[]
+) => {
     const elementRef = document.getElementById(element);
     if (!elementRef) {
         return;
     }
 
     const root = ReactDOM.createRoot(elementRef);
-    root.render(<App backgrounds={backgrounds} />);
+    root.render(<App emulator={emulator} backgrounds={backgrounds} />);
 };
 
 export default App;
