@@ -46,9 +46,9 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
         <div className="app">
             <Footer color={getBackground()}>
                 Built with ❤️ by{" "}
-                <a href="https://joao.me" target="_blank">
+                <Link href="https://joao.me" target="_blank">
                     João Magalhães
-                </a>
+                </Link>
             </Footer>
             <PanelSplit left={<div>This is the left panel</div>}>
                 <Title
