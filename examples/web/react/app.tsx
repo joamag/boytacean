@@ -34,16 +34,21 @@ type AppProps = {
 };
 
 export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
-    const [count, setCount] = useState(0);
+    const [paused, setPaused] = useState(false);
     const [backgroundIndex, setBackgroundIndex] = useState(0);
-    const getText = () => `Hello World ${count}`;
+    const getPauseText = () => (paused ? "Resume" : "Pause");
+    const getPauseIcon = () =>
+        paused ? require("../res/play.svg") : require("../res/pause.svg");
     const getBackground = () => backgrounds[backgroundIndex];
-    const onClick = () => setCount(count + 1);
-    const onThemeClick = () => {
-        setBackgroundIndex((backgroundIndex + 1) % backgrounds.length);
+    const onPauseClick = () => {
+        emulator.toggleRunning();
+        setPaused(!paused);
     };
     const onResetClick = () => {
         emulator.reset();
+    };
+    const onThemeClick = () => {
+        setBackgroundIndex((backgroundIndex + 1) % backgrounds.length);
     };
     useEffect(() => {
         document.body.style.backgroundColor = `#${getBackground()}`;
@@ -99,12 +104,11 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
                 </Section>
                 <Section>
                     <ButtonContainer>
-                        <Button text={getText()} onClick={onClick} />
                         <Button
-                            text={getText()}
-                            image={require("../res/pause.svg")}
-                            imageAlt="tobias"
-                            onClick={onClick}
+                            text={getPauseText()}
+                            image={getPauseIcon()}
+                            imageAlt="pause"
+                            onClick={onPauseClick}
                         />
                         <Button
                             text={"Reset"}
@@ -120,11 +124,7 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
                         />
                     </ButtonContainer>
                     <Info>
-                        <Pair
-                            key="tobias"
-                            name={"Tobias"}
-                            value={`Count ${count}`}
-                        />
+                        <Pair key="tobias" name={"Tobias"} value={"Matias"} />
                         <Pair key="matias" name={"Matias"} value={"3"} />
                         <Pair
                             key="button-tobias"

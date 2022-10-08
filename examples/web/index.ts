@@ -955,7 +955,7 @@ class GameboyEmulator implements Emulator {
     }
 
     getVersionUrl() {
-        return "https://gitlab.stage.hive.pt/joamag/boytacean/-/blob/master/CHANGELOG.md"";
+        return "https://gitlab.stage.hive.pt/joamag/boytacean/-/blob/master/CHANGELOG.md";
     }
 
     toggleRunning() {
