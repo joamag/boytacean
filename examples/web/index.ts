@@ -983,6 +983,18 @@ class GameboyEmulator implements Emulator {
         this.start({ engine: null });
     }
 
+    name() {
+        return "Boytacean";
+    }
+
+    version() {
+        return info.version;
+    }
+
+    versionUrl() {
+        return "https://gitlab.stage.hive.pt/joamag/boytacean/-/blob/master/CHANGELOG.md"";
+    }
+
     toggleWindow() {
         this.maximize();
     }

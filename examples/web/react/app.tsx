@@ -20,6 +20,9 @@ import "./app.css";
 
 export interface Emulator {
     reset(): void;
+    name(): string;
+    version(): string;
+    versionUrl(): string;
 }
 
 type AppProps = {
@@ -52,9 +55,9 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
             </Footer>
             <PanelSplit left={<div>This is the left panel</div>}>
                 <Title
-                    text="Boytacean"
-                    version="0.3.0"
-                    versionUrl="https://gitlab.stage.hive.pt/joamag/boytacean/-/blob/master/CHANGELOG.md"
+                    text={emulator.name()}
+                    version={emulator.version()}
+                    versionUrl={emulator.versionUrl()}
                     iconSrc={require("../res/thunder.png")}
                 ></Title>
                 <Section>
