@@ -428,7 +428,8 @@ pub static NO_MBC: Mbc = Mbc {
     write_rom: |_rom: &mut Cartridge, addr: u16, _value: u8| {
         match addr {
             // ignores this address as Tetris and some other games write
-            // to this address for some reason (probably MBC1 compatibility)
+            // to this address for some reason (probably related to
+            // any kind of MBC1 compatibility issue)
             0x2000 => (),
             _ => panic!("Writing to unknown Cartridge ROM location 0x{:04x}", addr),
         };
@@ -444,9 +445,10 @@ pub static MBC1: Mbc = Mbc {
     read_rom: |rom: &Cartridge, addr: u16| -> u8 {
         match addr & 0xf000 {
             0x0000 | 0x1000 | 0x2000 | 0x3000 => rom.rom_data[addr as usize],
-            0x4000 | 0x5000 | 0x6000 | 0x7000 => {
-                rom.rom_data[rom.rom_offset + (addr - 0x4000) as usize]
-            }
+            0x4000 | 0x5000 | 0x6000 | 0x7000 => *rom
+                .rom_data
+                .get(rom.rom_offset + (addr - 0x4000) as usize)
+                .unwrap_or(&0x0),
             _ => {
                 warnln!("Reading from unknown Cartridge ROM location 0x{:04x}", addr);
                 0xff
@@ -502,9 +504,10 @@ pub static MBC3: Mbc = Mbc {
     read_rom: |rom: &Cartridge, addr: u16| -> u8 {
         match addr & 0xf000 {
             0x0000 | 0x1000 | 0x2000 | 0x3000 => rom.rom_data[addr as usize],
-            0x4000 | 0x5000 | 0x6000 | 0x7000 => {
-                rom.rom_data[rom.rom_offset + (addr - 0x4000) as usize]
-            }
+            0x4000 | 0x5000 | 0x6000 | 0x7000 => *rom
+                .rom_data
+                .get(rom.rom_offset + (addr - 0x4000) as usize)
+                .unwrap_or(&0x0),
             _ => {
                 warnln!("Reading from unknown Cartridge ROM location 0x{:04x}", addr);
                 0xff
@@ -554,9 +557,10 @@ pub static MBC5: Mbc = Mbc {
     read_rom: |rom: &Cartridge, addr: u16| -> u8 {
         match addr & 0xf000 {
             0x0000 | 0x1000 | 0x2000 | 0x3000 => rom.rom_data[addr as usize],
-            0x4000 | 0x5000 | 0x6000 | 0x7000 => {
-                rom.rom_data[rom.rom_offset + (addr - 0x4000) as usize]
-            }
+            0x4000 | 0x5000 | 0x6000 | 0x7000 => *rom
+                .rom_data
+                .get(rom.rom_offset + (addr - 0x4000) as usize)
+                .unwrap_or(&0x0),
             _ => {
                 warnln!("Reading from unknown Cartridge ROM location 0x{:04x}", addr);
                 0xff
