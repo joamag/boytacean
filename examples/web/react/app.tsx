@@ -19,10 +19,13 @@ import {
 import "./app.css";
 
 export interface Emulator {
+    getName(): string;
+    getVersion(): string;
+    getVersionUrl(): string;
+    toggleRunning(): void;
+    pause(): void;
+    resume(): void;
     reset(): void;
-    name(): string;
-    version(): string;
-    versionUrl(): string;
 }
 
 type AppProps = {
@@ -55,9 +58,9 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
             </Footer>
             <PanelSplit left={<div>This is the left panel</div>}>
                 <Title
-                    text={emulator.name()}
-                    version={emulator.version()}
-                    versionUrl={emulator.versionUrl()}
+                    text={emulator.getName()}
+                    version={emulator.getVersion()}
+                    versionUrl={emulator.getVersionUrl()}
                     iconSrc={require("../res/thunder.png")}
                 ></Title>
                 <Section>

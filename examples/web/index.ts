@@ -946,6 +946,18 @@ class GameboyEmulator implements Emulator {
         //Component.get<KeyValue>("diag:framerate").value = `${value} FPS`;
     }
 
+    getName() {
+        return "Boytacean";
+    }
+
+    getVersion() {
+        return info.version;
+    }
+
+    getVersionUrl() {
+        return "https://gitlab.stage.hive.pt/joamag/boytacean/-/blob/master/CHANGELOG.md"";
+    }
+
     toggleRunning() {
         if (this.paused) {
             this.resume();
@@ -981,18 +993,6 @@ class GameboyEmulator implements Emulator {
      */
     reset() {
         this.start({ engine: null });
-    }
-
-    name() {
-        return "Boytacean";
-    }
-
-    version() {
-        return info.version;
-    }
-
-    versionUrl() {
-        return "https://gitlab.stage.hive.pt/joamag/boytacean/-/blob/master/CHANGELOG.md"";
     }
 
     toggleWindow() {
