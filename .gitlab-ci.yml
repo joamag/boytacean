@@ -71,7 +71,7 @@ deploy-netlify-prod:
   only:
     - tags
 
-deploy-cloudfare-preview:
+deploy-cloudfare-master:
   stage: deploy
   script:
     - cd examples/web/dist
@@ -81,7 +81,7 @@ deploy-cloudfare-preview:
   only:
     - master
 
-deploy-cloudfare-prod:
+deploy-cloudfare-stable:
   stage: deploy
   script:
     - cd examples/web/dist
