@@ -4,6 +4,12 @@ A Game Boy emulator that is written in Rust 🦀.
 
 **This emulator has been written for educational purposes and shouldn't be taken to seriously.** But yeahh it plays games, which is cool... 🎮
 
+## Deployments
+
+| Provider  | Stable | URL                                                |
+| --------- | ------ | -------------------------------------------------- |
+| Cloudfare | `True` | [boytacean.pages.dev](https://boytacean.pages.dev) |
+
 ## Build
 
 ### WASM for Node.js
