@@ -514,3 +514,11 @@ p {
 .keyboard .key:active {
     background-color: #2a9d8f;
 }
+
+#section-diag {
+    display: none;
+}
+
+#separator-diag {
+    display: none;
+}
