@@ -1,11 +1,14 @@
 import React, { FC, useEffect, useState } from "react";
 import ReactDOM from "react-dom/client";
 
+declare const require: any;
+
 import {
     Button,
     ButtonContainer,
     ButtonIncrement,
     ButtonSwitch,
+    Display,
     Footer,
     Info,
     Link,
@@ -61,7 +64,13 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
                     João Magalhães
                 </Link>
             </Footer>
-            <PanelSplit left={<div>This is the left panel</div>}>
+            <PanelSplit
+                left={
+                    <div>
+                        <Display />
+                    </div>
+                }
+            >
                 <Title
                     text={emulator.getName()}
                     version={emulator.getVersion()}
