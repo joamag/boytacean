@@ -38,13 +38,9 @@ export const Display: FC<DisplayProps> = ({
             <div className="display-frame">
                 <canvas
                     id="display-canvas"
-                    className="canvas"
+                    className="display-canvas"
                     width={options.width * options.scale}
                     height={options.height * options.scale}
-                    style={{
-                        width: `${options.width}px`,
-                        height: `${options.height}px`
-                    }}
                 ></canvas>
             </div>
         </div>
