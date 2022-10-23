@@ -71,9 +71,9 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
         setBackgroundIndex((backgroundIndex + 1) % backgrounds.length);
     };
     const onDrawHAndler = (handler: DrawHandler) => {
-        setTimeout(() => {
+        setInterval(() => {
             handler(emulator.getImageBuffer(), PixelFormat.RGB);
-        }, 3000);
+        }, 1000);
     };
     useEffect(() => {
         document.body.style.backgroundColor = `#${getBackground()}`;
