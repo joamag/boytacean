@@ -21,8 +21,8 @@ export const Display: FC<DisplayProps> = ({
     size = "small",
     style = []
 }) => {
-    const classes = () => ["display", size, ...style].join(" ");
     options = { ...options, ...{ width: 320, height: 288 } };
+    const classes = () => ["display", size, ...style].join(" ");
     if (!options.scale) {
         options.scale = window.devicePixelRatio ? window.devicePixelRatio : 1;
     }
