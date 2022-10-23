@@ -41,15 +41,8 @@
     background-color: #1b1a17;
     border: 2px solid #50cb93;
     font-size: 0px;
-    margin-top: 78px;
     max-width: 320px;
     padding: 8px 8px 8px 8px;
-}
-
-@media only screen and (max-width: 1120px) {
-    .display > .display-frame {
-        margin-top: 12px;
-    }
 }
 
 .display.fullscreen > .display-frame {
