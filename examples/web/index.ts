@@ -1,4 +1,4 @@
-import { Emulator, startApp } from "./react/app";
+import { Emulator, PixelFormat, startApp } from "./react/app";
 
 import { default as _wasm, GameBoy, PadKey, PpuMode } from "./lib/boytacean.js";
 import info from "./package.json";
@@ -42,13 +42,6 @@ const KEYS: Record<string, number> = {
 };
 
 const ROM_PATH = require("../../res/roms/20y.gb");
-
-// Enumeration that describes the multiple pixel
-// formats and the associated size in bytes.
-enum PixelFormat {
-    RGB = 3,
-    RGBA = 4
-}
 
 /**
  * Top level class that controls the emulator behaviour
@@ -993,6 +986,20 @@ class GameboyEmulator implements Emulator {
      */
     reset() {
         this.start({ engine: null });
+    }
+
+    /**
+     * Returns the array buffer that contains the complete set of
+     * pixel data that is going to be drawn.
+     *
+     * @returns The current pixel data for the emulator display.
+     */
+    getImageBuffer(): Uint8Array {
+        return this.gameBoy!.frame_buffer_eager();
+    }
+
+    getPixelFormat(): PixelFormat {
+        return PixelFormat.RGB;
     }
 
     toggleWindow() {

@@ -9,6 +9,7 @@ import {
     ButtonIncrement,
     ButtonSwitch,
     Display,
+    DrawHandler,
     Footer,
     Info,
     Link,
@@ -21,6 +22,11 @@ import {
 
 import "./app.css";
 
+/**
+ * Top level interface that declares the main abstract
+ * interface of an emulator structured entity.
+ * Should allow typical hardware operations to be performed.
+ */
 export interface Emulator {
     getName(): string;
     getVersion(): string;
@@ -29,6 +35,17 @@ export interface Emulator {
     pause(): void;
     resume(): void;
     reset(): void;
+    getImageBuffer(): Uint8Array;
+    getPixelFormat(): PixelFormat;
+}
+
+/**
+ * Enumeration that describes the multiple pixel
+ * formats and the associated size in bytes.
+ */
+export enum PixelFormat {
+    RGB = 3,
+    RGBA = 4
 }
 
 type AppProps = {
@@ -53,6 +70,11 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
     const onThemeClick = () => {
         setBackgroundIndex((backgroundIndex + 1) % backgrounds.length);
     };
+    const onDrawHAndler = (handler: DrawHandler) => {
+        setTimeout(() => {
+            handler(emulator.getImageBuffer(), PixelFormat.RGB);
+        }, 3000);
+    };
     useEffect(() => {
         document.body.style.backgroundColor = `#${getBackground()}`;
     });
@@ -67,7 +89,7 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
             <PanelSplit
                 left={
                     <div>
-                        <Display />
+                        <Display onDrawHandler={onDrawHAndler} />
                     </div>
                 }
             >
