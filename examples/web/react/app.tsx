@@ -31,12 +31,12 @@ export interface Emulator {
     getName(): string;
     getVersion(): string;
     getVersionUrl(): string;
+    getPixelFormat(): PixelFormat;
+    getImageBuffer(): Uint8Array;
     toggleRunning(): void;
     pause(): void;
     resume(): void;
     reset(): void;
-    getImageBuffer(): Uint8Array;
-    getPixelFormat(): PixelFormat;
 }
 
 /**

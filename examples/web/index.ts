@@ -951,6 +951,20 @@ class GameboyEmulator implements Emulator {
         return "https://gitlab.stage.hive.pt/joamag/boytacean/-/blob/master/CHANGELOG.md";
     }
 
+    getPixelFormat(): PixelFormat {
+        return PixelFormat.RGB;
+    }
+
+    /**
+     * Returns the array buffer that contains the complete set of
+     * pixel data that is going to be drawn.
+     *
+     * @returns The current pixel data for the emulator display.
+     */
+    getImageBuffer(): Uint8Array {
+        return this.gameBoy!.frame_buffer_eager();
+    }
+
     toggleRunning() {
         if (this.paused) {
             this.resume();
@@ -986,20 +1000,6 @@ class GameboyEmulator implements Emulator {
      */
     reset() {
         this.start({ engine: null });
-    }
-
-    /**
-     * Returns the array buffer that contains the complete set of
-     * pixel data that is going to be drawn.
-     *
-     * @returns The current pixel data for the emulator display.
-     */
-    getImageBuffer(): Uint8Array {
-        return this.gameBoy!.frame_buffer_eager();
-    }
-
-    getPixelFormat(): PixelFormat {
-        return PixelFormat.RGB;
     }
 
     toggleWindow() {
