@@ -59,6 +59,11 @@ export const Display: FC<DisplayProps> = ({
     const [width, setWidth] = useState<number | undefined>(undefined);
     const [height, setHeight] = useState<number | undefined>(undefined);
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const resizeRef = useRef(() => {
+        const [fullWidth, fullHeight] = crop(options.width / options.height);
+        setWidth(fullWidth);
+        setHeight(fullHeight);
+    });
 
     useEffect(() => {
         if (canvasRef.current && !canvasContents) {
@@ -69,16 +74,14 @@ export const Display: FC<DisplayProps> = ({
             );
         }
         if (fullscreen) {
-            const [fullWidth, fullHeight] = crop(
-                options.width / options.height
-            );
-            setWidth(fullWidth);
-            setHeight(fullHeight);
+            resizeRef.current();
+            window.addEventListener("resize", resizeRef.current);
         } else {
             setWidth(undefined);
             setHeight(undefined);
+            window.removeEventListener("resize", resizeRef.current);
         }
-    });
+    }, [canvasRef, fullscreen]);
 
     if (onDrawHandler) {
         onDrawHandler((pixels: Uint8Array, format: PixelFormat) => {
