@@ -1,4 +1,4 @@
-import React, { FC, useEffect, useState } from "react";
+import React, { FC, useEffect, useRef, useState } from "react";
 import ReactDOM from "react-dom/client";
 
 declare const require: any;
@@ -57,6 +57,7 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
     const [paused, setPaused] = useState(false);
     const [fullscreen, setFullscreen] = useState(false);
     const [backgroundIndex, setBackgroundIndex] = useState(0);
+    const interval = useRef<number | undefined>(undefined);
     const getPauseText = () => (paused ? "Resume" : "Pause");
     const getPauseIcon = () =>
         paused ? require("../res/play.svg") : require("../res/pause.svg");
@@ -78,13 +79,21 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
         setFullscreen(!fullscreen);
     };
     const onDrawHandler = (handler: DrawHandler) => {
-        setInterval(() => {
+        if (interval.current) return;
+        interval.current = setInterval(() => {
             handler(emulator.getImageBuffer(), PixelFormat.RGB);
         }, 1000);
     };
     useEffect(() => {
         document.body.style.backgroundColor = `#${getBackground()}`;
     });
+    useEffect(() => {
+        document.addEventListener("keydown", (event) => {
+            if (event.key === "Escape") {
+                setFullscreen(false);
+            }
+        });
+    }, []);
     return (
         <div className="app">
             <Footer color={getBackground()}>
