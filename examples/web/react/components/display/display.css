@@ -15,7 +15,7 @@
     z-index: 6;
 }
 
-.display > .display-close {
+.display > .display-minimize {
     bottom: 22px;
     display: none;
     position: absolute;
@@ -28,12 +28,12 @@
     -webkit-user-select: none;
 }
 
-.display > .display-close > img {
+.display > .display-minimize > img {
     height: 32px;
     width: 32px;
 }
 
-.display.fullscreen > .display-close {
+.display.fullscreen > .display-minimize {
     display: block;
 }
 
@@ -41,8 +41,8 @@
     background-color: #1b1a17;
     border: 2px solid #50cb93;
     font-size: 0px;
-    max-width: 320px;
     padding: 8px 8px 8px 8px;
+    box-sizing: content-box;
 }
 
 .display.fullscreen > .display-frame {

@@ -69,10 +69,13 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
         emulator.reset();
     };
     const onFullscreenClick = () => {
-        setFullscreen((!fullscreen);
+        setFullscreen(!fullscreen);
     };
     const onThemeClick = () => {
         setBackgroundIndex((backgroundIndex + 1) % backgrounds.length);
+    };
+    const onMinimize = () => {
+        setFullscreen(!fullscreen);
     };
     const onDrawHandler = (handler: DrawHandler) => {
         setInterval(() => {
@@ -93,7 +96,11 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
             <PanelSplit
                 left={
                     <div>
-                        <Display fullscreen={fullscreen} onDrawHandler={onDrawHandler} />
+                        <Display
+                            fullscreen={fullscreen}
+                            onDrawHandler={onDrawHandler}
+                            onMinimize={onMinimize}
+                        />
                     </div>
                 }
             >

@@ -1,4 +1,4 @@
-import React, { FC, useRef, useEffect } from "react";
+import React, { FC, useState, useRef, useEffect } from "react";
 import { PixelFormat } from "../../app";
 
 import "./display.css";
@@ -22,9 +22,10 @@ type DisplayOptions = {
 type DisplayProps = {
     options?: DisplayOptions;
     size?: string;
-    fullscreen?: boolean,
+    fullscreen?: boolean;
     style?: string[];
     onDrawHandler?: (caller: DrawHandler) => void;
+    onMinimize?: () => void;
 };
 
 type CanvasContents = {
@@ -40,7 +41,8 @@ export const Display: FC<DisplayProps> = ({
     size = "small",
     fullscreen = false,
     style = [],
-    onDrawHandler
+    onDrawHandler,
+    onMinimize
 }) => {
     options = {
         ...options,
@@ -51,8 +53,11 @@ export const Display: FC<DisplayProps> = ({
     }
 
     let canvasContents: CanvasContents | null = null;
-    const classes = () => ["display", fullscreen ? "fullscreen" : null, size, ...style].join(" ");
+    const classes = () =>
+        ["display", fullscreen ? "fullscreen" : null, size, ...style].join(" ");
 
+    const [width, setWidth] = useState<number | undefined>(undefined);
+    const [height, setHeight] = useState<number | undefined>(undefined);
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
     useEffect(() => {
@@ -62,6 +67,16 @@ export const Display: FC<DisplayProps> = ({
                 options.logicHeight,
                 canvasRef.current
             );
+        }
+        if (fullscreen) {
+            const [fullWidth, fullHeight] = crop(
+                options.width / options.height
+            );
+            setWidth(fullWidth);
+            setHeight(fullHeight);
+        } else {
+            setWidth(undefined);
+            setHeight(undefined);
         }
     });
 
@@ -74,14 +89,21 @@ export const Display: FC<DisplayProps> = ({
 
     return (
         <div id="display" className={classes()}>
-            <span id="display-close" className="magnify-button display-close">
+            <span
+                id="display-minimize"
+                className="magnify-button display-minimize"
+                onClick={onMinimize}
+            >
                 <img
                     className="large"
                     src={require("./minimise.svg")}
                     alt="minimise"
                 />
             </span>
-            <div className="display-frame">
+            <div
+                className="display-frame"
+                style={{ width: width ?? options.width, height: height }}
+            >
                 <canvas
                     ref={canvasRef}
                     id="display-canvas"
@@ -114,6 +136,7 @@ const initCanvas = (
     const videoBuffer = new DataView(imageData.data.buffer);
 
     const canvasCtx = canvas.getContext("2d")!;
+    canvasCtx.setTransform(1, 0, 0, 1, 0, 0);
     canvasCtx.scale(
         canvas.width / canvasBuffer.width,
         canvas.height / canvasBuffer.height
@@ -146,6 +169,20 @@ const updateCanvas = (
     }
     canvasContents.canvasBufferCtx.putImageData(canvasContents.imageData, 0, 0);
     canvasContents.canvasCtx.drawImage(canvasContents.canvasBuffer, 0, 0);
+};
+
+const crop = (ratio: number): [number, number] => {
+    // calculates the window ratio as this is fundamental to
+    // determine the proper way to crop the fullscreen
+    const windowRatio = window.innerWidth / window.innerHeight;
+
+    // in case the window is wider (more horizontal than the base ratio)
+    // this means that we must crop horizontally
+    if (windowRatio > ratio) {
+        return [window.innerWidth * (ratio / windowRatio), window.innerHeight];
+    } else {
+        return [window.innerWidth, window.innerHeight * (windowRatio / ratio)];
+    }
 };
 
 export default Display;
