@@ -22,6 +22,7 @@ type DisplayOptions = {
 type DisplayProps = {
     options?: DisplayOptions;
     size?: string;
+    fullscreen?: boolean,
     style?: string[];
     onDrawHandler?: (caller: DrawHandler) => void;
 };
@@ -37,6 +38,7 @@ type CanvasContents = {
 export const Display: FC<DisplayProps> = ({
     options = { width: 320, height: 288, logicWidth: 160, logicHeight: 144 },
     size = "small",
+    fullscreen = false,
     style = [],
     onDrawHandler
 }) => {
@@ -49,7 +51,7 @@ export const Display: FC<DisplayProps> = ({
     }
 
     let canvasContents: CanvasContents | null = null;
-    const classes = () => ["display", size, ...style].join(" ");
+    const classes = () => ["display", fullscreen ? "fullscreen" : null, size, ...style].join(" ");
 
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -72,7 +74,7 @@ export const Display: FC<DisplayProps> = ({
 
     return (
         <div id="display" className={classes()}>
-            <span id="display-close" className="magnify-button canvas-close">
+            <span id="display-close" className="magnify-button display-close">
                 <img
                     className="large"
                     src={require("./minimise.svg")}
