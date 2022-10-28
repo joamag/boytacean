@@ -55,6 +55,7 @@ type AppProps = {
 
 export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
     const [paused, setPaused] = useState(false);
+    const [fullscreen, setFullscreen] = useState(false);
     const [backgroundIndex, setBackgroundIndex] = useState(0);
     const getPauseText = () => (paused ? "Resume" : "Pause");
     const getPauseIcon = () =>
@@ -89,7 +90,7 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
             <PanelSplit
                 left={
                     <div>
-                        <Display onDrawHandler={onDrawHAndler} />
+                        <Display fullscreen={fullscreen} onDrawHandler={onDrawHAndler} />
                     </div>
                 }
             >
