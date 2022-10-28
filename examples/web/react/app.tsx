@@ -68,10 +68,13 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
     const onResetClick = () => {
         emulator.reset();
     };
+    const onFullscreenClick = () => {
+        setFullscreen((!fullscreen);
+    };
     const onThemeClick = () => {
         setBackgroundIndex((backgroundIndex + 1) % backgrounds.length);
     };
-    const onDrawHAndler = (handler: DrawHandler) => {
+    const onDrawHandler = (handler: DrawHandler) => {
         setInterval(() => {
             handler(emulator.getImageBuffer(), PixelFormat.RGB);
         }, 1000);
@@ -90,7 +93,7 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
             <PanelSplit
                 left={
                     <div>
-                        <Display fullscreen={fullscreen} onDrawHandler={onDrawHAndler} />
+                        <Display fullscreen={fullscreen} onDrawHandler={onDrawHandler} />
                     </div>
                 }
             >
@@ -147,6 +150,12 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
                             image={require("../res/reset.svg")}
                             imageAlt="reset"
                             onClick={onResetClick}
+                        />
+                        <Button
+                            text={"Fullscreen"}
+                            image={require("../res/maximise.svg")}
+                            imageAlt="maximise"
+                            onClick={onFullscreenClick}
                         />
                         <Button
                             text={"Theme"}
