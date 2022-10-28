@@ -52,13 +52,13 @@ export const Display: FC<DisplayProps> = ({
         options.scale = window.devicePixelRatio ? window.devicePixelRatio : 1;
     }
 
-    let canvasContents: CanvasContents | null = null;
     const classes = () =>
         ["display", fullscreen ? "fullscreen" : null, size, ...style].join(" ");
 
     const [width, setWidth] = useState<number | undefined>(undefined);
     const [height, setHeight] = useState<number | undefined>(undefined);
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const canvasContentsRef = useRef<CanvasContents | undefined>(undefined);
     const resizeRef = useRef(() => {
         const [fullWidth, fullHeight] = crop(options.width / options.height);
         setWidth(fullWidth);
@@ -66,8 +66,8 @@ export const Display: FC<DisplayProps> = ({
     });
 
     useEffect(() => {
-        if (canvasRef.current && !canvasContents) {
-            canvasContents = initCanvas(
+        if (canvasRef.current && !canvasContentsRef.current) {
+            canvasContentsRef.current = initCanvas(
                 options.logicWidth,
                 options.logicHeight,
                 canvasRef.current
@@ -85,8 +85,8 @@ export const Display: FC<DisplayProps> = ({
 
     if (onDrawHandler) {
         onDrawHandler((pixels: Uint8Array, format: PixelFormat) => {
-            if (!canvasContents) return;
-            updateCanvas(canvasContents, pixels, format);
+            if (!canvasContentsRef.current) return;
+            updateCanvas(canvasContentsRef.current, pixels, format);
         });
     }
 

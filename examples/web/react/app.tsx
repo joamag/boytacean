@@ -57,7 +57,7 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
     const [paused, setPaused] = useState(false);
     const [fullscreen, setFullscreen] = useState(false);
     const [backgroundIndex, setBackgroundIndex] = useState(0);
-    const interval = useRef<number | undefined>(undefined);
+    const intervalRef = useRef<number | undefined>(undefined);
     const getPauseText = () => (paused ? "Resume" : "Pause");
     const getPauseIcon = () =>
         paused ? require("../res/play.svg") : require("../res/pause.svg");
@@ -79,8 +79,8 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
         setFullscreen(!fullscreen);
     };
     const onDrawHandler = (handler: DrawHandler) => {
-        if (interval.current) return;
-        interval.current = setInterval(() => {
+        if (intervalRef.current) return;
+        intervalRef.current = setInterval(() => {
             handler(emulator.getImageBuffer(), PixelFormat.RGB);
         }, 1000);
     };
