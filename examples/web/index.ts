@@ -1,6 +1,18 @@
-import { Emulator, Observable, PixelFormat, startApp } from "./react/app";
+import {
+    Emulator,
+    Observable,
+    PixelFormat,
+    RomInfo,
+    startApp
+} from "./react/app";
 
-import { default as _wasm, GameBoy, PadKey, PpuMode } from "./lib/boytacean.js";
+import {
+    Cartridge,
+    default as _wasm,
+    GameBoy,
+    PadKey,
+    PpuMode
+} from "./lib/boytacean.js";
 import info from "./package.json";
 
 declare const require: any;
@@ -82,6 +94,7 @@ class GameboyEmulator extends Observable implements Emulator {
     private romName: string | null = null;
     private romData: Uint8Array | null = null;
     private romSize: number = 0;
+    private cartridge: Cartridge | null = null;
 
     async main() {
         // initializes the WASM module, this is required
@@ -90,7 +103,6 @@ class GameboyEmulator extends Observable implements Emulator {
 
         // initializes the complete set of sub-systems
         // and registers the event handlers
-        await this.buildVisuals();
         await this.init();
         await this.register();
 
@@ -309,33 +321,13 @@ class GameboyEmulator extends Observable implements Emulator {
         // updates the complete set of global information that
         // is going to be displayed
         this.setEngine(this.engine!);
-        this.setRom(romName!, romData!);
+        this.setRom(romName!, romData!, cartridge);
         this.setLogicFrequency(this.logicFrequency);
         this.setFps(this.fps);
 
         // in case the restore (state) flag is set
         // then resumes the machine execution
         if (restore) this.resume();
-    }
-
-    async buildVisuals() {
-        /*     KeyValue.create("ROM", "-", { id: "diag:rom-name" }).mount(".diag");
-        KeyValue.create("ROM Size", "-", { id: "diag:rom-size" }).mount(
-            ".diag"
-        );
-        KeyValue.create("Framerate", "-", { id: "diag:framerate" }).mount(
-            ".diag"
-        );
-        KeyValue.create("ROM Type", "-", { id: "diag:rom-type" }).mount(
-            ".diag"
-        );
-        KeySwitch.create("Tobias", ["1", "2", "3"], {
-            id: "diag:tobias"
-        }).mount(".diag");
-
-        Button.create("Tobias", require("./res/close.svg"))
-            .bind("click", () => alert("Hello World"))
-            .mount(".button-area");*/
     }
 
     // @todo remove this method, or at least most of it
@@ -916,13 +908,13 @@ class GameboyEmulator extends Observable implements Emulator {
         document.getElementById("engine")!.textContent = name;
     }
 
-    setRom(name: string, data: Uint8Array) {
+    setRom(name: string, data: Uint8Array, cartridge: Cartridge) {
         this.romName = name;
         this.romData = data;
         this.romSize = data.length;
-        //@todo update this one
-        //Component.get<KeyValue>("diag:rom-name").value = name;
-        //Component.get<KeyValue>("diag:rom-size").value = `${data.length} bytes`;
+        this.cartridge = cartridge;
+
+        this.trigger("rom:loaded");
     }
 
     setLogicFrequency(value: number) {
@@ -936,8 +928,6 @@ class GameboyEmulator extends Observable implements Emulator {
         if (value < 0) this.showToast("Invalid FPS value!", true);
         value = Math.max(value, 0);
         this.fps = value;
-        //@todo
-        //Component.get<KeyValue>("diag:framerate").value = `${value} FPS`;
     }
 
     getName() {
@@ -964,6 +954,23 @@ class GameboyEmulator extends Observable implements Emulator {
      */
     getImageBuffer(): Uint8Array {
         return this.gameBoy!.frame_buffer_eager();
+    }
+
+    getRomInfo(): RomInfo {
+        return {
+            name: this.romName || undefined,
+            data: this.romData || undefined,
+            size: this.romData?.length,
+            extra: {
+                romType: this.cartridge?.rom_type_s(),
+                romSize: this.cartridge?.rom_size_s(),
+                ramSize: this.cartridge?.ram_size_s()
+            }
+        };
+    }
+
+    getFramerate(): number {
+        return this.fps;
     }
 
     toggleRunning() {

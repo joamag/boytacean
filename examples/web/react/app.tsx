@@ -46,17 +46,31 @@ export class Observable {
     }
 }
 
+export type RomInfo = {
+    name?: string;
+    data?: Uint8Array;
+    size?: number;
+    extra?: Record<string, string | undefined>;
+};
+
+export interface ObservableI {
+    bind(event: string, callback: Callback<this>): void;
+    trigger(event: string): void;
+}
+
 /**
  * Top level interface that declares the main abstract
  * interface of an emulator structured entity.
  * Should allow typical hardware operations to be performed.
  */
-export interface Emulator extends Observable {
+export interface Emulator extends ObservableI {
     getName(): string;
     getVersion(): string;
     getVersionUrl(): string;
     getPixelFormat(): PixelFormat;
     getImageBuffer(): Uint8Array;
+    getRomInfo(): RomInfo;
+    getFramerate(): number;
     toggleRunning(): void;
     pause(): void;
     resume(): void;
@@ -81,7 +95,9 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
     const [paused, setPaused] = useState(false);
     const [fullscreen, setFullscreen] = useState(false);
     const [backgroundIndex, setBackgroundIndex] = useState(0);
-    const intervalRef = useRef<number | undefined>(undefined);
+    const [romInfo, setRomInfo] = useState<RomInfo>({});
+    const [framerate, setFramerate] = useState(0);
+    const frameRef = useRef<boolean>(false);
     const getPauseText = () => (paused ? "Resume" : "Pause");
     const getPauseIcon = () =>
         paused ? require("../res/play.svg") : require("../res/pause.svg");
@@ -103,10 +119,11 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
         setFullscreen(!fullscreen);
     };
     const onDrawHandler = (handler: DrawHandler) => {
-        if (intervalRef.current) return;
-        intervalRef.current = 1;
+        if (frameRef.current) return;
+        frameRef.current = true;
         emulator.bind("frame", () => {
             handler(emulator.getImageBuffer(), PixelFormat.RGB);
+            setFramerate(emulator.getFramerate());
         });
     };
     useEffect(() => {
@@ -117,6 +134,10 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
             if (event.key === "Escape") {
                 setFullscreen(false);
             }
+        });
+        emulator.bind("rom:loaded", () => {
+            const romInfo = emulator.getRomInfo();
+            setRomInfo(romInfo);
         });
     }, []);
     return (
@@ -129,7 +150,7 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
             </Footer>
             <PanelSplit
                 left={
-                    <div style={{marginTop: 78}}>
+                    <div style={{ marginTop: 78 }}>
                         <Display
                             fullscreen={fullscreen}
                             onDrawHandler={onDrawHandler}
@@ -206,8 +227,30 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
                         />
                     </ButtonContainer>
                     <Info>
-                        <Pair key="tobias" name={"Tobias"} value={"Matias"} />
-                        <Pair key="matias" name={"Matias"} value={"3"} />
+                        <Pair
+                            key="rom"
+                            name={"ROM"}
+                            value={romInfo.name ?? "-"}
+                        />
+                        <Pair
+                            key="rom-size"
+                            name={"ROM Size"}
+                            value={romInfo.name ? `${romInfo.size} bytes` : "-"}
+                        />
+                        <Pair
+                            key="rom-type"
+                            name={"ROM Type"}
+                            value={
+                                romInfo.extra?.romType
+                                    ? `${romInfo.extra?.romType}`
+                                    : "-"
+                            }
+                        />
+                        <Pair
+                            key="framerate"
+                            name={"Framerate"}
+                            value={`${framerate} fps`}
+                        />
                         <Pair
                             key="button-tobias"
                             name={"Button Increment"}
