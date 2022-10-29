@@ -43,6 +43,7 @@
     font-size: 0px;
     padding: 8px 8px 8px 8px;
     box-sizing: content-box;
+    transition: width 0.35s cubic-bezier(0.075, 0.82, 0.165, 1), height 0.35s cubic-bezier(0.075, 0.82, 0.165, 1), top 0.35s cubic-bezier(0.075, 0.82, 0.165, 1), left 0.35s cubic-bezier(0.075, 0.82, 0.165, 1);
 }
 
 .display.fullscreen > .display-frame {
