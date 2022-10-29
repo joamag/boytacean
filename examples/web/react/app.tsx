@@ -135,7 +135,7 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
                 setFullscreen(false);
             }
         });
-        emulator.bind("rom:loaded", () => {
+        emulator.bind("loaded", () => {
             const romInfo = emulator.getRomInfo();
             setRomInfo(romInfo);
         });

@@ -230,8 +230,11 @@ class GameboyEmulator extends Observable implements Emulator {
                     this.gameBoy!.frame_buffer_eager(),
                     PixelFormat.RGB
                 );
-                this.trigger("frame");
                 lastFrame = this.gameBoy!.ppu_frame();
+
+                // triggers the frame event indicating that
+                // a new frame is now available for drawing
+                this.trigger("frame");
             }
         }
 
@@ -328,6 +331,10 @@ class GameboyEmulator extends Observable implements Emulator {
         // in case the restore (state) flag is set
         // then resumes the machine execution
         if (restore) this.resume();
+
+        // triggers the loaded event indicating that the
+        // emulator has finished the loading process
+        this.trigger("loaded");
     }
 
     // @todo remove this method, or at least most of it
@@ -913,8 +920,6 @@ class GameboyEmulator extends Observable implements Emulator {
         this.romData = data;
         this.romSize = data.length;
         this.cartridge = cartridge;
-
-        this.trigger("rom:loaded");
     }
 
     setLogicFrequency(value: number) {
