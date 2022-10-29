@@ -26,7 +26,7 @@ export type Callback<T> = (owner: T) => void;
 
 /**
  * Abstract class that implements the basic functionality
- * part of the definition of the observable pattern.
+ * part of the definition of the Observer pattern.
  *
  * @see {@link https://en.wikipedia.org/wiki/Observer_pattern}
  */

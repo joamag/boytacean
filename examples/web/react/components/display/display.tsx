@@ -75,10 +75,14 @@ export const Display: FC<DisplayProps> = ({
         }
         if (fullscreen) {
             resizeRef.current();
+            document.getElementsByTagName("body")[0].style.overflow = "hidden";
             window.addEventListener("resize", resizeRef.current);
         } else {
             setWidth(undefined);
             setHeight(undefined);
+            document
+                .getElementsByTagName("body")[0]
+                .style.removeProperty("overflow");
             window.removeEventListener("resize", resizeRef.current);
         }
     }, [canvasRef, fullscreen]);
