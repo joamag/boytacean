@@ -22,12 +22,36 @@ import {
 
 import "./app.css";
 
+export type Callback<T> = (owner: T) => void;
+
+/**
+ * Abstract class that implements the basic functionality
+ * part of the definition of the observable pattern.
+ *
+ * @see {@link https://en.wikipedia.org/wiki/Observer_pattern}
+ */
+export class Observable {
+    private events: Record<string, [Callback<this>]> = {};
+
+    bind(event: string, callback: Callback<this>) {
+        const callbacks = this.events[event] ?? [];
+        if (callbacks.includes(callback)) return;
+        callbacks.push(callback);
+        this.events[event] = callbacks;
+    }
+
+    trigger(event: string) {
+        const callbacks = this.events[event] ?? [];
+        callbacks.forEach((c) => c(this));
+    }
+}
+
 /**
  * Top level interface that declares the main abstract
  * interface of an emulator structured entity.
  * Should allow typical hardware operations to be performed.
  */
-export interface Emulator {
+export interface Emulator extends Observable {
     getName(): string;
     getVersion(): string;
     getVersionUrl(): string;
@@ -80,9 +104,10 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
     };
     const onDrawHandler = (handler: DrawHandler) => {
         if (intervalRef.current) return;
-        intervalRef.current = setInterval(() => {
+        intervalRef.current = 1;
+        emulator.bind("frame", () => {
             handler(emulator.getImageBuffer(), PixelFormat.RGB);
-        }, 1000);
+        });
     };
     useEffect(() => {
         document.body.style.backgroundColor = `#${getBackground()}`;

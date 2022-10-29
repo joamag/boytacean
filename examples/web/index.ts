@@ -1,4 +1,4 @@
-import { Emulator, PixelFormat, startApp } from "./react/app";
+import { Emulator, Observable, PixelFormat, startApp } from "./react/app";
 
 import { default as _wasm, GameBoy, PadKey, PpuMode } from "./lib/boytacean.js";
 import info from "./package.json";
@@ -48,7 +48,7 @@ const ROM_PATH = require("../../res/roms/20y.gb");
  * and "joins" all the elements together to bring input/output
  * of the associated machine.
  */
-class GameboyEmulator implements Emulator {
+class GameboyEmulator extends Observable implements Emulator {
     /**
      * The Game Boy engine (probably coming from WASM) that
      * is going to be used for the emulation.
@@ -218,6 +218,7 @@ class GameboyEmulator implements Emulator {
                     this.gameBoy!.frame_buffer_eager(),
                     PixelFormat.RGB
                 );
+                this.trigger("frame");
                 lastFrame = this.gameBoy!.ppu_frame();
             }
         }
