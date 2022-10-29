@@ -8,6 +8,7 @@ import {
     ButtonContainer,
     ButtonIncrement,
     ButtonSwitch,
+    ClearHandler,
     Display,
     DrawHandler,
     Footer,
@@ -98,6 +99,7 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
     const [romInfo, setRomInfo] = useState<RomInfo>({});
     const [framerate, setFramerate] = useState(0);
     const frameRef = useRef<boolean>(false);
+    const errorRef = useRef<boolean>(false);
     const getPauseText = () => (paused ? "Resume" : "Pause");
     const getPauseIcon = () =>
         paused ? require("../res/play.svg") : require("../res/pause.svg");
@@ -126,6 +128,13 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
             setFramerate(emulator.getFramerate());
         });
     };
+    const onClearHandler = (handler: ClearHandler) => {
+        if (errorRef.current) return;
+        errorRef.current = true;
+        emulator.bind("error", async () => {
+            await handler(undefined, require("../res/storm.png"), 0.2);
+        });
+    };
     useEffect(() => {
         document.body.style.backgroundColor = `#${getBackground()}`;
     });
@@ -133,6 +142,13 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
         document.addEventListener("keydown", (event) => {
             if (event.key === "Escape") {
                 setFullscreen(false);
+                event.stopPropagation();
+                event.preventDefault();
+            }
+            if (event.key === "f" && event.ctrlKey === true) {
+                setFullscreen(true);
+                event.stopPropagation();
+                event.preventDefault();
             }
         });
         emulator.bind("loaded", () => {
@@ -154,6 +170,7 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
                         <Display
                             fullscreen={fullscreen}
                             onDrawHandler={onDrawHandler}
+                            onClearHandler={onClearHandler}
                             onMinimize={onMinimize}
                         />
                     </div>

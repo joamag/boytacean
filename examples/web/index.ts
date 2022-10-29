@@ -78,12 +78,6 @@ class GameboyEmulator extends Observable implements Emulator {
     private timerFrequency: number = TIMER_HZ;
     private idleFrequency: number = IDLE_HZ;
 
-    private canvas: HTMLCanvasElement | null = null;
-    private canvasScaled: HTMLCanvasElement | null = null;
-    private canvasCtx: CanvasRenderingContext2D | null = null;
-    private canvasScaledCtx: CanvasRenderingContext2D | null = null;
-    private image: ImageData | null = null;
-    private videoBuff: DataView | null = null;
     private toastTimeout: number | null = null;
     private paused: boolean = false;
     private nextTickTime: number = 0;
@@ -162,13 +156,10 @@ class GameboyEmulator extends Observable implements Emulator {
                 // system and the machine state (to be able to recover)
                 // also sets the default color on screen to indicate the issue
                 if (isPanic) {
-                    await this.clearCanvas(undefined, {
-                        image: require("./res/storm.png"),
-                        imageScale: 0.2
-                    });
-
                     await wasm();
                     await this.start({ restore: false });
+
+                    this.trigger("error");
                 }
             }
 
@@ -224,12 +215,6 @@ class GameboyEmulator extends Observable implements Emulator {
                 this.gameBoy!.ppu_mode() == PpuMode.VBlank &&
                 this.gameBoy!.ppu_frame() != lastFrame
             ) {
-                // updates the canvas object with the new
-                // visual information coming in
-                this.updateCanvas(
-                    this.gameBoy!.frame_buffer_eager(),
-                    PixelFormat.RGB
-                );
                 lastFrame = this.gameBoy!.ppu_frame();
 
                 // triggers the frame event indicating that
@@ -344,14 +329,13 @@ class GameboyEmulator extends Observable implements Emulator {
             this.registerKeys(),
             this.registerButtons(),
             this.registerKeyboard(),
-            this.registerCanvas(),
             this.registerToast(),
             this.registerModal()
         ]);
     }
 
     async init() {
-        await Promise.all([this.initBase(), this.initCanvas()]);
+        await Promise.all([this.initBase()]);
     }
 
     registerDrop() {
@@ -429,10 +413,6 @@ class GameboyEmulator extends Observable implements Emulator {
                         this.logicFrequency - FREQUENCY_DELTA
                     );
                     break;
-
-                case "Escape":
-                    this.minimize();
-                    break;
             }
         });
 
@@ -509,11 +489,6 @@ class GameboyEmulator extends Observable implements Emulator {
                 this.resume();
                 buttonBenchmark.classList.remove("enabled");
             }
-        });
-
-        const buttonFullscreen = document.getElementById("button-fullscreen")!;
-        buttonFullscreen.addEventListener("click", () => {
-            this.maximize();
         });
 
         const buttonKeyboard = document.getElementById("button-keyboard")!;
@@ -734,13 +709,6 @@ class GameboyEmulator extends Observable implements Emulator {
         });
     }
 
-    registerCanvas() {
-        const canvasClose = document.getElementById("canvas-close")!;
-        canvasClose.addEventListener("click", () => {
-            this.minimize();
-        });
-    }
-
     registerToast() {
         const toast = document.getElementById("toast")!;
         toast.addEventListener("click", () => {
@@ -773,104 +741,6 @@ class GameboyEmulator extends Observable implements Emulator {
 
     async initBase() {
         this.setVersion(info.version);
-    }
-
-    async initCanvas() {
-        // initializes the off-screen canvas that is going to be
-        // used in the drawing process
-        this.canvas = document.createElement("canvas");
-        this.canvas.width = DISPLAY_WIDTH;
-        this.canvas.height = DISPLAY_HEIGHT;
-        this.canvasCtx = this.canvas.getContext("2d")!;
-
-        this.canvasScaled = document.getElementById(
-            "engine-canvas"
-        ) as HTMLCanvasElement;
-        this.canvasScaled.width =
-            this.canvasScaled.width * window.devicePixelRatio;
-        this.canvasScaled.height =
-            this.canvasScaled.height * window.devicePixelRatio;
-        this.canvasScaledCtx = this.canvasScaled.getContext("2d")!;
-
-        this.canvasScaledCtx.scale(
-            this.canvasScaled.width / this.canvas.width,
-            this.canvasScaled.height / this.canvas.height
-        );
-        this.canvasScaledCtx.imageSmoothingEnabled = false;
-
-        this.image = this.canvasCtx.createImageData(
-            this.canvas.width,
-            this.canvas.height
-        );
-        this.videoBuff = new DataView(this.image.data.buffer);
-    }
-
-    updateCanvas(pixels: Uint8Array, format: PixelFormat = PixelFormat.RGB) {
-        let offset = 0;
-        for (let index = 0; index < pixels.length; index += format) {
-            const color =
-                (pixels[index] << 24) |
-                (pixels[index + 1] << 16) |
-                (pixels[index + 2] << 8) |
-                (format == PixelFormat.RGBA ? pixels[index + 3] : 0xff);
-            this.videoBuff!.setUint32(offset, color);
-            offset += PixelFormat.RGBA;
-        }
-        this.canvasCtx!.putImageData(this.image!, 0, 0);
-        this.canvasScaledCtx!.drawImage(this.canvas!, 0, 0);
-    }
-
-    async clearCanvas(
-        color = PIXEL_UNSET_COLOR,
-        {
-            image = null,
-            imageScale = 1
-        }: { image?: string | null; imageScale?: number } = {}
-    ) {
-        this.canvasScaledCtx!.fillStyle = `#${color
-            .toString(16)
-            .toUpperCase()}`;
-        this.canvasScaledCtx!.fillRect(
-            0,
-            0,
-            this.canvasScaled!.width,
-            this.canvasScaled!.height
-        );
-
-        // in case an image was requested then uses that to load
-        // an image at the center of the screen properly scaled
-        if (image) {
-            const img = await new Promise<HTMLImageElement>((resolve) => {
-                const img = new Image();
-                img.onload = () => {
-                    resolve(img);
-                };
-                img.src = image;
-            });
-            const [imgWidth, imgHeight] = [
-                img.width * imageScale * window.devicePixelRatio,
-                img.height * imageScale * window.devicePixelRatio
-            ];
-            const [x0, y0] = [
-                this.canvasScaled!.width / 2 - imgWidth / 2,
-                this.canvasScaled!.height / 2 - imgHeight / 2
-            ];
-            this.canvasScaledCtx!.setTransform(1, 0, 0, 1, 0, 0);
-            try {
-                this.canvasScaledCtx!.drawImage(
-                    img,
-                    x0,
-                    y0,
-                    imgWidth,
-                    imgHeight
-                );
-            } finally {
-                this.canvasScaledCtx!.scale(
-                    this.canvasScaled!.width / this.canvas!.width,
-                    this.canvasScaled!.height / this.canvas!.height
-                );
-            }
-        }
     }
 
     async showToast(message: string, error = false, timeout = 3500) {
@@ -1013,60 +883,6 @@ class GameboyEmulator extends Observable implements Emulator {
      */
     reset() {
         this.start({ engine: null });
-    }
-
-    toggleWindow() {
-        this.maximize();
-    }
-
-    /**
-     * Maximizes the emulator's viewport taking up all the available
-     * window space. This method is responsible for keeping the aspect
-     * ratio of the emulator canvas according to the width/height ratio.
-     */
-    maximize() {
-        const canvasContainer = document.getElementById("canvas-container")!;
-        canvasContainer.classList.add("fullscreen");
-
-        window.addEventListener("resize", this.crop);
-
-        this.crop();
-    }
-
-    /**
-     * Restore the emulator's viewport to the minimal size, should make all
-     * the other emulator's meta-information (info, buttons, etc.) visible.
-     */
-    minimize() {
-        const canvasContainer = document.getElementById("canvas-container")!;
-        const engineCanvas = document.getElementById("engine-canvas")!;
-        canvasContainer.classList.remove("fullscreen");
-        engineCanvas.style.width = "";
-        engineCanvas.style.height = "";
-        window.removeEventListener("resize", this.crop);
-    }
-
-    crop() {
-        // @todo let's make this more flexible
-        const engineCanvas = document.getElementById("engine-canvas")!;
-
-        // calculates the window ratio as this is fundamental to
-        // determine the proper way to crop the fullscreen
-        const windowRatio = window.innerWidth / window.innerHeight;
-
-        // in case the window is wider (more horizontal than the base ratio)
-        // this means that we must crop horizontally
-        if (windowRatio > DISPLAY_RATIO) {
-            engineCanvas.style.width = `${
-                window.innerWidth * (DISPLAY_RATIO / windowRatio)
-            }px`;
-            engineCanvas.style.height = `${window.innerHeight}px`;
-        } else {
-            engineCanvas.style.width = `${window.innerWidth}px`;
-            engineCanvas.style.height = `${
-                window.innerHeight * (windowRatio / DISPLAY_RATIO)
-            }px`;
-        }
     }
 
     async fetchRom(romPath: string): Promise<[string, Uint8Array]> {
