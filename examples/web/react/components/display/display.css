@@ -40,10 +40,20 @@
 .display > .display-frame {
     background-color: #1b1a17;
     border: 2px solid #50cb93;
+    box-sizing: content-box;
+    -o-box-sizing: content-box;
+    -ms-box-sizing: content-box;
+    -moz-box-sizing: content-box;
+    -khtml-box-sizing: content-box;
+    -webkit-box-sizing: content-box;
     font-size: 0px;
     padding: 8px 8px 8px 8px;
-    box-sizing: content-box;
     transition: width 0.35s cubic-bezier(0.075, 0.82, 0.165, 1), height 0.35s cubic-bezier(0.075, 0.82, 0.165, 1);
+    -o-transition: width 0.35s cubic-bezier(0.075, 0.82, 0.165, 1), height 0.35s cubic-bezier(0.075, 0.82, 0.165, 1);
+    -ms-transition: width 0.35s cubic-bezier(0.075, 0.82, 0.165, 1), height 0.35s cubic-bezier(0.075, 0.82, 0.165, 1);
+    -moz-transition: width 0.35s cubic-bezier(0.075, 0.82, 0.165, 1), height 0.35s cubic-bezier(0.075, 0.82, 0.165, 1);
+    -khtml-transition: width 0.35s cubic-bezier(0.075, 0.82, 0.165, 1), height 0.35s cubic-bezier(0.075, 0.82, 0.165, 1);
+    -webkit-transition: width 0.35s cubic-bezier(0.075, 0.82, 0.165, 1), height 0.35s cubic-bezier(0.075, 0.82, 0.165, 1);
 }
 
 .display.fullscreen > .display-frame {

@@ -14,6 +14,7 @@ import {
     Footer,
     Info,
     Link,
+    Modal,
     Pair,
     PanelSplit,
     Paragraph,
@@ -158,6 +159,7 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
     }, []);
     return (
         <div className="app">
+            <Modal />
             <Footer color={getBackground()}>
                 Built with ❤️ by{" "}
                 <Link href="https://joao.me" target="_blank">

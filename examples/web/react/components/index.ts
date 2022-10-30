@@ -6,6 +6,7 @@ export * from "./display/display";
 export * from "./footer/footer";
 export * from "./info/info";
 export * from "./link/link";
+export * from "./modal/modal";
 export * from "./pair/pair";
 export * from "./panel-split/panel-split";
 export * from "./paragraph/paragraph";

@@ -251,7 +251,7 @@ class GameboyEmulator extends Observable implements Emulator {
     /**
      * Starts the current machine, setting the internal structure in
      * a proper state to start drawing and receiving input.
-     * 
+     *
      * This method can also be used to load a new ROM into the machine.
      *
      * @param options The options that are going to be used in the

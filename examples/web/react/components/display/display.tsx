@@ -116,9 +116,8 @@ export const Display: FC<DisplayProps> = ({
     }
 
     return (
-        <div id="display" className={classes()}>
+        <div className={classes()}>
             <span
-                id="display-minimize"
                 className="magnify-button display-minimize"
                 onClick={onMinimize}
             >
@@ -134,7 +133,6 @@ export const Display: FC<DisplayProps> = ({
             >
                 <canvas
                     ref={canvasRef}
-                    id="display-canvas"
                     className="display-canvas"
                     width={options.width * options.scale}
                     height={options.height * options.scale}
