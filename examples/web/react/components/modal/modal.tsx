@@ -1,4 +1,4 @@
-import React, { ReactNode, FC, ButtonHTMLAttributes, useEffect } from "react";
+import React, { FC, useEffect } from "react";
 import Button from "../button/button";
 
 import "./modal.css";

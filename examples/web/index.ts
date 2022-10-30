@@ -17,18 +17,11 @@ import info from "./package.json";
 
 declare const require: any;
 
-const PIXEL_UNSET_COLOR = 0x1b1a17ff;
-
 const LOGIC_HZ = 600;
 const VISUAL_HZ = 60;
-const TIMER_HZ = 60;
 const IDLE_HZ = 10;
 
 const FREQUENCY_DELTA = 60;
-
-const DISPLAY_WIDTH = 160;
-const DISPLAY_HEIGHT = 144;
-const DISPLAY_RATIO = DISPLAY_WIDTH / DISPLAY_HEIGHT;
 
 const SAMPLE_RATE = 2;
 
@@ -82,7 +75,6 @@ class GameboyEmulator extends Observable implements Emulator {
 
     private logicFrequency: number = LOGIC_HZ;
     private visualFrequency: number = VISUAL_HZ;
-    private timerFrequency: number = TIMER_HZ;
     private idleFrequency: number = IDLE_HZ;
 
     private toastTimeout: number | null = null;
@@ -800,7 +792,7 @@ class GameboyEmulator extends Observable implements Emulator {
         return {
             name: this.romName || undefined,
             data: this.romData || undefined,
-            size: this.romData?.length,
+            size: this.romSize,
             extra: {
                 romType: this.cartridge?.rom_type_s(),
                 romSize: this.cartridge?.rom_size_s(),

@@ -254,6 +254,7 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
             "Are you sure you want to start a benchmark?\nThe benchmark is considered an expensive operation!",
             "Confirm"
         );
+        alert(`Will run it as ${result}`);
     };
     const onFullscreenClick = () => {
         setFullscreen(!fullscreen);

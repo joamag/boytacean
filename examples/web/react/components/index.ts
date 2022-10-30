@@ -12,3 +12,4 @@ export * from "./panel-split/panel-split";
 export * from "./paragraph/paragraph";
 export * from "./section/section";
 export * from "./title/title";
+export * from "./toast/toast";
