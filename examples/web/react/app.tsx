@@ -69,10 +69,51 @@ export interface Emulator extends ObservableI {
     getName(): string;
     getVersion(): string;
     getVersionUrl(): string;
+
+    /**
+     * Obtains the pixel format of the emulator's display
+     * image buffer (eg: RGB).
+     *
+     * @returns The pixel format used for the emulator's
+     * image buffer.
+     */
     getPixelFormat(): PixelFormat;
+
+    /**
+     * Obtains the complete image buffer as a sequence of
+     * bytes that respects the current pixel format from
+     * `getPixelFormat()`. This method returns an in memory
+     * pointer to the heap and not a copy.
+     *
+     * @returns The byte based image buffer that respects
+     * the emulator's pixel format.
+     */
     getImageBuffer(): Uint8Array;
+
+    /**
+     * Obtains information about the ROM that is currently
+     * loaded in the emulator.
+     *
+     * @returns Structure containing the information about
+     * the ROM that is currently loaded in the emulator.
+     */
     getRomInfo(): RomInfo;
+
+    /**
+     * Returns the current logic framerate of the running
+     * emulator.
+     *
+     * @return The current logic framerate of the running
+     * emulator.
+     */
     getFramerate(): number;
+
+    /**
+     * Toggle the running state of the emulator between paused
+     * and running, prevents consumers from the need to access
+     * the current running state of the emulator to implement
+     * a logic toggle.
+     */
     toggleRunning(): void;
     pause(): void;
     resume(): void;
