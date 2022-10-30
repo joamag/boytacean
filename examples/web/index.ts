@@ -339,8 +339,7 @@ class GameboyEmulator extends Observable implements Emulator {
             this.registerKeys(),
             this.registerButtons(),
             this.registerKeyboard(),
-            this.registerToast(),
-            this.registerModal()
+            this.registerToast()
         ]);
     }
 
@@ -475,11 +474,6 @@ class GameboyEmulator extends Observable implements Emulator {
 
         const buttonBenchmark = document.getElementById("button-benchmark")!;
         buttonBenchmark.addEventListener("click", async () => {
-            const result = await this.showModal(
-                "Are you sure you want to start a benchmark?\nThe benchmark is considered an expensive operation!",
-                "Confirm"
-            );
-            if (!result) return;
             buttonBenchmark.classList.add("enabled");
             this.pause();
             try {
@@ -730,29 +724,6 @@ class GameboyEmulator extends Observable implements Emulator {
         });
     }
 
-    registerModal() {
-        const modalClose = document.getElementById("modal-close")!;
-        modalClose.addEventListener("click", () => {
-            this.hideModal(false);
-        });
-
-        const modalCancel = document.getElementById("modal-cancel")!;
-        modalCancel.addEventListener("click", () => {
-            this.hideModal(false);
-        });
-
-        const modalConfirm = document.getElementById("modal-confirm")!;
-        modalConfirm.addEventListener("click", () => {
-            this.hideModal(true);
-        });
-
-        document.addEventListener("keydown", (event) => {
-            if (event.key === "Escape") {
-                this.hideModal(false);
-            }
-        });
-    }
-
     async initBase() {
         this.setVersion(info.version);
     }
@@ -768,26 +739,6 @@ class GameboyEmulator extends Observable implements Emulator {
             toast.classList.remove("visible");
             this.toastTimeout = null;
         }, timeout);
-    }
-
-    async showModal(message: string, title = "Alert"): Promise<boolean> {
-        const modalContainer = document.getElementById("modal-container")!;
-        const modalTitle = document.getElementById("modal-title")!;
-        const modalText = document.getElementById("modal-text")!;
-        modalContainer.classList.add("visible");
-        modalTitle.textContent = title;
-        modalText.innerHTML = message.replace(/\n/g, "<br/>");
-        const result = (await new Promise((resolve) => {
-            global.modalCallback = resolve;
-        })) as boolean;
-        return result;
-    }
-
-    async hideModal(result = true) {
-        const modalContainer = document.getElementById("modal-container")!;
-        modalContainer.classList.remove("visible");
-        if (global.modalCallback) global.modalCallback(result);
-        global.modalCallback = null;
     }
 
     setVersion(value: string) {
@@ -915,15 +866,6 @@ class GameboyEmulator extends Observable implements Emulator {
         return [romName, romData];
     }
 }
-
-type Global = {
-    modalCallback: Function | null;
-};
-
-//@todo check if this is really required
-const global: Global = {
-    modalCallback: null
-};
 
 declare global {
     interface Window {
