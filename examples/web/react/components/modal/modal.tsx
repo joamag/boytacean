@@ -31,6 +31,9 @@ export const Modal: FC<ModalProps> = ({
             }
         });
     }, []);
+    const getTextHtml = (separator = /\n/g) => ({
+        __html: text.replace(separator, "<br/>")
+    });
     return (
         <div className={classes()}>
             <div className="modal-window">
@@ -44,7 +47,10 @@ export const Modal: FC<ModalProps> = ({
                     />
                 </div>
                 <h2 className="modal-title">{title}</h2>
-                <p className="modal-text">{text}</p>
+                <p
+                    className="modal-text"
+                    dangerouslySetInnerHTML={getTextHtml()}
+                ></p>
                 <div className="modal-buttons">
                     <Button
                         text={"Cancel"}
