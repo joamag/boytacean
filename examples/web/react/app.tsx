@@ -66,8 +66,29 @@ export interface ObservableI {
  * Should allow typical hardware operations to be performed.
  */
 export interface Emulator extends ObservableI {
+    /**
+     * Obtains the descriptive name of the emulator.
+     *
+     * @returns The descriptive name of the emulator.
+     */
     getName(): string;
+
+    /**
+     * Obtains a semantic version string for the current
+     * version of the emulator.
+     *
+     * @returns The semantic version string.
+     * @see {@link https://semver.org}
+     */
     getVersion(): string;
+
+    /**
+     * Obtains a URL to the page describing the current version
+     * of the emulator.
+     *
+     * @returns A URL to the page describing the current version
+     * of the emulator.
+     */
     getVersionUrl(): string;
 
     /**
@@ -117,6 +138,11 @@ export interface Emulator extends ObservableI {
     toggleRunning(): void;
     pause(): void;
     resume(): void;
+
+    /**
+     * Resets the emulator machine to the start state and
+     * re-loads the ROM that is currently set in the emulator.
+     */
     reset(): void;
 }
 

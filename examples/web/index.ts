@@ -891,10 +891,6 @@ class GameboyEmulator extends Observable implements Emulator {
         span.textContent = "Pause";
     }
 
-    /**
-     * Resets the emulator machine to the start state and loads
-     * the ROM that is currently set in the emulator.
-     */
     reset() {
         this.boot({ engine: null });
     }
