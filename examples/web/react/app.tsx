@@ -19,12 +19,13 @@ import {
     PanelSplit,
     Paragraph,
     Section,
-    Title
+    Title,
+    Toast
 } from "./components";
 
 import "./app.css";
 
-export type Callback<T> = (owner: T) => void;
+export type Callback<T> = (owner: T, params?: Record<string, any>) => void;
 
 /**
  * Abstract class that implements the basic functionality
@@ -42,9 +43,9 @@ export class Observable {
         this.events[event] = callbacks;
     }
 
-    trigger(event: string) {
+    trigger(event: string, params?: Record<string, any>) {
         const callbacks = this.events[event] ?? [];
-        callbacks.forEach((c) => c(this));
+        callbacks.forEach((c) => c(this, params));
     }
 }
 
@@ -167,10 +168,14 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
     const [romInfo, setRomInfo] = useState<RomInfo>({});
     const [framerate, setFramerate] = useState(0);
     const [keyaction, setKeyaction] = useState<string>();
-    const [modalVisible, setModalVisible] = useState(false);
     const [modalTitle, setModalTitle] = useState<string>();
     const [modalText, setModalText] = useState<string>();
+    const [modalVisible, setModalVisible] = useState(false);
+    const [toastText, setToastText] = useState<string>();
+    const [toastError, setToastError] = useState(false);
+    const [toastVisible, setToastVisible] = useState(false);
 
+    const toastCounterRef = useRef(0);
     const frameRef = useRef<boolean>(false);
     const errorRef = useRef<boolean>(false);
     const modalCallbackRef =
@@ -208,6 +213,9 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
             const romInfo = emulator.getRomInfo();
             setRomInfo(romInfo);
         });
+        emulator.bind("message", (_, params = {}) => {
+            showToast(params.text, params.error, params.timeout);
+        });
     }, []);
 
     const getPauseText = () => (paused ? "Resume" : "Pause");
@@ -227,6 +235,20 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
         })) as boolean;
         return result;
     };
+    const showToast = async (text: string, error = false, timeout = 3500) => {
+        setToastText(text);
+        setToastError(error);
+        setToastVisible(true);
+        toastCounterRef.current++;
+        const counter = toastCounterRef.current;
+        await new Promise((resolve) => {
+            setTimeout(() => {
+                if (counter !== toastCounterRef.current) return;
+                setToastVisible(false);
+                resolve(true);
+            }, timeout);
+        });
+    };
 
     const onModalConfirm = () => {
         if (modalCallbackRef.current) {
@@ -242,6 +264,9 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
         }
         setModalVisible(false);
     };
+    const onToastCancel = () => {
+        setToastVisible(false);
+    };
     const onPauseClick = () => {
         emulator.toggleRunning();
         setPaused(!paused);
@@ -254,7 +279,12 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
             "Are you sure you want to start a benchmark?\nThe benchmark is considered an expensive operation!",
             "Confirm"
         );
-        alert(`Will run it as ${result}`);
+        await showToast(
+            result
+                ? "Will run the benchmark as fast as possible"
+                : "Will not run the benchmark",
+            !result
+        );
     };
     const onFullscreenClick = () => {
         setFullscreen(!fullscreen);
@@ -284,11 +314,17 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
     return (
         <div className="app">
             <Modal
-                visible={modalVisible}
                 title={modalTitle}
                 text={modalText}
+                visible={modalVisible}
                 onConfirm={onModalConfirm}
                 onCancel={onModalCancel}
+            />
+            <Toast
+                text={toastText}
+                error={toastError}
+                visible={toastVisible}
+                onCancel={onToastCancel}
             />
             <Footer color={getBackground()}>
                 Built with ❤️ by{" "}

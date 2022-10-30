@@ -77,7 +77,6 @@ class GameboyEmulator extends Observable implements Emulator {
     private visualFrequency: number = VISUAL_HZ;
     private idleFrequency: number = IDLE_HZ;
 
-    private toastTimeout: number | null = null;
     private paused: boolean = false;
     private nextTickTime: number = 0;
     private fps: number = 0;
@@ -96,7 +95,6 @@ class GameboyEmulator extends Observable implements Emulator {
 
         // initializes the complete set of sub-systems
         // and registers the event handlers
-        await this.init();
         await this.register();
 
         // boots the emulator subsystem with the initial
@@ -143,7 +141,11 @@ class GameboyEmulator extends Observable implements Emulator {
 
                 // displays the error information to both the end-user
                 // and the developer (for diagnostics)
-                this.showToast(message, true, 5000);
+                this.trigger("message", {
+                    text: message,
+                    error: true,
+                    timeout: 5000
+                });
                 console.error(err);
 
                 // pauses the machine, allowing the end-user to act
@@ -211,8 +213,8 @@ class GameboyEmulator extends Observable implements Emulator {
             // frame is different from the previously rendered
             // one then it's time to update the canvas
             if (
-                this.gameBoy!.ppu_mode() == PpuMode.VBlank &&
-                this.gameBoy!.ppu_frame() != lastFrame
+                this.gameBoy!.ppu_mode() === PpuMode.VBlank &&
+                this.gameBoy!.ppu_frame() !== lastFrame
             ) {
                 lastFrame = this.gameBoy!.ppu_frame();
 
@@ -233,7 +235,7 @@ class GameboyEmulator extends Observable implements Emulator {
             const currentTime = new Date().getTime();
             const deltaTime = (currentTime - this.frameStart) / 1000;
             const fps = Math.round(this.frameCount / deltaTime);
-            this.setFps(fps);
+            this.fps = fps;
             this.frameCount = 0;
             this.frameStart = currentTime;
         }
@@ -310,10 +312,7 @@ class GameboyEmulator extends Observable implements Emulator {
 
         // updates the complete set of global information that
         // is going to be displayed
-        this.setEngine(this.engine!);
         this.setRom(romName!, romData!, cartridge);
-        this.setLogicFrequency(this.logicFrequency);
-        this.setFps(this.fps);
 
         // in case the restore (state) flag is set
         // then resumes the machine execution
@@ -330,13 +329,8 @@ class GameboyEmulator extends Observable implements Emulator {
             this.registerDrop(),
             this.registerKeys(),
             this.registerButtons(),
-            this.registerKeyboard(),
-            this.registerToast()
+            this.registerKeyboard()
         ]);
-    }
-
-    async init() {
-        await Promise.all([this.initBase()]);
     }
 
     registerDrop() {
@@ -357,10 +351,10 @@ class GameboyEmulator extends Observable implements Emulator {
             const file = event.dataTransfer!.files[0];
 
             if (!file.name.endsWith(".gb")) {
-                this.showToast(
-                    "This is probably not a Game Boy ROM file!",
-                    true
-                );
+                this.trigger("message", {
+                    text: "This is probably not a Game Boy ROM file!",
+                    error: true
+                });
                 return;
             }
 
@@ -369,7 +363,9 @@ class GameboyEmulator extends Observable implements Emulator {
 
             this.boot({ engine: null, romName: file.name, romData: romData });
 
-            this.showToast(`Loaded ${file.name} ROM successfully!`);
+            this.trigger("message", {
+                text: `Loaded ${file.name} ROM successfully!`
+            });
         });
         document.addEventListener("dragover", async (event) => {
             if (!event.dataTransfer!.items || event.dataTransfer!.items[0].type)
@@ -406,15 +402,11 @@ class GameboyEmulator extends Observable implements Emulator {
 
             switch (event.key) {
                 case "+":
-                    this.setLogicFrequency(
-                        this.logicFrequency + FREQUENCY_DELTA
-                    );
+                    this.logicFrequency += FREQUENCY_DELTA;
                     break;
 
                 case "-":
-                    this.setLogicFrequency(
-                        this.logicFrequency - FREQUENCY_DELTA
-                    );
+                    this.logicFrequency -= FREQUENCY_DELTA;
                     break;
             }
         });
@@ -433,25 +425,25 @@ class GameboyEmulator extends Observable implements Emulator {
     registerButtons() {
         const engine = document.getElementById("engine")!;
         engine.addEventListener("click", () => {
-            const name = this.engine == "neo" ? "classic" : "neo";
+            const name = this.engine === "neo" ? "classic" : "neo";
             this.boot({ engine: name });
-            this.showToast(
-                `Game Boy running in engine "${name.toUpperCase()}" from now on!`
-            );
+            this.trigger("message", {
+                text: `Game Boy running in engine "${name.toUpperCase()}" from now on!`
+            });
         });
 
         const logicFrequencyPlus = document.getElementById(
             "logic-frequency-plus"
         )!;
         logicFrequencyPlus.addEventListener("click", () => {
-            this.setLogicFrequency(this.logicFrequency + FREQUENCY_DELTA);
+            this.logicFrequency = this.logicFrequency + FREQUENCY_DELTA;
         });
 
         const logicFrequencyMinus = document.getElementById(
             "logic-frequency-minus"
         )!;
         logicFrequencyMinus.addEventListener("click", () => {
-            this.setLogicFrequency(this.logicFrequency - FREQUENCY_DELTA);
+            this.logicFrequency = this.logicFrequency - FREQUENCY_DELTA;
         });
 
         const buttonPause = document.getElementById("button-pause")!;
@@ -476,15 +468,14 @@ class GameboyEmulator extends Observable implements Emulator {
                 }
                 const delta = (Date.now() - initial) / 1000;
                 const frequency_mhz = count / delta / 1000 / 1000;
-                this.showToast(
-                    `Took ${delta.toFixed(
+                this.trigger("message", {
+                    text: `Took ${delta.toFixed(
                         2
                     )} seconds to run ${count} ticks (${frequency_mhz.toFixed(
                         2
                     )} Mhz)!`,
-                    undefined,
-                    7500
-                );
+                    timeout: 7500
+                });
             } finally {
                 this.resume();
                 buttonBenchmark.classList.remove("enabled");
@@ -580,13 +571,13 @@ class GameboyEmulator extends Observable implements Emulator {
                             (pixels[index] << 24) |
                             (pixels[index + 1] << 16) |
                             (pixels[index + 2] << 8) |
-                            (format == PixelFormat.RGBA
+                            (format === PixelFormat.RGBA
                                 ? pixels[index + 3]
                                 : 0xff);
                         buffer.setUint32(offset, color);
 
                         counter++;
-                        if (counter == 8) {
+                        if (counter === 8) {
                             counter = 0;
                             offset +=
                                 (canvasTiles.width - 7) * PixelFormat.RGBA;
@@ -653,7 +644,9 @@ class GameboyEmulator extends Observable implements Emulator {
 
             this.boot({ engine: null, romName: file.name, romData: romData });
 
-            this.showToast(`Loaded ${file.name} ROM successfully!`);
+            this.trigger("message", {
+                text: `Loaded ${file.name} ROM successfully!`
+            });
         });
     }
 
@@ -709,57 +702,11 @@ class GameboyEmulator extends Observable implements Emulator {
         });
     }
 
-    registerToast() {
-        const toast = document.getElementById("toast")!;
-        toast.addEventListener("click", () => {
-            toast.classList.remove("visible");
-        });
-    }
-
-    async initBase() {
-        this.setVersion(info.version);
-    }
-
-    async showToast(message: string, error = false, timeout = 3500) {
-        const toast = document.getElementById("toast")!;
-        toast.classList.remove("error");
-        if (error) toast.classList.add("error");
-        toast.classList.add("visible");
-        toast.textContent = message;
-        if (this.toastTimeout) clearTimeout(this.toastTimeout);
-        this.toastTimeout = setTimeout(() => {
-            toast.classList.remove("visible");
-            this.toastTimeout = null;
-        }, timeout);
-    }
-
-    setVersion(value: string) {
-        document.getElementById("version")!.textContent = value;
-    }
-
-    setEngine(name: string, upper = true) {
-        name = upper ? name.toUpperCase() : name;
-        document.getElementById("engine")!.textContent = name;
-    }
-
     setRom(name: string, data: Uint8Array, cartridge: Cartridge) {
         this.romName = name;
         this.romData = data;
         this.romSize = data.length;
         this.cartridge = cartridge;
-    }
-
-    setLogicFrequency(value: number) {
-        if (value < 0) this.showToast("Invalid frequency value!", true);
-        value = Math.max(value, 0);
-        this.logicFrequency = value;
-        document.getElementById("logic-frequency")!.textContent = String(value);
-    }
-
-    setFps(value: number) {
-        if (value < 0) this.showToast("Invalid FPS value!", true);
-        value = Math.max(value, 0);
-        this.fps = value;
     }
 
     getName() {
