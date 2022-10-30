@@ -136,6 +136,9 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
             await handler(undefined, require("../res/storm.png"), 0.2);
         });
     };
+    const onKeyDown = (event: KeyboardEvent) => {
+        
+    }
     useEffect(() => {
         document.body.style.backgroundColor = `#${getBackground()}`;
     });

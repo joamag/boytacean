@@ -53,6 +53,13 @@ const KEYS: Record<string, number> = {
     s: PadKey.B
 };
 
+const ARROW_KEYS: Record<string, boolean> = {
+    ArrowUp: true,
+    ArrowDown: true,
+    ArrowLeft: true,
+    ArrowRight: true
+};
+
 const ROM_PATH = require("../../res/roms/20y.gb");
 
 /**
@@ -399,6 +406,8 @@ class GameboyEmulator extends Observable implements Emulator {
     registerKeys() {
         document.addEventListener("keydown", (event) => {
             const keyCode = KEYS[event.key];
+            const isArrow = KEYS[event.key] ?? false;
+            if (isArrow) event.preventDefault();
             if (keyCode !== undefined) {
                 this.gameBoy!.key_press(keyCode);
                 return;
@@ -421,6 +430,8 @@ class GameboyEmulator extends Observable implements Emulator {
 
         document.addEventListener("keyup", (event) => {
             const keyCode = KEYS[event.key];
+            const isArrow = KEYS[event.key] ?? false;
+            if (isArrow) event.preventDefault();
             if (keyCode !== undefined) {
                 this.gameBoy!.key_lift(keyCode);
                 return;
