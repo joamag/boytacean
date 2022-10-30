@@ -100,9 +100,9 @@ class GameboyEmulator extends Observable implements Emulator {
         await this.init();
         await this.register();
 
-        // start the emulator subsystem with the initial
+        // boots the emulator subsystem with the initial
         // ROM retrieved from a remote data source
-        await this.start({ loadRom: true });
+        await this.boot({ loadRom: true });
 
         // the counter that controls the overflowing cycles
         // from tick to tick operation
@@ -157,7 +157,7 @@ class GameboyEmulator extends Observable implements Emulator {
                 // also sets the default color on screen to indicate the issue
                 if (isPanic) {
                     await wasm();
-                    await this.start({ restore: false });
+                    await this.boot({ restore: false });
 
                     this.trigger("error");
                 }
@@ -251,11 +251,14 @@ class GameboyEmulator extends Observable implements Emulator {
     /**
      * Starts the current machine, setting the internal structure in
      * a proper state to start drawing and receiving input.
+     * 
+     * This method can also be used to load a new ROM into the machine.
      *
      * @param options The options that are going to be used in the
-     * starting of the machine.
+     * starting of the machine, includes information on the ROM and
+     * the emulator engine to use.
      */
-    async start({
+    async boot({
         engine = "neo",
         restore = true,
         loadRom = false,
@@ -317,9 +320,9 @@ class GameboyEmulator extends Observable implements Emulator {
         // then resumes the machine execution
         if (restore) this.resume();
 
-        // triggers the loaded event indicating that the
+        // triggers the booted event indicating that the
         // emulator has finished the loading process
-        this.trigger("loaded");
+        this.trigger("booted");
     }
 
     // @todo remove this method, or at least most of it
@@ -366,7 +369,7 @@ class GameboyEmulator extends Observable implements Emulator {
             const arrayBuffer = await file.arrayBuffer();
             const romData = new Uint8Array(arrayBuffer);
 
-            this.start({ engine: null, romName: file.name, romData: romData });
+            this.boot({ engine: null, romName: file.name, romData: romData });
 
             this.showToast(`Loaded ${file.name} ROM successfully!`);
         });
@@ -429,7 +432,7 @@ class GameboyEmulator extends Observable implements Emulator {
         const engine = document.getElementById("engine")!;
         engine.addEventListener("click", () => {
             const name = this.engine == "neo" ? "classic" : "neo";
-            this.start({ engine: name });
+            this.boot({ engine: name });
             this.showToast(
                 `Game Boy running in engine "${name.toUpperCase()}" from now on!`
             );
@@ -651,7 +654,7 @@ class GameboyEmulator extends Observable implements Emulator {
 
             buttonUploadFile.value = "";
 
-            this.start({ engine: null, romName: file.name, romData: romData });
+            this.boot({ engine: null, romName: file.name, romData: romData });
 
             this.showToast(`Loaded ${file.name} ROM successfully!`);
         });
@@ -882,7 +885,7 @@ class GameboyEmulator extends Observable implements Emulator {
      * the ROM that is currently set in the emulator.
      */
     reset() {
-        this.start({ engine: null });
+        this.boot({ engine: null });
     }
 
     async fetchRom(romPath: string): Promise<[string, Uint8Array]> {

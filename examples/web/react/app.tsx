@@ -151,7 +151,7 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
                 event.preventDefault();
             }
         });
-        emulator.bind("loaded", () => {
+        emulator.bind("booted", () => {
             const romInfo = emulator.getRomInfo();
             setRomInfo(romInfo);
         });
