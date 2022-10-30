@@ -15,7 +15,7 @@ type ModalProps = {
 export const Modal: FC<ModalProps> = ({
     title = "Alert",
     text = "Do you confirm the following operation?",
-    visible = true,
+    visible = false,
     style = []
 }) => {
     const classes = () =>
