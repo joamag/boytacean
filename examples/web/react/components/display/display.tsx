@@ -66,10 +66,10 @@ export const Display: FC<DisplayProps> = ({
     const classes = () =>
         ["display", fullscreen ? "fullscreen" : null, size, ...style].join(" ");
 
-    const [width, setWidth] = useState<number | undefined>(undefined);
-    const [height, setHeight] = useState<number | undefined>(undefined);
+    const [width, setWidth] = useState<number>();
+    const [height, setHeight] = useState<number>();
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    const canvasContentsRef = useRef<CanvasContents | undefined>(undefined);
+    const canvasContentsRef = useRef<CanvasContents>();
     const resizeRef = useRef(() => {
         const [fullWidth, fullHeight] = crop(options.width / options.height);
         setWidth(fullWidth);

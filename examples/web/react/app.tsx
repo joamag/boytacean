@@ -166,19 +166,94 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
     const [backgroundIndex, setBackgroundIndex] = useState(0);
     const [romInfo, setRomInfo] = useState<RomInfo>({});
     const [framerate, setFramerate] = useState(0);
-    const [keyaction, setKeyaction] = useState<string | null>(null);
+    const [keyaction, setKeyaction] = useState<string>();
+    const [modalVisible, setModalVisible] = useState(false);
+    const [modalTitle, setModalTitle] = useState<string>();
+    const [modalText, setModalText] = useState<string>();
+
     const frameRef = useRef<boolean>(false);
     const errorRef = useRef<boolean>(false);
+    const modalCallbackRef =
+        useRef<(value: boolean | PromiseLike<boolean>) => void>();
+
+    useEffect(() => {
+        document.body.style.backgroundColor = `#${getBackground()}`;
+    }, [backgroundIndex]);
+    useEffect(() => {
+        switch (keyaction) {
+            case "Escape":
+                setFullscreen(false);
+                setKeyaction(undefined);
+                break;
+            case "Fullscreen":
+                setFullscreen(!fullscreen);
+                setKeyaction(undefined);
+                break;
+        }
+    }, [keyaction]);
+    useEffect(() => {
+        document.addEventListener("keydown", (event) => {
+            if (event.key === "Escape") {
+                setKeyaction("Escape");
+                event.stopPropagation();
+                event.preventDefault();
+            }
+            if (event.key === "f" && event.ctrlKey === true) {
+                setKeyaction("Fullscreen");
+                event.stopPropagation();
+                event.preventDefault();
+            }
+        });
+        emulator.bind("booted", () => {
+            const romInfo = emulator.getRomInfo();
+            setRomInfo(romInfo);
+        });
+    }, []);
+
     const getPauseText = () => (paused ? "Resume" : "Pause");
     const getPauseIcon = () =>
         paused ? require("../res/play.svg") : require("../res/pause.svg");
     const getBackground = () => backgrounds[backgroundIndex];
+
+    const showModal = async (
+        text: string,
+        title = "Alert"
+    ): Promise<boolean> => {
+        setModalText(text);
+        setModalTitle(title);
+        setModalVisible(true);
+        const result = (await new Promise((resolve) => {
+            modalCallbackRef.current = resolve;
+        })) as boolean;
+        return result;
+    };
+
+    const onModalConfirm = () => {
+        if (modalCallbackRef.current) {
+            modalCallbackRef.current(true);
+            modalCallbackRef.current = undefined;
+        }
+        setModalVisible(false);
+    };
+    const onModalCancel = () => {
+        if (modalCallbackRef.current) {
+            modalCallbackRef.current(false);
+            modalCallbackRef.current = undefined;
+        }
+        setModalVisible(false);
+    };
     const onPauseClick = () => {
         emulator.toggleRunning();
         setPaused(!paused);
     };
     const onResetClick = () => {
         emulator.reset();
+    };
+    const onBenchmarkClick = async () => {
+        const result = await showModal(
+            "Are you sure you want to start a benchmark?\nThe benchmark is considered an expensive operation!",
+            "Confirm"
+        );
     };
     const onFullscreenClick = () => {
         setFullscreen(!fullscreen);
@@ -204,43 +279,16 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
             await handler(undefined, require("../res/storm.png"), 0.2);
         });
     };
-    const onKeyDown = (event: KeyboardEvent) => {};
-    useEffect(() => {
-        document.body.style.backgroundColor = `#${getBackground()}`;
-    }, [backgroundIndex]);
-    useEffect(() => {
-        switch (keyaction) {
-            case "Escape":
-                setFullscreen(false);
-                setKeyaction(null);
-                break;
-            case "Fullscreen":
-                setFullscreen(!fullscreen);
-                setKeyaction(null);
-                break;
-        }
-    }, [keyaction]);
-    useEffect(() => {
-        document.addEventListener("keydown", (event) => {
-            if (event.key === "Escape") {
-                setKeyaction("Escape");
-                event.stopPropagation();
-                event.preventDefault();
-            }
-            if (event.key === "f" && event.ctrlKey === true) {
-                setKeyaction("Fullscreen");
-                event.stopPropagation();
-                event.preventDefault();
-            }
-        });
-        emulator.bind("booted", () => {
-            const romInfo = emulator.getRomInfo();
-            setRomInfo(romInfo);
-        });
-    }, []);
+
     return (
         <div className="app">
-            <Modal />
+            <Modal
+                visible={modalVisible}
+                title={modalTitle}
+                text={modalText}
+                onConfirm={onModalConfirm}
+                onCancel={onModalCancel}
+            />
             <Footer color={getBackground()}>
                 Built with ❤️ by{" "}
                 <Link href="https://joao.me" target="_blank">
@@ -314,6 +362,12 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
                             onClick={onResetClick}
                         />
                         <Button
+                            text={"Benchmark"}
+                            image={require("../res/bolt.svg")}
+                            imageAlt="benchmark"
+                            onClick={onBenchmarkClick}
+                        />
+                        <Button
                             text={"Fullscreen"}
                             image={require("../res/maximise.svg")}
                             imageAlt="maximise"
@@ -322,7 +376,7 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
                         <Button
                             text={"Theme"}
                             image={require("../res/marker.svg")}
-                            imageAlt="marker"
+                            imageAlt="theme"
                             onClick={onThemeClick}
                         />
                     </ButtonContainer>
