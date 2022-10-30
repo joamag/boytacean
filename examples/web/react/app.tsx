@@ -99,6 +99,7 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
     const [backgroundIndex, setBackgroundIndex] = useState(0);
     const [romInfo, setRomInfo] = useState<RomInfo>({});
     const [framerate, setFramerate] = useState(0);
+    const [keyaction, setKeyaction] = useState<string | null>(null);
     const frameRef = useRef<boolean>(false);
     const errorRef = useRef<boolean>(false);
     const getPauseText = () => (paused ? "Resume" : "Pause");
@@ -136,21 +137,31 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
             await handler(undefined, require("../res/storm.png"), 0.2);
         });
     };
-    const onKeyDown = (event: KeyboardEvent) => {
-        
-    }
+    const onKeyDown = (event: KeyboardEvent) => {};
     useEffect(() => {
         document.body.style.backgroundColor = `#${getBackground()}`;
-    });
+    }, [backgroundIndex]);
+    useEffect(() => {
+        switch (keyaction) {
+            case "Escape":
+                setFullscreen(false);
+                setKeyaction(null);
+                break;
+            case "Fullscreen":
+                setFullscreen(!fullscreen);
+                setKeyaction(null);
+                break;
+        }
+    }, [keyaction]);
     useEffect(() => {
         document.addEventListener("keydown", (event) => {
             if (event.key === "Escape") {
-                setFullscreen(false);
+                setKeyaction("Escape");
                 event.stopPropagation();
                 event.preventDefault();
             }
             if (event.key === "f" && event.ctrlKey === true) {
-                setFullscreen(true);
+                setKeyaction("Fullscreen");
                 event.stopPropagation();
                 event.preventDefault();
             }

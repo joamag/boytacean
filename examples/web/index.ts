@@ -406,7 +406,7 @@ class GameboyEmulator extends Observable implements Emulator {
     registerKeys() {
         document.addEventListener("keydown", (event) => {
             const keyCode = KEYS[event.key];
-            const isArrow = KEYS[event.key] ?? false;
+            const isArrow = ARROW_KEYS[event.key] ?? false;
             if (isArrow) event.preventDefault();
             if (keyCode !== undefined) {
                 this.gameBoy!.key_press(keyCode);
@@ -430,7 +430,7 @@ class GameboyEmulator extends Observable implements Emulator {
 
         document.addEventListener("keyup", (event) => {
             const keyCode = KEYS[event.key];
-            const isArrow = KEYS[event.key] ?? false;
+            const isArrow = ARROW_KEYS[event.key] ?? false;
             if (isArrow) event.preventDefault();
             if (keyCode !== undefined) {
                 this.gameBoy!.key_lift(keyCode);
