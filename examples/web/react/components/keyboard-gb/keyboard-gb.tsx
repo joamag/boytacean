@@ -2,6 +2,8 @@ import React, { FC } from "react";
 
 import "./keyboard-gb.css";
 
+declare const require: any;
+
 type KeyboardGBProps = {
     style?: string[];
     onKeyDown?: (key: string) => void;
@@ -23,7 +25,7 @@ export const KeyboardGB: FC<KeyboardGBProps> = ({ style = [], onKeyDown }) => {
     return (
         <div className={classes()}>
             <div className="keyboard-line">
-                {["1", "2", "3", "4"].map((k) => renderKey(k))}
+                <img className="dpad" src={require("./dpad.svg")} />
             </div>
             <div className="keyboard-line">
                 {["Q", "W", "E", "R"].map((k) => renderKey(k))}

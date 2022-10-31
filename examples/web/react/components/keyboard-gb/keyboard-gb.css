@@ -53,3 +53,7 @@
 .keyboard-gb .key:active {
     background-color: #2a9d8f;
 }
+
+.keyboard-gb .dpad {
+    width: 120px;
+}
