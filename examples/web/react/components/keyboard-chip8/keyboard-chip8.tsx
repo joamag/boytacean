@@ -14,7 +14,11 @@ export const KeyboardChip8: FC<KeyboardChip8Props> = ({
     const classes = () => ["keyboard", "keyboard-chip8", ...style].join(" ");
     const renderKey = (key: string) => {
         return (
-            <span className="key" onKeyDown={() => onKeyDown && onKeyDown(key)}>
+            <span
+                className="key"
+                key={key}
+                onKeyDown={() => onKeyDown && onKeyDown(key)}
+            >
                 {key}
             </span>
         );
