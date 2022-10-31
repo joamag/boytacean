@@ -65,6 +65,7 @@ deploy-netlify-prod:
   stage: deploy
   script:
     - cd examples/web/dist
+    - cp ../robots.txt .
     - npm_config_yes=true npx --package=netlify-cli netlify deploy --dir=. --prod
   dependencies:
     - build-wasm
@@ -75,6 +76,7 @@ deploy-cloudfare-master:
   stage: deploy
   script:
     - cd examples/web/dist
+    - cp ../robots.txt .
     - npm_config_yes=true npx wrangler pages publish . --project-name=boytacean --branch master
   dependencies:
     - build-wasm
@@ -85,6 +87,7 @@ deploy-cloudfare-stable:
   stage: deploy
   script:
     - cd examples/web/dist
+    - cp ../robots.txt .
     - npm_config_yes=true npx wrangler pages publish . --project-name=boytacean --branch stable
   dependencies:
     - build-wasm
@@ -95,6 +98,7 @@ deploy-cloudfare-prod:
   stage: deploy
   script:
     - cd examples/web/dist
+    - cp ../robots.txt .
     - npm_config_yes=true npx wrangler pages publish . --project-name=boytacean --branch prod
   dependencies:
     - build-wasm
