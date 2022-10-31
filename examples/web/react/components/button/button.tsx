@@ -28,7 +28,7 @@ export const Button: FC<ButtonProps> = ({
     );
     const buttonImage = () => (
         <span className={classes()} onClick={_onClick}>
-            <img src={image} alt={imageAlt} />
+            <img src={image} alt={imageAlt || text || "button"} />
             <span>{text}</span>
         </span>
     );

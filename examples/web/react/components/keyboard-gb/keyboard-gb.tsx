@@ -25,7 +25,7 @@ export const KeyboardGB: FC<KeyboardGBProps> = ({ style = [], onKeyDown }) => {
     return (
         <div className={classes()}>
             <div className="keyboard-line">
-                <img className="dpad" src={require("./dpad.svg")} />
+                <img className="dpad" alt="dpad" src={require("./dpad.svg")} />
             </div>
             <div className="keyboard-line">
                 {["Q", "W", "E", "R"].map((k) => renderKey(k))}
