@@ -18,70 +18,13 @@
         <div class="side-left">
         </div>
         <div class="side-right">
-            <div class="separator"></div>
-            <div id="section-narrative" class="section">
-                <p>This is a <a href="https://en.wikipedia.org/wiki/Game_Boy" target="_blank">Game Boy</a> emulator built using
-                    the <a href="https://www.rust-lang.org" target="_blank">Rust Programming Language</a> and is running
-                    inside this browser with the help of <a href="https://webassembly.org/" target="_blank">WebAssembly</a>.
-                </p>
-                <p>You can check the source code of it at <a href="https://gitlab.stage.hive.pt/joamag/boytacean"
-                        target="_blank">GitLab</a>.</p>
-                <p>TIP: Drag and Drop ROM files to the Browser to load the ROM.</p>
-            </div>
-            <div id="separator-narrative"  class="separator"></div>
-            <div id="section-keyboard" class="section" style="display: none;">
-                <div id="keyboard" class="keyboard">
-                    <div class="keyboard-line">
-                        <span class="key">1</span>
-                        <span class="key">2</span>
-                        <span class="key">3</span>
-                        <span class="key">4</span>
-                    </div>
-                    <div class="keyboard-line">
-                        <span class="key">Q</span>
-                        <span class="key">W</span>
-                        <span class="key">E</span>
-                        <span class="key">R</span>
-                    </div>
-                    <div class="keyboard-line">
-                        <span class="key">A</span>
-                        <span class="key">S</span>
-                        <span class="key">D</span>
-                        <span class="key">F</span>
-                    </div>
-                    <div class="keyboard-line">
-                        <span class="key">Z</span>
-                        <span class="key">X</span>
-                        <span class="key">C</span>
-                        <span class="key">V</span>
-                    </div>
-                </div>
-            </div>
-            <div id="separator-keyboard" class="separator" style="display: none;"></div>
+            <div id="separator-narrative" class="separator"></div>
             <div id="section-debug" class="section" style="display: none;">
                 <div id="debug" class="debug">
                     <canvas id="canvas-tiles" class="canvas-tiles" width="128" height="192"></canvas>
                 </div>
             </div>
             <div id="separator-debug" class="separator" style="display: none;"></div>
-            <div id="section-diag" class="section">
-                <dl class="diag">
-                    <dt>Engine</dt>
-                    <dd id="engine" class="button simple">-</dd>
-                    <dt>ROM</dt>
-                    <dd id="rom-name">-</dd>
-                    <dt>ROM Size</dt>
-                    <dd><span id="rom-size">-</span> bytes</dd>
-                    <dt>CPU Frequency</dt>
-                    <dd>
-                        <span id="logic-frequency-minus" class="button simple">-</span>
-                        <span id="logic-frequency">-</span> Hz
-                        <span id="logic-frequency-plus" class="button simple">+</span></dd>
-                    <dt>Framerate</dt>
-                    <dd><span id="fps-count">-</span> fps</dd>
-                </dl>
-            </div>
-            <div id="separator-diag" class="separator"></div>
             <div class="section">
                 <div class="button-area">
                     <span id="button-pause" class="button simple border padded">

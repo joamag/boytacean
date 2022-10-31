@@ -422,29 +422,6 @@ class GameboyEmulator extends Observable implements Emulator {
     }
 
     registerButtons() {
-        const engine = document.getElementById("engine")!;
-        engine.addEventListener("click", () => {
-            const name = this.engine === "neo" ? "classic" : "neo";
-            this.boot({ engine: name });
-            this.trigger("message", {
-                text: `Game Boy running in engine "${name.toUpperCase()}" from now on!`
-            });
-        });
-
-        const logicFrequencyPlus = document.getElementById(
-            "logic-frequency-plus"
-        )!;
-        logicFrequencyPlus.addEventListener("click", () => {
-            this.logicFrequency = this.logicFrequency + FREQUENCY_DELTA;
-        });
-
-        const logicFrequencyMinus = document.getElementById(
-            "logic-frequency-minus"
-        )!;
-        logicFrequencyMinus.addEventListener("click", () => {
-            this.logicFrequency = this.logicFrequency - FREQUENCY_DELTA;
-        });
-
         const buttonPause = document.getElementById("button-pause")!;
         buttonPause.addEventListener("click", () => {
             this.toggleRunning();

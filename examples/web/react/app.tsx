@@ -146,6 +146,15 @@ export interface Emulator extends ObservableI {
      * re-loads the ROM that is currently set in the emulator.
      */
     reset(): void;
+
+    /**
+     * Boot (or reboots) the emulator according to the provided
+     * set of options.
+     *
+     * @param options The options that are going to be used for
+     * the booting operation of the emulator.
+     */
+    boot(options: any): void;
 }
 
 /**
@@ -299,6 +308,10 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
     const onThemeClick = () => {
         setBackgroundIndex((backgroundIndex + 1) % backgrounds.length);
     };
+    const onEngineChange = (engine: string) => {
+        emulator.boot({ engine: engine.toLowerCase() });
+        showToast(`Game Boy running in engine "${engine}" from now on!`);
+    };
     const onMinimize = () => {
         setFullscreen(!fullscreen);
     };
@@ -439,6 +452,30 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
                     </ButtonContainer>
                     <Info>
                         <Pair
+                            key="button-engine"
+                            name={"Engine"}
+                            valueNode={
+                                <ButtonSwitch
+                                    options={["NEO", "CLASSIC"]}
+                                    size={"large"}
+                                    style={["simple"]}
+                                    onChange={onEngineChange}
+                                />
+                            }
+                        />
+                        <Pair
+                            key="button-frequency"
+                            name={"CPU Frequency"}
+                            valueNode={
+                                <ButtonIncrement
+                                    value={200}
+                                    delta={100}
+                                    min={0}
+                                    suffix={"Hz"}
+                                />
+                            }
+                        />
+                        <Pair
                             key="rom"
                             name={"ROM"}
                             value={romInfo.name ?? "-"}
@@ -461,30 +498,6 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
                             key="framerate"
                             name={"Framerate"}
                             value={`${framerate} fps`}
-                        />
-                        <Pair
-                            key="button-tobias"
-                            name={"Button Increment"}
-                            valueNode={
-                                <ButtonIncrement
-                                    value={200}
-                                    delta={100}
-                                    min={0}
-                                    suffix={"Hz"}
-                                />
-                            }
-                        />
-                        <Pair
-                            key="button-cpu"
-                            name={"Button Switch"}
-                            valueNode={
-                                <ButtonSwitch
-                                    options={["NEO", "CLASSIC"]}
-                                    size={"large"}
-                                    style={["simple"]}
-                                    onChange={(v) => alert(v)}
-                                />
-                            }
                         />
                     </Info>
                 </Section>
