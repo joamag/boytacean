@@ -3,8 +3,8 @@
 }
 
 .button-container > * {
-    margin-right: 8px;
     margin-bottom: 12px;
+    margin-right: 8px;
 }
 
 .button-container > *:last-child {

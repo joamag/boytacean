@@ -293,6 +293,9 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
     const onKeyboardClick = () => {
         showToast("Keyboard click");
     };
+    const onInformationClick = () => {
+        showToast("Information click");
+    };
     const onThemeClick = () => {
         setBackgroundIndex((backgroundIndex + 1) % backgrounds.length);
     };
@@ -419,6 +422,12 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
                             image={require("../res/dialpad.svg")}
                             imageAlt="keyboard"
                             onClick={onKeyboardClick}
+                        />
+                        <Button
+                            text={"Information"}
+                            image={require("../res/info.svg")}
+                            imageAlt="iformation"
+                            onClick={onInformationClick}
                         />
                         <Button
                             text={"Theme"}
