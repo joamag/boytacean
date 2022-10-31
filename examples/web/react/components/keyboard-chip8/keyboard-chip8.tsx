@@ -4,35 +4,34 @@ import "./keyboard-chip8.css";
 
 type KeyboardChip8Props = {
     style?: string[];
+    onKeyDown?: (key: string) => void;
 };
 
-export const KeyboardChip8: FC<KeyboardChip8Props> = ({ style = [] }) => {
+export const KeyboardChip8: FC<KeyboardChip8Props> = ({
+    style = [],
+    onKeyDown
+}) => {
     const classes = () => ["keyboard", "keyboard-chip8", ...style].join(" ");
+    const renderKey = (key: string) => {
+        return (
+            <span className="key" onKeyDown={() => onKeyDown && onKeyDown(key)}>
+                {key}
+            </span>
+        );
+    };
     return (
         <div className={classes()}>
             <div className="keyboard-line">
-                <span className="key">1</span>
-                <span className="key">2</span>
-                <span className="key">3</span>
-                <span className="key">4</span>
+                {["1", "2", "3", "4"].map((k) => renderKey(k))}
             </div>
             <div className="keyboard-line">
-                <span className="key">Q</span>
-                <span className="key">W</span>
-                <span className="key">E</span>
-                <span className="key">R</span>
+                {["Q", "W", "E", "R"].map((k) => renderKey(k))}
             </div>
             <div className="keyboard-line">
-                <span className="key">A</span>
-                <span className="key">S</span>
-                <span className="key">D</span>
-                <span className="key">F</span>
+                {["A", "S", "D", "F"].map((k) => renderKey(k))}
             </div>
             <div className="keyboard-line">
-                <span className="key">Z</span>
-                <span className="key">X</span>
-                <span className="key">C</span>
-                <span className="key">V</span>
+                {["Z", "X", "C", "V"].map((k) => renderKey(k))}
             </div>
         </div>
     );
