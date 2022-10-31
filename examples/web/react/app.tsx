@@ -13,6 +13,7 @@ import {
     DrawHandler,
     Footer,
     Info,
+    KeyboardChip8,
     Link,
     Modal,
     Pair,
@@ -341,6 +342,7 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
                             onClearHandler={onClearHandler}
                             onMinimize={onMinimize}
                         />
+                        <KeyboardChip8 />
                     </div>
                 }
             >

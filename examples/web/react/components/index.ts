@@ -5,6 +5,7 @@ export * from "./button-switch/button-switch";
 export * from "./display/display";
 export * from "./footer/footer";
 export * from "./info/info";
+export * from "./keyboard-chip8/keyboard-chip8";
 export * from "./link/link";
 export * from "./modal/modal";
 export * from "./pair/pair";
