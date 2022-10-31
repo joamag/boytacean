@@ -334,7 +334,7 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
             </Footer>
             <PanelSplit
                 left={
-                    <div style={{ marginTop: 78 }}>
+                    <div className="display-container">
                         <Display
                             fullscreen={fullscreen}
                             onDrawHandler={onDrawHandler}

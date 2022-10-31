@@ -1,5 +1,10 @@
+.button-container {
+    margin-bottom: -12px;
+}
+
 .button-container > * {
     margin-right: 8px;
+    margin-bottom: 12px;
 }
 
 .button-container > *:last-child {

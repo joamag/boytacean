@@ -77,13 +77,16 @@ export const Display: FC<DisplayProps> = ({
     });
 
     useEffect(() => {
-        if (canvasRef.current && !canvasContentsRef.current) {
+        if (canvasRef.current) {
             canvasContentsRef.current = initCanvas(
                 options.logicWidth,
                 options.logicHeight,
                 canvasRef.current
             );
         }
+    }, [canvasRef, options.scale]);
+
+    useEffect(() => {
         if (fullscreen) {
             resizeRef.current();
             document.getElementsByTagName("body")[0].style.overflow = "hidden";
@@ -96,7 +99,7 @@ export const Display: FC<DisplayProps> = ({
                 .style.removeProperty("overflow");
             window.removeEventListener("resize", resizeRef.current);
         }
-    }, [canvasRef, fullscreen]);
+    }, [fullscreen]);
 
     if (onDrawHandler) {
         onDrawHandler((pixels, format) => {
@@ -161,6 +164,9 @@ const initCanvas = (
     );
     const videoBuffer = new DataView(imageData.data.buffer);
 
+    // initializes the visual canvas (where data is going to be written)
+    // with, resetting the transform vector to the identity and re-calculating
+    // the scale of the drawing properly
     const canvasCtx = canvas.getContext("2d")!;
     canvasCtx.setTransform(1, 0, 0, 1, 0, 0);
     canvasCtx.scale(

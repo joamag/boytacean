@@ -3,3 +3,13 @@
     font-family: VT323, Roboto, Open Sans, Arial, Helvetica, sans-serif;
     margin: 0px 0px 0px 0px;
 }
+
+.app .display-container {
+    margin-top: 78px;
+}
+
+@media only screen and (max-width: 1120px) {
+    .app .display-container {
+        margin-top: 0px;
+    }
+}
