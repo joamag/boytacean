@@ -290,6 +290,9 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
     const onFullscreenClick = () => {
         setFullscreen(!fullscreen);
     };
+    const onKeyboardClick = () => {
+        showToast("Keyboard click");
+    };
     const onThemeClick = () => {
         setBackgroundIndex((backgroundIndex + 1) % backgrounds.length);
     };
@@ -342,7 +345,6 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
                             onClearHandler={onClearHandler}
                             onMinimize={onMinimize}
                         />
-                        <KeyboardChip8 />
                     </div>
                 }
             >
@@ -411,6 +413,12 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
                             image={require("../res/maximise.svg")}
                             imageAlt="maximise"
                             onClick={onFullscreenClick}
+                        />
+                        <Button
+                            text={"Keyboard"}
+                            image={require("../res/dialpad.svg")}
+                            imageAlt="keyboard"
+                            onClick={onKeyboardClick}
                         />
                         <Button
                             text={"Theme"}

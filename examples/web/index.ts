@@ -328,8 +328,7 @@ class GameboyEmulator extends Observable implements Emulator {
         await Promise.all([
             this.registerDrop(),
             this.registerKeys(),
-            this.registerButtons(),
-            this.registerKeyboard()
+            this.registerButtons()
         ]);
     }
 
@@ -482,32 +481,6 @@ class GameboyEmulator extends Observable implements Emulator {
             }
         });
 
-        const buttonKeyboard = document.getElementById("button-keyboard")!;
-        buttonKeyboard.addEventListener("click", () => {
-            const sectionKeyboard =
-                document.getElementById("section-keyboard")!;
-            const separatorKeyboard =
-                document.getElementById("separator-keyboard")!;
-            const sectionNarrative =
-                document.getElementById("section-narrative")!;
-            const separatorNarrative = document.getElementById(
-                "separator-narrative"
-            )!;
-            if (buttonKeyboard.classList.contains("enabled")) {
-                sectionKeyboard.style.display = "none";
-                separatorKeyboard.style.display = "none";
-                sectionNarrative.style.display = "block";
-                separatorNarrative.style.display = "block";
-                buttonKeyboard.classList.remove("enabled");
-            } else {
-                sectionKeyboard.style.display = "block";
-                separatorKeyboard.style.display = "block";
-                sectionNarrative.style.display = "none";
-                separatorNarrative.style.display = "none";
-                buttonKeyboard.classList.add("enabled");
-            }
-        });
-
         const buttonDebug = document.getElementById("button-debug")!;
         buttonDebug.addEventListener("click", () => {
             const sectionDebug = document.getElementById("section-debug")!;
@@ -646,58 +619,6 @@ class GameboyEmulator extends Observable implements Emulator {
 
             this.trigger("message", {
                 text: `Loaded ${file.name} ROM successfully!`
-            });
-        });
-    }
-
-    // @todo this should be converted into a component
-    registerKeyboard() {
-        const keyboard = document.getElementById("keyboard")!;
-        const keys = keyboard.getElementsByClassName("key");
-
-        keyboard.addEventListener("touchstart", function (event) {
-            event.preventDefault();
-            event.stopPropagation();
-        });
-
-        keyboard.addEventListener("touchend", function (event) {
-            event.preventDefault();
-            event.stopPropagation();
-        });
-
-        Array.prototype.forEach.call(keys, (k: Element) => {
-            k.addEventListener(
-                "mousedown",
-                function (this: HTMLElement, event) {
-                    const keyCode = KEYS[this.textContent!.toLowerCase()];
-                    //this.gameBoy.key_press_ws(keyCode); @todo
-                    event.preventDefault();
-                    event.stopPropagation();
-                }
-            );
-
-            k.addEventListener(
-                "touchstart",
-                function (this: HTMLElement, event) {
-                    const keyCode = KEYS[this.textContent!.toLowerCase()];
-                    //this.gameBoy.key_press_ws(keyCode); @todo
-                    event.preventDefault();
-                    event.stopPropagation();
-                }
-            );
-
-            k.addEventListener("mouseup", function (this: HTMLElement, event) {
-                const keyCode = KEYS[this.textContent!.toLowerCase()];
-                //this.gameBoy.key_lift_ws(keyCode); @todo
-                event.preventDefault();
-                event.stopPropagation();
-            });
-
-            k.addEventListener("touchend", function (this: HTMLElement, event) {
-                const keyCode = KEYS[this.textContent!.toLowerCase()];
-                //this.gameBoy.key_lift_ws(keyCode); @todo
-                event.preventDefault();
-                event.stopPropagation();
             });
         });
     }
