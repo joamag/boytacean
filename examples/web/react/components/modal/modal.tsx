@@ -43,6 +43,7 @@ export const Modal: FC<ModalProps> = ({
                         size={"medium"}
                         style={["simple", "rounded", "no-text"]}
                         image={require("./close.svg")}
+                        imageAlt="close"
                         onClick={onCancel}
                     />
                 </div>
