@@ -1,4 +1,4 @@
-import React, { FC } from "react";
+import React, { FC, useEffect, useRef } from "react";
 import { PixelFormat } from "../../app";
 import Canvas, { CanvasStructure } from "../canvas/canvas";
 
@@ -18,6 +18,14 @@ export const Tiles: FC<TilesProps> = ({
     style = []
 }) => {
     const classes = () => ["tiles", ...style].join(" ");
+    const intervalsRef = useRef<number>();
+    useEffect(() => {
+        return () => {
+            if (intervalsRef.current) {
+                clearInterval(intervalsRef.current);
+            }
+        };
+    }, []);
     const onCanvas = (structure: CanvasStructure) => {
         const drawTiles = () => {
             for (let index = 0; index < 384; index++) {
@@ -26,7 +34,7 @@ export const Tiles: FC<TilesProps> = ({
             }
         };
         drawTiles();
-        setInterval(() => drawTiles(), interval);
+        intervalsRef.current = setInterval(() => drawTiles(), interval);
     };
     return (
         <div className={classes()}>
