@@ -502,18 +502,6 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
                             }
                         />
                         <Pair
-                            key="button-frequency"
-                            name={"CPU Frequency"}
-                            valueNode={
-                                <ButtonIncrement
-                                    value={200}
-                                    delta={100}
-                                    min={0}
-                                    suffix={"Hz"}
-                                />
-                            }
-                        />
-                        <Pair
                             key="rom"
                             name={"ROM"}
                             value={romInfo.name ?? "-"}
@@ -522,6 +510,19 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
                             key="rom-size"
                             name={"ROM Size"}
                             value={romInfo.name ? `${romInfo.size} bytes` : "-"}
+                        />
+
+                        <Pair
+                            key="button-frequency"
+                            name={"CPU Frequency"}
+                            valueNode={
+                                <ButtonIncrement
+                                    value={4.19}
+                                    delta={0.1}
+                                    min={0}
+                                    suffix={"MHz"}
+                                />
+                            }
                         />
                         <Pair
                             key="rom-type"
