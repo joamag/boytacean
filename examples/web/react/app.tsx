@@ -553,6 +553,7 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
                                         delta={0.1}
                                         min={0}
                                         suffix={"MHz"}
+                                        decimalPlaces={2}
                                     />
                                 }
                             />
