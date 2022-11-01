@@ -21,6 +21,7 @@ import {
     PanelSplit,
     Paragraph,
     Section,
+    Tiles,
     Title,
     Toast
 } from "./components";
@@ -158,6 +159,8 @@ export interface Emulator extends ObservableI {
      * emulator.
      */
     getFramerate(): number;
+
+    getTile(index: number): Uint8Array;
 
     /**
      * Boot (or reboots) the emulator according to the provided
@@ -442,6 +445,10 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
                             onDrawHandler={onDrawHandler}
                             onClearHandler={onClearHandler}
                             onMinimize={onMinimize}
+                        />
+                        <Tiles
+                            getTile={(index) => emulator.getTile(index)}
+                            tileCount={384}
                         />
                         <KeyboardGB />
                     </div>

@@ -524,6 +524,10 @@ class GameboyEmulator extends Observable implements Emulator {
         return this.fps;
     }
 
+    getTile(index: number): Uint8Array {
+        return this.gameBoy!.get_tile_buffer(index);
+    }
+
     toggleRunning() {
         if (this.paused) {
             this.resume();

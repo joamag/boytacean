@@ -1,17 +1,30 @@
 import React, { FC } from "react";
 import { PixelFormat } from "../../app";
+import Canvas, { CanvasStructure } from "../canvas/canvas";
 
 import "./tiles.css";
 
 type TilesProps = {
+    getTile: (index: number) => Uint8Array;
+    tileCount: number;
     style?: string[];
 };
 
-export const Tiles: FC<TilesProps> = ({ style = [] }) => {
+export const Tiles: FC<TilesProps> = ({ getTile, tileCount, style = [] }) => {
     const classes = () => ["title", ...style].join(" ");
+    const onCanvas = (structure: CanvasStructure) => {
+        console.info("On canvas");
+        setTimeout(() => {
+            for (let index = 0; index < 384; index++) {
+                const pixels = getTile(index);
+                console.info("VAI desenhar");
+                drawTile(index, pixels, structure);
+            }
+        }, 1000);
+    };
     return (
         <div className={classes()}>
-            <canvas className="canvas-tiles" width="128" height="192"></canvas>
+            <Canvas width={128} height={192} scale={2} onCanvas={onCanvas} />
         </div>
     );
 };
@@ -23,24 +36,20 @@ export const Tiles: FC<TilesProps> = ({ style = [] }) => {
  * @param index The index of the sprite to be drawn.
  * @param pixels Buffer of pixels that contains the RGB data
  * that is going to be drawn.
- * @param context The canvas context to which the tile is
+ * @param structure The canvas context to which the tile is
  * growing to be drawn.
- * @param buffer The data buffer to be used in the drawing
- * process, re-usage of it improves performance.
  * @param format The pixel format of the sprite.
  */
 const drawTile = (
     index: number,
     pixels: Uint8Array,
-    canvas: HTMLCanvasElement,
-    context: CanvasRenderingContext2D,
-    canvasImage: ImageData,
-    buffer: DataView,
+    structure: CanvasStructure,
     format: PixelFormat = PixelFormat.RGB
 ) => {
     const line = Math.floor(index / 16);
     const column = index % 16;
-    let offset = (line * canvas.width * 8 + column * 8) * PixelFormat.RGBA;
+    let offset =
+        (line * structure.canvas.width * 8 + column * 8) * PixelFormat.RGBA;
     let counter = 0;
     for (let i = 0; i < pixels.length; i += format) {
         const color =
@@ -48,17 +57,17 @@ const drawTile = (
             (pixels[i + 1] << 16) |
             (pixels[i + 2] << 8) |
             (format === PixelFormat.RGBA ? pixels[i + 3] : 0xff);
-        buffer.setUint32(offset, color);
+        structure.canvasBuffer.setUint32(offset, color);
 
         counter++;
         if (counter === 8) {
             counter = 0;
-            offset += (canvas.width - 7) * PixelFormat.RGBA;
+            offset += (structure.canvas.width - 7) * PixelFormat.RGBA;
         } else {
             offset += PixelFormat.RGBA;
         }
     }
-    context.putImageData(canvasImage, 0, 0);
+    structure.canvasContext.putImageData(structure.canvasImage, 0, 0);
 };
 
 export default Tiles;
