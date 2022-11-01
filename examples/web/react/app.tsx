@@ -510,6 +510,7 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
                 )}
                 {debugVisible && (
                     <Section>
+                        <h3>VRAM Tiles</h3>
                         <Tiles
                             getTile={(index) => emulator.getTile(index)}
                             tileCount={384}

@@ -4,6 +4,10 @@
     margin: 0px 0px 0px 0px;
 }
 
+.app h3 {
+    margin: 10px 0px 10px 0px;
+}
+
 .app .display-container {
     margin-top: 78px;
 }
