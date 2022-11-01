@@ -85,7 +85,7 @@ export interface Emulator extends ObservableI {
      */
     getDevice(): string;
 
-    getDeviceUrl(): string;
+    getDeviceUrl?(): string;
 
     /**
      * Obtains a semantic version string for the current
@@ -103,7 +103,7 @@ export interface Emulator extends ObservableI {
      * @returns A URL to the page describing the current version
      * of the emulator.
      */
-    getVersionUrl(): string;
+    getVersionUrl?(): string;
 
     /**
      * Obtains the pixel format of the emulator's display
@@ -398,15 +398,26 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
                 <Title
                     text={emulator.getName()}
                     version={emulator.getVersion()}
-                    versionUrl={emulator.getVersionUrl()}
+                    versionUrl={
+                        emulator.getVersionUrl
+                            ? emulator.getVersionUrl()
+                            : undefined
+                    }
                     iconSrc={require("../res/thunder.png")}
                 ></Title>
                 <Section>
                     <Paragraph>
                         This is a{" "}
-                        <Link href={emulator.getDeviceUrl()} target="_blank">
-                            {emulator.getDevice()}
-                        </Link>{" "}
+                        {emulator.getDeviceUrl ? (
+                            <Link
+                                href={emulator.getDeviceUrl()}
+                                target="_blank"
+                            >
+                                {emulator.getDevice()}
+                            </Link>
+                        ) : (
+                            emulator.getDevice()
+                        )}{" "}
                         emulator built using the{" "}
                         <Link href="https://www.rust-lang.org" target="_blank">
                             Rust Programming Language
