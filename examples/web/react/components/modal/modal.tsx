@@ -9,6 +9,7 @@ type ModalProps = {
     title?: string;
     text?: string;
     visible?: boolean;
+    overlayClose?: boolean;
     style?: string[];
     onConfirm?: () => void;
     onCancel?: () => void;
@@ -18,6 +19,7 @@ export const Modal: FC<ModalProps> = ({
     title = "Alert",
     text = "Do you confirm the following operation?",
     visible = false,
+    overlayClose = true,
     style = [],
     onConfirm,
     onCancel
@@ -38,9 +40,15 @@ export const Modal: FC<ModalProps> = ({
     const getTextHtml = (separator = /\n/g) => ({
         __html: text.replace(separator, "<br/>")
     });
+    const onWindowClick = (
+        event: React.MouseEvent<HTMLDivElement, MouseEvent>
+    ) => {
+        if (!overlayClose) return;
+        event.stopPropagation();
+    };
     return (
-        <div className={classes()}>
-            <div className="modal-window">
+        <div className={classes()} onClick={onCancel}>
+            <div className="modal-window" onClick={onWindowClick}>
                 <div className="modal-top-buttons">
                     <Button
                         text={""}

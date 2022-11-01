@@ -17,7 +17,7 @@ export const Tiles: FC<TilesProps> = ({
     interval = 500,
     style = []
 }) => {
-    const classes = () => ["title", ...style].join(" ");
+    const classes = () => ["tiles", ...style].join(" ");
     const onCanvas = (structure: CanvasStructure) => {
         setInterval(() => {
             for (let index = 0; index < 384; index++) {

@@ -33,6 +33,7 @@
     -moz-opacity: 1.0;
     -khtml-opacity: 1.0;
     -webkit-opacity: 1.0;
+    pointer-events: initial;
     transition: opacity 0.5s cubic-bezier(0.075, 0.82, 0.165, 1);
     -o-transition: opacity 0.5s cubic-bezier(0.075, 0.82, 0.165, 1);
     -ms-transition: opacity 0.5s cubic-bezier(0.075, 0.82, 0.165, 1);
@@ -49,12 +50,12 @@
     -moz-border-radius: 6px 6px 6px 6px;
     -khtml-border-radius: 6px 6px 6px 6px;
     -webkit-border-radius: 6px 6px 6px 6px;
-    box-shadow: 0px 3px 8px rgba(0, 0, 0, 0.24);
-    -o-box-shadow: 0px 3px 8px rgba(0, 0, 0, 0.24);
-    -ms-box-shadow: 0px 3px 8px rgba(0, 0, 0, 0.24);
-    -moz-box-shadow: 0px 3px 8px rgba(0, 0, 0, 0.24);
-    -khtml-box-shadow: 0px 3px 8px rgba(0, 0, 0, 0.24);
-    -webkit-box-shadow: 0px 3px 8px rgba(0, 0, 0, 0.24);
+    box-shadow: 0px 0px 8px rgba(0, 0, 0, 0.5);
+    -o-box-shadow: 0px 0px 8px rgba(0, 0, 0, 0.5);
+    -ms-box-shadow: 0px 0px 8px rgba(0, 0, 0, 0.5);
+    -moz-box-shadow: 0px 0px 8px rgba(0, 0, 0, 0.5);
+    -khtml-box-shadow: 0px 0px 8px rgba(0, 0, 0, 0.5);
+    -webkit-box-shadow: 0px 0px 8px rgba(0, 0, 0, 0.5);
     margin-top: 30px;
     max-width: 100%;
     padding: 24px 24px 24px 24px;
