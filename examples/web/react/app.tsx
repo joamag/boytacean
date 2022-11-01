@@ -61,6 +61,7 @@ export type RomInfo = {
 export type BenchmarkResult = {
     delta: number;
     count: number;
+    cycles: number;
     frequency_mhz: number;
 };
 
@@ -178,9 +179,12 @@ export interface Emulator extends ObservableI {
      * Runs a benchmark operation in the emulator, effectively
      * measuring the performance of it.
      *
+     * @param count The number of benchmark iterations to be
+     * run, increasing this value will make the benchmark take
+     * more time to be executed.
      * @returns The result metrics from the benchmark run.
      */
-    benchmark(): BenchmarkResult;
+    benchmark(count?: number): BenchmarkResult;
 }
 
 /**

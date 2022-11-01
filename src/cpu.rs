@@ -124,7 +124,8 @@ impl Cpu {
         }
 
         if self.ime {
-            // @todo aggregate all of this interrupts in the MMU
+            // @todo aggregate all of this interrupts in the MMU, as there's
+            // a lot of redundant code involved in here
             if (self.mmu.ie & 0x01 == 0x01) && self.mmu.ppu().int_vblank() {
                 debugln!("Going to run V-Blank interrupt handler (0x40)");
 

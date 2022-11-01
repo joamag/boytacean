@@ -541,19 +541,20 @@ class GameboyEmulator extends Observable implements Emulator {
         this.boot({ engine: null });
     }
 
-    benchmark() {
+    benchmark(count = 50000000) {
+        let cycles = 0;
         this.pause();
         try {
             const initial = Date.now();
-            const count = 500000000;
             for (let i = 0; i < count; i++) {
-                this.gameBoy!.clock();
+                cycles += this.gameBoy!.clock();
             }
             const delta = (Date.now() - initial) / 1000;
-            const frequency_mhz = count / delta / 1000 / 1000;
+            const frequency_mhz = cycles / delta / 1000 / 1000;
             return {
                 delta: delta,
                 count: count,
+                cycles: cycles,
                 frequency_mhz: frequency_mhz
             };
         } finally {
