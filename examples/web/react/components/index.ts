@@ -9,6 +9,7 @@ export * from "./keyboard-chip8/keyboard-chip8";
 export * from "./keyboard-gb/keyboard-gb";
 export * from "./link/link";
 export * from "./modal/modal";
+export * from "./overlay/overlay";
 export * from "./pair/pair";
 export * from "./panel-split/panel-split";
 export * from "./paragraph/paragraph";

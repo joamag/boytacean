@@ -16,6 +16,7 @@ import {
     KeyboardGB,
     Link,
     Modal,
+    Overlay,
     Pair,
     PanelSplit,
     Paragraph,
@@ -333,6 +334,7 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
 
     return (
         <div className="app">
+            <Overlay text={"Drag to load ROM"} />
             <Modal
                 title={modalTitle}
                 text={modalText}
