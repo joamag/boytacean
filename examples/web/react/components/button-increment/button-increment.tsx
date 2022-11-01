@@ -32,9 +32,6 @@ export const ButtonIncrement: FC<ButtonIncrementProps> = ({
 }) => {
     const [valueState, setValue] = useState(value);
     const classes = () => ["button-increment", size, ...style].join(" ");
-    const _onClick = () => {
-        if (onClick) onClick();
-    };
     const _onMinusClick = () => {
         const valueNew = valueState - delta;
         if (onBeforeChange) {
@@ -54,7 +51,7 @@ export const ButtonIncrement: FC<ButtonIncrementProps> = ({
         if (onChange) onChange(valueNew);
     };
     return (
-        <span className={classes()} onClick={_onClick}>
+        <span className={classes()} onClick={onClick}>
             <Button
                 text={"-"}
                 size={size}

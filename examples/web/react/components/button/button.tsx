@@ -35,12 +35,12 @@ export const Button: FC<ButtonProps> = ({
         onFile && onFile(file);
         event.target.value = "";
     };
-    const renderButtonSimple = () => (
+    const renderSimple = () => (
         <span className={classes()} onClick={onClick}>
             {text}
         </span>
     );
-    const renderButtonComplex = () => (
+    const renderComplex = () => (
         <span className={classes()} onClick={onClick}>
             {image && <img src={image} alt={imageAlt || text || "button"} />}
             {file && (
@@ -49,7 +49,7 @@ export const Button: FC<ButtonProps> = ({
             <span>{text}</span>
         </span>
     );
-    return image ? renderButtonComplex() : renderButtonSimple();
+    return image ? renderComplex() : renderSimple();
 };
 
 export default Button;
