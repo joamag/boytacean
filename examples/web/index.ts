@@ -1,6 +1,6 @@
 import {
     Emulator,
-    Observable,
+    EmulatorBase,
     PixelFormat,
     RomInfo,
     startApp
@@ -60,7 +60,7 @@ const ROM_PATH = require("../../res/roms/20y.gb");
  * and "joins" all the elements together to bring input/output
  * of the associated machine.
  */
-class GameboyEmulator extends Observable implements Emulator {
+class GameboyEmulator extends EmulatorBase implements Emulator {
     /**
      * The Game Boy engine (probably coming from WASM) that
      * is going to be used for the emulation.
@@ -367,27 +367,31 @@ class GameboyEmulator extends Observable implements Emulator {
         this.cartridge = cartridge;
     }
 
-    getName() {
+    get name(): string {
         return "Boytacean";
     }
 
-    getDevice(): string {
+    get device(): string {
         return "Game Boy";
     }
 
-    getDeviceUrl(): string {
+    get deviceUrl(): string {
         return "https://en.wikipedia.org/wiki/Game_Boy";
     }
 
-    getVersion() {
+    get engines() {
+        return ["neo"];
+    }
+
+    get version(): string {
         return info.version;
     }
 
-    getVersionUrl() {
+    get versionUrl(): string {
         return "https://gitlab.stage.hive.pt/joamag/boytacean/-/blob/master/CHANGELOG.md";
     }
 
-    getPixelFormat(): PixelFormat {
+    get pixelFormat(): PixelFormat {
         return PixelFormat.RGB;
     }
 
@@ -397,11 +401,11 @@ class GameboyEmulator extends Observable implements Emulator {
      *
      * @returns The current pixel data for the emulator display.
      */
-    getImageBuffer(): Uint8Array {
+    get imageBuffer(): Uint8Array {
         return this.gameBoy!.frame_buffer_eager();
     }
 
-    getRomInfo(): RomInfo {
+    get romInfo(): RomInfo {
         return {
             name: this.romName || undefined,
             data: this.romData || undefined,
@@ -414,7 +418,7 @@ class GameboyEmulator extends Observable implements Emulator {
         };
     }
 
-    getFramerate(): number {
+    get framerate(): number {
         return this.fps;
     }
 

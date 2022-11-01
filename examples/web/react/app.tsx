@@ -87,78 +87,60 @@ export interface ObservableI {
  */
 export interface Emulator extends ObservableI {
     /**
-     * Obtains the descriptive name of the emulator.
-     *
-     * @returns The descriptive name of the emulator.
+     * The descriptive name of the emulator.
      */
-    getName(): string;
+    get name(): string;
 
     /**
-     * Obtains the name of the name of the hardware that
-     * is being emulated by the emulator (eg: Super Nintendo).
-     *
-     * @returns The name of the hardware that is being
-     * emulated.
+     * The name of the the hardware that is being emulated
+     * by the emulator (eg: Super Nintendo).
      */
-    getDevice(): string;
+    get device(): string;
 
-    getDeviceUrl?(): string;
+    get deviceUrl(): string | undefined;
 
     /**
-     * Obtains a semantic version string for the current
-     * version of the emulator.
+     * A semantic version string for the current version
+     * of the emulator.
      *
-     * @returns The semantic version string.
      * @see {@link https://semver.org}
      */
-    getVersion(): string;
+    get version(): string;
 
     /**
-     * Obtains a URL to the page describing the current version
-     * of the emulator.
-     *
-     * @returns A URL to the page describing the current version
+     * The URL to the page describing the current version
      * of the emulator.
      */
-    getVersionUrl?(): string;
+    get versionUrl(): string;
+
+    get engines(): string[];
 
     /**
-     * Obtains the pixel format of the emulator's display
+     * The pixel format of the emulator's display
      * image buffer (eg: RGB).
-     *
-     * @returns The pixel format used for the emulator's
-     * image buffer.
      */
-    getPixelFormat(): PixelFormat;
+    get pixelFormat(): PixelFormat;
 
     /**
-     * Obtains the complete image buffer as a sequence of
+     * Gets the complete image buffer as a sequence of
      * bytes that respects the current pixel format from
      * `getPixelFormat()`. This method returns an in memory
      * pointer to the heap and not a copy.
-     *
-     * @returns The byte based image buffer that respects
-     * the emulator's pixel format.
      */
-    getImageBuffer(): Uint8Array;
+    get imageBuffer(): Uint8Array;
 
     /**
-     * Obtains information about the ROM that is currently
+     * Gets information about the ROM that is currently
+     * loaded in the emulator, using a structure containing
+     * the information about the ROM that is currently
      * loaded in the emulator.
-     *
-     * @returns Structure containing the information about
-     * the ROM that is currently loaded in the emulator.
      */
-    getRomInfo(): RomInfo;
+    get romInfo(): RomInfo;
 
     /**
-     * Returns the current logic framerate of the running
-     * emulator.
-     *
-     * @returns The current logic framerate of the running
-     * emulator.
+     * The current logic framerate of the running emulator.
      */
-    getFramerate(): number;
+    get framerate(): number;
 
     getTile(index: number): Uint8Array;
 
@@ -197,6 +179,16 @@ export interface Emulator extends ObservableI {
      * @returns The result metrics from the benchmark run.
      */
     benchmark(count?: number): BenchmarkResult;
+}
+
+export class EmulatorBase extends Observable {
+    get deviceUrl(): string | undefined {
+        return undefined;
+    }
+
+    get versionUrl(): string | undefined {
+        return undefined;
+    }
 }
 
 /**
@@ -265,8 +257,7 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
             }
         };
         const onBooted = () => {
-            const romInfo = emulator.getRomInfo();
-            setRomInfo(romInfo);
+            setRomInfo(emulator.romInfo);
             setPaused(false);
         };
         const onMessage = (
@@ -322,7 +313,7 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
         // Game Boy only (using the emulator interface)
         if (!file.name.endsWith(".gb")) {
             showToast(
-                `This is probably not a ${emulator.getDevice()} ROM file!`,
+                `This is probably not a ${emulator.device} ROM file!`,
                 true
             );
             return;
@@ -400,7 +391,7 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
     const onEngineChange = (engine: string) => {
         emulator.boot({ engine: engine.toLowerCase() });
         showToast(
-            `${emulator.getDevice()} running in engine "${engine}" from now on!`
+            `${emulator.device} running in engine "${engine}" from now on!`
         );
     };
     const onMinimize = () => {
@@ -410,8 +401,8 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
         if (frameRef.current) return;
         frameRef.current = true;
         emulator.bind("frame", () => {
-            handler(emulator.getImageBuffer(), PixelFormat.RGB);
-            setFramerate(emulator.getFramerate());
+            handler(emulator.imageBuffer, PixelFormat.RGB);
+            setFramerate(emulator.framerate);
         });
     };
     const onClearHandler = (handler: ClearHandler) => {
@@ -457,27 +448,22 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
                 }
             >
                 <Title
-                    text={emulator.getName()}
-                    version={emulator.getVersion()}
+                    text={emulator.name}
+                    version={emulator.version}
                     versionUrl={
-                        emulator.getVersionUrl
-                            ? emulator.getVersionUrl()
-                            : undefined
+                        emulator.versionUrl ? emulator.versionUrl : undefined
                     }
                     iconSrc={require("../res/thunder.png")}
                 ></Title>
                 <Section>
                     <Paragraph>
                         This is a{" "}
-                        {emulator.getDeviceUrl ? (
-                            <Link
-                                href={emulator.getDeviceUrl()}
-                                target="_blank"
-                            >
-                                {emulator.getDevice()}
+                        {emulator.deviceUrl ? (
+                            <Link href={emulator.deviceUrl} target="_blank">
+                                {emulator.device}
                             </Link>
                         ) : (
-                            emulator.getDevice()
+                            emulator.device
                         )}{" "}
                         emulator built using the{" "}
                         <Link href="https://www.rust-lang.org" target="_blank">
@@ -526,7 +512,9 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
                                 name={"Engine"}
                                 valueNode={
                                     <ButtonSwitch
-                                        options={["NEO", "CLASSIC"]}
+                                        options={emulator.engines.map((e) =>
+                                            e.toUpperCase()
+                                        )}
                                         size={"large"}
                                         style={["simple"]}
                                         onChange={onEngineChange}
