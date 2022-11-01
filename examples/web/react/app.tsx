@@ -77,6 +77,17 @@ export interface Emulator extends ObservableI {
     getName(): string;
 
     /**
+     * Obtains the name of the name of the hardware that
+     * is being emulated by the emulator (eg: Super Nintendo).
+     *
+     * @returns The name of the hardware that is being
+     * emulated.
+     */
+    getDevice(): string;
+
+    getDeviceUrl(): string;
+
+    /**
      * Obtains a semantic version string for the current
      * version of the emulator.
      *
@@ -261,6 +272,21 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
         });
     };
 
+    const onFile = async (file: File) => {
+        // @todo must make this more flexible and not just
+        // Game Boy only
+        if (!file.name.endsWith(".gb")) {
+            showToast("This is probably not a Game Boy ROM file!", true);
+            return;
+        }
+
+        const arrayBuffer = await file.arrayBuffer();
+        const romData = new Uint8Array(arrayBuffer);
+
+        emulator.boot({ engine: null, romName: file.name, romData: romData });
+
+        showToast(`Loaded ${file.name} ROM successfully!`);
+    };
     const onModalConfirm = () => {
         if (modalCallbackRef.current) {
             modalCallbackRef.current(true);
@@ -311,7 +337,9 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
     };
     const onEngineChange = (engine: string) => {
         emulator.boot({ engine: engine.toLowerCase() });
-        showToast(`Game Boy running in engine "${engine}" from now on!`);
+        showToast(
+            `${emulator.getDevice()} running in engine "${engine}" from now on!`
+        );
     };
     const onMinimize = () => {
         setFullscreen(!fullscreen);
@@ -334,7 +362,7 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
 
     return (
         <div className="app">
-            <Overlay text={"Drag to load ROM"} />
+            <Overlay text={"Drag to load ROM"} onFile={onFile} />
             <Modal
                 title={modalTitle}
                 text={modalText}
@@ -376,11 +404,8 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
                 <Section>
                     <Paragraph>
                         This is a{" "}
-                        <Link
-                            href="https://en.wikipedia.org/wiki/Game_Boy"
-                            target="_blank"
-                        >
-                            Game Boy
+                        <Link href={emulator.getDeviceUrl()} target="_blank">
+                            {emulator.getDevice()}
                         </Link>{" "}
                         emulator built using the{" "}
                         <Link href="https://www.rust-lang.org" target="_blank">

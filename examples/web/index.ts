@@ -325,68 +325,7 @@ class GameboyEmulator extends Observable implements Emulator {
 
     // @todo remove this method, or at least most of it
     async register() {
-        await Promise.all([
-            this.registerDrop(),
-            this.registerKeys(),
-            this.registerButtons()
-        ]);
-    }
-
-    registerDrop() {
-        document.addEventListener("drop", async (event) => {
-            if (
-                !event.dataTransfer!.files ||
-                event.dataTransfer!.files.length === 0
-            ) {
-                return;
-            }
-
-            event.preventDefault();
-            event.stopPropagation();
-
-            const overlay = document.getElementById("overlay")!;
-            overlay.classList.remove("visible");
-
-            const file = event.dataTransfer!.files[0];
-
-            if (!file.name.endsWith(".gb")) {
-                this.trigger("message", {
-                    text: "This is probably not a Game Boy ROM file!",
-                    error: true
-                });
-                return;
-            }
-
-            const arrayBuffer = await file.arrayBuffer();
-            const romData = new Uint8Array(arrayBuffer);
-
-            this.boot({ engine: null, romName: file.name, romData: romData });
-
-            this.trigger("message", {
-                text: `Loaded ${file.name} ROM successfully!`
-            });
-        });
-        document.addEventListener("dragover", async (event) => {
-            if (!event.dataTransfer!.items || event.dataTransfer!.items[0].type)
-                return;
-
-            event.preventDefault();
-
-            const overlay = document.getElementById("overlay")!;
-            overlay.classList.add("visible");
-        });
-        document.addEventListener("dragenter", async (event) => {
-            if (!event.dataTransfer!.items || event.dataTransfer!.items[0].type)
-                return;
-            const overlay = document.getElementById("overlay")!;
-            overlay.classList.add("visible");
-        });
-        document.addEventListener("dragleave", async (event) => {
-            if (!event.dataTransfer!.items || event.dataTransfer!.items[0].type)
-                return;
-            const overlay = document.getElementById("overlay")!;
-            overlay.classList.remove("visible");
-        });
+        await Promise.all([this.registerKeys(), this.registerButtons()]);
     }
 
     registerKeys() {
@@ -609,6 +548,14 @@ class GameboyEmulator extends Observable implements Emulator {
 
     getName() {
         return "Boytacean";
+    }
+
+    getDevice(): string {
+        return "Game Boy";
+    }
+
+    getDeviceUrl(): string {
+        return "https://en.wikipedia.org/wiki/Game_Boy";
     }
 
     getVersion() {
