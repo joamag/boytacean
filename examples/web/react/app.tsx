@@ -267,6 +267,7 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
         const onBooted = () => {
             const romInfo = emulator.getRomInfo();
             setRomInfo(romInfo);
+            setPaused(false);
         };
         const onMessage = (
             emulator: Emulator,
@@ -580,6 +581,7 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
                             text={getPauseText()}
                             image={getPauseIcon()}
                             imageAlt="pause"
+                            enabled={paused}
                             style={["simple", "border", "padded"]}
                             onClick={onPauseClick}
                         />

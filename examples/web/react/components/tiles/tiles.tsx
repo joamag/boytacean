@@ -19,12 +19,14 @@ export const Tiles: FC<TilesProps> = ({
 }) => {
     const classes = () => ["tiles", ...style].join(" ");
     const onCanvas = (structure: CanvasStructure) => {
-        setInterval(() => {
+        const drawTiles = () => {
             for (let index = 0; index < 384; index++) {
                 const pixels = getTile(index);
                 drawTile(index, pixels, structure);
             }
-        }, interval);
+        };
+        drawTiles();
+        setInterval(() => drawTiles(), interval);
     };
     return (
         <div className={classes()}>
