@@ -142,6 +142,11 @@ impl Emulator {
                     if self.system.ppu_mode() == PpuMode::VBlank
                         && self.system.ppu_frame() != last_frame
                     {
+                        // clears the graphics canvas, making sure that no garbage
+                        // pixel data remaining in the pixel buffer, not doing this would
+                        // create visual glitches in OSs like Mac OS X
+                        self.graphics.canvas.clear();
+
                         // obtains the frame buffer of the Game Boy PPU and uses it
                         // to update the stream texture, copying it then to the canvas
                         let frame_buffer = self.system.frame_buffer().as_ref();
@@ -154,6 +159,8 @@ impl Emulator {
                         // information presented to the user
                         self.graphics.canvas.present();
 
+                        // obtains the index of the current PPU frame, this value
+                        // is going to be used to detect for new frame presence
                         last_frame = self.system.ppu_frame();
                     }
                 }
