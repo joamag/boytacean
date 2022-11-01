@@ -58,6 +58,12 @@ export type RomInfo = {
     extra?: Record<string, string | undefined>;
 };
 
+export type BenchmarkResult = {
+    delta: number;
+    count: number;
+    frequency_mhz: number;
+};
+
 export interface ObservableI {
     bind(event: string, callback: Callback<this>): void;
     trigger(event: string): void;
@@ -138,10 +144,19 @@ export interface Emulator extends ObservableI {
      * Returns the current logic framerate of the running
      * emulator.
      *
-     * @return The current logic framerate of the running
+     * @returns The current logic framerate of the running
      * emulator.
      */
     getFramerate(): number;
+
+    /**
+     * Boot (or reboots) the emulator according to the provided
+     * set of options.
+     *
+     * @param options The options that are going to be used for
+     * the booting operation of the emulator.
+     */
+    boot(options: any): void;
 
     /**
      * Toggle the running state of the emulator between paused
@@ -160,13 +175,12 @@ export interface Emulator extends ObservableI {
     reset(): void;
 
     /**
-     * Boot (or reboots) the emulator according to the provided
-     * set of options.
+     * Runs a benchmark operation in the emulator, effectively
+     * measuring the performance of it.
      *
-     * @param options The options that are going to be used for
-     * the booting operation of the emulator.
+     * @returns The result metrics from the benchmark run.
      */
-    boot(options: any): void;
+    benchmark(): BenchmarkResult;
 }
 
 /**
@@ -274,9 +288,12 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
 
     const onFile = async (file: File) => {
         // @todo must make this more flexible and not just
-        // Game Boy only
+        // Game Boy only (using the emulator interface)
         if (!file.name.endsWith(".gb")) {
-            showToast("This is probably not a Game Boy ROM file!", true);
+            showToast(
+                `This is probably not a ${emulator.getDevice()} ROM file!`,
+                true
+            );
             return;
         }
 
@@ -316,11 +333,16 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
             "Are you sure you want to start a benchmark?\nThe benchmark is considered an expensive operation!",
             "Confirm"
         );
+        if (!result) return;
+        const { delta, count, frequency_mhz } = emulator.benchmark();
         await showToast(
-            result
-                ? "Will run the benchmark as fast as possible"
-                : "Will not run the benchmark",
-            !result
+            `Took ${delta.toFixed(
+                2
+            )} seconds to run ${count} ticks (${frequency_mhz.toFixed(
+                2
+            )} Mhz)!`,
+            undefined,
+            7500
         );
     };
     const onFullscreenClick = () => {

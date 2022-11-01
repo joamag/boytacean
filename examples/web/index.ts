@@ -361,32 +361,6 @@ class GameboyEmulator extends Observable implements Emulator {
     }
 
     registerButtons() {
-        const buttonBenchmark = document.getElementById("button-benchmark")!;
-        buttonBenchmark.addEventListener("click", async () => {
-            buttonBenchmark.classList.add("enabled");
-            this.pause();
-            try {
-                const initial = Date.now();
-                const count = 500000000;
-                for (let i = 0; i < count; i++) {
-                    this.gameBoy!.clock();
-                }
-                const delta = (Date.now() - initial) / 1000;
-                const frequency_mhz = count / delta / 1000 / 1000;
-                this.trigger("message", {
-                    text: `Took ${delta.toFixed(
-                        2
-                    )} seconds to run ${count} ticks (${frequency_mhz.toFixed(
-                        2
-                    )} Mhz)!`,
-                    timeout: 7500
-                });
-            } finally {
-                this.resume();
-                buttonBenchmark.classList.remove("enabled");
-            }
-        });
-
         const buttonDebug = document.getElementById("button-debug")!;
         buttonDebug.addEventListener("click", () => {
             const sectionDebug = document.getElementById("section-debug")!;
@@ -565,6 +539,26 @@ class GameboyEmulator extends Observable implements Emulator {
 
     reset() {
         this.boot({ engine: null });
+    }
+
+    benchmark() {
+        this.pause();
+        try {
+            const initial = Date.now();
+            const count = 500000000;
+            for (let i = 0; i < count; i++) {
+                this.gameBoy!.clock();
+            }
+            const delta = (Date.now() - initial) / 1000;
+            const frequency_mhz = count / delta / 1000 / 1000;
+            return {
+                delta: delta,
+                count: count,
+                frequency_mhz: frequency_mhz
+            };
+        } finally {
+            this.resume();
+        }
     }
 
     async fetchRom(romPath: string): Promise<[string, Uint8Array]> {
