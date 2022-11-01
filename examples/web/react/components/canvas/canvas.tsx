@@ -30,7 +30,7 @@ export const Canvas: FC<CanvasProps> = ({
         if (canvasRef.current) {
             const structure = initCanvas(
                 width,
-                width,
+                height,
                 scale,
                 canvasRef.current
             );
@@ -41,6 +41,7 @@ export const Canvas: FC<CanvasProps> = ({
         <canvas
             ref={canvasRef}
             className={classes()}
+            style={{ width: width * scale }}
             width={width}
             height={height}
         />
@@ -51,10 +52,11 @@ const initCanvas = (
     width: number,
     height: number,
     scale: number,
-    canvas: HTMLCanvasElement
+    canvas: HTMLCanvasElement,
+    smoothing = false
 ): CanvasStructure => {
     const canvasContext = canvas.getContext("2d")!;
-    canvasContext.imageSmoothingEnabled = false;
+    canvasContext.imageSmoothingEnabled = smoothing;
 
     const canvasImage = canvasContext.createImageData(width, height);
     const canvasBuffer = new DataView(canvasImage.data.buffer);

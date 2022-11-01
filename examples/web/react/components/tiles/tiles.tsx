@@ -5,12 +5,18 @@ import Canvas, { CanvasStructure } from "../canvas/canvas";
 import "./tiles.css";
 
 type TilesProps = {
-    getTile: (index: number) => Uint8Array;
     tileCount: number;
+    getTile: (index: number) => Uint8Array;
+    interval?: number;
     style?: string[];
 };
 
-export const Tiles: FC<TilesProps> = ({ getTile, tileCount, style = [] }) => {
+export const Tiles: FC<TilesProps> = ({
+    getTile,
+    tileCount,
+    interval = 500,
+    style = []
+}) => {
     const classes = () => ["title", ...style].join(" ");
     const onCanvas = (structure: CanvasStructure) => {
         setInterval(() => {
@@ -18,7 +24,7 @@ export const Tiles: FC<TilesProps> = ({ getTile, tileCount, style = [] }) => {
                 const pixels = getTile(index);
                 drawTile(index, pixels, structure);
             }
-        }, 1000);
+        }, interval);
     };
     return (
         <div className={classes()}>

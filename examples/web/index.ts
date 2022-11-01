@@ -325,7 +325,7 @@ class GameboyEmulator extends Observable implements Emulator {
 
     // @todo remove this method, or at least most of it
     async register() {
-        await Promise.all([this.registerKeys(), this.registerButtons()]);
+        await Promise.all([this.registerKeys()]);
     }
 
     registerKeys() {
@@ -356,112 +356,6 @@ class GameboyEmulator extends Observable implements Emulator {
             if (keyCode !== undefined) {
                 this.gameBoy!.key_lift(keyCode);
                 return;
-            }
-        });
-    }
-
-    registerButtons() {
-        const buttonDebug = document.getElementById("button-debug")!;
-        buttonDebug.addEventListener("click", () => {
-            const sectionDebug = document.getElementById("section-debug")!;
-            const separatorDebug = document.getElementById("separator-debug")!;
-            const sectionNarrative =
-                document.getElementById("section-narrative")!;
-            const separatorNarrative = document.getElementById(
-                "separator-narrative"
-            )!;
-            if (buttonDebug.classList.contains("enabled")) {
-                sectionDebug.style.display = "none";
-                separatorDebug.style.display = "none";
-                sectionNarrative.style.display = "block";
-                separatorNarrative.style.display = "block";
-                buttonDebug.classList.remove("enabled");
-            } else {
-                sectionDebug.style.display = "block";
-                separatorDebug.style.display = "block";
-                sectionNarrative.style.display = "none";
-                separatorNarrative.style.display = "none";
-                buttonDebug.classList.add("enabled");
-
-                const canvasTiles = document.getElementById(
-                    "canvas-tiles"
-                ) as HTMLCanvasElement;
-                const canvasTilesCtx = canvasTiles.getContext("2d")!;
-                canvasTilesCtx.imageSmoothingEnabled = false;
-
-                const canvasImage = canvasTilesCtx.createImageData(
-                    canvasTiles.width,
-                    canvasTiles.height
-                );
-                const videoBuff = new DataView(canvasImage.data.buffer);
-
-                /**
-                 * Draws the tile at the given index to the proper
-                 * vertical offset in the given context and buffer.
-                 *
-                 * @param index The index of the sprite to be drawn.
-                 * @param context The canvas context to which the
-                 * tile is growing to be drawn.
-                 * @param buffer The data buffer to be used in the
-                 * drawing process, re-usage of it improves performance.
-                 * @param format The pixel format of the sprite.
-                 */
-                const drawTile = (
-                    index: number,
-                    context: CanvasRenderingContext2D,
-                    buffer: DataView,
-                    format: PixelFormat = PixelFormat.RGB
-                ) => {
-                    const pixels = this.gameBoy!.get_tile_buffer(index);
-                    const line = Math.floor(index / 16);
-                    const column = index % 16;
-                    let offset =
-                        (line * canvasTiles.width * 8 + column * 8) *
-                        PixelFormat.RGBA;
-                    let counter = 0;
-                    for (
-                        let index = 0;
-                        index < pixels.length;
-                        index += format
-                    ) {
-                        const color =
-                            (pixels[index] << 24) |
-                            (pixels[index + 1] << 16) |
-                            (pixels[index + 2] << 8) |
-                            (format === PixelFormat.RGBA
-                                ? pixels[index + 3]
-                                : 0xff);
-                        buffer.setUint32(offset, color);
-
-                        counter++;
-                        if (counter === 8) {
-                            counter = 0;
-                            offset +=
-                                (canvasTiles.width - 7) * PixelFormat.RGBA;
-                        } else {
-                            offset += PixelFormat.RGBA;
-                        }
-                    }
-                    context.putImageData(canvasImage, 0, 0);
-                };
-
-                for (let index = 0; index < 384; index++) {
-                    drawTile(index, canvasTilesCtx, videoBuff);
-                }
-
-                const vram = this.gameBoy!.vram_eager();
-                const step = 16;
-                for (let index = 0; index < vram.length; index += step) {
-                    let line = `${(index + 0x8000)
-                        .toString(16)
-                        .padStart(4, "0")}`;
-                    for (let j = 0; j < step; j++) {
-                        line += ` ${vram[index + j]
-                            .toString(16)
-                            .padStart(2, "0")}`;
-                    }
-                    console.info(line);
-                }
             }
         });
     }
