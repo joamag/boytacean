@@ -99,6 +99,9 @@ export const Display: FC<DisplayProps> = ({
                 .style.removeProperty("overflow");
             window.removeEventListener("resize", resizeRef.current);
         }
+        return () => {
+            window.removeEventListener("resize", resizeRef.current);
+        };
     }, [fullscreen]);
 
     if (onDrawHandler) {

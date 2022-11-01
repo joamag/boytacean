@@ -16,39 +16,31 @@ export const Overlay: FC<OverlayProps> = ({ text, style = [], onFile }) => {
         ["overlay", visible ? "visible" : "", ...style].join(" ");
     useEffect(() => {
         const onDrop = async (event: DragEvent) => {
-            if (
-                !event.dataTransfer!.files ||
-                event.dataTransfer!.files.length === 0
-            ) {
-                return;
-            }
-
-            event.preventDefault();
-            event.stopPropagation();
+            if (!event.dataTransfer!.items) return;
+            if (event.dataTransfer!.items[0].type) return;
 
             setVisible(false);
 
             const file = event.dataTransfer!.files[0];
             onFile && onFile(file);
+
+            event.preventDefault();
+            event.stopPropagation();
         };
         const onDragOver = async (event: DragEvent) => {
-            if (!event.dataTransfer!.items || event.dataTransfer!.items[0].type)
-                return;
-            event.preventDefault();
+            if (!event.dataTransfer!.items) return;
+            if (event.dataTransfer!.items[0].type) return;
             setVisible(true);
+            event.preventDefault();
         };
         const onDragEnter = async (event: DragEvent) => {
-            if (!event.dataTransfer!.items || event.dataTransfer!.items[0].type)
-                return;
+            if (!event.dataTransfer!.items) return;
+            if (event.dataTransfer!.items[0].type) return;
             setVisible(true);
         };
         const onDragLeave = async (event: DragEvent) => {
-            if (
-                !event.dataTransfer!.items ||
-                event.dataTransfer!.items[0].type
-            ) {
-            }
-            return;
+            if (!event.dataTransfer!.items) return;
+            if (event.dataTransfer!.items[0].type) return;
             setVisible(false);
         };
         document.addEventListener("drop", onDrop);
