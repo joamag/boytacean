@@ -14,5 +14,6 @@ export * from "./pair/pair";
 export * from "./panel-split/panel-split";
 export * from "./paragraph/paragraph";
 export * from "./section/section";
+export * from "./tiles/tiles";
 export * from "./title/title";
 export * from "./toast/toast";

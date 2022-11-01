@@ -400,6 +400,10 @@ class GameboyEmulator extends Observable implements Emulator {
                  * vertical offset in the given context and buffer.
                  *
                  * @param index The index of the sprite to be drawn.
+                 * @param context The canvas context to which the
+                 * tile is growing to be drawn.
+                 * @param buffer The data buffer to be used in the
+                 * drawing process, re-usage of it improves performance.
                  * @param format The pixel format of the sprite.
                  */
                 const drawTile = (
