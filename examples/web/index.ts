@@ -562,7 +562,7 @@ class GameboyEmulator extends Observable implements Emulator {
         }
     }
 
-    async fetchRom(romPath: string): Promise<[string, Uint8Array]> {
+    private async fetchRom(romPath: string): Promise<[string, Uint8Array]> {
         // extracts the name of the ROM from the provided
         // path by splitting its structure
         const romPathS = romPath.split(/\//g);
