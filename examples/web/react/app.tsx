@@ -335,6 +335,12 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
     const onThemeClick = () => {
         setBackgroundIndex((backgroundIndex + 1) % backgrounds.length);
     };
+    const onUploadFile = async (file: File) => {
+        const arrayBuffer = await file.arrayBuffer();
+        const romData = new Uint8Array(arrayBuffer);
+        emulator.boot({ engine: null, romName: file.name, romData: romData });
+        showToast(`Loaded ${file.name} ROM successfully!`);
+    };
     const onEngineChange = (engine: string) => {
         emulator.boot({ engine: engine.toLowerCase() });
         showToast(
@@ -478,7 +484,7 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
                         <Button
                             text={"Information"}
                             image={require("../res/info.svg")}
-                            imageAlt="iformation"
+                            imageAlt="information"
                             onClick={onInformationClick}
                         />
                         <Button
@@ -486,6 +492,14 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
                             image={require("../res/marker.svg")}
                             imageAlt="theme"
                             onClick={onThemeClick}
+                        />
+                        <Button
+                            text={"Upload ROM"}
+                            image={require("../res/upload.svg")}
+                            imageAlt="upload"
+                            file={true}
+                            accept={".gb"}
+                            onFile={onUploadFile}
                         />
                     </ButtonContainer>
                     <Info>

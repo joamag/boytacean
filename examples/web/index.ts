@@ -361,16 +361,6 @@ class GameboyEmulator extends Observable implements Emulator {
     }
 
     registerButtons() {
-        const buttonPause = document.getElementById("button-pause")!;
-        buttonPause.addEventListener("click", () => {
-            this.toggleRunning();
-        });
-
-        const buttonReset = document.getElementById("button-reset")!;
-        buttonReset.addEventListener("click", () => {
-            this.reset();
-        });
-
         const buttonBenchmark = document.getElementById("button-benchmark")!;
         buttonBenchmark.addEventListener("click", async () => {
             buttonBenchmark.classList.add("enabled");
@@ -496,47 +486,6 @@ class GameboyEmulator extends Observable implements Emulator {
                 }
             }
         });
-
-        const buttonInformation =
-            document.getElementById("button-information")!;
-        buttonInformation.addEventListener("click", () => {
-            const sectionDiag = document.getElementById("section-diag")!;
-            const separatorDiag = document.getElementById("separator-diag")!;
-            if (buttonInformation.classList.contains("enabled")) {
-                sectionDiag.style.display = "none";
-                separatorDiag.style.display = "none";
-                buttonInformation.classList.remove("enabled");
-            } else {
-                sectionDiag.style.display = "block";
-                separatorDiag.style.display = "block";
-                buttonInformation.classList.add("enabled");
-            }
-        });
-
-        const buttonUploadFile = document.getElementById(
-            "button-upload-file"
-        ) as HTMLInputElement;
-        buttonUploadFile.addEventListener("change", async () => {
-            if (
-                !buttonUploadFile.files ||
-                buttonUploadFile.files.length === 0
-            ) {
-                return;
-            }
-
-            const file = buttonUploadFile.files[0];
-
-            const arrayBuffer = await file.arrayBuffer();
-            const romData = new Uint8Array(arrayBuffer);
-
-            buttonUploadFile.value = "";
-
-            this.boot({ engine: null, romName: file.name, romData: romData });
-
-            this.trigger("message", {
-                text: `Loaded ${file.name} ROM successfully!`
-            });
-        });
     }
 
     setRom(name: string, data: Uint8Array, cartridge: Cartridge) {
@@ -607,23 +556,11 @@ class GameboyEmulator extends Observable implements Emulator {
 
     pause() {
         this.paused = true;
-        const buttonPause = document.getElementById("button-pause")!;
-        const img = buttonPause.getElementsByTagName("img")[0];
-        const span = buttonPause.getElementsByTagName("span")[0];
-        buttonPause.classList.add("enabled");
-        img.src = require("./res/play.svg");
-        span.textContent = "Resume";
     }
 
     resume() {
         this.paused = false;
         this.nextTickTime = new Date().getTime();
-        const buttonPause = document.getElementById("button-pause")!;
-        const img = buttonPause.getElementsByTagName("img")[0];
-        const span = buttonPause.getElementsByTagName("span")[0];
-        buttonPause.classList.remove("enabled");
-        img.src = require("./res/pause.svg");
-        span.textContent = "Pause";
     }
 
     reset() {
