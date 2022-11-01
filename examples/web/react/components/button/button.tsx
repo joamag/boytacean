@@ -1,4 +1,4 @@
-import React, { FC } from "react";
+import React, { ChangeEvent, FC } from "react";
 
 import "./button.css";
 
@@ -6,33 +6,58 @@ type ButtonProps = {
     text: string;
     image?: string;
     imageAlt?: string;
+    enabled?: boolean;
+    file?: boolean;
+    accept?: string;
     size?: string;
     style?: string[];
     onClick?: () => void;
+    onFile?: (file: File) => void;
 };
 
 export const Button: FC<ButtonProps> = ({
     text,
     image,
     imageAlt,
+    enabled = false,
+    file = false,
+    accept = ".txt",
     size = "small",
     style = ["simple", "border"],
-    onClick
+    onClick,
+    onFile
 }) => {
-    const classes = () => ["button", size, ...style].join(" ");
-    const _onClick = () => (onClick ? onClick() : undefined);
-    const buttonSimple = () => (
-        <span className={classes()} onClick={_onClick}>
+    const classes = () =>
+        [
+            "button",
+            size,
+            enabled ? "enabled" : "",
+            file ? "file" : "",
+            ...style
+        ].join(" ");
+    const onFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+        if (!event.target.files || event.target.files.length === 0) {
+            return;
+        }
+        const file = event.target.files[0];
+        onFile && onFile(file);
+        event.target.value = "";
+    };
+    const renderSimple = () => (
+        <span className={classes()} onClick={onClick}>
             {text}
         </span>
     );
-    const buttonImage = () => (
-        <span className={classes()} onClick={_onClick}>
-            <img src={image} alt={imageAlt} />
+    const renderComplex = () => (
+        <span className={classes()} onClick={onClick}>
+            {image && <img src={image} alt={imageAlt || text || "button"} />}
+            {file && (
+                <input type="file" accept={accept} onChange={onFileChange} />
+            )}
             <span>{text}</span>
         </span>
     );
-    return image ? buttonImage() : buttonSimple();
+    return image ? renderComplex() : renderSimple();
 };
 
 export default Button;

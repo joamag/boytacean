@@ -2,5 +2,18 @@
     color: #ffffff;
     font-family: VT323, Roboto, Open Sans, Arial, Helvetica, sans-serif;
     margin: 0px 0px 0px 0px;
-    display: none;
+}
+
+.app h3 {
+    margin: 10px 0px 10px 0px;
+}
+
+.app .display-container {
+    margin-top: 78px;
+}
+
+@media only screen and (max-width: 1120px) {
+    .app .display-container {
+        margin-top: 0px;
+    }
 }

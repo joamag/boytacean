@@ -1,0 +1,55 @@
+
+.keyboard-chip8 {
+    font-size: 0px;
+    text-align: center;
+    touch-callout: none;
+    -o-touch-callout: none;
+    -ms-touch-callout: none;
+    -moz-touch-callout: none;
+    -khtml-touch-callout: none;
+    -webkit-touch-callout: none;
+    user-select: none;
+    -o-user-select: none;
+    -ms-user-select: none;
+    -moz-user-select: none;
+    -khtml-user-select: none;
+    -webkit-user-select: none;
+}
+
+.keyboard-chip8 > .keyboard-line {
+    margin-bottom: 12px;
+}
+
+.keyboard-chip8 > .keyboard-line:last-child {
+    margin-bottom: 0px;
+}
+
+.keyboard-chip8 .key {
+    border: 2px solid #ffffff;
+    border-radius: 5px 5px 5px 5px;
+    -o-border-radius: 5px 5px 5px 5px;
+    -ms-border-radius: 5px 5px 5px 5px;
+    -moz-border-radius: 5px 5px 5px 5px;
+    -khtml-border-radius: 5px 5px 5px 5px;
+    -webkit-border-radius: 5px 5px 5px 5px;
+    cursor: pointer;
+    display: inline-block;
+    font-size: 38px;
+    height: 48px;
+    line-height: 46px;
+    margin-right: 14px;
+    text-align: center;
+    width: 48px;
+}
+
+.keyboard-chip8 .key:last-child {
+    margin-right: 0px;
+}
+
+.keyboard-chip8 .key:hover {
+    background-color: #50cb93;
+}
+
+.keyboard-chip8 .key:active {
+    background-color: #2a9d8f;
+}

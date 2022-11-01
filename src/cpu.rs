@@ -112,7 +112,7 @@ impl Cpu {
         }
 
         // @todo this is so bad, need to improve this by an order
-        // of magnitude
+        // of magnitude, to be able to have better performance
         if self.halted {
             if ((self.mmu.ie & 0x01 == 0x01) && self.mmu.ppu().int_vblank())
                 || ((self.mmu.ie & 0x02 == 0x02) && self.mmu.ppu().int_stat())
@@ -124,7 +124,8 @@ impl Cpu {
         }
 
         if self.ime {
-            // @todo aggregate all of this interrupts in the MMU
+            // @todo aggregate all of this interrupts in the MMU, as there's
+            // a lot of redundant code involved in here
             if (self.mmu.ie & 0x01 == 0x01) && self.mmu.ppu().int_vblank() {
                 debugln!("Going to run V-Blank interrupt handler (0x40)");
 

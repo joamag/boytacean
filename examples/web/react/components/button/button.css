@@ -30,7 +30,7 @@
 }
 
 .button.simple.padded {
-    padding: 4px 10px 4px 10px;
+    padding: 0px 10px 0px 10px;
 }
 
 .button.simple.padded-large {
@@ -71,15 +71,15 @@
     width: 13px;
 }
 
-.button.simple > img.medium {
+.button.simple.medium > img {
     width: 20px;
 }
 
-.button.simple > img.large {
+.button.simple.large > img {
     width: 28px;
 }
 
-.button.simple > img.very-large {
+.button.simple.very-large > img {
     width: 38px;
 }
 

@@ -1,4 +1,9 @@
+.button-container {
+    margin-bottom: -12px;
+}
+
 .button-container > * {
+    margin-bottom: 12px;
     margin-right: 8px;
 }
 

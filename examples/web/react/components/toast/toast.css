@@ -1,0 +1,57 @@
+.toast {
+    background-color: black;
+    height: 0px;
+    left: 0px;
+    padding: 0px 24px 0px 24px;
+    pointer-events: none;
+    position: fixed;
+    text-align: center;
+    top: 0px;
+    width: 100%;
+    z-index: 8;
+}
+
+.toast > .toast-text {
+    background-color: #2a9d8f;
+    border-radius: 4px 4px 4px 4px;
+    -o-border-radius: 4px 4px 4px 4px;
+    -ms-border-radius: 4px 4px 4px 4px;
+    -moz-border-radius: 4px 4px 4px 4px;
+    -khtml-border-radius: 4px 4px 4px 4px;
+    -webkit-border-radius: 4px 4px 4px 4px;
+    cursor: pointer;
+    display: inline-block;
+    font-size: 20px;
+    line-height: 22px;
+    opacity: 0.0;
+    -o-opacity: 0.0;
+    -ms-opacity: 0.0;
+    -moz-opacity: 0.0;
+    -khtml-opacity: 0.0;
+    -webkit-opacity: 0.0;
+    padding: 12px 18px 12px 18px;
+    position: relative;
+    top: -46px;
+    transition: top 0.5s cubic-bezier(0.075, 0.82, 0.165, 1), opacity 0.35s cubic-bezier(0.075, 0.82, 0.165, 1);
+    -o-transition: top 0.5s cubic-bezier(0.075, 0.82, 0.165, 1), opacity 0.35s cubic-bezier(0.075, 0.82, 0.165, 1);
+    -ms-transition: top 0.5s cubic-bezier(0.075, 0.82, 0.165, 1), opacity 0.35s cubic-bezier(0.075, 0.82, 0.165, 1);
+    -moz-transition: top 0.5s cubic-bezier(0.075, 0.82, 0.165, 1), opacity 0.35s cubic-bezier(0.075, 0.82, 0.165, 1);
+    -khtml-transition: top 0.5s cubic-bezier(0.075, 0.82, 0.165, 1), opacity 0.35s cubic-bezier(0.075, 0.82, 0.165, 1);
+    -webkit-transition: top 0.5s cubic-bezier(0.075, 0.82, 0.165, 1), opacity 0.35s cubic-bezier(0.075, 0.82, 0.165, 1);
+    width: fit-content;
+}
+
+.toast.error > .toast-text {
+    background-color: #e63946;
+}
+
+.toast.visible > .toast-text {
+    opacity: 1.0;
+    -o-opacity: 1.0;
+    -ms-opacity: 1.0;
+    -moz-opacity: 1.0;
+    -khtml-opacity: 1.0;
+    -webkit-opacity: 1.0;
+    pointer-events: all;
+    top: 24px;
+}

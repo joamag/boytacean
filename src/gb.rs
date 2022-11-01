@@ -113,10 +113,16 @@ impl GameBoy {
         self.frame_buffer().to_vec()
     }
 
+    /// Obtains the tile structure for the tile at the
+    /// given index, no conversion in the pixel buffer
+    /// is done so that the color reference is the GB one.
     pub fn get_tile(&mut self, index: usize) -> Tile {
         self.ppu().tiles()[index]
     }
 
+    /// Obtains the pixel buffer for the tile at the
+    /// provided index, converting the color buffer
+    /// using the currently loaded palette.
     pub fn get_tile_buffer(&mut self, index: usize) -> Vec<u8> {
         let tile = self.get_tile(index);
         tile.palette_buffer(self.ppu().palette())

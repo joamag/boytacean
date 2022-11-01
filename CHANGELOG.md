@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+*
+
+### Changed
+
+*
+
+### Fixed
+
+*
+
+## [0.4.0] - 2022-11-01
+
+### Added
+
+* A whole new layout implemented using React.JS 🔥
 * Instant boot support using the `GameBoy.boot()` method
 * Support for pending cycles in web version
 

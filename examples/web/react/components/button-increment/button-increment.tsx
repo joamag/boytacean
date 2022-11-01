@@ -10,6 +10,7 @@ type ButtonIncrementProps = {
     max?: number;
     prefix?: string;
     suffix?: string;
+    decimalPlaces?: number;
     size?: string;
     style?: string[];
     onClick?: () => void;
@@ -24,6 +25,7 @@ export const ButtonIncrement: FC<ButtonIncrementProps> = ({
     max,
     prefix,
     suffix,
+    decimalPlaces,
     size = "medium",
     style = ["simple", "border"],
     onClick,
@@ -32,9 +34,6 @@ export const ButtonIncrement: FC<ButtonIncrementProps> = ({
 }) => {
     const [valueState, setValue] = useState(value);
     const classes = () => ["button-increment", size, ...style].join(" ");
-    const _onClick = () => {
-        if (onClick) onClick();
-    };
     const _onMinusClick = () => {
         const valueNew = valueState - delta;
         if (onBeforeChange) {
@@ -54,7 +53,7 @@ export const ButtonIncrement: FC<ButtonIncrementProps> = ({
         if (onChange) onChange(valueNew);
     };
     return (
-        <span className={classes()} onClick={_onClick}>
+        <span className={classes()} onClick={onClick}>
             <Button
                 text={"-"}
                 size={size}
@@ -62,7 +61,9 @@ export const ButtonIncrement: FC<ButtonIncrementProps> = ({
                 onClick={_onMinusClick}
             />
             {prefix && <span className="prefix">{prefix}</span>}
-            <span className="value">{valueState}</span>
+            <span className="value">
+                {decimalPlaces ? valueState.toFixed(decimalPlaces) : valueState}
+            </span>
             {suffix && <span className="suffix">{suffix}</span>}
             <Button
                 text={"+"}

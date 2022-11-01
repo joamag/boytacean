@@ -3129,6 +3129,7 @@ fn set_7_mhl(cpu: &mut Cpu) {
 fn set_7_a(cpu: &mut Cpu) {
     cpu.a = set(cpu.a, 7);
 }
+
 /// Helper function to set one bit in a u8.
 fn set(value: u8, bit: u8) -> u8 {
     value | (1u8 << (bit as usize))
