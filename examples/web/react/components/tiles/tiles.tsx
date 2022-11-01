@@ -12,8 +12,8 @@ type TilesProps = {
 };
 
 export const Tiles: FC<TilesProps> = ({
-    getTile,
     tileCount,
+    getTile,
     interval = 500,
     style = []
 }) => {
