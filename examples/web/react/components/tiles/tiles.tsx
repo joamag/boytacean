@@ -9,7 +9,11 @@ type TilesProps = {
 
 export const Tiles: FC<TilesProps> = ({ style = [] }) => {
     const classes = () => ["title", ...style].join(" ");
-    return <div className={classes()}></div>;
+    return (
+        <div className={classes()}>
+            <canvas className="canvas-tiles" width="128" height="192"></canvas>
+        </div>
+    );
 };
 
 /**
