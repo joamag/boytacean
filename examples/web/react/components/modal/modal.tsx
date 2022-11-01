@@ -25,11 +25,15 @@ export const Modal: FC<ModalProps> = ({
     const classes = () =>
         ["modal", visible ? "visible" : "", ...style].join(" ");
     useEffect(() => {
-        document.addEventListener("keydown", (event) => {
+        const onKeyDown = (event: KeyboardEvent) => {
             if (event.key === "Escape") {
                 onCancel && onCancel();
             }
-        });
+        };
+        document.addEventListener("keydown", onKeyDown);
+        return () => {
+            document.removeEventListener("keydown", onKeyDown);
+        };
     }, []);
     const getTextHtml = (separator = /\n/g) => ({
         __html: text.replace(separator, "<br/>")

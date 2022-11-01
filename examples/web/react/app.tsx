@@ -45,6 +45,14 @@ export class Observable {
         this.events[event] = callbacks;
     }
 
+    unbind(event: string, callback: Callback<this>) {
+        const callbacks = this.events[event] ?? [];
+        if (!callbacks.includes(callback)) return;
+        const index = callbacks.indexOf(callback);
+        callbacks.splice(index, 1);
+        this.events[event] = callbacks;
+    }
+
     trigger(event: string, params?: Record<string, any>) {
         const callbacks = this.events[event] ?? [];
         callbacks.forEach((c) => c(this, params));
@@ -67,6 +75,7 @@ export type BenchmarkResult = {
 
 export interface ObservableI {
     bind(event: string, callback: Callback<this>): void;
+    unbind(event: string, callback: Callback<this>): void;
     trigger(event: string): void;
 }
 
@@ -237,7 +246,7 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
         }
     }, [keyaction]);
     useEffect(() => {
-        document.addEventListener("keydown", (event) => {
+        const onKeyDown = (event: KeyboardEvent) => {
             if (event.key === "Escape") {
                 setKeyaction("Escape");
                 event.stopPropagation();
@@ -248,14 +257,25 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
                 event.stopPropagation();
                 event.preventDefault();
             }
-        });
-        emulator.bind("booted", () => {
+        };
+        const onBooted = () => {
             const romInfo = emulator.getRomInfo();
             setRomInfo(romInfo);
-        });
-        emulator.bind("message", (_, params = {}) => {
+        };
+        const onMessage = (
+            emulator: Emulator,
+            params: Record<string, any> = {}
+        ) => {
             showToast(params.text, params.error, params.timeout);
-        });
+        };
+        document.addEventListener("keydown", onKeyDown);
+        emulator.bind("booted", onBooted);
+        emulator.bind("message", onMessage);
+        return () => {
+            document.removeEventListener("keydown", onKeyDown);
+            emulator.unbind("booted", onBooted);
+            emulator.unbind("message", onMessage);
+        };
     }, []);
 
     const getPauseText = () => (paused ? "Resume" : "Pause");

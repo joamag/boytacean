@@ -15,7 +15,7 @@ export const Overlay: FC<OverlayProps> = ({ text, style = [], onFile }) => {
     const classes = () =>
         ["overlay", visible ? "visible" : "", ...style].join(" ");
     useEffect(() => {
-        document.addEventListener("drop", async (event) => {
+        const onDrop = async (event: DragEvent) => {
             if (
                 !event.dataTransfer!.files ||
                 event.dataTransfer!.files.length === 0
@@ -30,25 +30,37 @@ export const Overlay: FC<OverlayProps> = ({ text, style = [], onFile }) => {
 
             const file = event.dataTransfer!.files[0];
             onFile && onFile(file);
-        });
-        document.addEventListener("dragover", async (event) => {
+        };
+        const onDragOver = async (event: DragEvent) => {
             if (!event.dataTransfer!.items || event.dataTransfer!.items[0].type)
                 return;
-
             event.preventDefault();
-
             setVisible(true);
-        });
-        document.addEventListener("dragenter", async (event) => {
+        };
+        const onDragEnter = async (event: DragEvent) => {
             if (!event.dataTransfer!.items || event.dataTransfer!.items[0].type)
                 return;
             setVisible(true);
-        });
-        document.addEventListener("dragleave", async (event) => {
-            if (!event.dataTransfer!.items || event.dataTransfer!.items[0].type)
-                return;
+        };
+        const onDragLeave = async (event: DragEvent) => {
+            if (
+                !event.dataTransfer!.items ||
+                event.dataTransfer!.items[0].type
+            ) {
+            }
+            return;
             setVisible(false);
-        });
+        };
+        document.addEventListener("drop", onDrop);
+        document.addEventListener("dragover", onDragOver);
+        document.addEventListener("dragenter", onDragEnter);
+        document.addEventListener("dragleave", onDragLeave);
+        return () => {
+            document.removeEventListener("drop", onDrop);
+            document.removeEventListener("dragover", onDragOver);
+            document.removeEventListener("dragenter", onDragEnter);
+            document.removeEventListener("dragleave", onDragLeave);
+        };
     }, []);
     return (
         <div className={classes()}>
