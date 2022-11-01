@@ -6,6 +6,7 @@ type ButtonProps = {
     text: string;
     image?: string;
     imageAlt?: string;
+    enabled?: boolean;
     file?: boolean;
     accept?: string;
     size?: string;
@@ -18,6 +19,7 @@ export const Button: FC<ButtonProps> = ({
     text,
     image,
     imageAlt,
+    enabled = false,
     file = false,
     accept = ".txt",
     size = "small",
@@ -26,7 +28,13 @@ export const Button: FC<ButtonProps> = ({
     onFile
 }) => {
     const classes = () =>
-        ["button", size, file ? "file" : "", ...style].join(" ");
+        [
+            "button",
+            size,
+            enabled ? "enabled" : "",
+            file ? "file" : "",
+            ...style
+        ].join(" ");
     const onFileChange = (event: ChangeEvent<HTMLInputElement>) => {
         if (!event.target.files || event.target.files.length === 0) {
             return;

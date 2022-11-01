@@ -226,6 +226,9 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
     const [toastText, setToastText] = useState<string>();
     const [toastError, setToastError] = useState(false);
     const [toastVisible, setToastVisible] = useState(false);
+    const [keyboardVisible, setKeyboardVisible] = useState(false);
+    const [infoVisible, setInfoVisible] = useState(true);
+    const [debugVisible, setDebugVisible] = useState(false);
 
     const toastCounterRef = useRef(0);
     const frameRef = useRef<boolean>(false);
@@ -376,10 +379,13 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
         setFullscreen(!fullscreen);
     };
     const onKeyboardClick = () => {
-        showToast("Keyboard click");
+        setKeyboardVisible(!keyboardVisible);
     };
     const onInformationClick = () => {
-        showToast("Information click");
+        setInfoVisible(!infoVisible);
+    };
+    const onDebugClick = () => {
+        setDebugVisible(!debugVisible);
     };
     const onThemeClick = () => {
         setBackgroundIndex((backgroundIndex + 1) % backgrounds.length);
@@ -446,11 +452,6 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
                             onClearHandler={onClearHandler}
                             onMinimize={onMinimize}
                         />
-                        <Tiles
-                            getTile={(index) => emulator.getTile(index)}
-                            tileCount={384}
-                        />
-                        <KeyboardGB />
                     </div>
                 }
             >
@@ -502,48 +503,134 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
                         ROM.
                     </Paragraph>
                 </Section>
+                {keyboardVisible && (
+                    <Section>
+                        <KeyboardGB />
+                    </Section>
+                )}
+                {debugVisible && (
+                    <Section>
+                        <Tiles
+                            getTile={(index) => emulator.getTile(index)}
+                            tileCount={384}
+                        />
+                    </Section>
+                )}
+                {infoVisible && (
+                    <Section>
+                        <Info>
+                            <Pair
+                                key="button-engine"
+                                name={"Engine"}
+                                valueNode={
+                                    <ButtonSwitch
+                                        options={["NEO", "CLASSIC"]}
+                                        size={"large"}
+                                        style={["simple"]}
+                                        onChange={onEngineChange}
+                                    />
+                                }
+                            />
+                            <Pair
+                                key="rom"
+                                name={"ROM"}
+                                value={romInfo.name ?? "-"}
+                            />
+                            <Pair
+                                key="rom-size"
+                                name={"ROM Size"}
+                                value={
+                                    romInfo.name ? `${romInfo.size} bytes` : "-"
+                                }
+                            />
+                            <Pair
+                                key="button-frequency"
+                                name={"CPU Frequency"}
+                                valueNode={
+                                    <ButtonIncrement
+                                        value={4.19}
+                                        delta={0.1}
+                                        min={0}
+                                        suffix={"MHz"}
+                                    />
+                                }
+                            />
+                            <Pair
+                                key="rom-type"
+                                name={"ROM Type"}
+                                value={
+                                    romInfo.extra?.romType
+                                        ? `${romInfo.extra?.romType}`
+                                        : "-"
+                                }
+                            />
+                            <Pair
+                                key="framerate"
+                                name={"Framerate"}
+                                value={`${framerate} fps`}
+                            />
+                        </Info>
+                    </Section>
+                )}
                 <Section>
                     <ButtonContainer>
                         <Button
                             text={getPauseText()}
                             image={getPauseIcon()}
                             imageAlt="pause"
+                            style={["simple", "border", "padded"]}
                             onClick={onPauseClick}
                         />
                         <Button
                             text={"Reset"}
                             image={require("../res/reset.svg")}
                             imageAlt="reset"
+                            style={["simple", "border", "padded"]}
                             onClick={onResetClick}
                         />
                         <Button
                             text={"Benchmark"}
                             image={require("../res/bolt.svg")}
                             imageAlt="benchmark"
+                            style={["simple", "border", "padded"]}
                             onClick={onBenchmarkClick}
                         />
                         <Button
                             text={"Fullscreen"}
                             image={require("../res/maximise.svg")}
                             imageAlt="maximise"
+                            style={["simple", "border", "padded"]}
                             onClick={onFullscreenClick}
                         />
                         <Button
                             text={"Keyboard"}
                             image={require("../res/dialpad.svg")}
                             imageAlt="keyboard"
+                            enabled={keyboardVisible}
+                            style={["simple", "border", "padded"]}
                             onClick={onKeyboardClick}
                         />
                         <Button
                             text={"Information"}
                             image={require("../res/info.svg")}
                             imageAlt="information"
+                            enabled={infoVisible}
+                            style={["simple", "border", "padded"]}
                             onClick={onInformationClick}
+                        />
+                        <Button
+                            text={"Debug"}
+                            image={require("../res/bug.svg")}
+                            imageAlt="debug"
+                            enabled={debugVisible}
+                            style={["simple", "border", "padded"]}
+                            onClick={onDebugClick}
                         />
                         <Button
                             text={"Theme"}
                             image={require("../res/marker.svg")}
                             imageAlt="theme"
+                            style={["simple", "border", "padded"]}
                             onClick={onThemeClick}
                         />
                         <Button
@@ -552,60 +639,10 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
                             imageAlt="upload"
                             file={true}
                             accept={".gb"}
+                            style={["simple", "border", "padded"]}
                             onFile={onUploadFile}
                         />
                     </ButtonContainer>
-                    <Info>
-                        <Pair
-                            key="button-engine"
-                            name={"Engine"}
-                            valueNode={
-                                <ButtonSwitch
-                                    options={["NEO", "CLASSIC"]}
-                                    size={"large"}
-                                    style={["simple"]}
-                                    onChange={onEngineChange}
-                                />
-                            }
-                        />
-                        <Pair
-                            key="rom"
-                            name={"ROM"}
-                            value={romInfo.name ?? "-"}
-                        />
-                        <Pair
-                            key="rom-size"
-                            name={"ROM Size"}
-                            value={romInfo.name ? `${romInfo.size} bytes` : "-"}
-                        />
-
-                        <Pair
-                            key="button-frequency"
-                            name={"CPU Frequency"}
-                            valueNode={
-                                <ButtonIncrement
-                                    value={4.19}
-                                    delta={0.1}
-                                    min={0}
-                                    suffix={"MHz"}
-                                />
-                            }
-                        />
-                        <Pair
-                            key="rom-type"
-                            name={"ROM Type"}
-                            value={
-                                romInfo.extra?.romType
-                                    ? `${romInfo.extra?.romType}`
-                                    : "-"
-                            }
-                        />
-                        <Pair
-                            key="framerate"
-                            name={"Framerate"}
-                            value={`${framerate} fps`}
-                        />
-                    </Info>
                 </Section>
             </PanelSplit>
         </div>
