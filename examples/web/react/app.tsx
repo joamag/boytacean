@@ -540,7 +540,7 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
                             onClick={onThemeClick}
                         />
                         <Button
-                            text={"Upload ROM"}
+                            text={"Load ROM"}
                             image={require("../res/upload.svg")}
                             imageAlt="upload"
                             file={true}
