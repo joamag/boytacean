@@ -542,7 +542,11 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
                                 key="rom-size"
                                 name={"ROM Size"}
                                 value={
-                                    romInfo.name ? `${romInfo.size} bytes` : "-"
+                                    romInfo.size
+                                        ? `${new Intl.NumberFormat().format(
+                                              romInfo.size
+                                          )} bytes`
+                                        : "-"
                                 }
                             />
                             <Pair
