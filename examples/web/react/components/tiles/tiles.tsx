@@ -13,11 +13,9 @@ type TilesProps = {
 export const Tiles: FC<TilesProps> = ({ getTile, tileCount, style = [] }) => {
     const classes = () => ["title", ...style].join(" ");
     const onCanvas = (structure: CanvasStructure) => {
-        console.info("On canvas");
-        setTimeout(() => {
+        setInterval(() => {
             for (let index = 0; index < 384; index++) {
                 const pixels = getTile(index);
-                console.info("VAI desenhar");
                 drawTile(index, pixels, structure);
             }
         }, 1000);
