@@ -64,7 +64,8 @@ cd dist && python3 -m http.server
 
 ### Other
 
-* [GitHub - Awesome Game Boy Development](https://github.com/gbdev/awesome-gbdev)
+* [GitHub - gbdev/awesome-gbdev](https://github.com/gbdev/awesome-gbdev)
+* [GitHub - Hacktix/Bootix](https://github.com/Hacktix/Bootix)
 
 ## License
 
