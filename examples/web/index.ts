@@ -17,11 +17,11 @@ import info from "./package.json";
 
 declare const require: any;
 
-const LOGIC_HZ = 600;
-const VISUAL_HZ = 60;
+const LOGIC_HZ = 4194304;
+const VISUAL_HZ = 59.7275;
 const IDLE_HZ = 10;
 
-const FREQUENCY_DELTA = 60;
+const FREQUENCY_DELTA = 350000;
 
 const SAMPLE_RATE = 2;
 
@@ -71,7 +71,7 @@ class GameboyEmulator extends EmulatorBase implements Emulator {
      * The descriptive name of the engine that is currently
      * in use to emulate the system.
      */
-    private engine: string | null = null;
+    private _engine: string | null = null;
 
     private logicFrequency: number = LOGIC_HZ;
     private visualFrequency: number = VISUAL_HZ;
@@ -122,7 +122,11 @@ class GameboyEmulator extends EmulatorBase implements Emulator {
             let currentTime = new Date().getTime();
 
             try {
-                pending = this.tick(currentTime, pending);
+                pending = this.tick(
+                    currentTime,
+                    pending,
+                    Math.round(this.logicFrequency / this.visualFrequency)
+                );
             } catch (err) {
                 // sets the default error message to be displayed
                 // to the user, this value may be overridden in case
@@ -308,7 +312,7 @@ class GameboyEmulator extends EmulatorBase implements Emulator {
 
         // updates the name of the currently selected engine
         // to the one that has been provided (logic change)
-        if (engine) this.engine = engine;
+        if (engine) this._engine = engine;
 
         // updates the complete set of global information that
         // is going to be displayed
@@ -381,6 +385,10 @@ class GameboyEmulator extends EmulatorBase implements Emulator {
 
     get engines() {
         return ["neo"];
+    }
+
+    get engine() {
+        return this._engine;
     }
 
     get version(): string {

@@ -113,7 +113,17 @@ export interface Emulator extends ObservableI {
      */
     get versionUrl(): string;
 
+    /**
+     * The complete set of engine names that can be used 
+     * in the re-boot operation.
+     */
     get engines(): string[];
+
+    /**
+     * The name of the current execution engine being used
+     * by the emulator.
+     */
+    get engine(): string;
 
     /**
      * The pixel format of the emulator's display
