@@ -186,6 +186,10 @@ export interface Emulator extends ObservableI {
      */
     reset(): void;
 
+    keyPress(key: string): void;
+
+    keyLift(key: string): void;
+
     /**
      * Runs a benchmark operation in the emulator, effectively
      * measuring the performance of it.
@@ -222,6 +226,10 @@ type AppProps = {
     backgrounds?: string[];
 };
 
+const isTouchDevice = () => {
+    return "ontouchstart" in window || navigator.maxTouchPoints > 0;
+};
+
 export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
     const [paused, setPaused] = useState(false);
     const [fullscreen, setFullscreen] = useState(false);
@@ -235,7 +243,7 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
     const [toastText, setToastText] = useState<string>();
     const [toastError, setToastError] = useState(false);
     const [toastVisible, setToastVisible] = useState(false);
-    const [keyboardVisible, setKeyboardVisible] = useState(false);
+    const [keyboardVisible, setKeyboardVisible] = useState(isTouchDevice());
     const [infoVisible, setInfoVisible] = useState(true);
     const [debugVisible, setDebugVisible] = useState(false);
 
@@ -422,6 +430,13 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
     const onMinimize = () => {
         setFullscreen(!fullscreen);
     };
+    const onKeyDown = (key: string) => {
+        console.info(key);
+        emulator.keyPress(key);
+    };
+    const onKeyUp = (key: string) => {
+        emulator.keyLift(key);
+    };
     const onDrawHandler = (handler: DrawHandler) => {
         if (frameRef.current) return;
         frameRef.current = true;
@@ -472,6 +487,11 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
                     </div>
                 }
             >
+                {keyboardVisible && (
+                    <Section separatorBottom={true}>
+                        <KeyboardGB onKeyDown={onKeyDown} onKeyUp={onKeyUp} />
+                    </Section>
+                )}
                 <Title
                     text={emulator.name}
                     version={emulator.version}
@@ -515,11 +535,6 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
                         ROM.
                     </Paragraph>
                 </Section>
-                {keyboardVisible && (
-                    <Section>
-                        <KeyboardGB />
-                    </Section>
-                )}
                 {debugVisible && (
                     <Section>
                         <h3>VRAM Tiles</h3>

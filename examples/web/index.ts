@@ -46,6 +46,17 @@ const KEYS: Record<string, number> = {
     s: PadKey.B
 };
 
+const KEYS_NAME: Record<string, number> = {
+    ArrowUp: PadKey.Up,
+    ArrowDown: PadKey.Down,
+    ArrowLeft: PadKey.Left,
+    ArrowRight: PadKey.Right,
+    Start: PadKey.Start,
+    Select: PadKey.Select,
+    A: PadKey.A,
+    B: PadKey.B
+};
+
 const ARROW_KEYS: Record<string, boolean> = {
     ArrowUp: true,
     ArrowDown: true,
@@ -463,6 +474,18 @@ class GameboyEmulator extends EmulatorBase implements Emulator {
 
     reset() {
         this.boot({ engine: null });
+    }
+
+    keyPress(key: string) {
+        const keyCode = KEYS_NAME[key];
+        if (!keyCode) return;
+        this.gameBoy!.key_press(keyCode);
+    }
+
+    keyLift(key: string) {
+        const keyCode = KEYS_NAME[key];
+        if (!keyCode) return;
+        this.gameBoy!.key_lift(keyCode);
     }
 
     benchmark(count = 50000000) {

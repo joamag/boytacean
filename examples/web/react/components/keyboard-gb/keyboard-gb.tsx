@@ -1,4 +1,4 @@
-import React, { FC } from "react";
+import React, { FC, useState } from "react";
 
 import "./keyboard-gb.css";
 
@@ -7,34 +7,90 @@ declare const require: any;
 type KeyboardGBProps = {
     style?: string[];
     onKeyDown?: (key: string) => void;
+    onKeyUp?: (key: string) => void;
 };
 
-export const KeyboardGB: FC<KeyboardGBProps> = ({ style = [], onKeyDown }) => {
+export const KeyboardGB: FC<KeyboardGBProps> = ({
+    style = [],
+    onKeyDown,
+    onKeyUp
+}) => {
     const classes = () => ["keyboard", "keyboard-gb", ...style].join(" ");
-    const renderKey = (key: string) => {
+    const renderKey = (
+        key: string,
+        keyName?: string,
+        styles: string[] = []
+    ) => {
+        const [pressed, setPressed] = useState(false);
         return (
             <span
-                className="key"
-                key={key}
-                onKeyDown={() => onKeyDown && onKeyDown(key)}
+                className={["key", pressed ? "pressed" : "", ...styles].join(
+                    " "
+                )}
+                key={keyName || key}
+                onMouseDown={(event) => {
+                    setPressed(true);
+                    onKeyDown && onKeyDown(keyName || key);
+                    event.stopPropagation();
+                    event.preventDefault();
+                }}
+                onMouseUp={(event) => {
+                    setPressed(false);
+                    onKeyUp && onKeyUp(keyName || key);
+                    event.stopPropagation();
+                    event.preventDefault();
+                }}
+                onMouseLeave={(event) => {
+                    if (!pressed) return;
+                    setPressed(false);
+                    onKeyUp && onKeyUp(keyName || key);
+                    event.stopPropagation();
+                    event.preventDefault();
+                }}
+                onTouchStart={(event) => {
+                    setPressed(true);
+                    onKeyDown && onKeyDown(keyName || key);
+                    event.stopPropagation();
+                    event.preventDefault();
+                }}
+                onTouchEnd={(event) => {
+                    setPressed(false);
+                    onKeyUp && onKeyUp(keyName || key);
+                    event.stopPropagation();
+                    event.preventDefault();
+                }}
             >
                 {key}
             </span>
         );
     };
     return (
-        <div className={classes()}>
-            <div className="keyboard-line">
-                <img className="dpad" alt="dpad" src={require("./dpad.svg")} />
+        <div
+            className={classes()}
+            onTouchStart={(e) => e.preventDefault()}
+            onTouchEnd={(e) => e.preventDefault()}
+        >
+            <div className="dpad">
+                <div className="dpad-top">
+                    {renderKey("", "ArrowUp", ["up"])}
+                </div>
+                <div>
+                    {renderKey("", "ArrowLeft", ["left"])}
+                    {renderKey("", "Center", ["center"])}
+                    {renderKey("", "ArrowRight", ["right"])}
+                </div>
+                <div className="dpad-bottom">
+                    {renderKey("", "ArrowDown", ["down"])}
+                </div>
             </div>
-            <div className="keyboard-line">
-                {["Q", "W", "E", "R"].map((k) => renderKey(k))}
+            <div className="action">
+                {renderKey("B", "B", ["b"])}
+                {renderKey("A", "A", ["a"])}
             </div>
-            <div className="keyboard-line">
-                {["A", "S", "D", "F"].map((k) => renderKey(k))}
-            </div>
-            <div className="keyboard-line">
-                {["Z", "X", "C", "V"].map((k) => renderKey(k))}
+            <div className="break"></div>
+            <div className="options">
+                {renderKey("Start", "Start", ["start"])}
+                {renderKey("Select", "Select", ["select"])}
             </div>
         </div>
     );
