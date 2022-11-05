@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 * Logic frequency control using on click UI and keyboard
+* Support for on screen keyboard for Game Boy
 
 ### Changed
 

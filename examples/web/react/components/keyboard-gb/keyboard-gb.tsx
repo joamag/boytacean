@@ -72,15 +72,14 @@ export const KeyboardGB: FC<KeyboardGBProps> = ({
         >
             <div className="dpad">
                 <div className="dpad-top">
-                    {renderKey("", "ArrowUp", ["up"])}
+                    {renderKey("🡑", "ArrowUp", ["up"])}
                 </div>
                 <div>
-                    {renderKey("", "ArrowLeft", ["left"])}
-                    {renderKey("", "Center", ["center"])}
-                    {renderKey("", "ArrowRight", ["right"])}
+                    {renderKey("🡐", "ArrowLeft", ["left"])}
+                    {renderKey("🡒", "ArrowRight", ["right"])}
                 </div>
                 <div className="dpad-bottom">
-                    {renderKey("", "ArrowDown", ["down"])}
+                    {renderKey("🡓", "ArrowDown", ["down"])}
                 </div>
             </div>
             <div className="action">
@@ -89,8 +88,8 @@ export const KeyboardGB: FC<KeyboardGBProps> = ({
             </div>
             <div className="break"></div>
             <div className="options">
-                {renderKey("Start", "Start", ["start"])}
-                {renderKey("Select", "Select", ["select"])}
+                {renderKey("START", "Start", ["start"])}
+                {renderKey("SELECT", "Select", ["select"])}
             </div>
         </div>
     );
