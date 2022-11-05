@@ -235,7 +235,7 @@ class GameboyEmulator extends EmulatorBase implements Emulator {
         // in case the target number of frames for FPS control
         // has been reached calculates the number of FPS and
         // flushes the value to the screen
-        if (this.frameCount === this.visualFrequency * SAMPLE_RATE) {
+        if (this.frameCount >= this.visualFrequency * SAMPLE_RATE) {
             const currentTime = new Date().getTime();
             const deltaTime = (currentTime - this.frameStart) / 1000;
             const fps = Math.round(this.frameCount / deltaTime);
@@ -424,6 +424,10 @@ class GameboyEmulator extends EmulatorBase implements Emulator {
                 ramSize: this.cartridge?.ram_size_s()
             }
         };
+    }
+
+    get frequency(): number {
+        return this.logicFrequency;
     }
 
     get framerate(): number {

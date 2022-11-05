@@ -114,7 +114,7 @@ export interface Emulator extends ObservableI {
     get versionUrl(): string;
 
     /**
-     * The complete set of engine names that can be used 
+     * The complete set of engine names that can be used
      * in the re-boot operation.
      */
     get engines(): string[];
@@ -146,6 +146,12 @@ export interface Emulator extends ObservableI {
      * loaded in the emulator.
      */
     get romInfo(): RomInfo;
+
+    /**
+     * The current CPU frequency (logic) of the emulator,
+     * should impact other elements of the emulator.
+     */
+    get frequency(): number;
 
     /**
      * The current logic framerate of the running emulator.
