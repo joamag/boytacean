@@ -28,7 +28,7 @@ import {
 
 import "./app.css";
 
-export type Callback<T> = (owner: T, params?: Record<string, any>) => void;
+export type Callback<T> = (owner: T, params?: any) => void;
 
 /**
  * Abstract class that implements the basic functionality
@@ -54,7 +54,7 @@ export class Observable {
         this.events[event] = callbacks;
     }
 
-    trigger(event: string, params?: Record<string, any>) {
+    trigger(event: string, params?: any) {
         const callbacks = this.events[event] ?? [];
         callbacks.forEach((c) => c(this, params));
     }
@@ -123,7 +123,7 @@ export interface Emulator extends ObservableI {
      * The name of the current execution engine being used
      * by the emulator.
      */
-    get engine(): string;
+    get engine(): string | null;
 
     /**
      * The pixel format of the emulator's display
@@ -152,6 +152,7 @@ export interface Emulator extends ObservableI {
      * should impact other elements of the emulator.
      */
     get frequency(): number;
+    set frequency(value: number);
 
     /**
      * The current logic framerate of the running emulator.
@@ -410,6 +411,14 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
             `${emulator.device} running in engine "${engine}" from now on!`
         );
     };
+    const onFrequencyChange = (value: number) => {
+        emulator.frequency = value * 1000 * 1000;
+    };
+    const onFrequencyReady = (handler: (value: number) => void) => {
+        emulator.bind("frequency", (emulator: Emulator, frequency: number) => {
+            handler(frequency / 1000000);
+        });
+    };
     const onMinimize = () => {
         setFullscreen(!fullscreen);
     };
@@ -558,11 +567,13 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
                                 name={"CPU Frequency"}
                                 valueNode={
                                     <ButtonIncrement
-                                        value={4.19}
-                                        delta={0.1}
+                                        value={emulator.frequency / 1000 / 1000}
+                                        delta={0.4}
                                         min={0}
                                         suffix={"MHz"}
                                         decimalPlaces={2}
+                                        onChange={onFrequencyChange}
+                                        onReady={onFrequencyReady}
                                     />
                                 }
                             />

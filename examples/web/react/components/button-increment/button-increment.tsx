@@ -1,4 +1,4 @@
-import React, { FC, useState } from "react";
+import React, { FC, useEffect, useState } from "react";
 import Button from "../button/button";
 
 import "./button-increment.css";
@@ -16,6 +16,7 @@ type ButtonIncrementProps = {
     onClick?: () => void;
     onBeforeChange?: (value: number) => boolean;
     onChange?: (value: number) => void;
+    onReady?: (setValue: (value: number) => void) => void;
 };
 
 export const ButtonIncrement: FC<ButtonIncrementProps> = ({
@@ -30,25 +31,31 @@ export const ButtonIncrement: FC<ButtonIncrementProps> = ({
     style = ["simple", "border"],
     onClick,
     onBeforeChange,
-    onChange
+    onChange,
+    onReady
 }) => {
     const [valueState, setValue] = useState(value);
     const classes = () => ["button-increment", size, ...style].join(" ");
+    useEffect(() => {
+        onReady && onReady((value) => setValue(value));
+    }, []);
     const _onMinusClick = () => {
-        const valueNew = valueState - delta;
+        let valueNew = valueState - delta;
         if (onBeforeChange) {
             if (!onBeforeChange(valueNew)) return;
         }
-        if (min !== undefined && valueNew < min) return;
+        if (min !== undefined) valueNew = Math.max(min, valueNew);
+        if (valueNew === valueState) return;
         setValue(valueNew);
         if (onChange) onChange(valueNew);
     };
     const _onPlusClick = () => {
-        const valueNew = valueState + delta;
+        let valueNew = valueState + delta;
         if (onBeforeChange) {
             if (!onBeforeChange(valueNew)) return;
         }
-        if (max !== undefined && valueNew > max) return;
+        if (max !== undefined) valueNew = Math.min(max, valueNew);
+        if (valueNew === valueState) return;
         setValue(valueNew);
         if (onChange) onChange(valueNew);
     };

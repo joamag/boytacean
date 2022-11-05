@@ -21,7 +21,7 @@ const LOGIC_HZ = 4194304;
 const VISUAL_HZ = 59.7275;
 const IDLE_HZ = 10;
 
-const FREQUENCY_DELTA = 350000;
+const FREQUENCY_DELTA = 400000;
 
 const SAMPLE_RATE = 2;
 
@@ -344,11 +344,11 @@ class GameboyEmulator extends EmulatorBase implements Emulator {
 
             switch (event.key) {
                 case "+":
-                    this.logicFrequency += FREQUENCY_DELTA;
+                    this.frequency += FREQUENCY_DELTA;
                     break;
 
                 case "-":
-                    this.logicFrequency -= FREQUENCY_DELTA;
+                    this.frequency -= FREQUENCY_DELTA;
                     break;
             }
         });
@@ -428,6 +428,12 @@ class GameboyEmulator extends EmulatorBase implements Emulator {
 
     get frequency(): number {
         return this.logicFrequency;
+    }
+
+    set frequency(value: number) {
+        value = Math.max(value, 0);
+        this.logicFrequency = value;
+        this.trigger("frequency", value);
     }
 
     get framerate(): number {
