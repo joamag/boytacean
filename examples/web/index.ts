@@ -100,6 +100,11 @@ class GameboyEmulator extends EmulatorBase implements Emulator {
     private cartridge: Cartridge | null = null;
 
     async main() {
+        // parses the current location URL as retrieves
+        // some of the "relevant" GET parameters for logic
+        const params = new URLSearchParams(window.location.search);
+        const romUrl = params.get("url");
+
         // initializes the WASM module, this is required
         // so that the global symbols become available
         await wasm();
@@ -110,7 +115,7 @@ class GameboyEmulator extends EmulatorBase implements Emulator {
 
         // boots the emulator subsystem with the initial
         // ROM retrieved from a remote data source
-        await this.boot({ loadRom: true });
+        await this.boot({ loadRom: true, romPath: romUrl || undefined });
 
         // the counter that controls the overflowing cycles
         // from tick to tick operation
