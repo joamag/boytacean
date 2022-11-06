@@ -483,13 +483,13 @@ class GameboyEmulator extends EmulatorBase implements Emulator {
 
     keyPress(key: string) {
         const keyCode = KEYS_NAME[key];
-        if (!keyCode) return;
+        if (keyCode === undefined) return;
         this.gameBoy!.key_press(keyCode);
     }
 
     keyLift(key: string) {
         const keyCode = KEYS_NAME[key];
-        if (!keyCode) return;
+        if (keyCode === undefined) return;
         this.gameBoy!.key_lift(keyCode);
     }
 
