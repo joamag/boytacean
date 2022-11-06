@@ -2,12 +2,12 @@
 .keyboard-chip8 {
     font-size: 0px;
     text-align: center;
-    touch-callout: none;
-    -o-touch-callout: none;
-    -ms-touch-callout: none;
-    -moz-touch-callout: none;
-    -khtml-touch-callout: none;
-    -webkit-touch-callout: none;
+    touch-callout: none !important;
+    -o-touch-callout: none !important;
+    -ms-touch-callout: none !important;
+    -moz-touch-callout: none !important;
+    -khtml-touch-callout: none !important;
+    -webkit-touch-callout: none !important;
     user-select: none;
     -o-user-select: none;
     -ms-user-select: none;
