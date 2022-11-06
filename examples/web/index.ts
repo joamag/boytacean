@@ -292,7 +292,7 @@ class GameboyEmulator extends EmulatorBase implements Emulator {
         // in case a remote ROM loading operation has been
         // requested then loads it from the remote origin
         if (loadRom) {
-            [romName, romData] = await this.fetchRom(romPath);
+            ({ name: romName, data: romData } = await this.fetchRom(romPath));
         } else if (romName === null || romData === null) {
             [romName, romData] = [this.romName, this.romData];
         }
@@ -509,7 +509,9 @@ class GameboyEmulator extends EmulatorBase implements Emulator {
         }
     }
 
-    private async fetchRom(romPath: string): Promise<[string, Uint8Array]> {
+    private async fetchRom(
+        romPath: string
+    ): Promise<{ name: string; data: Uint8Array }> {
         // extracts the name of the ROM from the provided
         // path by splitting its structure
         const romPathS = romPath.split(/\//g);
@@ -519,14 +521,17 @@ class GameboyEmulator extends EmulatorBase implements Emulator {
 
         // loads the ROM data and converts it into the
         // target byte array buffer (to be used by WASM)
-        const response = await fetch(ROM_PATH);
+        const response = await fetch(romPath);
         const blob = await response.blob();
         const arrayBuffer = await blob.arrayBuffer();
         const romData = new Uint8Array(arrayBuffer);
 
         // returns both the name of the ROM and the data
         // contents as a byte array
-        return [romName, romData];
+        return {
+            name: romName,
+            data: romData
+        };
     }
 }
 
