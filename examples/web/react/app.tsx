@@ -431,7 +431,6 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
         setFullscreen(!fullscreen);
     };
     const onKeyDown = (key: string) => {
-        console.info(key);
         emulator.keyPress(key);
     };
     const onKeyUp = (key: string) => {
