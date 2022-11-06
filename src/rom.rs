@@ -436,7 +436,7 @@ pub static NO_MBC: Mbc = Mbc {
         match addr {
             // ignores this address as Tetris and some other games write
             // to this address for some reason (probably related to
-            // any kind of MBC1 compatibility issue)
+            // some kind of MBC1 compatibility issue)
             0x2000 => (),
             _ => panic!("Writing to unknown Cartridge ROM location 0x{:04x}", addr),
         };
