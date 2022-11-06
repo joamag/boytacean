@@ -62,6 +62,11 @@ cd dist && python3 -m http.server
 
 * [YouTube - The Ultimate Game Boy Talk (33c3)](https://www.youtube.com/watch?v=HyzD8pNlpwI)
 
+### Other
+
+* [GitHub - gbdev/awesome-gbdev](https://github.com/gbdev/awesome-gbdev)
+* [GitHub - Hacktix/Bootix](https://github.com/Hacktix/Bootix)
+
 ## License
 
 Boyacian is currently licensed under the [Apache License, Version 2.0](http://www.apache.org/licenses/).

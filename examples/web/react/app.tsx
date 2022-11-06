@@ -28,7 +28,7 @@ import {
 
 import "./app.css";
 
-export type Callback<T> = (owner: T, params?: Record<string, any>) => void;
+export type Callback<T> = (owner: T, params?: any) => void;
 
 /**
  * Abstract class that implements the basic functionality
@@ -54,7 +54,7 @@ export class Observable {
         this.events[event] = callbacks;
     }
 
-    trigger(event: string, params?: Record<string, any>) {
+    trigger(event: string, params?: any) {
         const callbacks = this.events[event] ?? [];
         callbacks.forEach((c) => c(this, params));
     }
@@ -87,78 +87,77 @@ export interface ObservableI {
  */
 export interface Emulator extends ObservableI {
     /**
-     * Obtains the descriptive name of the emulator.
-     *
-     * @returns The descriptive name of the emulator.
+     * The descriptive name of the emulator.
      */
-    getName(): string;
+    get name(): string;
 
     /**
-     * Obtains the name of the name of the hardware that
-     * is being emulated by the emulator (eg: Super Nintendo).
-     *
-     * @returns The name of the hardware that is being
-     * emulated.
+     * The name of the the hardware that is being emulated
+     * by the emulator (eg: Super Nintendo).
      */
-    getDevice(): string;
+    get device(): string;
 
-    getDeviceUrl?(): string;
+    get deviceUrl(): string | undefined;
 
     /**
-     * Obtains a semantic version string for the current
-     * version of the emulator.
+     * A semantic version string for the current version
+     * of the emulator.
      *
-     * @returns The semantic version string.
      * @see {@link https://semver.org}
      */
-    getVersion(): string;
+    get version(): string;
 
     /**
-     * Obtains a URL to the page describing the current version
-     * of the emulator.
-     *
-     * @returns A URL to the page describing the current version
+     * The URL to the page describing the current version
      * of the emulator.
      */
-    getVersionUrl?(): string;
+    get versionUrl(): string;
 
     /**
-     * Obtains the pixel format of the emulator's display
+     * The complete set of engine names that can be used
+     * in the re-boot operation.
+     */
+    get engines(): string[];
+
+    /**
+     * The name of the current execution engine being used
+     * by the emulator.
+     */
+    get engine(): string | null;
+
+    /**
+     * The pixel format of the emulator's display
      * image buffer (eg: RGB).
-     *
-     * @returns The pixel format used for the emulator's
-     * image buffer.
      */
-    getPixelFormat(): PixelFormat;
+    get pixelFormat(): PixelFormat;
 
     /**
-     * Obtains the complete image buffer as a sequence of
+     * Gets the complete image buffer as a sequence of
      * bytes that respects the current pixel format from
      * `getPixelFormat()`. This method returns an in memory
      * pointer to the heap and not a copy.
-     *
-     * @returns The byte based image buffer that respects
-     * the emulator's pixel format.
      */
-    getImageBuffer(): Uint8Array;
+    get imageBuffer(): Uint8Array;
 
     /**
-     * Obtains information about the ROM that is currently
+     * Gets information about the ROM that is currently
+     * loaded in the emulator, using a structure containing
+     * the information about the ROM that is currently
      * loaded in the emulator.
-     *
-     * @returns Structure containing the information about
-     * the ROM that is currently loaded in the emulator.
      */
-    getRomInfo(): RomInfo;
+    get romInfo(): RomInfo;
 
     /**
-     * Returns the current logic framerate of the running
-     * emulator.
-     *
-     * @returns The current logic framerate of the running
-     * emulator.
+     * The current CPU frequency (logic) of the emulator,
+     * should impact other elements of the emulator.
      */
-    getFramerate(): number;
+    get frequency(): number;
+    set frequency(value: number);
+
+    /**
+     * The current logic framerate of the running emulator.
+     */
+    get framerate(): number;
 
     getTile(index: number): Uint8Array;
 
@@ -187,6 +186,10 @@ export interface Emulator extends ObservableI {
      */
     reset(): void;
 
+    keyPress(key: string): void;
+
+    keyLift(key: string): void;
+
     /**
      * Runs a benchmark operation in the emulator, effectively
      * measuring the performance of it.
@@ -197,6 +200,16 @@ export interface Emulator extends ObservableI {
      * @returns The result metrics from the benchmark run.
      */
     benchmark(count?: number): BenchmarkResult;
+}
+
+export class EmulatorBase extends Observable {
+    get deviceUrl(): string | undefined {
+        return undefined;
+    }
+
+    get versionUrl(): string | undefined {
+        return undefined;
+    }
 }
 
 /**
@@ -213,6 +226,10 @@ type AppProps = {
     backgrounds?: string[];
 };
 
+const isTouchDevice = () => {
+    return "ontouchstart" in window || navigator.maxTouchPoints > 0;
+};
+
 export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
     const [paused, setPaused] = useState(false);
     const [fullscreen, setFullscreen] = useState(false);
@@ -226,7 +243,7 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
     const [toastText, setToastText] = useState<string>();
     const [toastError, setToastError] = useState(false);
     const [toastVisible, setToastVisible] = useState(false);
-    const [keyboardVisible, setKeyboardVisible] = useState(false);
+    const [keyboardVisible, setKeyboardVisible] = useState(isTouchDevice());
     const [infoVisible, setInfoVisible] = useState(true);
     const [debugVisible, setDebugVisible] = useState(false);
 
@@ -265,8 +282,7 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
             }
         };
         const onBooted = () => {
-            const romInfo = emulator.getRomInfo();
-            setRomInfo(romInfo);
+            setRomInfo(emulator.romInfo);
             setPaused(false);
         };
         const onMessage = (
@@ -322,7 +338,7 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
         // Game Boy only (using the emulator interface)
         if (!file.name.endsWith(".gb")) {
             showToast(
-                `This is probably not a ${emulator.getDevice()} ROM file!`,
+                `This is probably not a ${emulator.device} ROM file!`,
                 true
             );
             return;
@@ -400,18 +416,33 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
     const onEngineChange = (engine: string) => {
         emulator.boot({ engine: engine.toLowerCase() });
         showToast(
-            `${emulator.getDevice()} running in engine "${engine}" from now on!`
+            `${emulator.device} running in engine "${engine}" from now on!`
         );
+    };
+    const onFrequencyChange = (value: number) => {
+        emulator.frequency = value * 1000 * 1000;
+    };
+    const onFrequencyReady = (handler: (value: number) => void) => {
+        emulator.bind("frequency", (emulator: Emulator, frequency: number) => {
+            handler(frequency / 1000000);
+        });
     };
     const onMinimize = () => {
         setFullscreen(!fullscreen);
+    };
+    const onKeyDown = (key: string) => {
+        console.info(key);
+        emulator.keyPress(key);
+    };
+    const onKeyUp = (key: string) => {
+        emulator.keyLift(key);
     };
     const onDrawHandler = (handler: DrawHandler) => {
         if (frameRef.current) return;
         frameRef.current = true;
         emulator.bind("frame", () => {
-            handler(emulator.getImageBuffer(), PixelFormat.RGB);
-            setFramerate(emulator.getFramerate());
+            handler(emulator.imageBuffer, PixelFormat.RGB);
+            setFramerate(emulator.framerate);
         });
     };
     const onClearHandler = (handler: ClearHandler) => {
@@ -456,28 +487,28 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
                     </div>
                 }
             >
+                {keyboardVisible && (
+                    <Section separatorBottom={true}>
+                        <KeyboardGB onKeyDown={onKeyDown} onKeyUp={onKeyUp} />
+                    </Section>
+                )}
                 <Title
-                    text={emulator.getName()}
-                    version={emulator.getVersion()}
+                    text={emulator.name}
+                    version={emulator.version}
                     versionUrl={
-                        emulator.getVersionUrl
-                            ? emulator.getVersionUrl()
-                            : undefined
+                        emulator.versionUrl ? emulator.versionUrl : undefined
                     }
                     iconSrc={require("../res/thunder.png")}
                 ></Title>
                 <Section>
                     <Paragraph>
                         This is a{" "}
-                        {emulator.getDeviceUrl ? (
-                            <Link
-                                href={emulator.getDeviceUrl()}
-                                target="_blank"
-                            >
-                                {emulator.getDevice()}
+                        {emulator.deviceUrl ? (
+                            <Link href={emulator.deviceUrl} target="_blank">
+                                {emulator.device}
                             </Link>
                         ) : (
-                            emulator.getDevice()
+                            emulator.device
                         )}{" "}
                         emulator built using the{" "}
                         <Link href="https://www.rust-lang.org" target="_blank">
@@ -504,11 +535,6 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
                         ROM.
                     </Paragraph>
                 </Section>
-                {keyboardVisible && (
-                    <Section>
-                        <KeyboardGB />
-                    </Section>
-                )}
                 {debugVisible && (
                     <Section>
                         <h3>VRAM Tiles</h3>
@@ -526,7 +552,9 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
                                 name={"Engine"}
                                 valueNode={
                                     <ButtonSwitch
-                                        options={["NEO", "CLASSIC"]}
+                                        options={emulator.engines.map((e) =>
+                                            e.toUpperCase()
+                                        )}
                                         size={"large"}
                                         style={["simple"]}
                                         onChange={onEngineChange}
@@ -542,7 +570,11 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
                                 key="rom-size"
                                 name={"ROM Size"}
                                 value={
-                                    romInfo.name ? `${romInfo.size} bytes` : "-"
+                                    romInfo.size
+                                        ? `${new Intl.NumberFormat().format(
+                                              romInfo.size
+                                          )} bytes`
+                                        : "-"
                                 }
                             />
                             <Pair
@@ -550,11 +582,13 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
                                 name={"CPU Frequency"}
                                 valueNode={
                                     <ButtonIncrement
-                                        value={4.19}
-                                        delta={0.1}
+                                        value={emulator.frequency / 1000 / 1000}
+                                        delta={0.4}
                                         min={0}
                                         suffix={"MHz"}
                                         decimalPlaces={2}
+                                        onChange={onFrequencyChange}
+                                        onReady={onFrequencyReady}
                                     />
                                 }
                             />

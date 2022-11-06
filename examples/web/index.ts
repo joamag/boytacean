@@ -1,6 +1,6 @@
 import {
     Emulator,
-    Observable,
+    EmulatorBase,
     PixelFormat,
     RomInfo,
     startApp
@@ -17,11 +17,11 @@ import info from "./package.json";
 
 declare const require: any;
 
-const LOGIC_HZ = 600;
-const VISUAL_HZ = 60;
+const LOGIC_HZ = 4194304;
+const VISUAL_HZ = 59.7275;
 const IDLE_HZ = 10;
 
-const FREQUENCY_DELTA = 60;
+const FREQUENCY_DELTA = 400000;
 
 const SAMPLE_RATE = 2;
 
@@ -46,6 +46,17 @@ const KEYS: Record<string, number> = {
     s: PadKey.B
 };
 
+const KEYS_NAME: Record<string, number> = {
+    ArrowUp: PadKey.Up,
+    ArrowDown: PadKey.Down,
+    ArrowLeft: PadKey.Left,
+    ArrowRight: PadKey.Right,
+    Start: PadKey.Start,
+    Select: PadKey.Select,
+    A: PadKey.A,
+    B: PadKey.B
+};
+
 const ARROW_KEYS: Record<string, boolean> = {
     ArrowUp: true,
     ArrowDown: true,
@@ -60,7 +71,7 @@ const ROM_PATH = require("../../res/roms/20y.gb");
  * and "joins" all the elements together to bring input/output
  * of the associated machine.
  */
-class GameboyEmulator extends Observable implements Emulator {
+class GameboyEmulator extends EmulatorBase implements Emulator {
     /**
      * The Game Boy engine (probably coming from WASM) that
      * is going to be used for the emulation.
@@ -71,7 +82,7 @@ class GameboyEmulator extends Observable implements Emulator {
      * The descriptive name of the engine that is currently
      * in use to emulate the system.
      */
-    private engine: string | null = null;
+    private _engine: string | null = null;
 
     private logicFrequency: number = LOGIC_HZ;
     private visualFrequency: number = VISUAL_HZ;
@@ -89,6 +100,11 @@ class GameboyEmulator extends Observable implements Emulator {
     private cartridge: Cartridge | null = null;
 
     async main() {
+        // parses the current location URL as retrieves
+        // some of the "relevant" GET parameters for logic
+        const params = new URLSearchParams(window.location.search);
+        const romUrl = params.get("url");
+
         // initializes the WASM module, this is required
         // so that the global symbols become available
         await wasm();
@@ -99,7 +115,7 @@ class GameboyEmulator extends Observable implements Emulator {
 
         // boots the emulator subsystem with the initial
         // ROM retrieved from a remote data source
-        await this.boot({ loadRom: true });
+        await this.boot({ loadRom: true, romPath: romUrl || undefined });
 
         // the counter that controls the overflowing cycles
         // from tick to tick operation
@@ -122,7 +138,11 @@ class GameboyEmulator extends Observable implements Emulator {
             let currentTime = new Date().getTime();
 
             try {
-                pending = this.tick(currentTime, pending);
+                pending = this.tick(
+                    currentTime,
+                    pending,
+                    Math.round(this.logicFrequency / this.visualFrequency)
+                );
             } catch (err) {
                 // sets the default error message to be displayed
                 // to the user, this value may be overridden in case
@@ -231,7 +251,7 @@ class GameboyEmulator extends Observable implements Emulator {
         // in case the target number of frames for FPS control
         // has been reached calculates the number of FPS and
         // flushes the value to the screen
-        if (this.frameCount === this.visualFrequency * SAMPLE_RATE) {
+        if (this.frameCount >= this.visualFrequency * SAMPLE_RATE) {
             const currentTime = new Date().getTime();
             const deltaTime = (currentTime - this.frameStart) / 1000;
             const fps = Math.round(this.frameCount / deltaTime);
@@ -277,7 +297,7 @@ class GameboyEmulator extends Observable implements Emulator {
         // in case a remote ROM loading operation has been
         // requested then loads it from the remote origin
         if (loadRom) {
-            [romName, romData] = await this.fetchRom(romPath);
+            ({ name: romName, data: romData } = await this.fetchRom(romPath));
         } else if (romName === null || romData === null) {
             [romName, romData] = [this.romName, this.romData];
         }
@@ -308,7 +328,7 @@ class GameboyEmulator extends Observable implements Emulator {
 
         // updates the name of the currently selected engine
         // to the one that has been provided (logic change)
-        if (engine) this.engine = engine;
+        if (engine) this._engine = engine;
 
         // updates the complete set of global information that
         // is going to be displayed
@@ -340,11 +360,11 @@ class GameboyEmulator extends Observable implements Emulator {
 
             switch (event.key) {
                 case "+":
-                    this.logicFrequency += FREQUENCY_DELTA;
+                    this.frequency += FREQUENCY_DELTA;
                     break;
 
                 case "-":
-                    this.logicFrequency -= FREQUENCY_DELTA;
+                    this.frequency -= FREQUENCY_DELTA;
                     break;
             }
         });
@@ -367,27 +387,35 @@ class GameboyEmulator extends Observable implements Emulator {
         this.cartridge = cartridge;
     }
 
-    getName() {
+    get name(): string {
         return "Boytacean";
     }
 
-    getDevice(): string {
+    get device(): string {
         return "Game Boy";
     }
 
-    getDeviceUrl(): string {
+    get deviceUrl(): string {
         return "https://en.wikipedia.org/wiki/Game_Boy";
     }
 
-    getVersion() {
+    get engines() {
+        return ["neo"];
+    }
+
+    get engine() {
+        return this._engine;
+    }
+
+    get version(): string {
         return info.version;
     }
 
-    getVersionUrl() {
+    get versionUrl(): string {
         return "https://gitlab.stage.hive.pt/joamag/boytacean/-/blob/master/CHANGELOG.md";
     }
 
-    getPixelFormat(): PixelFormat {
+    get pixelFormat(): PixelFormat {
         return PixelFormat.RGB;
     }
 
@@ -397,11 +425,11 @@ class GameboyEmulator extends Observable implements Emulator {
      *
      * @returns The current pixel data for the emulator display.
      */
-    getImageBuffer(): Uint8Array {
+    get imageBuffer(): Uint8Array {
         return this.gameBoy!.frame_buffer_eager();
     }
 
-    getRomInfo(): RomInfo {
+    get romInfo(): RomInfo {
         return {
             name: this.romName || undefined,
             data: this.romData || undefined,
@@ -414,7 +442,17 @@ class GameboyEmulator extends Observable implements Emulator {
         };
     }
 
-    getFramerate(): number {
+    get frequency(): number {
+        return this.logicFrequency;
+    }
+
+    set frequency(value: number) {
+        value = Math.max(value, 0);
+        this.logicFrequency = value;
+        this.trigger("frequency", value);
+    }
+
+    get framerate(): number {
         return this.fps;
     }
 
@@ -443,6 +481,18 @@ class GameboyEmulator extends Observable implements Emulator {
         this.boot({ engine: null });
     }
 
+    keyPress(key: string) {
+        const keyCode = KEYS_NAME[key];
+        if (!keyCode) return;
+        this.gameBoy!.key_press(keyCode);
+    }
+
+    keyLift(key: string) {
+        const keyCode = KEYS_NAME[key];
+        if (!keyCode) return;
+        this.gameBoy!.key_lift(keyCode);
+    }
+
     benchmark(count = 50000000) {
         let cycles = 0;
         this.pause();
@@ -464,7 +514,9 @@ class GameboyEmulator extends Observable implements Emulator {
         }
     }
 
-    private async fetchRom(romPath: string): Promise<[string, Uint8Array]> {
+    private async fetchRom(
+        romPath: string
+    ): Promise<{ name: string; data: Uint8Array }> {
         // extracts the name of the ROM from the provided
         // path by splitting its structure
         const romPathS = romPath.split(/\//g);
@@ -474,14 +526,17 @@ class GameboyEmulator extends Observable implements Emulator {
 
         // loads the ROM data and converts it into the
         // target byte array buffer (to be used by WASM)
-        const response = await fetch(ROM_PATH);
+        const response = await fetch(romPath);
         const blob = await response.blob();
         const arrayBuffer = await blob.arrayBuffer();
         const romData = new Uint8Array(arrayBuffer);
 
         // returns both the name of the ROM and the data
         // contents as a byte array
-        return [romName, romData];
+        return {
+            name: romName,
+            data: romData
+        };
     }
 }
 

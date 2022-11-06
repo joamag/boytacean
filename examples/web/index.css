@@ -24,6 +24,7 @@ a:hover {
 html {
     margin: 0px 0px 0px 0px;
     padding: 0px 0px 0px 0px;
+    touch-action: pan-x pan-y;
 }
 
 body {

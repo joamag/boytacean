@@ -38,22 +38,155 @@
     height: 48px;
     line-height: 46px;
     margin-right: 14px;
+    min-width: 48px;
+    padding: 0px 8px 0px 8px;
     text-align: center;
-    width: 48px;
 }
 
 .keyboard-gb .key:last-child {
     margin-right: 0px;
 }
 
-.keyboard-gb .key:hover {
+.keyboard-gb .key.pressed {
     background-color: #50cb93;
 }
 
-.keyboard-gb .key:active {
-    background-color: #2a9d8f;
+.keyboard-gb > .dpad {
+    float: left;
+    text-align: center;
+    width: 180px;
 }
 
-.keyboard-gb .dpad {
-    width: 120px;
+.keyboard-gb > .dpad > .dpad-top {
+    margin-bottom: -3px;
+}
+
+.keyboard-gb > .dpad > .dpad-bottom {
+    margin-top: -3px;
+}
+
+.keyboard-gb > .dpad .key {
+    border: none;
+    padding: 0px 0px 0px 0px;
+    font-size: 24px;
+}
+
+.keyboard-gb > .dpad .key.pressed {
+    background-color: #50cb93;
+}
+
+.keyboard-gb > .dpad .key.up {
+    border-bottom: 3px solid transparent;
+    border-left: 3px solid #ffffff;
+    border-radius: 6px 6px 0px 0px;
+    -o-border-radius: 6px 6px 0px 0px;
+    -ms-border-radius: 6px 6px 0px 0px;
+    -moz-border-radius: 6px 6px 0px 0px;
+    -khtml-border-radius: 6px 6px 0px 0px;
+    -webkit-border-radius: 6px 6px 0px 0px;
+    border-right: 3px solid #ffffff;
+    border-top: 3px solid #ffffff;
+}
+
+.keyboard-gb > .dpad .key.left {
+    border-bottom: 3px solid #ffffff;
+    border-left: 3px solid #ffffff;
+    border-radius: 6px 0px 0px 6px;
+    -o-border-radius: 6px 0px 0px 6px;
+    -ms-border-radius: 6px 0px 0px 6px;
+    -moz-border-radius: 6px 0px 0px 6px;
+    -khtml-border-radius: 6px 0px 0px 6px;
+    -webkit-border-radius: 6px 0px 0px 6px;
+    border-right: 3px solid transparent;
+    border-top: 3px solid #ffffff;
+    margin-right: 44px;
+}
+
+.keyboard-gb > .dpad .key.right {
+    border-bottom: 3px solid #ffffff;
+    border-left: 3px solid transparent;
+    border-radius: 0px 6px 6px 0px;
+    -o-border-radius: 0px 6px 6px 0px;
+    -ms-border-radius: 0px 6px 6px 0px;
+    -moz-border-radius: 0px 6px 6px 0px;
+    -khtml-border-radius: 0px 6px 6px 0px;
+    -webkit-border-radius: 0px 6px 6px 0px;
+    border-right: 3px solid #ffffff;
+    border-top: 3px solid #ffffff;
+    margin-right: 0px;
+    margin-left: -3px;
+}
+
+.keyboard-gb > .dpad .key.center {
+    border-radius: 0px 0px 0px 0px;
+    -o-border-radius: 0px 0px 0px 0px;
+    -ms-border-radius: 0px 0px 0px 0px;
+    -moz-border-radius: 0px 0px 0px 0px;
+    -khtml-border-radius: 0px 0px 0px 0px;
+    -webkit-border-radius: 0px 0px 0px 0px;
+    margin-right: 0px;
+    pointer-events: none;
+}
+
+.keyboard-gb > .dpad .key.down {
+    border-bottom: 3px solid #ffffff;
+    border-left: 3px solid #ffffff;
+    border-radius: 0px 0px 6px 6px;
+    -o-border-radius: 0px 0px 6px 6px;
+    -ms-border-radius: 0px 0px 6px 6px;
+    -moz-border-radius: 0px 0px 6px 6px;
+    -khtml-border-radius: 0px 0px 6px 6px;
+    -webkit-border-radius: 0px 0px 6px 6px;
+    border-right: 3px solid #ffffff;
+    border-top: 3px solid transparent;
+}
+
+.keyboard-gb > .action {
+    float: right;
+    margin-right: 18px;
+}
+
+.keyboard-gb > .action > .key {
+    border-radius: 32px 32px 32px 32px;
+    -o-border-radius: 32px 32px 32px 32px;
+    -ms-border-radius: 32px 32px 32px 32px;
+    -moz-border-radius: 32px 32px 32px 32px;
+    -khtml-border-radius: 32px 32px 32px 32px;
+    -webkit-border-radius: 32px 32px 32px 32px;
+    border-width: 3px;
+    font-size: 30px;
+    height: 58px;
+    line-height: 52px;
+    width: 58px;
+    font-weight: 900;
+}
+
+.keyboard-gb > .action > .key.a {
+    position: relative;
+    right: 0px;
+    top: 10px;
+}
+
+.keyboard-gb > .action > .key.b {
+    position: relative;
+    right: 2px;
+    top: 50px;
+}
+
+.keyboard-gb > .options {
+    margin-top: 32px;
+}
+
+.keyboard-gb > .options > .key {
+    font-size: 14px;
+    height: 30px;
+    line-height: 26px;
+    margin-left: 16px;
+    margin-right: 16px;
+    min-width: 100px;
+    font-weight: 900;
+}
+
+.keyboard-gb > .break {
+    clear: both;
 }

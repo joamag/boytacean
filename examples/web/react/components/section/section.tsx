@@ -5,12 +5,14 @@ import "./section.css";
 type SectionProps = {
     children: ReactNode;
     separator?: boolean;
+    separatorBottom?: boolean;
     style?: string[];
 };
 
 export const Section: FC<SectionProps> = ({
     children,
     separator = true,
+    separatorBottom = false,
     style = []
 }) => {
     const classes = () => ["section", ...style].join(" ");
@@ -18,6 +20,7 @@ export const Section: FC<SectionProps> = ({
         <div className={classes()}>
             {separator && <div className="separator"></div>}
             <div className="section-contents">{children}</div>
+            {separatorBottom && <div className="separator"></div>}
         </div>
     );
 };

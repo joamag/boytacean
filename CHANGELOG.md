@@ -19,6 +19,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 *
 
+## [0.4.1] - 2022-11-06
+
+### Added
+
+* Logic frequency control using on click UI and keyboard
+* Support for on screen keyboard for Game Boy
+* Support for remote ROM loading using URL - [#3](https://gitlab.stage.hive.pt/joamag/boytacean/-/issues/3)
+
 ## [0.4.0] - 2022-11-01
 
 ### Added
