@@ -182,6 +182,10 @@ impl Display for RamSize {
     }
 }
 
+/// Structure that defines the ROM and ROM contents
+/// of a Game Boy cartridge. Should correctly address
+/// the specifics of all the major MBCs (Memory Bank
+/// Controllers).
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 #[derive(Clone)]
 pub struct Cartridge {
