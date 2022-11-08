@@ -17,7 +17,14 @@ export const KeyboardChip8: FC<KeyboardChip8Props> = ({
             <span
                 className="key"
                 key={key}
-                onKeyDown={() => onKeyDown && onKeyDown(key)}
+                tabIndex={0}
+                onKeyDown={(event) => {
+                    if (event.key !== "Enter") return;
+                    onKeyDown && onKeyDown(key);
+                    event.stopPropagation();
+                    event.preventDefault();
+                }}
+                onClick={() => onKeyDown && onKeyDown(key)}
             >
                 {key}
             </span>
