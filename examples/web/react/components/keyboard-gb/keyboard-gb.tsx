@@ -28,6 +28,21 @@ export const KeyboardGB: FC<KeyboardGBProps> = ({
                     " "
                 )}
                 key={keyName || key}
+                tabIndex={0}
+                onKeyDown={(event) => {
+                    if (event.key !== "Enter") return;
+                    setPressed(true);
+                    onKeyDown && onKeyDown(keyName || key);
+                    event.stopPropagation();
+                    event.preventDefault();
+                }}
+                onKeyUp={(event) => {
+                    if (event.key !== "Enter") return;
+                    setPressed(false);
+                    onKeyUp && onKeyUp(keyName || key);
+                    event.stopPropagation();
+                    event.preventDefault();
+                }}
                 onMouseDown={(event) => {
                     setPressed(true);
                     onKeyDown && onKeyDown(keyName || key);

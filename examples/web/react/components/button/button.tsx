@@ -44,9 +44,8 @@ export const Button: FC<ButtonProps> = ({
         event.target.value = "";
     };
     const onKeyPress = (event: React.KeyboardEvent) => {
-        if (event.key == "Enter") {
-            onClick && onClick();
-        }
+        if (event.key !== "Enter") return;
+        onClick && onClick();
     };
     const renderSimple = () => (
         <span
