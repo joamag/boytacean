@@ -43,13 +43,28 @@ export const Button: FC<ButtonProps> = ({
         onFile && onFile(file);
         event.target.value = "";
     };
+    const onKeyPress = (event: React.KeyboardEvent) => {
+        if (event.key == "Enter") {
+            onClick && onClick();
+        }
+    };
     const renderSimple = () => (
-        <span className={classes()} onClick={onClick}>
+        <span
+            className={classes()}
+            onClick={onClick}
+            onKeyPress={onKeyPress}
+            tabIndex={0}
+        >
             {text}
         </span>
     );
     const renderComplex = () => (
-        <span className={classes()} onClick={onClick}>
+        <span
+            className={classes()}
+            onClick={onClick}
+            onKeyPress={onKeyPress}
+            tabIndex={0}
+        >
             {image && <img src={image} alt={imageAlt || text || "button"} />}
             {file && (
                 <input type="file" accept={accept} onChange={onFileChange} />
