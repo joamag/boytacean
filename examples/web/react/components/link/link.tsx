@@ -20,7 +20,7 @@ export const Link: FC<LinkProps> = ({
     const classes = () => ["link", ...style].join(" ");
     return (
         <a className={classes()} href={href} target={target}>
-            {children || text}
+            {children ?? text}
         </a>
     );
 };

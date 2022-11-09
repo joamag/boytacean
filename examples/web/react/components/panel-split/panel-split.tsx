@@ -19,7 +19,7 @@ export const PanelSplit: FC<PanelSplitProps> = ({
     return (
         <div className={classes()}>
             <div className="side-left">{left}</div>
-            <div className="side-right">{children || right}</div>
+            <div className="side-right">{children ?? right}</div>
         </div>
     );
 };

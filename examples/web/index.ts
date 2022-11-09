@@ -115,7 +115,7 @@ class GameboyEmulator extends EmulatorBase implements Emulator {
 
         // boots the emulator subsystem with the initial
         // ROM retrieved from a remote data source
-        await this.boot({ loadRom: true, romPath: romUrl || undefined });
+        await this.boot({ loadRom: true, romPath: romUrl ?? undefined });
 
         // the counter that controls the overflowing cycles
         // from tick to tick operation
@@ -227,16 +227,16 @@ class GameboyEmulator extends EmulatorBase implements Emulator {
 
             // runs the Game Boy clock, this operations should
             // include the advance of both the CPU and the PPU
-            counterCycles += this.gameBoy!.clock();
+            counterCycles += this.gameBoy?.clock() ?? 0;
 
             // in case the current PPU mode is VBlank and the
             // frame is different from the previously rendered
             // one then it's time to update the canvas
             if (
-                this.gameBoy!.ppu_mode() === PpuMode.VBlank &&
-                this.gameBoy!.ppu_frame() !== lastFrame
+                this.gameBoy?.ppu_mode() === PpuMode.VBlank &&
+                this.gameBoy?.ppu_frame() !== lastFrame
             ) {
-                lastFrame = this.gameBoy!.ppu_frame();
+                lastFrame = this.gameBoy?.ppu_frame();
 
                 // triggers the frame event indicating that
                 // a new frame is now available for drawing
@@ -354,7 +354,7 @@ class GameboyEmulator extends EmulatorBase implements Emulator {
             const isArrow = ARROW_KEYS[event.key] ?? false;
             if (isArrow) event.preventDefault();
             if (keyCode !== undefined) {
-                this.gameBoy!.key_press(keyCode);
+                this.gameBoy?.key_press(keyCode);
                 return;
             }
 
@@ -374,7 +374,7 @@ class GameboyEmulator extends EmulatorBase implements Emulator {
             const isArrow = ARROW_KEYS[event.key] ?? false;
             if (isArrow) event.preventDefault();
             if (keyCode !== undefined) {
-                this.gameBoy!.key_lift(keyCode);
+                this.gameBoy?.key_lift(keyCode);
                 return;
             }
         });
@@ -431,8 +431,8 @@ class GameboyEmulator extends EmulatorBase implements Emulator {
 
     get romInfo(): RomInfo {
         return {
-            name: this.romName || undefined,
-            data: this.romData || undefined,
+            name: this.romName ?? undefined,
+            data: this.romData ?? undefined,
             size: this.romSize,
             extra: {
                 romType: this.cartridge?.rom_type_s(),
@@ -484,13 +484,13 @@ class GameboyEmulator extends EmulatorBase implements Emulator {
     keyPress(key: string) {
         const keyCode = KEYS_NAME[key];
         if (keyCode === undefined) return;
-        this.gameBoy!.key_press(keyCode);
+        this.gameBoy?.key_press(keyCode);
     }
 
     keyLift(key: string) {
         const keyCode = KEYS_NAME[key];
         if (keyCode === undefined) return;
-        this.gameBoy!.key_lift(keyCode);
+        this.gameBoy?.key_lift(keyCode);
     }
 
     benchmark(count = 50000000) {
@@ -499,7 +499,7 @@ class GameboyEmulator extends EmulatorBase implements Emulator {
         try {
             const initial = Date.now();
             for (let i = 0; i < count; i++) {
-                cycles += this.gameBoy!.clock();
+                cycles += this.gameBoy?.clock() ?? 0;
             }
             const delta = (Date.now() - initial) / 1000;
             const frequency_mhz = cycles / delta / 1000 / 1000;
