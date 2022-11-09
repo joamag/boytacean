@@ -21,7 +21,7 @@ export const Button: FC<ButtonProps> = ({
     image,
     imageAlt,
     enabled = false,
-    focusable = false,
+    focusable = true,
     file = false,
     accept = ".txt",
     size = "small",

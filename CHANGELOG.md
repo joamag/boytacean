@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 * Arrow keys usage for on-screen gamepad
+* Wrong UX for keyboard focus and fullscreen
 
 ## [0.4.1] - 2022-11-06
 

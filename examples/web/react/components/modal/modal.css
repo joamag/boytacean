@@ -58,6 +58,12 @@
     -webkit-box-shadow: 0px 0px 8px rgba(0, 0, 0, 0.5);
     margin-top: 30px;
     max-width: 100%;
+    outline: none;
+    -o-outline: none;
+    -ms-outline: none;
+    -moz-outline: none;
+    -khtml-outline: none;
+    -webkit-outline: none;
     padding: 24px 24px 24px 24px;
     text-align: left;
     transform: scale(0.96);

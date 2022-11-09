@@ -1,4 +1,4 @@
-import React, { FC, useEffect } from "react";
+import React, { FC, useEffect, useRef } from "react";
 import Button from "../button/button";
 
 import "./modal.css";
@@ -26,6 +26,7 @@ export const Modal: FC<ModalProps> = ({
 }) => {
     const classes = () =>
         ["modal", visible ? "visible" : "", ...style].join(" ");
+    const modalRef = useRef<HTMLDivElement>(null);
     useEffect(() => {
         const onKeyDown = (event: KeyboardEvent) => {
             if (event.key === "Escape") {
@@ -37,6 +38,11 @@ export const Modal: FC<ModalProps> = ({
             document.removeEventListener("keydown", onKeyDown);
         };
     }, []);
+    useEffect(() => {
+        if (visible) {
+            modalRef.current?.focus();
+        }
+    }, [visible]);
     const getTextHtml = (separator = /\n/g) => ({
         __html: text.replace(separator, "<br/>")
     });
@@ -48,7 +54,12 @@ export const Modal: FC<ModalProps> = ({
     };
     return (
         <div className={classes()} onClick={onCancel}>
-            <div className="modal-window" onClick={onWindowClick}>
+            <div
+                ref={modalRef}
+                className="modal-window"
+                onClick={onWindowClick}
+                tabIndex={-1}
+            >
                 <div className="modal-top-buttons">
                     <Button
                         text={""}

@@ -88,6 +88,7 @@ export const Display: FC<DisplayProps> = ({
 
     useEffect(() => {
         if (fullscreen) {
+            canvasRef.current?.focus();
             resizeRef.current();
             document.getElementsByTagName("body")[0].style.overflow = "hidden";
             window.addEventListener("resize", resizeRef.current);
@@ -139,6 +140,7 @@ export const Display: FC<DisplayProps> = ({
             >
                 <canvas
                     ref={canvasRef}
+                    tabIndex={-1}
                     className="display-canvas"
                     width={options.width * options.scale}
                     height={options.height * options.scale}
