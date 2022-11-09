@@ -27,50 +27,50 @@ export const KeyboardGB: FC<KeyboardGBProps> = ({
                 className={["key", pressed ? "pressed" : "", ...styles].join(
                     " "
                 )}
-                key={keyName || key}
+                key={keyName ?? key}
                 tabIndex={0}
                 onKeyDown={(event) => {
                     if (event.key !== "Enter") return;
                     setPressed(true);
-                    onKeyDown && onKeyDown(keyName || key);
+                    onKeyDown && onKeyDown(keyName ?? key);
                     event.stopPropagation();
                     event.preventDefault();
                 }}
                 onKeyUp={(event) => {
                     if (event.key !== "Enter") return;
                     setPressed(false);
-                    onKeyUp && onKeyUp(keyName || key);
+                    onKeyUp && onKeyUp(keyName ?? key);
                     event.stopPropagation();
                     event.preventDefault();
                 }}
                 onMouseDown={(event) => {
                     setPressed(true);
-                    onKeyDown && onKeyDown(keyName || key);
+                    onKeyDown && onKeyDown(keyName ?? key);
                     event.stopPropagation();
                     event.preventDefault();
                 }}
                 onMouseUp={(event) => {
                     setPressed(false);
-                    onKeyUp && onKeyUp(keyName || key);
+                    onKeyUp && onKeyUp(keyName ?? key);
                     event.stopPropagation();
                     event.preventDefault();
                 }}
                 onMouseLeave={(event) => {
                     if (!pressed) return;
                     setPressed(false);
-                    onKeyUp && onKeyUp(keyName || key);
+                    onKeyUp && onKeyUp(keyName ?? key);
                     event.stopPropagation();
                     event.preventDefault();
                 }}
                 onTouchStart={(event) => {
                     setPressed(true);
-                    onKeyDown && onKeyDown(keyName || key);
+                    onKeyDown && onKeyDown(keyName ?? key);
                     event.stopPropagation();
                     event.preventDefault();
                 }}
                 onTouchEnd={(event) => {
                     setPressed(false);
-                    onKeyUp && onKeyUp(keyName || key);
+                    onKeyUp && onKeyUp(keyName ?? key);
                     event.stopPropagation();
                     event.preventDefault();
                 }}

@@ -38,9 +38,8 @@ export const Button: FC<ButtonProps> = ({
             ...style
         ].join(" ");
     const onFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-        if (!event.target.files || event.target.files.length === 0) {
-            return;
-        }
+        if (!event.target.files) return;
+        if (event.target.files.length === 0) return;
         const file = event.target.files[0];
         onFile && onFile(file);
         event.target.value = "";
@@ -66,7 +65,7 @@ export const Button: FC<ButtonProps> = ({
             onKeyPress={onKeyPress}
             tabIndex={focusable ? 0 : undefined}
         >
-            {image && <img src={image} alt={imageAlt || text || "button"} />}
+            {image && <img src={image} alt={imageAlt ?? text ?? "button"} />}
             {file && (
                 <input type="file" accept={accept} onChange={onFileChange} />
             )}

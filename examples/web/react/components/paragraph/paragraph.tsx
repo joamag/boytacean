@@ -14,7 +14,7 @@ export const Paragraph: FC<ParagraphProps> = ({
     style = []
 }) => {
     const classes = () => ["paragraph", ...style].join(" ");
-    return <p className={classes()}>{children || text}</p>;
+    return <p className={classes()}>{children ?? text}</p>;
 };
 
 export default Paragraph;
