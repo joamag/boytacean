@@ -7,6 +7,7 @@ type ButtonProps = {
     image?: string;
     imageAlt?: string;
     enabled?: boolean;
+    focusable?: boolean;
     file?: boolean;
     accept?: string;
     size?: string;
@@ -20,6 +21,7 @@ export const Button: FC<ButtonProps> = ({
     image,
     imageAlt,
     enabled = false,
+    focusable = false,
     file = false,
     accept = ".txt",
     size = "small",
@@ -52,7 +54,7 @@ export const Button: FC<ButtonProps> = ({
             className={classes()}
             onClick={onClick}
             onKeyPress={onKeyPress}
-            tabIndex={0}
+            tabIndex={focusable ? 0 : undefined}
         >
             {text}
         </span>
@@ -62,7 +64,7 @@ export const Button: FC<ButtonProps> = ({
             className={classes()}
             onClick={onClick}
             onKeyPress={onKeyPress}
-            tabIndex={0}
+            tabIndex={focusable ? 0 : undefined}
         >
             {image && <img src={image} alt={imageAlt || text || "button"} />}
             {file && (
