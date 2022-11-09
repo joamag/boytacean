@@ -5,12 +5,14 @@ import "./keyboard-gb.css";
 declare const require: any;
 
 type KeyboardGBProps = {
+    focusable?: boolean;
     style?: string[];
     onKeyDown?: (key: string) => void;
     onKeyUp?: (key: string) => void;
 };
 
 export const KeyboardGB: FC<KeyboardGBProps> = ({
+    focusable = true,
     style = [],
     onKeyDown,
     onKeyUp
@@ -28,7 +30,7 @@ export const KeyboardGB: FC<KeyboardGBProps> = ({
                     " "
                 )}
                 key={keyName ?? key}
-                tabIndex={0}
+                tabIndex={focusable ? 0 : undefined}
                 onKeyDown={(event) => {
                     if (event.key !== "Enter") return;
                     setPressed(true);
@@ -42,6 +44,10 @@ export const KeyboardGB: FC<KeyboardGBProps> = ({
                     onKeyUp && onKeyUp(keyName ?? key);
                     event.stopPropagation();
                     event.preventDefault();
+                }}
+                onBlur={(event) => {
+                    setPressed(false);
+                    onKeyUp && onKeyUp(key);
                 }}
                 onMouseDown={(event) => {
                     setPressed(true);

@@ -44,6 +44,14 @@ export const Button: FC<ButtonProps> = ({
         onFile && onFile(file);
         event.target.value = "";
     };
+    const onMouseDown = (event: React.MouseEvent) => {
+        event.stopPropagation();
+        event.preventDefault();
+    };
+    const onMouseUp = (event: React.MouseEvent) => {
+        event.stopPropagation();
+        event.preventDefault();
+    };
     const onKeyPress = (event: React.KeyboardEvent) => {
         if (event.key !== "Enter") return;
         onClick && onClick();
@@ -62,6 +70,8 @@ export const Button: FC<ButtonProps> = ({
         <span
             className={classes()}
             onClick={onClick}
+            onMouseDown={onMouseDown}
+            onMouseUp={onMouseUp}
             onKeyPress={onKeyPress}
             tabIndex={focusable ? 0 : undefined}
         >

@@ -47,10 +47,6 @@
     margin-right: 0px;
 }
 
-.keyboard-chip8 .key:hover {
+.keyboard-chip8 .key.pressed {
     background-color: #50cb93;
-}
-
-.keyboard-chip8 .key:active {
-    background-color: #2a9d8f;
 }
