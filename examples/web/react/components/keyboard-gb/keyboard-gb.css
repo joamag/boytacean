@@ -67,8 +67,8 @@
 
 .keyboard-gb > .dpad .key {
     border: none;
-    padding: 0px 0px 0px 0px;
     font-size: 24px;
+    padding: 0px 0px 0px 0px;
 }
 
 .keyboard-gb > .dpad .key.pressed {
@@ -113,8 +113,8 @@
     -webkit-border-radius: 0px 6px 6px 0px;
     border-right: 3px solid #ffffff;
     border-top: 3px solid #ffffff;
-    margin-right: 0px;
     margin-left: -3px;
+    margin-right: 0px;
 }
 
 .keyboard-gb > .dpad .key.center {
@@ -155,10 +155,10 @@
     -webkit-border-radius: 32px 32px 32px 32px;
     border-width: 3px;
     font-size: 30px;
+    font-weight: 900;
     height: 58px;
     line-height: 52px;
     width: 58px;
-    font-weight: 900;
 }
 
 .keyboard-gb > .action > .key.a {
@@ -179,12 +179,12 @@
 
 .keyboard-gb > .options > .key {
     font-size: 14px;
+    font-weight: 900;
     height: 30px;
     line-height: 26px;
     margin-left: 16px;
     margin-right: 16px;
     min-width: 100px;
-    font-weight: 900;
 }
 
 .keyboard-gb > .break {

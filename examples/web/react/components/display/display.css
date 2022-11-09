@@ -100,5 +100,11 @@
 }
 
 .display > .display-frame > .display-canvas {
+    outline: none;
+    -o-outline: none;
+    -ms-outline: none;
+    -moz-outline: none;
+    -khtml-outline: none;
+    -webkit-outline: none;
     width: 100%;
 }
