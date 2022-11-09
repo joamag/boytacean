@@ -1,30 +1,79 @@
-import React, { FC } from "react";
+import React, { FC, useState } from "react";
 
 import "./keyboard-chip8.css";
 
 type KeyboardChip8Props = {
+    focusable?: boolean;
     style?: string[];
     onKeyDown?: (key: string) => void;
+    onKeyUp?: (key: string) => void;
 };
 
 export const KeyboardChip8: FC<KeyboardChip8Props> = ({
+    focusable = true,
     style = [],
-    onKeyDown
+    onKeyDown,
+    onKeyUp
 }) => {
     const classes = () => ["keyboard", "keyboard-chip8", ...style].join(" ");
-    const renderKey = (key: string) => {
+    const renderKey = (key: string, styles: string[] = []) => {
+        const [pressed, setPressed] = useState(false);
         return (
             <span
-                className="key"
+                className={["key", pressed ? "pressed" : "", ...styles].join(
+                    " "
+                )}
                 key={key}
-                tabIndex={0}
+                tabIndex={focusable ? 0 : undefined}
                 onKeyDown={(event) => {
                     if (event.key !== "Enter") return;
+                    setPressed(true);
                     onKeyDown && onKeyDown(key);
                     event.stopPropagation();
                     event.preventDefault();
                 }}
-                onClick={() => onKeyDown && onKeyDown(key)}
+                onKeyUp={(event) => {
+                    if (event.key !== "Enter") return;
+                    setPressed(false);
+                    onKeyUp && onKeyUp(key);
+                    event.stopPropagation();
+                    event.preventDefault();
+                }}
+                onBlur={(event) => {
+                    setPressed(false);
+                    onKeyUp && onKeyUp(key);
+                }}
+                onMouseDown={(event) => {
+                    setPressed(true);
+                    onKeyDown && onKeyDown(key);
+                    event.stopPropagation();
+                    event.preventDefault();
+                }}
+                onMouseUp={(event) => {
+                    setPressed(false);
+                    onKeyUp && onKeyUp(key);
+                    event.stopPropagation();
+                    event.preventDefault();
+                }}
+                onMouseLeave={(event) => {
+                    if (!pressed) return;
+                    setPressed(false);
+                    onKeyUp && onKeyUp(key);
+                    event.stopPropagation();
+                    event.preventDefault();
+                }}
+                onTouchStart={(event) => {
+                    setPressed(true);
+                    onKeyDown && onKeyDown(key);
+                    event.stopPropagation();
+                    event.preventDefault();
+                }}
+                onTouchEnd={(event) => {
+                    setPressed(false);
+                    onKeyUp && onKeyUp(key);
+                    event.stopPropagation();
+                    event.preventDefault();
+                }}
             >
                 {key}
             </span>
