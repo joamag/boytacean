@@ -1,4 +1,4 @@
-import React, { ChangeEvent, FC } from "react";
+import React, { ChangeEvent, FC, useRef } from "react";
 
 import "./button.css";
 
@@ -37,6 +37,7 @@ export const Button: FC<ButtonProps> = ({
             file ? "file" : "",
             ...style
         ].join(" ");
+    const fileRef = useRef<HTMLInputElement>(null);
     const onFileChange = (event: ChangeEvent<HTMLInputElement>) => {
         if (!event.target.files) return;
         if (event.target.files.length === 0) return;
@@ -54,6 +55,7 @@ export const Button: FC<ButtonProps> = ({
     };
     const onKeyPress = (event: React.KeyboardEvent) => {
         if (event.key !== "Enter") return;
+        if (file) fileRef.current?.click();
         onClick && onClick();
     };
     const renderSimple = () => (
@@ -77,7 +79,12 @@ export const Button: FC<ButtonProps> = ({
         >
             {image && <img src={image} alt={imageAlt ?? text ?? "button"} />}
             {file && (
-                <input type="file" accept={accept} onChange={onFileChange} />
+                <input
+                    ref={fileRef}
+                    type="file"
+                    accept={accept}
+                    onChange={onFileChange}
+                />
             )}
             <span>{text}</span>
         </span>

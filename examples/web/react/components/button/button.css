@@ -49,10 +49,12 @@
     position: relative;
 }
 
+.button.simple:focus,
 .button.simple:hover {
     background-color: #50cb93;
 }
 
+.button.simple.red:focus,
 .button.simple.red:hover {
     background-color: #e63946;
 }
