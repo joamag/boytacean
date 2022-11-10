@@ -538,6 +538,23 @@ class GameboyEmulator extends EmulatorBase implements Emulator {
             data: romData
         };
     }
+
+    // @todo move this out of here
+    get registers(): Record<string, string | number> {
+        const registers = this.gameBoy?.registers();
+        if (!registers) return {};
+        return {
+            pc: registers.pc,
+            sp: registers.sp,
+            a: registers.a,
+            b: registers.b,
+            c: registers.c,
+            d: registers.d,
+            e: registers.e,
+            h: registers.h,
+            l: registers.l
+        };
+    }
 }
 
 declare global {

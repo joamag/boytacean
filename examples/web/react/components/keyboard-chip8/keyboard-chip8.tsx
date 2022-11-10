@@ -18,11 +18,10 @@ export const KeyboardChip8: FC<KeyboardChip8Props> = ({
     const classes = () => ["keyboard", "keyboard-chip8", ...style].join(" ");
     const renderKey = (key: string, styles: string[] = []) => {
         const [pressed, setPressed] = useState(false);
+        const classes = ["key", pressed ? "pressed" : "", ...styles].join(" ");
         return (
             <span
-                className={["key", pressed ? "pressed" : "", ...styles].join(
-                    " "
-                )}
+                className={classes}
                 key={key}
                 tabIndex={focusable ? 0 : undefined}
                 onKeyDown={(event) => {

@@ -21,12 +21,16 @@ pub struct Cpu {
     pub e: u8,
     pub h: u8,
     pub l: u8,
+
     ime: bool,
     zero: bool,
     sub: bool,
     half_carry: bool,
     carry: bool,
     halted: bool,
+
+    /// Reference to the MMU (Memory Management Unit) to be used
+    /// for memory bus access operations.
     pub mmu: Mmu,
 
     /// Temporary counter used to control the number of cycles

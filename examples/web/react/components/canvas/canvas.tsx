@@ -12,6 +12,7 @@ export type CanvasStructure = {
 type CanvasProps = {
     width: number;
     height: number;
+    scaledWidth?: number | string;
     scale?: number;
     style?: string[];
     onCanvas?: (structure: CanvasStructure) => void;
@@ -20,6 +21,7 @@ type CanvasProps = {
 export const Canvas: FC<CanvasProps> = ({
     width,
     height,
+    scaledWidth,
     scale = 1,
     style = [],
     onCanvas
@@ -41,7 +43,7 @@ export const Canvas: FC<CanvasProps> = ({
         <canvas
             ref={canvasRef}
             className={classes()}
-            style={{ width: width * scale }}
+            style={{ width: scaledWidth ?? width * scale }}
             width={width}
             height={height}
         />

@@ -1,0 +1,28 @@
+.registers-gb > .section {
+    display: inline-block;
+    margin-right: 32px;
+    vertical-align: top;
+}
+
+.registers-gb > .section:last-child {
+    margin-right: 0px;
+}
+
+.registers-gb > .section > h4 {
+    font-size: 22px;
+    margin: 0px 0px 8px 0px;
+}
+
+.registers-gb > .section > .register {
+    font-size: 20px;
+    line-height: 24px;
+}
+
+.registers-gb > .section > .register > .register-key {
+    display: inline-block;
+    width: 70px;
+}
+
+.registers-gb > .section > .register > .register-value {
+    display: inline-block;
+}

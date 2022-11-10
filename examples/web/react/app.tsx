@@ -20,6 +20,7 @@ import {
     Pair,
     PanelSplit,
     Paragraph,
+    RegistersGB,
     Section,
     Tiles,
     Title,
@@ -97,6 +98,10 @@ export interface Emulator extends ObservableI {
      */
     get device(): string;
 
+    /**
+     * A URL to a website that describes the device that is
+     * being emulated by the emulator (eg: Wikipedia link).
+     */
     get deviceUrl(): string | undefined;
 
     /**
@@ -158,6 +163,8 @@ export interface Emulator extends ObservableI {
      * The current logic framerate of the running emulator.
      */
     get framerate(): number;
+
+    get registers(): Record<string, string | number>;
 
     getTile(index: number): Uint8Array;
 
@@ -536,11 +543,31 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
                 </Section>
                 {debugVisible && (
                     <Section>
-                        <h3>VRAM Tiles</h3>
-                        <Tiles
-                            getTile={(index) => emulator.getTile(index)}
-                            tileCount={384}
-                        />
+                        <div
+                            style={{
+                                display: "inline-block",
+                                verticalAlign: "top",
+                                marginRight: 32,
+                                width: 256
+                            }}
+                        >
+                            <h3>VRAM Tiles</h3>
+                            <Tiles
+                                getTile={(index) => emulator.getTile(index)}
+                                tileCount={384}
+                                width={"100%"}
+                                contentBox={false}
+                            />
+                        </div>
+                        <div
+                            style={{
+                                display: "inline-block",
+                                verticalAlign: "top"
+                            }}
+                        >
+                            <h3>Registers</h3>
+                            <RegistersGB registers={emulator.registers} />
+                        </div>
                     </Section>
                 )}
                 {infoVisible && (

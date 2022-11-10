@@ -24,11 +24,10 @@ export const KeyboardGB: FC<KeyboardGBProps> = ({
         styles: string[] = []
     ) => {
         const [pressed, setPressed] = useState(false);
+        const classes = ["key", pressed ? "pressed" : "", ...styles].join(" ");
         return (
             <span
-                className={["key", pressed ? "pressed" : "", ...styles].join(
-                    " "
-                )}
+                className={classes}
                 key={keyName ?? key}
                 tabIndex={focusable ? 0 : undefined}
                 onKeyDown={(event) => {

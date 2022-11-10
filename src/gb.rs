@@ -24,6 +24,19 @@ pub struct GameBoy {
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
+pub struct Registers {
+    pub pc: u16,
+    pub sp: u16,
+    pub a: u8,
+    pub b: u8,
+    pub c: u8,
+    pub d: u8,
+    pub e: u8,
+    pub h: u8,
+    pub l: u8,
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
 impl GameBoy {
     #[cfg_attr(feature = "wasm", wasm_bindgen(constructor))]
     pub fn new() -> Self {
@@ -113,6 +126,20 @@ impl GameBoy {
         self.frame_buffer().to_vec()
     }
 
+    pub fn registers(&mut self) -> Registers {
+        Registers {
+            pc: self.cpu.pc,
+            sp: self.cpu.sp,
+            a: self.cpu.a,
+            b: self.cpu.b,
+            c: self.cpu.c,
+            d: self.cpu.d,
+            e: self.cpu.e,
+            h: self.cpu.h,
+            l: self.cpu.l
+        }
+    }
+
     /// Obtains the tile structure for the tile at the
     /// given index, no conversion in the pixel buffer
     /// is done so that the color reference is the GB one.
@@ -129,6 +156,8 @@ impl GameBoy {
     }
 }
 
+/// Gameboy implementations that are meant with performance
+/// in mind and that do not support WASM interface of copy.
 impl GameBoy {
     /// The logical frequency of the Game Boy
     /// CPU in hz.
