@@ -566,7 +566,9 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
                             }}
                         >
                             <h3>Registers</h3>
-                            <RegistersGB registers={emulator.registers} />
+                            <RegistersGB
+                                getRegisters={() => emulator.registers}
+                            />
                         </div>
                     </Section>
                 )}

@@ -18,7 +18,7 @@ export const Tiles: FC<TilesProps> = ({
     tileCount,
     width,
     contentBox = true,
-    interval = 500,
+    interval = 1000,
     style = []
 }) => {
     const classes = () =>

@@ -1,29 +1,51 @@
-import React, { FC } from "react";
+import React, { FC, useEffect, useRef, useState } from "react";
 
 import "./registers-gb.css";
 
 type RegistersGBProps = {
-    registers: Record<string, string | number>;
+    getRegisters: () => Record<string, string | number>;
+    interval?: number;
     style?: string[];
 };
 
 export const RegistersGB: FC<RegistersGBProps> = ({
-    registers,
+    getRegisters,
+    interval = 100,
     style = []
 }) => {
     const classes = () => ["registers-gb", ...style].join(" ");
+    const [registers, setRegisters] = useState<Record<string, string | number>>(
+        {}
+    );
+    const intervalsRef = useRef<number>();
+    useEffect(() => {
+        const updateRegisters = () => {
+            const registers = getRegisters();
+            setRegisters(registers);
+        };
+        setInterval(() => updateRegisters(), interval);
+        updateRegisters();
+        return () => {
+            if (intervalsRef.current) {
+                clearInterval(intervalsRef.current);
+            }
+        };
+    }, []);
     const renderRegister = (
         key: string,
-        value: number,
+        value?: number,
         size = 2,
         styles: string[] = []
     ) => {
         const classes = ["register", ...styles].join(" ");
-        const valueS = value.toString(16).toUpperCase().padStart(size, "0");
+        const valueS =
+            value?.toString(16).toUpperCase().padStart(size, "0") ?? value;
         return (
             <div className={classes}>
                 <span className="register-key">{key}</span>
-                <span className="register-value">0x{valueS}</span>
+                <span className="register-value">
+                    {valueS ? `0x${valueS}` : "-"}
+                </span>
             </div>
         );
     };
