@@ -539,7 +539,6 @@ class GameboyEmulator extends EmulatorBase implements Emulator {
         };
     }
 
-    // @todo move this out of here
     get registers(): Record<string, string | number> {
         const registers = this.gameBoy?.registers();
         if (!registers) return {};
@@ -552,7 +551,9 @@ class GameboyEmulator extends EmulatorBase implements Emulator {
             d: registers.d,
             e: registers.e,
             h: registers.h,
-            l: registers.l
+            l: registers.l,
+            ly: registers.ly,
+            lyc: registers.lyc
         };
     }
 }

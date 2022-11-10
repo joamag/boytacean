@@ -34,6 +34,8 @@ pub struct Registers {
     pub e: u8,
     pub h: u8,
     pub l: u8,
+    pub ly: u8,
+    pub lyc: u8,
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
@@ -127,6 +129,7 @@ impl GameBoy {
     }
 
     pub fn registers(&mut self) -> Registers {
+        let ppu_registers = self.ppu().registers();
         Registers {
             pc: self.cpu.pc,
             sp: self.cpu.sp,
@@ -136,7 +139,9 @@ impl GameBoy {
             d: self.cpu.d,
             e: self.cpu.e,
             h: self.cpu.h,
-            l: self.cpu.l
+            l: self.cpu.l,
+            ly: ppu_registers.ly,
+            lyc: ppu_registers.lyc,
         }
     }
 

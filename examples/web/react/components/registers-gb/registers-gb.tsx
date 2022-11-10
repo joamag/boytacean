@@ -10,7 +10,7 @@ type RegistersGBProps = {
 
 export const RegistersGB: FC<RegistersGBProps> = ({
     getRegisters,
-    interval = 100,
+    interval = 50,
     style = []
 }) => {
     const classes = () => ["registers-gb", ...style].join(" ");
@@ -65,8 +65,8 @@ export const RegistersGB: FC<RegistersGBProps> = ({
             </div>
             <div className="section">
                 <h4>PPU</h4>
-                {renderRegister("LY", registers.l as number)}
-                {renderRegister("LYC", registers.l as number)}
+                {renderRegister("LY", registers.ly as number)}
+                {renderRegister("LYC", registers.lyc as number)}
             </div>
         </div>
     );

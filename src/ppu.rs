@@ -122,6 +122,11 @@ impl Display for ObjectData {
     }
 }
 
+pub struct PpuRegisters {
+    pub ly: u8,
+    pub lyc: u8,
+}
+
 /// Represents the Game Boy PPU (Pixel Processing Unit) and controls
 /// all of the logic behind the graphics processing and presentation.
 /// Should store both the VRAM and HRAM together with the internal
@@ -670,6 +675,13 @@ impl Ppu {
                 obj.index = obj_index as u8;
             }
             _ => (),
+        }
+    }
+
+    pub fn registers(&self) -> PpuRegisters {
+        PpuRegisters {
+            ly: self.ly,
+            lyc: self.lyc,
         }
     }
 
