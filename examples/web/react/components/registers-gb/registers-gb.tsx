@@ -15,13 +15,15 @@ export const RegistersGB: FC<RegistersGBProps> = ({
     const renderRegister = (
         key: string,
         value: number,
+        size = 2,
         styles: string[] = []
     ) => {
         const classes = ["register", ...styles].join(" ");
+        const valueS = value.toString(16).toUpperCase().padStart(size, "0");
         return (
             <div className={classes}>
                 <span className="register-key">{key}</span>
-                <span className="register-value">0x{value.toString(16)}</span>
+                <span className="register-value">0x{valueS}</span>
             </div>
         );
     };
@@ -29,8 +31,8 @@ export const RegistersGB: FC<RegistersGBProps> = ({
         <div className={classes()}>
             <div className="section">
                 <h4>CPU</h4>
-                {renderRegister("PC", registers.pc as number)}
-                {renderRegister("SP", registers.sp as number)}
+                {renderRegister("PC", registers.pc as number, 4)}
+                {renderRegister("SP", registers.sp as number, 4)}
                 {renderRegister("A", registers.a as number)}
                 {renderRegister("B", registers.b as number)}
                 {renderRegister("C", registers.c as number)}

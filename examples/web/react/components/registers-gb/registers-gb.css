@@ -14,15 +14,19 @@
 }
 
 .registers-gb > .section > .register {
-    font-size: 20px;
-    line-height: 24px;
+    font-size: 0px;
+    line-height: 22px;
 }
 
 .registers-gb > .section > .register > .register-key {
     display: inline-block;
-    width: 70px;
+    width: 40px;
+    font-size: 20px;
 }
 
 .registers-gb > .section > .register > .register-value {
     display: inline-block;
+    width: 66px;
+    text-align: right;
+    font-size: 20px;
 }
