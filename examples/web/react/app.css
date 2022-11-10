@@ -1,7 +1,8 @@
 .app {
     color: #ffffff;
     font-family: VT323, Roboto, Open Sans, Arial, Helvetica, sans-serif;
-    margin: 0px 0px 0px 0px;
+    margin: 0px auto 0px auto;
+    max-width: 1400px;
 }
 
 .app h3 {

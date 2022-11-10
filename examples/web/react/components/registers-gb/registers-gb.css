@@ -20,13 +20,13 @@
 
 .registers-gb > .section > .register > .register-key {
     display: inline-block;
-    width: 40px;
     font-size: 20px;
+    width: 40px;
 }
 
 .registers-gb > .section > .register > .register-value {
     display: inline-block;
-    width: 66px;
-    text-align: right;
     font-size: 20px;
+    text-align: right;
+    width: 66px;
 }
