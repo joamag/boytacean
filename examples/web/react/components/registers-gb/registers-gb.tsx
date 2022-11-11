@@ -65,6 +65,10 @@ export const RegistersGB: FC<RegistersGBProps> = ({
             </div>
             <div className="section">
                 <h4>PPU</h4>
+                {renderRegister("SCY", registers.scy as number)}
+                {renderRegister("SCX", registers.scx as number)}
+                {renderRegister("WY", registers.wy as number)}
+                {renderRegister("WX", registers.wx as number)}
                 {renderRegister("LY", registers.ly as number)}
                 {renderRegister("LYC", registers.lyc as number)}
             </div>

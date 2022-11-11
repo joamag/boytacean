@@ -123,6 +123,10 @@ impl Display for ObjectData {
 }
 
 pub struct PpuRegisters {
+    pub scy: u8,
+    pub scx: u8,
+    pub wy: u8,
+    pub wx: u8,
     pub ly: u8,
     pub lyc: u8,
 }
@@ -680,6 +684,10 @@ impl Ppu {
 
     pub fn registers(&self) -> PpuRegisters {
         PpuRegisters {
+            scy: self.scy,
+            scx: self.scx,
+            wy: self.wy,
+            wx: self.wx,
             ly: self.ly,
             lyc: self.lyc,
         }

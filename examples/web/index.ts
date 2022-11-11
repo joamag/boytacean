@@ -552,6 +552,10 @@ class GameboyEmulator extends EmulatorBase implements Emulator {
             e: registers.e,
             h: registers.h,
             l: registers.l,
+            scy: registers.scy,
+            scx: registers.scx,
+            wy: registers.wy,
+            wx: registers.wx,
             ly: registers.ly,
             lyc: registers.lyc
         };
