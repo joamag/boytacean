@@ -13,11 +13,12 @@ const KEYS: Record<string, string> = {
     s: "B"
 };
 
-const ARROW_KEYS: Record<string, boolean> = {
+const PREVENT_KEYS: Record<string, boolean> = {
     ArrowUp: true,
     ArrowDown: true,
     ArrowLeft: true,
-    ArrowRight: true
+    ArrowRight: true,
+    " ": true
 };
 
 declare const require: any;
@@ -53,8 +54,8 @@ export const KeyboardGB: FC<KeyboardGBProps> = ({
     useEffect(() => {
         const _onKeyDown = (event: KeyboardEvent) => {
             const keyCode = KEYS[event.key];
-            const isArrow = ARROW_KEYS[event.key] ?? false;
-            if (isArrow) event.preventDefault();
+            const isPrevent = PREVENT_KEYS[event.key] ?? false;
+            if (isPrevent) event.preventDefault();
             if (keyCode !== undefined) {
                 const records = recordRef.current ?? {};
                 const setter = records[keyCode];
@@ -65,8 +66,8 @@ export const KeyboardGB: FC<KeyboardGBProps> = ({
         };
         const _onKeyUp = (event: KeyboardEvent) => {
             const keyCode = KEYS[event.key];
-            const isArrow = ARROW_KEYS[event.key] ?? false;
-            if (isArrow) event.preventDefault();
+            const isPrevent = PREVENT_KEYS[event.key] ?? false;
+            if (isPrevent) event.preventDefault();
             if (keyCode !== undefined) {
                 const records = recordRef.current ?? {};
                 const setter = records[keyCode];
