@@ -293,6 +293,14 @@ export const App: FC<AppProps> = ({
     }, [backgroundIndex]);
     useEffect(() => {
         switch (keyaction) {
+            case "Plus":
+                emulator.frequency += 400000;
+                setKeyaction(undefined);
+                break;
+            case "Minus":
+                emulator.frequency -= 400000;
+                setKeyaction(undefined);
+                break;
             case "Escape":
                 setFullscreenState(false);
                 setKeyaction(undefined);
@@ -305,10 +313,24 @@ export const App: FC<AppProps> = ({
     }, [keyaction]);
     useEffect(() => {
         const onKeyDown = (event: KeyboardEvent) => {
-            if (event.key === "Escape") {
-                setKeyaction("Escape");
-                event.stopPropagation();
-                event.preventDefault();
+            switch (event.key) {
+                case "+":
+                    setKeyaction("Plus");
+                    event.stopPropagation();
+                    event.preventDefault();
+                    break;
+
+                case "-":
+                    setKeyaction("Minus");
+                    event.stopPropagation();
+                    event.preventDefault();
+                    break;
+
+                case "Escape":
+                    setKeyaction("Escape");
+                    event.stopPropagation();
+                    event.preventDefault();
+                    break;
             }
             if (event.key === "f" && event.ctrlKey === true) {
                 setKeyaction("Fullscreen");

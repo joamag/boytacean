@@ -21,8 +21,6 @@ const LOGIC_HZ = 4194304;
 const VISUAL_HZ = 59.7275;
 const IDLE_HZ = 10;
 
-const FREQUENCY_DELTA = 400000;
-
 const SAMPLE_RATE = 2;
 
 const BACKGROUNDS = [
@@ -35,17 +33,6 @@ const BACKGROUNDS = [
     "3a5a40"
 ];
 
-const KEYS: Record<string, number> = {
-    ArrowUp: PadKey.Up,
-    ArrowDown: PadKey.Down,
-    ArrowLeft: PadKey.Left,
-    ArrowRight: PadKey.Right,
-    Enter: PadKey.Start,
-    " ": PadKey.Select,
-    a: PadKey.A,
-    s: PadKey.B
-};
-
 const KEYS_NAME: Record<string, number> = {
     ArrowUp: PadKey.Up,
     ArrowDown: PadKey.Down,
@@ -55,13 +42,6 @@ const KEYS_NAME: Record<string, number> = {
     Select: PadKey.Select,
     A: PadKey.A,
     B: PadKey.B
-};
-
-const ARROW_KEYS: Record<string, boolean> = {
-    ArrowUp: true,
-    ArrowDown: true,
-    ArrowLeft: true,
-    ArrowRight: true
 };
 
 const ROM_PATH = require("../../res/roms/20y.gb");
@@ -103,10 +83,6 @@ class GameboyEmulator extends EmulatorBase implements Emulator {
         // initializes the WASM module, this is required
         // so that the global symbols become available
         await wasm();
-
-        // initializes the complete set of sub-systems
-        // and registers the event handlers
-        await this.register();
 
         // boots the emulator subsystem with the initial
         // ROM retrieved from a remote data source
@@ -338,42 +314,6 @@ class GameboyEmulator extends EmulatorBase implements Emulator {
         this.trigger("booted");
     }
 
-    async register() {
-        await Promise.all([this.registerKeys()]);
-    }
-
-    registerKeys() {
-        document.addEventListener("keydown", (event) => {
-            const keyCode = KEYS[event.key];
-            const isArrow = ARROW_KEYS[event.key] ?? false;
-            if (isArrow) event.preventDefault();
-            if (keyCode !== undefined) {
-                this.gameBoy?.key_press(keyCode);
-                return;
-            }
-
-            switch (event.key) {
-                case "+":
-                    this.frequency += FREQUENCY_DELTA;
-                    break;
-
-                case "-":
-                    this.frequency -= FREQUENCY_DELTA;
-                    break;
-            }
-        });
-
-        document.addEventListener("keyup", (event) => {
-            const keyCode = KEYS[event.key];
-            const isArrow = ARROW_KEYS[event.key] ?? false;
-            if (isArrow) event.preventDefault();
-            if (keyCode !== undefined) {
-                this.gameBoy?.key_lift(keyCode);
-                return;
-            }
-        });
-    }
-
     setRom(name: string, data: Uint8Array, cartridge: Cartridge) {
         this.romName = name;
         this.romData = data;
@@ -452,6 +392,28 @@ class GameboyEmulator extends EmulatorBase implements Emulator {
 
     get framerate(): number {
         return this.fps;
+    }
+
+    get registers(): Record<string, string | number> {
+        const registers = this.gameBoy?.registers();
+        if (!registers) return {};
+        return {
+            pc: registers.pc,
+            sp: registers.sp,
+            a: registers.a,
+            b: registers.b,
+            c: registers.c,
+            d: registers.d,
+            e: registers.e,
+            h: registers.h,
+            l: registers.l,
+            scy: registers.scy,
+            scx: registers.scx,
+            wy: registers.wy,
+            wx: registers.wx,
+            ly: registers.ly,
+            lyc: registers.lyc
+        };
     }
 
     getTile(index: number): Uint8Array {
@@ -534,28 +496,6 @@ class GameboyEmulator extends EmulatorBase implements Emulator {
         return {
             name: romName,
             data: romData
-        };
-    }
-
-    get registers(): Record<string, string | number> {
-        const registers = this.gameBoy?.registers();
-        if (!registers) return {};
-        return {
-            pc: registers.pc,
-            sp: registers.sp,
-            a: registers.a,
-            b: registers.b,
-            c: registers.c,
-            d: registers.d,
-            e: registers.e,
-            h: registers.h,
-            l: registers.l,
-            scy: registers.scy,
-            scx: registers.scx,
-            wy: registers.wy,
-            wx: registers.wx,
-            ly: registers.ly,
-            lyc: registers.lyc
         };
     }
 }

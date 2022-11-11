@@ -1,6 +1,24 @@
-import React, { FC, useState } from "react";
+import React, { FC, useEffect, useRef, useState } from "react";
 
 import "./keyboard-gb.css";
+
+const KEYS: Record<string, string> = {
+    ArrowUp: "ArrowUp",
+    ArrowDown: "ArrowDown",
+    ArrowLeft: "ArrowLeft",
+    ArrowRight: "ArrowRight",
+    Enter: "Start",
+    " ": "Select",
+    a: "A",
+    s: "B"
+};
+
+const ARROW_KEYS: Record<string, boolean> = {
+    ArrowUp: true,
+    ArrowDown: true,
+    ArrowLeft: true,
+    ArrowRight: true
+};
 
 declare const require: any;
 
@@ -23,6 +41,8 @@ export const KeyboardGB: FC<KeyboardGBProps> = ({
 }) => {
     const containerClasses = () =>
         ["keyboard-container", fullscreen ? "fullscreen" : ""].join(" ");
+    const recordRef =
+        useRef<Record<string, React.Dispatch<React.SetStateAction<boolean>>>>();
     const classes = () =>
         [
             "keyboard",
@@ -30,6 +50,38 @@ export const KeyboardGB: FC<KeyboardGBProps> = ({
             fullscreen ? "fullscreen" : "",
             ...style
         ].join(" ");
+    useEffect(() => {
+        const _onKeyDown = (event: KeyboardEvent) => {
+            const keyCode = KEYS[event.key];
+            const isArrow = ARROW_KEYS[event.key] ?? false;
+            if (isArrow) event.preventDefault();
+            if (keyCode !== undefined) {
+                const records = recordRef.current ?? {};
+                const setter = records[keyCode];
+                setter(true);
+                onKeyDown && onKeyDown(keyCode);
+                return;
+            }
+        };
+        const _onKeyUp = (event: KeyboardEvent) => {
+            const keyCode = KEYS[event.key];
+            const isArrow = ARROW_KEYS[event.key] ?? false;
+            if (isArrow) event.preventDefault();
+            if (keyCode !== undefined) {
+                const records = recordRef.current ?? {};
+                const setter = records[keyCode];
+                setter(false);
+                onKeyUp && onKeyUp(keyCode);
+                return;
+            }
+        };
+        document.addEventListener("keydown", _onKeyDown);
+        document.addEventListener("keyup", _onKeyUp);
+        return () => {
+            document.removeEventListener("keydown", _onKeyDown);
+            document.removeEventListener("keyup", _onKeyUp);
+        };
+    }, []);
     const renderKey = (
         key: string,
         keyName?: string,
@@ -38,6 +90,9 @@ export const KeyboardGB: FC<KeyboardGBProps> = ({
     ) => {
         const [pressed, setPressed] = useState(selected);
         const classes = ["key", pressed ? "pressed" : "", ...styles].join(" ");
+        const records = recordRef.current ?? {};
+        records[keyName ?? key ?? "undefined"] = setPressed;
+        recordRef.current = records;
         return (
             <span
                 className={classes}
