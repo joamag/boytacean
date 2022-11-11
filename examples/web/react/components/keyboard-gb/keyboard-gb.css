@@ -1,10 +1,10 @@
 .keyboard-container.fullscreen {
+    bottom: 30px;
+    left: 0px;
+    pointer-events: none;
     position: fixed;
     width: 100%;
-    left: 0px;
-    bottom: 30px;
     z-index: 10;
-    pointer-events: none;
 }
 
 @media only screen and (max-width: 1120px) {
@@ -31,17 +31,39 @@
 }
 
 .keyboard-gb.fullscreen {
-    max-width: 600px;
-    pointer-events: initial;
-    margin: 0px auto 0px auto;
     background: rgba(0, 0, 0, 0.3);
-    padding: 18px 0px 18px 0px;
     border-radius: 24px 24px 24px 24px;
+    -o-border-radius: 24px 24px 24px 24px;
+    -ms-border-radius: 24px 24px 24px 24px;
+    -moz-border-radius: 24px 24px 24px 24px;
+    -khtml-border-radius: 24px 24px 24px 24px;
+    -webkit-border-radius: 24px 24px 24px 24px;
+    margin: 0px auto 0px auto;
+    max-width: 600px;
+    padding: 18px 0px 18px 0px;
+    pointer-events: initial;
+}
+
+@media only screen and (max-width: 600px) {
+    .keyboard-gb.fullscreen {
+        border-radius: 0px 0px 0px 0px;
+        -o-border-radius: 0px 0px 0px 0px;
+        -ms-border-radius: 0px 0px 0px 0px;
+        -moz-border-radius: 0px 0px 0px 0px;
+        -khtml-border-radius: 0px 0px 0px 0px;
+        -webkit-border-radius: 0px 0px 0px 0px;
+        padding: 12px 0px 12px 0px;
+    }
 }
 
 .keyboard-gb > .keyboard-line {
-    margin-bottom: 12px;
     border-radius: 24px 24px 24px 24px;
+    -o-border-radius: 24px 24px 24px 24px;
+    -ms-border-radius: 24px 24px 24px 24px;
+    -moz-border-radius: 24px 24px 24px 24px;
+    -khtml-border-radius: 24px 24px 24px 24px;
+    -webkit-border-radius: 24px 24px 24px 24px;
+    margin-bottom: 12px;
 }
 
 .keyboard-gb > .keyboard-line:last-child {
@@ -78,7 +100,13 @@
 .keyboard-gb > .dpad {
     float: left;
     text-align: center;
-    width: 180px;
+    width: 172px;
+}
+
+@media only screen and (max-width: 600px) {
+    .keyboard-gb > .dpad {
+        width: 162px;
+    }
 }
 
 .keyboard-gb > .dpad > .dpad-top {
@@ -170,6 +198,12 @@
     margin-right: 18px;
 }
 
+@media only screen and (max-width: 600px) {
+    .keyboard-gb > .action {
+        margin-right: 8px;
+    }
+}
+
 .keyboard-gb > .action > .key {
     border-radius: 32px 32px 32px 32px;
     -o-border-radius: 32px 32px 32px 32px;
@@ -199,6 +233,12 @@
 
 .keyboard-gb > .options {
     margin-top: 32px;
+}
+
+@media only screen and (max-width: 600px) {
+    .keyboard-gb > .options {
+        margin-top: 22px;
+    }
 }
 
 .keyboard-gb > .options > .key {
