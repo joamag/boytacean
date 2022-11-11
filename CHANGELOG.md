@@ -9,9 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-* Better debug panel support
-* Support for some `GET` parameters
-* Support for fullscreen on screen keyboard mode
+*
 
 ### Changed
 
@@ -20,6 +18,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 *
+
+## [0.4.3] - 2022-11-11
+
+### Added
+
+* Better debug panel support
+* Support for some `GET` parameters
+* Support for fullscreen on screen keyboard mode
 
 ## [0.4.2] - 2022-11-09
 
