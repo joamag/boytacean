@@ -7,6 +7,7 @@ declare const require: any;
 type KeyboardGBProps = {
     focusable?: boolean;
     fullscreen?: boolean;
+    selectedKeys?: string[];
     style?: string[];
     onKeyDown?: (key: string) => void;
     onKeyUp?: (key: string) => void;
@@ -15,6 +16,7 @@ type KeyboardGBProps = {
 export const KeyboardGB: FC<KeyboardGBProps> = ({
     focusable = true,
     fullscreen = false,
+    selectedKeys = [],
     style = [],
     onKeyDown,
     onKeyUp
@@ -31,9 +33,10 @@ export const KeyboardGB: FC<KeyboardGBProps> = ({
     const renderKey = (
         key: string,
         keyName?: string,
+        selected = false,
         styles: string[] = []
     ) => {
-        const [pressed, setPressed] = useState(false);
+        const [pressed, setPressed] = useState(selected);
         const classes = ["key", pressed ? "pressed" : "", ...styles].join(" ");
         return (
             <span
@@ -103,24 +106,54 @@ export const KeyboardGB: FC<KeyboardGBProps> = ({
             >
                 <div className="dpad">
                     <div className="dpad-top">
-                        {renderKey("▲", "ArrowUp", ["up"])}
+                        {renderKey(
+                            "▲",
+                            "ArrowUp",
+                            selectedKeys.includes("ArrowUp"),
+                            ["up"]
+                        )}
                     </div>
                     <div>
-                        {renderKey("◄", "ArrowLeft", ["left"])}
-                        {renderKey("►", "ArrowRight", ["right"])}
+                        {renderKey(
+                            "◄",
+                            "ArrowLeft",
+                            selectedKeys.includes("ArrowLeft"),
+                            ["left"]
+                        )}
+                        {renderKey(
+                            "►",
+                            "ArrowRight",
+                            selectedKeys.includes("ArrowRight"),
+                            ["right"]
+                        )}
                     </div>
                     <div className="dpad-bottom">
-                        {renderKey("▼", "ArrowDown", ["down"])}
+                        {renderKey(
+                            "▼",
+                            "ArrowDown",
+                            selectedKeys.includes("ArrowDown"),
+                            ["down"]
+                        )}
                     </div>
                 </div>
                 <div className="action">
-                    {renderKey("B", "B", ["b"])}
-                    {renderKey("A", "A", ["a"])}
+                    {renderKey("B", "B", selectedKeys.includes("B"), ["b"])}
+                    {renderKey("A", "A", selectedKeys.includes("A"), ["a"])}
                 </div>
                 <div className="break"></div>
                 <div className="options">
-                    {renderKey("START", "Start", ["start"])}
-                    {renderKey("SELECT", "Select", ["select"])}
+                    {renderKey(
+                        "START",
+                        "Start",
+                        selectedKeys.includes("Start"),
+                        ["start"]
+                    )}
+                    {renderKey(
+                        "SELECT",
+                        "Select",
+                        selectedKeys.includes("Select"),
+                        ["select"]
+                    )}
                 </div>
             </div>
         </div>
