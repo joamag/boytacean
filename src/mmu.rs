@@ -37,9 +37,9 @@ pub struct Mmu {
 impl Mmu {
     pub fn new(ppu: Ppu, pad: Pad, timer: Timer) -> Self {
         Self {
-            ppu: ppu,
-            pad: pad,
-            timer: timer,
+            ppu,
+            pad,
+            timer,
             rom: Cartridge::new(),
             boot_active: true,
             boot: [0u8; BOOT_SIZE],
