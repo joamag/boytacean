@@ -1,6 +1,8 @@
 import React, { FC, useEffect, useRef, useState } from "react";
 import ReactDOM from "react-dom/client";
 
+const FREQUENCY_DELTA = 100000;
+
 declare const require: any;
 
 import {
@@ -166,6 +168,12 @@ export interface Emulator extends ObservableI {
     set frequency(value: number);
 
     /**
+     * The recommended frequency delta in hertz for scale up
+     * and scale down operations in the CPU frequency.
+     */
+    get frequencyDelta(): number | null;
+
+    /**
      * The current logic framerate of the running emulator.
      */
     get framerate(): number;
@@ -234,6 +242,10 @@ export class EmulatorBase extends Observable {
     get versionUrl(): string | undefined {
         return undefined;
     }
+
+    get frequencyDelta(): number | null {
+        return FREQUENCY_DELTA;
+    }
 }
 
 /**
@@ -294,11 +306,13 @@ export const App: FC<AppProps> = ({
     useEffect(() => {
         switch (keyaction) {
             case "Plus":
-                emulator.frequency += 400000;
+                emulator.frequency +=
+                    emulator.frequencyDelta ?? FREQUENCY_DELTA;
                 setKeyaction(undefined);
                 break;
             case "Minus":
-                emulator.frequency -= 400000;
+                emulator.frequency -=
+                    emulator.frequencyDelta ?? FREQUENCY_DELTA;
                 setKeyaction(undefined);
                 break;
             case "Escape":
@@ -664,7 +678,12 @@ export const App: FC<AppProps> = ({
                                 valueNode={
                                     <ButtonIncrement
                                         value={emulator.frequency / 1000 / 1000}
-                                        delta={0.4}
+                                        delta={
+                                            (emulator.frequencyDelta ??
+                                                FREQUENCY_DELTA) /
+                                            1000 /
+                                            1000
+                                        }
                                         min={0}
                                         suffix={"MHz"}
                                         decimalPlaces={2}

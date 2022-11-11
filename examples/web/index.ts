@@ -390,6 +390,10 @@ class GameboyEmulator extends EmulatorBase implements Emulator {
         this.trigger("frequency", value);
     }
 
+    get frequencyDelta(): number | null {
+        return 400000;
+    }
+
     get framerate(): number {
         return this.fps;
     }
