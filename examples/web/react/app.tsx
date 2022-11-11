@@ -517,7 +517,11 @@ export const App: FC<AppProps> = ({
             >
                 {keyboardVisible && (
                     <Section separatorBottom={true}>
-                        <KeyboardGB onKeyDown={onKeyDown} onKeyUp={onKeyUp} />
+                        <KeyboardGB
+                            fullscreen={fullscreenState}
+                            onKeyDown={onKeyDown}
+                            onKeyUp={onKeyUp}
+                        />
                     </Section>
                 )}
                 <Title

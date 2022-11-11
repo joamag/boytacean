@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * Better debug panel support
 * Support for some `GET` parameters
+* Support for fullscreen on screen keyboard mode
 
 ### Changed
 
