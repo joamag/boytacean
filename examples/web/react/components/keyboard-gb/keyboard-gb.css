@@ -7,6 +7,12 @@
     pointer-events: none;
 }
 
+@media only screen and (max-width: 1120px) {
+    .keyboard-container.fullscreen {
+        bottom: 0px;
+    }
+}
+
 .keyboard-gb {
     font-size: 0px;
     text-align: center;
