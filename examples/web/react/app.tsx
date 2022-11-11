@@ -241,6 +241,9 @@ export enum PixelFormat {
 
 type AppProps = {
     emulator: Emulator;
+    fullscreen?: boolean;
+    debug?: boolean;
+    keyboard?: boolean;
     backgrounds?: string[];
 };
 
@@ -248,9 +251,15 @@ const isTouchDevice = () => {
     return "ontouchstart" in window || navigator.maxTouchPoints > 0;
 };
 
-export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
+export const App: FC<AppProps> = ({
+    emulator,
+    fullscreen = false,
+    debug = false,
+    keyboard = false,
+    backgrounds = ["264653"]
+}) => {
     const [paused, setPaused] = useState(false);
-    const [fullscreen, setFullscreen] = useState(false);
+    const [fullscreenState, setFullscreenState] = useState(fullscreen);
     const [backgroundIndex, setBackgroundIndex] = useState(0);
     const [romInfo, setRomInfo] = useState<RomInfo>({});
     const [framerate, setFramerate] = useState(0);
@@ -261,9 +270,11 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
     const [toastText, setToastText] = useState<string>();
     const [toastError, setToastError] = useState(false);
     const [toastVisible, setToastVisible] = useState(false);
-    const [keyboardVisible, setKeyboardVisible] = useState(isTouchDevice());
+    const [keyboardVisible, setKeyboardVisible] = useState(
+        isTouchDevice() || keyboard
+    );
     const [infoVisible, setInfoVisible] = useState(true);
-    const [debugVisible, setDebugVisible] = useState(false);
+    const [debugVisible, setDebugVisible] = useState(debug);
 
     const toastCounterRef = useRef(0);
     const frameRef = useRef<boolean>(false);
@@ -277,11 +288,11 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
     useEffect(() => {
         switch (keyaction) {
             case "Escape":
-                setFullscreen(false);
+                setFullscreenState(false);
                 setKeyaction(undefined);
                 break;
             case "Fullscreen":
-                setFullscreen(!fullscreen);
+                setFullscreenState(!fullscreenState);
                 setKeyaction(undefined);
                 break;
         }
@@ -411,7 +422,7 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
         );
     };
     const onFullscreenClick = () => {
-        setFullscreen(!fullscreen);
+        setFullscreenState(!fullscreenState);
     };
     const onKeyboardClick = () => {
         setKeyboardVisible(!keyboardVisible);
@@ -446,7 +457,7 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
         });
     };
     const onMinimize = () => {
-        setFullscreen(!fullscreen);
+        setFullscreenState(!fullscreenState);
     };
     const onKeyDown = (key: string) => {
         emulator.keyPress(key);
@@ -496,7 +507,7 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
                 left={
                     <div className="display-container">
                         <Display
-                            fullscreen={fullscreen}
+                            fullscreen={fullscreenState}
                             onDrawHandler={onDrawHandler}
                             onClearHandler={onClearHandler}
                             onMinimize={onMinimize}
@@ -728,16 +739,33 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
 
 export const startApp = (
     element: string,
-    emulator: Emulator,
-    backgrounds: string[]
+    {
+        emulator,
+        fullscreen = false,
+        debug = false,
+        keyboard = false,
+        backgrounds = []
+    }: {
+        emulator: Emulator;
+        fullscreen?: boolean;
+        debug?: boolean;
+        keyboard?: boolean;
+        backgrounds: string[];
+    }
 ) => {
     const elementRef = document.getElementById(element);
-    if (!elementRef) {
-        return;
-    }
+    if (!elementRef) return;
 
     const root = ReactDOM.createRoot(elementRef);
-    root.render(<App emulator={emulator} backgrounds={backgrounds} />);
+    root.render(
+        <App
+            emulator={emulator}
+            fullscreen={fullscreen}
+            debug={debug}
+            keyboard={keyboard}
+            backgrounds={backgrounds}
+        />
+    );
 };
 
 export default App;

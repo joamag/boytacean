@@ -99,12 +99,7 @@ class GameboyEmulator extends EmulatorBase implements Emulator {
     private romSize: number = 0;
     private cartridge: Cartridge | null = null;
 
-    async main() {
-        // parses the current location URL as retrieves
-        // some of the "relevant" GET parameters for logic
-        const params = new URLSearchParams(window.location.search);
-        const romUrl = params.get("url");
-
+    async main({ romUrl }: { romUrl?: string }) {
         // initializes the WASM module, this is required
         // so that the global symbols become available
         await wasm();
@@ -426,7 +421,7 @@ class GameboyEmulator extends EmulatorBase implements Emulator {
      * @returns The current pixel data for the emulator display.
      */
     get imageBuffer(): Uint8Array {
-        return this.gameBoy!.frame_buffer_eager();
+        return this.gameBoy?.frame_buffer_eager() ?? new Uint8Array();
     }
 
     get romInfo(): RomInfo {
@@ -457,7 +452,7 @@ class GameboyEmulator extends EmulatorBase implements Emulator {
     }
 
     getTile(index: number): Uint8Array {
-        return this.gameBoy!.get_tile_buffer(index);
+        return this.gameBoy?.get_tile_buffer(index) ?? new Uint8Array();
     }
 
     toggleRunning() {
@@ -578,7 +573,25 @@ const wasm = async () => {
 };
 
 (async () => {
+    // parses the current location URL as retrieves
+    // some of the "relevant" GET parameters for logic
+    const params = new URLSearchParams(window.location.search);
+    const romUrl = params.get("rom_url") ?? params.get("url") ?? undefined;
+    const fullscreen = ["1", "true", "True"].includes(
+        params.get("fullscreen") ?? ""
+    );
+    const debug = ["1", "true", "True"].includes(params.get("debug") ?? "");
+    const keyboard = ["1", "true", "True"].includes(
+        params.get("keyboard") ?? ""
+    );
+
     const emulator = new GameboyEmulator();
-    startApp("app", emulator, BACKGROUNDS);
-    await emulator.main();
+    startApp("app", {
+        emulator: emulator,
+        fullscreen: fullscreen,
+        debug: debug,
+        keyboard: keyboard,
+        backgrounds: BACKGROUNDS
+    });
+    await emulator.main({ romUrl: romUrl });
 })();
