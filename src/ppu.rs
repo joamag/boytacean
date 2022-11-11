@@ -51,7 +51,7 @@ pub type Palette = [Pixel; PALETTE_SIZE];
 /// Represents a tile within the Game Boy context,
 /// should contain the pixel buffer of the tile.
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Tile {
     buffer: [u8; 64],
 }
@@ -100,7 +100,7 @@ impl Display for Tile {
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct ObjectData {
     x: i16,
     y: i16,
@@ -271,7 +271,7 @@ pub struct Ppu {
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum PpuMode {
     HBlank = 0,
     VBlank = 1,
