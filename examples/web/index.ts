@@ -338,7 +338,6 @@ class GameboyEmulator extends EmulatorBase implements Emulator {
         this.trigger("booted");
     }
 
-    // @todo remove this method, or at least most of it
     async register() {
         await Promise.all([this.registerKeys()]);
     }
@@ -408,6 +407,10 @@ class GameboyEmulator extends EmulatorBase implements Emulator {
 
     get versionUrl(): string {
         return "https://gitlab.stage.hive.pt/joamag/boytacean/-/blob/master/CHANGELOG.md";
+    }
+
+    get romExts(): string[] {
+        return ["gb"];
     }
 
     get pixelFormat(): PixelFormat {

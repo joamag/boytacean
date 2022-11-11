@@ -131,6 +131,12 @@ export interface Emulator extends ObservableI {
     get engine(): string | null;
 
     /**
+     * The complete set of file extensions that this emulator
+     * supports.
+     */
+    get romExts(): string[];
+
+    /**
      * The pixel format of the emulator's display
      * image buffer (eg: RGB).
      */
@@ -363,9 +369,8 @@ export const App: FC<AppProps> = ({
     };
 
     const onFile = async (file: File) => {
-        // @todo must make this more flexible and not just
-        // Game Boy only (using the emulator interface)
-        if (!file.name.endsWith(".gb")) {
+        const fileExtension = file.name.split(".").pop() ?? "";
+        if (!emulator.romExts.includes(fileExtension)) {
             showToast(
                 `This is probably not a ${emulator.device} ROM file!`,
                 true
