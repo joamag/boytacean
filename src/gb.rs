@@ -51,7 +51,7 @@ impl GameBoy {
         let timer = Timer::new();
         let mmu = Mmu::new(ppu, pad, timer);
         let cpu = Cpu::new(mmu);
-        Self { cpu: cpu }
+        Self { cpu }
     }
 
     pub fn reset(&mut self) {
