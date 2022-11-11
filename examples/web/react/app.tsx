@@ -164,8 +164,19 @@ export interface Emulator extends ObservableI {
      */
     get framerate(): number;
 
+    /**
+     * A dictionary that contains the register names associated
+     * with their value either as strings or numbers.
+     */
     get registers(): Record<string, string | number>;
 
+    /**
+     * Obtains the pixel buffer for the VRAM tile at the given
+     * index.
+     *
+     * @param index The index of the tile to obtain pixel buffer.
+     * @returns The pixel buffer of the tile at the given index.
+     */
     getTile(index: number): Uint8Array;
 
     /**
