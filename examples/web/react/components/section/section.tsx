@@ -4,6 +4,7 @@ import "./section.css";
 
 type SectionProps = {
     children: ReactNode;
+    visible?: boolean;
     separator?: boolean;
     separatorBottom?: boolean;
     style?: string[];
@@ -11,11 +12,13 @@ type SectionProps = {
 
 export const Section: FC<SectionProps> = ({
     children,
+    visible = true,
     separator = true,
     separatorBottom = false,
     style = []
 }) => {
-    const classes = () => ["section", ...style].join(" ");
+    const classes = () =>
+        ["section", visible ? "visible" : "", ...style].join(" ");
     return (
         <div className={classes()}>
             {separator && <div className="separator"></div>}

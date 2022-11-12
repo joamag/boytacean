@@ -26,6 +26,7 @@ declare const require: any;
 type KeyboardGBProps = {
     focusable?: boolean;
     fullscreen?: boolean;
+    physical?: boolean;
     selectedKeys?: string[];
     style?: string[];
     onKeyDown?: (key: string) => void;
@@ -35,6 +36,7 @@ type KeyboardGBProps = {
 export const KeyboardGB: FC<KeyboardGBProps> = ({
     focusable = true,
     fullscreen = false,
+    physical = true,
     selectedKeys = [],
     style = [],
     onKeyDown,
@@ -52,6 +54,7 @@ export const KeyboardGB: FC<KeyboardGBProps> = ({
             ...style
         ].join(" ");
     useEffect(() => {
+        if (!physical) return;
         const _onKeyDown = (event: KeyboardEvent) => {
             const keyCode = KEYS[event.key];
             const isPrevent = PREVENT_KEYS[event.key] ?? false;

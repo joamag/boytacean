@@ -1,3 +1,11 @@
+.section {
+    display: none;
+}
+
+.section.visible {
+    display: block;
+}
+
 .section > .separator {
     background: #ffffff;
     height: 2px;

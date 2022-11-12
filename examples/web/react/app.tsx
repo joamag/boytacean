@@ -556,15 +556,13 @@ export const App: FC<AppProps> = ({
                     </div>
                 }
             >
-                {keyboardVisible && (
-                    <Section separatorBottom={true}>
-                        <KeyboardGB
-                            fullscreen={fullscreenState}
-                            onKeyDown={onKeyDown}
-                            onKeyUp={onKeyUp}
-                        />
-                    </Section>
-                )}
+                <Section visible={keyboardVisible} separatorBottom={true}>
+                    <KeyboardGB
+                        fullscreen={fullscreenState}
+                        onKeyDown={onKeyDown}
+                        onKeyUp={onKeyUp}
+                    />
+                </Section>
                 <Title
                     text={emulator.name}
                     version={emulator.version}
