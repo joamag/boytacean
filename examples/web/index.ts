@@ -279,7 +279,6 @@ class GameboyEmulator extends EmulatorBase implements Emulator {
             case "neo":
                 this.gameBoy = new GameBoy();
                 break;
-
             default:
                 if (!this.gameBoy) {
                     throw new Error("No engine requested");

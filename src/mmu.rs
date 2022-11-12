@@ -26,8 +26,8 @@ pub struct Mmu {
     rom: Cartridge,
 
     /// Flag that control the access to the boot section in the
-    /// 0x0000-0x00fe memory area, this flag should be unset after
-    /// the bool sequence has been finished.
+    /// 0x0000-0x00FE memory area, this flag should be unset after
+    /// the boot sequence has been finished.
     boot_active: bool,
 
     boot: [u8; BOOT_SIZE],

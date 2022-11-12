@@ -92,6 +92,10 @@ export const Display: FC<DisplayProps> = ({
             resizeRef.current();
             document.getElementsByTagName("body")[0].style.overflow = "hidden";
             window.addEventListener("resize", resizeRef.current);
+
+            // requests the browser to go fullscreen using the
+            // body of the document as the entry HTML element
+            document.body.requestFullscreen();
         } else {
             setWidth(undefined);
             setHeight(undefined);
@@ -99,6 +103,10 @@ export const Display: FC<DisplayProps> = ({
                 .getElementsByTagName("body")[0]
                 .style.removeProperty("overflow");
             window.removeEventListener("resize", resizeRef.current);
+
+            // restores the window mode, returning from the
+            // fullscreen browser
+            document.exitFullscreen();
         }
         return () => {
             window.removeEventListener("resize", resizeRef.current);
