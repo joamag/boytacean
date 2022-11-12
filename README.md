@@ -4,6 +4,16 @@ A Game Boy emulator that is written in Rust 🦀.
 
 **This emulator has been written for educational purposes and shouldn't be taken to seriously.** But yeahh it plays games, which is cool... 🎮
 
+## Features
+
+* Supports Game Boy (DMG) emulation
+* Simple navigable source-code
+* Web and SDL front-ends
+* Fullscreen mode
+* Support for multiple MBCs: MBC1, MBC2, MBC3, and MBC5
+* Variable CPU clock speed
+* Debug mode: VRAM and registers
+
 ## Deployments
 
 | Provider  | Stable  | URL                                                              |
