@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-*
+* Critical error that prevented physical keyboard from working
 
 ## [0.4.4] - 2022-11-12
 
