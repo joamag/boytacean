@@ -333,13 +333,11 @@ export const App: FC<AppProps> = ({
                     event.stopPropagation();
                     event.preventDefault();
                     break;
-
                 case "-":
                     setKeyaction("Minus");
                     event.stopPropagation();
                     event.preventDefault();
                     break;
-
                 case "Escape":
                     setKeyaction("Escape");
                     event.stopPropagation();
