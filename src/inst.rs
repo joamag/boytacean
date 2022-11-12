@@ -171,7 +171,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &str); 256] = [
     (sbc_a_l, 4, "SBC A, L"),
     (sbc_a_mhl, 8, "SBC A, [HL]"),
     (sbc_a_a, 4, "SBC A, A"),
-    // 0xa opcodes
+    // 0xA opcodes
     (and_a_b, 4, "AND A, B"),
     (and_a_c, 4, "AND A, C"),
     (and_a_d, 4, "AND A, D"),
@@ -188,7 +188,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &str); 256] = [
     (xor_a_l, 4, "XOR A, L"),
     (xor_a_mhl, 8, "XOR A, [HL]"),
     (xor_a_a, 4, "XOR A, A"),
-    // 0xb opcodes
+    // 0xB opcodes
     (or_a_b, 4, "OR A, B"),
     (or_a_c, 4, "OR A, C"),
     (or_a_d, 4, "OR A, D"),
@@ -205,7 +205,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &str); 256] = [
     (cp_a_l, 4, "CP A, L"),
     (cp_a_mhl, 8, "CP A, [HL]"),
     (cp_a_a, 4, "CP A, A"),
-    // 0xc opcodes
+    // 0xC opcodes
     (ret_nz, 8, "RET NZ"),
     (pop_bc, 12, "POP BC"),
     (jp_nz_u16, 12, "JP NZ, u16"),
@@ -222,7 +222,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &str); 256] = [
     (call_u16, 24, "CALL u16"),
     (adc_a_u8, 8, "ADC A, u8 "),
     (rst_08h, 16, "RST 08h"),
-    // 0xd opcodes
+    // 0xD opcodes
     (ret_nc, 8, "RET NC"),
     (pop_de, 12, "POP DE"),
     (jp_nc_u16, 12, "JP NC, u16"),
@@ -239,7 +239,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &str); 256] = [
     (illegal, 4, "ILLEGAL"),
     (sbc_a_u8, 8, "SBC A, u8"),
     (rst_18h, 16, "RST 18h"),
-    // 0xe opcodes
+    // 0xE opcodes
     (ld_mff00u8_a, 12, "LD [FF00+u8], A"),
     (pop_hl, 12, "POP HL"),
     (ld_mff00c_a, 8, "LD [FF00+C], A"),
@@ -256,7 +256,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &str); 256] = [
     (illegal, 4, "ILLEGAL"),
     (xor_a_u8, 8, "XOR A, u8"),
     (rst_28h, 16, "RST 28h"),
-    // 0xf opcodes
+    // 0xF opcodes
     (ld_a_mff00u8, 12, "LD A, [FF00+u8]"),
     (pop_af, 12, "POP AF"),
     (ld_a_mff00c, 8, "LD A, [FF00+C]"),
@@ -446,7 +446,7 @@ pub const EXTENDED: [(fn(&mut Cpu), u8, &str); 256] = [
     (res_3_l, 8, "RES 3, L"),
     (res_3_mhl, 16, "RES 3, A"),
     (res_3_a, 8, "RES 3, A"),
-    // 0xa opcodes
+    // 0xA opcodes
     (res_4_b, 8, "RES 4, B"),
     (res_4_c, 8, "RES 4, C"),
     (res_4_d, 8, "RES 4, D"),
@@ -463,7 +463,7 @@ pub const EXTENDED: [(fn(&mut Cpu), u8, &str); 256] = [
     (res_5_l, 8, "RES 5, L"),
     (res_5_mhl, 16, "RES 5, A"),
     (res_5_a, 8, "RES 5, A"),
-    // 0xb opcodes
+    // 0xB opcodes
     (res_6_b, 8, "RES 6, B"),
     (res_6_c, 8, "RES 6, C"),
     (res_6_d, 8, "RES 6, D"),
@@ -480,7 +480,7 @@ pub const EXTENDED: [(fn(&mut Cpu), u8, &str); 256] = [
     (res_7_l, 8, "RES 7, L"),
     (res_7_mhl, 16, "RES 7, A"),
     (res_7_a, 8, "RES 7, A"),
-    // 0xc opcodes
+    // 0xC opcodes
     (set_0_b, 8, "SET 0, B"),
     (set_0_c, 8, "SET 0, C"),
     (set_0_d, 8, "SET 0, D"),
@@ -497,7 +497,7 @@ pub const EXTENDED: [(fn(&mut Cpu), u8, &str); 256] = [
     (set_1_l, 8, "SET 1, L"),
     (set_1_mhl, 16, "SET 1, [HL]"),
     (set_1_a, 8, "SET 1, A"),
-    // 0xd opcodes
+    // 0xD opcodes
     (set_2_b, 8, "SET 2, B"),
     (set_2_c, 8, "SET 2, C"),
     (set_2_d, 8, "SET 2, D"),
@@ -514,7 +514,7 @@ pub const EXTENDED: [(fn(&mut Cpu), u8, &str); 256] = [
     (set_3_l, 8, "SET 3, L"),
     (set_3_mhl, 16, "SET 3, [HL]"),
     (set_3_a, 8, "SET 3, A"),
-    // 0xe opcodes
+    // 0xE opcodes
     (set_4_b, 8, "SET 4, B"),
     (set_4_c, 8, "SET 4, C"),
     (set_4_d, 8, "SET 4, D"),
@@ -531,7 +531,7 @@ pub const EXTENDED: [(fn(&mut Cpu), u8, &str); 256] = [
     (set_5_l, 8, "SET 5, L"),
     (set_5_mhl, 16, "SET 5, [HL]"),
     (set_5_a, 8, "SET 5, A"),
-    // 0xf opcodes
+    // 0xF opcodes
     (set_6_b, 8, "SET 6, B"),
     (set_6_c, 8, "SET 6, C"),
     (set_6_d, 8, "SET 6, D"),
