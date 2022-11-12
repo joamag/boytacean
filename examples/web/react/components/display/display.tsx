@@ -31,6 +31,7 @@ type DisplayProps = {
     options?: DisplayOptions;
     size?: string;
     fullscreen?: boolean;
+    nativeFullscreen?: boolean;
     style?: string[];
     onDrawHandler?: (caller: DrawHandler) => void;
     onClearHandler?: (caller: ClearHandler) => void;
@@ -50,6 +51,7 @@ export const Display: FC<DisplayProps> = ({
     options = { width: 320, height: 288, logicWidth: 160, logicHeight: 144 },
     size = "small",
     fullscreen = false,
+    nativeFullscreen = true,
     style = [],
     onDrawHandler,
     onClearHandler,
@@ -95,7 +97,7 @@ export const Display: FC<DisplayProps> = ({
 
             // requests the browser to go fullscreen using the
             // body of the document as the entry HTML element
-            document.body.requestFullscreen();
+            nativeFullscreen && document.body?.requestFullscreen();
         } else {
             setWidth(undefined);
             setHeight(undefined);
@@ -106,7 +108,7 @@ export const Display: FC<DisplayProps> = ({
 
             // restores the window mode, returning from the
             // fullscreen browser
-            document.exitFullscreen();
+            nativeFullscreen && document?.exitFullscreen();
         }
         return () => {
             window.removeEventListener("resize", resizeRef.current);
