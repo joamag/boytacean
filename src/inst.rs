@@ -1,6 +1,6 @@
 use crate::cpu::Cpu;
 
-pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
+pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &str); 256] = [
     // 0x0 opcodes
     (nop, 4, "NOP"),
     (ld_bc_u16, 12, "LD BC, u16"),
@@ -275,7 +275,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &'static str); 256] = [
     (rst_38h, 16, "RST 38h"),
 ];
 
-pub const EXTENDED: [(fn(&mut Cpu), u8, &'static str); 256] = [
+pub const EXTENDED: [(fn(&mut Cpu), u8, &str); 256] = [
     // 0x0 opcodes
     (rlc_b, 8, "RLC B"),
     (rlc_c, 8, "RLC C"),

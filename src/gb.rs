@@ -24,6 +24,25 @@ pub struct GameBoy {
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
+pub struct Registers {
+    pub pc: u16,
+    pub sp: u16,
+    pub a: u8,
+    pub b: u8,
+    pub c: u8,
+    pub d: u8,
+    pub e: u8,
+    pub h: u8,
+    pub l: u8,
+    pub scy: u8,
+    pub scx: u8,
+    pub wy: u8,
+    pub wx: u8,
+    pub ly: u8,
+    pub lyc: u8,
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
 impl GameBoy {
     #[cfg_attr(feature = "wasm", wasm_bindgen(constructor))]
     pub fn new() -> Self {
@@ -32,7 +51,7 @@ impl GameBoy {
         let timer = Timer::new();
         let mmu = Mmu::new(ppu, pad, timer);
         let cpu = Cpu::new(mmu);
-        Self { cpu: cpu }
+        Self { cpu }
     }
 
     pub fn reset(&mut self) {
@@ -113,6 +132,27 @@ impl GameBoy {
         self.frame_buffer().to_vec()
     }
 
+    pub fn registers(&mut self) -> Registers {
+        let ppu_registers = self.ppu().registers();
+        Registers {
+            pc: self.cpu.pc,
+            sp: self.cpu.sp,
+            a: self.cpu.a,
+            b: self.cpu.b,
+            c: self.cpu.c,
+            d: self.cpu.d,
+            e: self.cpu.e,
+            h: self.cpu.h,
+            l: self.cpu.l,
+            scy: ppu_registers.scy,
+            scx: ppu_registers.scx,
+            wy: ppu_registers.wy,
+            wx: ppu_registers.wx,
+            ly: ppu_registers.ly,
+            lyc: ppu_registers.lyc,
+        }
+    }
+
     /// Obtains the tile structure for the tile at the
     /// given index, no conversion in the pixel buffer
     /// is done so that the color reference is the GB one.
@@ -129,6 +169,8 @@ impl GameBoy {
     }
 }
 
+/// Gameboy implementations that are meant with performance
+/// in mind and that do not support WASM interface of copy.
 impl GameBoy {
     /// The logical frequency of the Game Boy
     /// CPU in hz.

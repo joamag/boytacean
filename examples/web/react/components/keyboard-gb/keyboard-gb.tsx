@@ -1,11 +1,32 @@
-import React, { FC, useState } from "react";
+import React, { FC, useEffect, useRef, useState } from "react";
 
 import "./keyboard-gb.css";
+
+const KEYS: Record<string, string> = {
+    ArrowUp: "ArrowUp",
+    ArrowDown: "ArrowDown",
+    ArrowLeft: "ArrowLeft",
+    ArrowRight: "ArrowRight",
+    Enter: "Start",
+    " ": "Select",
+    a: "A",
+    s: "B"
+};
+
+const PREVENT_KEYS: Record<string, boolean> = {
+    ArrowUp: true,
+    ArrowDown: true,
+    ArrowLeft: true,
+    ArrowRight: true,
+    " ": true
+};
 
 declare const require: any;
 
 type KeyboardGBProps = {
     focusable?: boolean;
+    fullscreen?: boolean;
+    selectedKeys?: string[];
     style?: string[];
     onKeyDown?: (key: string) => void;
     onKeyUp?: (key: string) => void;
@@ -13,22 +34,69 @@ type KeyboardGBProps = {
 
 export const KeyboardGB: FC<KeyboardGBProps> = ({
     focusable = true,
+    fullscreen = false,
+    selectedKeys = [],
     style = [],
     onKeyDown,
     onKeyUp
 }) => {
-    const classes = () => ["keyboard", "keyboard-gb", ...style].join(" ");
+    const containerClasses = () =>
+        ["keyboard-container", fullscreen ? "fullscreen" : ""].join(" ");
+    const recordRef =
+        useRef<Record<string, React.Dispatch<React.SetStateAction<boolean>>>>();
+    const classes = () =>
+        [
+            "keyboard",
+            "keyboard-gb",
+            fullscreen ? "fullscreen" : "",
+            ...style
+        ].join(" ");
+    useEffect(() => {
+        const _onKeyDown = (event: KeyboardEvent) => {
+            const keyCode = KEYS[event.key];
+            const isPrevent = PREVENT_KEYS[event.key] ?? false;
+            if (isPrevent) event.preventDefault();
+            if (keyCode !== undefined) {
+                const records = recordRef.current ?? {};
+                const setter = records[keyCode];
+                setter(true);
+                onKeyDown && onKeyDown(keyCode);
+                return;
+            }
+        };
+        const _onKeyUp = (event: KeyboardEvent) => {
+            const keyCode = KEYS[event.key];
+            const isPrevent = PREVENT_KEYS[event.key] ?? false;
+            if (isPrevent) event.preventDefault();
+            if (keyCode !== undefined) {
+                const records = recordRef.current ?? {};
+                const setter = records[keyCode];
+                setter(false);
+                onKeyUp && onKeyUp(keyCode);
+                return;
+            }
+        };
+        document.addEventListener("keydown", _onKeyDown);
+        document.addEventListener("keyup", _onKeyUp);
+        return () => {
+            document.removeEventListener("keydown", _onKeyDown);
+            document.removeEventListener("keyup", _onKeyUp);
+        };
+    }, []);
     const renderKey = (
         key: string,
         keyName?: string,
+        selected = false,
         styles: string[] = []
     ) => {
-        const [pressed, setPressed] = useState(false);
+        const [pressed, setPressed] = useState(selected);
+        const classes = ["key", pressed ? "pressed" : "", ...styles].join(" ");
+        const records = recordRef.current ?? {};
+        records[keyName ?? key ?? "undefined"] = setPressed;
+        recordRef.current = records;
         return (
             <span
-                className={["key", pressed ? "pressed" : "", ...styles].join(
-                    " "
-                )}
+                className={classes}
                 key={keyName ?? key}
                 tabIndex={focusable ? 0 : undefined}
                 onKeyDown={(event) => {
@@ -86,31 +154,63 @@ export const KeyboardGB: FC<KeyboardGBProps> = ({
         );
     };
     return (
-        <div
-            className={classes()}
-            onTouchStart={(e) => e.preventDefault()}
-            onTouchEnd={(e) => e.preventDefault()}
-        >
-            <div className="dpad">
-                <div className="dpad-top">
-                    {renderKey("▲", "ArrowUp", ["up"])}
+        <div className={containerClasses()}>
+            <div
+                className={classes()}
+                onTouchStart={(e) => e.preventDefault()}
+                onTouchEnd={(e) => e.preventDefault()}
+            >
+                <div className="dpad">
+                    <div className="dpad-top">
+                        {renderKey(
+                            "▲",
+                            "ArrowUp",
+                            selectedKeys.includes("ArrowUp"),
+                            ["up"]
+                        )}
+                    </div>
+                    <div>
+                        {renderKey(
+                            "◄",
+                            "ArrowLeft",
+                            selectedKeys.includes("ArrowLeft"),
+                            ["left"]
+                        )}
+                        {renderKey(
+                            "►",
+                            "ArrowRight",
+                            selectedKeys.includes("ArrowRight"),
+                            ["right"]
+                        )}
+                    </div>
+                    <div className="dpad-bottom">
+                        {renderKey(
+                            "▼",
+                            "ArrowDown",
+                            selectedKeys.includes("ArrowDown"),
+                            ["down"]
+                        )}
+                    </div>
                 </div>
-                <div>
-                    {renderKey("◄", "ArrowLeft", ["left"])}
-                    {renderKey("►", "ArrowRight", ["right"])}
+                <div className="action">
+                    {renderKey("B", "B", selectedKeys.includes("B"), ["b"])}
+                    {renderKey("A", "A", selectedKeys.includes("A"), ["a"])}
                 </div>
-                <div className="dpad-bottom">
-                    {renderKey("▼", "ArrowDown", ["down"])}
+                <div className="break"></div>
+                <div className="options">
+                    {renderKey(
+                        "START",
+                        "Start",
+                        selectedKeys.includes("Start"),
+                        ["start"]
+                    )}
+                    {renderKey(
+                        "SELECT",
+                        "Select",
+                        selectedKeys.includes("Select"),
+                        ["select"]
+                    )}
                 </div>
-            </div>
-            <div className="action">
-                {renderKey("B", "B", ["b"])}
-                {renderKey("A", "A", ["a"])}
-            </div>
-            <div className="break"></div>
-            <div className="options">
-                {renderKey("START", "Start", ["start"])}
-                {renderKey("SELECT", "Select", ["select"])}
             </div>
         </div>
     );

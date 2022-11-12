@@ -3,7 +3,7 @@ use wasm_bindgen::prelude::*;
 
 use crate::warnln;
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum PadSelection {
     Action,
     Direction,

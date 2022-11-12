@@ -32,6 +32,18 @@ npm install && npm run build
 cd dist && python3 -m http.server
 ```
 
+## Web version
+
+You can use some GET parameters to control the initial behaviour of the emulator.
+
+| Parameter    | Type    | Description                                                                    |
+| ------------ | ------- | ------------------------------------------------------------------------------ |
+| `rom_url`    | String  | The URL from which the initial ROM is going to be loaded, should support CORS. |
+| `url`        | String  | The same as `url`.                                                             |
+| `fullscreen` | Boolean | If the emulator should start in fullscreen mode.                               |
+| `debug`      | Boolean | If the "debugger" should start visible.                                        |
+| `keyboard`   | Boolean | If the on screen keyboard should start visible.                                |
+
 ## Inspiration
 
 ### Documentation

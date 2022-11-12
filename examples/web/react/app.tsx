@@ -1,6 +1,8 @@
 import React, { FC, useEffect, useRef, useState } from "react";
 import ReactDOM from "react-dom/client";
 
+const FREQUENCY_DELTA = 100000;
+
 declare const require: any;
 
 import {
@@ -20,6 +22,7 @@ import {
     Pair,
     PanelSplit,
     Paragraph,
+    RegistersGB,
     Section,
     Tiles,
     Title,
@@ -97,6 +100,10 @@ export interface Emulator extends ObservableI {
      */
     get device(): string;
 
+    /**
+     * A URL to a website that describes the device that is
+     * being emulated by the emulator (eg: Wikipedia link).
+     */
     get deviceUrl(): string | undefined;
 
     /**
@@ -124,6 +131,12 @@ export interface Emulator extends ObservableI {
      * by the emulator.
      */
     get engine(): string | null;
+
+    /**
+     * The complete set of file extensions that this emulator
+     * supports.
+     */
+    get romExts(): string[];
 
     /**
      * The pixel format of the emulator's display
@@ -155,10 +168,29 @@ export interface Emulator extends ObservableI {
     set frequency(value: number);
 
     /**
+     * The recommended frequency delta in hertz for scale up
+     * and scale down operations in the CPU frequency.
+     */
+    get frequencyDelta(): number | null;
+
+    /**
      * The current logic framerate of the running emulator.
      */
     get framerate(): number;
 
+    /**
+     * A dictionary that contains the register names associated
+     * with their value either as strings or numbers.
+     */
+    get registers(): Record<string, string | number>;
+
+    /**
+     * Obtains the pixel buffer for the VRAM tile at the given
+     * index.
+     *
+     * @param index The index of the tile to obtain pixel buffer.
+     * @returns The pixel buffer of the tile at the given index.
+     */
     getTile(index: number): Uint8Array;
 
     /**
@@ -210,6 +242,10 @@ export class EmulatorBase extends Observable {
     get versionUrl(): string | undefined {
         return undefined;
     }
+
+    get frequencyDelta(): number | null {
+        return FREQUENCY_DELTA;
+    }
 }
 
 /**
@@ -223,6 +259,9 @@ export enum PixelFormat {
 
 type AppProps = {
     emulator: Emulator;
+    fullscreen?: boolean;
+    debug?: boolean;
+    keyboard?: boolean;
     backgrounds?: string[];
 };
 
@@ -230,9 +269,15 @@ const isTouchDevice = () => {
     return "ontouchstart" in window || navigator.maxTouchPoints > 0;
 };
 
-export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
+export const App: FC<AppProps> = ({
+    emulator,
+    fullscreen = false,
+    debug = false,
+    keyboard = false,
+    backgrounds = ["264653"]
+}) => {
     const [paused, setPaused] = useState(false);
-    const [fullscreen, setFullscreen] = useState(false);
+    const [fullscreenState, setFullscreenState] = useState(fullscreen);
     const [backgroundIndex, setBackgroundIndex] = useState(0);
     const [romInfo, setRomInfo] = useState<RomInfo>({});
     const [framerate, setFramerate] = useState(0);
@@ -243,9 +288,11 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
     const [toastText, setToastText] = useState<string>();
     const [toastError, setToastError] = useState(false);
     const [toastVisible, setToastVisible] = useState(false);
-    const [keyboardVisible, setKeyboardVisible] = useState(isTouchDevice());
+    const [keyboardVisible, setKeyboardVisible] = useState(
+        isTouchDevice() || keyboard
+    );
     const [infoVisible, setInfoVisible] = useState(true);
-    const [debugVisible, setDebugVisible] = useState(false);
+    const [debugVisible, setDebugVisible] = useState(debug);
 
     const toastCounterRef = useRef(0);
     const frameRef = useRef<boolean>(false);
@@ -258,22 +305,46 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
     }, [backgroundIndex]);
     useEffect(() => {
         switch (keyaction) {
+            case "Plus":
+                emulator.frequency +=
+                    emulator.frequencyDelta ?? FREQUENCY_DELTA;
+                setKeyaction(undefined);
+                break;
+            case "Minus":
+                emulator.frequency -=
+                    emulator.frequencyDelta ?? FREQUENCY_DELTA;
+                setKeyaction(undefined);
+                break;
             case "Escape":
-                setFullscreen(false);
+                setFullscreenState(false);
                 setKeyaction(undefined);
                 break;
             case "Fullscreen":
-                setFullscreen(!fullscreen);
+                setFullscreenState(!fullscreenState);
                 setKeyaction(undefined);
                 break;
         }
     }, [keyaction]);
     useEffect(() => {
         const onKeyDown = (event: KeyboardEvent) => {
-            if (event.key === "Escape") {
-                setKeyaction("Escape");
-                event.stopPropagation();
-                event.preventDefault();
+            switch (event.key) {
+                case "+":
+                    setKeyaction("Plus");
+                    event.stopPropagation();
+                    event.preventDefault();
+                    break;
+
+                case "-":
+                    setKeyaction("Minus");
+                    event.stopPropagation();
+                    event.preventDefault();
+                    break;
+
+                case "Escape":
+                    setKeyaction("Escape");
+                    event.stopPropagation();
+                    event.preventDefault();
+                    break;
             }
             if (event.key === "f" && event.ctrlKey === true) {
                 setKeyaction("Fullscreen");
@@ -334,9 +405,8 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
     };
 
     const onFile = async (file: File) => {
-        // @todo must make this more flexible and not just
-        // Game Boy only (using the emulator interface)
-        if (!file.name.endsWith(".gb")) {
+        const fileExtension = file.name.split(".").pop() ?? "";
+        if (!emulator.romExts.includes(fileExtension)) {
             showToast(
                 `This is probably not a ${emulator.device} ROM file!`,
                 true
@@ -393,7 +463,7 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
         );
     };
     const onFullscreenClick = () => {
-        setFullscreen(!fullscreen);
+        setFullscreenState(!fullscreenState);
     };
     const onKeyboardClick = () => {
         setKeyboardVisible(!keyboardVisible);
@@ -428,7 +498,7 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
         });
     };
     const onMinimize = () => {
-        setFullscreen(!fullscreen);
+        setFullscreenState(!fullscreenState);
     };
     const onKeyDown = (key: string) => {
         emulator.keyPress(key);
@@ -478,7 +548,7 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
                 left={
                     <div className="display-container">
                         <Display
-                            fullscreen={fullscreen}
+                            fullscreen={fullscreenState}
                             onDrawHandler={onDrawHandler}
                             onClearHandler={onClearHandler}
                             onMinimize={onMinimize}
@@ -488,7 +558,11 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
             >
                 {keyboardVisible && (
                     <Section separatorBottom={true}>
-                        <KeyboardGB onKeyDown={onKeyDown} onKeyUp={onKeyUp} />
+                        <KeyboardGB
+                            fullscreen={fullscreenState}
+                            onKeyDown={onKeyDown}
+                            onKeyUp={onKeyUp}
+                        />
                     </Section>
                 )}
                 <Title
@@ -536,11 +610,33 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
                 </Section>
                 {debugVisible && (
                     <Section>
-                        <h3>VRAM Tiles</h3>
-                        <Tiles
-                            getTile={(index) => emulator.getTile(index)}
-                            tileCount={384}
-                        />
+                        <div
+                            style={{
+                                display: "inline-block",
+                                verticalAlign: "top",
+                                marginRight: 32,
+                                width: 256
+                            }}
+                        >
+                            <h3>VRAM Tiles</h3>
+                            <Tiles
+                                getTile={(index) => emulator.getTile(index)}
+                                tileCount={384}
+                                width={"100%"}
+                                contentBox={false}
+                            />
+                        </div>
+                        <div
+                            style={{
+                                display: "inline-block",
+                                verticalAlign: "top"
+                            }}
+                        >
+                            <h3>Registers</h3>
+                            <RegistersGB
+                                getRegisters={() => emulator.registers}
+                            />
+                        </div>
                     </Section>
                 )}
                 {infoVisible && (
@@ -582,7 +678,12 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
                                 valueNode={
                                     <ButtonIncrement
                                         value={emulator.frequency / 1000 / 1000}
-                                        delta={0.4}
+                                        delta={
+                                            (emulator.frequencyDelta ??
+                                                FREQUENCY_DELTA) /
+                                            1000 /
+                                            1000
+                                        }
                                         min={0}
                                         suffix={"MHz"}
                                         decimalPlaces={2}
@@ -688,16 +789,33 @@ export const App: FC<AppProps> = ({ emulator, backgrounds = ["264653"] }) => {
 
 export const startApp = (
     element: string,
-    emulator: Emulator,
-    backgrounds: string[]
+    {
+        emulator,
+        fullscreen = false,
+        debug = false,
+        keyboard = false,
+        backgrounds = []
+    }: {
+        emulator: Emulator;
+        fullscreen?: boolean;
+        debug?: boolean;
+        keyboard?: boolean;
+        backgrounds: string[];
+    }
 ) => {
     const elementRef = document.getElementById(element);
-    if (!elementRef) {
-        return;
-    }
+    if (!elementRef) return;
 
     const root = ReactDOM.createRoot(elementRef);
-    root.render(<App emulator={emulator} backgrounds={backgrounds} />);
+    root.render(
+        <App
+            emulator={emulator}
+            fullscreen={fullscreen}
+            debug={debug}
+            keyboard={keyboard}
+            backgrounds={backgrounds}
+        />
+    );
 };
 
 export default App;

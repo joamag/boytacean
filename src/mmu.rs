@@ -37,9 +37,9 @@ pub struct Mmu {
 impl Mmu {
     pub fn new(ppu: Ppu, pad: Pad, timer: Timer) -> Self {
         Self {
-            ppu: ppu,
-            pad: pad,
-            timer: timer,
+            ppu,
+            pad,
+            timer,
             rom: Cartridge::new(),
             boot_active: true,
             boot: [0u8; BOOT_SIZE],
@@ -119,11 +119,10 @@ impl Mmu {
                 0xe00 => self.ppu.oam[(addr & 0x009f) as usize],
                 0xf00 => match addr & 0x00ff {
                     0x0f => {
-                        let value = if self.ppu.int_vblank() { 0x01 } else { 0x00 }
+                        (if self.ppu.int_vblank() { 0x01 } else { 0x00 }
                             | if self.ppu.int_stat() { 0x02 } else { 0x00 }
                             | if self.timer.int_tima() { 0x04 } else { 0x00 }
-                            | if self.pad.int_pad() { 0x10 } else { 0x00 };
-                        value
+                            | if self.pad.int_pad() { 0x10 } else { 0x00 })
                     }
                     0x80..=0xfe => self.ppu.hram[(addr & 0x007f) as usize],
                     0xff => self.ie,
@@ -245,7 +244,7 @@ impl Mmu {
             data.push(byte);
         }
 
-        return data;
+        data
     }
 
     pub fn write_boot(&mut self, addr: u16, buffer: &[u8]) {

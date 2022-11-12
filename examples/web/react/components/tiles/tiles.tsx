@@ -5,19 +5,24 @@ import Canvas, { CanvasStructure } from "../canvas/canvas";
 import "./tiles.css";
 
 type TilesProps = {
-    tileCount: number;
     getTile: (index: number) => Uint8Array;
+    tileCount: number;
+    width?: number | string;
+    contentBox?: boolean;
     interval?: number;
     style?: string[];
 };
 
 export const Tiles: FC<TilesProps> = ({
-    tileCount,
     getTile,
-    interval = 500,
+    tileCount,
+    width,
+    contentBox = true,
+    interval = 1000,
     style = []
 }) => {
-    const classes = () => ["tiles", ...style].join(" ");
+    const classes = () =>
+        ["tiles", contentBox ? "content-box" : "", ...style].join(" ");
     const intervalsRef = useRef<number>();
     useEffect(() => {
         return () => {
@@ -38,7 +43,13 @@ export const Tiles: FC<TilesProps> = ({
     };
     return (
         <div className={classes()}>
-            <Canvas width={128} height={192} scale={2} onCanvas={onCanvas} />
+            <Canvas
+                width={128}
+                height={192}
+                scale={2}
+                scaledWidth={width}
+                onCanvas={onCanvas}
+            />
         </div>
     );
 };

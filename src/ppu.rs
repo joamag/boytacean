@@ -51,7 +51,7 @@ pub type Palette = [Pixel; PALETTE_SIZE];
 /// Represents a tile within the Game Boy context,
 /// should contain the pixel buffer of the tile.
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Tile {
     buffer: [u8; 64],
 }
@@ -93,14 +93,14 @@ impl Display for Tile {
             for x in 0..8 {
                 buffer.push_str(format!("{}", self.get(x, y)).as_str());
             }
-            buffer.push_str("\n");
+            buffer.push('\n');
         }
         write!(f, "{}", buffer)
     }
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct ObjectData {
     x: i16,
     y: i16,
@@ -120,6 +120,15 @@ impl Display for ObjectData {
             self.index, self.x, self.y, self.tile
         )
     }
+}
+
+pub struct PpuRegisters {
+    pub scy: u8,
+    pub scx: u8,
+    pub wy: u8,
+    pub wx: u8,
+    pub ly: u8,
+    pub lyc: u8,
 }
 
 /// Represents the Game Boy PPU (Pixel Processing Unit) and controls
@@ -262,7 +271,7 @@ pub struct Ppu {
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum PpuMode {
     HBlank = 0,
     VBlank = 1,
@@ -425,24 +434,22 @@ impl Ppu {
     pub fn read(&mut self, addr: u16) -> u8 {
         match addr & 0x00ff {
             0x0040 => {
-                let value = if self.switch_bg { 0x01 } else { 0x00 }
+                (if self.switch_bg { 0x01 } else { 0x00 }
                     | if self.switch_obj { 0x02 } else { 0x00 }
                     | if self.obj_size { 0x04 } else { 0x00 }
                     | if self.bg_map { 0x08 } else { 0x00 }
                     | if self.bg_tile { 0x10 } else { 0x00 }
                     | if self.switch_window { 0x20 } else { 0x00 }
                     | if self.window_map { 0x40 } else { 0x00 }
-                    | if self.switch_lcd { 0x80 } else { 0x00 };
-                value
+                    | if self.switch_lcd { 0x80 } else { 0x00 })
             }
             0x0041 => {
-                let value = if self.stat_hblank { 0x08 } else { 0x00 }
+                (if self.stat_hblank { 0x08 } else { 0x00 }
                     | if self.stat_vblank { 0x10 } else { 0x00 }
                     | if self.stat_oam { 0x20 } else { 0x00 }
                     | if self.stat_lyc { 0x40 } else { 0x00 }
                     | if self.lyc == self.ly { 0x04 } else { 0x00 }
-                    | (self.mode as u8 & 0x03);
-                value
+                    | (self.mode as u8 & 0x03))
             }
             0x0042 => self.scy,
             0x0043 => self.scx,
@@ -664,12 +671,23 @@ impl Ppu {
             0x02 => obj.tile = value,
             0x03 => {
                 obj.palette = if value & 0x10 == 0x10 { 1 } else { 0 };
-                obj.xflip = if value & 0x20 == 0x20 { true } else { false };
-                obj.yflip = if value & 0x40 == 0x40 { true } else { false };
-                obj.priority = if value & 0x80 == 0x80 { false } else { true };
+                obj.xflip = value & 0x20 == 0x20;
+                obj.yflip = value & 0x40 == 0x40;
+                obj.priority = value & 0x80 != 0x80;
                 obj.index = obj_index as u8;
             }
             _ => (),
+        }
+    }
+
+    pub fn registers(&self) -> PpuRegisters {
+        PpuRegisters {
+            scy: self.scy,
+            scx: self.scx,
+            wy: self.wy,
+            wx: self.wx,
+            ly: self.ly,
+            lyc: self.lyc,
         }
     }
 
@@ -846,7 +864,7 @@ impl Ppu {
                     tile = &self.tiles[obj.tile as usize & 0xfe];
                 } else {
                     tile = &self.tiles[obj.tile as usize | 0x01];
-                    tile_offset = tile_offset - 8;
+                    tile_offset -= 8;
                 }
             }
             // otherwise we're facing a 8x8 sprite and we should grab

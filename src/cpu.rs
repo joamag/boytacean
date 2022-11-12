@@ -21,12 +21,16 @@ pub struct Cpu {
     pub e: u8,
     pub h: u8,
     pub l: u8,
+
     ime: bool,
     zero: bool,
     sub: bool,
     half_carry: bool,
     carry: bool,
     halted: bool,
+
+    /// Reference to the MMU (Memory Management Unit) to be used
+    /// for memory bus access operations.
     pub mmu: Mmu,
 
     /// Temporary counter used to control the number of cycles
@@ -52,7 +56,7 @@ impl Cpu {
             half_carry: false,
             carry: false,
             halted: false,
-            mmu: mmu,
+            mmu,
             cycles: 0,
         }
     }
@@ -113,14 +117,13 @@ impl Cpu {
 
         // @todo this is so bad, need to improve this by an order
         // of magnitude, to be able to have better performance
-        if self.halted {
-            if ((self.mmu.ie & 0x01 == 0x01) && self.mmu.ppu().int_vblank())
+        if self.halted
+            && (((self.mmu.ie & 0x01 == 0x01) && self.mmu.ppu().int_vblank())
                 || ((self.mmu.ie & 0x02 == 0x02) && self.mmu.ppu().int_stat())
                 || ((self.mmu.ie & 0x04 == 0x04) && self.mmu.timer().int_tima())
-                || ((self.mmu.ie & 0x10 == 0x10) && self.mmu.pad().int_pad())
-            {
-                self.halted = false;
-            }
+                || ((self.mmu.ie & 0x10 == 0x10) && self.mmu.pad().int_pad()))
+        {
+            self.halted = false;
         }
 
         if self.ime {

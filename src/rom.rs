@@ -475,7 +475,7 @@ pub static MBC1: Mbc = Mbc {
             // ROM bank selection 5 lower bits
             0x2000 | 0x3000 => {
                 let mut rom_bank = value & 0x1f;
-                rom_bank = rom_bank & (rom.rom_bank_count * 2 - 1) as u8;
+                rom_bank &= (rom.rom_bank_count * 2 - 1) as u8;
                 if rom_bank == 0 {
                     rom_bank = 1;
                 }
@@ -537,7 +537,7 @@ pub static MBC3: Mbc = Mbc {
             // ROM bank selection
             0x2000 | 0x3000 => {
                 let mut rom_bank = value & 0x7f;
-                rom_bank = rom_bank & (rom.rom_bank_count * 2 - 1) as u8;
+                rom_bank &= (rom.rom_bank_count * 2 - 1) as u8;
                 if rom_bank == 0 {
                     rom_bank = 1;
                 }
@@ -592,7 +592,7 @@ pub static MBC5: Mbc = Mbc {
             }
             // ROM bank selection
             0x2000 => {
-                let rom_bank = value & 0xff;
+                let rom_bank = value;
                 rom.set_rom_bank(rom_bank);
             }
             // RAM bank selection

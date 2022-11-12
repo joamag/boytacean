@@ -1,11 +1,14 @@
 .tiles > .canvas {
     background-color: #1b1a17;
     border: 2px solid #50cb93;
+    padding: 8px 8px 8px 8px;
+}
+
+.tiles > .canvas.content-box {
     box-sizing: content-box;
     -o-box-sizing: content-box;
     -ms-box-sizing: content-box;
     -moz-box-sizing: content-box;
     -khtml-box-sizing: content-box;
     -webkit-box-sizing: content-box;
-    padding: 8px 8px 8px 8px;
 }

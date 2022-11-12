@@ -57,6 +57,13 @@
     -webkit-user-select: none;
 }
 
+@media only screen and (max-width: 1120px) {
+    .display > .display-minimize {
+        bottom: initial;
+        top: 22px;
+    }
+}
+
 .display > .display-minimize > img {
     height: 32px;
     width: 32px;
