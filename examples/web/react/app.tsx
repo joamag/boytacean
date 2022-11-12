@@ -326,6 +326,11 @@ export const App: FC<AppProps> = ({
         }
     }, [keyaction]);
     useEffect(() => {
+        const onFullChange = (event: Event) => {
+            if (!document.fullscreenElement) {
+                setFullscreenState(false);
+            }
+        };
         const onKeyDown = (event: KeyboardEvent) => {
             switch (event.key) {
                 case "+":
@@ -360,10 +365,12 @@ export const App: FC<AppProps> = ({
         ) => {
             showToast(params.text, params.error, params.timeout);
         };
+        document.addEventListener("fullscreenchange", onFullChange);
         document.addEventListener("keydown", onKeyDown);
         emulator.bind("booted", onBooted);
         emulator.bind("message", onMessage);
         return () => {
+            document.removeEventListener("fullscreenchange", onFullChange);
             document.removeEventListener("keydown", onKeyDown);
             emulator.unbind("booted", onBooted);
             emulator.unbind("message", onMessage);
