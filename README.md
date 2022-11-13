@@ -54,6 +54,10 @@ You can use some GET parameters to control the initial behaviour of the emulator
 | `debug`      | Boolean | If the "debugger" should start visible.                                        |
 | `keyboard`   | Boolean | If the on screen keyboard should start visible.                                |
 
+### Palettes
+
+The palettes offered in the web version were provided by [TheWolfBunny64](https://www.deviantart.com/thewolfbunny).
+
 ## Inspiration
 
 ### Documentation
