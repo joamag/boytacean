@@ -515,33 +515,15 @@ impl Ppu {
             0x0043 => self.scx = value,
             0x0045 => self.lyc = value,
             0x0047 => {
-                for index in 0..PALETTE_SIZE {
-                    let color_index: usize = (value as usize >> (index * 2)) & 3;
-                    match color_index {
-                        0..=3 => self.palette[index] = self.palette_colors[color_index],
-                        color_index => panic!("Invalid palette color index {:04x}", color_index),
-                    }
-                }
+                Self::compute_palette(&mut self.palette, &self.palette_colors, value);
                 self.palettes[0] = value;
             }
             0x0048 => {
-                for index in 0..PALETTE_SIZE {
-                    let color_index: usize = (value as usize >> (index * 2)) & 3;
-                    match color_index {
-                        0..=3 => self.palette_obj_0[index] = self.palette_colors[color_index],
-                        color_index => panic!("Invalid palette color index {:04x}", color_index),
-                    }
-                }
+                Self::compute_palette(&mut self.palette_obj_0, &self.palette_colors, value);
                 self.palettes[1] = value;
             }
             0x0049 => {
-                for index in 0..PALETTE_SIZE {
-                    let color_index: usize = (value as usize >> (index * 2)) & 3;
-                    match color_index {
-                        0..=3 => self.palette_obj_1[index] = self.palette_colors[color_index],
-                        color_index => panic!("Invalid palette color index {:04x}", color_index),
-                    }
-                }
+                Self::compute_palette(&mut self.palette_obj_1, &self.palette_colors, value);
                 self.palettes[2] = value;
             }
             0x004a => self.wy = value,
@@ -567,6 +549,7 @@ impl Ppu {
 
     pub fn set_palette_colors(&mut self, value: &Palette) {
         self.palette_colors = *value;
+        self.compute_palettes()
     }
 
     pub fn palette(&self) -> Palette {
@@ -933,6 +916,37 @@ impl Ppu {
             || self.stat_oam && self.mode == PpuMode::OamRead
             || self.stat_vblank && self.mode == PpuMode::VBlank
             || self.stat_hblank && self.mode == PpuMode::HBlank
+    }
+
+    /// Computes the values for all of the palettes, this method
+    /// is useful to "flush" color computation whenever the base
+    /// palette colors are changed.
+    fn compute_palettes(&mut self) {
+        Self::compute_palette(&mut self.palette, &self.palette_colors, self.palettes[0]);
+        Self::compute_palette(
+            &mut self.palette_obj_0,
+            &self.palette_colors,
+            self.palettes[1],
+        );
+        Self::compute_palette(
+            &mut self.palette_obj_1,
+            &self.palette_colors,
+            self.palettes[2],
+        );
+    }
+
+    /// Static method used for the base logic of computation of RGB
+    /// based palettes from the internal Game Boy color indexes.
+    /// This method should be called whenever the palette indexes
+    /// are changed.
+    fn compute_palette(palette: &mut Palette, palette_colors: &Palette, value: u8) {
+        for index in 0..PALETTE_SIZE {
+            let color_index: usize = (value as usize >> (index * 2)) & 3;
+            match color_index {
+                0..=3 => palette[index] = palette_colors[color_index],
+                color_index => panic!("Invalid palette color index {:04x}", color_index),
+            }
+        }
     }
 }
 
