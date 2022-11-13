@@ -33,6 +33,11 @@ const BACKGROUNDS = [
     "3a5a40"
 ];
 
+const PALETTES = [
+    ["ffffff", "c0c0c0", "606060", "000000"],
+    ["b6a571", "8b7e56", "554d35", "201d13"]
+];
+
 const KEYS_NAME: Record<string, number> = {
     ArrowUp: PadKey.Up,
     ArrowDown: PadKey.Down,
@@ -73,6 +78,7 @@ class GameboyEmulator extends EmulatorBase implements Emulator {
     private fps: number = 0;
     private frameStart: number = new Date().getTime();
     private frameCount: number = 0;
+    private paletteIndex: number = 0;
 
     private romName: string | null = null;
     private romData: Uint8Array | null = null;
@@ -286,13 +292,8 @@ class GameboyEmulator extends EmulatorBase implements Emulator {
                 break;
         }
 
-        // @TODO replace this with something more flexible
-        this.gameBoy.set_palette_colors_ws([
-            "b6a571",
-            "8b7e56",
-            "554d35",
-            "201d13"
-        ]);
+        // runs the initial palette update operation
+        this.updatePalette();
 
         // resets the Game Boy engine to restore it into
         // a valid state ready to be used
@@ -462,6 +463,12 @@ class GameboyEmulator extends EmulatorBase implements Emulator {
         const keyCode = KEYS_NAME[key];
         if (keyCode === undefined) return;
         this.gameBoy?.key_lift(keyCode);
+    }
+
+    updatePalette() {
+        this.gameBoy?.set_palette_colors_ws(PALETTES[this.paletteIndex]);
+        this.paletteIndex += 1;
+        this.paletteIndex %= PALETTES.length;
     }
 
     benchmark(count = 50000000) {
