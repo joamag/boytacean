@@ -346,7 +346,13 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     }
 
     get features(): Feature[] {
-        return [Feature.Debug, Feature.Palettes, Feature.Benchmark];
+        return [
+            Feature.Debug,
+            Feature.Palettes,
+            Feature.Benchmark,
+            Feature.Keyboard,
+            Feature.KeyboardGB
+        ];
     }
 
     get romExts(): string[] {

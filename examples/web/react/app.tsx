@@ -15,6 +15,7 @@ import {
     DrawHandler,
     Footer,
     Info,
+    KeyboardChip8,
     KeyboardGB,
     Link,
     Modal,
@@ -80,7 +81,10 @@ export type BenchmarkResult = {
 export enum Feature {
     Debug = 1,
     Palettes,
-    Benchmark
+    Benchmark,
+    Keyboard,
+    KeyboardChip8,
+    KeyboardGB
 }
 
 export interface ObservableI {
@@ -591,11 +595,19 @@ export const App: FC<AppProps> = ({
                 }
             >
                 <Section visible={keyboardVisible} separatorBottom={true}>
-                    <KeyboardGB
-                        fullscreen={fullscreenState}
-                        onKeyDown={onKeyDown}
-                        onKeyUp={onKeyUp}
-                    />
+                    {hasFeature(Feature.KeyboardChip8) && (
+                        <KeyboardChip8
+                            onKeyDown={onKeyDown}
+                            onKeyUp={onKeyUp}
+                        />
+                    )}
+                    {hasFeature(Feature.KeyboardGB) && (
+                        <KeyboardGB
+                            fullscreen={fullscreenState}
+                            onKeyDown={onKeyDown}
+                            onKeyUp={onKeyUp}
+                        />
+                    )}
                 </Section>
                 <Title
                     text={emulator.name}
@@ -774,14 +786,16 @@ export const App: FC<AppProps> = ({
                             style={["simple", "border", "padded"]}
                             onClick={onFullscreenClick}
                         />
-                        <Button
-                            text={"Keyboard"}
-                            image={require("../res/dialpad.svg")}
-                            imageAlt="keyboard"
-                            enabled={keyboardVisible}
-                            style={["simple", "border", "padded"]}
-                            onClick={onKeyboardClick}
-                        />
+                        {hasFeature(Feature.Keyboard) && (
+                            <Button
+                                text={"Keyboard"}
+                                image={require("../res/dialpad.svg")}
+                                imageAlt="keyboard"
+                                enabled={keyboardVisible}
+                                style={["simple", "border", "padded"]}
+                                onClick={onKeyboardClick}
+                            />
+                        )}
                         <Button
                             text={"Information"}
                             image={require("../res/info.svg")}
