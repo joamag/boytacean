@@ -34,8 +34,18 @@ const BACKGROUNDS = [
 ];
 
 const PALETTES = [
-    ["ffffff", "c0c0c0", "606060", "000000"],
-    ["b6a571", "8b7e56", "554d35", "201d13"]
+    {
+        name: "basic",
+        colors: ["ffffff", "c0c0c0", "606060", "000000"]
+    },
+    {
+        name: "hogwards",
+        colors: ["b6a571", "8b7e56", "554d35", "201d13"]
+    },
+    {
+        name: "pacman",
+        colors: ["ffff00", "ffb897", "3732ff", "000000"]
+    }
 ];
 
 const KEYS_NAME: Record<string, number> = {
@@ -466,7 +476,8 @@ class GameboyEmulator extends EmulatorBase implements Emulator {
     }
 
     updatePalette() {
-        this.gameBoy?.set_palette_colors_ws(PALETTES[this.paletteIndex]);
+        const palette = PALETTES[this.paletteIndex];
+        this.gameBoy?.set_palette_colors_ws(palette.colors);
         this.paletteIndex += 1;
         this.paletteIndex %= PALETTES.length;
     }
