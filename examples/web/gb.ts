@@ -5,6 +5,7 @@ import {
     PixelFormat,
     RomInfo
 } from "./react/app";
+import { PALETTES } from "./palettes";
 
 import {
     Cartridge,
@@ -22,25 +23,6 @@ const VISUAL_HZ = 59.7275;
 const IDLE_HZ = 10;
 
 const SAMPLE_RATE = 2;
-
-const PALETTES = [
-    {
-        name: "basic",
-        colors: ["ffffff", "c0c0c0", "606060", "000000"]
-    },
-    {
-        name: "hogwards",
-        colors: ["b6a571", "8b7e56", "554d35", "201d13"]
-    },
-    {
-        name: "pacman",
-        colors: ["ffff00", "ffb897", "3732ff", "000000"]
-    },
-    {
-        name: "mariobros",
-        colors: ["f7cec3", "cc9e22", "923404", "000000"]
-    }
-];
 
 const KEYS_NAME: Record<string, number> = {
     ArrowUp: PadKey.Up,
@@ -296,8 +278,10 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
                 break;
         }
 
-        // runs the initial palette set operation
-        this.changePalette();
+        // runs the initial palette set operation, restoring
+        // the palette of the emulator according to the currently
+        // selected one
+        this.setPalette();
 
         // resets the Game Boy engine to restore it into
         // a valid state ready to be used
@@ -474,10 +458,9 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     }
 
     changePalette() {
-        const palette = PALETTES[this.paletteIndex];
-        this.gameBoy?.set_palette_colors_ws(palette.colors);
         this.paletteIndex += 1;
         this.paletteIndex %= PALETTES.length;
+        this.setPalette();
     }
 
     benchmark(count = 50000000) {
@@ -499,6 +482,12 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         } finally {
             this.resume();
         }
+    }
+
+    private setPalette(index?: number) {
+        index ??= this.paletteIndex;
+        const palette = PALETTES[index];
+        this.gameBoy?.set_palette_colors_ws(palette.colors);
     }
 
     private async fetchRom(
