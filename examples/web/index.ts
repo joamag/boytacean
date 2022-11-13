@@ -45,6 +45,10 @@ const PALETTES = [
     {
         name: "pacman",
         colors: ["ffff00", "ffb897", "3732ff", "000000"]
+    },
+    {
+        name: "mariobros",
+        colors: ["f7cec3", "cc9e22", "923404", "000000"]
     }
 ];
 
