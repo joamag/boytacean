@@ -1,7 +1,5 @@
 @import url("https://fonts.googleapis.com/css2?family=VT323&display=swap");
 
-@import url("./debug.css");
-
 * {
     box-sizing: border-box;
     -o-box-sizing: border-box;
@@ -9,16 +7,6 @@
     -moz-box-sizing: border-box;
     -khtml-box-sizing: border-box;
     -webkit-box-sizing: border-box;
-}
-
-a {
-    border-bottom: 2px dotted #ffffff;
-    color: #ffffff;
-    text-decoration: none;
-}
-
-a:hover {
-    border-bottom-style: solid;
 }
 
 html {
@@ -32,82 +20,4 @@ body {
     font-family: "VT323", "Roboto", "Open Sans", Arial, Helvetica, sans-serif;
     margin: 0px 0px 0px 0px;
     padding: 12px 12px 52px 12px;
-}
-
-p {
-    font-size: 18px;
-    line-height: 24px;
-    margin: 12px 0px 12px 0px;
-}
-
-.main {
-    display: flex;
-}
-
-@media only screen and (max-width: 1120px) {
-    .main {
-        flex-direction: column;
-    }
-}
-
-.main > .side-left {
-    display: flex;
-    flex: 1 0;
-    justify-content: center;
-    text-align: center;
-}
-
-.main > .side-right {
-    flex: 0 1;
-    max-width: 100%;
-    min-width: 580px;
-    padding: 0px 24px 0px 24px;
-}
-
-@media only screen and (max-width: 1120px) {
-    .main > .side-right {
-        min-width: unset;
-        padding: 0px 0px 0px 0px;
-    }
-}
-
-.main > .side-right .logo-image {
-    vertical-align: middle;
-    width: 32px;
-}
-
-.main > .side-right .separator {
-    background: #ffffff;
-    height: 2px;
-    margin: 22px 0px 22px 0px;
-}
-
-.main > .side-right .diag {
-    font-size: 24px;
-    vertical-align: top;
-}
-
-.main > .side-right .diag > dt {
-    clear: both;
-    float: left;
-    margin-top: 12px;
-}
-
-.main > .side-right .diag > dt:first-of-type {
-    margin-top: 0px;
-}
-
-.main > .side-right .diag > dd {
-    float: right;
-    margin-top: 12px;
-}
-
-.main > .side-right .diag > dd:first-of-type {
-    margin-top: 0px;
-}
-
-.main > .side-right .diag::after {
-    clear: both;
-    content: '';
-    display: block;
 }
