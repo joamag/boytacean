@@ -222,6 +222,8 @@ export interface Emulator extends ObservableI {
 
     keyLift(key: string): void;
 
+    updatePalette(): void;
+
     /**
      * Runs a benchmark operation in the emulator, effectively
      * measuring the performance of it.
@@ -483,7 +485,7 @@ export const App: FC<AppProps> = ({
         setBackgroundIndex((backgroundIndex + 1) % backgrounds.length);
     };
     const onPaletteClick = () => {
-        console.info("palette");
+        emulator.updatePalette();
     };
     const onUploadFile = async (file: File) => {
         const arrayBuffer = await file.arrayBuffer();
