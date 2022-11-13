@@ -235,7 +235,7 @@ impl Mmu {
                             0x50 => match addr & 0x00ff {
                                 // 0xFF50 - Boot active flag
                                 0x50 => self.boot_active = false,
-    
+
                                 // 0xFF51-0xFF52 - VRAM DMA source (CGB only)
                                 0x51..=0x52 => (),
 

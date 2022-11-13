@@ -286,7 +286,7 @@ class GameboyEmulator extends EmulatorBase implements Emulator {
                 break;
         }
 
-        // @todo replace this with somethign more flexible
+        // @TODO replace this with something more flexible
         this.gameBoy.set_palette_colors_ws([
             "b6a571",
             "8b7e56",

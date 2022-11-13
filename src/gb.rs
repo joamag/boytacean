@@ -258,14 +258,14 @@ impl GameBoy {
     pub fn set_palette_colors_ws(&mut self, value: Vec<JsValue>) {
         let palette: Palette = value
             .into_iter()
-            .map(|v| self.convert_value(&v))
+            .map(|v| Self::js_to_pixel(&v))
             .collect::<Vec<Pixel>>()
             .try_into()
             .unwrap();
         self.ppu().set_palette_colors(&palette);
     }
 
-    fn convert_value(&self, value: &JsValue) -> [u8; 3] {
+    fn js_to_pixel(value: &JsValue) -> [u8; 3] {
         value
             .as_string()
             .unwrap()
