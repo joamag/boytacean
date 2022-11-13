@@ -178,8 +178,8 @@ pub struct Ppu {
     /// The base colors that are going to be used in the registration
     /// of the concrete palettes, this value basically controls the
     /// colors that are going to be shown for each of the four base
-    /// values - 0x00, 0x01, 0x02, and 0x03
-    pallette_colors: Palette,
+    /// values - 0x00, 0x01, 0x02, and 0x03.
+    palette_colors: Palette,
 
     /// The palette of colors that is currently loaded in Game Boy
     /// and used for background (tiles).
@@ -308,7 +308,7 @@ impl Ppu {
                 priority: false,
                 index: 0,
             }; OBJ_COUNT],
-            pallette_colors: PALETTE_COLORS,
+            palette_colors: PALETTE_COLORS,
             palette: [[0u8; RGB_SIZE]; PALETTE_SIZE],
             palette_obj_0: [[0u8; RGB_SIZE]; PALETTE_SIZE],
             palette_obj_1: [[0u8; RGB_SIZE]; PALETTE_SIZE],
@@ -518,7 +518,7 @@ impl Ppu {
                 for index in 0..PALETTE_SIZE {
                     let color_index: usize = (value as usize >> (index * 2)) & 3;
                     match color_index {
-                        0..=3 => self.palette[index] = self.pallette_colors[color_index],
+                        0..=3 => self.palette[index] = self.palette_colors[color_index],
                         color_index => panic!("Invalid palette color index {:04x}", color_index),
                     }
                 }
@@ -528,7 +528,7 @@ impl Ppu {
                 for index in 0..PALETTE_SIZE {
                     let color_index: usize = (value as usize >> (index * 2)) & 3;
                     match color_index {
-                        0..=3 => self.palette_obj_0[index] = self.pallette_colors[color_index],
+                        0..=3 => self.palette_obj_0[index] = self.palette_colors[color_index],
                         color_index => panic!("Invalid palette color index {:04x}", color_index),
                     }
                 }
@@ -538,7 +538,7 @@ impl Ppu {
                 for index in 0..PALETTE_SIZE {
                     let color_index: usize = (value as usize >> (index * 2)) & 3;
                     match color_index {
-                        0..=3 => self.palette_obj_1[index] = self.pallette_colors[color_index],
+                        0..=3 => self.palette_obj_1[index] = self.palette_colors[color_index],
                         color_index => panic!("Invalid palette color index {:04x}", color_index),
                     }
                 }
@@ -563,6 +563,10 @@ impl Ppu {
 
     pub fn tiles(&self) -> &[Tile; TILE_COUNT] {
         &self.tiles
+    }
+
+    pub fn set_palette_colors(&mut self, value: &Palette) {
+        self.palette_colors = *value;
     }
 
     pub fn palette(&self) -> Palette {
