@@ -230,9 +230,9 @@ impl Mmu {
         }
     }
 
-    pub fn write_many(&mut self, addr: u16, data: &Vec<u8>) {
-        for index in 0..data.len() {
-            self.write(addr + index as u16, data[index])
+    pub fn write_many(&mut self, addr: u16, data: &[u8]) {
+        for (index, byte) in data.iter().enumerate() {
+            self.write(addr + index as u16, *byte)
         }
     }
 

@@ -381,7 +381,7 @@ impl Cpu {
     pub fn read_u16(&mut self) -> u16 {
         let byte1 = self.read_u8();
         let byte2 = self.read_u8();
-        
+
         byte1 as u16 | ((byte2 as u16) << 8)
     }
 
@@ -406,7 +406,6 @@ impl Cpu {
 
     #[inline(always)]
     pub fn pop_word(&mut self) -> u16 {
-        
         self.pop_byte() as u16 | ((self.pop_byte() as u16) << 8)
     }
 
