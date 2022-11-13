@@ -482,6 +482,9 @@ export const App: FC<AppProps> = ({
     const onThemeClick = () => {
         setBackgroundIndex((backgroundIndex + 1) % backgrounds.length);
     };
+    const onPaletteClick = () => {
+        console.info("palette");
+    };
     const onUploadFile = async (file: File) => {
         const arrayBuffer = await file.arrayBuffer();
         const romData = new Uint8Array(arrayBuffer);
@@ -773,6 +776,13 @@ export const App: FC<AppProps> = ({
                             imageAlt="theme"
                             style={["simple", "border", "padded"]}
                             onClick={onThemeClick}
+                        />
+                        <Button
+                            text={"Palette"}
+                            image={require("../res/brightness.svg")}
+                            imageAlt="palette"
+                            style={["simple", "border", "padded"]}
+                            onClick={onPaletteClick}
                         />
                         <Button
                             text={"Load ROM"}
