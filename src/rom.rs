@@ -410,6 +410,31 @@ impl Cartridge {
     pub fn ram_size_s(&self) -> String {
         String::from(self.ram_size().description())
     }
+
+    pub fn has_battery(&self) -> bool {
+        match self.rom_type() {
+            RomType::Mbc1RamBattery => true,
+            RomType::Mbc2Battery => true,
+            RomType::RomRamBattery => true,
+            RomType::Mmm01RamBattery => true,
+            RomType::Mbc3TimerBattery => true,
+            RomType::Mbc3TimerRamBattery => true,
+            RomType::Mbc3RamBattery => true,
+            RomType::Mbc5RamBattery => true,
+            RomType::Mbc5RumbleRamBattery => true,
+            RomType::Mbc7SensorRumbleRamBattery => true,
+            RomType::HuC1RamBattery => true,
+            _ => false,
+        }
+    }
+
+    pub fn ram_data_eager(&self) -> Vec<u8> {
+        self.ram_data.clone()
+    }
+
+    pub fn set_ram_data(&mut self, ram_data: Vec<u8>) {
+        self.ram_data = ram_data;
+    }
 }
 
 impl Default for Cartridge {

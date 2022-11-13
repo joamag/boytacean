@@ -138,6 +138,10 @@ impl GameBoy {
         self.frame_buffer().to_vec()
     }
 
+    pub fn cartridge_eager(&mut self) -> Cartridge {
+        self.mmu().rom().clone()
+    }
+
     pub fn registers(&mut self) -> Registers {
         let ppu_registers = self.ppu().registers();
         Registers {
