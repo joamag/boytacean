@@ -40,6 +40,10 @@ pub const COLOR_BUFFER_SIZE: usize = DISPLAY_WIDTH * DISPLAY_HEIGHT;
 /// The size of the RGB frame buffer in bytes.
 pub const FRAME_BUFFER_SIZE: usize = DISPLAY_WIDTH * DISPLAY_HEIGHT * RGB_SIZE;
 
+/// The base colors to be used to populate the
+/// custom palettes of the Game Boy.
+pub const PALETTE_COLORS: Palette = [[255, 255, 255], [192, 192, 192], [96, 96, 96], [0, 0, 0]];
+
 /// Defines the Game Boy pixel type as a buffer
 /// with the size of RGB (3 bytes).
 pub type Pixel = [u8; RGB_SIZE];
@@ -171,6 +175,12 @@ pub struct Ppu {
     /// to be drawn to the screen,
     obj_data: [ObjectData; OBJ_COUNT],
 
+    /// The base colors that are going to be used in the registration
+    /// of the concrete palettes, this value basically controls the
+    /// colors that are going to be shown for each of the four base
+    /// values - 0x00, 0x01, 0x02, and 0x03
+    pallette_colors: Palette,
+
     /// The palette of colors that is currently loaded in Game Boy
     /// and used for background (tiles).
     palette: Palette,
@@ -182,7 +192,7 @@ pub struct Ppu {
     palette_obj_1: Palette,
 
     /// The complete set of palettes in binary data so that they can
-    /// bre read if required by the system.
+    /// be re-read if required by the system.
     palettes: [u8; 3],
 
     /// The scroll Y register that controls the Y offset
@@ -298,6 +308,7 @@ impl Ppu {
                 priority: false,
                 index: 0,
             }; OBJ_COUNT],
+            pallette_colors: PALETTE_COLORS,
             palette: [[0u8; RGB_SIZE]; PALETTE_SIZE],
             palette_obj_0: [[0u8; RGB_SIZE]; PALETTE_SIZE],
             palette_obj_1: [[0u8; RGB_SIZE]; PALETTE_SIZE],
@@ -505,11 +516,9 @@ impl Ppu {
             0x0045 => self.lyc = value,
             0x0047 => {
                 for index in 0..PALETTE_SIZE {
-                    match (value >> (index * 2)) & 3 {
-                        0 => self.palette[index] = [255, 255, 255],
-                        1 => self.palette[index] = [192, 192, 192],
-                        2 => self.palette[index] = [96, 96, 96],
-                        3 => self.palette[index] = [0, 0, 0],
+                    let color_index: usize = (value as usize >> (index * 2)) & 3;
+                    match color_index {
+                        0..=3 => self.palette[index] = self.pallette_colors[color_index],
                         color_index => panic!("Invalid palette color index {:04x}", color_index),
                     }
                 }
@@ -517,11 +526,9 @@ impl Ppu {
             }
             0x0048 => {
                 for index in 0..PALETTE_SIZE {
-                    match (value >> (index * 2)) & 3 {
-                        0 => self.palette_obj_0[index] = [255, 255, 255],
-                        1 => self.palette_obj_0[index] = [192, 192, 192],
-                        2 => self.palette_obj_0[index] = [96, 96, 96],
-                        3 => self.palette_obj_0[index] = [0, 0, 0],
+                    let color_index: usize = (value as usize >> (index * 2)) & 3;
+                    match color_index {
+                        0..=3 => self.palette_obj_0[index] = self.pallette_colors[color_index],
                         color_index => panic!("Invalid palette color index {:04x}", color_index),
                     }
                 }
@@ -529,11 +536,9 @@ impl Ppu {
             }
             0x0049 => {
                 for index in 0..PALETTE_SIZE {
-                    match (value >> (index * 2)) & 3 {
-                        0 => self.palette_obj_1[index] = [255, 255, 255],
-                        1 => self.palette_obj_1[index] = [192, 192, 192],
-                        2 => self.palette_obj_1[index] = [96, 96, 96],
-                        3 => self.palette_obj_1[index] = [0, 0, 0],
+                    let color_index: usize = (value as usize >> (index * 2)) & 3;
+                    match color_index {
+                        0..=3 => self.palette_obj_1[index] = self.pallette_colors[color_index],
                         color_index => panic!("Invalid palette color index {:04x}", color_index),
                     }
                 }
