@@ -77,6 +77,12 @@ export type BenchmarkResult = {
     frequency_mhz: number;
 };
 
+export enum Feature {
+    Debug = 1,
+    Palettes,
+    Benchmark
+}
+
 export interface ObservableI {
     bind(event: string, callback: Callback<this>): void;
     unbind(event: string, callback: Callback<this>): void;
@@ -119,6 +125,12 @@ export interface Emulator extends ObservableI {
      * of the emulator.
      */
     get versionUrl(): string;
+
+    /**
+     * The features available and compatible with the emulator,
+     * these values will influence the associated GUIs.
+     */
+    get features(): Feature[];
 
     /**
      * The complete set of engine names that can be used
@@ -222,7 +234,10 @@ export interface Emulator extends ObservableI {
 
     keyLift(key: string): void;
 
-    updatePalette(): void;
+    /**
+     * Changes the palette of the emulator to the "next" one.
+     */
+    changePalette?: { (): void };
 
     /**
      * Runs a benchmark operation in the emulator, effectively
@@ -233,7 +248,7 @@ export interface Emulator extends ObservableI {
      * more time to be executed.
      * @returns The result metrics from the benchmark run.
      */
-    benchmark(count?: number): BenchmarkResult;
+    benchmark?: { (count?: number): BenchmarkResult };
 }
 
 export class EmulatorBase extends Observable {
@@ -243,6 +258,10 @@ export class EmulatorBase extends Observable {
 
     get versionUrl(): string | undefined {
         return undefined;
+    }
+
+    get features(): Feature[] {
+        return [];
     }
 
     get frequencyDelta(): number | null {
@@ -410,6 +429,9 @@ export const App: FC<AppProps> = ({
             }, timeout);
         });
     };
+    const hasFeature = (feature: Feature) => {
+        return emulator.features.includes(feature);
+    };
 
     const onFile = async (file: File) => {
         const fileExtension = file.name.split(".").pop() ?? "";
@@ -453,6 +475,7 @@ export const App: FC<AppProps> = ({
         emulator.reset();
     };
     const onBenchmarkClick = async () => {
+        if (!emulator.benchmark) return;
         const result = await showModal(
             "Are you sure you want to start a benchmark?\nThe benchmark is considered an expensive operation!",
             "Confirm"
@@ -485,7 +508,8 @@ export const App: FC<AppProps> = ({
         setBackgroundIndex((backgroundIndex + 1) % backgrounds.length);
     };
     const onPaletteClick = () => {
-        emulator.updatePalette();
+        if (!emulator.changePalette) return;
+        emulator.changePalette();
     };
     const onUploadFile = async (file: File) => {
         const arrayBuffer = await file.arrayBuffer();
@@ -734,13 +758,15 @@ export const App: FC<AppProps> = ({
                             style={["simple", "border", "padded"]}
                             onClick={onResetClick}
                         />
-                        <Button
-                            text={"Benchmark"}
-                            image={require("../res/bolt.svg")}
-                            imageAlt="benchmark"
-                            style={["simple", "border", "padded"]}
-                            onClick={onBenchmarkClick}
-                        />
+                        {hasFeature(Feature.Benchmark) && (
+                            <Button
+                                text={"Benchmark"}
+                                image={require("../res/bolt.svg")}
+                                imageAlt="benchmark"
+                                style={["simple", "border", "padded"]}
+                                onClick={onBenchmarkClick}
+                            />
+                        )}
                         <Button
                             text={"Fullscreen"}
                             image={require("../res/maximise.svg")}
@@ -764,14 +790,16 @@ export const App: FC<AppProps> = ({
                             style={["simple", "border", "padded"]}
                             onClick={onInformationClick}
                         />
-                        <Button
-                            text={"Debug"}
-                            image={require("../res/bug.svg")}
-                            imageAlt="debug"
-                            enabled={debugVisible}
-                            style={["simple", "border", "padded"]}
-                            onClick={onDebugClick}
-                        />
+                        {hasFeature(Feature.Debug) && (
+                            <Button
+                                text={"Debug"}
+                                image={require("../res/bug.svg")}
+                                imageAlt="debug"
+                                enabled={debugVisible}
+                                style={["simple", "border", "padded"]}
+                                onClick={onDebugClick}
+                            />
+                        )}
                         <Button
                             text={"Theme"}
                             image={require("../res/marker.svg")}
@@ -779,13 +807,15 @@ export const App: FC<AppProps> = ({
                             style={["simple", "border", "padded"]}
                             onClick={onThemeClick}
                         />
-                        <Button
-                            text={"Palette"}
-                            image={require("../res/brightness.svg")}
-                            imageAlt="palette"
-                            style={["simple", "border", "padded"]}
-                            onClick={onPaletteClick}
-                        />
+                        {hasFeature(Feature.Palettes) && (
+                            <Button
+                                text={"Palette"}
+                                image={require("../res/brightness.svg")}
+                                imageAlt="palette"
+                                style={["simple", "border", "padded"]}
+                                onClick={onPaletteClick}
+                            />
+                        )}
                         <Button
                             text={"Load ROM"}
                             image={require("../res/upload.svg")}

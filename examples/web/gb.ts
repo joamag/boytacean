@@ -1,6 +1,7 @@
 import {
     Emulator,
     EmulatorBase,
+    Feature,
     PixelFormat,
     RomInfo
 } from "./react/app";
@@ -295,8 +296,8 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
                 break;
         }
 
-        // runs the initial palette update operation
-        this.updatePalette();
+        // runs the initial palette set operation
+        this.changePalette();
 
         // resets the Game Boy engine to restore it into
         // a valid state ready to be used
@@ -358,6 +359,10 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
 
     get versionUrl(): string {
         return "https://gitlab.stage.hive.pt/joamag/boytacean/-/blob/master/CHANGELOG.md";
+    }
+
+    get features(): Feature[] {
+        return [Feature.Debug, Feature.Palettes, Feature.Benchmark];
     }
 
     get romExts(): string[] {
@@ -468,7 +473,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         this.gameBoy?.key_lift(keyCode);
     }
 
-    updatePalette() {
+    changePalette() {
         const palette = PALETTES[this.paletteIndex];
         this.gameBoy?.set_palette_colors_ws(palette.colors);
         this.paletteIndex += 1;
