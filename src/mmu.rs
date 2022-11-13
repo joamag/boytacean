@@ -118,14 +118,21 @@ impl Mmu {
                 | 0xa00 | 0xb00 | 0xc00 | 0xd00 => self.ram[(addr & 0x1fff) as usize],
                 0xe00 => self.ppu.oam[(addr & 0x009f) as usize],
                 0xf00 => match addr & 0x00ff {
+                    // 0xFF0F — IF: Interrupt flag
                     0x0f => {
                         (if self.ppu.int_vblank() { 0x01 } else { 0x00 }
                             | if self.ppu.int_stat() { 0x02 } else { 0x00 }
                             | if self.timer.int_tima() { 0x04 } else { 0x00 }
                             | if self.pad.int_pad() { 0x10 } else { 0x00 })
                     }
+
+                    // 0xFF80-0xFFFE - High RAM (HRAM)
                     0x80..=0xfe => self.ppu.hram[(addr & 0x007f) as usize],
+
+                    // 0xFFFF — IE: Interrupt enable
                     0xff => self.ie,
+
+                    // Other registers
                     _ => match addr & 0x00f0 {
                         0x00 => match addr & 0x00ff {
                             0x00 => self.pad.read(addr),
@@ -188,14 +195,21 @@ impl Mmu {
                     self.ppu.update_object(addr, value);
                 }
                 0xf00 => match addr & 0x00ff {
+                    // 0xFF0F — IF: Interrupt flag
                     0x0f => {
                         self.ppu.set_int_vblank(value & 0x01 == 0x01);
                         self.ppu.set_int_stat(value & 0x02 == 0x02);
                         self.timer.set_int_tima(value & 0x04 == 0x04);
                         self.pad.set_int_pad(value & 0x10 == 0x10);
                     }
+
+                    // 0xFF80-0xFFFE - High RAM (HRAM)
                     0x80..=0xfe => self.ppu.hram[(addr & 0x007f) as usize] = value,
+
+                    // 0xFFFF — IE: Interrupt enable
                     0xff => self.ie = value,
+
+                    // Other registers
                     _ => {
                         match addr & 0x00f0 {
                             0x00 => match addr & 0x00ff {
@@ -205,6 +219,7 @@ impl Mmu {
                             },
                             0x40 | 0x60 | 0x70 => {
                                 match addr & 0x00ff {
+                                    // 0xFF46 — DMA: OAM DMA source address & start
                                     0x0046 => {
                                         // @todo must increment the cycle count by 160
                                         // and make this a separated dma.rs file
@@ -212,11 +227,18 @@ impl Mmu {
                                         let data = self.read_many((value as u16) << 8, 160);
                                         self.write_many(0xfe00, &data);
                                     }
+
+                                    // VRAM related write
                                     _ => self.ppu.write(addr, value),
                                 }
                             }
                             0x50 => match addr & 0x00ff {
+                                // 0xFF50 - Boot active flag
                                 0x50 => self.boot_active = false,
+    
+                                // 0xFF51-0xFF52 - VRAM DMA source (CGB only)
+                                0x51..=0x52 => (),
+
                                 _ => debugln!("Writing to unknown IO control 0x{:04x}", addr),
                             },
                             _ => debugln!("Writing to unknown IO control 0x{:04x}", addr),
