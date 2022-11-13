@@ -100,3 +100,9 @@ impl Timer {
         self.set_int_tima(false);
     }
 }
+
+impl Default for Timer {
+    fn default() -> Self {
+        Self::new()
+    }
+}

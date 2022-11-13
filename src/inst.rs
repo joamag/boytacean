@@ -1,6 +1,6 @@
 use crate::cpu::Cpu;
 
-pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &str); 256] = [
+pub const INSTRUCTIONS: [Instruction; 256] = [
     // 0x0 opcodes
     (nop, 4, "NOP"),
     (ld_bc_u16, 12, "LD BC, u16"),
@@ -275,7 +275,7 @@ pub const INSTRUCTIONS: [(fn(&mut Cpu), u8, &str); 256] = [
     (rst_38h, 16, "RST 38h"),
 ];
 
-pub const EXTENDED: [(fn(&mut Cpu), u8, &str); 256] = [
+pub const EXTENDED: [Instruction; 256] = [
     // 0x0 opcodes
     (rlc_b, 8, "RLC B"),
     (rlc_c, 8, "RLC C"),
@@ -549,6 +549,8 @@ pub const EXTENDED: [(fn(&mut Cpu), u8, &str); 256] = [
     (set_7_mhl, 16, "SET 7, [HL]"),
     (set_7_a, 8, "SET 7, A"),
 ];
+
+pub type Instruction = (fn(&mut Cpu), u8, &'static str);
 
 fn nop(_cpu: &mut Cpu) {}
 
@@ -1040,9 +1042,7 @@ fn ccf(cpu: &mut Cpu) {
     cpu.set_carry(!cpu.get_carry());
 }
 
-fn ld_b_b(cpu: &mut Cpu) {
-    cpu.b = cpu.b;
-}
+fn ld_b_b(_cpu: &mut Cpu) {}
 
 fn ld_b_c(cpu: &mut Cpu) {
     cpu.b = cpu.c;
@@ -1077,9 +1077,7 @@ fn ld_c_b(cpu: &mut Cpu) {
     cpu.c = cpu.b;
 }
 
-fn ld_c_c(cpu: &mut Cpu) {
-    cpu.c = cpu.c;
-}
+fn ld_c_c(_cpu: &mut Cpu) {}
 
 fn ld_c_d(cpu: &mut Cpu) {
     cpu.c = cpu.d;
@@ -1114,9 +1112,7 @@ fn ld_d_c(cpu: &mut Cpu) {
     cpu.d = cpu.c;
 }
 
-fn ld_d_d(cpu: &mut Cpu) {
-    cpu.d = cpu.d;
-}
+fn ld_d_d(_cpu: &mut Cpu) {}
 
 fn ld_d_e(cpu: &mut Cpu) {
     cpu.d = cpu.e;
@@ -1151,9 +1147,7 @@ fn ld_e_d(cpu: &mut Cpu) {
     cpu.e = cpu.d;
 }
 
-fn ld_e_e(cpu: &mut Cpu) {
-    cpu.e = cpu.e;
-}
+fn ld_e_e(_cpu: &mut Cpu) {}
 
 fn ld_e_h(cpu: &mut Cpu) {
     cpu.e = cpu.h;
@@ -1188,9 +1182,7 @@ fn ld_h_e(cpu: &mut Cpu) {
     cpu.h = cpu.e;
 }
 
-fn ld_h_h(cpu: &mut Cpu) {
-    cpu.h = cpu.h;
-}
+fn ld_h_h(_cpu: &mut Cpu) {}
 
 fn ld_h_l(cpu: &mut Cpu) {
     cpu.h = cpu.l;
@@ -1225,9 +1217,7 @@ fn ld_l_h(cpu: &mut Cpu) {
     cpu.l = cpu.h;
 }
 
-fn ld_l_l(cpu: &mut Cpu) {
-    cpu.l = cpu.l;
-}
+fn ld_l_l(_cpu: &mut Cpu) {}
 
 fn ld_l_mhl(cpu: &mut Cpu) {
     let byte = cpu.mmu.read(cpu.hl());
@@ -1299,9 +1289,7 @@ fn ld_a_mhl(cpu: &mut Cpu) {
     cpu.a = byte;
 }
 
-fn ld_a_a(cpu: &mut Cpu) {
-    cpu.a = cpu.a;
-}
+fn ld_a_a(_cpu: &mut Cpu) {}
 
 fn add_a_b(cpu: &mut Cpu) {
     cpu.a = add_set_flags(cpu, cpu.a, cpu.b);

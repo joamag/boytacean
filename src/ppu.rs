@@ -882,12 +882,11 @@ impl Ppu {
                 tile = &self.tiles[obj.tile as usize];
             }
 
-            let tile_row: &[u8];
-            if obj.yflip {
-                tile_row = tile.get_row((7 - tile_offset) as usize);
+            let tile_row = if obj.yflip {
+                tile.get_row((7 - tile_offset) as usize)
             } else {
-                tile_row = tile.get_row((tile_offset) as usize);
-            }
+                tile.get_row((tile_offset) as usize)
+            };
 
             for x in 0..TILE_WIDTH {
                 let is_contained =
@@ -934,5 +933,11 @@ impl Ppu {
             || self.stat_oam && self.mode == PpuMode::OamRead
             || self.stat_vblank && self.mode == PpuMode::VBlank
             || self.stat_hblank && self.mode == PpuMode::HBlank
+    }
+}
+
+impl Default for Ppu {
+    fn default() -> Self {
+        Self::new()
     }
 }

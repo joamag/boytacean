@@ -53,21 +53,20 @@ impl Pad {
     pub fn read(&mut self, addr: u16) -> u8 {
         match addr & 0x00ff {
             0x0000 => {
-                let mut value;
-                match self.selection {
+                let mut value = match self.selection {
                     PadSelection::Action => {
-                        value = if self.a { 0x00 } else { 0x01 }
+                        (if self.a { 0x00 } else { 0x01 }
                             | if self.b { 0x00 } else { 0x02 }
                             | if self.select { 0x00 } else { 0x04 }
-                            | if self.start { 0x00 } else { 0x08 }
+                            | if self.start { 0x00 } else { 0x08 })
                     }
                     PadSelection::Direction => {
-                        value = if self.right { 0x00 } else { 0x01 }
+                        (if self.right { 0x00 } else { 0x01 }
                             | if self.left { 0x00 } else { 0x02 }
                             | if self.up { 0x00 } else { 0x04 }
-                            | if self.down { 0x00 } else { 0x08 }
+                            | if self.down { 0x00 } else { 0x08 })
                     }
-                }
+                };
                 value |= if self.selection == PadSelection::Direction {
                     0x10
                 } else {
@@ -139,5 +138,11 @@ impl Pad {
 
     pub fn ack_pad(&mut self) {
         self.set_int_pad(false);
+    }
+}
+
+impl Default for Pad {
+    fn default() -> Self {
+        Self::new()
     }
 }

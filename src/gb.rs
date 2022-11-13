@@ -13,7 +13,7 @@ use crate::{
 use wasm_bindgen::prelude::*;
 
 #[cfg(feature = "wasm")]
-use crate::ppu::{Pixel, Palette};
+use crate::ppu::{Palette, Pixel};
 
 #[cfg(feature = "wasm")]
 use std::{
@@ -206,7 +206,7 @@ impl GameBoy {
         self.cpu.timer()
     }
 
-    pub fn frame_buffer(&mut self) -> &Box<[u8; FRAME_BUFFER_SIZE]> {
+    pub fn frame_buffer(&mut self) -> &[u8; FRAME_BUFFER_SIZE] {
         &(self.ppu().frame_buffer)
     }
 
@@ -291,4 +291,10 @@ extern "C" {
 pub fn hook_impl(info: &PanicInfo) {
     let message = info.to_string();
     panic(message.as_str());
+}
+
+impl Default for GameBoy {
+    fn default() -> Self {
+        Self::new()
+    }
 }
