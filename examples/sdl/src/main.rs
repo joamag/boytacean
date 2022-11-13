@@ -23,7 +23,7 @@ const LOGIC_RATIO: f32 = 2.0;
 const SCREEN_SCALE: f32 = 2.0;
 
 /// The base title to be used in the window.
-static TITLE: &'static str = "Boytacean";
+static TITLE: &str = "Boytacean";
 
 pub struct Emulator {
     system: GameBoy,
@@ -36,7 +36,7 @@ pub struct Emulator {
 impl Emulator {
     pub fn new(system: GameBoy, screen_scale: f32) -> Self {
         Self {
-            system: system,
+            system,
             graphics: Graphics::new(
                 TITLE,
                 DISPLAY_WIDTH as u32,

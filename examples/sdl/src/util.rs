@@ -49,12 +49,12 @@ impl Graphics {
         canvas.clear();
 
         Self {
-            canvas: canvas,
-            video_subsystem: video_subsystem,
-            timer_subsystem: timer_subsystem,
-            audio_subsystem: audio_subsystem,
-            event_pump: event_pump,
-            ttf_context: ttf_context,
+            canvas,
+            video_subsystem,
+            timer_subsystem,
+            audio_subsystem,
+            event_pump,
+            ttf_context,
         }
     }
 
