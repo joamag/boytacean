@@ -10,12 +10,16 @@ use crate::{
 };
 
 #[cfg(feature = "wasm")]
-use crate::ppu::Palette;
-use std::convert::TryInto;
 use wasm_bindgen::prelude::*;
 
 #[cfg(feature = "wasm")]
-use std::panic::{set_hook, take_hook, PanicInfo};
+use crate::ppu::Palette;
+
+#[cfg(feature = "wasm")]
+use std::{
+    convert::TryInto,
+    panic::{set_hook, take_hook, PanicInfo},
+};
 
 /// Top level structure that abstracts the usage of the
 /// Game Boy system under the Boytacean emulator.
