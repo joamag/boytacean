@@ -286,6 +286,14 @@ class GameboyEmulator extends EmulatorBase implements Emulator {
                 break;
         }
 
+        // @todo replace this with somethign more flexible
+        this.gameBoy.set_palette_colors_ws([
+            "b6a571",
+            "8b7e56",
+            "554d35",
+            "201d13"
+        ]);
+
         // resets the Game Boy engine to restore it into
         // a valid state ready to be used
         this.gameBoy.reset();

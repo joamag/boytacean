@@ -10,6 +10,8 @@ use crate::{
 };
 
 #[cfg(feature = "wasm")]
+use crate::ppu::Palette;
+use std::convert::TryInto;
 use wasm_bindgen::prelude::*;
 
 #[cfg(feature = "wasm")]
@@ -244,8 +246,33 @@ impl GameBoy {
             prev(info);
         }));
     }
+
     pub fn load_rom_ws(&mut self, data: &[u8]) -> Cartridge {
         self.load_rom(data).clone()
+    }
+
+    pub fn set_palette_colors_ws(&mut self, value: Vec<JsValue>) {
+        let palette: Palette = value
+            .into_iter()
+            .map(|v| self.convert_value(&v))
+            .collect::<Vec<[u8; 3]>>()
+            .try_into()
+            .unwrap();
+        self.ppu().set_palette_colors(&palette);
+    }
+
+    fn convert_value(&self, value: &JsValue) -> [u8; 3] {
+        value
+            .as_string()
+            .unwrap()
+            .chars()
+            .collect::<Vec<char>>()
+            .chunks(2)
+            .map(|s| s.iter().collect::<String>())
+            .map(|s| u8::from_str_radix(&s, 16).unwrap())
+            .collect::<Vec<u8>>()
+            .try_into()
+            .unwrap()
     }
 }
 
