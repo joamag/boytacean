@@ -199,11 +199,21 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
                 this.gameBoy?.ppu_mode() === PpuMode.VBlank &&
                 this.gameBoy?.ppu_frame() !== lastFrame
             ) {
+                // updates the reference to the last frame index
+                // to be used for comparison in the next tick
                 lastFrame = this.gameBoy?.ppu_frame();
 
                 // triggers the frame event indicating that
                 // a new frame is now available for drawing
                 this.trigger("frame");
+
+                // @todo this has to be structureed in a better way
+                if (this.cartridge && this.cartridge.has_battery()) {
+                    const ramData = this.cartridge.ram_data_eager();
+                    const decoder = new TextDecoder("utf8");
+                    const ramDataB64 = btoa(decoder.decode(ramData));
+                    localStorage.setItem(this.cartridge.title(), ramDataB64)
+                }
             }
         }
 
@@ -288,6 +298,10 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         this.gameBoy.reset();
         this.gameBoy.load_boot_default();
         const cartridge = this.gameBoy.load_rom_ws(romData!);
+
+        // in case there's a battery involved tries to obtain
+        if (cartridge.has_battery()) {
+        }
 
         // updates the ROM name in case there's extra information
         // coming from the cartridge
