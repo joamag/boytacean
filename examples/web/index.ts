@@ -24,6 +24,8 @@ const BACKGROUNDS = [
         params.get("keyboard") ?? ""
     );
 
+    // creates the emulator structure and initializes the
+    // React app with both the parameters and the emulator
     const emulator = new GameboyEmulator();
     startApp("app", {
         emulator: emulator,
