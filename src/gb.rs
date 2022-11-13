@@ -13,7 +13,7 @@ use crate::{
 use wasm_bindgen::prelude::*;
 
 #[cfg(feature = "wasm")]
-use crate::ppu::Palette;
+use crate::ppu::{Pixel, Palette};
 
 #[cfg(feature = "wasm")]
 use std::{
@@ -259,7 +259,7 @@ impl GameBoy {
         let palette: Palette = value
             .into_iter()
             .map(|v| self.convert_value(&v))
-            .collect::<Vec<[u8; 3]>>()
+            .collect::<Vec<Pixel>>()
             .try_into()
             .unwrap();
         self.ppu().set_palette_colors(&palette);
