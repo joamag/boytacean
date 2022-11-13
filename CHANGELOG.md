@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 * Support for true fullscreen at a browser level
+* Support for more flexible palette colors
 
 ### Changed
 
