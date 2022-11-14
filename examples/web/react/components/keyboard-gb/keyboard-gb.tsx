@@ -15,9 +15,13 @@ const KEYS: Record<string, string> = {
 
 const KEYS_XBOX: Record<number, string> = {
     12: "ArrowUp",
+    102: "ArrowUp",
     13: "ArrowDown",
+    103: "ArrowDown",
     14: "ArrowLeft",
+    100: "ArrowLeft",
     15: "ArrowRight",
+    101: "ArrowRight",
     9: "Start",
     8: "Select",
     1: "A",
@@ -83,7 +87,7 @@ export const KeyboardGB: FC<KeyboardGBProps> = ({
         if (!physical) return;
         const getGamepadType = (gamepad: globalThis.Gamepad): Gamepad => {
             let gamepadType = Gamepad.Unknown;
-            const isXbox = gamepad.id.startsWith("Xbox");
+            const isXbox = gamepad.id.includes("Xbox");
             if (isXbox) gamepadType = Gamepad.Xbox;
             return gamepadType;
         };
@@ -126,35 +130,53 @@ export const KeyboardGB: FC<KeyboardGBProps> = ({
             }
 
             const buttonStates: Record<number, boolean> = {};
+
             const updateStatus = () => {
                 const _gamepad = navigator.getGamepads()[gamepad.index];
                 if (!_gamepad) return;
+
+                handleButton(100, _gamepad.axes[0] < -0.5);
+                handleButton(101, _gamepad.axes[0] > 0.5);
+                handleButton(102, _gamepad.axes[1] < -0.5);
+                handleButton(103, _gamepad.axes[1] > 0.5);
+
                 _gamepad.buttons.forEach((button, index) => {
-                    const keyCode = keySolver[index];
-                    if (keyCode === undefined) return;
-                    const state = buttonStates[index] ?? false;
-                    const pressed = button.value === 1;
-                    const keyDown = pressed && !state;
-                    const keyUp = !pressed && state;
+                    const pressed = button.pressed;
 
-                    if (keyDown) {
-                        const records = recordRef.current ?? {};
-                        const setter = records[keyCode];
-                        setter(true);
-                        onKeyDown && onKeyDown(keyCode);
+                    if (pressed) {
+                        console.info(index);
                     }
 
-                    if (keyUp) {
-                        const records = recordRef.current ?? {};
-                        const setter = records[keyCode];
-                        setter(false);
-                        onKeyUp && onKeyUp(keyCode);
-                    }
-
-                    buttonStates[index] = pressed;
+                    handleButton(index, pressed);
                 });
+
                 requestAnimationFrame(updateStatus);
             };
+
+            const handleButton = (index: number, pressed: boolean) => {
+                const keyCode = keySolver[index];
+                if (keyCode === undefined) return;
+                const state = buttonStates[index] ?? false;
+                const keyDown = pressed && !state;
+                const keyUp = !pressed && state;
+
+                if (keyDown) {
+                    const records = recordRef.current ?? {};
+                    const setter = records[keyCode];
+                    setter(true);
+                    onKeyDown && onKeyDown(keyCode);
+                }
+
+                if (keyUp) {
+                    const records = recordRef.current ?? {};
+                    const setter = records[keyCode];
+                    setter(false);
+                    onKeyUp && onKeyUp(keyCode);
+                }
+
+                buttonStates[index] = pressed;
+            };
+
             requestAnimationFrame(updateStatus);
         };
         const onGamepadDisconnected = (event: GamepadEvent) => {
