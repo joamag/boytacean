@@ -9,13 +9,18 @@ A Game Boy emulator that is written in Rust 🦀.
 * Supports Game Boy (DMG) emulation
 * Simple navigable source-code
 * Web and SDL front-ends
-* Fullscreen mode
 * Support for multiple MBCs: MBC1, MBC2, MBC3, and MBC5
-* Cool bespoke display palettes built by [TheWolfBunny64](https://www.deviantart.com/thewolfbunny).
+* Variable CPU clock speed
+
+For the web front-end...
+
+* Mobile first experience
 * Transparent RAM saving using [Web Storage API](https://developer.mozilla.org/docs/Web/API/Window/localStorage)
 * GamePad support using [Web Gamepad API](https://developer.mozilla.org/docs/Web/API/Gamepad_API)
-* Variable CPU clock speed
-* Debug mode: VRAM and registers
+* Unobstructive on-screen GamePad
+* Cool bespoke display palettes built by [TheWolfBunny64](https://www.deviantart.com/thewolfbunny).
+* Fullscreen mode
+* Debug mode - VRAM and registers
 
 ## Deployments
 
