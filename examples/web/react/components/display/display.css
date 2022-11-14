@@ -93,7 +93,6 @@
 }
 
 .display.fullscreen > .display-frame {
-    background-color: transparent;
     border: none;
     box-shadow: 0px 0px 12px rgba(0, 0, 0, 0.24);
     -o-box-shadow: 0px 0px 12px rgba(0, 0, 0, 0.24);

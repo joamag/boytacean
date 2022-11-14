@@ -13,7 +13,7 @@ A Game Boy emulator that is written in Rust 🦀.
 * Support for multiple MBCs: MBC1, MBC2, MBC3, and MBC5
 * Cool bespoke display palettes built by [TheWolfBunny64](https://www.deviantart.com/thewolfbunny).
 * Transparent RAM saving using [Web Storage API](https://developer.mozilla.org/docs/Web/API/Window/localStorage)
-* GamePad support using [Web Gamepad API](hhttps://developer.mozilla.org/en-US/docs/Web/API/Gamepad_API)
+* GamePad support using [Web Gamepad API](https://developer.mozilla.org/en-US/docs/Web/API/Gamepad_API)
 * Variable CPU clock speed
 * Debug mode: VRAM and registers
 
