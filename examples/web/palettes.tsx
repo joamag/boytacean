@@ -28,3 +28,7 @@ export const PALETTES = [
         colors: ["f87800", "b86000", "783800", "000000"]
     }
 ];
+
+export const PALETTES_MAP = Object.fromEntries(
+    PALETTES.map((v) => [v.name, v])
+);

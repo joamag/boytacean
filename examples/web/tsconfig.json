@@ -1,6 +1,6 @@
 {
     "compilerOptions": {
-        "module": "es2015",
+        "module": "ES2015",
         "moduleResolution": "node",
         "resolveJsonModule": true,
         "allowSyntheticDefaultImports": true,
@@ -17,7 +17,7 @@
         "jsx": "react",
         "outDir": ".",
         "baseUrl": ".",
-        "lib": ["es2017", "dom"],
+        "lib": ["es2019", "dom"],
         "paths": {
             "*": ["node_modules/*", "src/types/*"]
         }

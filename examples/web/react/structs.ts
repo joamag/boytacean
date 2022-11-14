@@ -193,9 +193,19 @@ export interface Emulator extends ObservableI {
     keyLift(key: string): void;
 
     /**
-     * Changes the palette of the emulator to the "next" one.
+     * Changes the palette of the emulator to the "next" one,
+     * the order in which the palette is chosen is defined by
+     * the concrete emulator implementation.
      */
     changePalette?: { (): void };
+
+    /**
+     * Sets the palette with the given name/description
+     * as the current palette to be used by the emulator.
+     *
+     * @param palette The name of the palette to be set.
+     */
+    setPalette?: { (palette: string): void };
 
     /**
      * Runs a benchmark operation in the emulator, effectively

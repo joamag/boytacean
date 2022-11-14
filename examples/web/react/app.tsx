@@ -109,7 +109,7 @@ export const EmulatorApp: FC<EmulatorAppProps> = ({
     }, [keyaction]);
     useEffect(() => {
         if (palette) {
-            emulator.setPalete
+            emulator.setPalette?.(palette);
         }
         const onFullChange = (event: Event) => {
             if (
@@ -280,8 +280,7 @@ export const EmulatorApp: FC<EmulatorAppProps> = ({
         setBackgroundIndex((backgroundIndex + 1) % backgrounds.length);
     };
     const onPaletteClick = () => {
-        if (!emulator.changePalette) return;
-        emulator.changePalette();
+        emulator.changePalette?.();
     };
     const onUploadFile = async (file: File) => {
         const arrayBuffer = await file.arrayBuffer();
@@ -641,7 +640,7 @@ export const startApp = (
         fullscreen?: boolean;
         debug?: boolean;
         keyboard?: boolean;
-        palette?: string,
+        palette?: string;
         backgrounds: string[];
     }
 ) => {

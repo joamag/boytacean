@@ -13,6 +13,7 @@ A Game Boy emulator that is written in Rust 🦀.
 * Support for multiple MBCs: MBC1, MBC2, MBC3, and MBC5
 * Cool bespoke display palettes built by [TheWolfBunny64](https://www.deviantart.com/thewolfbunny).
 * Transparent RAM saving using [Web Storage API](https://developer.mozilla.org/docs/Web/API/Window/localStorage)
+* GamePad support using [Web Gamepad API](hhttps://developer.mozilla.org/en-US/docs/Web/API/Gamepad_API)
 * Variable CPU clock speed
 * Debug mode: VRAM and registers
 
@@ -48,13 +49,14 @@ cd dist && python3 -m http.server
 
 You can use some GET parameters to control the initial behaviour of the emulator.
 
-| Parameter    | Type    | Description                                                                    |
-| ------------ | ------- | ------------------------------------------------------------------------------ |
-| `rom_url`    | String  | The URL from which the initial ROM is going to be loaded, should support CORS. |
-| `url`        | String  | The same as `url`.                                                             |
-| `fullscreen` | Boolean | If the emulator should start in fullscreen mode.                               |
-| `debug`      | Boolean | If the "debugger" should start visible.                                        |
-| `keyboard`   | Boolean | If the on screen keyboard should start visible.                                |
+| Parameter    | Type    | Description                                                                                    |
+| ------------ | ------- | ---------------------------------------------------------------------------------------------- |
+| `rom_url`    | String  | The URL from which the initial ROM is going to be loaded, should support CORS.                 |
+| `url`        | String  | The same as `url`.                                                                             |
+| `fullscreen` | Boolean | If the emulator should start in fullscreen mode.                                               |
+| `debug`      | Boolean | If the "debugger" should start visible.                                                        |
+| `keyboard`   | Boolean | If the on screen keyboard should start visible.                                                |
+| `palette`    | String  | The name of the palette to be set at startup( eg: `christmas`, `hogwards`, `mariobros`, etc.). |
 
 ### Palettes
 
