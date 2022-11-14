@@ -202,16 +202,16 @@ export const KeyboardGB: FC<KeyboardGBProps> = ({
                 <div className="break"></div>
                 <div className="options">
                     {renderKey(
-                        "START",
-                        "Start",
-                        selectedKeys.includes("Start"),
-                        ["start"]
-                    )}
-                    {renderKey(
                         "SELECT",
                         "Select",
                         selectedKeys.includes("Select"),
                         ["select"]
+                    )}
+                    {renderKey(
+                        "START",
+                        "Start",
+                        selectedKeys.includes("Start"),
+                        ["start"]
                     )}
                 </div>
             </div>
