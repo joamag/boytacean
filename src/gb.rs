@@ -1,6 +1,6 @@
 use crate::{
     cpu::Cpu,
-    data::{BootRom, DMG_BOOT, DMG_BOOTIX, MGB_BOOTIX, SGB_BOOT},
+    data::{BootRom, CGB_BOOT, DMG_BOOT, DMG_BOOTIX, MGB_BOOTIX, SGB_BOOT},
     mmu::Mmu,
     pad::{Pad, PadKey},
     ppu::{Ppu, PpuMode, Tile, FRAME_BUFFER_SIZE},
@@ -119,11 +119,16 @@ impl GameBoy {
             BootRom::Sgb => self.load_boot(&SGB_BOOT),
             BootRom::DmgBootix => self.load_boot(&DMG_BOOTIX),
             BootRom::MgbBootix => self.load_boot(&MGB_BOOTIX),
+            BootRom::Cgb => self.load_boot(&CGB_BOOT),
         }
     }
 
     pub fn load_boot_default(&mut self) {
         self.load_boot_static(BootRom::DmgBootix);
+    }
+
+    pub fn load_boot_cgb(&mut self) {
+        self.load_boot_static(BootRom::Cgb);
     }
 
     pub fn vram_eager(&mut self) -> Vec<u8> {
@@ -233,6 +238,7 @@ impl GameBoy {
             BootRom::Sgb => self.load_boot_path("./res/boot/sgb_boot.bin"),
             BootRom::DmgBootix => self.load_boot_path("./res/boot/dmg_bootix.bin"),
             BootRom::MgbBootix => self.load_boot_path("./res/boot/mgb_bootix.bin"),
+            BootRom::Cgb => self.load_boot_path("./res/boot/cgb_boot.bin"),
         }
     }
 
