@@ -1,6 +1,6 @@
 [package]
 name = "boytacean-sdl"
-version = "0.4.5"
+version = "0.5.0"
 authors = ["João Magalhães <joamag@gmail.com>"]
 description = "Game Boy Emulator SDL (Desktop) Application"
 license = "Apache-2.0"
