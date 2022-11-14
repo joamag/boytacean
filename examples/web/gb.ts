@@ -519,7 +519,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     }
 
     private loadRam() {
-        if (!this.gameBoy || !this.cartridge) return;
+        if (!this.gameBoy || !this.cartridge || !window.localStorage) return;
         const ramDataB64 = localStorage.getItem(this.cartridge.title());
         if (!ramDataB64) return;
         const ramData = base64ToBuffer(ramDataB64);
@@ -527,7 +527,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     }
 
     private storeRam() {
-        if (!this.gameBoy || !this.cartridge) return;
+        if (!this.gameBoy || !this.cartridge || !window.localStorage) return;
         const title = this.cartridge.title();
         const ramData = this.gameBoy.ram_data_eager();
         const ramDataB64 = bufferToBase64(ramData);
