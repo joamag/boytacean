@@ -312,6 +312,14 @@ export const EmulatorApp: FC<EmulatorAppProps> = ({
     const onKeyUp = (key: string) => {
         emulator.keyLift(key);
     };
+    const onGamepad = (id: string, isValid: boolean, connected = true) => {
+        if (connected) {
+            if (isValid) showToast(`🕹️ Gamepad connect ${id}`);
+            else showToast(`😥 Unsupported gamepad connect ${id}`, true);
+        } else if (isValid) {
+            showToast(`🕹️ Gamepad disconnected ${id}`, true);
+        }
+    };
     const onDrawHandler = (handler: DrawHandler) => {
         if (frameRef.current) return;
         frameRef.current = true;
@@ -374,6 +382,7 @@ export const EmulatorApp: FC<EmulatorAppProps> = ({
                             fullscreen={fullscreenState}
                             onKeyDown={onKeyDown}
                             onKeyUp={onKeyUp}
+                            onGamepad={onGamepad}
                         />
                     )}
                 </Section>

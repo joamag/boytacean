@@ -13,6 +13,17 @@ const KEYS: Record<string, string> = {
     s: "B"
 };
 
+const KEYS_XBOX: Record<number, string> = {
+    12: "ArrowUp",
+    13: "ArrowDown",
+    14: "ArrowLeft",
+    15: "ArrowRight",
+    9: "Start",
+    8: "Select",
+    1: "A",
+    0: "B"
+};
+
 const PREVENT_KEYS: Record<string, boolean> = {
     ArrowUp: true,
     ArrowDown: true,
@@ -23,6 +34,13 @@ const PREVENT_KEYS: Record<string, boolean> = {
 
 declare const require: any;
 
+enum Gamepad {
+    Unknown = 1,
+    Xbox,
+    Playstation,
+    Switch
+}
+
 type KeyboardGBProps = {
     focusable?: boolean;
     fullscreen?: boolean;
@@ -31,6 +49,7 @@ type KeyboardGBProps = {
     style?: string[];
     onKeyDown?: (key: string) => void;
     onKeyUp?: (key: string) => void;
+    onGamepad?: (id: string, isValid: boolean, connected?: boolean) => void;
 };
 
 export const KeyboardGB: FC<KeyboardGBProps> = ({
@@ -40,7 +59,8 @@ export const KeyboardGB: FC<KeyboardGBProps> = ({
     selectedKeys = [],
     style = [],
     onKeyDown,
-    onKeyUp
+    onKeyUp,
+    onGamepad
 }) => {
     const containerClasses = () =>
         ["keyboard-container", fullscreen ? "fullscreen" : ""].join(" ");
@@ -55,6 +75,12 @@ export const KeyboardGB: FC<KeyboardGBProps> = ({
         ].join(" ");
     useEffect(() => {
         if (!physical) return;
+        const getGamepadType = (gamepad: globalThis.Gamepad): Gamepad => {
+            let gamepadType = Gamepad.Unknown;
+            const isXbox = gamepad.id.startsWith("Xbox");
+            if (isXbox) gamepadType = Gamepad.Xbox;
+            return gamepadType;
+        };
         const _onKeyDown = (event: KeyboardEvent) => {
             const keyCode = KEYS[event.key];
             const isPrevent = PREVENT_KEYS[event.key] ?? false;
@@ -81,33 +107,72 @@ export const KeyboardGB: FC<KeyboardGBProps> = ({
         };
         const onGamepadConnected = (event: GamepadEvent) => {
             const gamepad = event.gamepad;
-            
-            console.log(
-                "Gamepad connected at index %d: %s. %d buttons, %d axes.",
-                event.gamepad.index,
-                event.gamepad.id,
-                event.gamepad.buttons.length,
-                event.gamepad.axes.length
-            );
+            let gamepadType = getGamepadType(gamepad);
+            const isValid = [Gamepad.Xbox].includes(gamepadType);
 
+            onGamepad && onGamepad(gamepad.id, isValid);
+
+            let keySolver: Record<number, string>;
+            switch (gamepadType) {
+                case Gamepad.Xbox:
+                    keySolver = KEYS_XBOX;
+                    break;
+            }
+
+            const buttonStates: Record<number, boolean> = {};
             const updateStatus = () => {
-                event.gamepad.buttons.forEach((button, index) => {
-                    if (button.pressed) {
-                        console.info(`${index} => ${button.pressed}`);
+                const _gamepad = navigator.getGamepads()[gamepad.index];
+                if (!_gamepad) return;
+                _gamepad.buttons.forEach((button, index) => {
+                    const keyCode = keySolver[index];
+                    if (keyCode === undefined) return;
+                    const state = buttonStates[index] ?? false;
+                    const pressed = button.value === 1;
+                    const keyDown = pressed && !state;
+                    const keyUp = !pressed && state;
+
+                    if (keyDown) {
+                        const records = recordRef.current ?? {};
+                        const setter = records[keyCode];
+                        setter(true);
+                        onKeyDown && onKeyDown(keyCode);
                     }
+
+                    if (keyUp) {
+                        const records = recordRef.current ?? {};
+                        const setter = records[keyCode];
+                        setter(false);
+                        onKeyUp && onKeyUp(keyCode);
+                    }
+
+                    buttonStates[index] = pressed;
                 });
                 requestAnimationFrame(updateStatus);
             };
-
             requestAnimationFrame(updateStatus);
+        };
+        const onGamepadDisconnected = (event: GamepadEvent) => {
+            const gamepad = event.gamepad;
+            let gamepadType = Gamepad.Unknown;
+
+            const isXbox = gamepad.id.startsWith("Xbox");
+            if (isXbox) gamepadType = Gamepad.Xbox;
+
+            const isValid = [Gamepad.Xbox].includes(gamepadType);
+            onGamepad && onGamepad(gamepad.id, isValid, false);
         };
         document.addEventListener("keydown", _onKeyDown);
         document.addEventListener("keyup", _onKeyUp);
         window.addEventListener("gamepadconnected", onGamepadConnected);
+        window.addEventListener("gamepaddisconnected", onGamepadDisconnected);
         return () => {
             document.removeEventListener("keydown", _onKeyDown);
             document.removeEventListener("keyup", _onKeyUp);
             window.removeEventListener("gamepadconnected", onGamepadConnected);
+            window.removeEventListener(
+                "gamepadconnected",
+                onGamepadDisconnected
+            );
         };
     }, []);
     const renderKey = (
