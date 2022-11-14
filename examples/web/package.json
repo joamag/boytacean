@@ -4,7 +4,7 @@
     "description": "The web version of Boytacean",
     "repository": {
         "type": "git",
-        "url": "git+https://gitlab.stage.hive.pt/joamag/boytacean.git"
+        "url": "git+https://github.com/joamag/boytacean.git"
     },
     "license": "Apache-2.0",
     "scripts": {

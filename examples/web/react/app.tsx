@@ -204,7 +204,7 @@ export const App: FC<AppProps> = ({
         const fileExtension = file.name.split(".").pop() ?? "";
         if (!emulator.romExts.includes(fileExtension)) {
             showToast(
-                `This is probably not a ${emulator.device} ROM file!`,
+                `This is probably not a ${emulator.device.text} ROM file!`,
                 true
             );
             return;
@@ -287,7 +287,7 @@ export const App: FC<AppProps> = ({
     const onEngineChange = (engine: string) => {
         emulator.boot({ engine: engine.toLowerCase() });
         showToast(
-            `${emulator.device} running in engine "${engine}" from now on!`
+            `${emulator.device.text} running in engine "${engine}" from now on!`
         );
     };
     const onFrequencyChange = (value: number) => {
@@ -374,21 +374,19 @@ export const App: FC<AppProps> = ({
                 </Section>
                 <Title
                     text={emulator.name}
-                    version={emulator.version}
-                    versionUrl={
-                        emulator.versionUrl ? emulator.versionUrl : undefined
-                    }
+                    version={emulator.version?.text}
+                    versionUrl={emulator.version?.url}
                     iconSrc={require("../res/thunder.png")}
                 ></Title>
                 <Section>
                     <Paragraph>
                         This is a{" "}
-                        {emulator.deviceUrl ? (
-                            <Link href={emulator.deviceUrl} target="_blank">
-                                {emulator.device}
+                        {emulator.device.url ? (
+                            <Link href={emulator.device.url} target="_blank">
+                                {emulator.device.text}
                             </Link>
                         ) : (
-                            emulator.device
+                            emulator.device.text
                         )}{" "}
                         emulator built using the{" "}
                         <Link href="https://www.rust-lang.org" target="_blank">
@@ -403,15 +401,15 @@ export const App: FC<AppProps> = ({
                     {emulator.repository && (
                         <Paragraph>
                             You can check the source code of it at{" "}
-                            {emulator.repositoryUrl ? (
+                            {emulator.repository.url ? (
                                 <Link
-                                    href={emulator.repositoryUrl}
+                                    href={emulator.repository.url}
                                     target="_blank"
                                 >
-                                    {emulator.repository}
+                                    {emulator.repository.text}
                                 </Link>
                             ) : (
-                                <>{emulator.repository}</>
+                                <>{emulator.repository.text}</>
                             )}
                             .
                         </Paragraph>

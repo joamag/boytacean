@@ -2,36 +2,6 @@ export const FREQUENCY_DELTA = 100000;
 
 export type Callback<T> = (owner: T, params?: any) => void;
 
-/**
- * Abstract class that implements the basic functionality
- * part of the definition of the Observer pattern.
- *
- * @see {@link https://en.wikipedia.org/wiki/Observer_pattern}
- */
-export class Observable {
-    private events: Record<string, [Callback<this>]> = {};
-
-    bind(event: string, callback: Callback<this>) {
-        const callbacks = this.events[event] ?? [];
-        if (callbacks.includes(callback)) return;
-        callbacks.push(callback);
-        this.events[event] = callbacks;
-    }
-
-    unbind(event: string, callback: Callback<this>) {
-        const callbacks = this.events[event] ?? [];
-        if (!callbacks.includes(callback)) return;
-        const index = callbacks.indexOf(callback);
-        callbacks.splice(index, 1);
-        this.events[event] = callbacks;
-    }
-
-    trigger(event: string, params?: any) {
-        const callbacks = this.events[event] ?? [];
-        callbacks.forEach((c) => c(this, params));
-    }
-}
-
 export type RomInfo = {
     name?: string;
     data?: Uint8Array;
@@ -46,6 +16,16 @@ export type BenchmarkResult = {
     frequency_mhz: number;
 };
 
+export type Entry = {
+    text: string;
+    url?: string;
+};
+
+/**
+ * Enumeration to be used to describe the set of
+ * features that a certain emulator supports, this
+ * is going to condition its runtime execution.
+ */
 export enum Feature {
     Debug = 1,
     Palettes,
@@ -82,34 +62,27 @@ export interface Emulator extends ObservableI {
     get name(): string;
 
     /**
-     * The name of the the hardware that is being emulated
-     * by the emulator (eg: Super Nintendo).
+     * The information on the hardware that is being emulated
+     * by the emulator (eg: Super Nintendo), can contain a URL
+     * that describes the device that is being emulated by
+     * the emulator (eg: Wikipedia link).
      */
-    get device(): string;
-
-    /**
-     * A URL to a website that describes the device that is
-     * being emulated by the emulator (eg: Wikipedia link).
-     */
-    get deviceUrl(): string | undefined;
+    get device(): Entry;
 
     /**
      * A semantic version string for the current version
-     * of the emulator.
+     * of the emulator, can include a URL pointing to a
+     * changelog or equivalent document.
      *
      * @see {@link https://semver.org}
      */
-    get version(): string;
+    get version(): Entry | undefined;
 
     /**
-     * The URL to the page describing the current version
-     * of the emulator.
+     * Information about the source code repository where
+     * the emulator source code is being stored.
      */
-    get versionUrl(): string | undefined;
-
-    get repository(): string | undefined;
-
-    get repositoryUrl(): string | undefined;
+    get repository(): Entry | undefined;
 
     /**
      * The features available and compatible with the emulator,
@@ -236,20 +209,42 @@ export interface Emulator extends ObservableI {
     benchmark?: { (count?: number): BenchmarkResult };
 }
 
+/**
+ * Abstract class that implements the basic functionality
+ * part of the definition of the Observer pattern.
+ *
+ * @see {@link https://en.wikipedia.org/wiki/Observer_pattern}
+ */
+export class Observable {
+    private events: Record<string, [Callback<this>]> = {};
+
+    bind(event: string, callback: Callback<this>) {
+        const callbacks = this.events[event] ?? [];
+        if (callbacks.includes(callback)) return;
+        callbacks.push(callback);
+        this.events[event] = callbacks;
+    }
+
+    unbind(event: string, callback: Callback<this>) {
+        const callbacks = this.events[event] ?? [];
+        if (!callbacks.includes(callback)) return;
+        const index = callbacks.indexOf(callback);
+        callbacks.splice(index, 1);
+        this.events[event] = callbacks;
+    }
+
+    trigger(event: string, params?: any) {
+        const callbacks = this.events[event] ?? [];
+        callbacks.forEach((c) => c(this, params));
+    }
+}
+
 export class EmulatorBase extends Observable {
-    get deviceUrl(): string | undefined {
+    get version(): Entry | undefined {
         return undefined;
     }
 
-    get versionUrl(): string | undefined {
-        return undefined;
-    }
-
-    get repository(): string | undefined {
-        return undefined;
-    }
-
-    get repositoryUrl(): string | undefined {
+    get repository(): Entry | undefined {
         return undefined;
     }
 

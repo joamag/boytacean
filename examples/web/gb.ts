@@ -1,6 +1,7 @@
 import {
     Emulator,
     EmulatorBase,
+    Entry,
     Feature,
     PixelFormat,
     RomInfo
@@ -349,36 +350,25 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         return "Boytacean";
     }
 
-    get device(): string {
-        return "Game Boy";
+    get device(): Entry {
+        return {
+            text: "Game Boy",
+            url: "https://en.wikipedia.org/wiki/Game_Boy"
+        };
     }
 
-    get deviceUrl(): string {
-        return "https://en.wikipedia.org/wiki/Game_Boy";
+    get version(): Entry | undefined {
+        return {
+            text: info.version,
+            url: "https://github.com/joamag/boytacean/blob/master/CHANGELOG.md"
+        };
     }
 
-    get engines() {
-        return ["neo"];
-    }
-
-    get engine() {
-        return this._engine;
-    }
-
-    get version(): string {
-        return info.version;
-    }
-
-    get versionUrl(): string {
-        return "https://github.com/joamag/boytacean/blob/master/CHANGELOG.md";
-    }
-
-    get repository(): string | undefined {
-        return "GitHub";
-    }
-
-    get repositoryUrl(): string | undefined {
-        return "https://github.com/joamag/boytacean";
+    get repository(): Entry {
+        return {
+            text: "GitHub",
+            url: "https://github.com/joamag/boytacean"
+        };
     }
 
     get features(): Feature[] {
@@ -389,6 +379,14 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
             Feature.Keyboard,
             Feature.KeyboardGB
         ];
+    }
+
+    get engines() {
+        return ["neo"];
+    }
+
+    get engine() {
+        return this._engine;
     }
 
     get romExts(): string[] {
