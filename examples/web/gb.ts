@@ -4,7 +4,7 @@ import {
     Feature,
     PixelFormat,
     RomInfo
-} from "./react/app";
+} from "./react/structs";
 import { PALETTES } from "./palettes";
 
 import {

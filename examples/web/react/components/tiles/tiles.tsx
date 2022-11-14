@@ -1,5 +1,5 @@
 import React, { FC, useEffect, useRef } from "react";
-import { PixelFormat } from "../../app";
+import { PixelFormat } from "../../structs";
 import Canvas, { CanvasStructure } from "../canvas/canvas";
 
 import "./tiles.css";
