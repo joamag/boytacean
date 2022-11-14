@@ -124,7 +124,11 @@ impl GameBoy {
     }
 
     pub fn load_boot_default(&mut self) {
-        self.load_boot_static(BootRom::DmgBootix);
+        self.load_boot_dmg();
+    }
+
+    pub fn load_boot_dmg(&mut self) {
+        self.load_boot_static(BootRom::Cgb);
     }
 
     pub fn load_boot_cgb(&mut self) {

@@ -1,6 +1,6 @@
 use crate::{debugln, pad::Pad, ppu::Ppu, rom::Cartridge, timer::Timer};
 
-pub const BOOT_SIZE: usize = 256;
+pub const BOOT_SIZE: usize = 2304;
 pub const RAM_SIZE: usize = 8192;
 
 pub struct Mmu {
@@ -30,7 +30,16 @@ pub struct Mmu {
     /// the boot sequence has been finished.
     boot_active: bool,
 
+    /// Buffer to be used to store the boot ROM, this is the code
+    /// that is going to be executed at the beginning of the Game
+    /// Boy execution. The buffer effectively used is of 256 bytes
+    /// for the "normal" Game Boy (MGB) and 2308 bytes for the
+    /// Game Boy Color (CGB). Note that in the case of the CGB
+    /// the bios which is 2308 bytes long is in fact only 2048 bytes
+    /// as the 256 bytes in range 0x100-0x1FF are meant to be
+    /// overwritten byte the cartridge header.
     boot: [u8; BOOT_SIZE],
+
     ram: [u8; RAM_SIZE],
 }
 
