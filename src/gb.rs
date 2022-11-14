@@ -142,6 +142,14 @@ impl GameBoy {
         self.mmu().rom().clone()
     }
 
+    pub fn ram_data_eager(&mut self) -> Vec<u8> {
+        self.mmu().rom().ram_data_eager()
+    }
+
+    pub fn set_ram_data(&mut self, ram_data: Vec<u8>) {
+        self.mmu().rom().set_ram_data(ram_data)
+    }
+
     pub fn registers(&mut self) -> Registers {
         let ppu_registers = self.ppu().registers();
         Registers {
