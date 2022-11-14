@@ -37,11 +37,12 @@ import {
 
 import "./app.css";
 
-type AppProps = {
+type EmulatorAppProps = {
     emulator: Emulator;
     fullscreen?: boolean;
     debug?: boolean;
     keyboard?: boolean;
+    palette?: string;
     backgrounds?: string[];
 };
 
@@ -49,11 +50,12 @@ const isTouchDevice = () => {
     return "ontouchstart" in window || navigator.maxTouchPoints > 0;
 };
 
-export const App: FC<AppProps> = ({
+export const EmulatorApp: FC<EmulatorAppProps> = ({
     emulator,
     fullscreen = false,
     debug = false,
     keyboard = false,
+    palette,
     backgrounds = ["264653"]
 }) => {
     const [paused, setPaused] = useState(false);
@@ -106,6 +108,9 @@ export const App: FC<AppProps> = ({
         }
     }, [keyaction]);
     useEffect(() => {
+        if (palette) {
+            emulator.setPalette?.(palette);
+        }
         const onFullChange = (event: Event) => {
             if (
                 !document.fullscreenElement &&
@@ -275,8 +280,7 @@ export const App: FC<AppProps> = ({
         setBackgroundIndex((backgroundIndex + 1) % backgrounds.length);
     };
     const onPaletteClick = () => {
-        if (!emulator.changePalette) return;
-        emulator.changePalette();
+        emulator.changePalette?.();
     };
     const onUploadFile = async (file: File) => {
         const arrayBuffer = await file.arrayBuffer();
@@ -629,12 +633,14 @@ export const startApp = (
         fullscreen = false,
         debug = false,
         keyboard = false,
+        palette,
         backgrounds = []
     }: {
         emulator: Emulator;
         fullscreen?: boolean;
         debug?: boolean;
         keyboard?: boolean;
+        palette?: string;
         backgrounds: string[];
     }
 ) => {
@@ -643,14 +649,15 @@ export const startApp = (
 
     const root = ReactDOM.createRoot(elementRef);
     root.render(
-        <App
+        <EmulatorApp
             emulator={emulator}
             fullscreen={fullscreen}
             debug={debug}
             keyboard={keyboard}
+            palette={palette}
             backgrounds={backgrounds}
         />
     );
 };
 
-export default App;
+export default EmulatorApp;

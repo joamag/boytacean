@@ -6,7 +6,7 @@ import {
     PixelFormat,
     RomInfo
 } from "./react/structs";
-import { PALETTES } from "./palettes";
+import { PALETTES, PALETTES_MAP } from "./palettes";
 
 import {
     Cartridge,
@@ -303,10 +303,10 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
                 break;
         }
 
-        // runs the initial palette set operation, restoring
+        // runs the initial palette update operation, restoring
         // the palette of the emulator according to the currently
         // selected one
-        this.setPalette();
+        this.updatePalette();
 
         // resets the Game Boy engine to restore it into
         // a valid state ready to be used
@@ -500,7 +500,13 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     changePalette() {
         this.paletteIndex += 1;
         this.paletteIndex %= PALETTES.length;
-        this.setPalette();
+        this.updatePalette();
+    }
+
+    setPalette(palette: string) {
+        const paletteObj = PALETTES_MAP[palette];
+        this.paletteIndex = PALETTES.indexOf(paletteObj);
+        this.updatePalette();
     }
 
     benchmark(count = 50000000) {
@@ -540,7 +546,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         localStorage.setItem(title, ramDataB64);
     }
 
-    private setPalette(index?: number) {
+    private updatePalette(index?: number) {
         index ??= this.paletteIndex;
         const palette = PALETTES[index];
         this.gameBoy?.set_palette_colors_ws(palette.colors);

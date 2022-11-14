@@ -23,6 +23,7 @@ const BACKGROUNDS = [
     const keyboard = ["1", "true", "True"].includes(
         params.get("keyboard") ?? ""
     );
+    const palette = params.get("palette") ?? params.get("palette") ?? undefined;
 
     // creates the emulator structure and initializes the
     // React app with both the parameters and the emulator
@@ -32,6 +33,7 @@ const BACKGROUNDS = [
         fullscreen: fullscreen,
         debug: debug,
         keyboard: keyboard,
+        palette: palette,
         backgrounds: BACKGROUNDS
     });
     await emulator.main({ romUrl: romUrl });

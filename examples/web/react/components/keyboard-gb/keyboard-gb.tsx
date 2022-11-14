@@ -142,11 +142,6 @@ export const KeyboardGB: FC<KeyboardGBProps> = ({
 
                 _gamepad.buttons.forEach((button, index) => {
                     const pressed = button.pressed;
-
-                    if (pressed) {
-                        console.info(index);
-                    }
-
                     handleButton(index, pressed);
                 });
 
