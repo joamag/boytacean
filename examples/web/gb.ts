@@ -373,6 +373,14 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         return "https://gitlab.stage.hive.pt/joamag/boytacean/-/blob/master/CHANGELOG.md";
     }
 
+    get repository(): string | undefined {
+        return "GitLab";
+    }
+
+    get repositoryUrl(): string | undefined {
+        return "https://gitlab.stage.hive.pt/joamag/boytacean";
+    }
+
     get features(): Feature[] {
         return [
             Feature.Debug,

@@ -128,7 +128,11 @@ export interface Emulator extends ObservableI {
      * The URL to the page describing the current version
      * of the emulator.
      */
-    get versionUrl(): string;
+    get versionUrl(): string | undefined;
+
+    get repository(): string | undefined;
+
+    get repositoryUrl(): string | undefined;
 
     /**
      * The features available and compatible with the emulator,
@@ -261,6 +265,14 @@ export class EmulatorBase extends Observable {
     }
 
     get versionUrl(): string | undefined {
+        return undefined;
+    }
+
+    get repository(): string | undefined {
+        return undefined;
+    }
+
+    get repositoryUrl(): string | undefined {
         return undefined;
     }
 
@@ -645,16 +657,22 @@ export const App: FC<AppProps> = ({
                         </Link>
                         .
                     </Paragraph>
-                    <Paragraph>
-                        You can check the source code of it at{" "}
-                        <Link
-                            href="https://gitlab.stage.hive.pt/joamag/boytacean"
-                            target="_blank"
-                        >
-                            GitLab
-                        </Link>
-                        .
-                    </Paragraph>
+                    {emulator.repository && (
+                        <Paragraph>
+                            You can check the source code of it at{" "}
+                            {emulator.repositoryUrl ? (
+                                <Link
+                                    href={emulator.repositoryUrl}
+                                    target="_blank"
+                                >
+                                    {emulator.repository}
+                                </Link>
+                            ) : (
+                                <>{emulator.repository}</>
+                            )}
+                            .
+                        </Paragraph>
+                    )}
                     <Paragraph>
                         TIP: Drag and Drop ROM files to the Browser to load the
                         ROM.
