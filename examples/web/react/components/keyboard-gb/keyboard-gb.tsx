@@ -52,6 +52,12 @@ type KeyboardGBProps = {
     onGamepad?: (id: string, isValid: boolean, connected?: boolean) => void;
 };
 
+/**
+ * The sequence of game pads that are considered
+ * supported by the current implementation.
+ */
+const SUPPORTED_PADS = [Gamepad.Xbox];
+
 export const KeyboardGB: FC<KeyboardGBProps> = ({
     focusable = true,
     fullscreen = false,
@@ -108,7 +114,7 @@ export const KeyboardGB: FC<KeyboardGBProps> = ({
         const onGamepadConnected = (event: GamepadEvent) => {
             const gamepad = event.gamepad;
             let gamepadType = getGamepadType(gamepad);
-            const isValid = [Gamepad.Xbox].includes(gamepadType);
+            const isValid = SUPPORTED_PADS.includes(gamepadType);
 
             onGamepad && onGamepad(gamepad.id, isValid);
 
@@ -153,12 +159,9 @@ export const KeyboardGB: FC<KeyboardGBProps> = ({
         };
         const onGamepadDisconnected = (event: GamepadEvent) => {
             const gamepad = event.gamepad;
-            let gamepadType = Gamepad.Unknown;
+            let gamepadType = getGamepadType(gamepad);
+            const isValid = SUPPORTED_PADS.includes(gamepadType);
 
-            const isXbox = gamepad.id.startsWith("Xbox");
-            if (isXbox) gamepadType = Gamepad.Xbox;
-
-            const isValid = [Gamepad.Xbox].includes(gamepadType);
             onGamepad && onGamepad(gamepad.id, isValid, false);
         };
         document.addEventListener("keydown", _onKeyDown);
