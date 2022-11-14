@@ -352,7 +352,10 @@ export const App: FC<AppProps> = ({
     }, [keyaction]);
     useEffect(() => {
         const onFullChange = (event: Event) => {
-            if (!document.fullscreenElement) {
+            if (
+                !document.fullscreenElement &&
+                !(document as any).webkitFullscreenElement
+            ) {
                 setFullscreenState(false);
             }
         };
@@ -391,11 +394,16 @@ export const App: FC<AppProps> = ({
             showToast(params.text, params.error, params.timeout);
         };
         document.addEventListener("fullscreenchange", onFullChange);
+        document.addEventListener("webkitfullscreenchange", onFullChange);
         document.addEventListener("keydown", onKeyDown);
         emulator.bind("booted", onBooted);
         emulator.bind("message", onMessage);
         return () => {
             document.removeEventListener("fullscreenchange", onFullChange);
+            document.removeEventListener(
+                "webkitfullscreenchange",
+                onFullChange
+            );
             document.removeEventListener("keydown", onKeyDown);
             emulator.unbind("booted", onBooted);
             emulator.unbind("message", onMessage);
