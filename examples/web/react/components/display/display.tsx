@@ -97,9 +97,14 @@ export const Display: FC<DisplayProps> = ({
 
             // requests the browser to go fullscreen using the
             // body of the document as the entry HTML element
-            nativeFullscreen &&
-                document.body.requestFullscreen &&
+            if (nativeFullscreen && document.body.requestFullscreen) {
                 document.body.requestFullscreen().catch(() => {});
+            } else if (
+                nativeFullscreen &&
+                (document.body as any).webkitRequestFullscreen
+            ) {
+                (document.body as any).webkitRequestFullscreen();
+            }
         } else {
             setWidth(undefined);
             setHeight(undefined);
@@ -110,9 +115,14 @@ export const Display: FC<DisplayProps> = ({
 
             // restores the window mode, returning from the
             // fullscreen browser
-            nativeFullscreen &&
-                document.exitFullscreen &&
+            if (nativeFullscreen && document.exitFullscreen) {
                 document.exitFullscreen().catch(() => {});
+            } else if (
+                nativeFullscreen &&
+                (document as any).webkitExitFullscreen
+            ) {
+                (document as any).webkitExitFullscreen();
+            }
         }
         return () => {
             window.removeEventListener("resize", resizeRef.current);
