@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Support for true fullscreen at a browser level
 * Support for more flexible palette colors
 * Support for setting palette colors using WASM
+* Local storage usage for saving battery backed RAM
 
 ### Changed
 

@@ -15,12 +15,21 @@ import {
     PpuMode
 } from "./lib/boytacean.js";
 import info from "./package.json";
+import { base64ToBuffer, bufferToBase64 } from "./util";
 
 declare const require: any;
 
 const LOGIC_HZ = 4194304;
+
 const VISUAL_HZ = 59.7275;
 const IDLE_HZ = 10;
+
+/**
+ * The rate at which the local storage RAM state flush
+ * operation is going to be performed, this value is the
+ * number of seconds in between flush operations (eg: 5 seconds).
+ */
+const STORE_RATE = 5;
 
 const SAMPLE_RATE = 2;
 
@@ -65,6 +74,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     private frameStart: number = new Date().getTime();
     private frameCount: number = 0;
     private paletteIndex: number = 0;
+    private storeCycles: number = LOGIC_HZ * STORE_RATE;
 
     private romName: string | null = null;
     private romData: Uint8Array | null = null;
@@ -190,7 +200,8 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
 
             // runs the Game Boy clock, this operations should
             // include the advance of both the CPU and the PPU
-            counterCycles += this.gameBoy?.clock() ?? 0;
+            const tickCycles = this.gameBoy?.clock() ?? 0;
+            counterCycles += tickCycles;
 
             // in case the current PPU mode is VBlank and the
             // frame is different from the previously rendered
@@ -206,13 +217,16 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
                 // triggers the frame event indicating that
                 // a new frame is now available for drawing
                 this.trigger("frame");
+            }
 
-                // @todo this has to be structureed in a better way
-                if (this.cartridge && this.cartridge.has_battery()) {
-                    const ramData = this.cartridge.ram_data_eager();
-                    const decoder = new TextDecoder("utf8");
-                    const ramDataB64 = btoa(decoder.decode(ramData));
-                    localStorage.setItem(this.cartridge.title(), ramDataB64)
+            // in case the current cartridge is battery backed
+            // then we need to check if a RAM flush to local
+            // storage operation is required
+            if (this.cartridge && this.cartridge.has_battery()) {
+                this.storeCycles -= tickCycles;
+                if (this.storeCycles <= 0) {
+                    this.storeRam();
+                    this.storeCycles = this.logicFrequency * STORE_RATE;
                 }
             }
         }
@@ -299,21 +313,21 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         this.gameBoy.load_boot_default();
         const cartridge = this.gameBoy.load_rom_ws(romData!);
 
-        // in case there's a battery involved tries to obtain
-        if (cartridge.has_battery()) {
-        }
+        // updates the name of the currently selected engine
+        // to the one that has been provided (logic change)
+        if (engine) this._engine = engine;
 
         // updates the ROM name in case there's extra information
         // coming from the cartridge
         romName = cartridge.title() ? cartridge.title() : romName;
 
-        // updates the name of the currently selected engine
-        // to the one that has been provided (logic change)
-        if (engine) this._engine = engine;
-
         // updates the complete set of global information that
         // is going to be displayed
         this.setRom(romName!, romData!, cartridge);
+
+        // in case there's a battery involved tries to load the
+        // current RAM from the local storage
+        if (cartridge.has_battery()) this.loadRam();
 
         // in case the restore (state) flag is set
         // then resumes the machine execution
@@ -502,6 +516,22 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         } finally {
             this.resume();
         }
+    }
+
+    private loadRam() {
+        if (!this.gameBoy || !this.cartridge) return;
+        const ramDataB64 = localStorage.getItem(this.cartridge.title());
+        if (!ramDataB64) return;
+        const ramData = base64ToBuffer(ramDataB64);
+        this.gameBoy.set_ram_data(ramData);
+    }
+
+    private storeRam() {
+        if (!this.gameBoy || !this.cartridge) return;
+        const title = this.cartridge.title();
+        const ramData = this.gameBoy.ram_data_eager();
+        const ramDataB64 = bufferToBase64(ramData);
+        localStorage.setItem(title, ramDataB64);
     }
 
     private setPalette(index?: number) {
