@@ -79,11 +79,35 @@ export const KeyboardGB: FC<KeyboardGBProps> = ({
                 return;
             }
         };
+        const onGamepadConnected = (event: GamepadEvent) => {
+            const gamepad = event.gamepad;
+            
+            console.log(
+                "Gamepad connected at index %d: %s. %d buttons, %d axes.",
+                event.gamepad.index,
+                event.gamepad.id,
+                event.gamepad.buttons.length,
+                event.gamepad.axes.length
+            );
+
+            const updateStatus = () => {
+                event.gamepad.buttons.forEach((button, index) => {
+                    if (button.pressed) {
+                        console.info(`${index} => ${button.pressed}`);
+                    }
+                });
+                requestAnimationFrame(updateStatus);
+            };
+
+            requestAnimationFrame(updateStatus);
+        };
         document.addEventListener("keydown", _onKeyDown);
         document.addEventListener("keyup", _onKeyUp);
+        window.addEventListener("gamepadconnected", onGamepadConnected);
         return () => {
             document.removeEventListener("keydown", _onKeyDown);
             document.removeEventListener("keyup", _onKeyUp);
+            window.removeEventListener("gamepadconnected", onGamepadConnected);
         };
     }, []);
     const renderKey = (
