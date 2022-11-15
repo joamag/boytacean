@@ -11,7 +11,7 @@ def print_buffer(filename):
     buffer = [str(byte) for byte in data]
     buffer_s = ", ".join(buffer)
 
-    print("[" + buffer_s + "]")
+    print("[%s]" % buffer_s)
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
