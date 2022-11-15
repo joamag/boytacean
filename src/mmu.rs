@@ -135,6 +135,15 @@ impl Mmu {
                             | if self.pad.int_pad() { 0x10 } else { 0x00 })
                     }
 
+                    // 0xFF50 - Boot active flag
+                    0x50 => {
+                        if self.boot_active {
+                            0x01
+                        } else {
+                            0x00
+                        }
+                    }
+
                     // 0xFF80-0xFFFE - High RAM (HRAM)
                     0x80..=0xfe => self.ppu.hram[(addr & 0x007f) as usize],
 
@@ -212,6 +221,9 @@ impl Mmu {
                         self.pad.set_int_pad(value & 0x10 == 0x10);
                     }
 
+                    // 0xFF50 - Boot active flag
+                    0x50 => self.boot_active = false,
+
                     // 0xFF80-0xFFFE - High RAM (HRAM)
                     0x80..=0xfe => self.ppu.hram[(addr & 0x007f) as usize] = value,
 
@@ -242,9 +254,6 @@ impl Mmu {
                                 }
                             }
                             0x50 => match addr & 0x00ff {
-                                // 0xFF50 - Boot active flag
-                                0x50 => self.boot_active = false,
-
                                 // 0xFF51-0xFF52 - VRAM DMA source (CGB only)
                                 0x51..=0x52 => (),
 
