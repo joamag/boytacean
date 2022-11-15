@@ -3,13 +3,19 @@
 
 import sys
 
+def print_buffer(filename):
+    file = open(filename, "rb")
+    try: data = file.read()
+    finally: file.close()
+
+    buffer = [str(byte) for byte in data]
+    buffer_s = ", ".join(buffer)
+
+    print("[" + buffer_s + "]")
+
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Missing arguments")
         exit(1)
-    file = open(sys.argv[1], "rb")
-    try: data = file.read()
-    finally: file.close()
-    buffer = [str(byte) for byte in data]
-    buffer_s = ", ".join(buffer)
-    print("[" + buffer_s + "]")
+
+    print_buffer(sys.argv[1])
