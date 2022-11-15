@@ -43,18 +43,18 @@ build-wasm:
     - rustup override set $RUST_VERSION
     - rustc --version
     - cargo install wasm-pack
-    - wasm-pack build --release --target=web --out-dir=examples/web/lib -- --features wasm
-    - cd examples/web && npm install && npm run build
+    - wasm-pack build --release --target=web --out-dir=frontends/web/lib -- --features wasm
+    - cd frontends/web && npm install && npm run build
   artifacts:
     paths:
-      - examples/web/dist
-      - examples/web/lib
+      - frontends/web/dist
+      - frontends/web/lib
     expire_in: 1 day
 
 deploy-netlify-preview:
   stage: deploy
   script:
-    - cd examples/web/dist
+    - cd frontends/web/dist
     - cp -rp ../static/* .
     - npm_config_yes=true npx --package=netlify-cli netlify deploy --dir=.
   dependencies:
@@ -65,7 +65,7 @@ deploy-netlify-preview:
 deploy-netlify-prod:
   stage: deploy
   script:
-    - cd examples/web/dist
+    - cd frontends/web/dist
     - cp -rp ../static/* .
     - npm_config_yes=true npx --package=netlify-cli netlify deploy --dir=. --prod
   dependencies:
@@ -76,7 +76,7 @@ deploy-netlify-prod:
 deploy-cloudfare-master:
   stage: deploy
   script:
-    - cd examples/web/dist
+    - cd frontends/web/dist
     - cp -rp ../static/* .
     - npm_config_yes=true npx wrangler pages publish . --project-name=boytacean --branch master
   dependencies:
@@ -87,7 +87,7 @@ deploy-cloudfare-master:
 deploy-cloudfare-stable:
   stage: deploy
   script:
-    - cd examples/web/dist
+    - cd frontends/web/dist
     - cp -rp ../static/* .
     - npm_config_yes=true npx wrangler pages publish . --project-name=boytacean --branch stable
   dependencies:
@@ -98,7 +98,7 @@ deploy-cloudfare-stable:
 deploy-cloudfare-prod:
   stage: deploy
   script:
-    - cd examples/web/dist
+    - cd frontends/web/dist
     - cp -rp ../static/* .
     - npm_config_yes=true npx wrangler pages publish . --project-name=boytacean --branch prod
   dependencies:
@@ -120,7 +120,7 @@ deploy-npm:
   stage: deploy
   script:
     - echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
-    - cd examples/web/lib && npm publish
+    - cd frontends/web/lib && npm publish
   dependencies:
     - build-wasm
   only:

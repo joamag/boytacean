@@ -6,4 +6,4 @@ Cargo.lock
 
 /target
 /res/roms.prop
-/examples/*/target
+/frontends/*/target
