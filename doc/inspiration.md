@@ -13,6 +13,7 @@
 ## ROMs
 
 * [GitHub - c-sp/gameboy-test-roms](https://github.com/c-sp/gameboy-test-roms)
+* [GAME BOY Demospotting - ROMs](http://privat.bahnhof.se/wb800787/gb/demos)
 
 ## Emulators
 
@@ -32,4 +33,4 @@
 
 * [GitHub - gbdev/awesome-gbdev](https://github.com/gbdev/awesome-gbdev)
 * [GitHub - Hacktix/Bootix](https://github.com/Hacktix/Bootix)
-* 
+* [Game Boy Boot ROMs](https://gbdev.gg8.se/files/roms/bootroms)
