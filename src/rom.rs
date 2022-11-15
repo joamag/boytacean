@@ -413,17 +413,17 @@ impl Cartridge {
 
     pub fn has_battery(&self) -> bool {
         match self.rom_type() {
-            RomType::Mbc1RamBattery => true,
-            RomType::Mbc2Battery => true,
-            RomType::RomRamBattery => true,
-            RomType::Mmm01RamBattery => true,
-            RomType::Mbc3TimerBattery => true,
-            RomType::Mbc3TimerRamBattery => true,
-            RomType::Mbc3RamBattery => true,
-            RomType::Mbc5RamBattery => true,
-            RomType::Mbc5RumbleRamBattery => true,
-            RomType::Mbc7SensorRumbleRamBattery => true,
-            RomType::HuC1RamBattery => true,
+            RomType::Mbc1RamBattery
+            | RomType::Mbc2Battery
+            | RomType::RomRamBattery
+            | RomType::Mmm01RamBattery
+            | RomType::Mbc3TimerBattery
+            | RomType::Mbc3TimerRamBattery
+            | RomType::Mbc3RamBattery
+            | RomType::Mbc5RamBattery
+            | RomType::Mbc5RumbleRamBattery
+            | RomType::Mbc7SensorRumbleRamBattery
+            | RomType::HuC1RamBattery => true,
             _ => false,
         }
     }
