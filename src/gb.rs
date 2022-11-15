@@ -247,7 +247,7 @@ impl GameBoy {
     }
 
     pub fn load_boot_default_f(&mut self) {
-        self.load_boot_cgb_f();
+        self.load_boot_dmg_f();
     }
 
     pub fn load_boot_dmg_f(&mut self) {
