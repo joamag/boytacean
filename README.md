@@ -69,7 +69,7 @@ The palettes offered in the web version were provided by [TheWolfBunny64](https:
 
 ### Inspiration
 
-To get some information about the resources that inspired my through the emulation creation journey check [inspiration.md](doc/inspiration.md).
+To get some information about the resources that inspired my through the emulation creation journey check [Inspiration](doc/inspiration.md).
 
 ## License
 
