@@ -17,7 +17,7 @@ const BACKGROUNDS = [
     const params = new URLSearchParams(window.location.search);
     const romUrl = params.get("rom_url") ?? params.get("url") ?? undefined;
     const fullscreen = ["1", "true", "True"].includes(
-        params.get("fullscreen") ?? ""
+        params.get("fullscreen") ?? params.get("fs") ?? ""
     );
     const debug = ["1", "true", "True"].includes(params.get("debug") ?? "");
     const keyboard = ["1", "true", "True"].includes(

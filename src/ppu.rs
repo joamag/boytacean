@@ -940,10 +940,10 @@ impl Ppu {
     /// This method should be called whenever the palette indexes
     /// are changed.
     fn compute_palette(palette: &mut Palette, palette_colors: &Palette, value: u8) {
-        for index in 0..PALETTE_SIZE {
+        for (index, palette_item) in palette.iter_mut().enumerate() {
             let color_index: usize = (value as usize >> (index * 2)) & 3;
             match color_index {
-                0..=3 => palette[index] = palette_colors[color_index],
+                0..=3 => *palette_item = palette_colors[color_index],
                 color_index => panic!("Invalid palette color index {:04x}", color_index),
             }
         }

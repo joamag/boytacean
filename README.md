@@ -57,8 +57,9 @@ You can use some GET parameters to control the initial behaviour of the emulator
 | Parameter    | Type    | Description                                                                                    |
 | ------------ | ------- | ---------------------------------------------------------------------------------------------- |
 | `rom_url`    | String  | The URL from which the initial ROM is going to be loaded, should support CORS.                 |
-| `url`        | String  | The same as `url`.                                                                             |
+| `url`        | String  | The same as `rom_url`.                                                                         |
 | `fullscreen` | Boolean | If the emulator should start in fullscreen mode.                                               |
+| `fs`         | Boolean | The same as `fullscreen`.                                                                      |
 | `debug`      | Boolean | If the "debugger" should start visible.                                                        |
 | `keyboard`   | Boolean | If the on screen keyboard should start visible.                                                |
 | `palette`    | String  | The name of the palette to be set at startup( eg: `christmas`, `hogwards`, `mariobros`, etc.). |
