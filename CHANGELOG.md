@@ -13,11 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-* New default demo ROM
+*
 
 ### Fixed
 
-*
+* Critical issue with loading of Boot ROM
 
 ## [0.5.3] - 2022-11-15
 

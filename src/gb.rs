@@ -128,7 +128,7 @@ impl GameBoy {
     }
 
     pub fn load_boot_dmg(&mut self) {
-        self.load_boot_static(BootRom::Cgb);
+        self.load_boot_static(BootRom::DmgBootix);
     }
 
     pub fn load_boot_cgb(&mut self) {
@@ -247,7 +247,15 @@ impl GameBoy {
     }
 
     pub fn load_boot_default_f(&mut self) {
+        self.load_boot_cgb_f();
+    }
+
+    pub fn load_boot_dmg_f(&mut self) {
         self.load_boot_file(BootRom::DmgBootix);
+    }
+
+    pub fn load_boot_cgb_f(&mut self) {
+        self.load_boot_file(BootRom::Cgb);
     }
 
     pub fn load_rom(&mut self, data: &[u8]) -> &Cartridge {
