@@ -1,7 +1,10 @@
 use crate::{debugln, pad::Pad, ppu::Ppu, rom::Cartridge, timer::Timer};
 
-pub const BOOT_SIZE: usize = 2304;
-pub const RAM_SIZE: usize = 8192;
+pub const BOOT_SIZE_DMG: usize = 256;
+pub const BOOT_SIZE_CGB: usize = 2304;
+
+pub const RAM_SIZE_DMG: usize = 8192;
+pub const RAM_SIZE_CGB: usize = 32768;
 
 pub struct Mmu {
     /// Register that controls the interrupts that are considered
@@ -38,9 +41,15 @@ pub struct Mmu {
     /// the bios which is 2308 bytes long is in fact only 2048 bytes
     /// as the 256 bytes in range 0x100-0x1FF are meant to be
     /// overwritten byte the cartridge header.
-    boot: [u8; BOOT_SIZE],
+    boot: Vec<u8>,
 
-    ram: [u8; RAM_SIZE],
+    ram: Vec<u8>,
+
+    /// The RAM bank to be used in the read and write operation of
+    /// the 0xD000-0xDFFF memory range. CGB Only
+    ram_bank: u8,
+
+    ram_offset: u16,
 }
 
 impl Mmu {
@@ -51,8 +60,10 @@ impl Mmu {
             timer,
             rom: Cartridge::new(),
             boot_active: true,
-            boot: [0u8; BOOT_SIZE],
-            ram: [0u8; RAM_SIZE],
+            boot: vec![],
+            ram: vec![],
+            ram_bank: 0x1,
+            ram_offset: 0x1000,
             ie: 0x0,
         }
     }
@@ -60,9 +71,25 @@ impl Mmu {
     pub fn reset(&mut self) {
         self.rom = Cartridge::new();
         self.boot_active = true;
-        self.boot = [0u8; BOOT_SIZE];
-        self.ram = [0u8; RAM_SIZE];
+        self.boot = vec![];
+        self.ram = vec![];
+        self.ram_bank = 0x1;
+        self.ram_offset = 0x1000;
         self.ie = 0x0;
+    }
+
+    pub fn allocate_default(&mut self) {
+        self.allocate_dmg();
+    }
+
+    pub fn allocate_dmg(&mut self) {
+        self.boot = vec![0x00; BOOT_SIZE_DMG];
+        self.ram = vec![0x00; RAM_SIZE_DMG];
+    }
+
+    pub fn allocate_cgb(&mut self) {
+        self.boot = vec![0x00; BOOT_SIZE_CGB];
+        self.ram = vec![0x00; RAM_SIZE_CGB];
     }
 
     pub fn ppu(&mut self) -> &mut Ppu {
@@ -106,7 +133,7 @@ impl Mmu {
             // ROM 0 (12 KB/16 KB)
             0x1000 | 0x2000 | 0x3000 => self.rom.read(addr),
 
-            // ROM 1 (Unbanked) (16 KB)
+            // ROM 1 (Banked) (16 KB)
             0x4000 | 0x5000 | 0x6000 | 0x7000 => self.rom.read(addr),
 
             // Graphics: VRAM (8 KB)
@@ -115,8 +142,11 @@ impl Mmu {
             // External RAM (8 KB)
             0xa000 | 0xb000 => self.rom.read(addr),
 
-            // Working RAM (8 KB)
-            0xc000 | 0xd000 => self.ram[(addr & 0x1fff) as usize],
+            // Working RAM 0 (4 KB)
+            0xc000 => self.ram[(addr & 0x0fff) as usize],
+
+            // Working RAM 1 (Banked) (4KB)
+            0xd000 => self.ram[(self.ram_offset + (addr & 0x0fff)) as usize],
 
             // Working RAM Shadow
             0xe000 => self.ram[(addr & 0x1fff) as usize],
@@ -182,7 +212,7 @@ impl Mmu {
             // ROM 0 (12 KB/16 KB)
             0x1000 | 0x2000 | 0x3000 => self.rom.write(addr, value),
 
-            // ROM 1 (Unbanked) (16 KB)
+            // ROM 1 (Banked) (16 KB)
             0x4000 | 0x5000 | 0x6000 | 0x7000 => self.rom.write(addr, value),
 
             // Graphics: VRAM (8 KB)
@@ -223,6 +253,16 @@ impl Mmu {
 
                     // 0xFF50 - Boot active flag
                     0x50 => self.boot_active = false,
+
+                    // 0xFF70 - SVBK: WRAM bank (CGB Mode only)
+                    0x70 => {
+                        let mut ram_bank = value & 0x7;
+                        if ram_bank == 0x0 {
+                            ram_bank = 0x1;
+                        }
+                        self.ram_bank = ram_bank;
+                        self.ram_offset = self.ram_bank as u16 * 0x1000;
+                    }
 
                     // 0xFF80-0xFFFE - High RAM (HRAM)
                     0x80..=0xfe => self.ppu.hram[(addr & 0x007f) as usize] = value,

@@ -109,6 +109,27 @@ impl GameBoy {
         self.cpu.boot();
     }
 
+    pub fn load_default(&mut self, boot: bool) {
+        self.mmu().allocate_default();
+        if boot {
+            self.load_boot_default();
+        }
+    }
+
+    pub fn load_dmg(&mut self, boot: bool) {
+        self.mmu().allocate_dmg();
+        if boot {
+            self.load_boot_dmg();
+        }
+    }
+
+    pub fn load_cgb(&mut self, boot: bool) {
+        self.mmu().allocate_cgb();
+        if boot {
+            self.load_boot_cgb();
+        }
+    }
+
     pub fn load_boot(&mut self, data: &[u8]) {
         self.cpu.mmu().write_boot(0x0000, data);
     }

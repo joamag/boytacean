@@ -113,7 +113,7 @@ impl Emulator {
                     },
                     Event::DropFile { filename, .. } => {
                         self.system.reset();
-                        self.system.load_boot_default();
+                        self.system.load_cgb(true);
                         self.load_rom(&filename);
                     }
                     _ => (),
@@ -185,7 +185,7 @@ fn main() {
     // creates a new Game Boy instance and loads both the boot ROM
     // and the initial game ROM to "start the engine"
     let mut game_boy = GameBoy::new();
-    game_boy.load_boot_default();
+    game_boy.load_cgb(true);
 
     let mut emulator = Emulator::new(game_boy, SCREEN_SCALE);
     emulator.load_rom("../../res/roms.prop/super_mario.gb");
