@@ -412,7 +412,7 @@ impl Cartridge {
     }
 
     pub fn has_battery(&self) -> bool {
-        matches!(
+        return matches!(
             self.rom_type(),
             RomType::Mbc1RamBattery
                 | RomType::Mbc2Battery
