@@ -412,20 +412,20 @@ impl Cartridge {
     }
 
     pub fn has_battery(&self) -> bool {
-        match self.rom_type() {
+        matches!(
+            self.rom_type(),
             RomType::Mbc1RamBattery
-            | RomType::Mbc2Battery
-            | RomType::RomRamBattery
-            | RomType::Mmm01RamBattery
-            | RomType::Mbc3TimerBattery
-            | RomType::Mbc3TimerRamBattery
-            | RomType::Mbc3RamBattery
-            | RomType::Mbc5RamBattery
-            | RomType::Mbc5RumbleRamBattery
-            | RomType::Mbc7SensorRumbleRamBattery
-            | RomType::HuC1RamBattery => true,
-            _ => false,
-        }
+                | RomType::Mbc2Battery
+                | RomType::RomRamBattery
+                | RomType::Mmm01RamBattery
+                | RomType::Mbc3TimerBattery
+                | RomType::Mbc3TimerRamBattery
+                | RomType::Mbc3RamBattery
+                | RomType::Mbc5RamBattery
+                | RomType::Mbc5RumbleRamBattery
+                | RomType::Mbc7SensorRumbleRamBattery
+                | RomType::HuC1RamBattery
+        );
     }
 
     pub fn ram_data_eager(&self) -> Vec<u8> {
