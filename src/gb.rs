@@ -295,7 +295,7 @@ impl GameBoy {
         self.ppu().set_palette_colors(&palette);
     }
 
-    fn js_to_pixel(value: &JsValue) -> [u8; 3] {
+    fn js_to_pixel(value: &JsValue) -> Pixel {
         value
             .as_string()
             .unwrap()
