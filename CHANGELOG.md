@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-*
+* PPU issue related to the maximum number of objects/sprite per line being 10
 
 ## [0.5.4] - 2022-11-15
 

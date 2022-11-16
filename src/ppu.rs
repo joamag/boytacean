@@ -802,7 +802,15 @@ impl Ppu {
     }
 
     fn render_objects(&mut self) {
+        let mut draw_count = 0u8;
+
         for index in 0..OBJ_COUNT {
+            // in case the limit on number of object to be draw per
+            // line has been reached breaks the loop avoiding more draws
+            if draw_count == 10 {
+                break;
+            }
+
             // obtains the meta data of the object that is currently
             // under iteration to be checked for drawing
             let obj = self.obj_data[index];
@@ -899,6 +907,10 @@ impl Ppu {
                 // size of an RGB pixel (which is 3 bytes)
                 frame_offset += RGB_SIZE as i32;
             }
+
+            // increments the counter so that we're able to keep
+            // track on the number of object drawn
+            draw_count += 1;
         }
     }
 
