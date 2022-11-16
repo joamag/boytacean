@@ -1,4 +1,4 @@
-# [Boytacean](https://boytacean.pages.dev)
+# [Boytacean](https://boytacean.joao.me)
 
 A Game Boy emulator that is written in Rust 🦀.
 
@@ -6,7 +6,7 @@ A Game Boy emulator that is written in Rust 🦀.
 
 ## Features
 
-* Supports Game Boy (DMG) emulation
+* Game Boy (DMG) emulation
 * Simple navigable source-code
 * Web and SDL front-ends
 * Support for multiple MBCs: MBC1, MBC2, MBC3, and MBC5
@@ -22,10 +22,16 @@ For the Web front-end...
 * Fullscreen browser mode
 * Debug mode - VRAM and registers
 
+What's missing...
+
+* Audio emulation APU
+* Game Boy Color (GBC) emulation
+
 ## Deployments
 
 | Provider  | Stable  | URL                                                              |
 | --------- | ------- | ---------------------------------------------------------------- |
+| Cloudfare | `True`  | [boytacean.joao.me](https://boytacean.joao.me)                   |
 | Cloudfare | `True`  | [boytacean.pages.dev](https://boytacean.pages.dev)               |
 | Cloudfare | `True`  | [prod.boytacean.pages.dev](https://prod.boytacean.pages.dev)     |
 | Cloudfare | `True`  | [stable.boytacean.pages.dev](https://stable.boytacean.pages.dev) |
