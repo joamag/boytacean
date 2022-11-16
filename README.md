@@ -1,4 +1,4 @@
-# [Boytacean](https://boytacean.pages.dev)
+# [Boytacean](https://boytacean.joao.me)
 
 A Game Boy emulator that is written in Rust 🦀.
 
