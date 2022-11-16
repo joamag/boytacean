@@ -31,6 +31,7 @@ What's missing...
 
 | Provider  | Stable  | URL                                                              |
 | --------- | ------- | ---------------------------------------------------------------- |
+| Cloudfare | `True`  | [boytacean.joao.me](https://boytacean.joao.me)                   |
 | Cloudfare | `True`  | [boytacean.pages.dev](https://boytacean.pages.dev)               |
 | Cloudfare | `True`  | [prod.boytacean.pages.dev](https://prod.boytacean.pages.dev)     |
 | Cloudfare | `True`  | [stable.boytacean.pages.dev](https://stable.boytacean.pages.dev) |
