@@ -242,7 +242,7 @@ impl Mmu {
                                 match addr & 0x00ff {
                                     // 0xFF46 — DMA: OAM DMA source address & start
                                     0x0046 => {
-                                        // @todo must increment the cycle count by 160
+                                        // @TODO must increment the cycle count by 160
                                         // and make this a separated dma.rs file
                                         debugln!("Going to start DMA transfer to 0x{:x}00", value);
                                         let data = self.read_many((value as u16) << 8, 160);

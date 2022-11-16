@@ -115,7 +115,7 @@ impl Cpu {
             panic!("Invalid PC area at 0x{:04x}", pc);
         }
 
-        // @todo this is so bad, need to improve this by an order
+        // @TODO this is so bad, need to improve this by an order
         // of magnitude, to be able to have better performance
         if self.halted
             && (((self.mmu.ie & 0x01 == 0x01) && self.mmu.ppu().int_vblank())
@@ -127,7 +127,7 @@ impl Cpu {
         }
 
         if self.ime {
-            // @todo aggregate all of this interrupts in the MMU, as there's
+            // @TODO aggregate all of this interrupts in the MMU, as there's
             // a lot of redundant code involved in here which complicates the
             // readability and maybe performance of this code
             if (self.mmu.ie & 0x01 == 0x01) && self.mmu.ppu().int_vblank() {
@@ -149,7 +149,7 @@ impl Cpu {
 
                 return 24;
             }
-            // @todo aggregate the handling of these interrupts
+            // @TODO aggregate the handling of these interrupts
             else if (self.mmu.ie & 0x02 == 0x02) && self.mmu.ppu().int_stat() {
                 debugln!("Going to run LCD STAT interrupt handler (0x48)");
 
@@ -169,7 +169,7 @@ impl Cpu {
 
                 return 24;
             }
-            // @todo aggregate the handling of these interrupts
+            // @TODO aggregate the handling of these interrupts
             else if (self.mmu.ie & 0x04 == 0x04) && self.mmu.timer().int_tima() {
                 debugln!("Going to run Timer interrupt handler (0x50)");
 
@@ -189,7 +189,7 @@ impl Cpu {
 
                 return 24;
             }
-            // @todo aggregate the handling of these interrupts
+            // @TODO aggregate the handling of these interrupts
             else if (self.mmu.ie & 0x10 == 0x10) && self.mmu.pad().int_pad() {
                 debugln!("Going to run JoyPad interrupt handler (0x60)");
 
