@@ -112,7 +112,7 @@ pub struct ObjectData {
     palette: u8,
     xflip: bool,
     yflip: bool,
-    priority: bool,
+    bg_over: bool,
     index: u8,
 }
 
@@ -305,7 +305,7 @@ impl Ppu {
                 palette: 0,
                 xflip: false,
                 yflip: false,
-                priority: false,
+                bg_over: false,
                 index: 0,
             }; OBJ_COUNT],
             palette_colors: PALETTE_COLORS,
@@ -665,7 +665,7 @@ impl Ppu {
                 obj.palette = if value & 0x10 == 0x10 { 1 } else { 0 };
                 obj.xflip = value & 0x20 == 0x20;
                 obj.yflip = value & 0x40 == 0x40;
-                obj.priority = value & 0x80 != 0x80;
+                obj.bg_over = value & 0x80 == 0x80;
                 obj.index = obj_index as u8;
             }
             _ => (),
@@ -883,14 +883,20 @@ impl Ppu {
                 let is_contained =
                     (obj.x + x as i16 >= 0) && ((obj.x + x as i16) < DISPLAY_WIDTH as i16);
                 if is_contained {
-                    // the object is only considered visible if it's a priority
-                    // or if the underlying pixel is transparent (zero value)
-                    let is_visible = obj.priority || self.color_buffer[color_offset as usize] == 0;
+                    // the object is only considered visible if no background or
+                    // window should be drawn over or if the underlying pixel
+                    // is transparent (zero value) meaning there's no background
+                    // or window for the provided pixel
+                    let is_visible = !obj.bg_over || self.color_buffer[color_offset as usize] == 0;
                     let pixel = tile_row[if obj.xflip { 7 - x } else { x }];
                     if is_visible && pixel != 0 {
                         // obtains the current pixel data from the tile row and
                         // re-maps it according to the object palette
                         let color = palette[pixel as usize];
+
+                        // updates the pixel in the color buffer, which stores
+                        // the raw pixel color information (unmapped)
+                        self.color_buffer[color_offset as usize] = pixel;
 
                         // sets the color pixel in the frame buffer
                         self.frame_buffer[frame_offset as usize] = color[0];
