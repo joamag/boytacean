@@ -672,7 +672,7 @@ impl Ppu {
         let mut mask;
 
         for x in 0..TILE_WIDTH {
-            mask = 1 << (TILE_WIDTH - 1 - x);
+            mask = 1 << (7 - x);
             tile.set(
                 x,
                 y,
