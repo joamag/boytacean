@@ -763,7 +763,7 @@ impl Ppu {
             };
 
             // Get the address of the tile in memory.
-            let tile_id_address = {
+            let tile_index_address = {
                 let tile_map_row = tile_y / TILE_SIZE;
                 let tile_map_col = tile_x as u16 / TILE_SIZE;
 
@@ -784,27 +784,21 @@ impl Ppu {
                 tile_start_addr as u16 + tile_map_row * TILE_MAP_WIDTH + tile_map_col
             };
 
-            let tile_id = self.vram[tile_id_address as usize];
-            let tile_address = self.tile_data_address(tile_id);
+            let tile_index = self.vram[tile_index_address as usize];
+            let tile_address = self.tile_data_address(tile_index);
 
             // Find the correct vertical position within the tile. Multiply by two because each
             // row of the tile takes two bytes.
             let tile_y = (tile_y % TILE_SIZE) * 2;
-
             let addr = (tile_address + tile_y) as usize;
-            
-            let mask = 1 << (TILE_WIDTH - 1 - (tile_x % TILE_SIZE as u8) as usize);
-
-            let pixel = if self.vram[addr] & mask == mask { 0x1 } else { 0x0 }
-                    | if self.vram[addr + 1] & mask == mask {
-                        0x2
-                    } else {
-                        0x0
-                    };
 
             // obtains the current pixel data from the tile and
             // re-maps it according to the current palette
-//            let pixel = self.tiles[tile_index].get(x, y);
+            let pixel = Ppu::shade_number(
+                self.vram[addr],
+                self.vram[addr + 1],
+                tile_x % TILE_SIZE as u8,
+            );
             let color = self.palette[pixel as usize];
 
             // updates the pixel in the color buffer, which stores
@@ -826,16 +820,27 @@ impl Ppu {
         }
     }
 
-    fn tile_data_address(&self, tile_id: u8) -> u16 {
+    fn shade_number(first: u8, second: u8, tile_x: u8) -> u8 {
+        // Convert x-position into bit position (bit 7 is leftmost bit).
+        let color_bit = 7 - tile_x;
+        let mask = 1 << color_bit;
+
+        let mut color_num = 0;
+        color_num += if first & mask == mask { 0x01 } else { 0x00 };
+        color_num += if second & mask == mask { 0x02 } else { 0x00 };
+        color_num
+    }
+
+    fn tile_data_address(&self, tile_index: u8) -> u16 {
         const SIGNED_TILE_OFFSET: i16 = 128;
         const TILE_DATA_ROW_SIZE: u16 = 16;
 
         let start = if self.bg_tile { 0x0000 } else { 0x0800 };
 
         let offset = if self.bg_tile {
-            tile_id.into()
+            tile_index.into()
         } else {
-            (i16::from(tile_id as i8) + SIGNED_TILE_OFFSET) as u16
+            (i16::from(tile_index as i8) + SIGNED_TILE_OFFSET) as u16
         };
 
         start as u16 + offset * TILE_DATA_ROW_SIZE
