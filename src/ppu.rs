@@ -992,6 +992,8 @@ impl Ppu {
     /// is useful to "flush" color computation whenever the base
     /// palette colors are changed.
     fn compute_palettes(&mut self) {
+        // re-computes the complete set of palettes according to
+        // the currently set palette colors (that may have chaged)
         Self::compute_palette(&mut self.palette, &self.palette_colors, self.palettes[0]);
         Self::compute_palette(
             &mut self.palette_obj_0,
@@ -1003,6 +1005,9 @@ impl Ppu {
             &self.palette_colors,
             self.palettes[2],
         );
+
+        // clears the frame buffer to allow the new background
+        // color to be used
         self.clear_frame_buffer();
     }
 
