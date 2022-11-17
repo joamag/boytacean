@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-*
+* More issues related with bad PPU handling
 
 ## [0.5.6] - 2022-11-17
 
