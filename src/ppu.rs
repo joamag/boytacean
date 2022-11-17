@@ -214,7 +214,7 @@ pub struct Ppu {
 
     /// The current scan line in processing, should
     /// range between 0 (0x00) and 153 (0x99), representing
-    /// the 154 lines plus 10 extra v-blank lines.
+    /// the 154 lines plus 10 extra V-Blank lines.
     ly: u8,
 
     /// The line compare register that is going to be used
@@ -258,7 +258,11 @@ pub struct Ppu {
     /// content.
     switch_lcd: bool,
 
-    // TODO: Comment this properly
+    // Internal window counter value used to control the ines that
+    // were effectively rendered as part of the window tile drawing process.
+    // A line is only considered rendered when the WX and WY registers
+    // are within the valid screen range and the window switch register
+    // is valid.
     window_counter: u8,
 
     /// Flag that controls if the frame currently in rendering is the
@@ -395,7 +399,6 @@ impl Ppu {
                 if self.mode_clock >= 80 {
                     self.mode = PpuMode::VramRead;
                     self.mode_clock -= 80;
-                    self.update_stat()
                 }
             }
             PpuMode::VramRead => {
@@ -404,16 +407,14 @@ impl Ppu {
 
                     self.mode = PpuMode::HBlank;
                     self.mode_clock -= 172;
-                    self.update_stat()
                 }
             }
             PpuMode::HBlank => {
                 if self.mode_clock >= 204 {
-                    // @TODO need to properly understand this one
-                    // updates the window counter making sure that the
-                    // only lines where all the registers make sense
-                    // are counted as valid window lines for which the
-                    // window counter should be incremented
+                    // increments the window counter making sure that the
+                    // valid is only incremented when both the WX and WY
+                    // registers make sense (are within range), the window
+                    // switch is on and the line in drawing is above WY
                     if self.switch_window
                         && self.wx - 7 < DISPLAY_WIDTH as u8
                         && self.wy < DISPLAY_HEIGHT as u8
@@ -427,7 +428,7 @@ impl Ppu {
                     self.ly += 1;
 
                     // in case we've reached the end of the
-                    // screen we're now entering the v-blank
+                    // screen we're now entering the V-Blank
                     if self.ly == 144 {
                         self.int_vblank = true;
                         self.mode = PpuMode::VBlank;
@@ -446,7 +447,7 @@ impl Ppu {
                     // scanlines that are virtual and not real (off-screen)
                     self.ly += 1;
 
-                    // in case the end of v-blank has been reached then
+                    // in case the end of V-Blank has been reached then
                     // we must jump again to the OAM read mode and reset
                     // the scan line counter to the zero value
                     if self.ly == 154 {
@@ -458,7 +459,6 @@ impl Ppu {
                     }
 
                     self.mode_clock -= 456;
-                    self.update_stat()
                 }
             }
         }
@@ -724,126 +724,14 @@ impl Ppu {
             return;
         }
         if self.switch_bg {
-            self.render_tiles();
+            self.render_map(self.bg_map, self.scx, self.scy, 0, 0, self.ly);
+        }
+        if self.switch_window {
+            self.render_map(self.window_map, 0, 0, self.wx, self.wy, self.window_counter);
         }
         if self.switch_obj {
             self.render_objects();
         }
-    }
-
-    fn render_tiles(&mut self) {
-        /// Width or height of a tile, in pixels.
-        const TILE_SIZE: u16 = 8;
-
-        /// Width of the tile map, in bytes.
-        const TILE_MAP_WIDTH: u16 = 32;
-
-        // calculates the offset that is going to be used in the update of the color buffer
-        // which stores Game Boy colors from 0 to 3
-        let mut color_offset = self.ly as usize * DISPLAY_WIDTH;
-
-        // calculates the frame buffer offset position assuming the proper
-        // Game Boy screen width and RGB pixel (3 bytes) size
-        let mut frame_offset = self.ly as usize * DISPLAY_WIDTH * RGB_SIZE;
-
-        // Draw the line.
-        for screen_x in 0..DISPLAY_WIDTH as u8 {
-            let screen_y = self.ly;
-
-            let use_window = self.switch_window && screen_y >= self.wy && screen_x >= self.wx - 7;
-
-            let (tile_y, tile_x) = if use_window {
-                let y = self.window_counter;
-                let x = screen_x.wrapping_sub(self.wx - 7);
-                (u16::from(y), x)
-            } else {
-                let y = screen_y.wrapping_add(self.scy);
-                let x = screen_x.wrapping_add(self.scx);
-                (u16::from(y), x)
-            };
-
-            // Get the address of the tile in memory.
-            let tile_index_address = {
-                let tile_map_row = tile_y / TILE_SIZE;
-                let tile_map_col = tile_x as u16 / TILE_SIZE;
-
-                let tile_start_addr = if use_window {
-                    if self.window_map {
-                        0x1c00
-                    } else {
-                        0x1800
-                    }
-                } else {
-                    if self.bg_map {
-                        0x1c00
-                    } else {
-                        0x1800
-                    }
-                };
-
-                tile_start_addr as u16 + tile_map_row * TILE_MAP_WIDTH + tile_map_col
-            };
-
-            let tile_index = self.vram[tile_index_address as usize];
-            let tile_address = self.tile_data_address(tile_index);
-
-            // Find the correct vertical position within the tile. Multiply by two because each
-            // row of the tile takes two bytes.
-            let tile_y = (tile_y % TILE_SIZE) * 2;
-            let addr = (tile_address + tile_y) as usize;
-
-            // obtains the current pixel data from the tile and
-            // re-maps it according to the current palette
-            let pixel = Ppu::shade_number(
-                self.vram[addr],
-                self.vram[addr + 1],
-                tile_x % TILE_SIZE as u8,
-            );
-            let color = self.palette[pixel as usize];
-
-            // updates the pixel in the color buffer, which stores
-            // the raw pixel color information (unmapped)
-            self.color_buffer[color_offset] = pixel;
-
-            // set the color pixel in the frame buffer
-            self.frame_buffer[frame_offset] = color[0];
-            self.frame_buffer[frame_offset + 1] = color[1];
-            self.frame_buffer[frame_offset + 2] = color[2];
-
-            // increments the color offset by one, representing
-            // the drawing of one pixel
-            color_offset += 1;
-
-            // increments the offset of the frame buffer by the
-            // size of an RGB pixel (which is 3 bytes)
-            frame_offset += RGB_SIZE;
-        }
-    }
-
-    fn shade_number(first: u8, second: u8, tile_x: u8) -> u8 {
-        // Convert x-position into bit position (bit 7 is leftmost bit).
-        let color_bit = 7 - tile_x;
-        let mask = 1 << color_bit;
-
-        let mut color_num = 0;
-        color_num += if first & mask == mask { 0x01 } else { 0x00 };
-        color_num += if second & mask == mask { 0x02 } else { 0x00 };
-        color_num
-    }
-
-    fn tile_data_address(&self, tile_index: u8) -> u16 {
-        const SIGNED_TILE_OFFSET: i16 = 128;
-        const TILE_DATA_ROW_SIZE: u16 = 16;
-
-        let start = if self.bg_tile { 0x0000 } else { 0x0800 };
-
-        let offset = if self.bg_tile {
-            tile_index.into()
-        } else {
-            (i16::from(tile_index as i8) + SIGNED_TILE_OFFSET) as u16
-        };
-
-        start as u16 + offset * TILE_DATA_ROW_SIZE
     }
 
     fn render_map(&mut self, map: bool, scx: u8, scy: u8, wx: u8, wy: u8, ld: u8) {
@@ -852,11 +740,6 @@ impl Ppu {
         if self.ly < wy {
             return;
         }
-
-        // calculates the LD (line delta) useful for draw operations where the window
-        // is repositioned, as the current line for tile calculus is different from
-        // the one currently in drawing
-        //let ld = self.ly - wy; // @TODO: CHECK THIS ONE
 
         // calculates the row offset for the tile by using the current line
         // index and the DY (scroll Y) divided by 8 (as the tiles are 8x8 pixels),
