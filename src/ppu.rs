@@ -407,6 +407,7 @@ impl Ppu {
 
                     self.mode = PpuMode::HBlank;
                     self.mode_clock -= 172;
+                    self.update_stat()
                 }
             }
             PpuMode::HBlank => {
@@ -456,6 +457,7 @@ impl Ppu {
                         self.window_counter = 0;
                         self.first_frame = false;
                         self.frame_index = self.frame_index.wrapping_add(1);
+                        self.update_stat()
                     }
 
                     self.mode_clock -= 456;
