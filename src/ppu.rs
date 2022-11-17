@@ -663,7 +663,7 @@ impl Ppu {
     /// Updates the tile structure with the value that has
     /// just been written to a location on the VRAM associated
     /// with tiles.
-    pub fn update_tile(&mut self, addr: u16, _value: u8) {
+    fn update_tile(&mut self, addr: u16, _value: u8) {
         let addr = (addr & 0x1ffe) as usize;
         let tile_index = ((addr >> 4) & 0x01ff) as usize;
         let tile = self.tiles[tile_index].borrow_mut();
@@ -686,7 +686,7 @@ impl Ppu {
         }
     }
 
-    pub fn update_object(&mut self, addr: u16, value: u8) {
+    fn update_object(&mut self, addr: u16, value: u8) {
         let addr = (addr & 0x01ff) as usize;
         let obj_index = addr >> 2;
         if obj_index >= OBJ_COUNT {
