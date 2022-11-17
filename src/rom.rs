@@ -412,7 +412,7 @@ impl Cartridge {
     }
 
     pub fn has_battery(&self) -> bool {
-        return matches!(
+        matches!(
             self.rom_type(),
             RomType::Mbc1RamBattery
                 | RomType::Mbc2Battery
@@ -425,7 +425,7 @@ impl Cartridge {
                 | RomType::Mbc5RumbleRamBattery
                 | RomType::Mbc7SensorRumbleRamBattery
                 | RomType::HuC1RamBattery
-        );
+        )
     }
 
     pub fn ram_data_eager(&self) -> Vec<u8> {
