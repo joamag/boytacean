@@ -509,7 +509,9 @@ impl Ppu {
         match addr {
             0x8000..=0x9fff => {
                 self.vram[(addr & 0x1fff) as usize] = value;
-                if addr < 0x9800 { self.update_tile(addr, value); }
+                if addr < 0x9800 {
+                    self.update_tile(addr, value);
+                }
             }
             0xfe00..=0xfe9f => {
                 self.oam[(addr & 0x009f) as usize] = value;
