@@ -1018,7 +1018,7 @@ impl Default for Ppu {
 
 #[cfg(test)]
 mod tests {
-    use crate::ppu::Ppu;
+    use super::Ppu;
 
     #[test]
     fn test_update_tile_simple() {
