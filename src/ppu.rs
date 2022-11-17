@@ -158,15 +158,15 @@ pub struct Ppu {
 
     /// Video dedicated memory (VRAM) where both the tiles and
     /// the sprites/objects are going to be stored.
-    pub vram: [u8; VRAM_SIZE],
+    vram: [u8; VRAM_SIZE],
 
     /// High RAM memory that should provide extra speed for regular
     /// operations.
-    pub hram: [u8; HRAM_SIZE],
+    hram: [u8; HRAM_SIZE],
 
     /// OAM RAM (Sprite Attribute Table ) used for the storage of the
     /// sprite attributes for each of the 40 sprites of the Game Boy.
-    pub oam: [u8; OAM_SIZE],
+    oam: [u8; OAM_SIZE],
 
     /// The current set of processed tiles that are store in the
     /// PPU related structures.
