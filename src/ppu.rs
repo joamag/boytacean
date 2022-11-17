@@ -415,7 +415,7 @@ impl Ppu {
                     // are counted as valid window lines for which the
                     // window counter should be incremented
                     if self.switch_window
-                        && self.wx < (DISPLAY_WIDTH + 6) as u8
+                        && self.wx - 7 < DISPLAY_WIDTH as u8
                         && self.wy < DISPLAY_HEIGHT as u8
                         && self.ly >= self.wy
                     {
@@ -724,14 +724,121 @@ impl Ppu {
             return;
         }
         if self.switch_bg {
-            self.render_map(self.bg_map, self.scx, self.scy, 0, 0, self.ly);
-        }
-        if self.switch_window {
-            self.render_map(self.window_map, 0, 0, self.wx, self.wy, self.window_counter);
+            self.render_tiles();
         }
         if self.switch_obj {
             self.render_objects();
         }
+    }
+
+    fn render_tiles(&mut self) {
+        /// Width or height of a tile, in pixels.
+        const TILE_SIZE: u16 = 8;
+
+        /// Width of the tile map, in bytes.
+        const TILE_MAP_WIDTH: u16 = 32;
+
+        // calculates the offset that is going to be used in the update of the color buffer
+        // which stores Game Boy colors from 0 to 3
+        let mut color_offset = self.ly as usize * DISPLAY_WIDTH;
+
+        // calculates the frame buffer offset position assuming the proper
+        // Game Boy screen width and RGB pixel (3 bytes) size
+        let mut frame_offset = self.ly as usize * DISPLAY_WIDTH * RGB_SIZE;
+
+        // Draw the line.
+        for screen_x in 0..DISPLAY_WIDTH as u8 {
+            let screen_y = self.ly;
+
+            let use_window = self.switch_window && screen_y >= self.wy && screen_x >= self.wx - 7;
+
+            let (tile_y, tile_x) = if use_window {
+                let y = self.window_counter;
+                let x = screen_x.wrapping_sub(self.wx - 7);
+                (u16::from(y), x)
+            } else {
+                let y = screen_y.wrapping_add(self.scy);
+                let x = screen_x.wrapping_add(self.scx);
+                (u16::from(y), x)
+            };
+
+            // Get the address of the tile in memory.
+            let tile_id_address = {
+                let tile_map_row = tile_y / TILE_SIZE;
+                let tile_map_col = tile_x as u16 / TILE_SIZE;
+
+                let tile_start_addr = if use_window {
+                    if self.window_map {
+                        0x1c00
+                    } else {
+                        0x1800
+                    }
+                } else {
+                    if self.bg_map {
+                        0x1c00
+                    } else {
+                        0x1800
+                    }
+                };
+
+                tile_start_addr as u16 + tile_map_row * TILE_MAP_WIDTH + tile_map_col
+            };
+
+            let tile_id = self.vram[tile_id_address as usize];
+            let tile_address = self.tile_data_address(tile_id);
+
+            // Find the correct vertical position within the tile. Multiply by two because each
+            // row of the tile takes two bytes.
+            let tile_y = (tile_y % TILE_SIZE) * 2;
+
+            let addr = (tile_address + tile_y) as usize;
+            
+            let mask = 1 << (TILE_WIDTH - 1 - (tile_x % TILE_SIZE as u8) as usize);
+
+            let pixel = if self.vram[addr] & mask == mask { 0x1 } else { 0x0 }
+                    | if self.vram[addr + 1] & mask == mask {
+                        0x2
+                    } else {
+                        0x0
+                    };
+
+            // obtains the current pixel data from the tile and
+            // re-maps it according to the current palette
+//            let pixel = self.tiles[tile_index].get(x, y);
+            let color = self.palette[pixel as usize];
+
+            // updates the pixel in the color buffer, which stores
+            // the raw pixel color information (unmapped)
+            self.color_buffer[color_offset] = pixel;
+
+            // set the color pixel in the frame buffer
+            self.frame_buffer[frame_offset] = color[0];
+            self.frame_buffer[frame_offset + 1] = color[1];
+            self.frame_buffer[frame_offset + 2] = color[2];
+
+            // increments the color offset by one, representing
+            // the drawing of one pixel
+            color_offset += 1;
+
+            // increments the offset of the frame buffer by the
+            // size of an RGB pixel (which is 3 bytes)
+            frame_offset += RGB_SIZE;
+        }
+    }
+
+    fn tile_data_address(&self, tile_id: u8) -> u16 {
+        const SIGNED_TILE_OFFSET: i16 = 128;
+        const TILE_DATA_ROW_SIZE: u16 = 16;
+
+        let start = if self.bg_tile { 0x0000 } else { 0x0800 };
+
+        let offset = if self.bg_tile {
+            tile_id.into()
+        } else {
+            (i16::from(tile_id as i8) + SIGNED_TILE_OFFSET) as u16
+        };
+
+        start as u16 + offset * TILE_DATA_ROW_SIZE
     }
 
     fn render_map(&mut self, map: bool, scx: u8, scy: u8, wx: u8, wy: u8, ld: u8) {
@@ -828,7 +935,7 @@ impl Ppu {
             }
 
             // increments the color offset by one, representing
-            // the drawing og one pixel
+            // the drawing of one pixel
             color_offset += 1;
 
             // increments the offset of the frame buffer by the
