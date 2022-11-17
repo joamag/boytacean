@@ -51,6 +51,17 @@ build-wasm:
       - frontends/web/lib
     expire_in: 1 day
 
+test-rust:
+  stage: test
+  parallel:
+    matrix:
+      - RUST_VERSION: ["1.56.1", "1.60.0", "stable", "nightly"]
+  script:
+    - rustup toolchain install $RUST_VERSION
+    - rustup override set $RUST_VERSION
+    - rustc --version
+    - cargo test
+
 deploy-netlify-preview:
   stage: deploy
   script:

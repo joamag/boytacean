@@ -656,7 +656,7 @@ impl Ppu {
         let mut mask;
 
         for x in 0..TILE_WIDTH {
-            mask = 1 << (7 - x);
+            mask = 1 << (TILE_WIDTH - 1 - x);
             tile.set(
                 x,
                 y,
@@ -722,14 +722,6 @@ impl Ppu {
         // in case the target window Y position has not yet been reached
         // then there's nothing to be done, returns control flow immediately
         if self.ly < wy {
-            return;
-        }
-
-        if wx >= 166 {
-            return;
-        }
-
-        if wy >= 143 {
             return;
         }
 
@@ -1020,5 +1012,38 @@ impl Ppu {
 impl Default for Ppu {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::ppu::Ppu;
+
+    #[test]
+    fn test_update_tile_simple() {
+        let mut ppu = Ppu::new();
+        ppu.vram[0x0000] = 0xff;
+        ppu.vram[0x0001] = 0xff;
+
+        let result = ppu.tiles()[0].get(0, 0);
+        assert_eq!(result, 0);
+
+        ppu.update_tile(0x8000, 0x00);
+        let result = ppu.tiles()[0].get(0, 0);
+        assert_eq!(result, 3);
+    }
+
+    #[test]
+    fn test_update_tile_upper() {
+        let mut ppu = Ppu::new();
+        ppu.vram[0x1000] = 0xff;
+        ppu.vram[0x1001] = 0xff;
+
+        let result = ppu.tiles()[256].get(0, 0);
+        assert_eq!(result, 0);
+
+        ppu.update_tile(0x9000, 0x00);
+        let result = ppu.tiles()[256].get(0, 0);
+        assert_eq!(result, 3);
     }
 }
