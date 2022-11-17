@@ -4,6 +4,8 @@ A Game Boy emulator that is written in Rust 🦀.
 
 **This emulator has been written for educational purposes and shouldn't be taken too seriously.** But yeahh it plays games, which is cool... 🎮
 
+<img src="res/videos/001-mario.gif" width="120" />
+
 ## Features
 
 * Game Boy (DMG) emulation
