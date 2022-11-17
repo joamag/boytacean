@@ -415,7 +415,7 @@ impl Ppu {
                     if self.switch_window
                         && self.wx < (DISPLAY_WIDTH + 6) as u8
                         && self.wy < DISPLAY_HEIGHT as u8
-                       && self.ly >= self.wy
+                        && self.ly >= self.wy
                     {
                         self.window_counter += 1;
                     }
