@@ -857,11 +857,17 @@ impl Ppu {
             // objects and from 0 to 15 in 8x16 objects
             let mut tile_offset = self.ly as i16 - obj.y;
 
+            // in case we're flipping the object we must recompute the
+            // tile offset as an inverted value using the object's height
+            if obj.yflip {
+                tile_offset = obj_height as i16 - tile_offset - 1;
+            }
+
             // saves some space for the reference to the tile that
             // is going to be used in the current operation
             let tile: &Tile;
 
-            // in case we're facing a 8x16 object and we must
+            // in case we're facing a 8x16 object then we must
             // differentiate between the handling of the top tile
             // and the bottom tile through bitwise manipulation
             // of the tile index
@@ -879,11 +885,7 @@ impl Ppu {
                 tile = &self.tiles[obj.tile as usize];
             }
 
-            let tile_row = if obj.yflip {
-                tile.get_row((7 - tile_offset) as usize)
-            } else {
-                tile.get_row((tile_offset) as usize)
-            };
+            let tile_row = tile.get_row(tile_offset as usize);
 
             for tile_x in 0..TILE_WIDTH {
                 let x = obj.x + tile_x as i16;
