@@ -651,7 +651,7 @@ impl Ppu {
     /// Clears the current frame buffer, setting the background color
     /// for all the pixels in the frame buffer.
     pub fn clear_frame_buffer(&mut self) {
-        self.fill_frame_buffer([255, 255, 255]);
+        self.fill_frame_buffer(self.palette_colors[0]);
     }
 
     /// Prints the tile data information to the stdout, this is
@@ -1003,6 +1003,7 @@ impl Ppu {
             &self.palette_colors,
             self.palettes[2],
         );
+        self.clear_frame_buffer();
     }
 
     /// Static method used for the base logic of computation of RGB

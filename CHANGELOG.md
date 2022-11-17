@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-*
+* Issue with background color and change of palette colors
 
 ## [0.5.5] - 2022-11-17
 
