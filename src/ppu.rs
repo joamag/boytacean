@@ -698,7 +698,7 @@ impl Ppu {
             0x01 => obj.x = value as i16 - 8,
             0x02 => obj.tile = value,
             0x03 => {
-                obj.palette = if value & 0x10 == 0x10 { 1 } else { 0 };
+                obj.palette = (value & 0x10 == 0x10) as u8;
                 obj.xflip = value & 0x20 == 0x20;
                 obj.yflip = value & 0x40 == 0x40;
                 obj.bg_over = value & 0x80 == 0x80;
