@@ -112,7 +112,7 @@ pub struct ObjectData {
     palette: u8,
     xflip: bool,
     yflip: bool,
-    priority: bool,
+    bg_over: bool,
     index: u8,
 }
 
@@ -143,8 +143,9 @@ pub struct PpuRegisters {
 ///
 /// # Basic usage
 /// ```rust
-/// let ppu = Ppu::new();
-/// ppu.clock();
+/// use boytacean::ppu::Ppu;
+/// let mut ppu = Ppu::new();
+/// ppu.clock(8);
 /// ```
 pub struct Ppu {
     /// The color buffer that is going to store the colors
@@ -213,7 +214,7 @@ pub struct Ppu {
 
     /// The current scan line in processing, should
     /// range between 0 (0x00) and 153 (0x99), representing
-    /// the 154 lines plus 10 extra v-blank lines.
+    /// the 154 lines plus 10 extra V-Blank lines.
     ly: u8,
 
     /// The line compare register that is going to be used
@@ -256,6 +257,13 @@ pub struct Ppu {
     /// Flag that controls if the LCD screen is ON and displaying
     /// content.
     switch_lcd: bool,
+
+    // Internal window counter value used to control the ines that
+    // were effectively rendered as part of the window tile drawing process.
+    // A line is only considered rendered when the WX and WY registers
+    // are within the valid screen range and the window switch register
+    // is valid.
+    window_counter: u8,
 
     /// Flag that controls if the frame currently in rendering is the
     /// first one, preventing actions.
@@ -305,7 +313,7 @@ impl Ppu {
                 palette: 0,
                 xflip: false,
                 yflip: false,
-                priority: false,
+                bg_over: false,
                 index: 0,
             }; OBJ_COUNT],
             palette_colors: PALETTE_COLORS,
@@ -329,6 +337,7 @@ impl Ppu {
             switch_window: false,
             window_map: false,
             switch_lcd: false,
+            window_counter: 0x0,
             first_frame: false,
             frame_index: 0,
             stat_hblank: false,
@@ -390,7 +399,6 @@ impl Ppu {
                 if self.mode_clock >= 80 {
                     self.mode = PpuMode::VramRead;
                     self.mode_clock -= 80;
-                    self.update_stat()
                 }
             }
             PpuMode::VramRead => {
@@ -399,17 +407,28 @@ impl Ppu {
 
                     self.mode = PpuMode::HBlank;
                     self.mode_clock -= 172;
-                    self.update_stat()
                 }
             }
             PpuMode::HBlank => {
                 if self.mode_clock >= 204 {
+                    // increments the window counter making sure that the
+                    // valid is only incremented when both the WX and WY
+                    // registers make sense (are within range), the window
+                    // switch is on and the line in drawing is above WY
+                    if self.switch_window
+                        && self.wx - 7 < DISPLAY_WIDTH as u8
+                        && self.wy < DISPLAY_HEIGHT as u8
+                        && self.ly >= self.wy
+                    {
+                        self.window_counter += 1;
+                    }
+
                     // increments the register that holds the
                     // information about the current line in drawing
                     self.ly += 1;
 
                     // in case we've reached the end of the
-                    // screen we're now entering the v-blank
+                    // screen we're now entering the V-Blank
                     if self.ly == 144 {
                         self.int_vblank = true;
                         self.mode = PpuMode::VBlank;
@@ -423,28 +442,34 @@ impl Ppu {
             }
             PpuMode::VBlank => {
                 if self.mode_clock >= 456 {
+                    // increments the register that controls the line count,
+                    // notice that these represent the extra 10 horizontal
+                    // scanlines that are virtual and not real (off-screen)
                     self.ly += 1;
 
-                    // in case the end of v-blank has been reached then
+                    // in case the end of V-Blank has been reached then
                     // we must jump again to the OAM read mode and reset
                     // the scan line counter to the zero value
                     if self.ly == 154 {
                         self.mode = PpuMode::OamRead;
                         self.ly = 0;
+                        self.window_counter = 0;
                         self.first_frame = false;
                         self.frame_index = self.frame_index.wrapping_add(1);
                     }
 
                     self.mode_clock -= 456;
-                    self.update_stat()
                 }
             }
         }
     }
 
     pub fn read(&mut self, addr: u16) -> u8 {
-        match addr & 0x00ff {
-            0x0040 => {
+        match addr {
+            0x8000..=0x97ff => self.vram[(addr & 0x1fff) as usize],
+            0xfe00..=0xfe9f => self.oam[(addr & 0x009f) as usize],
+            0xff80..=0xfffe => self.hram[(addr & 0x007f) as usize],
+            0xff40 => {
                 (if self.switch_bg { 0x01 } else { 0x00 }
                     | if self.switch_obj { 0x02 } else { 0x00 }
                     | if self.obj_size { 0x04 } else { 0x00 }
@@ -454,7 +479,7 @@ impl Ppu {
                     | if self.window_map { 0x40 } else { 0x00 }
                     | if self.switch_lcd { 0x80 } else { 0x00 })
             }
-            0x0041 => {
+            0xff41 => {
                 (if self.stat_hblank { 0x08 } else { 0x00 }
                     | if self.stat_vblank { 0x10 } else { 0x00 }
                     | if self.stat_oam { 0x20 } else { 0x00 }
@@ -462,17 +487,17 @@ impl Ppu {
                     | if self.lyc == self.ly { 0x04 } else { 0x00 }
                     | (self.mode as u8 & 0x03))
             }
-            0x0042 => self.scy,
-            0x0043 => self.scx,
-            0x0044 => self.ly,
-            0x0045 => self.lyc,
-            0x0047 => self.palettes[0],
-            0x0048 => self.palettes[1],
-            0x0049 => self.palettes[2],
-            0x004a => self.wy,
-            0x004b => self.wx,
-            // VBK - CGB Mode Only
-            0x004f => 0xff,
+            0xff42 => self.scy,
+            0xff43 => self.scx,
+            0xff44 => self.ly,
+            0xff45 => self.lyc,
+            0xff47 => self.palettes[0],
+            0xff48 => self.palettes[1],
+            0xff49 => self.palettes[2],
+            0xff4a => self.wy,
+            0xff4b => self.wx,
+            // 0xFF4F — VBK (CGB only)
+            0xff4f => 0xff,
             _ => {
                 warnln!("Reading from unknown PPU location 0x{:04x}", addr);
                 0xff
@@ -481,8 +506,19 @@ impl Ppu {
     }
 
     pub fn write(&mut self, addr: u16, value: u8) {
-        match addr & 0x00ff {
-            0x0040 => {
+        match addr {
+            0x8000..=0x9fff => {
+                self.vram[(addr & 0x1fff) as usize] = value;
+                if addr < 0x9800 {
+                    self.update_tile(addr, value);
+                }
+            }
+            0xfe00..=0xfe9f => {
+                self.oam[(addr & 0x009f) as usize] = value;
+                self.update_object(addr, value);
+            }
+            0xff80..=0xfffe => self.hram[(addr & 0x007f) as usize] = value,
+            0xff40 => {
                 self.switch_bg = value & 0x01 == 0x01;
                 self.switch_obj = value & 0x02 == 0x02;
                 self.obj_size = value & 0x04 == 0x04;
@@ -505,32 +541,32 @@ impl Ppu {
                     self.clear_frame_buffer();
                 }
             }
-            0x0041 => {
+            0xff41 => {
                 self.stat_hblank = value & 0x08 == 0x08;
                 self.stat_vblank = value & 0x10 == 0x10;
                 self.stat_oam = value & 0x20 == 0x20;
                 self.stat_lyc = value & 0x40 == 0x40;
             }
-            0x0042 => self.scy = value,
-            0x0043 => self.scx = value,
-            0x0045 => self.lyc = value,
-            0x0047 => {
+            0xff42 => self.scy = value,
+            0xff43 => self.scx = value,
+            0xff45 => self.lyc = value,
+            0xff47 => {
                 Self::compute_palette(&mut self.palette, &self.palette_colors, value);
                 self.palettes[0] = value;
             }
-            0x0048 => {
+            0xff48 => {
                 Self::compute_palette(&mut self.palette_obj_0, &self.palette_colors, value);
                 self.palettes[1] = value;
             }
-            0x0049 => {
+            0xff49 => {
                 Self::compute_palette(&mut self.palette_obj_1, &self.palette_colors, value);
                 self.palettes[2] = value;
             }
-            0x004a => self.wy = value,
-            0x004b => self.wx = value,
-            // VBK - CGB Mode Only
-            0x004f => (),
-            0x007f => (),
+            0xff4a => self.wy = value,
+            0xff4b => self.wx = value,
+            // 0xFF4F — VBK (CGB only)
+            0xff4f => (),
+            0xff7f => (),
             _ => warnln!("Writing in unknown PPU location 0x{:04x}", addr),
         }
     }
@@ -615,7 +651,7 @@ impl Ppu {
     /// Clears the current frame buffer, setting the background color
     /// for all the pixels in the frame buffer.
     pub fn clear_frame_buffer(&mut self) {
-        self.fill_frame_buffer([255, 255, 255]);
+        self.fill_frame_buffer(self.palette_colors[0]);
     }
 
     /// Prints the tile data information to the stdout, this is
@@ -627,7 +663,7 @@ impl Ppu {
     /// Updates the tile structure with the value that has
     /// just been written to a location on the VRAM associated
     /// with tiles.
-    pub fn update_tile(&mut self, addr: u16, _value: u8) {
+    fn update_tile(&mut self, addr: u16, _value: u8) {
         let addr = (addr & 0x1ffe) as usize;
         let tile_index = ((addr >> 4) & 0x01ff) as usize;
         let tile = self.tiles[tile_index].borrow_mut();
@@ -650,7 +686,7 @@ impl Ppu {
         }
     }
 
-    pub fn update_object(&mut self, addr: u16, value: u8) {
+    fn update_object(&mut self, addr: u16, value: u8) {
         let addr = (addr & 0x01ff) as usize;
         let obj_index = addr >> 2;
         if obj_index >= OBJ_COUNT {
@@ -662,10 +698,10 @@ impl Ppu {
             0x01 => obj.x = value as i16 - 8,
             0x02 => obj.tile = value,
             0x03 => {
-                obj.palette = if value & 0x10 == 0x10 { 1 } else { 0 };
+                obj.palette = (value & 0x10 == 0x10) as u8;
                 obj.xflip = value & 0x20 == 0x20;
                 obj.yflip = value & 0x40 == 0x40;
-                obj.priority = value & 0x80 != 0x80;
+                obj.bg_over = value & 0x80 == 0x80;
                 obj.index = obj_index as u8;
             }
             _ => (),
@@ -688,27 +724,22 @@ impl Ppu {
             return;
         }
         if self.switch_bg {
-            self.render_map(self.bg_map, self.scx, self.scy, 0, 0);
+            self.render_map(self.bg_map, self.scx, self.scy, 0, 0, self.ly);
         }
         if self.switch_window {
-            self.render_map(self.window_map, 0, 0, self.wx, self.wy);
+            self.render_map(self.window_map, 0, 0, self.wx, self.wy, self.window_counter);
         }
         if self.switch_obj {
             self.render_objects();
         }
     }
 
-    fn render_map(&mut self, map: bool, scx: u8, scy: u8, wx: u8, wy: u8) {
+    fn render_map(&mut self, map: bool, scx: u8, scy: u8, wx: u8, wy: u8, ld: u8) {
         // in case the target window Y position has not yet been reached
         // then there's nothing to be done, returns control flow immediately
         if self.ly < wy {
             return;
         }
-
-        // calculates the LD (line delta) useful for draw operations where the window
-        // is repositioned, as the current line for tile calculus is different from
-        // the one currently in drawing
-        let ld = self.ly - wy;
 
         // calculates the row offset for the tile by using the current line
         // index and the DY (scroll Y) divided by 8 (as the tiles are 8x8 pixels),
@@ -729,7 +760,7 @@ impl Ppu {
         let mut line_offset: usize = (scx >> 3) as usize;
 
         // calculates the index of the initial tile in drawing,
-        // if the tile data set in use is #1, the indices are
+        // if the tile data set in use is #1, the indexes are
         // signed, then calculates a real tile offset
         let mut tile_index = self.vram[map_offset + line_offset] as usize;
         if !self.bg_tile && tile_index < 128 {
@@ -792,7 +823,7 @@ impl Ppu {
             }
 
             // increments the color offset by one, representing
-            // the drawing og one pixel
+            // the drawing of one pixel
             color_offset += 1;
 
             // increments the offset of the frame buffer by the
@@ -802,7 +833,21 @@ impl Ppu {
     }
 
     fn render_objects(&mut self) {
+        let mut draw_count = 0u8;
+
+        // allocates the buffer that is going to be used to determine
+        // drawing priority for overlapping pixels between different
+        // objects, in MBR mode the object that has the smallest X
+        // coordinate takes priority in drawing the pixel
+        let mut index_buffer = [-256i16; DISPLAY_WIDTH];
+
         for index in 0..OBJ_COUNT {
+            // in case the limit on number of object to be draw per
+            // line has been reached breaks the loop avoiding more draws
+            if draw_count == 10 {
+                break;
+            }
+
             // obtains the meta data of the object that is currently
             // under iteration to be checked for drawing
             let obj = self.obj_data[index];
@@ -843,11 +888,17 @@ impl Ppu {
             // objects and from 0 to 15 in 8x16 objects
             let mut tile_offset = self.ly as i16 - obj.y;
 
+            // in case we're flipping the object we must recompute the
+            // tile offset as an inverted value using the object's height
+            if obj.yflip {
+                tile_offset = obj_height as i16 - tile_offset - 1;
+            }
+
             // saves some space for the reference to the tile that
             // is going to be used in the current operation
             let tile: &Tile;
 
-            // in case we're facing a 8x16 object and we must
+            // in case we're facing a 8x16 object then we must
             // differentiate between the handling of the top tile
             // and the bottom tile through bitwise manipulation
             // of the tile index
@@ -865,24 +916,39 @@ impl Ppu {
                 tile = &self.tiles[obj.tile as usize];
             }
 
-            let tile_row = if obj.yflip {
-                tile.get_row((7 - tile_offset) as usize)
-            } else {
-                tile.get_row((tile_offset) as usize)
-            };
+            let tile_row = tile.get_row(tile_offset as usize);
 
-            for x in 0..TILE_WIDTH {
-                let is_contained =
-                    (obj.x + x as i16 >= 0) && ((obj.x + x as i16) < DISPLAY_WIDTH as i16);
+            for tile_x in 0..TILE_WIDTH {
+                let x = obj.x + tile_x as i16;
+                let is_contained = (x >= 0) && (x < DISPLAY_WIDTH as i16);
                 if is_contained {
-                    // the object is only considered visible if it's a priority
-                    // or if the underlying pixel is transparent (zero value)
-                    let is_visible = obj.priority || self.color_buffer[color_offset as usize] == 0;
-                    let pixel = tile_row[if obj.xflip { 7 - x } else { x }];
-                    if is_visible && pixel != 0 {
+                    // the object is only considered visible if no background or
+                    // window should be drawn over or if the underlying pixel
+                    // is transparent (zero value) meaning there's no background
+                    // or window for the provided pixel
+                    let is_visible = !obj.bg_over || self.color_buffer[color_offset as usize] == 0;
+
+                    // determines if the current pixel has priority over a possible
+                    // one that has been drawn by a previous object, this happens
+                    // in case the current object has a small X coordinate according
+                    // to the MBR algorithm
+                    let has_priority =
+                        index_buffer[x as usize] == -256 || obj.x < index_buffer[x as usize];
+
+                    let pixel = tile_row[if obj.xflip { 7 - tile_x } else { tile_x }];
+                    if is_visible && has_priority && pixel != 0 {
+                        // marks the current pixel in iteration as "owned"
+                        // by the object with the defined X base position,
+                        // to be used in priority calculus
+                        index_buffer[x as usize] = obj.x;
+
                         // obtains the current pixel data from the tile row and
                         // re-maps it according to the object palette
                         let color = palette[pixel as usize];
+
+                        // updates the pixel in the color buffer, which stores
+                        // the raw pixel color information (unmapped)
+                        self.color_buffer[color_offset as usize] = pixel;
 
                         // sets the color pixel in the frame buffer
                         self.frame_buffer[frame_offset as usize] = color[0];
@@ -899,6 +965,10 @@ impl Ppu {
                 // size of an RGB pixel (which is 3 bytes)
                 frame_offset += RGB_SIZE as i32;
             }
+
+            // increments the counter so that we're able to keep
+            // track on the number of object drawn
+            draw_count += 1;
         }
     }
 
@@ -922,6 +992,8 @@ impl Ppu {
     /// is useful to "flush" color computation whenever the base
     /// palette colors are changed.
     fn compute_palettes(&mut self) {
+        // re-computes the complete set of palettes according to
+        // the currently set palette colors (that may have chaged)
         Self::compute_palette(&mut self.palette, &self.palette_colors, self.palettes[0]);
         Self::compute_palette(
             &mut self.palette_obj_0,
@@ -933,6 +1005,10 @@ impl Ppu {
             &self.palette_colors,
             self.palettes[2],
         );
+
+        // clears the frame buffer to allow the new background
+        // color to be used
+        self.clear_frame_buffer();
     }
 
     /// Static method used for the base logic of computation of RGB
@@ -953,5 +1029,38 @@ impl Ppu {
 impl Default for Ppu {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Ppu;
+
+    #[test]
+    fn test_update_tile_simple() {
+        let mut ppu = Ppu::new();
+        ppu.vram[0x0000] = 0xff;
+        ppu.vram[0x0001] = 0xff;
+
+        let result = ppu.tiles()[0].get(0, 0);
+        assert_eq!(result, 0);
+
+        ppu.update_tile(0x8000, 0x00);
+        let result = ppu.tiles()[0].get(0, 0);
+        assert_eq!(result, 3);
+    }
+
+    #[test]
+    fn test_update_tile_upper() {
+        let mut ppu = Ppu::new();
+        ppu.vram[0x1000] = 0xff;
+        ppu.vram[0x1001] = 0xff;
+
+        let result = ppu.tiles()[256].get(0, 0);
+        assert_eq!(result, 0);
+
+        ppu.update_tile(0x9000, 0x00);
+        let result = ppu.tiles()[256].get(0, 0);
+        assert_eq!(result, 3);
     }
 }
