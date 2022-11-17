@@ -9,6 +9,7 @@ variables:
 
 stages:
   - build
+  - test
   - deploy
 
 before_script:
