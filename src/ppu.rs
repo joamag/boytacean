@@ -143,8 +143,9 @@ pub struct PpuRegisters {
 ///
 /// # Basic usage
 /// ```rust
-/// let ppu = Ppu::new();
-/// ppu.clock();
+/// use boytacean::ppu::Ppu;
+/// let mut ppu = Ppu::new();
+/// ppu.clock(8);
 /// ```
 pub struct Ppu {
     /// The color buffer that is going to store the colors
@@ -213,7 +214,7 @@ pub struct Ppu {
 
     /// The current scan line in processing, should
     /// range between 0 (0x00) and 153 (0x99), representing
-    /// the 154 lines plus 10 extra v-blank lines.
+    /// the 154 lines plus 10 extra V-Blank lines.
     ly: u8,
 
     /// The line compare register that is going to be used
@@ -256,6 +257,13 @@ pub struct Ppu {
     /// Flag that controls if the LCD screen is ON and displaying
     /// content.
     switch_lcd: bool,
+
+    // Internal window counter value used to control the ines that
+    // were effectively rendered as part of the window tile drawing process.
+    // A line is only considered rendered when the WX and WY registers
+    // are within the valid screen range and the window switch register
+    // is valid.
+    window_counter: u8,
 
     /// Flag that controls if the frame currently in rendering is the
     /// first one, preventing actions.
@@ -329,6 +337,7 @@ impl Ppu {
             switch_window: false,
             window_map: false,
             switch_lcd: false,
+            window_counter: 0x0,
             first_frame: false,
             frame_index: 0,
             stat_hblank: false,
@@ -390,7 +399,6 @@ impl Ppu {
                 if self.mode_clock >= 80 {
                     self.mode = PpuMode::VramRead;
                     self.mode_clock -= 80;
-                    self.update_stat()
                 }
             }
             PpuMode::VramRead => {
@@ -399,17 +407,28 @@ impl Ppu {
 
                     self.mode = PpuMode::HBlank;
                     self.mode_clock -= 172;
-                    self.update_stat()
                 }
             }
             PpuMode::HBlank => {
                 if self.mode_clock >= 204 {
+                    // increments the window counter making sure that the
+                    // valid is only incremented when both the WX and WY
+                    // registers make sense (are within range), the window
+                    // switch is on and the line in drawing is above WY
+                    if self.switch_window
+                        && self.wx - 7 < DISPLAY_WIDTH as u8
+                        && self.wy < DISPLAY_HEIGHT as u8
+                        && self.ly >= self.wy
+                    {
+                        self.window_counter += 1;
+                    }
+
                     // increments the register that holds the
                     // information about the current line in drawing
                     self.ly += 1;
 
                     // in case we've reached the end of the
-                    // screen we're now entering the v-blank
+                    // screen we're now entering the V-Blank
                     if self.ly == 144 {
                         self.int_vblank = true;
                         self.mode = PpuMode::VBlank;
@@ -423,28 +442,34 @@ impl Ppu {
             }
             PpuMode::VBlank => {
                 if self.mode_clock >= 456 {
+                    // increments the register that controls the line count,
+                    // notice that these represent the extra 10 horizontal
+                    // scanlines that are virtual and not real (off-screen)
                     self.ly += 1;
 
-                    // in case the end of v-blank has been reached then
+                    // in case the end of V-Blank has been reached then
                     // we must jump again to the OAM read mode and reset
                     // the scan line counter to the zero value
                     if self.ly == 154 {
                         self.mode = PpuMode::OamRead;
                         self.ly = 0;
+                        self.window_counter = 0;
                         self.first_frame = false;
                         self.frame_index = self.frame_index.wrapping_add(1);
                     }
 
                     self.mode_clock -= 456;
-                    self.update_stat()
                 }
             }
         }
     }
 
     pub fn read(&mut self, addr: u16) -> u8 {
-        match addr & 0x00ff {
-            0x0040 => {
+        match addr {
+            0x8000..=0x97ff => self.vram[(addr & 0x1fff) as usize],
+            0xfe00..=0xfe9f => self.oam[(addr & 0x009f) as usize],
+            0xff80..=0xfffe => self.hram[(addr & 0x007f) as usize],
+            0xff40 => {
                 (if self.switch_bg { 0x01 } else { 0x00 }
                     | if self.switch_obj { 0x02 } else { 0x00 }
                     | if self.obj_size { 0x04 } else { 0x00 }
@@ -454,7 +479,7 @@ impl Ppu {
                     | if self.window_map { 0x40 } else { 0x00 }
                     | if self.switch_lcd { 0x80 } else { 0x00 })
             }
-            0x0041 => {
+            0xff41 => {
                 (if self.stat_hblank { 0x08 } else { 0x00 }
                     | if self.stat_vblank { 0x10 } else { 0x00 }
                     | if self.stat_oam { 0x20 } else { 0x00 }
@@ -462,17 +487,17 @@ impl Ppu {
                     | if self.lyc == self.ly { 0x04 } else { 0x00 }
                     | (self.mode as u8 & 0x03))
             }
-            0x0042 => self.scy,
-            0x0043 => self.scx,
-            0x0044 => self.ly,
-            0x0045 => self.lyc,
-            0x0047 => self.palettes[0],
-            0x0048 => self.palettes[1],
-            0x0049 => self.palettes[2],
-            0x004a => self.wy,
-            0x004b => self.wx,
-            // VBK - CGB Mode Only
-            0x004f => 0xff,
+            0xff42 => self.scy,
+            0xff43 => self.scx,
+            0xff44 => self.ly,
+            0xff45 => self.lyc,
+            0xff47 => self.palettes[0],
+            0xff48 => self.palettes[1],
+            0xff49 => self.palettes[2],
+            0xff4a => self.wy,
+            0xff4b => self.wx,
+            // 0xFF4F — VBK (CGB only)
+            0xff4f => 0xff,
             _ => {
                 warnln!("Reading from unknown PPU location 0x{:04x}", addr);
                 0xff
@@ -481,8 +506,19 @@ impl Ppu {
     }
 
     pub fn write(&mut self, addr: u16, value: u8) {
-        match addr & 0x00ff {
-            0x0040 => {
+        match addr {
+            0x8000..=0x9fff => {
+                self.vram[(addr & 0x1fff) as usize] = value;
+                if addr < 0x9800 {
+                    self.update_tile(addr, value);
+                }
+            }
+            0xfe00..=0xfe9f => {
+                self.oam[(addr & 0x009f) as usize] = value;
+                self.update_object(addr, value);
+            }
+            0xff80..=0xfffe => self.hram[(addr & 0x007f) as usize] = value,
+            0xff40 => {
                 self.switch_bg = value & 0x01 == 0x01;
                 self.switch_obj = value & 0x02 == 0x02;
                 self.obj_size = value & 0x04 == 0x04;
@@ -505,32 +541,32 @@ impl Ppu {
                     self.clear_frame_buffer();
                 }
             }
-            0x0041 => {
+            0xff41 => {
                 self.stat_hblank = value & 0x08 == 0x08;
                 self.stat_vblank = value & 0x10 == 0x10;
                 self.stat_oam = value & 0x20 == 0x20;
                 self.stat_lyc = value & 0x40 == 0x40;
             }
-            0x0042 => self.scy = value,
-            0x0043 => self.scx = value,
-            0x0045 => self.lyc = value,
-            0x0047 => {
+            0xff42 => self.scy = value,
+            0xff43 => self.scx = value,
+            0xff45 => self.lyc = value,
+            0xff47 => {
                 Self::compute_palette(&mut self.palette, &self.palette_colors, value);
                 self.palettes[0] = value;
             }
-            0x0048 => {
+            0xff48 => {
                 Self::compute_palette(&mut self.palette_obj_0, &self.palette_colors, value);
                 self.palettes[1] = value;
             }
-            0x0049 => {
+            0xff49 => {
                 Self::compute_palette(&mut self.palette_obj_1, &self.palette_colors, value);
                 self.palettes[2] = value;
             }
-            0x004a => self.wy = value,
-            0x004b => self.wx = value,
-            // VBK - CGB Mode Only
-            0x004f => (),
-            0x007f => (),
+            0xff4a => self.wy = value,
+            0xff4b => self.wx = value,
+            // 0xFF4F — VBK (CGB only)
+            0xff4f => (),
+            0xff7f => (),
             _ => warnln!("Writing in unknown PPU location 0x{:04x}", addr),
         }
     }
@@ -627,7 +663,7 @@ impl Ppu {
     /// Updates the tile structure with the value that has
     /// just been written to a location on the VRAM associated
     /// with tiles.
-    pub fn update_tile(&mut self, addr: u16, _value: u8) {
+    fn update_tile(&mut self, addr: u16, _value: u8) {
         let addr = (addr & 0x1ffe) as usize;
         let tile_index = ((addr >> 4) & 0x01ff) as usize;
         let tile = self.tiles[tile_index].borrow_mut();
@@ -636,7 +672,7 @@ impl Ppu {
         let mut mask;
 
         for x in 0..TILE_WIDTH {
-            mask = 1 << (7 - x);
+            mask = 1 << (TILE_WIDTH - 1 - x);
             tile.set(
                 x,
                 y,
@@ -650,7 +686,7 @@ impl Ppu {
         }
     }
 
-    pub fn update_object(&mut self, addr: u16, value: u8) {
+    fn update_object(&mut self, addr: u16, value: u8) {
         let addr = (addr & 0x01ff) as usize;
         let obj_index = addr >> 2;
         if obj_index >= OBJ_COUNT {
@@ -662,7 +698,7 @@ impl Ppu {
             0x01 => obj.x = value as i16 - 8,
             0x02 => obj.tile = value,
             0x03 => {
-                obj.palette = if value & 0x10 == 0x10 { 1 } else { 0 };
+                obj.palette = (value & 0x10 == 0x10) as u8;
                 obj.xflip = value & 0x20 == 0x20;
                 obj.yflip = value & 0x40 == 0x40;
                 obj.bg_over = value & 0x80 == 0x80;
@@ -688,27 +724,22 @@ impl Ppu {
             return;
         }
         if self.switch_bg {
-            self.render_map(self.bg_map, self.scx, self.scy, 0, 0);
+            self.render_map(self.bg_map, self.scx, self.scy, 0, 0, self.ly);
         }
         if self.switch_window {
-            self.render_map(self.window_map, 0, 0, self.wx, self.wy);
+            self.render_map(self.window_map, 0, 0, self.wx, self.wy, self.window_counter);
         }
         if self.switch_obj {
             self.render_objects();
         }
     }
 
-    fn render_map(&mut self, map: bool, scx: u8, scy: u8, wx: u8, wy: u8) {
+    fn render_map(&mut self, map: bool, scx: u8, scy: u8, wx: u8, wy: u8, ld: u8) {
         // in case the target window Y position has not yet been reached
         // then there's nothing to be done, returns control flow immediately
         if self.ly < wy {
             return;
         }
-
-        // calculates the LD (line delta) useful for draw operations where the window
-        // is repositioned, as the current line for tile calculus is different from
-        // the one currently in drawing
-        let ld = self.ly - wy;
 
         // calculates the row offset for the tile by using the current line
         // index and the DY (scroll Y) divided by 8 (as the tiles are 8x8 pixels),
@@ -729,7 +760,7 @@ impl Ppu {
         let mut line_offset: usize = (scx >> 3) as usize;
 
         // calculates the index of the initial tile in drawing,
-        // if the tile data set in use is #1, the indices are
+        // if the tile data set in use is #1, the indexes are
         // signed, then calculates a real tile offset
         let mut tile_index = self.vram[map_offset + line_offset] as usize;
         if !self.bg_tile && tile_index < 128 {
@@ -792,7 +823,7 @@ impl Ppu {
             }
 
             // increments the color offset by one, representing
-            // the drawing og one pixel
+            // the drawing of one pixel
             color_offset += 1;
 
             // increments the offset of the frame buffer by the
@@ -992,5 +1023,38 @@ impl Ppu {
 impl Default for Ppu {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Ppu;
+
+    #[test]
+    fn test_update_tile_simple() {
+        let mut ppu = Ppu::new();
+        ppu.vram[0x0000] = 0xff;
+        ppu.vram[0x0001] = 0xff;
+
+        let result = ppu.tiles()[0].get(0, 0);
+        assert_eq!(result, 0);
+
+        ppu.update_tile(0x8000, 0x00);
+        let result = ppu.tiles()[0].get(0, 0);
+        assert_eq!(result, 3);
+    }
+
+    #[test]
+    fn test_update_tile_upper() {
+        let mut ppu = Ppu::new();
+        ppu.vram[0x1000] = 0xff;
+        ppu.vram[0x1001] = 0xff;
+
+        let result = ppu.tiles()[256].get(0, 0);
+        assert_eq!(result, 0);
+
+        ppu.update_tile(0x9000, 0x00);
+        let result = ppu.tiles()[256].get(0, 0);
+        assert_eq!(result, 3);
     }
 }

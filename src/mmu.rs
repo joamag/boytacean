@@ -110,7 +110,7 @@ impl Mmu {
             0x4000 | 0x5000 | 0x6000 | 0x7000 => self.rom.read(addr),
 
             // Graphics: VRAM (8 KB)
-            0x8000 | 0x9000 => self.ppu.vram[(addr & 0x1fff) as usize],
+            0x8000 | 0x9000 => self.ppu.read(addr),
 
             // External RAM (8 KB)
             0xa000 | 0xb000 => self.rom.read(addr),
@@ -125,7 +125,7 @@ impl Mmu {
             0xf000 => match addr & 0x0f00 {
                 0x000 | 0x100 | 0x200 | 0x300 | 0x400 | 0x500 | 0x600 | 0x700 | 0x800 | 0x900
                 | 0xa00 | 0xb00 | 0xc00 | 0xd00 => self.ram[(addr & 0x1fff) as usize],
-                0xe00 => self.ppu.oam[(addr & 0x009f) as usize],
+                0xe00 => self.ppu.read(addr),
                 0xf00 => match addr & 0x00ff {
                     // 0xFF0F — IF: Interrupt flag
                     0x0f => {
@@ -145,7 +145,7 @@ impl Mmu {
                     }
 
                     // 0xFF80-0xFFFE - High RAM (HRAM)
-                    0x80..=0xfe => self.ppu.hram[(addr & 0x007f) as usize],
+                    0x80..=0xfe => self.ppu.read(addr),
 
                     // 0xFFFF — IE: Interrupt enable
                     0xff => self.ie,
@@ -186,12 +186,7 @@ impl Mmu {
             0x4000 | 0x5000 | 0x6000 | 0x7000 => self.rom.write(addr, value),
 
             // Graphics: VRAM (8 KB)
-            0x8000 | 0x9000 => {
-                self.ppu.vram[(addr & 0x1fff) as usize] = value;
-                if addr < 0x9800 {
-                    self.ppu.update_tile(addr, value);
-                }
-            }
+            0x8000 | 0x9000 => self.ppu.write(addr, value),
 
             // External RAM (8 KB)
             0xa000 | 0xb000 => self.rom.write(addr, value),
@@ -208,10 +203,7 @@ impl Mmu {
                 | 0xa00 | 0xb00 | 0xc00 | 0xd00 => {
                     self.ram[(addr & 0x1fff) as usize] = value;
                 }
-                0xe00 => {
-                    self.ppu.oam[(addr & 0x009f) as usize] = value;
-                    self.ppu.update_object(addr, value);
-                }
+                0xe00 => self.ppu.write(addr, value),
                 0xf00 => match addr & 0x00ff {
                     // 0xFF0F — IF: Interrupt flag
                     0x0f => {
@@ -225,7 +217,7 @@ impl Mmu {
                     0x50 => self.boot_active = false,
 
                     // 0xFF80-0xFFFE - High RAM (HRAM)
-                    0x80..=0xfe => self.ppu.hram[(addr & 0x007f) as usize] = value,
+                    0x80..=0xfe => self.ppu.write(addr, value),
 
                     // 0xFFFF — IE: Interrupt enable
                     0xff => self.ie = value,
