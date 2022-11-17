@@ -804,6 +804,12 @@ impl Ppu {
     fn render_objects(&mut self) {
         let mut draw_count = 0u8;
 
+        // allocates the buffer that is going to be used to determine
+        // drawing priority for overlapping pixels between different
+        // objects, in MBR mode the object that has the smallest X
+        // coordinate takes priority in drawing the pixel
+        let mut index_buffer = [-256i16; DISPLAY_WIDTH];
+
         for index in 0..OBJ_COUNT {
             // in case the limit on number of object to be draw per
             // line has been reached breaks the loop avoiding more draws
@@ -879,17 +885,30 @@ impl Ppu {
                 tile.get_row((tile_offset) as usize)
             };
 
-            for x in 0..TILE_WIDTH {
-                let is_contained =
-                    (obj.x + x as i16 >= 0) && ((obj.x + x as i16) < DISPLAY_WIDTH as i16);
+            for tile_x in 0..TILE_WIDTH {
+                let x = obj.x + tile_x as i16;
+                let is_contained = (x >= 0) && (x < DISPLAY_WIDTH as i16);
                 if is_contained {
                     // the object is only considered visible if no background or
                     // window should be drawn over or if the underlying pixel
                     // is transparent (zero value) meaning there's no background
                     // or window for the provided pixel
                     let is_visible = !obj.bg_over || self.color_buffer[color_offset as usize] == 0;
-                    let pixel = tile_row[if obj.xflip { 7 - x } else { x }];
-                    if is_visible && pixel != 0 {
+
+                    // determines if the current pixel has priority over a possible
+                    // one that has been drawn by a previous object, this happens
+                    // in case the current object has a small X coordinate according
+                    // to the MBR algorithm
+                    let has_priority =
+                        index_buffer[x as usize] == -256 || obj.x < index_buffer[x as usize];
+
+                    let pixel = tile_row[if obj.xflip { 7 - tile_x } else { tile_x }];
+                    if is_visible && has_priority && pixel != 0 {
+                        // marks the current pixel in iteration as "owned"
+                        // by the object with the defined X base position,
+                        // to be used in priority calculus
+                        index_buffer[x as usize] = obj.x;
+
                         // obtains the current pixel data from the tile row and
                         // re-maps it according to the object palette
                         let color = palette[pixel as usize];
