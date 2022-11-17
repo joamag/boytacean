@@ -257,6 +257,8 @@ pub struct Ppu {
     /// content.
     switch_lcd: bool,
 
+    window_counter: u8,
+
     /// Flag that controls if the frame currently in rendering is the
     /// first one, preventing actions.
     first_frame: bool,
@@ -329,6 +331,7 @@ impl Ppu {
             switch_window: false,
             window_map: false,
             switch_lcd: false,
+            window_counter: 0x0,
             first_frame: false,
             frame_index: 0,
             stat_hblank: false,
@@ -404,6 +407,19 @@ impl Ppu {
             }
             PpuMode::HBlank => {
                 if self.mode_clock >= 204 {
+                    // @TODO need to properly understand this one
+                    // updates the window counter making sure that the
+                    // only lines where all the registers make sense
+                    // are counted as valid window lines for which the
+                    // window counter should be incremented
+                    if self.switch_window
+                        && self.wx < (DISPLAY_WIDTH + 6) as u8
+                        && self.wy < DISPLAY_HEIGHT as u8
+                       && self.ly >= self.wy
+                    {
+                        self.window_counter += 1;
+                    }
+
                     // increments the register that holds the
                     // information about the current line in drawing
                     self.ly += 1;
@@ -423,6 +439,9 @@ impl Ppu {
             }
             PpuMode::VBlank => {
                 if self.mode_clock >= 456 {
+                    // increments the register that controls the line count,
+                    // notice that these represent the extra 10 horizontal
+                    // scanlines that are virtual and not real (off-screen)
                     self.ly += 1;
 
                     // in case the end of v-blank has been reached then
@@ -431,6 +450,7 @@ impl Ppu {
                     if self.ly == 154 {
                         self.mode = PpuMode::OamRead;
                         self.ly = 0;
+                        self.window_counter = 0;
                         self.first_frame = false;
                         self.frame_index = self.frame_index.wrapping_add(1);
                     }
@@ -688,27 +708,35 @@ impl Ppu {
             return;
         }
         if self.switch_bg {
-            self.render_map(self.bg_map, self.scx, self.scy, 0, 0);
+            self.render_map(self.bg_map, self.scx, self.scy, 0, 0, self.ly);
         }
         if self.switch_window {
-            self.render_map(self.window_map, 0, 0, self.wx, self.wy);
+            self.render_map(self.window_map, 0, 0, self.wx, self.wy, self.window_counter);
         }
         if self.switch_obj {
             self.render_objects();
         }
     }
 
-    fn render_map(&mut self, map: bool, scx: u8, scy: u8, wx: u8, wy: u8) {
+    fn render_map(&mut self, map: bool, scx: u8, scy: u8, wx: u8, wy: u8, ld: u8) {
         // in case the target window Y position has not yet been reached
         // then there's nothing to be done, returns control flow immediately
         if self.ly < wy {
             return;
         }
 
+        if wx >= 166 {
+            return;
+        }
+
+        if wy >= 143 {
+            return;
+        }
+
         // calculates the LD (line delta) useful for draw operations where the window
         // is repositioned, as the current line for tile calculus is different from
         // the one currently in drawing
-        let ld = self.ly - wy;
+        //let ld = self.ly - wy; // @TODO: CHECK THIS ONE
 
         // calculates the row offset for the tile by using the current line
         // index and the DY (scroll Y) divided by 8 (as the tiles are 8x8 pixels),
@@ -729,7 +757,7 @@ impl Ppu {
         let mut line_offset: usize = (scx >> 3) as usize;
 
         // calculates the index of the initial tile in drawing,
-        // if the tile data set in use is #1, the indices are
+        // if the tile data set in use is #1, the indexes are
         // signed, then calculates a real tile offset
         let mut tile_index = self.vram[map_offset + line_offset] as usize;
         if !self.bg_tile && tile_index < 128 {
