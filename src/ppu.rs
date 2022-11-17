@@ -143,8 +143,9 @@ pub struct PpuRegisters {
 ///
 /// # Basic usage
 /// ```rust
-/// let ppu = Ppu::new();
-/// ppu.clock();
+/// use boytacean::ppu::Ppu;
+/// let mut ppu = Ppu::new();
+/// ppu.clock(8);
 /// ```
 pub struct Ppu {
     /// The color buffer that is going to store the colors
