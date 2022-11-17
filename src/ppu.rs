@@ -258,6 +258,7 @@ pub struct Ppu {
     /// content.
     switch_lcd: bool,
 
+    // TODO: Comment this properly
     window_counter: u8,
 
     /// Flag that controls if the frame currently in rendering is the
@@ -464,8 +465,11 @@ impl Ppu {
     }
 
     pub fn read(&mut self, addr: u16) -> u8 {
-        match addr & 0x00ff {
-            0x0040 => {
+        match addr {
+            0x8000..=0x97ff => self.vram[(addr & 0x1fff) as usize],
+            0xfe00..=0xfe9f => self.oam[(addr & 0x009f) as usize],
+            0xff80..=0xfffe => self.hram[(addr & 0x007f) as usize],
+            0xff40 => {
                 (if self.switch_bg { 0x01 } else { 0x00 }
                     | if self.switch_obj { 0x02 } else { 0x00 }
                     | if self.obj_size { 0x04 } else { 0x00 }
@@ -475,7 +479,7 @@ impl Ppu {
                     | if self.window_map { 0x40 } else { 0x00 }
                     | if self.switch_lcd { 0x80 } else { 0x00 })
             }
-            0x0041 => {
+            0xff41 => {
                 (if self.stat_hblank { 0x08 } else { 0x00 }
                     | if self.stat_vblank { 0x10 } else { 0x00 }
                     | if self.stat_oam { 0x20 } else { 0x00 }
@@ -483,17 +487,17 @@ impl Ppu {
                     | if self.lyc == self.ly { 0x04 } else { 0x00 }
                     | (self.mode as u8 & 0x03))
             }
-            0x0042 => self.scy,
-            0x0043 => self.scx,
-            0x0044 => self.ly,
-            0x0045 => self.lyc,
-            0x0047 => self.palettes[0],
-            0x0048 => self.palettes[1],
-            0x0049 => self.palettes[2],
-            0x004a => self.wy,
-            0x004b => self.wx,
-            // VBK - CGB Mode Only
-            0x004f => 0xff,
+            0xff42 => self.scy,
+            0xff43 => self.scx,
+            0xff44 => self.ly,
+            0xff45 => self.lyc,
+            0xff47 => self.palettes[0],
+            0xff48 => self.palettes[1],
+            0xff49 => self.palettes[2],
+            0xff4a => self.wy,
+            0xff4b => self.wx,
+            // 0xFF4F — VBK (CGB only)
+            0xff4f => 0xff,
             _ => {
                 warnln!("Reading from unknown PPU location 0x{:04x}", addr);
                 0xff
@@ -502,8 +506,17 @@ impl Ppu {
     }
 
     pub fn write(&mut self, addr: u16, value: u8) {
-        match addr & 0x00ff {
-            0x0040 => {
+        match addr {
+            0x8000..=0x9fff => {
+                self.vram[(addr & 0x1fff) as usize] = value;
+                if addr < 0x9800 { self.update_tile(addr, value); }
+            }
+            0xfe00..=0xfe9f => {
+                self.oam[(addr & 0x009f) as usize] = value;
+                self.update_object(addr, value);
+            }
+            0xff80..=0xfffe => self.hram[(addr & 0x007f) as usize] = value,
+            0xff40 => {
                 self.switch_bg = value & 0x01 == 0x01;
                 self.switch_obj = value & 0x02 == 0x02;
                 self.obj_size = value & 0x04 == 0x04;
@@ -526,32 +539,32 @@ impl Ppu {
                     self.clear_frame_buffer();
                 }
             }
-            0x0041 => {
+            0xff41 => {
                 self.stat_hblank = value & 0x08 == 0x08;
                 self.stat_vblank = value & 0x10 == 0x10;
                 self.stat_oam = value & 0x20 == 0x20;
                 self.stat_lyc = value & 0x40 == 0x40;
             }
-            0x0042 => self.scy = value,
-            0x0043 => self.scx = value,
-            0x0045 => self.lyc = value,
-            0x0047 => {
+            0xff42 => self.scy = value,
+            0xff43 => self.scx = value,
+            0xff45 => self.lyc = value,
+            0xff47 => {
                 Self::compute_palette(&mut self.palette, &self.palette_colors, value);
                 self.palettes[0] = value;
             }
-            0x0048 => {
+            0xff48 => {
                 Self::compute_palette(&mut self.palette_obj_0, &self.palette_colors, value);
                 self.palettes[1] = value;
             }
-            0x0049 => {
+            0xff49 => {
                 Self::compute_palette(&mut self.palette_obj_1, &self.palette_colors, value);
                 self.palettes[2] = value;
             }
-            0x004a => self.wy = value,
-            0x004b => self.wx = value,
-            // VBK - CGB Mode Only
-            0x004f => (),
-            0x007f => (),
+            0xff4a => self.wy = value,
+            0xff4b => self.wx = value,
+            // 0xFF4F — VBK (CGB only)
+            0xff4f => (),
+            0xff7f => (),
             _ => warnln!("Writing in unknown PPU location 0x{:04x}", addr),
         }
     }
