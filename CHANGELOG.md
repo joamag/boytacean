@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * Support for Ctrl+D (Speedup) and Ctrl+K (Keyboard toggle) shortcuts
 * Initial help panel
+* Palette debugging panel
 
 ### Changed
 
