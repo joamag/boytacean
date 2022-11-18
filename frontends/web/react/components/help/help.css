@@ -7,18 +7,20 @@
 }
 
 .help > ul > li {
-    margin: 10px 0px 4px 0px;
+    margin: 12px 0px 12px 0px;
 }
 
 .help > ul .key-container {
     display: inline-block;
     min-width: 86px;
+    margin-right: 18px;
+    text-align: right;
 }
 
 .help > ul .key {
-    border: 1px solid #ffffff;
+    border: 2px solid #ffffff;
     display: inline-block;
-    padding: 0px 6px 0px 6px;
+    padding: 1px 8px 1px 8px;
     border-radius: 6px;
     font-size: 16px;
 }
