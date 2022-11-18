@@ -105,6 +105,16 @@ export const EmulatorApp: FC<EmulatorAppProps> = ({
                 setFullscreenState(!fullscreenState);
                 setKeyaction(undefined);
                 break;
+            case "Keyboard":
+                setKeyboardVisible(!keyboardVisible);
+                setKeyaction(undefined);
+                break;
+            case "Accelerate":
+                emulator.frequency *= 8;
+                break;
+            case "Slowdown":
+                emulator.frequency /= 8;
+                break;
         }
     }, [keyaction]);
     useEffect(() => {
@@ -137,10 +147,35 @@ export const EmulatorApp: FC<EmulatorAppProps> = ({
                     event.preventDefault();
                     break;
             }
-            if (event.key === "f" && event.ctrlKey === true) {
-                setKeyaction("Fullscreen");
-                event.stopPropagation();
-                event.preventDefault();
+            if (event.ctrlKey === true) {
+                switch (event.key) {
+                    case "f":
+                        setKeyaction("Fullscreen");
+                        event.stopPropagation();
+                        event.preventDefault();
+                        break;
+                    case "k":
+                        setKeyaction("Keyboard");
+                        event.stopPropagation();
+                        event.preventDefault();
+                        break;
+                    case "d":
+                        setKeyaction("Accelerate");
+                        event.stopPropagation();
+                        event.preventDefault();
+                        break;
+                }
+            }
+        };
+        const onKeyUp = (event: KeyboardEvent) => {
+            if (event.ctrlKey === true) {
+                switch (event.key) {
+                    case "d":
+                        setKeyaction("Slowdown");
+                        event.stopPropagation();
+                        event.preventDefault();
+                        break;
+                }
             }
         };
         const onBooted = () => {
@@ -156,6 +191,7 @@ export const EmulatorApp: FC<EmulatorAppProps> = ({
         document.addEventListener("fullscreenchange", onFullChange);
         document.addEventListener("webkitfullscreenchange", onFullChange);
         document.addEventListener("keydown", onKeyDown);
+        document.addEventListener("keyup", onKeyUp);
         emulator.bind("booted", onBooted);
         emulator.bind("message", onMessage);
         return () => {
@@ -165,6 +201,7 @@ export const EmulatorApp: FC<EmulatorAppProps> = ({
                 onFullChange
             );
             document.removeEventListener("keydown", onKeyDown);
+            document.removeEventListener("keyup", onKeyUp);
             emulator.unbind("booted", onBooted);
             emulator.unbind("message", onMessage);
         };

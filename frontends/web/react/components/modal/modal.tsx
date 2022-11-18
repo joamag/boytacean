@@ -9,6 +9,7 @@ type ModalProps = {
     title?: string;
     text?: string;
     visible?: boolean;
+    buttons?: boolean;
     overlayClose?: boolean;
     style?: string[];
     onConfirm?: () => void;
@@ -19,6 +20,7 @@ export const Modal: FC<ModalProps> = ({
     title = "Alert",
     text = "Do you confirm the following operation?",
     visible = false,
+    buttons = true,
     overlayClose = true,
     style = [],
     onConfirm,
@@ -75,20 +77,22 @@ export const Modal: FC<ModalProps> = ({
                     className="modal-text"
                     dangerouslySetInnerHTML={getTextHtml()}
                 ></p>
-                <div className="modal-buttons">
-                    <Button
-                        text={"Cancel"}
-                        size={"medium"}
-                        style={["simple", "red", "border", "padded-large"]}
-                        onClick={onCancel}
-                    />
-                    <Button
-                        text={"Confirm"}
-                        size={"medium"}
-                        style={["simple", "border", "padded-large"]}
-                        onClick={onConfirm}
-                    />
-                </div>
+                {buttons && (
+                    <div className="modal-buttons">
+                        <Button
+                            text={"Cancel"}
+                            size={"medium"}
+                            style={["simple", "red", "border", "padded-large"]}
+                            onClick={onCancel}
+                        />
+                        <Button
+                            text={"Confirm"}
+                            size={"medium"}
+                            style={["simple", "border", "padded-large"]}
+                            onClick={onConfirm}
+                        />
+                    </div>
+                )}
             </div>
         </div>
     );

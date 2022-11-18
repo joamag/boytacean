@@ -2,7 +2,9 @@
 
 A Game Boy emulator that is written in Rust 🦀.
 
-**This emulator has been written for educational purposes and shouldn't be taken too seriously.** But yeahh it plays games, which is cool... 🎮
+<img src="res/videos/002-mario.low.gif" width="360" />
+
+**This emulator has been written for educational purposes and shouldn't be taken too seriously.** But yeahh it plays most of Game Boy games, which is cool... 🕹️
 
 ## Features
 
@@ -11,7 +13,7 @@ A Game Boy emulator that is written in Rust 🦀.
 * Web and SDL front-ends
 * Support for multiple MBCs: MBC1, MBC2, MBC3, and MBC5
 * Variable CPU clock speed
-* Passes [dmg-acid2](https://github.com/mattcurrie/dmg-acid2) PPU tests
+* Accurate PPU - passes [dmg-acid2](https://github.com/mattcurrie/dmg-acid2) tests
 
 For the Web front-end...
 

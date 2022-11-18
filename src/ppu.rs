@@ -158,15 +158,15 @@ pub struct Ppu {
 
     /// Video dedicated memory (VRAM) where both the tiles and
     /// the sprites/objects are going to be stored.
-    pub vram: [u8; VRAM_SIZE],
+    vram: [u8; VRAM_SIZE],
 
     /// High RAM memory that should provide extra speed for regular
     /// operations.
-    pub hram: [u8; HRAM_SIZE],
+    hram: [u8; HRAM_SIZE],
 
     /// OAM RAM (Sprite Attribute Table ) used for the storage of the
     /// sprite attributes for each of the 40 sprites of the Game Boy.
-    pub oam: [u8; OAM_SIZE],
+    oam: [u8; OAM_SIZE],
 
     /// The current set of processed tiles that are store in the
     /// PPU related structures.
@@ -417,7 +417,7 @@ impl Ppu {
                     // registers make sense (are within range), the window
                     // switch is on and the line in drawing is above WY
                     if self.switch_window
-                        && self.wx - 7 < DISPLAY_WIDTH as u8
+                        && self.wx as i16 - 7 < DISPLAY_WIDTH as i16
                         && self.wy < DISPLAY_HEIGHT as u8
                         && self.ly >= self.wy
                     {
@@ -468,7 +468,7 @@ impl Ppu {
 
     pub fn read(&mut self, addr: u16) -> u8 {
         match addr {
-            0x8000..=0x97ff => self.vram[(addr & 0x1fff) as usize],
+            0x8000..=0x9fff => self.vram[(addr & 0x1fff) as usize],
             0xfe00..=0xfe9f => self.oam[(addr & 0x009f) as usize],
             0xff80..=0xfffe => self.hram[(addr & 0x007f) as usize],
             0xff40 => {
