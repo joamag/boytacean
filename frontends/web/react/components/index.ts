@@ -14,6 +14,7 @@ export * from "./modal/modal";
 export * from "./overlay/overlay";
 export * from "./pair/pair";
 export * from "./panel-split/panel-split";
+export * from "./panel-tab/panel-tab";
 export * from "./paragraph/paragraph";
 export * from "./registers-gb/registers-gb";
 export * from "./section/section";
