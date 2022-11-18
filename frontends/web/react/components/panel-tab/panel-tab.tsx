@@ -1,6 +1,6 @@
 import React, { FC, ReactNode } from "react";
 
-import "./panel-split.css";
+import "./panel-tag.css";
 
 type PanelTabProps = {
     tabs?: ReactNode[];
