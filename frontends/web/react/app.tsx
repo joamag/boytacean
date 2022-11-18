@@ -1,4 +1,4 @@
-import React, { FC, useEffect, useRef, useState } from "react";
+import React, { FC, ReactNode, useEffect, useRef, useState } from "react";
 import ReactDOM from "react-dom/client";
 
 declare const require: any;
@@ -12,6 +12,7 @@ import {
     Display,
     DrawHandler,
     Footer,
+    Help,
     Info,
     KeyboardChip8,
     KeyboardGB,
@@ -66,6 +67,7 @@ export const EmulatorApp: FC<EmulatorAppProps> = ({
     const [keyaction, setKeyaction] = useState<string>();
     const [modalTitle, setModalTitle] = useState<string>();
     const [modalText, setModalText] = useState<string>();
+    const [modalContents, setModalContents] = useState<ReactNode>();
     const [modalVisible, setModalVisible] = useState(false);
     const [toastText, setToastText] = useState<string>();
     const [toastError, setToastError] = useState(false);
@@ -213,16 +215,21 @@ export const EmulatorApp: FC<EmulatorAppProps> = ({
     const getBackground = () => backgrounds[backgroundIndex];
 
     const showModal = async (
-        text: string,
-        title = "Alert"
+        title = "Alert",
+        text?: string,
+        contents?: ReactNode
     ): Promise<boolean> => {
-        setModalText(text);
         setModalTitle(title);
+        setModalText(text);
+        setModalContents(contents);
         setModalVisible(true);
         const result = (await new Promise((resolve) => {
             modalCallbackRef.current = resolve;
         })) as boolean;
         return result;
+    };
+    const showHelp = async (title = "Help") => {
+        await showModal(title, undefined, <Help />);
     };
     const showToast = async (text: string, error = false, timeout = 3500) => {
         setToastText(text);
@@ -286,8 +293,8 @@ export const EmulatorApp: FC<EmulatorAppProps> = ({
     const onBenchmarkClick = async () => {
         if (!emulator.benchmark) return;
         const result = await showModal(
-            "Are you sure you want to start a benchmark?\nThe benchmark is considered an expensive operation!",
-            "Confirm"
+            "Confirm",
+            "Are you sure you want to start a benchmark?\nThe benchmark is considered an expensive operation!"
         );
         if (!result) return;
         const { delta, count, frequency_mhz } = emulator.benchmark();
@@ -309,6 +316,9 @@ export const EmulatorApp: FC<EmulatorAppProps> = ({
     };
     const onInformationClick = () => {
         setInfoVisible(!infoVisible);
+    };
+    const onHelpClick = () => {
+        showHelp();
     };
     const onDebugClick = () => {
         setDebugVisible(!debugVisible);
@@ -378,6 +388,7 @@ export const EmulatorApp: FC<EmulatorAppProps> = ({
             <Modal
                 title={modalTitle}
                 text={modalText}
+                contents={modalContents}
                 visible={modalVisible}
                 onConfirm={onModalConfirm}
                 onCancel={onModalCancel}
@@ -620,6 +631,13 @@ export const EmulatorApp: FC<EmulatorAppProps> = ({
                             enabled={infoVisible}
                             style={["simple", "border", "padded"]}
                             onClick={onInformationClick}
+                        />
+                        <Button
+                            text={"Help"}
+                            image={require("../res/help.svg")}
+                            imageAlt="help"
+                            style={["simple", "border", "padded"]}
+                            onClick={onHelpClick}
                         />
                         {hasFeature(Feature.Debug) && (
                             <Button

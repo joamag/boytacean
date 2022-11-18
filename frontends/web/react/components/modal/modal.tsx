@@ -1,4 +1,4 @@
-import React, { FC, useEffect, useRef } from "react";
+import React, { FC, ReactNode, useEffect, useRef } from "react";
 import Button from "../button/button";
 
 import "./modal.css";
@@ -8,6 +8,7 @@ declare const require: any;
 type ModalProps = {
     title?: string;
     text?: string;
+    contents?: ReactNode;
     visible?: boolean;
     buttons?: boolean;
     overlayClose?: boolean;
@@ -18,9 +19,10 @@ type ModalProps = {
 
 export const Modal: FC<ModalProps> = ({
     title = "Alert",
-    text = "Do you confirm the following operation?",
+    text,
+    contents,
     visible = false,
-    buttons = true,
+    buttons,
     overlayClose = true,
     style = [],
     onConfirm,
@@ -28,6 +30,10 @@ export const Modal: FC<ModalProps> = ({
 }) => {
     const classes = () =>
         ["modal", visible ? "visible" : "", ...style].join(" ");
+    text =
+        text ??
+        (contents ? undefined : "Do you confirm the following operation?");
+    buttons = buttons ?? (contents ? false : true);
     const modalRef = useRef<HTMLDivElement>(null);
     useEffect(() => {
         const onKeyDown = (event: KeyboardEvent) => {
@@ -45,9 +51,12 @@ export const Modal: FC<ModalProps> = ({
             modalRef.current?.focus();
         }
     }, [visible]);
-    const getTextHtml = (separator = /\n/g) => ({
-        __html: text.replace(separator, "<br/>")
-    });
+    const getTextHtml = (separator = /\n/g) =>
+        text
+            ? {
+                  __html: text.replace(separator, "<br/>")
+              }
+            : undefined;
     const onWindowClick = (
         event: React.MouseEvent<HTMLDivElement, MouseEvent>
     ) => {
@@ -73,10 +82,14 @@ export const Modal: FC<ModalProps> = ({
                     />
                 </div>
                 <h2 className="modal-title">{title}</h2>
-                <p
-                    className="modal-text"
-                    dangerouslySetInnerHTML={getTextHtml()}
-                ></p>
+                {contents ? (
+                    contents
+                ) : (
+                    <p
+                        className="modal-text"
+                        dangerouslySetInnerHTML={getTextHtml()}
+                    ></p>
+                )}
                 {buttons && (
                     <div className="modal-buttons">
                         <Button

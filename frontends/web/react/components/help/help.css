@@ -1,0 +1,19 @@
+.help > ul {
+    padding-left: 0px;
+    font-size: 18px;
+    line-height: 22px;
+    list-style: none;
+    margin: 0px 0px 0px 0px;
+}
+
+.help > ul > li {
+    margin: 10px 0px 4px 0px;
+}
+
+.help > ul .key {
+    border: 1px solid #ffffff;
+    display: inline-block;
+    padding: 0px 6px 0px 6px;
+    border-radius: 6px;
+    font-size: 16px;
+}
