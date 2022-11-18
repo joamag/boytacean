@@ -1,3 +1,9 @@
+.help {
+    display: flex;
+    flex-direction: column;
+    overflow: auto;
+}
+
 .keyboard-help {
     font-size: 18px;
     line-height: 22px;
@@ -27,7 +33,12 @@
     -webkit-border-radius: 6px 6px 6px 6px;
     display: inline-block;
     font-size: 16px;
+    margin-right: 8px;
     padding: 1px 8px 1px 8px;
+}
+
+.keyboard-help .key:last-child {
+    margin-right: 0px;
 }
 
 .faqs-help > h3 {

@@ -1,3 +1,9 @@
+.panel-tab {
+    display: flex;
+    flex-direction: column;
+    overflow: auto;
+}
+
 .panel-tab > .tab-selectors {
     line-height: 30px;
     margin-bottom: 26px;
@@ -50,4 +56,10 @@
     -moz-opacity: 1.0;
     -khtml-opacity: 1.0;
     -webkit-opacity: 1.0;
+}
+
+.panel-tab > .tab-container {
+    display: flex;
+    flex-direction: column;
+    overflow: auto;
 }

@@ -115,6 +115,8 @@
 }
 
 .modal > .modal-window > .modal-contents {
+    display: flex;
+    flex-direction: column;
     overflow: auto;
 }
 

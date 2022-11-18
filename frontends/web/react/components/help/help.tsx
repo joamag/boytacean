@@ -48,6 +48,20 @@ const keyboardHelp = () => (
         </li>
         <li>
             <span className="key-container">
+                <span className="key">🡐</span>
+                <span className="key">🡒</span>
+            </span>
+            Horizontal control
+        </li>
+        <li>
+            <span className="key-container">
+                <span className="key">🡑</span>
+                <span className="key">🡓</span>
+            </span>
+            Vertical control
+        </li>
+        <li>
+            <span className="key-container">
                 <span className="key">Escape</span>
             </span>
             Exit fullscreen
@@ -84,14 +98,16 @@ const faqsHelp = () => (
         <p>It's under development, I'm hopping to have it before Christmas.</p>
         <h3>Can I use my Xbox One game pad?</h3>
         <p>
-            Yes, just plug it in and press a button. BTW: This uses{" "}
+            Yes, just plug it in and press a button.
+            <br />
+            BTW: This uses the{" "}
             <Link
                 href="https://developer.mozilla.org/docs/Web/API/Gamepad_API/Using_the_Gamepad_API"
                 target="_blank"
             >
                 Web Gamepad API
-            </Link>
-            .
+            </Link>{" "}
+            🕹️.
         </p>
         <h3>Will it ever play Game Boy Color games?</h3>
         <p>Eventually...</p>

@@ -460,6 +460,18 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         };
     }
 
+    get palette(): string | undefined {
+        const paletteObj = PALETTES[this.paletteIndex];
+        return paletteObj.name;
+    }
+
+    set palette(value: string | undefined) {
+        if (value === undefined) return;
+        const paletteObj = PALETTES_MAP[value];
+        this.paletteIndex = PALETTES.indexOf(paletteObj);
+        this.updatePalette();
+    }
+
     getTile(index: number): Uint8Array {
         return this.gameBoy?.get_tile_buffer(index) ?? new Uint8Array();
     }
@@ -501,12 +513,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         this.paletteIndex += 1;
         this.paletteIndex %= PALETTES.length;
         this.updatePalette();
-    }
-
-    setPalette(palette: string) {
-        const paletteObj = PALETTES_MAP[palette];
-        this.paletteIndex = PALETTES.indexOf(paletteObj);
-        this.updatePalette();
+        return PALETTES[this.paletteIndex].name;
     }
 
     benchmark(count = 50000000) {

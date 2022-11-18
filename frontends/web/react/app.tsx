@@ -21,6 +21,7 @@ import {
     Overlay,
     Pair,
     PanelSplit,
+    PanelTab,
     Paragraph,
     RegistersGB,
     Section,
@@ -64,6 +65,7 @@ export const EmulatorApp: FC<EmulatorAppProps> = ({
     const [backgroundIndex, setBackgroundIndex] = useState(0);
     const [romInfo, setRomInfo] = useState<RomInfo>({});
     const [framerate, setFramerate] = useState(0);
+    const [paletteName, setPaletteName] = useState(emulator.palette);
     const [keyaction, setKeyaction] = useState<string>();
     const [modalTitle, setModalTitle] = useState<string>();
     const [modalText, setModalText] = useState<string>();
@@ -121,7 +123,7 @@ export const EmulatorApp: FC<EmulatorAppProps> = ({
     }, [keyaction]);
     useEffect(() => {
         if (palette) {
-            emulator.setPalette?.(palette);
+            emulator.palette = palette;
         }
         const onFullChange = (event: Event) => {
             if (
@@ -327,7 +329,8 @@ export const EmulatorApp: FC<EmulatorAppProps> = ({
         setBackgroundIndex((backgroundIndex + 1) % backgrounds.length);
     };
     const onPaletteClick = () => {
-        emulator.changePalette?.();
+        const palette = emulator.changePalette?.();
+        setPaletteName(palette);
     };
     const onUploadFile = async (file: File) => {
         const arrayBuffer = await file.arrayBuffer();
@@ -513,72 +516,88 @@ export const EmulatorApp: FC<EmulatorAppProps> = ({
                 )}
                 {infoVisible && (
                     <Section>
-                        <Info>
-                            <Pair
-                                key="button-engine"
-                                name={"Engine"}
-                                valueNode={
-                                    <ButtonSwitch
-                                        options={emulator.engines.map((e) =>
-                                            e.toUpperCase()
-                                        )}
-                                        size={"large"}
-                                        style={["simple"]}
-                                        onChange={onEngineChange}
-                                    />
-                                }
-                            />
-                            <Pair
-                                key="rom"
-                                name={"ROM"}
-                                value={romInfo.name ?? "-"}
-                            />
-                            <Pair
-                                key="rom-size"
-                                name={"ROM Size"}
-                                value={
-                                    romInfo.size
-                                        ? `${new Intl.NumberFormat().format(
-                                              romInfo.size
-                                          )} bytes`
-                                        : "-"
-                                }
-                            />
-                            <Pair
-                                key="button-frequency"
-                                name={"CPU Frequency"}
-                                valueNode={
-                                    <ButtonIncrement
-                                        value={emulator.frequency / 1000 / 1000}
-                                        delta={
-                                            (emulator.frequencyDelta ??
-                                                FREQUENCY_DELTA) /
-                                            1000 /
-                                            1000
+                        <PanelTab
+                            tabs={[
+                                <Info>
+                                    <Pair
+                                        key="button-engine"
+                                        name={"Engine"}
+                                        valueNode={
+                                            <ButtonSwitch
+                                                options={emulator.engines.map(
+                                                    (e) => e.toUpperCase()
+                                                )}
+                                                size={"large"}
+                                                style={["simple"]}
+                                                onChange={onEngineChange}
+                                            />
                                         }
-                                        min={0}
-                                        suffix={"MHz"}
-                                        decimalPlaces={2}
-                                        onChange={onFrequencyChange}
-                                        onReady={onFrequencyReady}
                                     />
-                                }
-                            />
-                            <Pair
-                                key="rom-type"
-                                name={"ROM Type"}
-                                value={
-                                    romInfo.extra?.romType
-                                        ? `${romInfo.extra?.romType}`
-                                        : "-"
-                                }
-                            />
-                            <Pair
-                                key="framerate"
-                                name={"Framerate"}
-                                value={`${framerate} fps`}
-                            />
-                        </Info>
+                                    <Pair
+                                        key="rom"
+                                        name={"ROM"}
+                                        value={romInfo.name ?? "-"}
+                                    />
+                                    <Pair
+                                        key="rom-size"
+                                        name={"ROM Size"}
+                                        value={
+                                            romInfo.size
+                                                ? `${new Intl.NumberFormat().format(
+                                                      romInfo.size
+                                                  )} bytes`
+                                                : "-"
+                                        }
+                                    />
+                                    <Pair
+                                        key="button-frequency"
+                                        name={"CPU Frequency"}
+                                        valueNode={
+                                            <ButtonIncrement
+                                                value={
+                                                    emulator.frequency /
+                                                    1000 /
+                                                    1000
+                                                }
+                                                delta={
+                                                    (emulator.frequencyDelta ??
+                                                        FREQUENCY_DELTA) /
+                                                    1000 /
+                                                    1000
+                                                }
+                                                min={0}
+                                                suffix={"MHz"}
+                                                decimalPlaces={2}
+                                                onChange={onFrequencyChange}
+                                                onReady={onFrequencyReady}
+                                            />
+                                        }
+                                    />
+                                    <Pair
+                                        key="rom-type"
+                                        name={"ROM Type"}
+                                        value={
+                                            romInfo.extra?.romType
+                                                ? `${romInfo.extra?.romType}`
+                                                : "-"
+                                        }
+                                    />
+                                    <Pair
+                                        key="framerate"
+                                        name={"Framerate"}
+                                        value={`${framerate} fps`}
+                                    />
+                                </Info>,
+                                <Info>
+                                    <Pair
+                                        key="palette"
+                                        name={"Palette"}
+                                        value={paletteName}
+                                    />
+                                </Info>
+                            ]}
+                            tabNames={["General", "Detailed"]}
+                        />
                     </Section>
                 )}
                 <Section>
