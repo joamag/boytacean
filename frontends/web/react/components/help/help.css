@@ -1,4 +1,4 @@
-.help > ul {
+.keyboard-help {
     padding-left: 0px;
     font-size: 18px;
     line-height: 22px;
@@ -6,21 +6,30 @@
     margin: 0px 0px 0px 0px;
 }
 
-.help > ul > li {
+.keyboard-help > li {
     margin: 12px 0px 12px 0px;
 }
 
-.help > ul .key-container {
+.keyboard-help .key-container {
     display: inline-block;
     min-width: 86px;
     margin-right: 18px;
     text-align: right;
 }
 
-.help > ul .key {
+.keyboard-help .key {
     border: 2px solid #ffffff;
     display: inline-block;
     padding: 1px 8px 1px 8px;
     border-radius: 6px;
     font-size: 16px;
+}
+
+.faqs-help > h3 {
+    margin: 0px 0px 6px 0px;
+}
+
+.faqs-help > p {
+    margin: 0px 0px 22px 0px;
+    line-height: 20px;
 }

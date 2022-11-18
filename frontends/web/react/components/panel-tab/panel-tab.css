@@ -1,0 +1,20 @@
+.panel-tab > .tab-selectors {
+    line-height: 30px;
+    margin-bottom: 26px;
+}
+
+.panel-tab > .tab-selectors > .tab-selector {
+    display: inline-block;
+    margin-right: 18px;
+    font-size: 22px; 
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+}
+
+.panel-tab > .tab-selectors > .tab-selector:last-child {
+    margin-right: 0px;
+}
+
+.panel-tab > .tab-selectors > .tab-selector.selected {
+    border-bottom: 2px solid #ffffff;
+}
