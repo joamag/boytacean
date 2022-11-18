@@ -1,9 +1,9 @@
 .keyboard-help {
-    padding-left: 0px;
     font-size: 18px;
     line-height: 22px;
     list-style: none;
     margin: 0px 0px 0px 0px;
+    padding-left: 0px;
 }
 
 .keyboard-help > li {
@@ -12,17 +12,22 @@
 
 .keyboard-help .key-container {
     display: inline-block;
-    min-width: 86px;
     margin-right: 18px;
+    min-width: 86px;
     text-align: right;
 }
 
 .keyboard-help .key {
     border: 2px solid #ffffff;
+    border-radius: 6px 6px 6px 6px;
+    -o-border-radius: 6px 6px 6px 6px;
+    -ms-border-radius: 6px 6px 6px 6px;
+    -moz-border-radius: 6px 6px 6px 6px;
+    -khtml-border-radius: 6px 6px 6px 6px;
+    -webkit-border-radius: 6px 6px 6px 6px;
     display: inline-block;
-    padding: 1px 8px 1px 8px;
-    border-radius: 6px;
     font-size: 16px;
+    padding: 1px 8px 1px 8px;
 }
 
 .faqs-help > h3 {
@@ -30,6 +35,6 @@
 }
 
 .faqs-help > p {
-    margin: 0px 0px 22px 0px;
     line-height: 20px;
+    margin: 0px 0px 22px 0px;
 }

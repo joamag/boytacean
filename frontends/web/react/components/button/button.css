@@ -1,6 +1,12 @@
 .button {
     cursor: pointer;
     display: inline-flex;
+    transition: background-color 0.25s cubic-bezier(0.075, 0.82, 0.165, 1);
+    -o-transition: background-color 0.25s cubic-bezier(0.075, 0.82, 0.165, 1);
+    -ms-transition: background-color 0.25s cubic-bezier(0.075, 0.82, 0.165, 1);
+    -moz-transition: background-color 0.25s cubic-bezier(0.075, 0.82, 0.165, 1);
+    -khtml-transition: background-color 0.25s cubic-bezier(0.075, 0.82, 0.165, 1);
+    -webkit-transition: background-color 0.25s cubic-bezier(0.075, 0.82, 0.165, 1);
     vertical-align: middle;
 }
 

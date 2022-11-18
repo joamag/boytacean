@@ -80,8 +80,19 @@ const faqsHelp = () => (
             Not really, but it plays the coolest ones. Now seriously it should
             play around 90% of the Game Boy games.
         </p>
-        <h3>Why there's not sound?</h3>
+        <h3>Why there's no sound?</h3>
         <p>It's under development, I'm hopping to have it before Christmas.</p>
+        <h3>Can I use my Xbox One game pad?</h3>
+        <p>
+            Yes, just plug it in and press a button. BTW: This uses{" "}
+            <Link
+                href="https://developer.mozilla.org/docs/Web/API/Gamepad_API/Using_the_Gamepad_API"
+                target="_blank"
+            >
+                Web Gamepad API
+            </Link>
+            .
+        </p>
         <h3>Will it ever play Game Boy Color games?</h3>
         <p>Eventually...</p>
         <h3>I've found a bug, where can I report it?</h3>

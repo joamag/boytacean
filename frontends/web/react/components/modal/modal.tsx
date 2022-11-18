@@ -83,7 +83,7 @@ export const Modal: FC<ModalProps> = ({
                 </div>
                 <h2 className="modal-title">{title}</h2>
                 {contents ? (
-                    contents
+                    <div className="modal-contents">{contents}</div>
                 ) : (
                     <p
                         className="modal-text"
