@@ -42,6 +42,12 @@ What's missing...
 
 ## Build
 
+### Library
+
+```bash
+cargo build
+```
+
 ### WASM for Node.js
 
 ```bash
@@ -59,7 +65,7 @@ npm install && npm run build
 cd dist && python3 -m http.server
 ```
 
-## Web version
+## Web front-end
 
 You can use some GET parameters to control the initial behaviour of the emulator.
 
