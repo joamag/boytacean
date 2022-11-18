@@ -19,6 +19,7 @@
 
 * [GitHub - LIJI32/SameBoy (C)](https://github.com/LIJI32/SameBoy)
 * [GitHub - binji/binjgb (C)](https://github.com/binji/binjgb)
+* [GitHub - feo-boy/feo-boy (Rust)](https://github.com/feo-boy/feo-boy)
 * [GitHub - Rodrigodd/gameroy (Rust)](https://github.com/Rodrigodd/gameroy)
 * [GitHub - simias/gb-rs (Rust)](https://github.com/simias/gb-rs)
 * [GitHub - RubenG123/frosty (Rust)](https://github.com/RubenG123/frosty)
