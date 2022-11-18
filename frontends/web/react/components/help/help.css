@@ -10,6 +10,11 @@
     margin: 10px 0px 4px 0px;
 }
 
+.help > ul .key-container {
+    display: inline-block;
+    min-width: 86px;
+}
+
 .help > ul .key {
     border: 1px solid #ffffff;
     display: inline-block;

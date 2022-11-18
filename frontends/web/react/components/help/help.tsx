@@ -12,29 +12,52 @@ export const Help: FC<HelpProps> = ({ style = [] }) => {
         <div className={classes()}>
             <ul>
                 <li>
-                    <span className="key">Enter</span> - Start
+                    <span className="key-container">
+                        <span className="key">Enter</span>
+                    </span>
+                    Start button
                 </li>
                 <li>
-                    <span className="key">Space</span> - Select
+                    <span className="key-container">
+                        <span className="key">Space</span>
+                    </span>
+                    Select button
                 </li>
                 <li>
-                    <span className="key">A</span> - A
+                    <span className="key-container">
+                        <span className="key">A</span>
+                    </span>
+                    A button
                 </li>
                 <li>
-                    <span className="key">S</span> - B
+                    <span className="key-container">
+                        <span className="key">S</span>
+                    </span>
+                    B button
                 </li>
                 <li>
-                    <span className="key">Escape</span> - Exit fullscreen
+                    <span className="key-container">
+                        <span className="key">Escape</span>
+                    </span>
+                    Exit fullscreen
                 </li>
                 <li>
-                    <span className="key">Ctrl + D</span> - Turbo speed
+                    <span className="key-container">
+                        <span className="key">Ctrl + D</span>
+                    </span>
+                    Turbo speed
                 </li>
                 <li>
-                    <span className="key">Ctrl + F</span> - Toggle fullscreen
+                    <span className="key-container">
+                        <span className="key">Ctrl + F</span>
+                    </span>
+                    Toggle fullscreen
                 </li>
                 <li>
-                    <span className="key">Ctrl + K</span> - Toggle on-screen
-                    keyboard
+                    <span className="key-container">
+                        <span className="key">Ctrl + K</span>
+                    </span>
+                    Toggle on-screen keyboard
                 </li>
             </ul>
         </div>
