@@ -7,6 +7,7 @@ license = "Apache-2.0"
 repository = "https://github.com/joamag/boytacean"
 keywords = ["gameboy", "emulator", "rust"]
 edition = "2018"
+exclude = ["/res/roms", "/res/screens", "/res/videos"]
 
 [lib]
 crate-type = ["cdylib", "rlib"]
