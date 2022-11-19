@@ -155,6 +155,13 @@ export interface Emulator extends ObservableI {
     get registers(): Record<string, string | number>;
 
     /**
+     * The palette as a string name that is currently
+     * set in the emulator for display.
+     */
+    get palette(): string | undefined;
+    set palette(value: string | undefined);
+
+    /**
      * Obtains the pixel buffer for the VRAM tile at the given
      * index.
      *
@@ -196,16 +203,10 @@ export interface Emulator extends ObservableI {
      * Changes the palette of the emulator to the "next" one,
      * the order in which the palette is chosen is defined by
      * the concrete emulator implementation.
-     */
-    changePalette?: { (): void };
-
-    /**
-     * Sets the palette with the given name/description
-     * as the current palette to be used by the emulator.
      *
-     * @param palette The name of the palette to be set.
+     * @returns The name of the palette that has been selected.
      */
-    setPalette?: { (palette: string): void };
+    changePalette?: { (): string };
 
     /**
      * Runs a benchmark operation in the emulator, effectively
@@ -265,4 +266,10 @@ export class EmulatorBase extends Observable {
     get frequencyDelta(): number | null {
         return FREQUENCY_DELTA;
     }
+
+    get palette(): string | undefined {
+        return undefined;
+    }
+
+    set palette(value: string | undefined) {}
 }
