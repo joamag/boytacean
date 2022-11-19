@@ -276,7 +276,7 @@ export const KeyboardGB: FC<KeyboardGBProps> = ({
                 <div className="dpad">
                     <div className="dpad-top">
                         {renderKey(
-                            "▲",
+                            isAndroid() ? "▲" : "▲",
                             "ArrowUp",
                             selectedKeys.includes("ArrowUp"),
                             ["up"]
@@ -298,7 +298,7 @@ export const KeyboardGB: FC<KeyboardGBProps> = ({
                     </div>
                     <div className="dpad-bottom">
                         {renderKey(
-                            "▼",
+                            isAndroid() ? "▼" : "▼",
                             "ArrowDown",
                             selectedKeys.includes("ArrowDown"),
                             ["down"]
