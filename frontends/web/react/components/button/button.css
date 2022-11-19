@@ -23,6 +23,7 @@
     -khtml-border-radius: 96px 96px 96px 96px;
     -webkit-border-radius: 96px 96px 96px 96px;
     padding: 0px 8px 0px 8px;
+    -webkit-tap-highlight-color: transparent;
     user-select: none;
     -o-user-select: none;
     -ms-user-select: none;
