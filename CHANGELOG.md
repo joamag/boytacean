@@ -17,6 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+*
+
+## [0.6.1] - 2022-11-19
+
+### Fixed
+
 * Exclusion of files from `Cargo.toml`
 
 ## [0.6.0] - 2022-11-19
