@@ -597,7 +597,7 @@ export const EmulatorApp: FC<EmulatorAppProps> = ({
                                 </Info>
                             ]}
                             tabNames={["General", "Detailed"]}
-                            selectors={false}
+                            selectors={true}
                         />
                     </Section>
                 )}
