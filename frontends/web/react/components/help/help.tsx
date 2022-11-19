@@ -48,15 +48,15 @@ const keyboardHelp = () => (
         </li>
         <li>
             <span className="key-container">
-                <span className="key">🡐</span>
-                <span className="key">🡒</span>
+                <span className="key">←</span>
+                <span className="key">→</span>
             </span>
             Horizontal control
         </li>
         <li>
             <span className="key-container">
-                <span className="key">🡑</span>
-                <span className="key">🡓</span>
+                <span className="key">↑</span>
+                <span className="key">↓</span>
             </span>
             Vertical control
         </li>

@@ -1,4 +1,5 @@
 import React, { FC, useEffect, useRef, useState } from "react";
+import { isAndroid } from "../../util";
 
 import "./keyboard-gb.css";
 
@@ -283,13 +284,13 @@ export const KeyboardGB: FC<KeyboardGBProps> = ({
                     </div>
                     <div>
                         {renderKey(
-                            "◄",
+                            isAndroid() ? "◀" : "◄",
                             "ArrowLeft",
                             selectedKeys.includes("ArrowLeft"),
                             ["left"]
                         )}
                         {renderKey(
-                            "►",
+                            isAndroid() ? "▶" : "►",
                             "ArrowRight",
                             selectedKeys.includes("ArrowRight"),
                             ["right"]

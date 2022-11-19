@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 * Android highlight color in buttons
+* Android issue with arrow pointers
 
 ## [0.5.7] - 2022-11-17
 
