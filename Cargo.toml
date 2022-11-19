@@ -1,12 +1,13 @@
 [package]
 name = "boytacean"
 description = "A Game Boy emulator that is written in Rust."
-version = "0.6.0"
+version = "0.6.1"
 authors = ["João Magalhães <joamag@gmail.com>"]
 license = "Apache-2.0"
 repository = "https://github.com/joamag/boytacean"
 keywords = ["gameboy", "emulator", "rust"]
 edition = "2018"
+exclude = ["/frontends", "/res/roms", "/res/screens", "/res/videos"]
 
 [lib]
 crate-type = ["cdylib", "rlib"]
