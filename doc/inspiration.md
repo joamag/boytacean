@@ -23,7 +23,6 @@
 * [GitHub - Rodrigodd/gameroy (Rust)](https://github.com/Rodrigodd/gameroy)
 * [GitHub - simias/gb-rs (Rust)](https://github.com/simias/gb-rs)
 * [GitHub - RubenG123/frosty (Rust)](https://github.com/RubenG123/frosty)
-* [GitHub - feo-boy/feo-boy (Rust)](https://github.com/feo-boy/feo-boy)
 * [GitHub - calvinbaart/gameboy (TypeScript)](https://github.com/calvinbaart/gameboy)
 
 ## Videos
