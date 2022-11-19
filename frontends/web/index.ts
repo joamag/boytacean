@@ -1,5 +1,5 @@
-import { startApp } from "./react/app";
-import { GameboyEmulator } from "./gb";
+import { startApp } from "emukit";
+import { GameboyEmulator } from "./ts";
 
 const BACKGROUNDS = [
     "264653",

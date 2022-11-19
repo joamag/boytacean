@@ -5,7 +5,7 @@ import {
     Feature,
     PixelFormat,
     RomInfo
-} from "./react/structs";
+} from "emukit";
 import { PALETTES, PALETTES_MAP } from "./palettes";
 
 import {
@@ -14,8 +14,8 @@ import {
     GameBoy,
     PadKey,
     PpuMode
-} from "./lib/boytacean.js";
-import info from "./package.json";
+} from "../lib/boytacean.js";
+import info from "../package.json";
 import { base64ToBuffer, bufferToBase64 } from "./util";
 
 declare const require: any;
@@ -45,7 +45,7 @@ const KEYS_NAME: Record<string, number> = {
     B: PadKey.B
 };
 
-const ROM_PATH = require("../../res/roms/pocket.gb");
+const ROM_PATH = require("../../../res/roms/pocket.gb");
 
 /**
  * Top level class that controls the emulator behaviour
