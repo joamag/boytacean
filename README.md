@@ -67,7 +67,7 @@ cd dist && python3 -m http.server
 
 ## Web front-end
 
-You can use some GET parameters to control the initial behaviour of the emulator.
+You can use some GET parameters to control the initial behavior of the emulator.
 
 | Parameter    | Type    | Description                                                                                    |
 | ------------ | ------- | ---------------------------------------------------------------------------------------------- |
