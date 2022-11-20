@@ -1,0 +1,5 @@
+{
+    "ext": "js,ts,jsx,tsx,mjs,css,json",
+    "ignore": ["dist", ".parcel-cache"],
+    "ignoreRoot": [".git"]
+}

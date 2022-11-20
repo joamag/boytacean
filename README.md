@@ -4,7 +4,7 @@ A Game Boy emulator that is written in Rust 🦀.
 
 <img src="res/videos/002-mario.low.gif" width="360" />
 
-**This emulator has been written for educational purposes and shouldn't be taken too seriously.** But yeahh it plays most of Game Boy games, which is cool... 🕹️
+**This emulator has been written for educational purposes and shouldn't be taken too seriously.** But yeahh it plays most Game Boy games, which is cool... 🕹️
 
 ## Features
 
@@ -67,7 +67,7 @@ cd dist && python3 -m http.server
 
 ## Web front-end
 
-You can use some GET parameters to control the initial behaviour of the emulator.
+You can use some GET parameters to control the initial behavior of the emulator.
 
 | Parameter    | Type    | Description                                                                                    |
 | ------------ | ------- | ---------------------------------------------------------------------------------------------- |
@@ -76,7 +76,7 @@ You can use some GET parameters to control the initial behaviour of the emulator
 | `fullscreen` | Boolean | If the emulator should start in fullscreen mode.                                               |
 | `fs`         | Boolean | The same as `fullscreen`.                                                                      |
 | `debug`      | Boolean | If the "debugger" should start visible.                                                        |
-| `keyboard`   | Boolean | If the on screen keyboard should start visible.                                                |
+| `keyboard`   | Boolean | If the on-screen keyboard should start visible.                                                |
 | `palette`    | String  | The name of the palette to be set at startup( eg: `christmas`, `hogwards`, `mariobros`, etc.). |
 
 ### Palettes
@@ -85,7 +85,7 @@ The palettes offered in the web version were provided by [TheWolfBunny64](https:
 
 ### Inspiration
 
-To get some information about the resources that inspired my through the emulation creation journey check [Inspiration](doc/inspiration.md).
+To get some information about the resources that inspired me through the emulation creation journey check [Inspiration](doc/inspiration.md).
 
 ## License
 
