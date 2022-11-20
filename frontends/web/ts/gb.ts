@@ -8,6 +8,7 @@ import {
     Size
 } from "emukit";
 import { PALETTES, PALETTES_MAP } from "./palettes";
+import { base64ToBuffer, bufferToBase64 } from "./util";
 
 import {
     Cartridge,
@@ -15,9 +16,8 @@ import {
     GameBoy,
     PadKey,
     PpuMode
-} from "../lib/boytacean.js";
+} from "../lib/boytacean";
 import info from "../package.json";
-import { base64ToBuffer, bufferToBase64 } from "./util";
 
 declare const require: any;
 
@@ -384,16 +384,17 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
             Feature.Palettes,
             Feature.Benchmark,
             Feature.Keyboard,
-            Feature.KeyboardGB
+            Feature.KeyboardGB,
+            Feature.RomTypeInfo
         ];
     }
 
-    get engines() {
+    get engines(): string[] {
         return ["neo"];
     }
 
-    get engine() {
-        return this._engine;
+    get engine(): string {
+        return this._engine || "neo";
     }
 
     get romExts(): string[] {
