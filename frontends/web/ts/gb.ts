@@ -1,4 +1,5 @@
 import {
+    BenchmarkResult,
     Emulator,
     EmulatorBase,
     Entry,
@@ -488,10 +489,6 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         this.updatePalette();
     }
 
-    getTile(index: number): Uint8Array {
-        return this.gameBoy?.get_tile_buffer(index) ?? new Uint8Array();
-    }
-
     toggleRunning() {
         if (this.paused) {
             this.resume();
@@ -525,14 +522,18 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         this.gameBoy?.key_lift(keyCode);
     }
 
-    changePalette() {
+    getTile(index: number): Uint8Array {
+        return this.gameBoy?.get_tile_buffer(index) ?? new Uint8Array();
+    }
+
+    changePalette(): string {
         this.paletteIndex += 1;
         this.paletteIndex %= PALETTES.length;
         this.updatePalette();
         return PALETTES[this.paletteIndex].name;
     }
 
-    benchmark(count = 50000000) {
+    benchmark(count = 50000000): BenchmarkResult {
         let cycles = 0;
         this.pause();
         try {
