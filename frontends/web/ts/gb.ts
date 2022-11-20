@@ -4,7 +4,8 @@ import {
     Entry,
     Feature,
     PixelFormat,
-    RomInfo
+    RomInfo,
+    Size
 } from "emukit";
 import { PALETTES, PALETTES_MAP } from "./palettes";
 
@@ -24,6 +25,10 @@ const LOGIC_HZ = 4194304;
 
 const VISUAL_HZ = 59.7275;
 const IDLE_HZ = 10;
+
+const DISPLAY_WIDTH = 160;
+const DISPLAY_HEIGHT = 144;
+const DISPLAY_SCALE = 2;
 
 /**
  * The rate at which the local storage RAM state flush
@@ -285,7 +290,9 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         // in case a remote ROM loading operation has been
         // requested then loads it from the remote origin
         if (loadRom) {
-            ({ name: romName, data: romData } = await this.fetchRom(romPath));
+            ({ name: romName, data: romData } = await GameboyEmulator.fetchRom(
+                romPath
+            ));
         } else if (romName === null || romData === null) {
             [romName, romData] = [this.romName, this.romData];
         }
@@ -395,6 +402,14 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
 
     get pixelFormat(): PixelFormat {
         return PixelFormat.RGB;
+    }
+
+    get dimensions(): Size {
+        return {
+            width: DISPLAY_WIDTH,
+            height: DISPLAY_HEIGHT,
+            scale: DISPLAY_SCALE
+        };
     }
 
     /**
@@ -559,7 +574,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         this.gameBoy?.set_palette_colors_ws(palette.colors);
     }
 
-    private async fetchRom(
+    private static async fetchRom(
         romPath: string
     ): Promise<{ name: string; data: Uint8Array }> {
         // extracts the name of the ROM from the provided
