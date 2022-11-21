@@ -19,6 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 *
 
+## [0.6.2] - 2022-11-21
+
+### Changed
+
+* Made UI generic by extracting components into [EmuKit](https://github.com/joamag/emukit) 🎉
+* More generic help panels
+
 ## [0.6.1] - 2022-11-19
 
 ### Fixed
