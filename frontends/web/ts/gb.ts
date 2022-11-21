@@ -4,12 +4,14 @@ import {
     EmulatorBase,
     Entry,
     Feature,
+    HelpPanel,
     PixelFormat,
     RomInfo,
     Size
 } from "emukit";
 import { PALETTES, PALETTES_MAP } from "./palettes";
 import { base64ToBuffer, bufferToBase64 } from "./util";
+import { HelpFaqs, HelpKeyboard } from "../react";
 
 import {
     Cartridge,
@@ -381,12 +383,26 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
 
     get features(): Feature[] {
         return [
+            Feature.Help,
             Feature.Debug,
             Feature.Palettes,
             Feature.Benchmark,
             Feature.Keyboard,
             Feature.KeyboardGB,
             Feature.RomTypeInfo
+        ];
+    }
+
+    get help(): HelpPanel[] {
+        return [
+            {
+                name: "Keyboard",
+                node: HelpKeyboard({})
+            },
+            {
+                name: "FAQs",
+                node: HelpFaqs({})
+            }
         ];
     }
 
