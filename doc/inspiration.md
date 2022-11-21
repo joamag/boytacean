@@ -14,6 +14,7 @@
 
 * [GitHub - c-sp/gameboy-test-roms](https://github.com/c-sp/gameboy-test-roms)
 * [GAME BOY Demospotting - ROMs](http://privat.bahnhof.se/wb800787/gb/demos)
+* [PDRoms - Homebrew Game Boy (Color) Files](https://pdroms.de/files/nintendo-gameboy-gb-gameboycolor-gbc)
 
 ## Emulators
 
@@ -24,6 +25,7 @@
 * [GitHub - simias/gb-rs (Rust)](https://github.com/simias/gb-rs)
 * [GitHub - RubenG123/frosty (Rust)](https://github.com/RubenG123/frosty)
 * [GitHub - calvinbaart/gameboy (TypeScript)](https://github.com/calvinbaart/gameboy)
+* [GitHub - djhworld/gomeboycolor-wasm (Go)](https://github.com/djhworld/gomeboycolor-wasm)
 
 ## Videos
 
@@ -33,4 +35,5 @@
 
 * [GitHub - gbdev/awesome-gbdev](https://github.com/gbdev/awesome-gbdev)
 * [GitHub - Hacktix/Bootix](https://github.com/Hacktix/Bootix)
+* [GitHub - fcambus/jsemu (Emulators written in JavaScript)](https://github.com/fcambus/jsemu)
 * [Game Boy Boot ROMs](https://gbdev.gg8.se/files/roms/bootroms)
