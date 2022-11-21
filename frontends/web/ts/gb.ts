@@ -4,6 +4,8 @@ import {
     EmulatorBase,
     Entry,
     Feature,
+    Frequency,
+    FrequencySpecs,
     HelpPanel,
     PixelFormat,
     RomInfo,
@@ -463,8 +465,12 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         this.trigger("frequency", value);
     }
 
-    get frequencyDelta(): number | null {
-        return 400000;
+    get frequencySpecs(): FrequencySpecs {
+        return {
+            unit: Frequency.MHz,
+            delta: 400000,
+            places: 2
+        };
     }
 
     get framerate(): number {
