@@ -84,11 +84,11 @@ You can use some GET parameters to control the initial behavior of the emulator.
 | `keyboard`   | Boolean | If the on-screen keyboard should start visible.                                                |
 | `palette`    | String  | The name of the palette to be set at startup( eg: `christmas`, `hogwards`, `mariobros`, etc.). |
 
-### Palettes
+## Palettes
 
 The palettes offered in the web version were provided by [TheWolfBunny64](https://www.deviantart.com/thewolfbunny).
 
-### Inspiration
+## Inspiration
 
 To get some information about the resources that inspired me through the emulation creation journey check [Inspiration](doc/inspiration.md).
 
