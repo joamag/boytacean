@@ -67,6 +67,11 @@ cd dist && python3 -m http.server
 
 ## Web front-end
 
+The Web front-end makes use of [EmuKit](https://github.com/joamag/emukit) which is a library tht provides the required infrastructure for the creation
+of interfaces for emulation in a Web context.
+
+### Configuration
+
 You can use some GET parameters to control the initial behavior of the emulator.
 
 | Parameter    | Type    | Description                                                                                    |
