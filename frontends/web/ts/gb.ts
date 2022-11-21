@@ -4,12 +4,16 @@ import {
     EmulatorBase,
     Entry,
     Feature,
+    Frequency,
+    FrequencySpecs,
+    HelpPanel,
     PixelFormat,
     RomInfo,
     Size
 } from "emukit";
 import { PALETTES, PALETTES_MAP } from "./palettes";
 import { base64ToBuffer, bufferToBase64 } from "./util";
+import { HelpFaqs, HelpKeyboard } from "../react";
 
 import {
     Cartridge,
@@ -381,12 +385,26 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
 
     get features(): Feature[] {
         return [
+            Feature.Help,
             Feature.Debug,
             Feature.Palettes,
             Feature.Benchmark,
             Feature.Keyboard,
             Feature.KeyboardGB,
             Feature.RomTypeInfo
+        ];
+    }
+
+    get help(): HelpPanel[] {
+        return [
+            {
+                name: "Keyboard",
+                node: HelpKeyboard({})
+            },
+            {
+                name: "FAQs",
+                node: HelpFaqs({})
+            }
         ];
     }
 
@@ -447,8 +465,12 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         this.trigger("frequency", value);
     }
 
-    get frequencyDelta(): number | null {
-        return 400000;
+    get frequencySpecs(): FrequencySpecs {
+        return {
+            unit: Frequency.MHz,
+            delta: 400000,
+            places: 2
+        };
     }
 
     get framerate(): number {
