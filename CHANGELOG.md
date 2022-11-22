@@ -17,6 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+*
+
+## [0.6.4] - 2022-11-22
+
+### Fixed
+
 * Emukit version bump
 
 ## [0.6.3] - 2022-11-21
