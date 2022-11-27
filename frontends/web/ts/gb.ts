@@ -93,6 +93,15 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     private romSize = 0;
     private cartridge: Cartridge | null = null;
 
+    /**
+     * Runs the initialization and main loop execution for
+     * the Game Boy emulator.
+     * The main execution of this function should be an
+     * infinite loop running machine `tick` operations.
+     *
+     * @param options The set of options that are going to be
+     * used in he Game Boy emulator initialization.
+     */
     async main({ romUrl }: { romUrl?: string }) {
         // initializes the WASM module, this is required
         // so that the global symbols become available
@@ -514,7 +523,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     set palette(value: string | undefined) {
         if (value === undefined) return;
         const paletteObj = PALETTES_MAP[value];
-        this.paletteIndex = PALETTES.indexOf(paletteObj);
+        this.paletteIndex = Math.max(PALETTES.indexOf(paletteObj), 0);
         this.updatePalette();
     }
 
@@ -583,6 +592,11 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         }
     }
 
+    /**
+     * Tries to load game RAM from the `localStorage` using the
+     * current cartridge title as the name of the item and
+     * decoding it using Base64.
+     */
     private loadRam() {
         if (!this.gameBoy || !this.cartridge || !window.localStorage) return;
         const ramDataB64 = localStorage.getItem(this.cartridge.title());
@@ -591,6 +605,10 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         this.gameBoy.set_ram_data(ramData);
     }
 
+    /**
+     * Tries for store/flush the current machine RAM into the
+     * `localStorage`, so that it can be latter restored.
+     */
     private storeRam() {
         if (!this.gameBoy || !this.cartridge || !window.localStorage) return;
         const title = this.cartridge.title();
@@ -599,10 +617,18 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         localStorage.setItem(title, ramDataB64);
     }
 
-    private updatePalette(index?: number) {
-        index ??= this.paletteIndex;
-        const palette = PALETTES[index];
+    private storeSettings() {
+        if (!window.localStorage) return;
+        const settings = {
+            palette: PALETTES[this.paletteIndex].name
+        };
+        localStorage.setItem("settings", JSON.stringify(settings));
+    }
+
+    private updatePalette() {
+        const palette = PALETTES[this.paletteIndex];
         this.gameBoy?.set_palette_colors_ws(palette.colors);
+        this.storeSettings();
     }
 
     private static async fetchRom(
