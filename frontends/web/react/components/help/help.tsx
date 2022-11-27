@@ -79,9 +79,9 @@ export const HelpFaqs: FC = () => (
         </p>
         <h3>Why there's no sound?</h3>
         <p>It's under development, I'm hopping to have it before Christmas.</p>
-        <h3>Can I use my Xbox One game pad?</h3>
+        <h3>Can I use my Xbox One/PS4/PS5 game pad?</h3>
         <p>
-            Yes, just plug it in and press a button.
+            Yes, just plug it in, press a button, and you're ready to go.
             <br />
             BTW: This uses the{" "}
             <Link
