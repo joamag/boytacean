@@ -10,7 +10,7 @@
     "scripts": {
         "build": "parcel build index.html",
         "dev": "parcel index.html",
-        "eslint": "eslint .",
+        "lint": "eslint .",
         "nodemon": "nodemon --exec \"parcel --no-cache index.html\"",
         "pretty": "prettier --config .prettierrc \"./**/*.{js,ts,tsx,json}\" --write",
         "start": "npm run build",
