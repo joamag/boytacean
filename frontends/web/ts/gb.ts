@@ -24,6 +24,7 @@ import {
 } from "../lib/boytacean";
 import info from "../package.json";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 declare const require: any;
 
 const LOGIC_HZ = 4194304;
@@ -79,17 +80,17 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     private visualFrequency: number = VISUAL_HZ;
     private idleFrequency: number = IDLE_HZ;
 
-    private paused: boolean = false;
-    private nextTickTime: number = 0;
-    private fps: number = 0;
+    private paused = false;
+    private nextTickTime = 0;
+    private fps = 0;
     private frameStart: number = new Date().getTime();
-    private frameCount: number = 0;
-    private paletteIndex: number = 0;
+    private frameCount = 0;
+    private paletteIndex = 0;
     private storeCycles: number = LOGIC_HZ * STORE_RATE;
 
     private romName: string | null = null;
     private romData: Uint8Array | null = null;
-    private romSize: number = 0;
+    private romSize = 0;
     private cartridge: Cartridge | null = null;
 
     async main({ romUrl }: { romUrl?: string }) {
@@ -181,7 +182,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         }
     }
 
-    tick(currentTime: number, pending: number, cycles: number = 70224) {
+    tick(currentTime: number, pending: number, cycles = 70224) {
         // in case the time to draw the next frame has not been
         // reached the flush of the "tick" logic is skipped
         if (currentTime < this.nextTickTime) return pending;
@@ -302,6 +303,12 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
             [romName, romData] = [this.romName, this.romData];
         }
 
+        // in case either the ROM's name or data is not available
+        // throws an error as the boot process is not possible
+        if (!romName || !romData) {
+            throw new Error("Unable to load initial ROM");
+        }
+
         // selects the proper engine for execution
         // and builds a new instance of it
         switch (engine) {
@@ -324,7 +331,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         // a valid state ready to be used
         this.gameBoy.reset();
         this.gameBoy.load_boot_default();
-        const cartridge = this.gameBoy.load_rom_ws(romData!);
+        const cartridge = this.gameBoy.load_rom_ws(romData);
 
         // updates the name of the currently selected engine
         // to the one that has been provided (logic change)
@@ -336,7 +343,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
 
         // updates the complete set of global information that
         // is going to be displayed
-        this.setRom(romName!, romData!, cartridge);
+        this.setRom(romName, romData, cartridge);
 
         // in case there's a battery involved tries to load the
         // current RAM from the local storage
