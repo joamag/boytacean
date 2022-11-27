@@ -13,7 +13,7 @@ pub struct Mmu {
     /// some of the access operations.
     ppu: Ppu,
 
-    /// Reference to the Game Pad structure that is going to control
+    /// Reference to the Gamepad structure that is going to control
     /// the I/O access to this device.
     pad: Pad,
 
