@@ -9,15 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+*
+
+### Changed
+
+*
+
+### Fixed
+
+*
+
+## [0.6.5] - 2022-11-27
+
+### Added
+
 * Canonical URL support for boytacean.joao.me
 
 ### Changed
 
 * Small help changes regarding gamepad
-
-### Fixed
-
-*
 
 ## [0.6.4] - 2022-11-22
 
