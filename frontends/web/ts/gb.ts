@@ -24,6 +24,7 @@ import {
 } from "../lib/boytacean";
 import info from "../package.json";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 declare const require: any;
 
 const LOGIC_HZ = 4194304;
@@ -79,19 +80,28 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     private visualFrequency: number = VISUAL_HZ;
     private idleFrequency: number = IDLE_HZ;
 
-    private paused: boolean = false;
-    private nextTickTime: number = 0;
-    private fps: number = 0;
+    private paused = false;
+    private nextTickTime = 0;
+    private fps = 0;
     private frameStart: number = new Date().getTime();
-    private frameCount: number = 0;
-    private paletteIndex: number = 0;
+    private frameCount = 0;
+    private paletteIndex = 0;
     private storeCycles: number = LOGIC_HZ * STORE_RATE;
 
     private romName: string | null = null;
     private romData: Uint8Array | null = null;
-    private romSize: number = 0;
+    private romSize = 0;
     private cartridge: Cartridge | null = null;
 
+    /**
+     * Runs the initialization and main loop execution for
+     * the Game Boy emulator.
+     * The main execution of this function should be an
+     * infinite loop running machine `tick` operations.
+     *
+     * @param options The set of options that are going to be
+     * used in he Game Boy emulator initialization.
+     */
     async main({ romUrl }: { romUrl?: string }) {
         // initializes the WASM module, this is required
         // so that the global symbols become available
@@ -181,7 +191,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         }
     }
 
-    tick(currentTime: number, pending: number, cycles: number = 70224) {
+    tick(currentTime: number, pending: number, cycles = 70224) {
         // in case the time to draw the next frame has not been
         // reached the flush of the "tick" logic is skipped
         if (currentTime < this.nextTickTime) return pending;
@@ -302,6 +312,12 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
             [romName, romData] = [this.romName, this.romData];
         }
 
+        // in case either the ROM's name or data is not available
+        // throws an error as the boot process is not possible
+        if (!romName || !romData) {
+            throw new Error("Unable to load initial ROM");
+        }
+
         // selects the proper engine for execution
         // and builds a new instance of it
         switch (engine) {
@@ -324,7 +340,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         // a valid state ready to be used
         this.gameBoy.reset();
         this.gameBoy.load_boot_default();
-        const cartridge = this.gameBoy.load_rom_ws(romData!);
+        const cartridge = this.gameBoy.load_rom_ws(romData);
 
         // updates the name of the currently selected engine
         // to the one that has been provided (logic change)
@@ -336,7 +352,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
 
         // updates the complete set of global information that
         // is going to be displayed
-        this.setRom(romName!, romData!, cartridge);
+        this.setRom(romName, romData, cartridge);
 
         // in case there's a battery involved tries to load the
         // current RAM from the local storage
@@ -507,7 +523,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     set palette(value: string | undefined) {
         if (value === undefined) return;
         const paletteObj = PALETTES_MAP[value];
-        this.paletteIndex = PALETTES.indexOf(paletteObj);
+        this.paletteIndex = Math.max(PALETTES.indexOf(paletteObj), 0);
         this.updatePalette();
     }
 
@@ -576,6 +592,11 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         }
     }
 
+    /**
+     * Tries to load game RAM from the `localStorage` using the
+     * current cartridge title as the name of the item and
+     * decoding it using Base64.
+     */
     private loadRam() {
         if (!this.gameBoy || !this.cartridge || !window.localStorage) return;
         const ramDataB64 = localStorage.getItem(this.cartridge.title());
@@ -584,6 +605,10 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         this.gameBoy.set_ram_data(ramData);
     }
 
+    /**
+     * Tries for store/flush the current machine RAM into the
+     * `localStorage`, so that it can be latter restored.
+     */
     private storeRam() {
         if (!this.gameBoy || !this.cartridge || !window.localStorage) return;
         const title = this.cartridge.title();
@@ -592,10 +617,18 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         localStorage.setItem(title, ramDataB64);
     }
 
-    private updatePalette(index?: number) {
-        index ??= this.paletteIndex;
-        const palette = PALETTES[index];
+    private storeSettings() {
+        if (!window.localStorage) return;
+        const settings = {
+            palette: PALETTES[this.paletteIndex].name
+        };
+        localStorage.setItem("settings", JSON.stringify(settings));
+    }
+
+    private updatePalette() {
+        const palette = PALETTES[this.paletteIndex];
         this.gameBoy?.set_palette_colors_ws(palette.colors);
+        this.storeSettings();
     }
 
     private static async fetchRom(

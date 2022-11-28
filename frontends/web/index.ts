@@ -12,6 +12,13 @@ const BACKGROUNDS = [
 ];
 
 (async () => {
+    // tries to load the settings from the local storage
+    // to be used as fallback process for GET parameters
+    let settings: Record<string, string> = {};
+    if (window.localStorage) {
+        settings = JSON.parse(localStorage.getItem("settings") ?? "{}");
+    }
+
     // parses the current location URL as retrieves
     // some of the "relevant" GET parameters for logic
     const params = new URLSearchParams(window.location.search);
@@ -23,7 +30,13 @@ const BACKGROUNDS = [
     const keyboard = ["1", "true", "True"].includes(
         params.get("keyboard") ?? ""
     );
-    const palette = params.get("palette") ?? params.get("palette") ?? undefined;
+    const palette = params.get("palette") ?? settings["palette"] ?? undefined;
+    const background =
+        params.get("background") ??
+        params.get("theme") ??
+        settings["background"] ??
+        settings["theme"] ??
+        undefined;
 
     // creates the emulator structure and initializes the
     // React app with both the parameters and the emulator
@@ -34,6 +47,7 @@ const BACKGROUNDS = [
         debug: debug,
         keyboard: keyboard,
         palette: palette,
+        background: background,
         backgrounds: BACKGROUNDS
     });
     await emulator.main({ romUrl: romUrl });

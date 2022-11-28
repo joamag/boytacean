@@ -45,7 +45,7 @@ build-wasm:
     - rustc --version
     - cargo install wasm-pack
     - wasm-pack build --release --target=web --out-dir=frontends/web/lib -- --features wasm
-    - cd frontends/web && npm install && npm run build
+    - cd frontends/web && npm install && npm run build && npm run lint
   artifacts:
     paths:
       - frontends/web/dist
