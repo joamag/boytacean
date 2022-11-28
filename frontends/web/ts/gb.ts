@@ -94,6 +94,18 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     private cartridge: Cartridge | null = null;
 
     /**
+     * Associative map for extra settings to be used in
+     * opaque local storage operations, associated setting
+     * name with its value as a string.
+     */
+    private extraSettings: Record<string, string> = {};
+
+    constructor(extraSettings = {}) {
+        super();
+        this.extraSettings = extraSettings;
+    }
+
+    /**
      * Runs the initialization and main loop execution for
      * the Game Boy emulator.
      * The main execution of this function should be an
@@ -592,6 +604,11 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         }
     }
 
+    onBackground(background: string) {
+        this.extraSettings.background = background;
+        this.storeSettings();
+    }
+
     /**
      * Tries to load game RAM from the `localStorage` using the
      * current cartridge title as the name of the item and
@@ -620,7 +637,8 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     private storeSettings() {
         if (!window.localStorage) return;
         const settings = {
-            palette: PALETTES[this.paletteIndex].name
+            palette: PALETTES[this.paletteIndex].name,
+            ...this.extraSettings
         };
         localStorage.setItem("settings", JSON.stringify(settings));
     }
