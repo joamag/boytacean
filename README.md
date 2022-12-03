@@ -1,10 +1,10 @@
-# [Boytacean](https://boytacean.joao.me) 🕹️
+# [Boytacean](https://boytacean.joao.me)
 
 A Game Boy emulator that is written in Rust 🦀.
 
 <img src="res/videos/002-mario.low.gif" width="360" />
 
-**This emulator has been written for educational purposes and shouldn't be taken too seriously.** But yeahh it plays most Game Boy games, which is cool...
+**This emulator has been written for educational purposes and shouldn't be taken too seriously.** But yeahh it plays most Game Boy games, which is cool... 🕹️
 
 ## Features
 
