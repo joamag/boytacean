@@ -9,7 +9,7 @@ jobs:
     timeout-minutes: 10
     strategy:
       matrix:
-        rust-version: ["1.56.1", "1.60.0", "1.65.0", "latest"]
+        rust-version: ["1.56.1", "1.60.0", "1.62.0", "1.64.0", "1.65.0", "latest"]
     runs-on: ubuntu-latest
     container: rust:${{ matrix.rust-version }}
     steps:
@@ -27,7 +27,7 @@ jobs:
     timeout-minutes: 10
     strategy:
       matrix:
-        rust-version: ["1.56.1", "1.60.0", "1.65.0", "latest"]
+        rust-version: ["1.56.1", "1.60.0", "1.62.0", "1.64.0", "1.65.0", "latest"]
     runs-on: ubuntu-latest
     container: rust:${{ matrix.rust-version }}
     steps:
