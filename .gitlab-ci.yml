@@ -33,7 +33,7 @@ build-rust:
     - rustup component add rustfmt
     - rustup component add clippy
     - rustc --version
-    - cargo fmt --check
+    - cargo fmt --all -- --check
     - cargo clippy
     - cargo build
     - cargo build --release
