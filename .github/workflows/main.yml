@@ -32,7 +32,7 @@ jobs:
       - run: cargo build --release
   build-wasm:
     name: Build WASM
-    timeout-minutes: 10
+    timeout-minutes: 30
     strategy:
       matrix:
         rust-version: [
