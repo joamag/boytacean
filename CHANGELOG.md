@@ -9,8 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-* Support for theme and palette selection
-* Theme stored in `localStorage`
+*
 
 ### Changed
 
@@ -19,6 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 *
+
+## [0.6.6] - 2022-12-04
+
+### Added
+
+* Support for theme and palette selection
+* Theme stored in `localStorage`
 
 ## [0.6.5] - 2022-11-27
 
