@@ -1,0 +1,21 @@
+name: Main Workflow
+on:
+  push:
+  schedule:
+    - cron: "0 0 * * 0"
+jobs:
+  build:
+    name: Build
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        rust-version: ["1.56.1", "1.60.0", "1.65.0", "latest"]
+    runs-on: ubuntu-latest
+    container: rust:${{ matrix.rust-version }}
+    steps:
+      - uses: actions/checkout@v1
+      - run: rustc --version
+      - run: cargo fmt --check
+      - run: cargo clippy
+      - run: cargo build
+      - run: cargo build --release

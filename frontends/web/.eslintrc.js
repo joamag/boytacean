@@ -4,7 +4,12 @@ module.exports = {
     parser: "@typescript-eslint/parser",
     plugins: ["@typescript-eslint"],
     rules: {
-        "no-constant-condition": ["error", { checkLoops: false }],
+        "no-constant-condition": [
+            "error",
+            {
+                checkLoops: false
+            }
+        ],
         "no-empty-function": "off",
         semi: ["error", "always"]
     },
