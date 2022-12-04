@@ -36,4 +36,5 @@
 * [GitHub - gbdev/awesome-gbdev](https://github.com/gbdev/awesome-gbdev)
 * [GitHub - Hacktix/Bootix](https://github.com/Hacktix/Bootix)
 * [GitHub - fcambus/jsemu (Emulators written in JavaScript)](https://github.com/fcambus/jsemu)
+* [Gameboy Doctor: debug and fix your gameboy emulator](https://robertheaton.com/gameboy-doctor)
 * [Game Boy Boot ROMs](https://gbdev.gg8.se/files/roms/bootroms)

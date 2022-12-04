@@ -40,7 +40,7 @@ const BACKGROUNDS = [
 
     // creates the emulator structure and initializes the
     // React app with both the parameters and the emulator
-    const emulator = new GameboyEmulator();
+    const emulator = new GameboyEmulator({ background: background });
     startApp("app", {
         emulator: emulator,
         fullscreen: fullscreen,
