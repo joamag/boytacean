@@ -30,8 +30,10 @@ build-rust:
   script:
     - rustup toolchain install $RUST_VERSION
     - rustup override set $RUST_VERSION
+    - rustup component add rustfmt
     - rustup component add clippy
     - rustc --version
+    - cargo fmt --check
     - cargo clippy
     - cargo build
     - cargo build --release
