@@ -14,6 +14,9 @@ jobs:
     container: rust:${{ matrix.rust-version }}
     steps:
       - uses: actions/checkout@v1
+      - run: |
+          rustup component add rustfmt
+          rustup component add clippy
       - run: rustc --version
       - run: cargo fmt --check
       - run: cargo clippy
