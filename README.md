@@ -2,7 +2,7 @@
 
 A Game Boy emulator that is written in Rust 🦀.
 
-<img src="res/videos/002-mario.low.gif" width="360" />
+<a href="https://boytacean.joao.me" target="_blank"><img src="res/videos/002-mario.low.gif" width="360" /></a>
 
 **This emulator has been written for educational purposes and shouldn't be taken too seriously.** But yeahh it plays most Game Boy games, which is cool... 🕹️
 
