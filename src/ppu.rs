@@ -99,7 +99,7 @@ impl Display for Tile {
             }
             buffer.push('\n');
         }
-        write!(f, "{buffer}")
+        write!(f, "{}", buffer)
     }
 }
 
