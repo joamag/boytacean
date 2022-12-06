@@ -99,7 +99,7 @@ impl Display for Tile {
             }
             buffer.push('\n');
         }
-        write!(f, "{}", buffer)
+        write!(f, "{buffer}")
     }
 }
 
@@ -669,9 +669,9 @@ impl Ppu {
     /// with tiles.
     fn update_tile(&mut self, addr: u16, _value: u8) {
         let addr = (addr & 0x1ffe) as usize;
-        let tile_index = ((addr >> 4) & 0x01ff) as usize;
+        let tile_index = (addr >> 4) & 0x01ff;
         let tile = self.tiles[tile_index].borrow_mut();
-        let y = ((addr >> 1) & 0x0007) as usize;
+        let y = (addr >> 1) & 0x0007;
 
         let mut mask;
 
@@ -758,7 +758,7 @@ impl Ppu {
 
         // increments the map offset by the row offset multiplied by the number
         // of tiles in each row (32)
-        map_offset += row_offset as usize * 32;
+        map_offset += row_offset * 32;
 
         // calculates the sprite line offset by using the SCX register
         // shifted by 3 meaning that the tiles are 8x8
