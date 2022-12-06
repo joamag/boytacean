@@ -16,7 +16,8 @@ jobs:
           "1.63.0",
           "1.64.0",
           "1.65.0",
-          "latest"
+          "latest",
+          "nightly"
         ]
     runs-on: ubuntu-latest
     container: rust:${{ matrix.rust-version }}
@@ -42,7 +43,8 @@ jobs:
           "1.63.0",
           "1.64.0",
           "1.65.0",
-          "latest"
+          "latest",
+          "nightly"
         ]
     runs-on: ubuntu-latest
     container: rust:${{ matrix.rust-version }}
