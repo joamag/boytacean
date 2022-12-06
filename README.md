@@ -95,3 +95,10 @@ To get some information about the resources that inspired me through the emulati
 ## License
 
 Boytacian is currently licensed under the [Apache License, Version 2.0](http://www.apache.org/licenses/).
+
+## Build Automation
+
+[![Build Status](https://github.com/joamag/boytacean/workflows/Main%20Workflow/badge.svg)](https://github.com/joamag/boytacean/actions)
+[![crates Status](https://img.shields.io/crates/v/boytacean)](https://crates.io/crates/boytacean)
+[![npm Status](https://img.shields.io/npm/v/boytacean.svg)](https://www.npmjs.com/package/boytacean)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://www.apache.org/licenses/)
