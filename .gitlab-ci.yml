@@ -34,7 +34,7 @@ build-rust:
     - rustup component add clippy
     - rustc --version
     - cargo fmt --all -- --check
-    - cargo clippy -- -D warnings
+    - cargo clippy -- -D warnings -A unknown-lints
     - cargo build
     - cargo build --release
 
