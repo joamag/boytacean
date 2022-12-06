@@ -16,8 +16,7 @@ jobs:
           "1.63.0",
           "1.64.0",
           "1.65.0",
-          "latest",
-          "nightly"
+          "latest"
         ]
     runs-on: ubuntu-latest
     container: rust:${{ matrix.rust-version }}
@@ -29,7 +28,6 @@ jobs:
       - run: rustc --version
       - run: cargo fmt --all -- --check
       - run: cargo clippy -- -D warnings -A unknown-lints
-        if: matrix.rust-version != 'nightly'
       - run: cargo build
       - run: cargo build --release
   build-wasm:
@@ -44,8 +42,7 @@ jobs:
           "1.63.0",
           "1.64.0",
           "1.65.0",
-          "latest",
-          "nightly"
+          "latest"
         ]
     runs-on: ubuntu-latest
     container: rust:${{ matrix.rust-version }}
@@ -57,7 +54,6 @@ jobs:
       - run: rustc --version
       - run: cargo fmt --all -- --check
       - run: cargo clippy -- -D warnings -A unknown-lints
-        if: matrix.rust-version != 'nightly'
       - run: cargo install wasm-pack
       - run: wasm-pack build --release --target=web --out-dir=frontends/web/lib -- --features wasm
       - run: apt-get update && apt-get install -y -q nodejs npm
