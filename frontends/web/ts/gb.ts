@@ -402,6 +402,10 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         };
     }
 
+    get icon(): string | undefined {
+        return require("../res/star.png");
+    }
+
     get version(): Entry | undefined {
         return {
             text: info.version,
