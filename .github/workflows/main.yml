@@ -25,11 +25,17 @@ jobs:
       - run: |
           rustup component add rustfmt
           rustup component add clippy
+        name: Install Rust components
       - run: rustc --version
+        name: Print Rust information
       - run: cargo fmt --all -- --check
+        name: Verify Rust code format
       - run: cargo clippy -- -D warnings -A unknown-lints
+        name: Verify Rust code linting
       - run: cargo build
+        name: Build development version
       - run: cargo build --release
+        name: Build release version
   build-wasm:
     name: Build WASM
     timeout-minutes: 30
@@ -51,10 +57,18 @@ jobs:
       - run: |
           rustup component add rustfmt
           rustup component add clippy
+        name: Install Rust components
       - run: rustc --version
+        name: Print Rust information
       - run: cargo fmt --all -- --check
+        name: Verify Rust code format
       - run: cargo clippy -- -D warnings -A unknown-lints
+        name: Verify Rust code linting
       - run: cargo install wasm-pack
+        name: Install wasm-pack
       - run: wasm-pack build --release --target=web --out-dir=frontends/web/lib -- --features wasm
+        name: Build WASM Web binary
       - run: apt-get update && apt-get install -y -q nodejs npm
+        name: Install Node.js
       - run: cd frontends/web && npm install && npm run build && npm run lint
+        name: Build and lint Web code
