@@ -16,6 +16,8 @@ jobs:
           "1.63.0",
           "1.64.0",
           "1.65.0",
+          "1.66.0",
+          "1.67.0",
           "latest"
         ]
     runs-on: ubuntu-latest
@@ -32,7 +34,7 @@ jobs:
       - name: Verify Rust code format
         run: cargo fmt --all -- --check
       - name: Verify Rust code linting
-        run: cargo clippy -- -D warnings -A unknown-lints
+        run: cargo clippy -- -D warnings -A unknown-lints -A clippy::uninlined-format-args
       - name: Build development version
         run: cargo build
       - name: Build release version
@@ -49,6 +51,8 @@ jobs:
           "1.63.0",
           "1.64.0",
           "1.65.0",
+          "1.66.0",
+          "1.67.0",
           "latest"
         ]
         node-version: ["16"]
@@ -66,7 +70,7 @@ jobs:
       - name: Verify Rust code format
         run: cargo fmt --all -- --check
       - name: Verify Rust code linting
-        run: cargo clippy -- -D warnings -A unknown-lints
+        run: cargo clippy -- -D warnings -A unknown-lints -A clippy::uninlined-format-args
       - name: Install wasm-pack
         run: cargo install wasm-pack
       - name: Build WASM Web binary
