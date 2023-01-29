@@ -34,7 +34,7 @@ jobs:
       - name: Verify Rust code format
         run: cargo fmt --all -- --check
       - name: Verify Rust code linting
-        run: cargo clippy -- -D warnings -A unknown-lints -A clippy::uninlined-format-args
+        run: cargo clippy -- -D warnings -A unknown-lints
       - name: Build development version
         run: cargo build
       - name: Build release version
@@ -70,7 +70,7 @@ jobs:
       - name: Verify Rust code format
         run: cargo fmt --all -- --check
       - name: Verify Rust code linting
-        run: cargo clippy -- -D warnings -A unknown-lints -A clippy::uninlined-format-args
+        run: cargo clippy -- -D warnings -A unknown-lints
       - name: Install wasm-pack
         run: cargo install wasm-pack
       - name: Build WASM Web binary

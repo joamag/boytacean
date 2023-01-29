@@ -1,3 +1,4 @@
+#![allow(clippy::uninlined_format_args)]
 pub mod cpu;
 pub mod data;
 pub mod gb;
