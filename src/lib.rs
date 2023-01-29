@@ -1,4 +1,4 @@
-#![allow(clippy::uninlined_format_args)]
+#![allow(clippy::uninlined_format_args, unknown_lints)]
 
 pub mod cpu;
 pub mod data;
