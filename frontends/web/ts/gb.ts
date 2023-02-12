@@ -424,6 +424,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         return [
             Feature.Help,
             Feature.Debug,
+            Feature.Themes,
             Feature.Palettes,
             Feature.Benchmark,
             Feature.Keyboard,
