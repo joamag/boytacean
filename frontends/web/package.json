@@ -23,7 +23,7 @@
         "@types/react-dom": "^18.0.10",
         "@typescript-eslint/eslint-plugin": "^5.51.0",
         "@typescript-eslint/parser": "^5.51.0",
-        "emukit": "^0.6.2",
+        "emukit": "^0.6.3",
         "eslint": "^8.34.0",
         "nodemon": "^2.0.20",
         "parcel": "^2.8.3",
