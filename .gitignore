@@ -8,4 +8,4 @@ Cargo.lock
 /res/roms.prop
 /frontends/*/target
 
-/src/gen.rs
+/src/gen/build.rs
