@@ -78,7 +78,9 @@ export const HelpFaqs: FC = () => (
             play around 90% of the Game Boy games.
         </p>
         <h3>Why there's no sound?</h3>
-        <p>It's under development, I'm hopping to have it before end of 2023.</p>
+        <p>
+            It's under development, I'm hopping to have it before end of 2023.
+        </p>
         <h3>Can I use my Xbox One/PS4/PS5 Gamepad?</h3>
         <p>
             Yes, just plug it in, press a button, and you're ready to go.
