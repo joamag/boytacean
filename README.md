@@ -94,7 +94,7 @@ To get some information about the resources that inspired me through the emulati
 
 ## License
 
-Boytacian is currently licensed under the [Apache License, Version 2.0](http://www.apache.org/licenses/).
+Boytacean is currently licensed under the [Apache License, Version 2.0](http://www.apache.org/licenses/).
 
 ## Build Automation
 

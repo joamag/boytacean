@@ -1,6 +1,7 @@
 use crate::{
     cpu::Cpu,
     data::{BootRom, CGB_BOOT, DMG_BOOT, DMG_BOOTIX, MGB_BOOTIX, SGB_BOOT},
+    gen::{COMPILATION_DATE, COMPILATION_TIME, COMPILER, COMPILER_VERSION},
     mmu::Mmu,
     pad::{Pad, PadKey},
     ppu::{Ppu, PpuMode, Tile, FRAME_BUFFER_SIZE},
@@ -214,6 +215,25 @@ impl GameBoy {
     pub fn get_tile_buffer(&mut self, index: usize) -> Vec<u8> {
         let tile = self.get_tile(index);
         tile.palette_buffer(self.ppu().palette())
+    }
+
+    /// Obtains the name of the compiler that has been
+    /// used in the compilation of the base Boytacean
+    /// library. Can be used for diagnostics.
+    pub fn get_compiler(&self) -> String {
+        String::from(COMPILER)
+    }
+
+    pub fn get_compiler_version(&self) -> String {
+        String::from(COMPILER_VERSION)
+    }
+
+    pub fn get_compilation_date(&self) -> String {
+        String::from(COMPILATION_DATE)
+    }
+
+    pub fn get_compilation_time(&self) -> String {
+        String::from(COMPILATION_TIME)
     }
 }
 

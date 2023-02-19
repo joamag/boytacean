@@ -1,5 +1,7 @@
 import {
     BenchmarkResult,
+    Compilation,
+    Compiler,
     Emulator,
     EmulatorBase,
     Entry,
@@ -424,6 +426,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         return [
             Feature.Help,
             Feature.Debug,
+            Feature.Themes,
             Feature.Palettes,
             Feature.Benchmark,
             Feature.Keyboard,
@@ -507,6 +510,22 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
             unit: Frequency.MHz,
             delta: 400000,
             places: 2
+        };
+    }
+
+    get compiler(): Compiler | null {
+        if (!this.gameBoy) return null;
+        return {
+            name: this.gameBoy.get_compiler(),
+            version: this.gameBoy.get_compiler_version()
+        };
+    }
+
+    get compilation(): Compilation | null {
+        if (!this.gameBoy) return null;
+        return {
+            date: this.gameBoy.get_compilation_date(),
+            time: this.gameBoy.get_compilation_time()
         };
     }
 
