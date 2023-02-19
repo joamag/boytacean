@@ -29,8 +29,8 @@ use std::path::Path;
 use std::process::Command;
 use std::str;
 
-const BUILD_OUT_FILE: &str = "gen.rs";
-const SOURCE_DIR: &str = "./src";
+const BUILD_OUT_FILE: &str = "build.rs";
+const SOURCE_DIR: &str = "./src/gen";
 
 fn main() {
     // in case we're running under docs.rs then we must return the control
