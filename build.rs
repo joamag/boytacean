@@ -1,3 +1,5 @@
+#![allow(clippy::uninlined_format_args)]
+
 /// Build script (https://doc.rust-lang.org/cargo/reference/build-scripts.html)
 /// This script is executed as the first step in the compilation process.
 /// Here we export metadata constants to a `constants/generated.rs` file which is then
