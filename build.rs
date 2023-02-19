@@ -119,6 +119,12 @@ fn main() {
 
     write_str_constant(
         &mut file,
+        "OPT_LEVEL",
+        &env::var("OPT_LEVEL").unwrap_or(String::from("UNKNOWN")),
+    );
+
+    write_str_constant(
+        &mut file,
         "MAKEFLAGS",
         option_env!("CARGO_MAKEFLAGS").unwrap_or("UNKNOWN"),
     );
