@@ -25,7 +25,6 @@
 /// ```
 use chrono::Utc;
 use regex::Regex;
-use std::fmt::Write as _;
 use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::path::Path;
@@ -141,7 +140,7 @@ where
 {
     let mut list_str = String::new();
     for value in &vec {
-        write!(&mut list_str, "\"{}\", ", value).unwrap();
+        list_str.push_str(format!("\"{}\", ", value).as_str());
     }
     list_str.pop();
     writeln!(
