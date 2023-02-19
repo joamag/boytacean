@@ -139,10 +139,15 @@ where
     T: std::fmt::Display,
 {
     let mut list_str = String::new();
+    let mut is_first = true;
     for value in &vec {
-        list_str.push_str(format!("\"{}\", ", value).as_str());
+        if is_first {
+            is_first = false;
+        } else {
+            list_str.push_str(", ");
+        }
+        list_str.push_str(format!("\"{}\"", value).as_str());
     }
-    list_str.pop();
     writeln!(
         file,
         "pub const {}: [{}; {}] = [{}];",
