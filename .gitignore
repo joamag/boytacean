@@ -7,3 +7,5 @@ Cargo.lock
 /target
 /res/roms.prop
 /frontends/*/target
+
+/src/gen.rs

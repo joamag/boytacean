@@ -8,6 +8,8 @@ repository = "https://github.com/joamag/boytacean"
 keywords = ["gameboy", "emulator", "rust"]
 edition = "2018"
 exclude = ["/frontends", "/res/roms", "/res/screens", "/res/videos"]
+build = "build.rs"
+readme = "README.md"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
@@ -18,6 +20,11 @@ debug = []
 
 [dependencies]
 wasm-bindgen = { version = "0.2", optional = true }
+
+[build-dependencies]
+chrono = "0.4"
+num_cpus = "1"
+regex = "1"
 
 [profile.release]
 debug = false
