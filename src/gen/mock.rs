@@ -9,6 +9,7 @@ pub const COMPILER_VERSION: &str = "x.x.x";
 pub const HOST: &str = "-";
 pub const TARGET: &str = "-";
 pub const PROFILE: &str = "-";
+pub const OPT_LEVEL: &str = "-";
 pub const MAKEFLAGS: &str = "-";
 pub const FEATURES: [&str; 1] = ["cpu"];
 pub const PLATFORM_CPU_BITS: &str = "64";
