@@ -471,7 +471,9 @@ impl Ppu {
             0x8000..=0x9fff => self.vram[(addr & 0x1fff) as usize],
             0xfe00..=0xfe9f => self.oam[(addr & 0x009f) as usize],
             0xff80..=0xfffe => self.hram[(addr & 0x007f) as usize],
-            0xff40 => {
+            0xff40 =>
+            {
+                #[allow(clippy::bool_to_int_with_if)]
                 (if self.switch_bg { 0x01 } else { 0x00 }
                     | if self.switch_obj { 0x02 } else { 0x00 }
                     | if self.obj_size { 0x04 } else { 0x00 }
@@ -667,14 +669,15 @@ impl Ppu {
     /// with tiles.
     fn update_tile(&mut self, addr: u16, _value: u8) {
         let addr = (addr & 0x1ffe) as usize;
-        let tile_index = ((addr >> 4) & 0x01ff) as usize;
+        let tile_index = (addr >> 4) & 0x01ff;
         let tile = self.tiles[tile_index].borrow_mut();
-        let y = ((addr >> 1) & 0x0007) as usize;
+        let y = (addr >> 1) & 0x0007;
 
         let mut mask;
 
         for x in 0..TILE_WIDTH {
             mask = 1 << (7 - x);
+            #[allow(clippy::bool_to_int_with_if)]
             tile.set(
                 x,
                 y,
@@ -755,7 +758,7 @@ impl Ppu {
 
         // increments the map offset by the row offset multiplied by the number
         // of tiles in each row (32)
-        map_offset += row_offset as usize * 32;
+        map_offset += row_offset * 32;
 
         // calculates the sprite line offset by using the SCX register
         // shifted by 3 meaning that the tiles are 8x8

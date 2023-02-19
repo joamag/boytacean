@@ -128,7 +128,9 @@ impl Mmu {
                 0xe00 => self.ppu.read(addr),
                 0xf00 => match addr & 0x00ff {
                     // 0xFF0F — IF: Interrupt flag
-                    0x0f => {
+                    0x0f =>
+                    {
+                        #[allow(clippy::bool_to_int_with_if)]
                         (if self.ppu.int_vblank() { 0x01 } else { 0x00 }
                             | if self.ppu.int_stat() { 0x02 } else { 0x00 }
                             | if self.timer.int_tima() { 0x04 } else { 0x00 }
@@ -136,13 +138,7 @@ impl Mmu {
                     }
 
                     // 0xFF50 - Boot active flag
-                    0x50 => {
-                        if self.boot_active {
-                            0x01
-                        } else {
-                            0x00
-                        }
-                    }
+                    0x50 => u8::from(self.boot_active),
 
                     // 0xFF80-0xFFFE - High RAM (HRAM)
                     0x80..=0xfe => self.ppu.read(addr),
@@ -248,6 +244,9 @@ impl Mmu {
                             0x50 => match addr & 0x00ff {
                                 // 0xFF51-0xFF52 - VRAM DMA source (CGB only)
                                 0x51..=0x52 => (),
+
+                                // 0xFF53-0xFF54 - VRAM DMA destination (CGB only)
+                                0x53..=0x54 => (),
 
                                 _ => debugln!("Writing to unknown IO control 0x{:04x}", addr),
                             },

@@ -2,7 +2,7 @@
 
 A Game Boy emulator that is written in Rust 🦀.
 
-<img src="res/videos/002-mario.low.gif" width="360" />
+<a href="https://boytacean.joao.me" target="_blank"><img src="https://github.com/joamag/boytacean/raw/master/res/videos/002-mario.low.gif" width="360" /></a>
 
 **This emulator has been written for educational purposes and shouldn't be taken too seriously.** But yeahh it plays most Game Boy games, which is cool... 🕹️
 
@@ -95,3 +95,10 @@ To get some information about the resources that inspired me through the emulati
 ## License
 
 Boytacian is currently licensed under the [Apache License, Version 2.0](http://www.apache.org/licenses/).
+
+## Build Automation
+
+[![Build Status](https://github.com/joamag/boytacean/workflows/Main%20Workflow/badge.svg)](https://github.com/joamag/boytacean/actions)
+[![crates Status](https://img.shields.io/crates/v/boytacean)](https://crates.io/crates/boytacean)
+[![npm Status](https://img.shields.io/npm/v/boytacean.svg)](https://www.npmjs.com/package/boytacean)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://www.apache.org/licenses/)

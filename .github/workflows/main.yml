@@ -1,0 +1,83 @@
+name: Main Workflow
+on:
+  push:
+  schedule:
+    - cron: "0 0 * * 0"
+jobs:
+  build:
+    name: Build
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        rust-version: [
+          "1.56.1",
+          "1.60.0",
+          "1.62.0",
+          "1.63.0",
+          "1.64.0",
+          "1.65.0",
+          "1.66.0",
+          "1.67.0",
+          "latest"
+        ]
+    runs-on: ubuntu-latest
+    container: rust:${{ matrix.rust-version }}
+    steps:
+      - name: Checkout code from repository
+        uses: actions/checkout@v3
+      - name: Install Rust components
+        run: |
+          rustup component add rustfmt
+          rustup component add clippy
+      - name: Print Rust information
+        run: rustc --version
+      - name: Verify Rust code format
+        run: cargo fmt --all -- --check
+      - name: Verify Rust code linting
+        run: cargo clippy -- -D warnings -A unknown-lints
+      - name: Build development version
+        run: cargo build
+      - name: Build release version
+        run: cargo build --release
+  build-wasm:
+    name: Build WASM
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        rust-version: [
+          "1.56.1",
+          "1.60.0",
+          "1.62.0",
+          "1.63.0",
+          "1.64.0",
+          "1.65.0",
+          "1.66.0",
+          "1.67.0",
+          "latest"
+        ]
+        node-version: ["16"]
+    runs-on: ubuntu-latest
+    container: rust:${{ matrix.rust-version }}
+    steps:
+      - name: Checkout code from repository
+        uses: actions/checkout@v3
+      - name: Install Rust components
+        run: |
+          rustup component add rustfmt
+          rustup component add clippy
+      - name: Print Rust information
+        run: rustc --version
+      - name: Verify Rust code format
+        run: cargo fmt --all -- --check
+      - name: Verify Rust code linting
+        run: cargo clippy -- -D warnings -A unknown-lints
+      - name: Install wasm-pack
+        run: cargo install wasm-pack
+      - name: Build WASM Web binary
+        run: wasm-pack build --release --target=web --out-dir=frontends/web/lib -- --features wasm
+      - name: Install Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: Build and lint Web code
+        run: cd frontends/web && npm install && npm run build && npm run lint

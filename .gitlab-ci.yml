@@ -30,7 +30,11 @@ build-rust:
   script:
     - rustup toolchain install $RUST_VERSION
     - rustup override set $RUST_VERSION
+    - rustup component add rustfmt
+    - rustup component add clippy
     - rustc --version
+    - cargo fmt --all -- --check
+    - if [[ $RUST_VERSION != nightly ]]; then cargo clippy -- -D warnings -A unknown-lints; fi
     - cargo build
     - cargo build --release
 

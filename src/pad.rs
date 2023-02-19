@@ -54,13 +54,17 @@ impl Pad {
         match addr & 0x00ff {
             0x0000 => {
                 let mut value = match self.selection {
-                    PadSelection::Action => {
+                    PadSelection::Action =>
+                    {
+                        #[allow(clippy::bool_to_int_with_if)]
                         (if self.a { 0x00 } else { 0x01 }
                             | if self.b { 0x00 } else { 0x02 }
                             | if self.select { 0x00 } else { 0x04 }
                             | if self.start { 0x00 } else { 0x08 })
                     }
-                    PadSelection::Direction => {
+                    PadSelection::Direction =>
+                    {
+                        #[allow(clippy::bool_to_int_with_if)]
                         (if self.right { 0x00 } else { 0x01 }
                             | if self.left { 0x00 } else { 0x02 }
                             | if self.up { 0x00 } else { 0x04 }

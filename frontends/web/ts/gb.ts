@@ -43,7 +43,12 @@ const DISPLAY_SCALE = 2;
  */
 const STORE_RATE = 5;
 
-const SAMPLE_RATE = 2;
+/**
+ * The sample rate that is going to be used for FPS calculus,
+ * meaning that every N seconds we will calculate the number
+ * of frames rendered divided by the N seconds.
+ */
+const FPS_SAMPLE_RATE = 3;
 
 const KEYS_NAME: Record<string, number> = {
     ArrowUp: PadKey.Up,
@@ -271,7 +276,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         // in case the target number of frames for FPS control
         // has been reached calculates the number of FPS and
         // flushes the value to the screen
-        if (this.frameCount >= this.visualFrequency * SAMPLE_RATE) {
+        if (this.frameCount >= this.visualFrequency * FPS_SAMPLE_RATE) {
             const currentTime = new Date().getTime();
             const deltaTime = (currentTime - this.frameStart) / 1000;
             const fps = Math.round(this.frameCount / deltaTime);
@@ -397,6 +402,10 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         };
     }
 
+    get icon(): string | undefined {
+        return require("../res/star.png");
+    }
+
     get version(): Entry | undefined {
         return {
             text: info.version,
@@ -415,6 +424,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         return [
             Feature.Help,
             Feature.Debug,
+            Feature.Themes,
             Feature.Palettes,
             Feature.Benchmark,
             Feature.Keyboard,
