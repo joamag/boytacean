@@ -102,25 +102,25 @@ fn main() {
     write_str_constant(
         &mut file,
         "HOST",
-        &env::var("HOST").unwrap_or(String::from("UNKNOWN")),
+        &env::var("HOST").unwrap_or_else(|_| String::from("UNKNOWN")),
     );
 
     write_str_constant(
         &mut file,
         "TARGET",
-        &env::var("TARGET").unwrap_or(String::from("UNKNOWN")),
+        &env::var("TARGET").unwrap_or_else(|_| String::from("UNKNOWN")),
     );
 
     write_str_constant(
         &mut file,
         "PROFILE",
-        &env::var("PROFILE").unwrap_or(String::from("UNKNOWN")),
+        &env::var("PROFILE").unwrap_or_else(|_| String::from("UNKNOWN")),
     );
 
     write_str_constant(
         &mut file,
         "OPT_LEVEL",
-        &env::var("OPT_LEVEL").unwrap_or(String::from("UNKNOWN")),
+        &env::var("OPT_LEVEL").unwrap_or_else(|_| String::from("UNKNOWN")),
     );
 
     write_str_constant(
