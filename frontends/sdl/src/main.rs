@@ -3,13 +3,13 @@
 pub mod data;
 pub mod util;
 
-use std::time::SystemTime;
 use boytacean::{
     gb::GameBoy,
     pad::PadKey,
     ppu::{PpuMode, DISPLAY_HEIGHT, DISPLAY_WIDTH},
 };
 use sdl2::{event::Event, keyboard::Keycode, pixels::PixelFormatEnum};
+use std::time::SystemTime;
 use util::Graphics;
 
 use crate::util::surface_from_bytes;
@@ -79,7 +79,10 @@ impl Emulator {
         let delta = initial.elapsed().unwrap().as_millis() as f32 / 1000.0;
         let frequency_mhz = cycles as f32 / delta / 1000.0 / 1000.0;
 
-        println!("Took {:.2} seconds to run {} ticks ({:.2} Mhz)!", delta, count, frequency_mhz);
+        println!(
+            "Took {:.2} seconds to run {} ticks ({:.2} Mhz)!",
+            delta, count, frequency_mhz
+        );
     }
 
     pub fn run(&mut self) {
