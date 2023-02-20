@@ -181,17 +181,17 @@ impl Emulator {
                 match event {
                     Event::Quit { .. } => break 'main,
                     Event::KeyDown {
+                        keycode: Some(Keycode::Escape),
+                        ..
+                    } => break 'main,
+                    Event::KeyDown {
                         keycode: Some(Keycode::B),
                         ..
-                    } => {
-                        self.benchmark(Benchmark::default());
-                    }
+                    } => self.benchmark(Benchmark::default()),
                     Event::KeyDown {
                         keycode: Some(Keycode::P),
                         ..
-                    } => {
-                        self.toggle_palette();
-                    }
+                    } => self.toggle_palette(),
                     Event::KeyDown {
                         keycode: Some(keycode),
                         ..
@@ -208,6 +208,7 @@ impl Emulator {
                             self.system.key_lift(key)
                         }
                     }
+
                     Event::DropFile { filename, .. } => {
                         self.system.reset();
                         self.system.load_boot_default();
