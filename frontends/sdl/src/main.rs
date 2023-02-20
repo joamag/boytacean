@@ -195,17 +195,19 @@ impl Emulator {
                     Event::KeyDown {
                         keycode: Some(keycode),
                         ..
-                    } => match key_to_pad(keycode) {
-                        Some(key) => self.system.key_press(key),
-                        None => (),
-                    },
+                    } => {
+                        if let Some(key) = key_to_pad(keycode) {
+                            self.system.key_press(key)
+                        }
+                    }
                     Event::KeyUp {
                         keycode: Some(keycode),
                         ..
-                    } => match key_to_pad(keycode) {
-                        Some(key) => self.system.key_lift(key),
-                        None => (),
-                    },
+                    } => {
+                        if let Some(key) = key_to_pad(keycode) {
+                            self.system.key_lift(key)
+                        }
+                    }
                     Event::DropFile { filename, .. } => {
                         self.system.reset();
                         self.system.load_boot_default();
