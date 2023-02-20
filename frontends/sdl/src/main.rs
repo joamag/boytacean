@@ -34,7 +34,7 @@ pub struct Benchmark {
 
 impl Benchmark {
     pub fn new(count: usize) -> Self {
-        Self { count: count }
+        Self { count }
     }
 }
 
@@ -221,7 +221,7 @@ impl Emulator {
             let mut last_frame = 0xffffu16;
 
             if current_time >= self.next_tick_time_i {
-                let cycle_limit = (GameBoy::LCD_CYCLES as f32 / self.logic_ratio as f32) as u32;
+                let cycle_limit = (GameBoy::LCD_CYCLES as f32 / self.logic_ratio) as u32;
 
                 loop {
                     // limits the number of ticks to the typical number
@@ -246,7 +246,7 @@ impl Emulator {
                         // to update the stream texture, copying it then to the canvas
                         let frame_buffer = self.system.frame_buffer().as_ref();
                         texture
-                            .update(None, frame_buffer, DISPLAY_WIDTH as usize * 3)
+                            .update(None, frame_buffer, DISPLAY_WIDTH * 3)
                             .unwrap();
                         self.graphics.canvas.copy(&texture, None, None).unwrap();
 
@@ -265,7 +265,7 @@ impl Emulator {
 
                 // updates the next update time reference to the current
                 // time so that it can be used from game loop control
-                self.next_tick_time += 1000.0 / logic_frequency as f32;
+                self.next_tick_time += 1000.0 / logic_frequency;
                 self.next_tick_time_i = self.next_tick_time.ceil() as u32;
             }
 
