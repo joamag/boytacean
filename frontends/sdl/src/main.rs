@@ -3,6 +3,7 @@
 pub mod data;
 pub mod util;
 
+use std::time::SystemTime;
 use boytacean::{
     gb::GameBoy,
     pad::PadKey,
@@ -54,13 +55,31 @@ impl Emulator {
     pub fn load_rom(&mut self, path: &str) {
         let rom = self.system.load_rom_file(path);
         println!(
-            "========= Cartridge =========\n{}\n=============================\n",
+            "========= Cartridge =========\n{}\n=============================",
             rom
         );
         self.graphics
             .window_mut()
             .set_title(format!("{} [{}]", TITLE, rom.title()).as_str())
             .unwrap();
+    }
+
+    pub fn benchmark(&mut self) {
+        println!("Going to run benchmark...");
+
+        let count = 50000000;
+        let mut cycles = 0;
+
+        let initial = SystemTime::now();
+
+        for _ in 0..count {
+            cycles += self.system.clock() as u32;
+        }
+
+        let delta = initial.elapsed().unwrap().as_millis() as f32 / 1000.0;
+        let frequency_mhz = cycles as f32 / delta / 1000.0 / 1000.0;
+
+        println!("Took {:.2} seconds to run {} ticks ({:.2} Mhz)!", delta, count, frequency_mhz);
     }
 
     pub fn run(&mut self) {
@@ -103,6 +122,12 @@ impl Emulator {
             while let Some(event) = self.graphics.event_pump.poll_event() {
                 match event {
                     Event::Quit { .. } => break 'main,
+                    Event::KeyDown {
+                        keycode: Some(Keycode::B),
+                        ..
+                    } => {
+                        self.benchmark();
+                    }
                     Event::KeyDown {
                         keycode: Some(keycode),
                         ..
