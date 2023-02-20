@@ -57,6 +57,10 @@ impl Emulator {
             "========= Cartridge =========\n{}\n=============================\n",
             rom
         );
+        self.graphics
+            .window_mut()
+            .set_title(format!("{} - {}", TITLE, rom.title()).as_str())
+            .unwrap();
     }
 
     pub fn run(&mut self) {
@@ -189,6 +193,8 @@ fn main() {
     let mut game_boy = GameBoy::new();
     game_boy.load_boot_default();
 
+    // creates a new generic emulator structure loads the default
+    // ROM file and starts running it
     let mut emulator = Emulator::new(game_boy, SCREEN_SCALE);
     emulator.load_rom("../../res/roms/pocket.gb");
     emulator.run();
