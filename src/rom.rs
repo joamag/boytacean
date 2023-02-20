@@ -222,6 +222,11 @@ pub struct Cartridge {
     /// If the RAM access ia enabled, this flag allows
     /// control of memory access to avoid corruption.
     ram_enabled: bool,
+
+    // The final offset of the last character of the title
+    // that is considered to be non zero (0x0) so that a
+    // proper safe conversion to UTF-8 string can be done.
+    title_offset: usize,
 }
 
 impl Cartridge {
@@ -235,6 +240,7 @@ impl Cartridge {
             rom_offset: 0x4000,
             ram_offset: 0x0000,
             ram_enabled: false,
+            title_offset: 0x0143,
         }
     }
 
@@ -312,6 +318,7 @@ impl Cartridge {
         self.ram_offset = 0x0000;
         self.set_mbc();
         self.set_computed();
+        self.set_title_offset();
         self.allocate_ram();
         self.set_rom_bank(1);
         self.set_ram_bank(0);
@@ -326,6 +333,18 @@ impl Cartridge {
         self.ram_bank_count = self.ram_size().ram_banks();
     }
 
+    pub fn set_title_offset(&mut self) {
+        let mut offset: usize = 0;
+        for byte in &self.rom_data[0x0134..0x0143] {
+            if *byte != 0u8 {
+                offset += 1;
+                continue;
+            }
+            break;
+        }
+        self.title_offset = 0x0134 + offset;
+    }
+
     fn allocate_ram(&mut self) {
         let ram_banks = max(self.ram_size().ram_banks(), 1);
         self.ram_data = vec![0u8; ram_banks as usize * RAM_BANK_SIZE];
@@ -335,7 +354,7 @@ impl Cartridge {
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 impl Cartridge {
     pub fn title(&self) -> String {
-        String::from(std::str::from_utf8(&self.rom_data[0x0134..0x0143]).unwrap())
+        String::from(std::str::from_utf8(&self.rom_data[0x0134..self.title_offset]).unwrap())
     }
 
     pub fn rom_type(&self) -> RomType {

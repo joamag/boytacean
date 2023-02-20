@@ -3,7 +3,7 @@ use sdl2::{
     AudioSubsystem, EventPump, TimerSubsystem, VideoSubsystem,
 };
 
-/// Structure that provide the complete set of Graphics
+/// Structure that provides the complete set of Graphics
 /// and Sound syb-system ready to be used by the overall
 /// emulator infrastructure.
 pub struct Graphics {
@@ -67,6 +67,8 @@ impl Graphics {
     }
 }
 
+/// Creates an SDL2 Surface structure from the provided
+/// bytes that represent an image (eg: an PNG image buffer).
 pub fn surface_from_bytes(bytes: &[u8]) -> Surface {
     unsafe {
         let rw_ops = RWops::from_bytes(bytes).unwrap();
