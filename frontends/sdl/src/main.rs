@@ -59,7 +59,7 @@ impl Emulator {
         );
         self.graphics
             .window_mut()
-            .set_title(format!("{} - {}", TITLE, rom.title()).as_str())
+            .set_title(format!("{} [{}]", TITLE, rom.title()).as_str())
             .unwrap();
     }
 

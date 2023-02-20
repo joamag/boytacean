@@ -335,12 +335,11 @@ impl Cartridge {
 
     pub fn set_title_offset(&mut self) {
         let mut offset: usize = 0;
-        for byte in &self.rom_data[0x0134..0x0143] {
-            if *byte != 0u8 {
-                offset += 1;
-                continue;
+        for byte in &self.rom_data[0x0134..=0x0143] {
+            if *byte == 0u8 {
+                break;
             }
-            break;
+            offset += 1;
         }
         self.title_offset = 0x0134 + offset;
     }
@@ -354,7 +353,11 @@ impl Cartridge {
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 impl Cartridge {
     pub fn title(&self) -> String {
-        String::from(std::str::from_utf8(&self.rom_data[0x0134..self.title_offset]).unwrap())
+        String::from(
+            std::str::from_utf8(&self.rom_data[0x0134..self.title_offset])
+                .unwrap()
+                .trim(),
+        )
     }
 
     pub fn rom_type(&self) -> RomType {
