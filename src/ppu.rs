@@ -65,7 +65,7 @@ impl PaletteInfo {
     pub fn new(name: &str, colors: Palette) -> Self {
         Self {
             name: String::from(name),
-            colors: colors
+            colors
         }
     }
 
