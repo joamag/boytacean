@@ -85,6 +85,17 @@ impl Emulator {
         );
     }
 
+    pub fn toggle_palette(&mut self) {
+        //colors: ["b6a571", "8b7e56", "554d35", "201d13"]
+        // @todo add more palettes here
+        self.system.ppu().set_palette_colors(&[
+            [0xb6, 0xa5, 0x71],
+            [139, 126, 86],
+            [85, 77, 83],
+            [32, 29, 19],
+        ])
+    }
+
     pub fn run(&mut self) {
         // updates the icon of the window to reflect the image
         // and style of the emulator
@@ -130,6 +141,12 @@ impl Emulator {
                         ..
                     } => {
                         self.benchmark();
+                    }
+                    Event::KeyDown {
+                        keycode: Some(Keycode::P),
+                        ..
+                    } => {
+                        self.toggle_palette();
                     }
                     Event::KeyDown {
                         keycode: Some(keycode),
