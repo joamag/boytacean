@@ -52,6 +52,32 @@ pub type Pixel = [u8; RGB_SIZE];
 /// within the Game Boy context.
 pub type Palette = [Pixel; PALETTE_SIZE];
 
+/// Represents a palette with the metadata that is
+/// associated with it.
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
+#[derive(Clone, PartialEq, Eq)]
+pub struct PaletteInfo {
+    name: String,
+    colors: Palette
+}
+
+impl PaletteInfo {
+    pub fn new(name: &str, colors: Palette) -> Self {
+        Self {
+            name: String::from(name),
+            colors: colors
+        }
+    }
+
+    pub fn name(&self) -> &String {
+        &self.name
+    }
+
+    pub fn colors(&self) -> &Palette {
+        &self.colors
+    }
+}
+
 /// Represents a tile within the Game Boy context,
 /// should contain the pixel buffer of the tile.
 #[cfg_attr(feature = "wasm", wasm_bindgen)]

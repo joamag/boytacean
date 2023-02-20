@@ -6,7 +6,7 @@ pub mod util;
 use boytacean::{
     gb::GameBoy,
     pad::PadKey,
-    ppu::{PpuMode, DISPLAY_HEIGHT, DISPLAY_WIDTH},
+    ppu::{PaletteInfo, PpuMode, DISPLAY_HEIGHT, DISPLAY_WIDTH},
 };
 use sdl2::{event::Event, keyboard::Keycode, pixels::PixelFormatEnum};
 use std::time::SystemTime;
@@ -28,12 +28,30 @@ const SCREEN_SCALE: f32 = 2.0;
 /// The base title to be used in the window.
 static TITLE: &str = "Boytacean";
 
+pub struct Benchmark {
+    count: usize,
+}
+
+impl Benchmark {
+    pub fn new(count: usize) -> Self {
+        Self { count: count }
+    }
+}
+
+impl Default for Benchmark {
+    fn default() -> Self {
+        Self::new(50000000)
+    }
+}
+
 pub struct Emulator {
     system: GameBoy,
     graphics: Graphics,
     logic_ratio: f32,
     next_tick_time: f32,
     next_tick_time_i: u32,
+    palettes: [PaletteInfo; 3],
+    palette_index: usize,
 }
 
 impl Emulator {
@@ -49,6 +67,36 @@ impl Emulator {
             logic_ratio: LOGIC_RATIO,
             next_tick_time: 0.0,
             next_tick_time_i: 0,
+            palettes: [
+                PaletteInfo::new(
+                    "basic",
+                    [
+                        [0xff, 0xff, 0xff],
+                        [0xc0, 0xc0, 0xc0],
+                        [0x60, 0x60, 0x60],
+                        [0x00, 0x00, 0x00],
+                    ],
+                ),
+                PaletteInfo::new(
+                    "hogwards",
+                    [
+                        [0xb6, 0xa5, 0x71],
+                        [0x8b, 0x7e, 0x56],
+                        [0x55, 0x4d, 0x35],
+                        [0x20, 0x1d, 0x13],
+                    ],
+                ),
+                PaletteInfo::new(
+                    "christmas",
+                    [
+                        [0xe8, 0xe7, 0xdf],
+                        [0x8b, 0xab, 0x95],
+                        [0x9e, 0x5c, 0x5e],
+                        [0x53, 0x4d, 0x57],
+                    ],
+                ),
+            ],
+            palette_index: 0,
         }
     }
 
@@ -64,10 +112,10 @@ impl Emulator {
             .unwrap();
     }
 
-    pub fn benchmark(&mut self) {
+    pub fn benchmark(&mut self, params: Benchmark) {
         println!("Going to run benchmark...");
 
-        let count = 50000000;
+        let count = params.count;
         let mut cycles = 0;
 
         let initial = SystemTime::now();
@@ -86,14 +134,10 @@ impl Emulator {
     }
 
     pub fn toggle_palette(&mut self) {
-        //colors: ["b6a571", "8b7e56", "554d35", "201d13"]
-        // @todo add more palettes here
-        self.system.ppu().set_palette_colors(&[
-            [0xb6, 0xa5, 0x71],
-            [139, 126, 86],
-            [85, 77, 83],
-            [32, 29, 19],
-        ])
+        self.system
+            .ppu()
+            .set_palette_colors(self.palettes[self.palette_index].colors());
+        self.palette_index = (self.palette_index + 1) % self.palettes.len();
     }
 
     pub fn run(&mut self) {
@@ -140,7 +184,7 @@ impl Emulator {
                         keycode: Some(Keycode::B),
                         ..
                     } => {
-                        self.benchmark();
+                        self.benchmark(Benchmark::default());
                     }
                     Event::KeyDown {
                         keycode: Some(Keycode::P),
@@ -242,6 +286,7 @@ fn main() {
     // ROM file and starts running it
     let mut emulator = Emulator::new(game_boy, SCREEN_SCALE);
     emulator.load_rom("../../res/roms/pocket.gb");
+    emulator.toggle_palette();
     emulator.run();
 }
 
