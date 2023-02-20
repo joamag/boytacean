@@ -58,14 +58,14 @@ pub type Palette = [Pixel; PALETTE_SIZE];
 #[derive(Clone, PartialEq, Eq)]
 pub struct PaletteInfo {
     name: String,
-    colors: Palette
+    colors: Palette,
 }
 
 impl PaletteInfo {
     pub fn new(name: &str, colors: Palette) -> Self {
         Self {
             name: String::from(name),
-            colors
+            colors,
         }
     }
 
