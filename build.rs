@@ -54,8 +54,8 @@ fn main() {
         .open(dest_path)
         .unwrap_or_else(|_| panic!("Can't open '{}'", BUILD_OUT_FILE));
 
-    writeln!(file, "{}", "//! Global constants, such as compiler version used, features, platform information and others.\n").unwrap();
-    writeln!(file, "{}", "// @generated\n").unwrap();
+    writeln!(file, "//! Global constants, such as compiler version used, features, platform information and others.\n").unwrap();
+    writeln!(file, "// @generated\n").unwrap();
 
     let now_utc = Utc::now();
     write_str_constant(
