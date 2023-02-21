@@ -9,16 +9,10 @@ use boytacean::{
     ppu::{PaletteInfo, PpuMode, DISPLAY_HEIGHT, DISPLAY_WIDTH},
 };
 use sdl2::{event::Event, keyboard::Keycode, pixels::PixelFormatEnum};
-use std::time::SystemTime;
+use std::{cmp::max, time::SystemTime};
 use util::Graphics;
 
 use crate::util::surface_from_bytes;
-
-/// The ratio at which the logic of the Game Boy is
-/// going to be run, increasing this value will provide
-/// better emulator accuracy, please keep in mind that
-/// the PPU will keep running at the same speed.
-const LOGIC_RATIO: f32 = 2.0;
 
 /// The scale at which the screen is going to be drawn
 /// meaning the ratio between Game Boy resolution and
@@ -47,7 +41,8 @@ impl Default for Benchmark {
 pub struct Emulator {
     system: GameBoy,
     graphics: Graphics,
-    logic_ratio: f32,
+    logic_frequency: u32,
+    visual_frequency: f32,
     next_tick_time: f32,
     next_tick_time_i: u32,
     palettes: [PaletteInfo; 3],
@@ -64,7 +59,8 @@ impl Emulator {
                 DISPLAY_HEIGHT as u32,
                 screen_scale,
             ),
-            logic_ratio: LOGIC_RATIO,
+            logic_frequency: GameBoy::CPU_FREQ,
+            visual_frequency: GameBoy::VISUAL_FREQ,
             next_tick_time: 0.0,
             next_tick_time_i: 0,
             palettes: [
@@ -164,6 +160,10 @@ impl Emulator {
             )
             .unwrap();
 
+        // starts the variable that will control the number of cycles that
+        // are going to move (because of overflow) from one tick to another
+        let mut pending_cycles = 0u32;
+
         // allocates space for the loop ticks counter to be used in each
         // iteration cycle
         let mut counter = 0u32;
@@ -193,6 +193,14 @@ impl Emulator {
                         ..
                     } => self.toggle_palette(),
                     Event::KeyDown {
+                        keycode: Some(Keycode::Plus),
+                        ..
+                    } => self.logic_frequency = self.logic_frequency.saturating_add(400000),
+                    Event::KeyDown {
+                        keycode: Some(Keycode::Minus),
+                        ..
+                    } => self.logic_frequency = self.logic_frequency.saturating_sub(400000),
+                    Event::KeyDown {
                         keycode: Some(keycode),
                         ..
                     } => {
@@ -208,7 +216,6 @@ impl Emulator {
                             self.system.key_lift(key)
                         }
                     }
-
                     Event::DropFile { filename, .. } => {
                         self.system.reset();
                         self.system.load_boot_default();
@@ -220,19 +227,21 @@ impl Emulator {
 
             let current_time = self.graphics.timer_subsystem.ticks();
 
-            let mut counter_cycles = 0u32;
+            let mut counter_cycles = pending_cycles;
             let mut last_frame = 0xffffu16;
 
             if current_time >= self.next_tick_time_i {
                 // calculates the number of cycles that are meant to be the target
-                // for the current "tick" operation this is basically the number of
-                // cycles per LCD roundtrip divided by the logic ratio
-                let cycle_limit = (GameBoy::LCD_CYCLES as f32 / self.logic_ratio) as u32;
+                // for the current "tick" operation this is basically the current
+                // logic frequency divided by the visual one
+                let cycle_limit =
+                    (self.logic_frequency as f32 / self.visual_frequency).round() as u32;
 
                 loop {
                     // limits the number of ticks to the typical number
                     // of cycles expected for the current logic cycle
                     if counter_cycles >= cycle_limit {
+                        pending_cycles = counter_cycles - cycle_limit;
                         break;
                     }
 
@@ -266,12 +275,22 @@ impl Emulator {
                     }
                 }
 
-                let logic_frequency =
-                    GameBoy::CPU_FREQ as f32 / GameBoy::LCD_CYCLES as f32 * self.logic_ratio;
+                // calculates the number of ticks that have elapsed since the
+                // last draw operation, this is critical to be able to properly
+                // operate the clock of the CPU in frame drop situations, meaning
+                // a situation where the system resources are no able to emulate
+                // the system on time and frames must be skipped (ticks > 1)
+                if self.next_tick_time == 0.0 {
+                    self.next_tick_time = current_time as f32;
+                }
+                let mut ticks = ((current_time as f32 - self.next_tick_time)
+                    / ((1.0 / self.visual_frequency) * 1000.0))
+                    .ceil() as u8;
+                ticks = max(ticks, 1);
 
                 // updates the next update time reference to the current
                 // time so that it can be used from game loop control
-                self.next_tick_time += 1000.0 / logic_frequency;
+                self.next_tick_time += (1000.0 / self.visual_frequency) * ticks as f32;
                 self.next_tick_time_i = self.next_tick_time.ceil() as u32;
             }
 

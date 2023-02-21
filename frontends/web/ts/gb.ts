@@ -29,9 +29,24 @@ import info from "../package.json";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 declare const require: any;
 
+/**
+ * The frequency at which the Game Boy emulator should
+ * run "normally".
+ */
 const LOGIC_HZ = 4194304;
 
+/**
+ * The frequency at witch the the visual loop is going to
+ * run, increasing this value will have a consequence in
+ * the visual frames per second (FPS) of emulation.
+ */
 const VISUAL_HZ = 59.7275;
+
+/**
+ * The frequency of the pause polling update operation,
+ * increasing this value will make resume from emulation
+ * paused state fasted.
+ */
 const IDLE_HZ = 10;
 
 const DISPLAY_WIDTH = 160;
@@ -215,16 +230,6 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         // reached the flush of the "tick" logic is skipped
         if (currentTime < this.nextTickTime) return pending;
 
-        // calculates the number of ticks that have elapsed since the
-        // last draw operation, this is critical to be able to properly
-        // operate the clock of the CPU in frame drop situations
-        if (this.nextTickTime === 0) this.nextTickTime = currentTime;
-        let ticks = Math.ceil(
-            (currentTime - this.nextTickTime) /
-                ((1 / this.visualFrequency) * 1000)
-        );
-        ticks = Math.max(ticks, 1);
-
         // initializes the counter of cycles with the pending number
         // of cycles coming from the previous tick
         let counterCycles = pending;
@@ -287,8 +292,21 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
             this.frameStart = currentTime;
         }
 
-        // updates the next update time reference to the, so that it
-        // can be used to control the game loop
+        // calculates the number of ticks that have elapsed since the
+        // last draw operation, this is critical to be able to properly
+        // operate the clock of the CPU in frame drop situations, meaning
+        // a situation where the system resources are no able to emulate
+        // the system on time and frames must be skipped (ticks > 1)
+        if (this.nextTickTime === 0) this.nextTickTime = currentTime;
+        let ticks = Math.ceil(
+            (currentTime - this.nextTickTime) /
+                ((1 / this.visualFrequency) * 1000)
+        );
+        ticks = Math.max(ticks, 1);
+
+        // updates the next update time according to the number of ticks
+        // that have elapsed since the last operation, this way this value
+        // can better be used to control the game loop
         this.nextTickTime += (1000 / this.visualFrequency) * ticks;
 
         // calculates the new number of pending (overflow) cycles
