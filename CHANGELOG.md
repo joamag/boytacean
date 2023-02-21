@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-* Support for the `build.rs` generation file that creates the `gen.rs` file
+*
 
 ### Changed
 
@@ -18,6 +18,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 *
+
+## [0.6.8] - 2023-02-21
+
+### Added
+
+* Support for the `build.rs` generation file that creates the `gen.rs` file
+* Support for benchmark in the SDL frontend
+* Palette switching for the SDL frontend
+
+### Fixed
+
+* Bug with ROM title that included 0x0 characters in it
+* V-Sync issue with SDL
 
 ## [0.6.7] - 2023-02-13
 

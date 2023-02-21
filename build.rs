@@ -29,7 +29,7 @@ use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::path::Path;
 use std::process::Command;
-use std::str;
+use std::{env, str};
 
 const BUILD_OUT_FILE: &str = "build.rs";
 const SOURCE_DIR: &str = "./src/gen";
@@ -72,6 +72,12 @@ fn main() {
 
     write_str_constant(
         &mut file,
+        "NAME",
+        option_env!("CARGO_PKG_NAME").unwrap_or("UNKNOWN"),
+    );
+
+    write_str_constant(
+        &mut file,
         "VERSION",
         option_env!("CARGO_PKG_VERSION").unwrap_or("UNKNOWN"),
     );
@@ -92,6 +98,36 @@ fn main() {
         .unwrap()
         .as_str();
     write_str_constant(&mut file, "COMPILER_VERSION", compiler_version);
+
+    write_str_constant(
+        &mut file,
+        "HOST",
+        &env::var("HOST").unwrap_or_else(|_| String::from("UNKNOWN")),
+    );
+
+    write_str_constant(
+        &mut file,
+        "TARGET",
+        &env::var("TARGET").unwrap_or_else(|_| String::from("UNKNOWN")),
+    );
+
+    write_str_constant(
+        &mut file,
+        "PROFILE",
+        &env::var("PROFILE").unwrap_or_else(|_| String::from("UNKNOWN")),
+    );
+
+    write_str_constant(
+        &mut file,
+        "OPT_LEVEL",
+        &env::var("OPT_LEVEL").unwrap_or_else(|_| String::from("UNKNOWN")),
+    );
+
+    write_str_constant(
+        &mut file,
+        "MAKEFLAGS",
+        option_env!("CARGO_MAKEFLAGS").unwrap_or("UNKNOWN"),
+    );
 
     let mut features = vec!["cpu"];
 
@@ -139,10 +175,15 @@ where
     T: std::fmt::Display,
 {
     let mut list_str = String::new();
+    let mut is_first = true;
     for value in &vec {
-        list_str.push_str(&format!("\"{}\", ", value))
+        if is_first {
+            is_first = false;
+        } else {
+            list_str.push_str(", ");
+        }
+        list_str.push_str(format!("\"{}\"", value).as_str());
     }
-    list_str.pop();
     writeln!(
         file,
         "pub const {}: [{}; {}] = [{}];",

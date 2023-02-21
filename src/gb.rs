@@ -240,9 +240,13 @@ impl GameBoy {
 /// Gameboy implementations that are meant with performance
 /// in mind and that do not support WASM interface of copy.
 impl GameBoy {
-    /// The logical frequency of the Game Boy
+    /// The logic frequency of the Game Boy
     /// CPU in hz.
     pub const CPU_FREQ: u32 = 4194304;
+
+    /// The visual frequency (refresh rate)
+    /// of the Game Boy, close to 60 hz.
+    pub const VISUAL_FREQ: f32 = 59.7275;
 
     /// The cycles taken to run a complete frame
     /// loop in the Game Boy's PPU (in CPU cycles).

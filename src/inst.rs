@@ -3123,7 +3123,7 @@ fn set(value: u8, bit: u8) -> u8 {
     value | (1u8 << (bit as usize))
 }
 
-/// Helper function to clear one bit in a u8
+/// Helper function to clear one bit in a u8.
 fn res(value: u8, bit: u8) -> u8 {
     value & !(1u8 << (bit as usize))
 }
