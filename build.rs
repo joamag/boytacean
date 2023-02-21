@@ -29,7 +29,7 @@ use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::path::Path;
 use std::process::Command;
-use std::{env, str, thread};
+use std::{env, str};
 
 const BUILD_OUT_FILE: &str = "build.rs";
 const SOURCE_DIR: &str = "./src/gen";
