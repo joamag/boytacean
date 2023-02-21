@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-*
+* Old compilation problem with `NUM_CPUS` generation
 
 ## [0.6.9] - 2023-02-21
 
