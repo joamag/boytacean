@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 * Bug with ROM title that included 0x0 characters in it
+* V-Sync issue with SDL
 
 ## [0.6.7] - 2023-02-13
 
