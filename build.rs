@@ -149,8 +149,8 @@ fn main() {
 
     write_constant(
         &mut file,
-        "NUM_CPUS",
-        thread::available_parallelism().unwrap().get(),
+        "PLATFORM_CPU_BITS_INT",
+        std::mem::size_of::<usize>() * 8,
     );
 }
 

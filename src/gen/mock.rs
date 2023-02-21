@@ -13,4 +13,4 @@ pub const OPT_LEVEL: &str = "-";
 pub const MAKEFLAGS: &str = "-";
 pub const FEATURES: [&str; 1] = ["cpu"];
 pub const PLATFORM_CPU_BITS: &str = "64";
-pub const NUM_CPUS: usize = 1;
+pub const PLATFORM_CPU_BITS_INT: usize = 64;
