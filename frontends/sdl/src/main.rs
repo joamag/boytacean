@@ -14,7 +14,7 @@ use util::Graphics;
 
 use crate::util::surface_from_bytes;
 
-/// The ration at which the logic of the Game Boy is
+/// The ratio at which the logic of the Game Boy is
 /// going to be run, increasing this value will provide
 /// better emulator accuracy, please keep in mind that
 /// the PPU will keep running at the same speed.
@@ -224,6 +224,9 @@ impl Emulator {
             let mut last_frame = 0xffffu16;
 
             if current_time >= self.next_tick_time_i {
+                // calculates the number of cycles that are meant to be the target
+                // for the current "tick" operation this is basically the number of
+                // cycles per LCD roundtrip divided by the logic ratio
                 let cycle_limit = (GameBoy::LCD_CYCLES as f32 / self.logic_ratio) as u32;
 
                 loop {
