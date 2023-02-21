@@ -1024,7 +1024,7 @@ impl Ppu {
     /// palette colors are changed.
     fn compute_palettes(&mut self) {
         // re-computes the complete set of palettes according to
-        // the currently set palette colors (that may have chaged)
+        // the currently set palette colors (that may have changed)
         Self::compute_palette(&mut self.palette, &self.palette_colors, self.palettes[0]);
         Self::compute_palette(
             &mut self.palette_obj_0,
