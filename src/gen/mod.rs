@@ -12,6 +12,8 @@ pub use self::mock::*;
 pub mod build;
 #[cfg(not(feature = "gen-mock"))]
 pub use self::build::*;
+
+#[rustfmt::skip]
 #[cfg(not(feature = "gen-mock"))]
 pub mod _build;
 #[cfg(not(feature = "gen-mock"))]
