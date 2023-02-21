@@ -1,28 +1,30 @@
 #![allow(clippy::uninlined_format_args)]
 
-/// Build script (https://doc.rust-lang.org/cargo/reference/build-scripts.html)
-/// This script is executed as the first step in the compilation process.
-/// Here we export metadata constants to a `constants/generated.rs` file which is then
-/// imported and used by the remaining crate.
-///
-/// # Examples
-///
-/// In C you can use the preprocessor macro `__DATE__` to save the compilation date like:
-///
-/// ```c
-/// #define COMPILATION_DATE __DATE__
-/// ```
-///
-/// Rust does not have such preprocessor macros, so we use this script and do:
-///
-/// ```rust
-/// let now_utc = chrono::Utc::now();
-/// write_str_constant(
-///     &mut file,
-///     "COMPILATION_DATE",
-///     &format!("{}", now_utc.format("%b %d %Y")),
-/// );
-/// ```
+//! Build script (https://doc.rust-lang.org/cargo/reference/build-scripts.html)
+//! This script is executed as the first step in the compilation process.
+//! Here we export metadata constants to a `constants/generated.rs` file which is then
+//! imported and used by the remaining crate.
+//!
+//! # Examples
+//!
+//! In C you can use the preprocessor macro `__DATE__` to save the compilation date like:
+//!
+//! ```c
+//! #define COMPILATION_DATE __DATE__
+//! ```
+//!
+//! Rust does not have such preprocessor macros, so we use this script and do:
+//!
+//! ```rust
+//! let now_utc = chrono::Utc::now();
+//! write_str_constant(
+//!     &mut file,
+//!     "COMPILATION_DATE",
+//!     &format!("{}", now_utc.format("%b %d %Y")),
+//! );
+//! ```
+
+use built::{write_built_file_with_opts, Options};
 use chrono::Utc;
 use regex::Regex;
 use std::fs::{File, OpenOptions};
@@ -32,7 +34,7 @@ use std::process::Command;
 use std::{env, str};
 
 const BUILD_OUT_FILE: &str = "build.rs";
-const SOURCE_DIR: &str = "./src/gen";
+const GEN_DIR: &str = "./src/gen";
 
 fn main() {
     // in case we're running under docs.rs then we must return the control
@@ -44,7 +46,7 @@ fn main() {
 
     // opens the target destination file panicking with a proper message in
     // case it was not possible to open it (eg: directory inexistent)
-    let dest_path = Path::new(SOURCE_DIR).join(Path::new(BUILD_OUT_FILE));
+    let dest_path = Path::new(GEN_DIR).join(Path::new(BUILD_OUT_FILE));
     let mut file = OpenOptions::new()
         .truncate(true)
         .write(true)
@@ -52,11 +54,8 @@ fn main() {
         .open(dest_path)
         .unwrap_or_else(|_| panic!("Can't open '{}'", BUILD_OUT_FILE));
 
-    let module_doc_string = "//! Global constants, such as compiler version used, features, platform information and others.\n";
-    writeln!(file, "{}", module_doc_string).unwrap();
-
-    let generated_annotation = "// @generated\n";
-    writeln!(file, "{}", generated_annotation).unwrap();
+    writeln!(file, "{}", "//! Global constants, such as compiler version used, features, platform information and others.\n").unwrap();
+    writeln!(file, "{}", "// @generated\n").unwrap();
 
     let now_utc = Utc::now();
     write_str_constant(
@@ -152,6 +151,19 @@ fn main() {
         "PLATFORM_CPU_BITS_INT",
         std::mem::size_of::<usize>() * 8,
     );
+
+    let mut options = Options::default();
+    options.set_cfg(false);
+    options.set_ci(false);
+    options.set_compiler(false);
+    options.set_env(false);
+    options.set_dependencies(true);
+    options.set_features(true);
+
+    let manifest_path = env::var("CARGO_MANIFEST_DIR").unwrap();
+    let built_path = Path::new(GEN_DIR).join(Path::new("_build.rs"));
+
+    write_built_file_with_opts(&options, manifest_path.as_ref(), &built_path).unwrap();
 }
 
 fn write_constant<T>(file: &mut File, key: &str, val: T)

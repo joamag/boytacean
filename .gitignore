@@ -9,3 +9,4 @@ Cargo.lock
 /frontends/*/target
 
 /src/gen/build.rs
+/src/gen/_build.rs

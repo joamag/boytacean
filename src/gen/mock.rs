@@ -14,3 +14,8 @@ pub const MAKEFLAGS: &str = "-";
 pub const FEATURES: [&str; 1] = ["cpu"];
 pub const PLATFORM_CPU_BITS: &str = "64";
 pub const PLATFORM_CPU_BITS_INT: usize = 64;
+
+pub const FEATURES: [&str; 0] = [];
+pub const FEATURES_STR: &str = r"";
+pub const DEPENDENCIES: [(&str, &str); 0] = [];
+pub const DEPENDENCIES_STR: &str = r"";

@@ -25,6 +25,7 @@ wasm-bindgen = { version = "0.2", optional = true }
 [build-dependencies]
 chrono = "0.4"
 regex = "1"
+built = "0.5"
 
 [profile.release]
 debug = false
