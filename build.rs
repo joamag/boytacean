@@ -52,7 +52,7 @@ fn main() {
         .open(dest_path)
         .unwrap_or_else(|_| panic!("Can't open '{}'", BUILD_OUT_FILE));
 
-    let module_doc_string = "//! Global constants, such as compiler version used, features, platform information and others\n";
+    let module_doc_string = "//! Global constants, such as compiler version used, features, platform information and others.\n";
     writeln!(file, "{}", module_doc_string).unwrap();
 
     let generated_annotation = "// @generated\n";
