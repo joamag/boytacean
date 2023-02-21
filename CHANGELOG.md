@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-*
+* Build process for the docs.rs website
 
 ## [0.6.11] - 2023-02-21
 

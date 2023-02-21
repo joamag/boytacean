@@ -17,6 +17,7 @@ crate-type = ["cdylib", "rlib"]
 [features]
 wasm = ["wasm-bindgen"]
 debug = []
+gen-mock = []
 
 [dependencies]
 wasm-bindgen = { version = "0.2", optional = true }
@@ -35,3 +36,6 @@ members = [
     ".",
     "frontends/sdl",
 ]
+
+[package.metadata.docs.rs]
+features = ["wasm", "gen-mock"]
