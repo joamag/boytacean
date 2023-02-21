@@ -549,7 +549,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
 
     get wasmEngine(): string | null {
         if (!this.gameBoy) return null;
-        return this.gameBoy.get_wasm_engine_ws();
+        return this.gameBoy.get_wasm_engine_ws() ?? null;
     }
 
     get framerate(): number {
