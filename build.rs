@@ -29,7 +29,7 @@ use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::path::Path;
 use std::process::Command;
-use std::{env, str};
+use std::{env, str, thread};
 
 const BUILD_OUT_FILE: &str = "build.rs";
 const SOURCE_DIR: &str = "./src/gen";
@@ -147,8 +147,11 @@ fn main() {
         &(std::mem::size_of::<usize>() * 8).to_string(),
     );
 
-    write_constant(&mut file, "DEFAULT_THREAD_POOL_SIZE", num_cpus::get());
-    write_constant(&mut file, "MAX_THREAD_POOL_SIZE", num_cpus::get() * 10);
+    write_constant(
+        &mut file,
+        "NUM_CPUS",
+        thread::available_parallelism().unwrap().get(),
+    );
 }
 
 fn write_constant<T>(file: &mut File, key: &str, val: T)
