@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-*
+* Support for WASM engine version printing
 
 ### Changed
 
@@ -18,6 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 *
+
+## [0.6.12] - 2023-02-21
+
+### Fixed
+
+* Build process for the docs.rs website
 
 ## [0.6.11] - 2023-02-21
 
