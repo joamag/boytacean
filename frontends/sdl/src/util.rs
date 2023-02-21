@@ -44,7 +44,12 @@ impl Graphics {
 
         // creates an accelerated canvas to be used in the drawing
         // then clears it so that is can be presented empty initially
-        let mut canvas = window.into_canvas().accelerated().build().unwrap();
+        let mut canvas = window
+            .into_canvas()
+            .accelerated()
+            .present_vsync()
+            .build()
+            .unwrap();
         canvas.set_logical_size(width, height).unwrap();
         canvas.clear();
 

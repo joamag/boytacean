@@ -227,10 +227,14 @@ impl Emulator {
 
             let current_time = self.graphics.timer_subsystem.ticks();
 
-            let mut counter_cycles = pending_cycles;
-            let mut last_frame = 0xffffu16;
-
             if current_time >= self.next_tick_time_i {
+                // re-starts the counter cycles with the number of pending cycles
+                // from the previous tick and the last frame with a dummy value
+                // meant to be overridden in case there's at least one new frame
+                // being drawn in the current tick
+                let mut counter_cycles = pending_cycles;
+                let mut last_frame = 0xffffu16;
+
                 // calculates the number of cycles that are meant to be the target
                 // for the current "tick" operation this is basically the current
                 // logic frequency divided by the visual one
@@ -252,27 +256,38 @@ impl Emulator {
                     if self.system.ppu_mode() == PpuMode::VBlank
                         && self.system.ppu_frame() != last_frame
                     {
-                        // clears the graphics canvas, making sure that no garbage
-                        // pixel data remaining in the pixel buffer, not doing this would
-                        // create visual glitches in OSs like Mac OS X
-                        self.graphics.canvas.clear();
-
                         // obtains the frame buffer of the Game Boy PPU and uses it
-                        // to update the stream texture, copying it then to the canvas
+                        // to update the stream texture, that will latter be copied
+                        // to the canvas
                         let frame_buffer = self.system.frame_buffer().as_ref();
                         texture
                             .update(None, frame_buffer, DISPLAY_WIDTH * 3)
                             .unwrap();
-                        self.graphics.canvas.copy(&texture, None, None).unwrap();
-
-                        // presents the canvas effectively updating the screen
-                        // information presented to the user
-                        self.graphics.canvas.present();
 
                         // obtains the index of the current PPU frame, this value
                         // is going to be used to detect for new frame presence
                         last_frame = self.system.ppu_frame();
                     }
+                }
+
+                // in case there's at least one new frame that was drawn during
+                // during the current tick, then we need to flush it to the canvas,
+                // this separation between texture creation and canvas flush prevents
+                // resources from being over-used in situations where multiple frames
+                // are generated during the same tick cycle
+                if last_frame != 0xffffu16 {
+                    // clears the graphics canvas, making sure that no garbage
+                    // pixel data remaining in the pixel buffer, not doing this would
+                    // create visual glitches in OSs like Mac OS X
+                    self.graphics.canvas.clear();
+
+                    // copies the texture that was created for the frame (during
+                    // the loop part of the tick) to the canvas
+                    self.graphics.canvas.copy(&texture, None, None).unwrap();
+
+                    // presents the canvas effectively updating the screen
+                    // information presented to the user
+                    self.graphics.canvas.present();
                 }
 
                 // calculates the number of ticks that have elapsed since the
