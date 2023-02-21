@@ -9,13 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-* Support for the `build.rs` generation file that creates the `gen.rs` file
-* Support for benchmark in the SDL frontend
-* Palette switching for the SDL frontend
+*
 
 ### Changed
 
 *
+
+### Fixed
+
+*
+
+## [0.6.8] - 2023-02-21
+
+### Added
+
+* Support for the `build.rs` generation file that creates the `gen.rs` file
+* Support for benchmark in the SDL frontend
+* Palette switching for the SDL frontend
 
 ### Fixed
 
