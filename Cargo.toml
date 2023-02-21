@@ -1,7 +1,7 @@
 [package]
 name = "boytacean"
 description = "A Game Boy emulator that is written in Rust."
-version = "0.6.8"
+version = "0.6.11"
 authors = ["João Magalhães <joamag@gmail.com>"]
 license = "Apache-2.0"
 repository = "https://github.com/joamag/boytacean"
@@ -23,7 +23,6 @@ wasm-bindgen = { version = "0.2", optional = true }
 
 [build-dependencies]
 chrono = "0.4"
-num_cpus = "1"
 regex = "1"
 
 [profile.release]

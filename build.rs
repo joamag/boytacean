@@ -52,7 +52,7 @@ fn main() {
         .open(dest_path)
         .unwrap_or_else(|_| panic!("Can't open '{}'", BUILD_OUT_FILE));
 
-    let module_doc_string = "//! Global constants, such as compiler version used, algorithms, compression and filters supported and others\n";
+    let module_doc_string = "//! Global constants, such as compiler version used, features, platform information and others\n";
     writeln!(file, "{}", module_doc_string).unwrap();
 
     let generated_annotation = "// @generated\n";
@@ -147,8 +147,11 @@ fn main() {
         &(std::mem::size_of::<usize>() * 8).to_string(),
     );
 
-    write_constant(&mut file, "DEFAULT_THREAD_POOL_SIZE", num_cpus::get());
-    write_constant(&mut file, "MAX_THREAD_POOL_SIZE", num_cpus::get() * 10);
+    write_constant(
+        &mut file,
+        "PLATFORM_CPU_BITS_INT",
+        std::mem::size_of::<usize>() * 8,
+    );
 }
 
 fn write_constant<T>(file: &mut File, key: &str, val: T)

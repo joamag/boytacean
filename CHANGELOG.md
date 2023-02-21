@@ -19,6 +19,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 *
 
+## [0.6.11] - 2023-02-21
+
+### Fixed
+
+* Unused code issue
+
+## [0.6.10] - 2023-02-21
+
+### Fixed
+
+* Old compilation problem with `NUM_CPUS` generation
+
+## [0.6.9] - 2023-02-21
+
+### Changed
+
+* Bumped emukit dependency
+
 ## [0.6.8] - 2023-02-21
 
 ### Added
