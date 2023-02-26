@@ -11,8 +11,10 @@ edition = "2018"
 path = "../.."
 
 [dependencies.sdl2]
-version = "0.35"
-features = ["ttf", "image", "gfx", "mixer", "static-link", "use-vcpkg"]
+sdl2 = { version = "0.35", features = ["ttf", "image", "gfx", "mixer", "static-link", "use-vcpkg"] }
+
+[target.'cfg(linux)'.dependencies]
+sdl2 = { version = "0.35", features = ["ttf", "image", "gfx", "mixer", "bundled"] }
 
 # If the vcpkg version of SDL2 does not work (eg: display not found error)
 # then try dynamic linking SDL2 using the following features
