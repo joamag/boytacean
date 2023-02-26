@@ -11,8 +11,10 @@ edition = "2018"
 path = "../.."
 
 [dependencies.sdl2]
-version = "0.35"
-features = ["ttf", "image", "gfx", "mixer", "static-link", "use-vcpkg"]
+sdl2 = { version = "0.35", features = ["ttf", "image", "gfx", "mixer", "static-link", "use-vcpkg"] }
+
+[target.'cfg(linux)'.dependencies]
+sdl2 = { version = "0.35", features = ["ttf", "image", "gfx", "mixer", "bundled"] }
 
 [package.metadata.vcpkg]
 dependencies = ["sdl2", "sdl2-image[libjpeg-turbo,tiff,libwebp]", "sdl2-ttf", "sdl2-gfx", "sdl2-mixer"]
