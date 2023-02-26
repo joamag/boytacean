@@ -14,6 +14,10 @@ path = "../.."
 version = "0.35"
 features = ["ttf", "image", "gfx", "mixer", "static-link", "use-vcpkg"]
 
+# If the vcpkg version of SDL2 does not work (eg: display not found error)
+# then try dynamic linking SDL2 using the following features
+# features = ["ttf", "image", "gfx", "mixer", "bundled"]
+
 [package.metadata.vcpkg]
 dependencies = ["sdl2", "sdl2-image[libjpeg-turbo,tiff,libwebp]", "sdl2-ttf", "sdl2-gfx", "sdl2-mixer"]
 git = "https://github.com/microsoft/vcpkg"
