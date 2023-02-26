@@ -7,7 +7,7 @@ use crate::{
     ppu::{Ppu, PpuMode, Tile, FRAME_BUFFER_SIZE},
     rom::Cartridge,
     timer::Timer,
-    util::read_file,
+    util::read_file, apu::Apu,
 };
 
 #[cfg(feature = "wasm")]
@@ -57,9 +57,10 @@ impl GameBoy {
     #[cfg_attr(feature = "wasm", wasm_bindgen(constructor))]
     pub fn new() -> Self {
         let ppu = Ppu::new();
+        let apu = Apu::new();
         let pad = Pad::new();
         let timer = Timer::new();
-        let mmu = Mmu::new(ppu, pad, timer);
+        let mmu = Mmu::new(ppu, apu, pad, timer);
         let cpu = Cpu::new(mmu);
         Self { cpu }
     }

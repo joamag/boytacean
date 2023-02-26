@@ -1,23 +1,27 @@
 use sdl2::{
-    audio::{AudioCallback, AudioSpecDesired},
+    audio::{AudioCallback, AudioDevice, AudioSpecDesired},
     AudioSubsystem, Sdl,
 };
-use std::time::Duration;
 
-struct SquareWave {
+pub struct AudioWave {
     phase_inc: f32,
+
     phase: f32,
+
     volume: f32,
+
+    /// The relative amount of time (as a percentage decimal) the low level
+    /// is going to be present during a period (cycle).
+    /// From [Wikipedia](https://en.wikipedia.org/wiki/Duty_cycle).
+    duty_cycle: f32,
 }
 
-impl AudioCallback for SquareWave {
+impl AudioCallback for AudioWave {
     type Channel = f32;
 
     fn callback(&mut self, out: &mut [f32]) {
         for x in out.iter_mut() {
-            // this is a square wave with 50% of down
-            // and 50% of up values
-            *x = if self.phase <= 0.5 {
+            *x = if self.phase < (1.0 - self.duty_cycle) {
                 self.volume
             } else {
                 -self.volume
@@ -28,6 +32,7 @@ impl AudioCallback for SquareWave {
 }
 
 pub struct Audio {
+    pub device: AudioDevice<AudioWave>,
     pub audio_subsystem: AudioSubsystem,
 }
 
@@ -42,10 +47,11 @@ impl Audio {
         };
 
         let device = audio_subsystem
-            .open_playback(None, &desired_spec, |spec| SquareWave {
+            .open_playback(None, &desired_spec, |spec| AudioWave {
                 phase_inc: 440.0 / spec.freq as f32,
                 phase: 0.0,
                 volume: 0.25,
+                duty_cycle: 0.5,
             })
             .unwrap();
 
@@ -53,8 +59,9 @@ impl Audio {
         // device's activity
         device.resume();
 
-        std::thread::sleep(Duration::from_millis(2000));
-
-        Self { audio_subsystem }
+        Self {
+            device,
+            audio_subsystem,
+        }
     }
 }

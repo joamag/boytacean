@@ -1,4 +1,4 @@
-use crate::{debugln, pad::Pad, ppu::Ppu, rom::Cartridge, timer::Timer};
+use crate::{debugln, pad::Pad, ppu::Ppu, rom::Cartridge, timer::Timer, apu::Apu};
 
 pub const BOOT_SIZE: usize = 2304;
 pub const RAM_SIZE: usize = 8192;
@@ -12,6 +12,11 @@ pub struct Mmu {
     /// to be used both for VRAM reading/writing and to forward
     /// some of the access operations.
     ppu: Ppu,
+
+    /// Reference to the APU (Audio Processing Unit) that is going
+    /// to be used both for register reading/writing and to forward
+    /// some of the access operations.
+    apu: Apu,
 
     /// Reference to the Gamepad structure that is going to control
     /// the I/O access to this device.
@@ -44,9 +49,10 @@ pub struct Mmu {
 }
 
 impl Mmu {
-    pub fn new(ppu: Ppu, pad: Pad, timer: Timer) -> Self {
+    pub fn new(ppu: Ppu, apu: Apu, pad: Pad, timer: Timer) -> Self {
         Self {
             ppu,
+            apu,
             pad,
             timer,
             rom: Cartridge::new(),
