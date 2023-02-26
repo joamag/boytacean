@@ -1,18 +1,18 @@
 #![allow(clippy::uninlined_format_args)]
 
+pub mod audio;
 pub mod data;
-pub mod util;
+pub mod graphics;
 
+use audio::Audio;
 use boytacean::{
     gb::GameBoy,
     pad::PadKey,
     ppu::{PaletteInfo, PpuMode, DISPLAY_HEIGHT, DISPLAY_WIDTH},
 };
+use graphics::{surface_from_bytes, Graphics};
 use sdl2::{event::Event, keyboard::Keycode, pixels::PixelFormatEnum};
 use std::{cmp::max, time::SystemTime};
-use util::Graphics;
-
-use crate::util::surface_from_bytes;
 
 /// The scale at which the screen is going to be drawn
 /// meaning the ratio between Game Boy resolution and
@@ -41,6 +41,7 @@ impl Default for Benchmark {
 pub struct Emulator {
     system: GameBoy,
     graphics: Graphics,
+    audio: Audio,
     logic_frequency: u32,
     visual_frequency: f32,
     next_tick_time: f32,
@@ -51,14 +52,19 @@ pub struct Emulator {
 
 impl Emulator {
     pub fn new(system: GameBoy, screen_scale: f32) -> Self {
+        let sdl = sdl2::init().unwrap();
+        let graphics = Graphics::new(
+            &sdl,
+            TITLE,
+            DISPLAY_WIDTH as u32,
+            DISPLAY_HEIGHT as u32,
+            screen_scale,
+        );
+        let audio = Audio::new(&sdl);
         Self {
             system,
-            graphics: Graphics::new(
-                TITLE,
-                DISPLAY_WIDTH as u32,
-                DISPLAY_HEIGHT as u32,
-                screen_scale,
-            ),
+            graphics: graphics,
+            audio: audio,
             logic_frequency: GameBoy::CPU_FREQ,
             visual_frequency: GameBoy::VISUAL_FREQ,
             next_tick_time: 0.0,

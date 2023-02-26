@@ -1,6 +1,6 @@
 use sdl2::{
     render::Canvas, rwops::RWops, surface::Surface, sys::image, ttf::Sdl2TtfContext, video::Window,
-    AudioSubsystem, EventPump, TimerSubsystem, VideoSubsystem,
+    AudioSubsystem, EventPump, Sdl, TimerSubsystem, VideoSubsystem,
 };
 
 /// Structure that provides the complete set of Graphics
@@ -19,10 +19,9 @@ impl Graphics {
     /// Start the SDL sub-system and all of its structure and returns
     /// a structure with all the needed stuff to handle SDL graphics
     /// and sound.
-    pub fn new(title: &str, width: u32, height: u32, scale: f32) -> Self {
+    pub fn new(sdl: &Sdl, title: &str, width: u32, height: u32, scale: f32) -> Self {
         // initializes the SDL sub-system, making it ready to be
         // used for display of graphics and audio
-        let sdl = sdl2::init().unwrap();
         let video_subsystem = sdl.video().unwrap();
         let timer_subsystem = sdl.timer().unwrap();
         let audio_subsystem = sdl.audio().unwrap();
