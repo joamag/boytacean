@@ -146,9 +146,27 @@ impl Apu {
 
     #[inline(always)]
     pub fn cycle(&mut self, freq: u32) {
+        self.ch1_timer = self.ch1_timer.saturating_sub(1);
+        if self.ch1_timer == 0 {
+            let target_freq = 1048576.0 / (2048.0 - self.ch1_wave_length as f32);
+            self.ch1_timer = (freq as f32 / target_freq) as u16;
+            self.ch1_sequence = (self.ch1_sequence + 1) & 7;
+
+            if self.ch1_enabled {
+                self.ch1_output =
+                    if DUTY_TABLE[self.ch1_wave_duty as usize][self.ch1_sequence as usize] == 1 {
+                        self.ch1_volume
+                    } else {
+                        0
+                    };
+            } else {
+                self.ch1_output = 0;
+            }
+        }
+
         self.ch2_timer = self.ch2_timer.saturating_sub(1);
         if self.ch2_timer == 0 {
-            let target_freq = 1048576.0 / (2048.0 - self.ch1_wave_length as f32);
+            let target_freq = 1048576.0 / (2048.0 - self.ch2_wave_length as f32);
             self.ch2_timer = (freq as f32 / target_freq) as u16;
             self.ch2_sequence = (self.ch2_sequence + 1) & 7;
 
@@ -166,6 +184,6 @@ impl Apu {
     }
 
     pub fn output(&self) -> u8 {
-        self.ch2_output
+        self.ch1_output + self.ch2_output
     }
 }
