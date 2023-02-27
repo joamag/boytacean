@@ -79,6 +79,10 @@ impl Mmu {
         &mut self.apu
     }
 
+    pub fn apu_i(&self) -> &Apu {
+        &self.apu
+    }
+
     pub fn pad(&mut self) -> &mut Pad {
         &mut self.pad
     }

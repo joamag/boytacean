@@ -28,7 +28,7 @@ impl AudioCallback for AudioWave {
         for x in out.iter_mut() {
             *x = match self.audio_provider.lock() {
                 Ok(mut provider) => {
-                    let value = provider.tick_apu(self.spec.freq as u32) as f32 / 7.0;
+                    let value = provider.output_clock_apu(1, self.spec.freq as u32) as f32 / 7.0;
                     value
                 }
                 Err(_) => 0.0,
@@ -49,7 +49,7 @@ impl Audio {
         let desired_spec = AudioSpecDesired {
             freq: Some(44100),
             channels: Some(1),
-            samples: None,
+            samples: Some(2),
         };
 
         let device = audio_subsystem

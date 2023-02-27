@@ -6,7 +6,7 @@ pub mod graphics;
 
 use audio::Audio;
 use boytacean::{
-    gb::{AudioProvider, GameBoy},
+    gb::GameBoy,
     pad::PadKey,
     ppu::{PaletteInfo, PpuMode, DISPLAY_HEIGHT, DISPLAY_WIDTH},
 };
@@ -115,10 +115,6 @@ impl Emulator {
 
     pub fn start_audio(&mut self, sdl: &Sdl, audio_provider: Arc<Mutex<Box<GameBoy>>>) {
         self.audio = Some(Audio::new(sdl, audio_provider));
-    }
-
-    pub fn tick_audio(&mut self, freq: u32) -> u8 {
-        self.system.lock().unwrap().tick_apu(freq)
     }
 
     pub fn load_rom(&mut self, path: &str) {
@@ -288,10 +284,13 @@ impl Emulator {
                         // valid under the current block
                         let mut system = self.system.lock().unwrap();
 
-                        // runs the Game Boy clock, this operations should
-                        // include the advance of both the CPU and the PPU
+                        // runs the Game Boy clock, this operation should
+                        // include the advance of both the CPU, PPU, APU
+                        // and any other frequency based component of the system
                         counter_cycles += system.clock() as u32;
 
+                        // in case a V-Blank state has been reached a new frame is available
+                        // then the frame must be pushed into SDL for display
                         if system.ppu_mode() == PpuMode::VBlank && system.ppu_frame() != last_frame
                         {
                             // obtains the frame buffer of the Game Boy PPU and uses it

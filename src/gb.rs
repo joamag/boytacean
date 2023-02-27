@@ -54,7 +54,8 @@ pub struct Registers {
 }
 
 pub trait AudioProvider {
-    fn tick_apu(&mut self, freq: u32) -> u8;
+    fn output_apu(&self) -> u8;
+    fn output_clock_apu(&mut self, cycles: u8, freq: u32) -> u8;
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
@@ -99,8 +100,8 @@ impl GameBoy {
         self.ppu().clock(cycles)
     }
 
-    pub fn apu_clock(&mut self, cycles: u8, freq: u32) {
-        self.apu().clock(cycles, freq)
+    pub fn apu_clock(&mut self, cycles: u8) {
+        self.apu().clock(cycles)
     }
 
     pub fn timer_clock(&mut self, cycles: u8) {
@@ -260,6 +261,10 @@ impl GameBoy {
         self.cpu.apu()
     }
 
+    pub fn apu_i(&self) -> &Apu {
+        self.cpu.apu_i()
+    }
+
     pub fn pad(&mut self) -> &mut Pad {
         self.cpu.pad()
     }
@@ -376,9 +381,13 @@ pub fn hook_impl(info: &PanicInfo) {
 }
 
 impl AudioProvider for GameBoy {
-    fn tick_apu(&mut self, freq: u32) -> u8 {
-        self.apu_clock(1, freq);
-        self.apu().output()
+    fn output_apu(&self) -> u8 {
+        self.apu_i().output()
+    }
+
+    fn output_clock_apu(&mut self, cycles: u8, freq: u32) -> u8 {
+        self.apu().clock_f(cycles, freq);
+        self.apu_i().output()
     }
 }
 

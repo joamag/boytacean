@@ -34,6 +34,18 @@ pub struct Apu {
     ch2_wave_length: u16,
     ch2_sound_length: bool,
     ch2_enabled: bool,
+
+    ch3_timer: u16,
+    ch3_sequence: u8,
+    ch3_output: u8,
+    ch3_dac: bool,
+    ch3_length_timer: u8,
+    ch3_output_level: u8,
+    ch3_wave_length: u16,
+    ch3_sound_length: bool,
+    ch3_enabled: bool,
+
+    wave_ram: [u8; 16],
 }
 
 impl Apu {
@@ -65,10 +77,27 @@ impl Apu {
             ch2_wave_length: 0x0,
             ch2_sound_length: false,
             ch2_enabled: false,
+
+            ch3_timer: 0,
+            ch3_sequence: 0,
+            ch3_output: 0,
+            ch3_dac: false,
+            ch3_length_timer: 0x0,
+            ch3_output_level: 0x0,
+            ch3_wave_length: 0x0,
+            ch3_sound_length: false,
+            ch3_enabled: false,
+
+            wave_ram: [0u8; 16],
         }
     }
 
-    pub fn clock(&mut self, cycles: u8, freq: u32) {
+    pub fn clock(&mut self, cycles: u8) {
+        self.clock_f(cycles, 4194304);
+    }
+
+    pub fn clock_f(&mut self, cycles: u8, freq: u32) {
+        // @todo the performance here requires improvement
         for _ in 0..cycles {
             self.cycle(freq);
         }
@@ -76,7 +105,6 @@ impl Apu {
 
     pub fn read(&mut self, addr: u16) -> u8 {
         match addr {
-            0xff26 => 1 as u8, // @todo implement this
             _ => {
                 warnln!("Reading from unknown APU location 0x{:04x}", addr);
                 0xff
@@ -137,7 +165,42 @@ impl Apu {
                     (self.ch2_wave_length & 0x00ff) | (((value & 0x07) as u16) << 8);
                 self.ch2_sound_length |= value & 0x40 == 0x40;
                 self.ch2_enabled |= value & 0x80 == 0x80;
+                if value & 0x80 == 0x80 {
+                    //self.ch2_timer = 0;
+                    //self.ch2_sequence = 0;
+                    //@todo improve this reset operation
+                }
                 println!("CH2 Enabled {}", self.ch2_enabled);
+            }
+
+            // 0xFF1A — NR30: Channel 3 DAC enable
+            0xff1a => {
+                self.ch3_dac = value & 0x80 == 0x80;
+            }
+            // 0xFF1B — NR31: Channel 3 length timer
+            0xff1b => {
+                self.ch3_length_timer = value;
+            }
+            // 0xFF1C — NR32: Channel 3 output level
+            0xff1c => {
+                self.ch3_output_level = value & 0x60 >> 5;
+            }
+            // 0xFF1D — NR33: Channel 3 wavelength low [write-only]
+            0xff1d => {
+                self.ch3_wave_length = (self.ch3_wave_length & 0xff00) | value as u16;
+            }
+            // 0xFF1E — NR34: Channel 3 wavelength high & control
+            0xff1e => {
+                self.ch3_wave_length =
+                    (self.ch3_wave_length & 0x00ff) | (((value & 0x07) as u16) << 8);
+                self.ch3_sound_length |= value & 0x40 == 0x40;
+                self.ch3_enabled |= value & 0x80 == 0x80;
+                println!("CH3 Enabled {}", self.ch3_enabled);
+            }
+
+            // 0xFF30-0xFF3F — Wave pattern RAM
+            0xff30..=0xff3f => {
+                self.wave_ram[addr as usize - 0xff30] = value;
             }
 
             _ => warnln!("Writing in unknown APU location 0x{:04x}", addr),
