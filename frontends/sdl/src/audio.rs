@@ -25,6 +25,20 @@ impl AudioCallback for AudioWave {
     fn callback(&mut self, out: &mut [f32]) {
         self.ticks = self.ticks.wrapping_add(out.len() as usize);
 
+        out.fill(0.0);
+
+        match self.audio_provider.try_lock() {
+            Ok(provider) => {
+                for (place, data) in out.iter_mut().zip(provider.output_buffer_apu().iter()) {
+                    *place = *data as f32 / 7.0;
+                }
+            }
+            Err(_) => (),
+        }
+
+        self.audio_provider.lock().unwrap().clear_buffer_apu();
+
+        /*
         for x in out.iter_mut() {
             *x = match self.audio_provider.lock() {
                 Ok(mut provider) => {
@@ -33,7 +47,7 @@ impl AudioCallback for AudioWave {
                 }
                 Err(_) => 0.0,
             }
-        }
+        }*/
     }
 }
 
@@ -49,7 +63,7 @@ impl Audio {
         let desired_spec = AudioSpecDesired {
             freq: Some(44100),
             channels: Some(1),
-            samples: Some(2),
+            samples: None,
         };
 
         let device = audio_subsystem

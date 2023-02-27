@@ -50,6 +50,7 @@ pub struct Emulator {
     visual_frequency: f32,
     next_tick_time: f32,
     next_tick_time_i: u32,
+    features: Vec<&'static str>,
     palettes: [PaletteInfo; 3],
     palette_index: usize,
 }
@@ -61,9 +62,10 @@ impl Emulator {
             graphics: None,
             audio: None,
             logic_frequency: GameBoy::CPU_FREQ,
-            visual_frequency: GameBoy::VISUAL_FREQ,
+            visual_frequency: GameBoy::VISUAL_FREQ * 2.0,
             next_tick_time: 0.0,
             next_tick_time_i: 0,
+            features: vec!["no-vsync"],
             palettes: [
                 PaletteInfo::new(
                     "basic",
@@ -110,6 +112,8 @@ impl Emulator {
             DISPLAY_WIDTH as u32,
             DISPLAY_HEIGHT as u32,
             screen_scale,
+            !self.features.contains(&"no-accelerated"),
+            !self.features.contains(&"no-vsync"),
         ));
     }
 
