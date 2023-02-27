@@ -164,6 +164,10 @@ impl GameBoy {
         self.frame_buffer().to_vec()
     }
 
+    pub fn audio_buffer_eager(&mut self) -> Vec<u8> {
+        self.audio_buffer().to_vec()
+    }
+
     pub fn cartridge_eager(&mut self) -> Cartridge {
         self.mmu().rom().clone()
     }
@@ -279,6 +283,10 @@ impl GameBoy {
         &(self.ppu().frame_buffer)
     }
 
+    pub fn audio_buffer(&mut self) -> &Vec<u8> {
+        self.apu().audio_buffer()
+    }
+
     pub fn load_boot_path(&mut self, path: &str) {
         let data = read_file(path);
         self.load_boot(&data);
@@ -388,11 +396,11 @@ impl AudioProvider for GameBoy {
     }
 
     fn audio_buffer(&self) -> &Vec<u8> {
-        self.apu_i().output_buffer()
+        self.apu_i().audio_buffer()
     }
 
     fn clear_audio_buffer(&mut self) {
-        self.apu().clear_buffer()
+        self.apu().clear_audio_buffer()
     }
 }
 

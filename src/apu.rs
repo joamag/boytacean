@@ -35,9 +35,10 @@ pub struct Apu {
     ch2_sound_length: bool,
     ch2_enabled: bool,
 
-    ch3_timer: u16,
-    ch3_sequence: u8,
-    ch3_output: u8,
+    // @TODO start using this once we're ready for CH3
+    //ch3_timer: u16,
+    //ch3_sequence: u8,
+    //ch3_output: u8,
     ch3_dac: bool,
     ch3_length_timer: u8,
     ch3_output_level: u8,
@@ -48,7 +49,7 @@ pub struct Apu {
     wave_ram: [u8; 16],
 
     output_timer: u16,
-    output_buffer: Vec<u8>,
+    audio_buffer: Vec<u8>,
 }
 
 impl Apu {
@@ -81,9 +82,10 @@ impl Apu {
             ch2_sound_length: false,
             ch2_enabled: false,
 
-            ch3_timer: 0,
-            ch3_sequence: 0,
-            ch3_output: 0,
+            // @TODO start using this once we're ready for CH3
+            //ch3_timer: 0,
+            //ch3_sequence: 0,
+            //ch3_output: 0,
             ch3_dac: false,
             ch3_length_timer: 0x0,
             ch3_output_level: 0x0,
@@ -94,7 +96,7 @@ impl Apu {
             wave_ram: [0u8; 16],
 
             output_timer: 0,
-            output_buffer: Vec::new(),
+            audio_buffer: Vec::new(),
         }
     }
 
@@ -167,7 +169,7 @@ impl Apu {
                 if value & 0x80 == 0x80 {
                     //self.ch2_timer = 0;
                     //self.ch2_sequence = 0;
-                    //@TODO improve this reset operation
+                    // @TODO improve this reset operation
                 }
             }
 
@@ -242,7 +244,7 @@ impl Apu {
 
         self.output_timer = self.output_timer.saturating_sub(1);
         if self.output_timer == 0 {
-            self.output_buffer.push(self.output());
+            self.audio_buffer.push(self.output());
             // @TODO target sampling rate is hardcoded, need to softcode this
             self.output_timer = (4194304.0 / 44100.0) as u16;
         }
@@ -252,12 +254,16 @@ impl Apu {
         self.ch1_output + self.ch2_output
     }
 
-    pub fn output_buffer(&self) -> &Vec<u8> {
-        &self.output_buffer
+    pub fn audio_buffer(&self) -> &Vec<u8> {
+        &self.audio_buffer
     }
 
-    pub fn clear_buffer(&mut self) {
-        self.output_buffer.clear();
+    pub fn audio_buffer_mut(&mut self) -> &mut Vec<u8> {
+        &mut self.audio_buffer
+    }
+
+    pub fn clear_audio_buffer(&mut self) {
+        self.audio_buffer.clear();
     }
 }
 
