@@ -56,8 +56,8 @@ pub struct Registers {
 pub trait AudioProvider {
     fn output_apu(&self) -> u8;
     fn output_clock_apu(&mut self, cycles: u8, freq: u32) -> u8;
-    fn output_buffer_apu(&self) -> &Vec<u8>;
-    fn clear_buffer_apu(&mut self);
+    fn audio_buffer(&self) -> &Vec<u8>;
+    fn clear_audio_buffer(&mut self);
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
@@ -393,11 +393,11 @@ impl AudioProvider for GameBoy {
         self.apu_i().output()
     }
 
-    fn output_buffer_apu(&self) -> &Vec<u8> {
+    fn audio_buffer(&self) -> &Vec<u8> {
         self.apu_i().output_buffer()
     }
 
-    fn clear_buffer_apu(&mut self) {
+    fn clear_audio_buffer(&mut self) {
         self.apu().clear_buffer()
     }
 }

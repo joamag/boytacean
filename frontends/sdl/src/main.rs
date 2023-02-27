@@ -6,17 +6,13 @@ pub mod graphics;
 
 use audio::Audio;
 use boytacean::{
-    gb::GameBoy,
+    gb::{AudioProvider, GameBoy},
     pad::PadKey,
     ppu::{PaletteInfo, PpuMode, DISPLAY_HEIGHT, DISPLAY_WIDTH},
 };
 use graphics::{surface_from_bytes, Graphics};
 use sdl2::{event::Event, keyboard::Keycode, pixels::PixelFormatEnum, Sdl};
-use std::{
-    cmp::max,
-    sync::{Arc, Mutex},
-    time::SystemTime,
-};
+use std::{cmp::max, time::SystemTime};
 
 /// The scale at which the screen is going to be drawn
 /// meaning the ratio between Game Boy resolution and
@@ -43,7 +39,7 @@ impl Default for Benchmark {
 }
 
 pub struct Emulator {
-    system: Arc<Mutex<Box<GameBoy>>>,
+    system: GameBoy,
     graphics: Option<Graphics>,
     audio: Option<Audio>,
     logic_frequency: u32,
@@ -56,7 +52,7 @@ pub struct Emulator {
 }
 
 impl Emulator {
-    pub fn new(system: Arc<Mutex<Box<GameBoy>>>) -> Self {
+    pub fn new(system: GameBoy) -> Self {
         Self {
             system,
             graphics: None,
@@ -99,10 +95,10 @@ impl Emulator {
         }
     }
 
-    pub fn start(&mut self, screen_scale: f32, audio_provider: Arc<Mutex<Box<GameBoy>>>) {
+    pub fn start(&mut self, screen_scale: f32) {
         let sdl = sdl2::init().unwrap();
         self.start_graphics(&sdl, screen_scale);
-        self.start_audio(&sdl, audio_provider);
+        self.start_audio(&sdl);
     }
 
     pub fn start_graphics(&mut self, sdl: &Sdl, screen_scale: f32) {
@@ -117,13 +113,12 @@ impl Emulator {
         ));
     }
 
-    pub fn start_audio(&mut self, sdl: &Sdl, audio_provider: Arc<Mutex<Box<GameBoy>>>) {
-        self.audio = Some(Audio::new(sdl, audio_provider));
+    pub fn start_audio(&mut self, sdl: &Sdl) {
+        self.audio = Some(Audio::new(sdl));
     }
 
     pub fn load_rom(&mut self, path: &str) {
-        let mut system = self.system.lock().unwrap();
-        let rom = system.load_rom_file(path);
+        let rom = self.system.load_rom_file(path);
         println!(
             "========= Cartridge =========\n{}\n=============================",
             rom
@@ -145,7 +140,7 @@ impl Emulator {
         let initial = SystemTime::now();
 
         for _ in 0..count {
-            cycles += self.system.lock().unwrap().clock() as u32;
+            cycles += self.system.clock() as u32;
         }
 
         let delta = initial.elapsed().unwrap().as_millis() as f32 / 1000.0;
@@ -159,8 +154,6 @@ impl Emulator {
 
     pub fn toggle_palette(&mut self) {
         self.system
-            .lock()
-            .unwrap()
             .ppu()
             .set_palette_colors(self.palettes[self.palette_index].colors());
         self.palette_index = (self.palette_index + 1) % self.palettes.len();
@@ -239,7 +232,7 @@ impl Emulator {
                         ..
                     } => {
                         if let Some(key) = key_to_pad(keycode) {
-                            self.system.lock().unwrap().key_press(key)
+                            self.system.key_press(key)
                         }
                     }
                     Event::KeyUp {
@@ -247,12 +240,12 @@ impl Emulator {
                         ..
                     } => {
                         if let Some(key) = key_to_pad(keycode) {
-                            self.system.lock().unwrap().key_lift(key)
+                            self.system.key_lift(key)
                         }
                     }
                     Event::DropFile { filename, .. } => {
-                        self.system.lock().unwrap().reset();
-                        self.system.lock().unwrap().load_boot_default();
+                        self.system.reset();
+                        self.system.load_boot_default();
                         self.load_rom(&filename);
                     }
                     _ => (),
@@ -283,33 +276,44 @@ impl Emulator {
                         break;
                     }
 
+                    // runs the Game Boy clock, this operation should
+                    // include the advance of both the CPU, PPU, APU
+                    // and any other frequency based component of the system
+                    counter_cycles += self.system.clock() as u32;
+
+                    // in case a V-Blank state has been reached a new frame is available
+                    // then the frame must be pushed into SDL for display
+                    if self.system.ppu_mode() == PpuMode::VBlank
+                        && self.system.ppu_frame() != last_frame
                     {
-                        // obtains a locked reference to the system that is going to be
-                        // valid under the current block
-                        let mut system = self.system.lock().unwrap();
+                        // obtains the frame buffer of the Game Boy PPU and uses it
+                        // to update the stream texture, that will latter be copied
+                        // to the canvas
+                        let frame_buffer = self.system.frame_buffer().as_ref();
+                        texture
+                            .update(None, frame_buffer, DISPLAY_WIDTH * 3)
+                            .unwrap();
 
-                        // runs the Game Boy clock, this operation should
-                        // include the advance of both the CPU, PPU, APU
-                        // and any other frequency based component of the system
-                        counter_cycles += system.clock() as u32;
-
-                        // in case a V-Blank state has been reached a new frame is available
-                        // then the frame must be pushed into SDL for display
-                        if system.ppu_mode() == PpuMode::VBlank && system.ppu_frame() != last_frame
-                        {
-                            // obtains the frame buffer of the Game Boy PPU and uses it
-                            // to update the stream texture, that will latter be copied
-                            // to the canvas
-                            let frame_buffer = system.frame_buffer().as_ref();
-                            texture
-                                .update(None, frame_buffer, DISPLAY_WIDTH * 3)
-                                .unwrap();
-
-                            // obtains the index of the current PPU frame, this value
-                            // is going to be used to detect for new frame presence
-                            last_frame = system.ppu_frame();
-                        }
+                        // obtains the index of the current PPU frame, this value
+                        // is going to be used to detect for new frame presence
+                        last_frame = self.system.ppu_frame();
                     }
+
+                    // obtains the new audio buffer and queues it into the audio
+                    // subsystem ready to be processed
+                    let audio_buffer = self
+                        .system
+                        .audio_buffer()
+                        .iter()
+                        .map(|v| *v as f32 / 7.0)
+                        .collect::<Vec<f32>>();
+                    self.audio
+                        .as_mut()
+                        .unwrap()
+                        .device
+                        .queue_audio(&audio_buffer)
+                        .unwrap();
+                    self.system.clear_audio_buffer();
                 }
 
                 // in case there's at least one new frame that was drawn during
@@ -370,16 +374,14 @@ impl Emulator {
 fn main() {
     // creates a new Game Boy instance and loads both the boot ROM
     // and the initial game ROM to "start the engine"
-    let game_boy = Arc::new(Mutex::new(Box::new(GameBoy::new())));
-    game_boy.try_lock().unwrap().as_mut().load_boot_default();
+    let mut game_boy = GameBoy::new();
+    game_boy.load_boot_default();
 
-    // creates a new generic emulator structure loads the default
+    // creates a new generic emulator structure then starts
+    // both the video and audio sub-systems, loads default
     // ROM file and starts running it
     let mut emulator = Emulator::new(game_boy);
-
-    let game_boy_ref = emulator.system.clone();
-
-    emulator.start(SCREEN_SCALE, game_boy_ref);
+    emulator.start(SCREEN_SCALE);
     emulator.load_rom("../../res/roms/pocket.gb");
     emulator.toggle_palette();
     emulator.run();
