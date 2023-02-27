@@ -48,7 +48,7 @@ pub struct Apu {
     wave_ram: [u8; 16],
 
     output_timer: u16,
-    output_buffer: Vec<u8>
+    output_buffer: Vec<u8>,
 }
 
 impl Apu {
@@ -94,18 +94,14 @@ impl Apu {
             wave_ram: [0u8; 16],
 
             output_timer: 0,
-            output_buffer: Vec::new()
+            output_buffer: Vec::new(),
         }
     }
 
     pub fn clock(&mut self, cycles: u8) {
-        self.clock_f(cycles, 4194304);
-    }
-
-    pub fn clock_f(&mut self, cycles: u8, freq: u32) {
-        // @todo the performance here requires improvement
+        // @TODO the performance here requires improvement
         for _ in 0..cycles {
-            self.cycle(freq);
+            self.cycle();
         }
     }
 
@@ -147,7 +143,6 @@ impl Apu {
                     (self.ch1_wave_length & 0x00ff) | (((value & 0x07) as u16) << 8);
                 self.ch1_sound_length |= value & 0x40 == 0x40;
                 self.ch1_enabled |= value & 0x80 == 0x80;
-                //println!("CH1 Enabled {}", self.ch1_enabled);
             }
 
             // 0xFF16 — NR21: Channel 2 length timer & duty cycle
@@ -174,9 +169,8 @@ impl Apu {
                 if value & 0x80 == 0x80 {
                     //self.ch2_timer = 0;
                     //self.ch2_sequence = 0;
-                    //@todo improve this reset operation
+                    //@TODO improve this reset operation
                 }
-                //println!("CH2 Enabled {}", self.ch2_enabled);
             }
 
             // 0xFF1A — NR30: Channel 3 DAC enable
@@ -201,7 +195,6 @@ impl Apu {
                     (self.ch3_wave_length & 0x00ff) | (((value & 0x07) as u16) << 8);
                 self.ch3_sound_length |= value & 0x40 == 0x40;
                 self.ch3_enabled |= value & 0x80 == 0x80;
-                //println!("CH3 Enabled {}", self.ch3_enabled);
             }
 
             // 0xFF30-0xFF3F — Wave pattern RAM
@@ -214,11 +207,10 @@ impl Apu {
     }
 
     #[inline(always)]
-    pub fn cycle(&mut self, freq: u32) {
+    pub fn cycle(&mut self) {
         self.ch1_timer = self.ch1_timer.saturating_sub(1);
         if self.ch1_timer == 0 {
-            let target_freq = 1048576.0 / (2048.0 - self.ch1_wave_length as f32);
-            self.ch1_timer = (freq as f32 / target_freq) as u16;
+            self.ch1_timer = (2048 - self.ch1_wave_length) << 2;
             self.ch1_sequence = (self.ch1_sequence + 1) & 7;
 
             if self.ch1_enabled {
@@ -235,8 +227,7 @@ impl Apu {
 
         self.ch2_timer = self.ch2_timer.saturating_sub(1);
         if self.ch2_timer == 0 {
-            let target_freq = 1048576.0 / (2048.0 - self.ch2_wave_length as f32);
-            self.ch2_timer = (freq as f32 / target_freq) as u16;
+            self.ch2_timer = (2048 - self.ch2_wave_length) << 2;
             self.ch2_sequence = (self.ch2_sequence + 1) & 7;
 
             if self.ch2_enabled {
@@ -254,7 +245,8 @@ impl Apu {
         self.output_timer = self.output_timer.saturating_sub(1);
         if self.output_timer == 0 {
             self.output_buffer.push(self.output());
-            self.output_timer = (freq as f32 / 44100.0) as u16; // @todo target sampling rate is hardcoded
+            // @TODO target sampling rate is hardcoded, need to softcode this
+            self.output_timer = (4194304.0 / 44100.0) as u16;
         }
     }
 

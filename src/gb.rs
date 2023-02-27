@@ -54,8 +54,7 @@ pub struct Registers {
 }
 
 pub trait AudioProvider {
-    fn output_apu(&self) -> u8;
-    fn output_clock_apu(&mut self, cycles: u8, freq: u32) -> u8;
+    fn audio_output(&self) -> u8;
     fn audio_buffer(&self) -> &Vec<u8>;
     fn clear_audio_buffer(&mut self);
 }
@@ -384,12 +383,7 @@ pub fn hook_impl(info: &PanicInfo) {
 }
 
 impl AudioProvider for GameBoy {
-    fn output_apu(&self) -> u8 {
-        self.apu_i().output()
-    }
-
-    fn output_clock_apu(&mut self, cycles: u8, freq: u32) -> u8 {
-        self.apu().clock_f(cycles, freq);
+    fn audio_output(&self) -> u8 {
         self.apu_i().output()
     }
 

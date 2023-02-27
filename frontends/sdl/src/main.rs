@@ -42,6 +42,7 @@ pub struct Emulator {
     system: GameBoy,
     graphics: Option<Graphics>,
     audio: Option<Audio>,
+    title: &'static str,
     logic_frequency: u32,
     visual_frequency: f32,
     next_tick_time: f32,
@@ -57,11 +58,12 @@ impl Emulator {
             system,
             graphics: None,
             audio: None,
+            title: TITLE,
             logic_frequency: GameBoy::CPU_FREQ,
-            visual_frequency: GameBoy::VISUAL_FREQ * 2.0,
+            visual_frequency: GameBoy::VISUAL_FREQ,
             next_tick_time: 0.0,
             next_tick_time_i: 0,
-            features: vec!["no-vsync"],
+            features: vec!["video", "audio", "no-vsync"],
             palettes: [
                 PaletteInfo::new(
                     "basic",
@@ -97,14 +99,18 @@ impl Emulator {
 
     pub fn start(&mut self, screen_scale: f32) {
         let sdl = sdl2::init().unwrap();
-        self.start_graphics(&sdl, screen_scale);
-        self.start_audio(&sdl);
+        if self.features.contains(&"video") {
+            self.start_graphics(&sdl, screen_scale);
+        }
+        if self.features.contains(&"audio") {
+            self.start_audio(&sdl);
+        }
     }
 
     pub fn start_graphics(&mut self, sdl: &Sdl, screen_scale: f32) {
         self.graphics = Some(Graphics::new(
             &sdl,
-            TITLE,
+            self.title,
             DISPLAY_WIDTH as u32,
             DISPLAY_HEIGHT as u32,
             screen_scale,
@@ -127,7 +133,7 @@ impl Emulator {
             .as_mut()
             .unwrap()
             .window_mut()
-            .set_title(format!("{} [{}]", TITLE, rom.title()).as_str())
+            .set_title(format!("{} [{}]", self.title, rom.title()).as_str())
             .unwrap();
     }
 
@@ -299,20 +305,23 @@ impl Emulator {
                         last_frame = self.system.ppu_frame();
                     }
 
-                    // obtains the new audio buffer and queues it into the audio
-                    // subsystem ready to be processed
-                    let audio_buffer = self
-                        .system
-                        .audio_buffer()
-                        .iter()
-                        .map(|v| *v as f32 / 7.0)
-                        .collect::<Vec<f32>>();
-                    self.audio
-                        .as_mut()
-                        .unwrap()
-                        .device
-                        .queue_audio(&audio_buffer)
-                        .unwrap();
+                    match self.audio.as_mut() {
+                        Some(audio) => {
+                            // obtains the new audio buffer and queues it into the audio
+                            // subsystem ready to be processed
+                            let audio_buffer = self
+                                .system
+                                .audio_buffer()
+                                .iter()
+                                .map(|v| *v as f32 / 14.0)
+                                .collect::<Vec<f32>>();
+                            audio.device.queue_audio(&audio_buffer).unwrap();
+                        }
+                        None => (),
+                    }
+
+                    // clears the audio buffer to prevent it from
+                    // "exploding" in size
                     self.system.clear_audio_buffer();
                 }
 
