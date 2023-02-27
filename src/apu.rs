@@ -56,7 +56,7 @@ impl Apu {
 
     pub fn read(&mut self, addr: u16) -> u8 {
         match addr {
-            0xff26 => 1 as u8, // todo implement this
+            0xff26 => 1 as u8, // @todo implement this
             _ => {
                 warnln!("Reading from unknown APU location 0x{:04x}", addr);
                 0xff
