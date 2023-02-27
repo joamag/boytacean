@@ -1,4 +1,4 @@
-use crate::{debugln, pad::Pad, ppu::Ppu, rom::Cartridge, timer::Timer, apu::Apu};
+use crate::{apu::Apu, debugln, pad::Pad, ppu::Ppu, rom::Cartridge, timer::Timer};
 
 pub const BOOT_SIZE: usize = 2304;
 pub const RAM_SIZE: usize = 8192;
@@ -162,6 +162,7 @@ impl Mmu {
                                 0x00
                             }
                         },
+                        0x10..=26 | 0x30..=0x37 => self.apu.read(addr),
                         0x40 | 0x50 | 0x60 | 0x70 => self.ppu.read(addr),
                         _ => {
                             debugln!("Reading from unknown IO control 0x{:04x}", addr);
@@ -232,6 +233,7 @@ impl Mmu {
                                 0x04..=0x07 => self.timer.write(addr, value),
                                 _ => debugln!("Writing to unknown IO control 0x{:04x}", addr),
                             },
+                            0x10..=26 | 0x30..=0x37 => self.apu.write(addr, value),
                             0x40 | 0x60 | 0x70 => {
                                 match addr & 0x00ff {
                                     // 0xFF46 — DMA: OAM DMA source address & start

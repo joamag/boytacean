@@ -1,4 +1,5 @@
 use crate::{
+    apu::Apu,
     cpu::Cpu,
     data::{BootRom, CGB_BOOT, DMG_BOOT, DMG_BOOTIX, MGB_BOOTIX, SGB_BOOT},
     gen::{COMPILATION_DATE, COMPILATION_TIME, COMPILER, COMPILER_VERSION},
@@ -7,7 +8,7 @@ use crate::{
     ppu::{Ppu, PpuMode, Tile, FRAME_BUFFER_SIZE},
     rom::Cartridge,
     timer::Timer,
-    util::read_file, apu::Apu,
+    util::read_file,
 };
 
 #[cfg(feature = "wasm")]
