@@ -106,11 +106,9 @@ impl Apu {
     }
 
     pub fn read(&mut self, addr: u16) -> u8 {
-        match addr {
-            _ => {
-                warnln!("Reading from unknown APU location 0x{:04x}", addr);
-                0xff
-            }
+        {
+            warnln!("Reading from unknown APU location 0x{:04x}", addr);
+            0xff
         }
     }
 
@@ -260,5 +258,11 @@ impl Apu {
 
     pub fn clear_buffer(&mut self) {
         self.output_buffer.clear();
+    }
+}
+
+impl Default for Apu {
+    fn default() -> Self {
+        Self::new()
     }
 }
