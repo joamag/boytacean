@@ -49,6 +49,11 @@ impl Apu {
         }
     }
 
+    pub fn clock(&mut self, cycles: u8) {
+        // @todo implement the clock and allow for the proper
+        // writing of the output buffer at a fixed frequency
+    }
+
     pub fn read(&mut self, addr: u16) -> u8 {
         match addr {
             0xff26 => 1 as u8, // todo implement this

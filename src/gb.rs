@@ -75,6 +75,7 @@ impl GameBoy {
     pub fn clock(&mut self) -> u8 {
         let cycles = self.cpu_clock();
         self.ppu_clock(cycles);
+        self.apu_clock(cycles);
         self.timer_clock(cycles);
         cycles
     }
@@ -93,6 +94,10 @@ impl GameBoy {
 
     pub fn ppu_clock(&mut self, cycles: u8) {
         self.ppu().clock(cycles)
+    }
+
+    pub fn apu_clock(&mut self, cycles: u8) {
+        self.apu().clock(cycles)
     }
 
     pub fn timer_clock(&mut self, cycles: u8) {
@@ -246,6 +251,10 @@ impl GameBoy {
 
     pub fn ppu(&mut self) -> &mut Ppu {
         self.cpu.ppu()
+    }
+
+    pub fn apu(&mut self) -> &mut Apu {
+        self.cpu.apu()
     }
 
     pub fn pad(&mut self) -> &mut Pad {
