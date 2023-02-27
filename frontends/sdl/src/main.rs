@@ -109,7 +109,7 @@ impl Emulator {
 
     pub fn start_graphics(&mut self, sdl: &Sdl, screen_scale: f32) {
         self.graphics = Some(Graphics::new(
-            &sdl,
+            sdl,
             self.title,
             DISPLAY_WIDTH as u32,
             DISPLAY_HEIGHT as u32,
@@ -305,19 +305,16 @@ impl Emulator {
                         last_frame = self.system.ppu_frame();
                     }
 
-                    match self.audio.as_mut() {
-                        Some(audio) => {
-                            // obtains the new audio buffer and queues it into the audio
-                            // subsystem ready to be processed
-                            let audio_buffer = self
-                                .system
-                                .audio_buffer()
-                                .iter()
-                                .map(|v| *v as f32 / 14.0)
-                                .collect::<Vec<f32>>();
-                            audio.device.queue_audio(&audio_buffer).unwrap();
-                        }
-                        None => (),
+                    if let Some(audio) = self.audio.as_mut() {
+                        // obtains the new audio buffer and queues it into the audio
+                        // subsystem ready to be processed
+                        let audio_buffer = self
+                            .system
+                            .audio_buffer()
+                            .iter()
+                            .map(|v| *v as f32 / 14.0)
+                            .collect::<Vec<f32>>();
+                        audio.device.queue_audio(&audio_buffer).unwrap();
                     }
 
                     // clears the audio buffer to prevent it from
