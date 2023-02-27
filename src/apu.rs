@@ -52,6 +52,10 @@ impl Apu {
     pub fn clock(&mut self, cycles: u8) {
         // @todo implement the clock and allow for the proper
         // writing of the output buffer at a fixed frequency
+
+        
+
+
     }
 
     pub fn read(&mut self, addr: u16) -> u8 {
@@ -66,7 +70,7 @@ impl Apu {
 
     pub fn write(&mut self, addr: u16, value: u8) {
         match addr {
-            // 0xFF10 — NR10: Channel 1 length timer & duty cycle
+            // 0xFF10 — NR10: Channel 1 sweep
             0xff10 => {
                 self.ch1_sweep_slope = value & 0x03;
                 self.ch1_sweep_increase = value & 0x04 == 0x04;
