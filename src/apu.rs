@@ -111,7 +111,7 @@ impl Apu {
             0xff18 => {
                 self.ch2_wave_length = (self.ch2_wave_length & 0xff00) | value as u16;
             }
-            // 0xFF19 — NR24: Channel 1 wavelength high & control
+            // 0xFF19 — NR24: Channel 2 wavelength high & control
             0xff19 => {
                 self.ch2_wave_length =
                     (self.ch2_wave_length & 0x00ff) | (((value & 0x07) as u16) << 8);
