@@ -1,32 +1,38 @@
+use boytacean::gb::{AudioProvider, GameBoy};
 use sdl2::{
-    audio::{AudioCallback, AudioDevice, AudioSpecDesired},
+    audio::{AudioCallback, AudioDevice, AudioSpec, AudioSpecDesired},
     AudioSubsystem, Sdl,
 };
+use std::sync::{Arc, Mutex};
 
 pub struct AudioWave {
-    phase_inc: f32,
+    /// Specification of the audion settings that have been put in place
+    /// for the playing of this audio wave.
+    spec: AudioSpec,
 
-    phase: f32,
+    /// The object that is going to be used as the provider of the audio
+    /// operation.
+    audio_provider: Arc<Mutex<Box<GameBoy>>>,
 
-    volume: f32,
-
-    /// The relative amount of time (as a percentage decimal) the low level
-    /// is going to be present during a period (cycle).
-    /// From [Wikipedia](https://en.wikipedia.org/wiki/Duty_cycle).
-    duty_cycle: f32,
+    /// The number of audio ticks that have passed since the beginning
+    /// of the audio playback, the value wraps around (avoids overflow).
+    ticks: usize,
 }
 
 impl AudioCallback for AudioWave {
     type Channel = f32;
 
     fn callback(&mut self, out: &mut [f32]) {
+        self.ticks = self.ticks.wrapping_add(out.len() as usize);
+
         for x in out.iter_mut() {
-            *x = if self.phase < (1.0 - self.duty_cycle) {
-                self.volume
-            } else {
-                -self.volume
-            };
-            self.phase = (self.phase + self.phase_inc) % 1.0;
+            *x = match self.audio_provider.lock() {
+                Ok(mut provider) => {
+                    let value = provider.tick_apu(self.spec.freq as u32) as f32 / 7.0;
+                    value
+                }
+                Err(_) => 0.0,
+            }
         }
     }
 }
@@ -37,7 +43,7 @@ pub struct Audio {
 }
 
 impl Audio {
-    pub fn new(sdl: &Sdl) -> Self {
+    pub fn new(sdl: &Sdl, audio_provider: Arc<Mutex<Box<GameBoy>>>) -> Self {
         let audio_subsystem = sdl.audio().unwrap();
 
         let desired_spec = AudioSpecDesired {
@@ -48,10 +54,9 @@ impl Audio {
 
         let device = audio_subsystem
             .open_playback(None, &desired_spec, |spec| AudioWave {
-                phase_inc: 440.0 / spec.freq as f32,
-                phase: 0.0,
-                volume: 0.25,
-                duty_cycle: 0.5,
+                spec: spec,
+                audio_provider: audio_provider,
+                ticks: 0,
             })
             .unwrap();
 

@@ -1,6 +1,16 @@
 use crate::warnln;
 
+const DUTY_TABLE: [[u8; 8]; 4] = [
+    [0, 0, 0, 0, 0, 0, 0, 1],
+    [1, 0, 0, 0, 0, 0, 0, 1],
+    [1, 0, 0, 0, 0, 1, 1, 1],
+    [0, 1, 1, 1, 1, 1, 1, 0],
+];
+
 pub struct Apu {
+    ch1_timer: u16,
+    ch1_sequence: u8,
+    ch1_output: u8,
     ch1_sweep_slope: u8,
     ch1_sweep_increase: bool,
     ch1_sweep_pace: u8,
@@ -13,6 +23,9 @@ pub struct Apu {
     ch1_sound_length: bool,
     ch1_enabled: bool,
 
+    ch2_timer: u16,
+    ch2_sequence: u8,
+    ch2_output: u8,
     ch2_length_timer: u8,
     ch2_wave_duty: u8,
     ch2_pace: u8,
@@ -26,6 +39,9 @@ pub struct Apu {
 impl Apu {
     pub fn new() -> Self {
         Self {
+            ch1_timer: 0,
+            ch1_sequence: 0,
+            ch1_output: 0,
             ch1_sweep_slope: 0x0,
             ch1_sweep_increase: false,
             ch1_sweep_pace: 0x0,
@@ -38,6 +54,9 @@ impl Apu {
             ch1_sound_length: false,
             ch1_enabled: false,
 
+            ch2_timer: 0,
+            ch2_sequence: 0,
+            ch2_output: 0,
             ch2_length_timer: 0x0,
             ch2_wave_duty: 0x0,
             ch2_pace: 0x0,
@@ -49,13 +68,10 @@ impl Apu {
         }
     }
 
-    pub fn clock(&mut self, cycles: u8) {
-        // @todo implement the clock and allow for the proper
-        // writing of the output buffer at a fixed frequency
-
-        
-
-
+    pub fn clock(&mut self, cycles: u8, freq: u32) {
+        for _ in 0..cycles {
+            self.cycle(freq);
+        }
     }
 
     pub fn read(&mut self, addr: u16) -> u8 {
@@ -126,5 +142,30 @@ impl Apu {
 
             _ => warnln!("Writing in unknown APU location 0x{:04x}", addr),
         }
+    }
+
+    #[inline(always)]
+    pub fn cycle(&mut self, freq: u32) {
+        self.ch2_timer = self.ch2_timer.saturating_sub(1);
+        if self.ch2_timer == 0 {
+            let target_freq = 1048576.0 / (2048.0 - self.ch1_wave_length as f32);
+            self.ch2_timer = (freq as f32 / target_freq) as u16;
+            self.ch2_sequence = (self.ch2_sequence + 1) & 7;
+
+            if self.ch2_enabled {
+                self.ch2_output =
+                    if DUTY_TABLE[self.ch2_wave_duty as usize][self.ch2_sequence as usize] == 1 {
+                        self.ch2_volume
+                    } else {
+                        0
+                    };
+            } else {
+                self.ch2_output = 0;
+            }
+        }
+    }
+
+    pub fn output(&self) -> u8 {
+        self.ch2_output
     }
 }
