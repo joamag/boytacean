@@ -346,7 +346,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         // some sync, this is required because of time hogging
         const audioCurrentTime = this.audioContext.currentTime;
         if (
-            this.nextPlayTime > audioCurrentTime + 0.05 ||
+            this.nextPlayTime > audioCurrentTime + 0.25 ||
             this.nextPlayTime < audioCurrentTime
         ) {
             // @TODO: this is tricky as it cancels most of the code
@@ -355,7 +355,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
                 chunk.source.stop();
             });
             this.audioChunks = [];
-            this.nextPlayTime = audioCurrentTime;
+            this.nextPlayTime = audioCurrentTime + 0.1;
         }
 
         const source = this.audioContext.createBufferSource();
