@@ -164,8 +164,12 @@ impl GameBoy {
         self.frame_buffer().to_vec()
     }
 
-    pub fn audio_buffer_eager(&mut self) -> Vec<u8> {
-        self.audio_buffer().to_vec()
+    pub fn audio_buffer_eager(&mut self, clear: bool) -> Vec<u8> {
+        let buffer = self.audio_buffer().to_vec();
+        if clear {
+            self.clear_audio_buffer();
+        }
+        buffer
     }
 
     pub fn cartridge_eager(&mut self) -> Cartridge {

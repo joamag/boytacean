@@ -80,6 +80,13 @@ const KEYS_NAME: Record<string, number> = {
 
 const ROM_PATH = require("../../../res/roms/pocket.gb");
 
+// @TODO: check if this is the right place for this struct
+type AudioChunk = {
+    source: AudioBufferSourceNode;
+    playTime: number;
+    duration: number;
+};
+
 /**
  * Top level class that controls the emulator behaviour
  * and "joins" all the elements together to bring input/output
@@ -114,6 +121,13 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     private romData: Uint8Array | null = null;
     private romSize = 0;
     private cartridge: Cartridge | null = null;
+
+    // @TODO: try to think where does this belong
+    private audioContext = new AudioContext({
+        sampleRate: 44100
+    });
+    private audioChunks: AudioChunk[] = [];
+    private nextPlayTime = 0.0;
 
     /**
      * Associative map for extra settings to be used in
@@ -226,6 +240,10 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     }
 
     tick(currentTime: number, pending: number, cycles = 70224) {
+        // in case the reference to the system is not set then
+        // returns the control flow immediately (not possible to tick)
+        if (!this.gameBoy) return pending;
+
         // in case the time to draw the next frame has not been
         // reached the flush of the "tick" logic is skipped
         if (currentTime < this.nextTickTime) return pending;
@@ -245,19 +263,19 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
 
             // runs the Game Boy clock, this operations should
             // include the advance of both the CPU and the PPU
-            const tickCycles = this.gameBoy?.clock() ?? 0;
+            const tickCycles = this.gameBoy.clock();
             counterCycles += tickCycles;
 
             // in case the current PPU mode is VBlank and the
             // frame is different from the previously rendered
             // one then it's time to update the canvas
             if (
-                this.gameBoy?.ppu_mode() === PpuMode.VBlank &&
-                this.gameBoy?.ppu_frame() !== lastFrame
+                this.gameBoy.ppu_mode() === PpuMode.VBlank &&
+                this.gameBoy.ppu_frame() !== lastFrame
             ) {
                 // updates the reference to the last frame index
                 // to be used for comparison in the next tick
-                lastFrame = this.gameBoy?.ppu_frame();
+                lastFrame = this.gameBoy.ppu_frame();
 
                 // triggers the frame event indicating that
                 // a new frame is now available for drawing
@@ -303,6 +321,61 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
                 ((1 / this.visualFrequency) * 1000)
         );
         ticks = Math.max(ticks, 1);
+
+        // --- START OF THE AUDIO CODE
+
+        const channels = 2;
+        const internalBuffer = this.gameBoy.audio_buffer_eager(true);
+        const audioBuffer = this.audioContext.createBuffer(
+            channels,
+            internalBuffer.length,
+            44100
+        );
+
+        for (let channel = 0; channel < channels; channel++) {
+            const channelBuffer = audioBuffer.getChannelData(channel);
+            for (let index = 0; index < internalBuffer.length; index++) {
+                channelBuffer[index] = internalBuffer[index] / 100.0;
+            }
+        }
+
+        // @todo check this code so see if it makes sense
+
+        // makes sure that we're not too far away from the audio
+        // and if that's the case drops some of the audio to regain
+        // some sync, this is required because of time hogging
+        const audioCurrentTime = this.audioContext.currentTime;
+        if (
+            this.nextPlayTime > audioCurrentTime + 0.05 ||
+            this.nextPlayTime < audioCurrentTime
+        ) {
+            // @TODO: this is tricky as it cancels most of the code
+            this.audioChunks.forEach((chunk) => {
+                chunk.source.disconnect(this.audioContext.destination);
+                chunk.source.stop();
+            });
+            this.audioChunks = [];
+            this.nextPlayTime = audioCurrentTime;
+        }
+
+        const source = this.audioContext.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(this.audioContext.destination);
+
+        this.nextPlayTime = this.nextPlayTime || audioCurrentTime;
+
+        const chunk: AudioChunk = {
+            source: source,
+            playTime: this.nextPlayTime,
+            duration: audioBuffer.length / 44100.0
+        };
+
+        source.start(chunk.playTime);
+        this.nextPlayTime += chunk.duration;
+
+        this.audioChunks.push(chunk);
+
+        // ---- END OF THE AUDIO CODE
 
         // updates the next update time according to the number of ticks
         // that have elapsed since the last operation, this way this value
