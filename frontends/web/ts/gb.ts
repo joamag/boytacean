@@ -1,4 +1,5 @@
 import {
+    AudioSpecs,
     BenchmarkResult,
     Compilation,
     Compiler,
@@ -80,13 +81,6 @@ const KEYS_NAME: Record<string, number> = {
 
 const ROM_PATH = require("../../../res/roms/pocket.gb");
 
-// @TODO: check if this is the right place for this struct
-type AudioChunk = {
-    source: AudioBufferSourceNode;
-    playTime: number;
-    duration: number;
-};
-
 /**
  * Top level class that controls the emulator behaviour
  * and "joins" all the elements together to bring input/output
@@ -121,13 +115,6 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     private romData: Uint8Array | null = null;
     private romSize = 0;
     private cartridge: Cartridge | null = null;
-
-    // @TODO: try to think where does this belong
-    private audioContext = new AudioContext({
-        sampleRate: 44100
-    });
-    private audioChunks: AudioChunk[] = [];
-    private nextPlayTime = 0.0;
 
     /**
      * Associative map for extra settings to be used in
@@ -294,6 +281,11 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
             }
         }
 
+        // triggers the audio event, meaning that the audio should be
+        // processed for the current emulator, effectively emptying
+        // the audio buffer that is pending processing
+        this.trigger("audio");
+
         // increments the number of frames rendered in the current
         // section, this value is going to be used to calculate FPS
         this.frameCount += 1;
@@ -321,61 +313,6 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
                 ((1 / this.visualFrequency) * 1000)
         );
         ticks = Math.max(ticks, 1);
-
-        // --- START OF THE AUDIO CODE
-
-        const channels = 2;
-        const internalBuffer = this.gameBoy.audio_buffer_eager(true);
-        const audioBuffer = this.audioContext.createBuffer(
-            channels,
-            internalBuffer.length,
-            44100
-        );
-
-        for (let channel = 0; channel < channels; channel++) {
-            const channelBuffer = audioBuffer.getChannelData(channel);
-            for (let index = 0; index < internalBuffer.length; index++) {
-                channelBuffer[index] = internalBuffer[index] / 100.0;
-            }
-        }
-
-        // @todo check this code so see if it makes sense
-
-        // makes sure that we're not too far away from the audio
-        // and if that's the case drops some of the audio to regain
-        // some sync, this is required because of time hogging
-        const audioCurrentTime = this.audioContext.currentTime;
-        if (
-            this.nextPlayTime > audioCurrentTime + 0.25 ||
-            this.nextPlayTime < audioCurrentTime
-        ) {
-            // @TODO: this is tricky as it cancels most of the code
-            this.audioChunks.forEach((chunk) => {
-                chunk.source.disconnect(this.audioContext.destination);
-                chunk.source.stop();
-            });
-            this.audioChunks = [];
-            this.nextPlayTime = audioCurrentTime + 0.1;
-        }
-
-        const source = this.audioContext.createBufferSource();
-        source.buffer = audioBuffer;
-        source.connect(this.audioContext.destination);
-
-        this.nextPlayTime = this.nextPlayTime || audioCurrentTime;
-
-        const chunk: AudioChunk = {
-            source: source,
-            playTime: this.nextPlayTime,
-            duration: audioBuffer.length / 44100.0
-        };
-
-        source.start(chunk.playTime);
-        this.nextPlayTime += chunk.duration;
-
-        this.audioChunks.push(chunk);
-
-        // ---- END OF THE AUDIO CODE
 
         // updates the next update time according to the number of ticks
         // that have elapsed since the last operation, this way this value
@@ -571,6 +508,26 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
      */
     get imageBuffer(): Uint8Array {
         return this.gameBoy?.frame_buffer_eager() ?? new Uint8Array();
+    }
+
+    get audioSpecs(): AudioSpecs {
+        return {
+            samplingRate: 44100,
+            channels: 2
+        };
+    }
+
+    get audioBuffer(): Float32Array[] {
+        const audioBuffer = [];
+        const internalBuffer = this.gameBoy?.audio_buffer_eager(true) ?? [];
+        for (let channel = 0; channel < 2; channel++) {
+            const stream = new Float32Array(internalBuffer.length);
+            for (let index = 0; index < internalBuffer.length; index++) {
+                stream[index] = internalBuffer[index] / 100.0;
+            }
+            audioBuffer.push(stream);
+        }
+        return audioBuffer;
     }
 
     get romInfo(): RomInfo {
