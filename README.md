@@ -11,10 +11,10 @@ A Game Boy emulator that is written in Rust 🦀.
 * Game Boy (DMG) emulation
 * Simple navigable source-code
 * Web and SDL front-ends
+* Audio, with a pretty accurate APU
 * Support for multiple MBCs: MBC1, MBC2, MBC3, and MBC5
 * Variable CPU clock speed
 * Accurate PPU - passes [dmg-acid2](https://github.com/mattcurrie/dmg-acid2) tests
-* Audio, with a pretty accurate APU
 
 For the Web front-end...
 
