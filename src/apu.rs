@@ -289,6 +289,7 @@ impl Apu {
         }
     }
 
+    #[inline(always)]
     fn tick_length_all(&mut self) {
         self.tick_length(Channel::Ch1);
         self.tick_length(Channel::Ch2);
@@ -296,6 +297,7 @@ impl Apu {
         self.tick_length(Channel::Ch4);
     }
 
+    #[inline(always)]
     fn tick_length(&mut self, channel: Channel) {
         match channel {
             Channel::Ch1 => {
@@ -326,10 +328,12 @@ impl Apu {
         }
     }
 
+    #[inline(always)]
     fn tick_envelope_all(&mut self) {
         self.tick_envelope(Channel::Ch1);
     }
 
+    #[inline(always)]
     fn tick_envelope(&mut self, channel: Channel) {
         match channel {
             Channel::Ch1 => {
@@ -371,6 +375,7 @@ impl Apu {
         }
     }
 
+    #[inline(always)]
     fn tick_ch1_sweep(&mut self) {
         if self.ch1_sweep_pace == 0x0 {
             return;
@@ -392,12 +397,14 @@ impl Apu {
         }
     }
 
+    #[inline(always)]
     fn tick_ch_all(&mut self) {
         self.tick_ch1();
         self.tick_ch2();
         self.tick_ch3();
     }
 
+    #[inline(always)]
     fn tick_ch1(&mut self) {
         self.ch1_timer = self.ch1_timer.saturating_sub(1);
         if self.ch1_timer > 0 {
@@ -419,6 +426,7 @@ impl Apu {
         self.ch1_sequence = (self.ch1_sequence + 1) & 7;
     }
 
+    #[inline(always)]
     fn tick_ch2(&mut self) {
         self.ch2_timer = self.ch2_timer.saturating_sub(1);
         if self.ch2_timer > 0 {
@@ -440,6 +448,7 @@ impl Apu {
         self.ch2_sequence = (self.ch2_sequence + 1) & 7;
     }
 
+    #[inline(always)]
     fn tick_ch3(&mut self) {
         self.ch3_timer = self.ch3_timer.saturating_sub(1);
         if self.ch3_timer > 0 {
