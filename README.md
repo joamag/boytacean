@@ -14,6 +14,7 @@ A Game Boy emulator that is written in Rust 🦀.
 * Support for multiple MBCs: MBC1, MBC2, MBC3, and MBC5
 * Variable CPU clock speed
 * Accurate PPU - passes [dmg-acid2](https://github.com/mattcurrie/dmg-acid2) tests
+* Audio, with a pretty accurate APU
 
 For the Web front-end...
 
@@ -27,7 +28,6 @@ For the Web front-end...
 
 What's missing...
 
-* Audio emulation APU
 * Game Boy Color (GBC) emulation
 
 ## Deployments
