@@ -9,8 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-* Support for Audio 🔈!!! - [#12](https://gitlab.stage.hive.pt/joamag/boytacean/-/issues/12)
-* Support for WASM engine version printing
+*
 
 ### Changed
 
@@ -19,6 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 *
+
+## [0.7.0] - 2023-03-01
+
+### Added
+
+* Support for Audio 🔈!!! - [#12](https://gitlab.stage.hive.pt/joamag/boytacean/-/issues/12)
+* Support for WASM engine version printing
 
 ## [0.6.12] - 2023-02-21
 
