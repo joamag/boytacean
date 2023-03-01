@@ -7,9 +7,17 @@ const DUTY_TABLE: [[u8; 8]; 4] = [
     [0, 1, 1, 1, 1, 1, 1, 0],
 ];
 
+pub enum Channel {
+    Ch1,
+    Ch2,
+    Ch3,
+    Ch4,
+}
+
 pub struct Apu {
     ch1_timer: u16,
     ch1_sequence: u8,
+    ch1_sweep_sequence: u8,
     ch1_output: u8,
     ch1_sweep_slope: u8,
     ch1_sweep_increase: bool,
@@ -48,6 +56,9 @@ pub struct Apu {
 
     wave_ram: [u8; 16],
 
+    sampling_frequency: u16,
+    sequencer: u16,
+    sequencer_step: u8,
     output_timer: u16,
     audio_buffer: Vec<u8>,
 }
@@ -57,6 +68,7 @@ impl Apu {
         Self {
             ch1_timer: 0,
             ch1_sequence: 0,
+            ch1_sweep_sequence: 0,
             ch1_output: 0,
             ch1_sweep_slope: 0x0,
             ch1_sweep_increase: false,
@@ -95,6 +107,12 @@ impl Apu {
 
             wave_ram: [0u8; 16],
 
+            sampling_frequency: 44100,
+
+            /// Internal sequencer counter that runs at 512Hz
+            /// used for the activation of the tick actions.
+            sequencer: 0,
+            sequencer_step: 0,
             output_timer: 0,
             audio_buffer: Vec::new(),
         }
@@ -103,7 +121,7 @@ impl Apu {
     pub fn clock(&mut self, cycles: u8) {
         // @TODO the performance here requires improvement
         for _ in 0..cycles {
-            self.cycle();
+            self.tick();
         }
     }
 
@@ -118,8 +136,8 @@ impl Apu {
         match addr {
             // 0xFF10 — NR10: Channel 1 sweep
             0xff10 => {
-                self.ch1_sweep_slope = value & 0x03;
-                self.ch1_sweep_increase = value & 0x04 == 0x04;
+                self.ch1_sweep_slope = value & 0x07;
+                self.ch1_sweep_increase = value & 0x08 == 0x00;
                 self.ch1_sweep_pace = (value & 0x70) >> 4;
             }
             // 0xFF11 — NR11: Channel 1 length timer & duty cycle
@@ -206,8 +224,57 @@ impl Apu {
         }
     }
 
+    pub fn output(&self) -> u8 {
+        self.ch1_output + self.ch2_output
+    }
+
+    pub fn audio_buffer(&self) -> &Vec<u8> {
+        &self.audio_buffer
+    }
+
+    pub fn audio_buffer_mut(&mut self) -> &mut Vec<u8> {
+        &mut self.audio_buffer
+    }
+
+    pub fn clear_audio_buffer(&mut self) {
+        self.audio_buffer.clear();
+    }
+
     #[inline(always)]
-    pub fn cycle(&mut self) {
+    fn tick(&mut self) {
+        self.sequencer += 1;
+        if self.sequencer >= 8192 {
+            // each of these steps runs at 518/8 Hz = 64Hz
+            match self.sequencer_step {
+                0 => {
+                    self.tick_length_all();
+                }
+                1 => (),
+                2 => {
+                    self.tick_ch1_sweep();
+                    self.tick_length_all();
+                }
+                3 => (),
+                4 => {
+                    self.tick_length_all();
+                }
+                5 => (),
+                6 => {
+                    self.tick_ch1_sweep();
+                    self.tick_length_all();
+                }
+                7 => {
+                    //channels[0]->envelope_clock();
+                    //channels[1]->envelope_clock();
+                    //channels[3]->envelope_clock();
+                }
+                _ => (),
+            }
+
+            self.sequencer = 0;
+            self.sequencer_step = (self.sequencer_step + 1) & 7;
+        }
+
         self.ch1_timer = self.ch1_timer.saturating_sub(1);
         if self.ch1_timer == 0 {
             self.ch1_timer = (2048 - self.ch1_wave_length) << 2;
@@ -246,24 +313,57 @@ impl Apu {
         if self.output_timer == 0 {
             self.audio_buffer.push(self.output());
             // @TODO target sampling rate is hardcoded, need to softcode this
-            self.output_timer = (4194304.0 / 44100.0) as u16;
+            self.output_timer = (4194304.0 / self.sampling_frequency as f32) as u16;
         }
     }
 
-    pub fn output(&self) -> u8 {
-        self.ch1_output + self.ch2_output
+    fn tick_length_all(&mut self) {
+        self.tick_length(Channel::Ch1);
+        self.tick_length(Channel::Ch2);
+        self.tick_length(Channel::Ch3);
+        self.tick_length(Channel::Ch4);
     }
 
-    pub fn audio_buffer(&self) -> &Vec<u8> {
-        &self.audio_buffer
+    fn tick_length(&mut self, channel: Channel) {
+        match channel {
+            Channel::Ch1 => {
+                self.ch1_length_timer = self.ch1_length_timer.saturating_add(1);
+                if self.ch1_length_timer >= 64 {
+                    self.ch1_enabled = false;
+                    self.ch1_length_timer = 0;
+                }
+            }
+            Channel::Ch2 => {
+                self.ch2_length_timer = self.ch2_length_timer.saturating_add(1);
+                if self.ch2_length_timer >= 64 {
+                    self.ch2_enabled = false;
+                    self.ch2_length_timer = 0;
+                }
+            }
+            Channel::Ch3 => (),
+            Channel::Ch4 => (),
+        }
     }
 
-    pub fn audio_buffer_mut(&mut self) -> &mut Vec<u8> {
-        &mut self.audio_buffer
-    }
-
-    pub fn clear_audio_buffer(&mut self) {
-        self.audio_buffer.clear();
+    fn tick_ch1_sweep(&mut self) {
+        if self.ch1_sweep_pace == 0x0 {
+            return;
+        }
+        self.ch1_sweep_sequence += 1;
+        if self.ch1_sweep_sequence >= self.ch1_sweep_pace {
+            let divisor = (1 as u16) << self.ch1_sweep_slope as u16;
+            let delta = (self.ch1_wave_length as f32 / divisor as f32) as u16;
+            if self.ch1_sweep_increase {
+                self.ch1_wave_length = self.ch1_wave_length.saturating_add(delta);
+            } else {
+                self.ch1_wave_length = self.ch1_wave_length.saturating_sub(delta);
+            }
+            if self.ch1_wave_length > 0x07ff {
+                self.ch1_enabled = false;
+                self.ch1_wave_length = 0x07ff;
+            }
+            self.ch1_sweep_sequence = 0;
+        }
     }
 }
 

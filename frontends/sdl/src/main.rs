@@ -22,6 +22,10 @@ const SCREEN_SCALE: f32 = 2.0;
 /// The base title to be used in the window.
 static TITLE: &str = "Boytacean";
 
+/// Base audio volume to be used as the basis of the
+/// amplification level of the volume
+static VOLUME: f32 = 100.0;
+
 pub struct Benchmark {
     count: usize,
 }
@@ -312,7 +316,7 @@ impl Emulator {
                             .system
                             .audio_buffer()
                             .iter()
-                            .map(|v| *v as f32 / 14.0)
+                            .map(|v| *v as f32 / VOLUME)
                             .collect::<Vec<f32>>();
                         audio.device.queue_audio(&audio_buffer).unwrap();
                     }
