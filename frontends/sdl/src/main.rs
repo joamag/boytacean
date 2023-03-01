@@ -24,7 +24,7 @@ static TITLE: &str = "Boytacean";
 
 /// Base audio volume to be used as the basis of the
 /// amplification level of the volume
-static VOLUME: f32 = 100.0;
+static VOLUME: f32 = 40.0;
 
 pub struct Benchmark {
     count: usize,
