@@ -1,4 +1,4 @@
-use crate::{debugln, pad::Pad, ppu::Ppu, rom::Cartridge, timer::Timer};
+use crate::{apu::Apu, debugln, pad::Pad, ppu::Ppu, rom::Cartridge, timer::Timer};
 
 pub const BOOT_SIZE: usize = 2304;
 pub const RAM_SIZE: usize = 8192;
@@ -12,6 +12,11 @@ pub struct Mmu {
     /// to be used both for VRAM reading/writing and to forward
     /// some of the access operations.
     ppu: Ppu,
+
+    /// Reference to the APU (Audio Processing Unit) that is going
+    /// to be used both for register reading/writing and to forward
+    /// some of the access operations.
+    apu: Apu,
 
     /// Reference to the Gamepad structure that is going to control
     /// the I/O access to this device.
@@ -44,9 +49,10 @@ pub struct Mmu {
 }
 
 impl Mmu {
-    pub fn new(ppu: Ppu, pad: Pad, timer: Timer) -> Self {
+    pub fn new(ppu: Ppu, apu: Apu, pad: Pad, timer: Timer) -> Self {
         Self {
             ppu,
+            apu,
             pad,
             timer,
             rom: Cartridge::new(),
@@ -67,6 +73,14 @@ impl Mmu {
 
     pub fn ppu(&mut self) -> &mut Ppu {
         &mut self.ppu
+    }
+
+    pub fn apu(&mut self) -> &mut Apu {
+        &mut self.apu
+    }
+
+    pub fn apu_i(&self) -> &Apu {
+        &self.apu
     }
 
     pub fn pad(&mut self) -> &mut Pad {
@@ -156,6 +170,7 @@ impl Mmu {
                                 0x00
                             }
                         },
+                        0x10..=26 | 0x30..=0x37 => self.apu.read(addr),
                         0x40 | 0x50 | 0x60 | 0x70 => self.ppu.read(addr),
                         _ => {
                             debugln!("Reading from unknown IO control 0x{:04x}", addr);
@@ -226,6 +241,7 @@ impl Mmu {
                                 0x04..=0x07 => self.timer.write(addr, value),
                                 _ => debugln!("Writing to unknown IO control 0x{:04x}", addr),
                             },
+                            0x10..=26 | 0x30..=0x37 => self.apu.write(addr, value),
                             0x40 | 0x60 | 0x70 => {
                                 match addr & 0x00ff {
                                     // 0xFF46 — DMA: OAM DMA source address & start

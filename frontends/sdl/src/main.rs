@@ -1,18 +1,18 @@
 #![allow(clippy::uninlined_format_args)]
 
+pub mod audio;
 pub mod data;
-pub mod util;
+pub mod graphics;
 
+use audio::Audio;
 use boytacean::{
-    gb::GameBoy,
+    gb::{AudioProvider, GameBoy},
     pad::PadKey,
     ppu::{PaletteInfo, PpuMode, DISPLAY_HEIGHT, DISPLAY_WIDTH},
 };
-use sdl2::{event::Event, keyboard::Keycode, pixels::PixelFormatEnum};
+use graphics::{surface_from_bytes, Graphics};
+use sdl2::{event::Event, keyboard::Keycode, pixels::PixelFormatEnum, Sdl};
 use std::{cmp::max, time::SystemTime};
-use util::Graphics;
-
-use crate::util::surface_from_bytes;
 
 /// The scale at which the screen is going to be drawn
 /// meaning the ratio between Game Boy resolution and
@@ -21,6 +21,10 @@ const SCREEN_SCALE: f32 = 2.0;
 
 /// The base title to be used in the window.
 static TITLE: &str = "Boytacean";
+
+/// Base audio volume to be used as the basis of the
+/// amplification level of the volume
+static VOLUME: f32 = 64.0;
 
 pub struct Benchmark {
     count: usize,
@@ -40,29 +44,30 @@ impl Default for Benchmark {
 
 pub struct Emulator {
     system: GameBoy,
-    graphics: Graphics,
+    graphics: Option<Graphics>,
+    audio: Option<Audio>,
+    title: &'static str,
     logic_frequency: u32,
     visual_frequency: f32,
     next_tick_time: f32,
     next_tick_time_i: u32,
+    features: Vec<&'static str>,
     palettes: [PaletteInfo; 3],
     palette_index: usize,
 }
 
 impl Emulator {
-    pub fn new(system: GameBoy, screen_scale: f32) -> Self {
+    pub fn new(system: GameBoy) -> Self {
         Self {
             system,
-            graphics: Graphics::new(
-                TITLE,
-                DISPLAY_WIDTH as u32,
-                DISPLAY_HEIGHT as u32,
-                screen_scale,
-            ),
+            graphics: None,
+            audio: None,
+            title: TITLE,
             logic_frequency: GameBoy::CPU_FREQ,
             visual_frequency: GameBoy::VISUAL_FREQ,
             next_tick_time: 0.0,
             next_tick_time_i: 0,
+            features: vec!["video", "audio", "no-vsync"],
             palettes: [
                 PaletteInfo::new(
                     "basic",
@@ -96,6 +101,32 @@ impl Emulator {
         }
     }
 
+    pub fn start(&mut self, screen_scale: f32) {
+        let sdl = sdl2::init().unwrap();
+        if self.features.contains(&"video") {
+            self.start_graphics(&sdl, screen_scale);
+        }
+        if self.features.contains(&"audio") {
+            self.start_audio(&sdl);
+        }
+    }
+
+    pub fn start_graphics(&mut self, sdl: &Sdl, screen_scale: f32) {
+        self.graphics = Some(Graphics::new(
+            sdl,
+            self.title,
+            DISPLAY_WIDTH as u32,
+            DISPLAY_HEIGHT as u32,
+            screen_scale,
+            !self.features.contains(&"no-accelerated"),
+            !self.features.contains(&"no-vsync"),
+        ));
+    }
+
+    pub fn start_audio(&mut self, sdl: &Sdl) {
+        self.audio = Some(Audio::new(sdl));
+    }
+
     pub fn load_rom(&mut self, path: &str) {
         let rom = self.system.load_rom_file(path);
         println!(
@@ -103,8 +134,10 @@ impl Emulator {
             rom
         );
         self.graphics
+            .as_mut()
+            .unwrap()
             .window_mut()
-            .set_title(format!("{} [{}]", TITLE, rom.title()).as_str())
+            .set_title(format!("{} [{}]", self.title, rom.title()).as_str())
             .unwrap();
     }
 
@@ -140,15 +173,19 @@ impl Emulator {
         // updates the icon of the window to reflect the image
         // and style of the emulator
         let surface = surface_from_bytes(&data::ICON);
-        self.graphics.window_mut().set_icon(&surface);
+        self.graphics
+            .as_mut()
+            .unwrap()
+            .window_mut()
+            .set_icon(&surface);
 
         // creates an accelerated canvas to be used in the drawing
         // then clears it and presents it
-        self.graphics.canvas.present();
+        self.graphics.as_mut().unwrap().canvas.present();
 
         // creates a texture creator for the current canvas, required
         // for the creation of dynamic and static textures
-        let texture_creator = self.graphics.canvas.texture_creator();
+        let texture_creator = self.graphics.as_mut().unwrap().canvas.texture_creator();
 
         // creates the texture streaming that is going to be used
         // as the target for the pixel buffer
@@ -177,7 +214,7 @@ impl Emulator {
 
             // obtains an event from the SDL sub-system to be
             // processed under the current emulation context
-            while let Some(event) = self.graphics.event_pump.poll_event() {
+            while let Some(event) = self.graphics.as_mut().unwrap().event_pump.poll_event() {
                 match event {
                     Event::Quit { .. } => break 'main,
                     Event::KeyDown {
@@ -225,7 +262,7 @@ impl Emulator {
                 }
             }
 
-            let current_time = self.graphics.timer_subsystem.ticks();
+            let current_time = self.graphics.as_mut().unwrap().timer_subsystem.ticks();
 
             if current_time >= self.next_tick_time_i {
                 // re-starts the counter cycles with the number of pending cycles
@@ -249,10 +286,13 @@ impl Emulator {
                         break;
                     }
 
-                    // runs the Game Boy clock, this operations should
-                    // include the advance of both the CPU and the PPU
+                    // runs the Game Boy clock, this operation should
+                    // include the advance of both the CPU, PPU, APU
+                    // and any other frequency based component of the system
                     counter_cycles += self.system.clock() as u32;
 
+                    // in case a V-Blank state has been reached a new frame is available
+                    // then the frame must be pushed into SDL for display
                     if self.system.ppu_mode() == PpuMode::VBlank
                         && self.system.ppu_frame() != last_frame
                     {
@@ -268,6 +308,22 @@ impl Emulator {
                         // is going to be used to detect for new frame presence
                         last_frame = self.system.ppu_frame();
                     }
+
+                    if let Some(audio) = self.audio.as_mut() {
+                        // obtains the new audio buffer and queues it into the audio
+                        // subsystem ready to be processed
+                        let audio_buffer = self
+                            .system
+                            .audio_buffer()
+                            .iter()
+                            .map(|v| *v as f32 / VOLUME)
+                            .collect::<Vec<f32>>();
+                        audio.device.queue_audio(&audio_buffer).unwrap();
+                    }
+
+                    // clears the audio buffer to prevent it from
+                    // "exploding" in size
+                    self.system.clear_audio_buffer();
                 }
 
                 // in case there's at least one new frame that was drawn during
@@ -279,15 +335,20 @@ impl Emulator {
                     // clears the graphics canvas, making sure that no garbage
                     // pixel data remaining in the pixel buffer, not doing this would
                     // create visual glitches in OSs like Mac OS X
-                    self.graphics.canvas.clear();
+                    self.graphics.as_mut().unwrap().canvas.clear();
 
                     // copies the texture that was created for the frame (during
                     // the loop part of the tick) to the canvas
-                    self.graphics.canvas.copy(&texture, None, None).unwrap();
+                    self.graphics
+                        .as_mut()
+                        .unwrap()
+                        .canvas
+                        .copy(&texture, None, None)
+                        .unwrap();
 
                     // presents the canvas effectively updating the screen
                     // information presented to the user
-                    self.graphics.canvas.present();
+                    self.graphics.as_mut().unwrap().canvas.present();
                 }
 
                 // calculates the number of ticks that have elapsed since the
@@ -309,9 +370,13 @@ impl Emulator {
                 self.next_tick_time_i = self.next_tick_time.ceil() as u32;
             }
 
-            let current_time = self.graphics.timer_subsystem.ticks();
+            let current_time = self.graphics.as_mut().unwrap().timer_subsystem.ticks();
             let pending_time = self.next_tick_time_i.saturating_sub(current_time);
-            self.graphics.timer_subsystem.delay(pending_time);
+            self.graphics
+                .as_mut()
+                .unwrap()
+                .timer_subsystem
+                .delay(pending_time);
         }
     }
 }
@@ -322,9 +387,11 @@ fn main() {
     let mut game_boy = GameBoy::new();
     game_boy.load_boot_default();
 
-    // creates a new generic emulator structure loads the default
+    // creates a new generic emulator structure then starts
+    // both the video and audio sub-systems, loads default
     // ROM file and starts running it
-    let mut emulator = Emulator::new(game_boy, SCREEN_SCALE);
+    let mut emulator = Emulator::new(game_boy);
+    emulator.start(SCREEN_SCALE);
     emulator.load_rom("../../res/roms/pocket.gb");
     emulator.toggle_palette();
     emulator.run();
