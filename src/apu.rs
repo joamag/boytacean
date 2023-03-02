@@ -116,7 +116,7 @@ impl Apu {
 
             wave_ram: [0u8; 16],
 
-            sampling_rate: sampling_rate,
+            sampling_rate,
 
             /// Internal sequencer counter that runs at 512Hz
             /// used for the activation of the tick actions.
