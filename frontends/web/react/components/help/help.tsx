@@ -67,6 +67,12 @@ export const HelpKeyboard: FC = () => (
             </span>
             Toggle on-screen keyboard
         </li>
+        <li>
+            <span className="key-container">
+                <span className="key">Ctrl + P</span>
+            </span>
+            Change screen palette
+        </li>
     </ul>
 );
 
