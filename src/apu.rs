@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use crate::warnln;
 
 const DUTY_TABLE: [[u8; 8]; 4] = [
@@ -59,15 +61,16 @@ pub struct Apu {
 
     wave_ram: [u8; 16],
 
-    sampling_frequency: u16,
+    sampling_rate: u16,
     sequencer: u16,
     sequencer_step: u8,
     output_timer: u16,
-    audio_buffer: Vec<u8>,
+    audio_buffer: VecDeque<u8>,
+    audio_buffer_max: usize,
 }
 
 impl Apu {
-    pub fn new() -> Self {
+    pub fn new(sampling_rate: u16) -> Self {
         Self {
             ch1_timer: 0,
             ch1_sequence: 0,
@@ -113,14 +116,15 @@ impl Apu {
 
             wave_ram: [0u8; 16],
 
-            sampling_frequency: 44100,
+            sampling_rate: sampling_rate,
 
             /// Internal sequencer counter that runs at 512Hz
             /// used for the activation of the tick actions.
             sequencer: 0,
             sequencer_step: 0,
             output_timer: 0,
-            audio_buffer: Vec::new(),
+            audio_buffer: VecDeque::with_capacity(sampling_rate as usize),
+            audio_buffer_max: sampling_rate as usize,
         }
     }
 
@@ -232,11 +236,11 @@ impl Apu {
         self.ch1_output + self.ch2_output + self.ch3_output
     }
 
-    pub fn audio_buffer(&self) -> &Vec<u8> {
+    pub fn audio_buffer(&self) -> &VecDeque<u8> {
         &self.audio_buffer
     }
 
-    pub fn audio_buffer_mut(&mut self) -> &mut Vec<u8> {
+    pub fn audio_buffer_mut(&mut self) -> &mut VecDeque<u8> {
         &mut self.audio_buffer
     }
 
@@ -282,10 +286,18 @@ impl Apu {
 
         self.output_timer = self.output_timer.saturating_sub(1);
         if self.output_timer == 0 {
-            self.audio_buffer.push(self.output());
+            // verifies if we've reached the maximum allowed size for the
+            // audio buffer and if that's the case an item is removed from
+            // the buffer (avoiding overflow) and then then the new audio
+            // volume item is added to the queue
+            if self.audio_buffer.len() >= self.audio_buffer_max {
+                self.audio_buffer.pop_front();
+            }
+            self.audio_buffer.push_back(self.output());
+
             // @TODO the CPU clock is hardcoded here, we must handle situations
             // where there's some kind of overclock
-            self.output_timer = (4194304.0 / self.sampling_frequency as f32) as u16;
+            self.output_timer = (4194304.0 / self.sampling_rate as f32) as u16;
         }
     }
 
@@ -480,6 +492,6 @@ impl Apu {
 
 impl Default for Apu {
     fn default() -> Self {
-        Self::new()
+        Self::new(44100)
     }
 }

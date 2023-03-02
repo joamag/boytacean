@@ -11,6 +11,8 @@ use crate::{
     util::read_file,
 };
 
+use std::collections::VecDeque;
+
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
 
@@ -55,7 +57,7 @@ pub struct Registers {
 
 pub trait AudioProvider {
     fn audio_output(&self) -> u8;
-    fn audio_buffer(&self) -> &Vec<u8>;
+    fn audio_buffer(&self) -> &VecDeque<u8>;
     fn clear_audio_buffer(&mut self);
 }
 
@@ -63,10 +65,10 @@ pub trait AudioProvider {
 impl GameBoy {
     #[cfg_attr(feature = "wasm", wasm_bindgen(constructor))]
     pub fn new() -> Self {
-        let ppu = Ppu::new();
-        let apu = Apu::new();
-        let pad = Pad::new();
-        let timer = Timer::new();
+        let ppu = Ppu::default();
+        let apu = Apu::default();
+        let pad = Pad::default();
+        let timer = Timer::default();
         let mmu = Mmu::new(ppu, apu, pad, timer);
         let cpu = Cpu::new(mmu);
         Self { cpu }
@@ -165,7 +167,7 @@ impl GameBoy {
     }
 
     pub fn audio_buffer_eager(&mut self, clear: bool) -> Vec<u8> {
-        let buffer = self.audio_buffer().to_vec();
+        let buffer = Vec::from(self.audio_buffer().clone());
         if clear {
             self.clear_audio_buffer();
         }
@@ -287,7 +289,7 @@ impl GameBoy {
         &(self.ppu().frame_buffer)
     }
 
-    pub fn audio_buffer(&mut self) -> &Vec<u8> {
+    pub fn audio_buffer(&mut self) -> &VecDeque<u8> {
         self.apu().audio_buffer()
     }
 
@@ -399,7 +401,7 @@ impl AudioProvider for GameBoy {
         self.apu_i().output()
     }
 
-    fn audio_buffer(&self) -> &Vec<u8> {
+    fn audio_buffer(&self) -> &VecDeque<u8> {
         self.apu_i().audio_buffer()
     }
 
