@@ -34,6 +34,9 @@ use std::{
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 pub struct GameBoy {
     cpu: Cpu,
+    ppu_enabled: bool,
+    apu_enabled: bool,
+    timer_enabled: bool,
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
@@ -71,7 +74,12 @@ impl GameBoy {
         let timer = Timer::default();
         let mmu = Mmu::new(ppu, apu, pad, timer);
         let cpu = Cpu::new(mmu);
-        Self { cpu }
+        Self {
+            cpu,
+            ppu_enabled: true,
+            apu_enabled: false,
+            timer_enabled: true,
+        }
     }
 
     pub fn reset(&mut self) {
@@ -82,9 +90,15 @@ impl GameBoy {
 
     pub fn clock(&mut self) -> u8 {
         let cycles = self.cpu_clock();
-        self.ppu_clock(cycles);
-        self.apu_clock(cycles);
-        self.timer_clock(cycles);
+        if self.ppu_enabled {
+            self.ppu_clock(cycles);
+        }
+        if self.apu_enabled {
+            self.apu_clock(cycles);
+        }
+        if self.timer_enabled {
+            self.timer_clock(cycles);
+        }
         cycles
     }
 
