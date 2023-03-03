@@ -27,6 +27,18 @@ impl Timer {
         }
     }
 
+    pub fn reset(&mut self) {
+        self.div = 0;
+        self.tima = 0;
+        self.tma = 0;
+        self.tac = 0x0;
+        self.div_clock = 0;
+        self.tima_clock = 0;
+        self.tima_enabled = false;
+        self.tima_ratio = 1024;
+        self.int_tima = false;
+    }
+
     pub fn clock(&mut self, cycles: u8) {
         self.div_clock += cycles as u16;
         while self.div_clock >= 256 {

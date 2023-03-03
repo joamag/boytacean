@@ -128,6 +128,56 @@ impl Apu {
         }
     }
 
+    pub fn reset(&mut self) {
+        self.ch1_timer = 0;
+        self.ch1_sequence = 0;
+        self.ch1_envelope_sequence = 0;
+        self.ch1_envelope_enabled = false;
+        self.ch1_sweep_sequence = 0;
+        self.ch1_output = 0;
+        self.ch1_sweep_slope = 0x0;
+        self.ch1_sweep_increase = false;
+        self.ch1_sweep_pace = 0x0;
+        self.ch1_length_timer = 0x0;
+        self.ch1_wave_duty = 0x0;
+        self.ch1_pace = 0x0;
+        self.ch1_direction = 0x0;
+        self.ch1_volume = 0x0;
+        self.ch1_wave_length = 0x0;
+        self.ch1_length_stop = false;
+        self.ch1_enabled = false;
+
+        self.ch2_timer = 0;
+        self.ch2_sequence = 0;
+        self.ch2_envelope_sequence = 0;
+        self.ch2_envelope_enabled = false;
+        self.ch2_output = 0;
+        self.ch2_length_timer = 0x0;
+        self.ch2_wave_duty = 0x0;
+        self.ch2_pace = 0x0;
+        self.ch2_direction = 0x0;
+        self.ch2_volume = 0x0;
+        self.ch2_wave_length = 0x0;
+        self.ch2_length_stop = false;
+        self.ch2_enabled = false;
+
+        self.ch3_timer = 0;
+        self.ch3_position = 0;
+        self.ch3_output = 0;
+        self.ch3_dac = false;
+        self.ch3_length_timer = 0x0;
+        self.ch3_output_level = 0x0;
+        self.ch3_wave_length = 0x0;
+        self.ch3_length_stop = false;
+        self.ch3_enabled = false;
+
+        self.sequencer = 0;
+        self.sequencer_step = 0;
+        self.output_timer = 0;
+
+        self.clear_audio_buffer()
+    }
+
     pub fn clock(&mut self, cycles: u8) {
         // @TODO the performance here requires improvement
         for _ in 0..cycles {

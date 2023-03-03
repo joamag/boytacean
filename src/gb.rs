@@ -77,13 +77,14 @@ impl GameBoy {
         Self {
             cpu,
             ppu_enabled: true,
-            apu_enabled: false,
+            apu_enabled: true,
             timer_enabled: true,
         }
     }
 
     pub fn reset(&mut self) {
         self.ppu().reset();
+        self.apu().reset();
         self.mmu().reset();
         self.cpu.reset();
     }
@@ -253,6 +254,30 @@ impl GameBoy {
 
     pub fn get_compilation_time(&self) -> String {
         String::from(COMPILATION_TIME)
+    }
+
+    pub fn get_ppu_enabled(&self) -> bool {
+        self.ppu_enabled
+    }
+
+    pub fn set_ppu_enabled(&mut self, value: bool) {
+        self.ppu_enabled = value;
+    }
+
+    pub fn get_apu_enabled(&self) -> bool {
+        self.apu_enabled
+    }
+
+    pub fn set_apu_enabled(&mut self, value: bool) {
+        self.apu_enabled = value;
+    }
+
+    pub fn get_timer_enabled(&self) -> bool {
+        self.apu_enabled
+    }
+
+    pub fn set_timer_enabled(&mut self, value: bool) {
+        self.timer_enabled = value;
     }
 }
 

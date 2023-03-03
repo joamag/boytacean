@@ -162,6 +162,11 @@ impl Emulator {
         );
     }
 
+    pub fn toggle_audio(&mut self) {
+        let apu_enabled = self.system.get_apu_enabled();
+        self.system.set_apu_enabled(!apu_enabled);
+    }
+
     pub fn toggle_palette(&mut self) {
         self.system
             .ppu()
@@ -225,6 +230,10 @@ impl Emulator {
                         keycode: Some(Keycode::B),
                         ..
                     } => self.benchmark(Benchmark::default()),
+                    Event::KeyDown {
+                        keycode: Some(Keycode::T),
+                        ..
+                    } => self.toggle_audio(),
                     Event::KeyDown {
                         keycode: Some(Keycode::P),
                         ..
