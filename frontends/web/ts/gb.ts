@@ -653,6 +653,30 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         this.gameBoy?.key_lift(keyCode);
     }
 
+    pauseVideo() {
+        this.gameBoy?.set_ppu_enabled(false);
+    }
+
+    resumeVideo() {
+        this.gameBoy?.set_ppu_enabled(true);
+    }
+
+    getVideoState(): boolean {
+        return this.gameBoy?.get_ppu_enabled() ?? false;
+    }
+
+    pauseAudio() {
+        this.gameBoy?.set_apu_enabled(false);
+    }
+
+    resumeAudio() {
+        this.gameBoy?.set_apu_enabled(true);
+    }
+
+    getAudioState(): boolean {
+        return this.gameBoy?.get_apu_enabled() ?? false;
+    }
+
     getTile(index: number): Uint8Array {
         return this.gameBoy?.get_tile_buffer(index) ?? new Uint8Array();
     }
