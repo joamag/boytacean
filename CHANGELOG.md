@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-*
+* Added reset of APU, which fixes annoying "garbage" data in buffer when restarting the state of the emulator
 
 ## [0.7.1] - 2023-03-02
 
