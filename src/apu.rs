@@ -130,9 +130,9 @@ impl Apu {
             sequencer_step: 0,
             output_timer: 0,
             audio_buffer: VecDeque::with_capacity(
-                (sampling_rate as f32 * buffer_size as f32 * 2.0) as usize,
+                (sampling_rate as f32 * buffer_size * 2.0) as usize,
             ),
-            audio_buffer_max: (sampling_rate as f32 * buffer_size as f32 * 2.0) as usize,
+            audio_buffer_max: (sampling_rate as f32 * buffer_size * 2.0) as usize,
         }
     }
 
