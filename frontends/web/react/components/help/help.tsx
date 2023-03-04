@@ -67,6 +67,12 @@ export const HelpKeyboard: FC = () => (
             </span>
             Toggle on-screen keyboard
         </li>
+        <li>
+            <span className="key-container">
+                <span className="key">Ctrl + P</span>
+            </span>
+            Change screen palette
+        </li>
     </ul>
 );
 
@@ -79,7 +85,15 @@ export const HelpFaqs: FC = () => (
         </p>
         <h3>Why there's no sound?</h3>
         <p>
-            It's under development, I'm hopping to have it before end of 2023.
+            You need to click or touch the screen to start the{" "}
+            <Link
+                href="https://developer.mozilla.org/docs/Web/API/Web_Audio_API"
+                target="_blank"
+            >
+                Web Audio API
+            </Link>{" "}
+            support. That's just the way browsers work these days, security
+            first 😄.
         </p>
         <h3>Can I use my Xbox One/PS4/PS5 Gamepad?</h3>
         <p>
