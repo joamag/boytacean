@@ -14,7 +14,7 @@ impl Audio {
 
         let desired_spec = AudioSpecDesired {
             freq: Some(44100),
-            channels: Some(1),
+            channels: Some(2),
             samples: Some(4096),
         };
 

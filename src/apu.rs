@@ -59,6 +59,9 @@ pub struct Apu {
     ch3_length_stop: bool,
     ch3_enabled: bool,
 
+    right_enabled: bool,
+    left_enabled: bool,
+
     wave_ram: [u8; 16],
 
     sampling_rate: u16,
@@ -70,7 +73,7 @@ pub struct Apu {
 }
 
 impl Apu {
-    pub fn new(sampling_rate: u16) -> Self {
+    pub fn new(sampling_rate: u16, buffer_size: f32) -> Self {
         Self {
             ch1_timer: 0,
             ch1_sequence: 0,
@@ -114,6 +117,9 @@ impl Apu {
             ch3_length_stop: false,
             ch3_enabled: false,
 
+            left_enabled: true,
+            right_enabled: true,
+
             wave_ram: [0u8; 16],
 
             sampling_rate,
@@ -123,8 +129,10 @@ impl Apu {
             sequencer: 0,
             sequencer_step: 0,
             output_timer: 0,
-            audio_buffer: VecDeque::with_capacity(sampling_rate as usize),
-            audio_buffer_max: sampling_rate as usize,
+            audio_buffer: VecDeque::with_capacity(
+                (sampling_rate as f32 * buffer_size as f32 * 2.0) as usize,
+            ),
+            audio_buffer_max: (sampling_rate as f32 * buffer_size as f32 * 2.0) as usize,
         }
     }
 
@@ -170,6 +178,9 @@ impl Apu {
         self.ch3_wave_length = 0x0;
         self.ch3_length_stop = false;
         self.ch3_enabled = false;
+
+        self.left_enabled = true;
+        self.right_enabled = true;
 
         self.sequencer = 0;
         self.sequencer_step = 0;
@@ -342,8 +353,14 @@ impl Apu {
             // volume item is added to the queue
             if self.audio_buffer.len() >= self.audio_buffer_max {
                 self.audio_buffer.pop_front();
+                self.audio_buffer.pop_front();
             }
-            self.audio_buffer.push_back(self.output());
+            if self.left_enabled {
+                self.audio_buffer.push_back(self.output());
+            }
+            if self.right_enabled {
+                self.audio_buffer.push_back(self.output());
+            }
 
             // @TODO the CPU clock is hardcoded here, we must handle situations
             // where there's some kind of overclock
@@ -542,6 +559,6 @@ impl Apu {
 
 impl Default for Apu {
     fn default() -> Self {
-        Self::new(44100)
+        Self::new(44100, 1.0)
     }
 }

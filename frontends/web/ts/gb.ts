@@ -518,16 +518,14 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     }
 
     get audioBuffer(): Float32Array[] {
-        const audioBuffer = [];
         const internalBuffer = this.gameBoy?.audio_buffer_eager(true) ?? [];
-        for (let channel = 0; channel < 2; channel++) {
-            const stream = new Float32Array(internalBuffer.length);
-            for (let index = 0; index < internalBuffer.length; index++) {
-                stream[index] = internalBuffer[index] / 100.0;
-            }
-            audioBuffer.push(stream);
+        const leftStream = new Float32Array(internalBuffer.length / 2);
+        const rightStream = new Float32Array(internalBuffer.length / 2);
+        for (let index = 0; index < internalBuffer.length; index += 2) {
+            leftStream[index / 2] = internalBuffer[index] / 100.0;
+            rightStream[index / 2] = internalBuffer[index + 1] / 100.0;
         }
-        return audioBuffer;
+        return [leftStream, rightStream];
     }
 
     get romInfo(): RomInfo {
