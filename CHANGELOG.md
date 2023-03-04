@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+*
+
+### Changed
+
+*
+
+### Fixed
+
+*
+
+## [0.7.2] - 2023-03-04
+
+### Added
+
 * Support for stereo sound 🔊
 
 ### Changed

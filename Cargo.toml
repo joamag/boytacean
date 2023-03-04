@@ -1,7 +1,7 @@
 [package]
 name = "boytacean"
 description = "A Game Boy emulator that is written in Rust."
-version = "0.7.1"
+version = "0.7.2"
 authors = ["João Magalhães <joamag@gmail.com>"]
 license = "Apache-2.0"
 repository = "https://github.com/joamag/boytacean"
