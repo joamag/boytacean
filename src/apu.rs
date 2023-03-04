@@ -17,7 +17,7 @@ pub enum Channel {
 }
 
 pub struct Apu {
-    ch1_timer: u16,
+    ch1_timer: i16,
     ch1_sequence: u8,
     ch1_envelope_sequence: u8,
     ch1_envelope_enabled: bool,
@@ -35,7 +35,7 @@ pub struct Apu {
     ch1_length_stop: bool,
     ch1_enabled: bool,
 
-    ch2_timer: u16,
+    ch2_timer: i16,
     ch2_sequence: u8,
     ch2_envelope_sequence: u8,
     ch2_envelope_enabled: bool,
@@ -49,7 +49,7 @@ pub struct Apu {
     ch2_length_stop: bool,
     ch2_enabled: bool,
 
-    ch3_timer: u16,
+    ch3_timer: i16,
     ch3_position: u8,
     ch3_output: u8,
     ch3_dac: bool,
@@ -67,7 +67,7 @@ pub struct Apu {
     sampling_rate: u16,
     sequencer: u16,
     sequencer_step: u8,
-    output_timer: u16,
+    output_timer: i16,
     audio_buffer: VecDeque<u8>,
     audio_buffer_max: usize,
 }
@@ -190,9 +190,60 @@ impl Apu {
     }
 
     pub fn clock(&mut self, cycles: u8) {
-        // @TODO the performance here requires improvement
-        for _ in 0..cycles {
-            self.tick();
+        self.sequencer += cycles as u16;
+        if self.sequencer >= 8192 {
+            // each of these steps runs at 512/8 Hz = 64Hz,
+            // meaning a complete loop runs at 512 Hz
+            match self.sequencer_step {
+                0 => {
+                    self.tick_length_all();
+                }
+                1 => (),
+                2 => {
+                    self.tick_ch1_sweep();
+                    self.tick_length_all();
+                }
+                3 => (),
+                4 => {
+                    self.tick_length_all();
+                }
+                5 => (),
+                6 => {
+                    self.tick_ch1_sweep();
+                    self.tick_length_all();
+                }
+                7 => {
+                    self.tick_envelope_all();
+                }
+                _ => (),
+            }
+
+            self.sequencer -= 8192;
+            self.sequencer_step = (self.sequencer_step + 1) & 7;
+        }
+
+        self.tick_ch_all(cycles);
+
+        self.output_timer = self.output_timer.saturating_sub(cycles as i16);
+        if self.output_timer <= 0 {
+            // verifies if we've reached the maximum allowed size for the
+            // audio buffer and if that's the case an item is removed from
+            // the buffer (avoiding overflow) and then then the new audio
+            // volume item is added to the queue
+            if self.audio_buffer.len() >= self.audio_buffer_max {
+                self.audio_buffer.pop_front();
+                self.audio_buffer.pop_front();
+            }
+            if self.left_enabled {
+                self.audio_buffer.push_back(self.output());
+            }
+            if self.right_enabled {
+                self.audio_buffer.push_back(self.output());
+            }
+
+            // @TODO the CPU clock is hardcoded here, we must handle situations
+            // where there's some kind of overclock
+            self.output_timer += (4194304.0 / self.sampling_rate as f32) as i16;
         }
     }
 
@@ -310,65 +361,6 @@ impl Apu {
     }
 
     #[inline(always)]
-    fn tick(&mut self) {
-        self.sequencer += 1;
-        if self.sequencer >= 8192 {
-            // each of these steps runs at 512/8 Hz = 64Hz,
-            // meaning a complete loop runs at 512 Hz
-            match self.sequencer_step {
-                0 => {
-                    self.tick_length_all();
-                }
-                1 => (),
-                2 => {
-                    self.tick_ch1_sweep();
-                    self.tick_length_all();
-                }
-                3 => (),
-                4 => {
-                    self.tick_length_all();
-                }
-                5 => (),
-                6 => {
-                    self.tick_ch1_sweep();
-                    self.tick_length_all();
-                }
-                7 => {
-                    self.tick_envelope_all();
-                }
-                _ => (),
-            }
-
-            self.sequencer = 0;
-            self.sequencer_step = (self.sequencer_step + 1) & 7;
-        }
-
-        self.tick_ch_all();
-
-        self.output_timer = self.output_timer.saturating_sub(1);
-        if self.output_timer == 0 {
-            // verifies if we've reached the maximum allowed size for the
-            // audio buffer and if that's the case an item is removed from
-            // the buffer (avoiding overflow) and then then the new audio
-            // volume item is added to the queue
-            if self.audio_buffer.len() >= self.audio_buffer_max {
-                self.audio_buffer.pop_front();
-                self.audio_buffer.pop_front();
-            }
-            if self.left_enabled {
-                self.audio_buffer.push_back(self.output());
-            }
-            if self.right_enabled {
-                self.audio_buffer.push_back(self.output());
-            }
-
-            // @TODO the CPU clock is hardcoded here, we must handle situations
-            // where there's some kind of overclock
-            self.output_timer = (4194304.0 / self.sampling_rate as f32) as u16;
-        }
-    }
-
-    #[inline(always)]
     fn tick_length_all(&mut self) {
         self.tick_length(Channel::Ch1);
         self.tick_length(Channel::Ch2);
@@ -477,15 +469,15 @@ impl Apu {
     }
 
     #[inline(always)]
-    fn tick_ch_all(&mut self) {
-        self.tick_ch1();
-        self.tick_ch2();
-        self.tick_ch3();
+    fn tick_ch_all(&mut self, cycles: u8) {
+        self.tick_ch1(cycles);
+        self.tick_ch2(cycles);
+        self.tick_ch3(cycles);
     }
 
     #[inline(always)]
-    fn tick_ch1(&mut self) {
-        self.ch1_timer = self.ch1_timer.saturating_sub(1);
+    fn tick_ch1(&mut self, cycles: u8) {
+        self.ch1_timer = self.ch1_timer.saturating_sub(cycles as i16);
         if self.ch1_timer > 0 {
             return;
         }
@@ -501,13 +493,13 @@ impl Apu {
             self.ch1_output = 0;
         }
 
-        self.ch1_timer = (2048 - self.ch1_wave_length) << 2;
+        self.ch1_timer += ((2048 - self.ch1_wave_length) << 2) as i16;
         self.ch1_sequence = (self.ch1_sequence + 1) & 7;
     }
 
     #[inline(always)]
-    fn tick_ch2(&mut self) {
-        self.ch2_timer = self.ch2_timer.saturating_sub(1);
+    fn tick_ch2(&mut self, cycles: u8) {
+        self.ch2_timer = self.ch2_timer.saturating_sub(cycles as i16);
         if self.ch2_timer > 0 {
             return;
         }
@@ -523,13 +515,13 @@ impl Apu {
             self.ch2_output = 0;
         }
 
-        self.ch2_timer = (2048 - self.ch2_wave_length) << 2;
+        self.ch2_timer += ((2048 - self.ch2_wave_length) << 2) as i16;
         self.ch2_sequence = (self.ch2_sequence + 1) & 7;
     }
 
     #[inline(always)]
-    fn tick_ch3(&mut self) {
-        self.ch3_timer = self.ch3_timer.saturating_sub(1);
+    fn tick_ch3(&mut self, cycles: u8) {
+        self.ch3_timer = self.ch3_timer.saturating_sub(cycles as i16);
         if self.ch3_timer > 0 {
             return;
         }
@@ -552,7 +544,7 @@ impl Apu {
             self.ch3_output = 0;
         }
 
-        self.ch3_timer = (2048 - self.ch3_wave_length) << 1;
+        self.ch3_timer += ((2048 - self.ch3_wave_length) << 1) as i16;
         self.ch3_position = (self.ch3_position + 1) & 31;
     }
 }
