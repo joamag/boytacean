@@ -52,7 +52,7 @@ pub struct Emulator {
     next_tick_time: f32,
     next_tick_time_i: u32,
     features: Vec<&'static str>,
-    palettes: [PaletteInfo; 3],
+    palettes: [PaletteInfo; 7],
     palette_index: usize,
 }
 
@@ -94,6 +94,42 @@ impl Emulator {
                         [0x8b, 0xab, 0x95],
                         [0x9e, 0x5c, 0x5e],
                         [0x53, 0x4d, 0x57],
+                    ],
+                ),
+                PaletteInfo::new(
+                    "goldsilver",
+                    [
+                        [0xc5, 0xc6, 0x6d],
+                        [0x97, 0xa1, 0xb0],
+                        [0x58, 0x5e, 0x67],
+                        [0x23, 0x52, 0x29],
+                    ],
+                ),
+                PaletteInfo::new(
+                    "pacman",
+                    [
+                        [0xff, 0xff, 0x00],
+                        [0xff, 0xb8, 0x97],
+                        [0x37, 0x32, 0xff],
+                        [0x00, 0x00, 0x00],
+                    ],
+                ),
+                PaletteInfo::new(
+                    "mariobros",
+                    [
+                        [0xf7, 0xce, 0xc3],
+                        [0xcc, 0x9e, 0x22],
+                        [0x92, 0x34, 0x04],
+                        [0x00, 0x00, 0x00],
+                    ],
+                ),
+                PaletteInfo::new(
+                    "pokemon",
+                    [
+                        [0xf8, 0x78, 0x00],
+                        [0xb8, 0x60, 0x00],
+                        [0x78, 0x38, 0x00],
+                        [0x00, 0x00, 0x00],
                     ],
                 ),
             ],
