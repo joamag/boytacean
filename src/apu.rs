@@ -59,6 +59,14 @@ pub struct Apu {
     ch3_length_stop: bool,
     ch3_enabled: bool,
 
+    ch4_timer: i16,
+    ch4_output: u8,
+    ch4_length_timer: u8,
+    ch4_output_level: u8,
+    ch4_wave_length: u16,
+    ch4_length_stop: bool,
+    ch4_enabled: bool,
+
     right_enabled: bool,
     left_enabled: bool,
 
@@ -117,9 +125,19 @@ impl Apu {
             ch3_length_stop: false,
             ch3_enabled: false,
 
+            ch4_timer: 0,
+            ch4_output: 0,
+            ch4_length_timer: 0x0,
+            ch4_output_level: 0x0,
+            ch4_wave_length: 0x0,
+            ch4_length_stop: false,
+            ch4_enabled: false,
+
             left_enabled: true,
             right_enabled: true,
 
+            /// The RAM that is used to sore the wave information
+            /// to be used in channel 3 audio
             wave_ram: [0u8; 16],
 
             sampling_rate,
@@ -178,6 +196,14 @@ impl Apu {
         self.ch3_wave_length = 0x0;
         self.ch3_length_stop = false;
         self.ch3_enabled = false;
+
+        self.ch4_timer = 0;
+        self.ch4_output = 0;
+        self.ch4_length_timer = 0x0;
+        self.ch4_output_level = 0x0;
+        self.ch4_wave_length = 0x0;
+        self.ch4_length_stop = false;
+        self.ch4_enabled = false;
 
         self.left_enabled = true;
         self.right_enabled = true;
