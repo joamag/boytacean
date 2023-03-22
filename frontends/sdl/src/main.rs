@@ -47,6 +47,7 @@ pub struct Emulator {
     graphics: Option<Graphics>,
     audio: Option<Audio>,
     title: &'static str,
+    rom_path: String,
     logic_frequency: u32,
     visual_frequency: f32,
     next_tick_time: f32,
@@ -63,6 +64,7 @@ impl Emulator {
             graphics: None,
             audio: None,
             title: TITLE,
+            rom_path: String::from("invalid"),
             logic_frequency: GameBoy::CPU_FREQ,
             visual_frequency: GameBoy::VISUAL_FREQ,
             next_tick_time: 0.0,
@@ -163,8 +165,9 @@ impl Emulator {
         self.audio = Some(Audio::new(sdl));
     }
 
-    pub fn load_rom(&mut self, path: &str) {
-        let rom = self.system.load_rom_file(path);
+    pub fn load_rom(&mut self, path: Option<&str>) {
+        let path_res = path.unwrap_or(&self.rom_path);
+        let rom = self.system.load_rom_file(path_res);
         println!(
             "========= Cartridge =========\n{}\n=============================",
             rom
@@ -175,6 +178,13 @@ impl Emulator {
             .window_mut()
             .set_title(format!("{} [{}]", self.title, rom.title()).as_str())
             .unwrap();
+        self.rom_path = String::from(path_res);
+    }
+
+    pub fn reset(&mut self) {
+        self.system.reset();
+        self.system.load_boot_default();
+        self.load_rom(None);
     }
 
     pub fn benchmark(&mut self, params: Benchmark) {
@@ -263,6 +273,10 @@ impl Emulator {
                         ..
                     } => break 'main,
                     Event::KeyDown {
+                        keycode: Some(Keycode::R),
+                        ..
+                    } => self.reset(),
+                    Event::KeyDown {
                         keycode: Some(Keycode::B),
                         ..
                     } => self.benchmark(Benchmark::default()),
@@ -301,7 +315,7 @@ impl Emulator {
                     Event::DropFile { filename, .. } => {
                         self.system.reset();
                         self.system.load_boot_default();
-                        self.load_rom(&filename);
+                        self.load_rom(Some(&filename));
                     }
                     _ => (),
                 }
@@ -437,7 +451,7 @@ fn main() {
     // ROM file and starts running it
     let mut emulator = Emulator::new(game_boy);
     emulator.start(SCREEN_SCALE);
-    emulator.load_rom("../../res/roms/pocket.gb");
+    emulator.load_rom(Some("../../res/roms/pocket.gb"));
     emulator.toggle_palette();
     emulator.run();
 }
