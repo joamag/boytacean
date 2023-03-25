@@ -115,7 +115,7 @@ impl Pad {
         }
 
         // signals that a JoyPad interrupt is pending to be
-        // handled as a key pressed has been done
+        // handled as a key press has been performed
         self.int_pad = true;
     }
 
