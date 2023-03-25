@@ -16,3 +16,10 @@ Then you can use the following command to build and run Boytacean SDL:
 cargo build
 cargo run
 ```
+
+To reload the code continuously use the cargo watch tool:
+
+```bash
+cargo install cargo-watch
+cargo watch -x run
+```
