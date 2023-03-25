@@ -62,6 +62,9 @@ pub struct Apu {
     ch4_timer: i16,
     ch4_output: u8,
     ch4_length_timer: u8,
+    ch4_pace: u8,
+    ch4_direction: u8,
+    ch4_volume: u8,
     ch4_output_level: u8,
     ch4_wave_length: u16,
     ch4_length_stop: bool,
@@ -128,6 +131,9 @@ impl Apu {
             ch4_timer: 0,
             ch4_output: 0,
             ch4_length_timer: 0x0,
+            ch4_pace: 0x0,
+            ch4_direction: 0x0,
+            ch4_volume: 0x0,
             ch4_output_level: 0x0,
             ch4_wave_length: 0x0,
             ch4_length_stop: false,
@@ -140,6 +146,10 @@ impl Apu {
             /// to be used in channel 3 audio
             wave_ram: [0u8; 16],
 
+            /// The rate at which audio samples are going to be
+            /// taken, ideally this value should be aligned with
+            /// the sampling rate of the output device. A typical
+            /// sampling rate would be of 44.1kHz.
             sampling_rate,
 
             /// Internal sequencer counter that runs at 512Hz
@@ -361,6 +371,26 @@ impl Apu {
                 self.ch3_enabled |= value & 0x80 == 0x80;
             }
 
+            // 0xFF20 — NR41: Channel 4 length timer
+            0xff20 => {
+                self.ch4_length_timer = value & 0x3f;
+            }
+            // 0xFF21 — NR42: Channel 4 volume & envelope
+            0xff21 => {
+                self.ch4_pace = value & 0x07;
+                self.ch4_direction = (value & 0x08) >> 3;
+                self.ch4_volume = (value & 0xf0) >> 4;
+            }
+            // 0xFF22 — NR43: Channel 4 frequency & randomness
+            0xff22 => {
+                //@TODO need to implement this one!
+            }
+            // 0xFF23 — NR44: Channel 4 control
+            0xff23 => {
+                self.ch4_length_stop |= value & 0x40 == 0x40;
+                self.ch4_enabled |= value & 0x80 == 0x80;
+            }
+
             // 0xFF30-0xFF3F — Wave pattern RAM
             0xff30..=0xff3f => {
                 self.wave_ram[addr as usize & 0x000f] = value;
@@ -371,7 +401,7 @@ impl Apu {
     }
 
     pub fn output(&self) -> u8 {
-        self.ch1_output + self.ch2_output + self.ch3_output
+        self.ch1_output + self.ch2_output + self.ch3_output + self.ch4_output
     }
 
     pub fn audio_buffer(&self) -> &VecDeque<u8> {
