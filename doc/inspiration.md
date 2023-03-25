@@ -20,12 +20,14 @@
 
 * [GitHub - LIJI32/SameBoy (C)](https://github.com/LIJI32/SameBoy)
 * [GitHub - binji/binjgb (C)](https://github.com/binji/binjgb)
+* [GitHub - 7thSamurai/Azayaka (C++)](https://github.com/7thSamurai/Azayaka)
 * [GitHub - feo-boy/feo-boy (Rust)](https://github.com/feo-boy/feo-boy)
 * [GitHub - Rodrigodd/gameroy (Rust)](https://github.com/Rodrigodd/gameroy)
 * [GitHub - simias/gb-rs (Rust)](https://github.com/simias/gb-rs)
 * [GitHub - RubenG123/frosty (Rust)](https://github.com/RubenG123/frosty)
 * [GitHub - calvinbaart/gameboy (TypeScript)](https://github.com/calvinbaart/gameboy)
 * [GitHub - djhworld/gomeboycolor-wasm (Go)](https://github.com/djhworld/gomeboycolor-wasm)
+* [GitHub - torch2424/wasmboy (WASM)](https://github.com/torch2424/wasmboy)
 
 ## Videos
 
