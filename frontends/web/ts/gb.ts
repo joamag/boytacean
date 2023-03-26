@@ -606,6 +606,18 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         };
     }
 
+    get audioOutput(): Record<string, number> {
+        const output = this.gameBoy?.audio_all_output();
+        if (!output) return {};
+        return {
+            master: output[0],
+            ch1: output[1],
+            ch2: output[2],
+            ch3: output[3],
+            ch4: 0
+        };
+    }
+
     get palette(): string | undefined {
         const paletteObj = PALETTES[this.paletteIndex];
         return paletteObj.name;
