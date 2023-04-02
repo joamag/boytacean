@@ -19,18 +19,18 @@
     "source": "index.ts",
     "devDependencies": {
         "@parcel/transformer-typescript-tsc": "^2.8.3",
-        "@types/react": "^18.0.28",
+        "@types/react": "^18.0.32",
         "@types/react-dom": "^18.0.11",
-        "@typescript-eslint/eslint-plugin": "^5.54.0",
-        "@typescript-eslint/parser": "^5.54.0",
-        "emukit": "^0.7.2",
-        "eslint": "^8.35.0",
-        "nodemon": "^2.0.21",
+        "@typescript-eslint/eslint-plugin": "^5.57.0",
+        "@typescript-eslint/parser": "^5.57.0",
+        "emukit": "^0.8.0",
+        "eslint": "^8.37.0",
+        "nodemon": "^2.0.22",
         "parcel": "^2.8.3",
-        "prettier": "^2.8.4",
+        "prettier": "^2.8.7",
         "process": "^0.11.10",
         "react": "^18.2.0",
         "react-dom": "^18.2.0",
-        "typescript": "^4.9.5"
+        "typescript": "^5.0.3"
     }
 }
