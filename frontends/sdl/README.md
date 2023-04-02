@@ -1,0 +1,18 @@
+# Boytacean SDL
+
+## Build
+
+To be able to run the `cargo build` one must first install a local version of `vcpkg` using:
+
+```bash
+cargo install cargo-vcpkg
+cargo vcpkg build
+cargo build
+```
+
+Then you can use the following command to build and run Boytacean SDL:
+
+```bash
+cargo build
+cargo run
+```

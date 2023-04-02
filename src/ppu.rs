@@ -873,7 +873,7 @@ impl Ppu {
         let mut index_buffer = [-256i16; DISPLAY_WIDTH];
 
         for index in 0..OBJ_COUNT {
-            // in case the limit on number of object to be draw per
+            // in case the limit on the number of objects to be draw per
             // line has been reached breaks the loop avoiding more draws
             if draw_count == 10 {
                 break;

@@ -1,4 +1,5 @@
 import {
+    AudioSpecs,
     BenchmarkResult,
     Compilation,
     Compiler,
@@ -105,7 +106,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     private paused = false;
     private nextTickTime = 0;
     private fps = 0;
-    private frameStart: number = new Date().getTime();
+    private frameStart: number = EmulatorBase.now();
     private frameCount = 0;
     private paletteIndex = 0;
     private storeCycles: number = LOGIC_HZ * STORE_RATE;
@@ -163,7 +164,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
 
             // obtains the current time, this value is going
             // to be used to compute the need for tick computation
-            let currentTime = new Date().getTime();
+            let currentTime = EmulatorBase.now();
 
             try {
                 pending = this.tick(
@@ -214,7 +215,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
 
             // calculates the amount of time until the next draw operation
             // this is the amount of time that is going to be pending
-            currentTime = new Date().getTime();
+            currentTime = EmulatorBase.now();
             const pendingTime = Math.max(this.nextTickTime - currentTime, 0);
 
             // waits a little bit for the next frame to be draw,
@@ -226,6 +227,10 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     }
 
     tick(currentTime: number, pending: number, cycles = 70224) {
+        // in case the reference to the system is not set then
+        // returns the control flow immediately (not possible to tick)
+        if (!this.gameBoy) return pending;
+
         // in case the time to draw the next frame has not been
         // reached the flush of the "tick" logic is skipped
         if (currentTime < this.nextTickTime) return pending;
@@ -245,19 +250,19 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
 
             // runs the Game Boy clock, this operations should
             // include the advance of both the CPU and the PPU
-            const tickCycles = this.gameBoy?.clock() ?? 0;
+            const tickCycles = this.gameBoy.clock();
             counterCycles += tickCycles;
 
             // in case the current PPU mode is VBlank and the
             // frame is different from the previously rendered
             // one then it's time to update the canvas
             if (
-                this.gameBoy?.ppu_mode() === PpuMode.VBlank &&
-                this.gameBoy?.ppu_frame() !== lastFrame
+                this.gameBoy.ppu_mode() === PpuMode.VBlank &&
+                this.gameBoy.ppu_frame() !== lastFrame
             ) {
                 // updates the reference to the last frame index
                 // to be used for comparison in the next tick
-                lastFrame = this.gameBoy?.ppu_frame();
+                lastFrame = this.gameBoy.ppu_frame();
 
                 // triggers the frame event indicating that
                 // a new frame is now available for drawing
@@ -276,6 +281,11 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
             }
         }
 
+        // triggers the audio event, meaning that the audio should be
+        // processed for the current emulator, effectively emptying
+        // the audio buffer that is pending processing
+        this.trigger("audio");
+
         // increments the number of frames rendered in the current
         // section, this value is going to be used to calculate FPS
         this.frameCount += 1;
@@ -284,7 +294,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         // has been reached calculates the number of FPS and
         // flushes the value to the screen
         if (this.frameCount >= this.visualFrequency * FPS_SAMPLE_RATE) {
-            const currentTime = new Date().getTime();
+            const currentTime = EmulatorBase.now();
             const deltaTime = (currentTime - this.frameStart) / 1000;
             const fps = Math.round(this.frameCount / deltaTime);
             this.fps = fps;
@@ -500,6 +510,24 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         return this.gameBoy?.frame_buffer_eager() ?? new Uint8Array();
     }
 
+    get audioSpecs(): AudioSpecs {
+        return {
+            samplingRate: 44100,
+            channels: 2
+        };
+    }
+
+    get audioBuffer(): Float32Array[] {
+        const internalBuffer = this.gameBoy?.audio_buffer_eager(true) ?? [];
+        const leftStream = new Float32Array(internalBuffer.length / 2);
+        const rightStream = new Float32Array(internalBuffer.length / 2);
+        for (let index = 0; index < internalBuffer.length; index += 2) {
+            leftStream[index / 2] = internalBuffer[index] / 100.0;
+            rightStream[index / 2] = internalBuffer[index + 1] / 100.0;
+        }
+        return [leftStream, rightStream];
+    }
+
     get romInfo(): RomInfo {
         return {
             name: this.romName ?? undefined,
@@ -578,6 +606,18 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         };
     }
 
+    get audioOutput(): Record<string, number> {
+        const output = this.gameBoy?.audio_all_output();
+        if (!output) return {};
+        return {
+            master: output[0],
+            ch1: output[1],
+            ch2: output[2],
+            ch3: output[3],
+            ch4: 0
+        };
+    }
+
     get palette(): string | undefined {
         const paletteObj = PALETTES[this.paletteIndex];
         return paletteObj.name;
@@ -604,7 +644,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
 
     resume() {
         this.paused = false;
-        this.nextTickTime = new Date().getTime();
+        this.nextTickTime = EmulatorBase.now();
     }
 
     reset() {
@@ -623,6 +663,30 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         this.gameBoy?.key_lift(keyCode);
     }
 
+    pauseVideo() {
+        this.gameBoy?.set_ppu_enabled(false);
+    }
+
+    resumeVideo() {
+        this.gameBoy?.set_ppu_enabled(true);
+    }
+
+    getVideoState(): boolean {
+        return this.gameBoy?.get_ppu_enabled() ?? false;
+    }
+
+    pauseAudio() {
+        this.gameBoy?.set_apu_enabled(false);
+    }
+
+    resumeAudio() {
+        this.gameBoy?.set_apu_enabled(true);
+    }
+
+    getAudioState(): boolean {
+        return this.gameBoy?.get_apu_enabled() ?? false;
+    }
+
     getTile(index: number): Uint8Array {
         return this.gameBoy?.get_tile_buffer(index) ?? new Uint8Array();
     }
@@ -638,11 +702,11 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         let cycles = 0;
         this.pause();
         try {
-            const initial = Date.now();
+            const initial = EmulatorBase.now();
             for (let i = 0; i < count; i++) {
                 cycles += this.gameBoy?.clock() ?? 0;
             }
-            const delta = (Date.now() - initial) / 1000;
+            const delta = (EmulatorBase.now() - initial) / 1000;
             const frequency_mhz = cycles / delta / 1000 / 1000;
             return {
                 delta: delta,

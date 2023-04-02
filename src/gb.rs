@@ -1,4 +1,5 @@
 use crate::{
+    apu::Apu,
     cpu::Cpu,
     data::{BootRom, CGB_BOOT, DMG_BOOT, DMG_BOOTIX, MGB_BOOTIX, SGB_BOOT},
     gen::{COMPILATION_DATE, COMPILATION_TIME, COMPILER, COMPILER_VERSION},
@@ -9,6 +10,8 @@ use crate::{
     timer::Timer,
     util::read_file,
 };
+
+use std::collections::VecDeque;
 
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
@@ -31,6 +34,9 @@ use std::{
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 pub struct GameBoy {
     cpu: Cpu,
+    ppu_enabled: bool,
+    apu_enabled: bool,
+    timer_enabled: bool,
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
@@ -52,28 +58,48 @@ pub struct Registers {
     pub lyc: u8,
 }
 
+pub trait AudioProvider {
+    fn audio_output(&self) -> u8;
+    fn audio_buffer(&self) -> &VecDeque<u8>;
+    fn clear_audio_buffer(&mut self);
+}
+
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 impl GameBoy {
     #[cfg_attr(feature = "wasm", wasm_bindgen(constructor))]
     pub fn new() -> Self {
-        let ppu = Ppu::new();
-        let pad = Pad::new();
-        let timer = Timer::new();
-        let mmu = Mmu::new(ppu, pad, timer);
+        let ppu = Ppu::default();
+        let apu = Apu::default();
+        let pad = Pad::default();
+        let timer = Timer::default();
+        let mmu = Mmu::new(ppu, apu, pad, timer);
         let cpu = Cpu::new(mmu);
-        Self { cpu }
+        Self {
+            cpu,
+            ppu_enabled: true,
+            apu_enabled: true,
+            timer_enabled: true,
+        }
     }
 
     pub fn reset(&mut self) {
         self.ppu().reset();
+        self.apu().reset();
         self.mmu().reset();
         self.cpu.reset();
     }
 
     pub fn clock(&mut self) -> u8 {
         let cycles = self.cpu_clock();
-        self.ppu_clock(cycles);
-        self.timer_clock(cycles);
+        if self.ppu_enabled {
+            self.ppu_clock(cycles);
+        }
+        if self.apu_enabled {
+            self.apu_clock(cycles);
+        }
+        if self.timer_enabled {
+            self.timer_clock(cycles);
+        }
         cycles
     }
 
@@ -91,6 +117,10 @@ impl GameBoy {
 
     pub fn ppu_clock(&mut self, cycles: u8) {
         self.ppu().clock(cycles)
+    }
+
+    pub fn apu_clock(&mut self, cycles: u8) {
+        self.apu().clock(cycles)
     }
 
     pub fn timer_clock(&mut self, cycles: u8) {
@@ -149,6 +179,39 @@ impl GameBoy {
 
     pub fn frame_buffer_eager(&mut self) -> Vec<u8> {
         self.frame_buffer().to_vec()
+    }
+
+    pub fn audio_buffer_eager(&mut self, clear: bool) -> Vec<u8> {
+        let buffer = Vec::from(self.audio_buffer().clone());
+        if clear {
+            self.clear_audio_buffer();
+        }
+        buffer
+    }
+
+    pub fn audio_output(&self) -> u8 {
+        self.apu_i().output()
+    }
+
+    pub fn audio_all_output(&self) -> Vec<u8> {
+        vec![
+            self.audio_output(),
+            self.audio_ch1_output(),
+            self.audio_ch2_output(),
+            self.audio_ch3_output(),
+        ]
+    }
+
+    pub fn audio_ch1_output(&self) -> u8 {
+        self.apu_i().ch1_output()
+    }
+
+    pub fn audio_ch2_output(&self) -> u8 {
+        self.apu_i().ch2_output()
+    }
+
+    pub fn audio_ch3_output(&self) -> u8 {
+        self.apu_i().ch3_output()
     }
 
     pub fn cartridge_eager(&mut self) -> Cartridge {
@@ -217,6 +280,30 @@ impl GameBoy {
     pub fn get_compilation_time(&self) -> String {
         String::from(COMPILATION_TIME)
     }
+
+    pub fn get_ppu_enabled(&self) -> bool {
+        self.ppu_enabled
+    }
+
+    pub fn set_ppu_enabled(&mut self, value: bool) {
+        self.ppu_enabled = value;
+    }
+
+    pub fn get_apu_enabled(&self) -> bool {
+        self.apu_enabled
+    }
+
+    pub fn set_apu_enabled(&mut self, value: bool) {
+        self.apu_enabled = value;
+    }
+
+    pub fn get_timer_enabled(&self) -> bool {
+        self.apu_enabled
+    }
+
+    pub fn set_timer_enabled(&mut self, value: bool) {
+        self.timer_enabled = value;
+    }
 }
 
 /// Gameboy implementations that are meant with performance
@@ -246,6 +333,14 @@ impl GameBoy {
         self.cpu.ppu()
     }
 
+    pub fn apu(&mut self) -> &mut Apu {
+        self.cpu.apu()
+    }
+
+    pub fn apu_i(&self) -> &Apu {
+        self.cpu.apu_i()
+    }
+
     pub fn pad(&mut self) -> &mut Pad {
         self.cpu.pad()
     }
@@ -256,6 +351,10 @@ impl GameBoy {
 
     pub fn frame_buffer(&mut self) -> &[u8; FRAME_BUFFER_SIZE] {
         &(self.ppu().frame_buffer)
+    }
+
+    pub fn audio_buffer(&mut self) -> &VecDeque<u8> {
+        self.apu().audio_buffer()
     }
 
     pub fn load_boot_path(&mut self, path: &str) {
@@ -359,6 +458,20 @@ extern "C" {
 pub fn hook_impl(info: &PanicInfo) {
     let message = info.to_string();
     panic(message.as_str());
+}
+
+impl AudioProvider for GameBoy {
+    fn audio_output(&self) -> u8 {
+        self.apu_i().output()
+    }
+
+    fn audio_buffer(&self) -> &VecDeque<u8> {
+        self.apu_i().audio_buffer()
+    }
+
+    fn clear_audio_buffer(&mut self) {
+        self.apu().clear_audio_buffer()
+    }
 }
 
 impl Default for GameBoy {
