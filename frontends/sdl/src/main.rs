@@ -451,7 +451,7 @@ fn main() {
     // ROM file and starts running it
     let mut emulator = Emulator::new(game_boy);
     emulator.start(SCREEN_SCALE);
-    emulator.load_rom(Some("../../res/roms/pocket.gb"));
+    emulator.load_rom(Some("../../res/roms/demo/pocket.gb"));
     emulator.toggle_palette();
     emulator.run();
 }

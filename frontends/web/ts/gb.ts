@@ -79,7 +79,7 @@ const KEYS_NAME: Record<string, number> = {
     B: PadKey.B
 };
 
-const ROM_PATH = require("../../../res/roms/pocket.gb");
+const ROM_PATH = require("../../../res/roms/demo/pocket.gb");
 
 /**
  * Top level class that controls the emulator behaviour
