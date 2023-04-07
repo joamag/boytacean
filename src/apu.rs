@@ -69,7 +69,6 @@ pub struct Apu {
     ch4_pace: u8,
     ch4_direction: u8,
     ch4_volume: u8,
-    ch4_output_level: u8,
     ch4_divisor: u8,
     ch4_width_mode: bool,
     ch4_clock_shift: u8,
@@ -143,7 +142,6 @@ impl Apu {
             ch4_pace: 0x0,
             ch4_direction: 0x0,
             ch4_volume: 0x0,
-            ch4_output_level: 0x0,
             ch4_divisor: 0x0,
             ch4_width_mode: false,
             ch4_clock_shift: 0x0,
@@ -227,7 +225,6 @@ impl Apu {
         self.ch4_pace = 0x0;
         self.ch4_direction = 0x0;
         self.ch4_volume = 0x0;
-        self.ch4_output_level = 0x0;
         self.ch4_divisor = 0x0;
         self.ch4_width_mode = false;
         self.ch4_clock_shift = 0x0;
@@ -401,6 +398,8 @@ impl Apu {
                 self.ch4_pace = value & 0x07;
                 self.ch4_direction = (value & 0x08) >> 3;
                 self.ch4_volume = (value & 0xf0) >> 4;
+                self.ch4_envelope_enabled = self.ch4_pace > 0;
+                self.ch4_envelope_sequence = 0;
             }
             // 0xFF22 — NR43: Channel 4 frequency & randomness
             0xff22 => {
@@ -521,6 +520,8 @@ impl Apu {
     #[inline(always)]
     fn tick_envelope_all(&mut self) {
         self.tick_envelope(Channel::Ch1);
+        self.tick_envelope(Channel::Ch2);
+        self.tick_envelope(Channel::Ch4);
     }
 
     #[inline(always)]

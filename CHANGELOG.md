@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-* Support for Audio Channel 4 (Noise) 🔈
+* Support for audio channel 4 (noise) 🔈
 
 ### Changed
 
@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-*
+* Envelope support for both channel 2 and 4
 
 ## [0.7.3] - 2023-04-02
 
