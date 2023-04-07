@@ -76,6 +76,8 @@ pub struct Apu {
     ch4_length_stop: bool,
     ch4_enabled: bool,
 
+    glob_panning: u8,
+
     right_enabled: bool,
     left_enabled: bool,
 
@@ -148,6 +150,8 @@ impl Apu {
             ch4_lfsr: 0x0,
             ch4_length_stop: false,
             ch4_enabled: false,
+
+            glob_panning: 0x0,
 
             left_enabled: true,
             right_enabled: true,
@@ -232,6 +236,8 @@ impl Apu {
         self.ch4_length_stop = false;
         self.ch4_enabled = false;
 
+        self.glob_panning = 0x0;
+
         self.left_enabled = true;
         self.right_enabled = true;
 
@@ -302,9 +308,13 @@ impl Apu {
     }
 
     pub fn read(&mut self, addr: u16) -> u8 {
-        {
-            warnln!("Reading from unknown APU location 0x{:04x}", addr);
-            0xff
+        match addr {
+            // 0xFF25 — NR51: Sound panning
+            0xff25 => self.glob_panning,
+            _ => {
+                warnln!("Reading from unknown APU location 0x{:04x}", addr);
+                0xff
+            }
         }
     }
 
@@ -424,7 +434,7 @@ impl Apu {
             }
             // 0xFF25 — NR51: Sound panning
             0xff25 => {
-                //@TODO: Implement sound panning
+                self.glob_panning = value;
             }
             // 0xFF26 — NR52: Sound on/off
             0xff26 => {
