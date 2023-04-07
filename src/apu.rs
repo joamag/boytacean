@@ -413,10 +413,23 @@ impl Apu {
                 self.ch4_length_stop |= value & 0x40 == 0x40;
                 self.ch4_enabled |= value & 0x80 == 0x80;
                 if value & 0x80 == 0x80 {
-                    self.ch4_timer =
-                        (CH4_DIVISORS[self.ch4_divisor as usize] << self.ch4_clock_shift) as i16;
+                    self.ch4_timer = ((CH4_DIVISORS[self.ch4_divisor as usize] as u16)
+                        << self.ch4_clock_shift) as i16;
                     self.ch4_lfsr = 0x7ff1;
                 }
+            }
+
+            // 0xFF24 — NR50: Master volume & VIN panning
+            0xff24 => {
+                //@TODO: Implement master volume & VIN panning
+            }
+            // 0xFF25 — NR51: Sound panning
+            0xff25 => {
+                //@TODO: Implement sound panning
+            }
+            // 0xFF26 — NR52: Sound on/off
+            0xff26 => {
+                //@TODO: Implement sound on/off
             }
 
             // 0xFF30-0xFF3F — Wave pattern RAM
@@ -700,7 +713,8 @@ impl Apu {
             self.ch4_output = 0;
         }
 
-        self.ch4_timer += (CH4_DIVISORS[self.ch4_divisor as usize] << self.ch4_clock_shift) as i16;
+        self.ch4_timer +=
+            ((CH4_DIVISORS[self.ch4_divisor as usize] as u16) << self.ch4_clock_shift) as i16;
     }
 }
 
