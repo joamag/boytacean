@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-* Support for CGB flag parsing
+*
 
 ### Changed
 
@@ -17,7 +17,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+*
+
+## [0.7.3] - 2023-04-02
+
+### Added
+
+* Support for CGB flag parsing
+* Waveform plotting support
+
+### Fixed
+
 * Major JoyPad issue with Action/Select read in register
+* Small issue with channel 3 audio and DAC disable
 
 ## [0.7.2] - 2023-03-04
 

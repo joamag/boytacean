@@ -117,6 +117,8 @@ deploy-cloudfare-prod:
     - cd frontends/web/dist
     - cp -rp ../static/* .
     - npm_config_yes=true npx wrangler pages publish . --project-name=boytacean --branch prod
+    - npm_config_yes=true npx wrangler pages publish . --project-name=boytacean --branch production
+    - npm_config_yes=true npx wrangler pages publish . --project-name=boytacean --branch main
   dependencies:
     - build-wasm
   only:

@@ -189,6 +189,31 @@ impl GameBoy {
         buffer
     }
 
+    pub fn audio_output(&self) -> u8 {
+        self.apu_i().output()
+    }
+
+    pub fn audio_all_output(&self) -> Vec<u8> {
+        vec![
+            self.audio_output(),
+            self.audio_ch1_output(),
+            self.audio_ch2_output(),
+            self.audio_ch3_output(),
+        ]
+    }
+
+    pub fn audio_ch1_output(&self) -> u8 {
+        self.apu_i().ch1_output()
+    }
+
+    pub fn audio_ch2_output(&self) -> u8 {
+        self.apu_i().ch2_output()
+    }
+
+    pub fn audio_ch3_output(&self) -> u8 {
+        self.apu_i().ch3_output()
+    }
+
     pub fn cartridge_eager(&mut self) -> Cartridge {
         self.mmu().rom().clone()
     }

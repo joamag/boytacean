@@ -404,6 +404,18 @@ impl Apu {
         self.ch1_output + self.ch2_output + self.ch3_output + self.ch4_output
     }
 
+    pub fn ch1_output(&self) -> u8 {
+        self.ch1_output
+    }
+
+    pub fn ch2_output(&self) -> u8 {
+        self.ch2_output
+    }
+
+    pub fn ch3_output(&self) -> u8 {
+        self.ch3_output
+    }
+
     pub fn audio_buffer(&self) -> &VecDeque<u8> {
         &self.audio_buffer
     }
@@ -582,7 +594,7 @@ impl Apu {
             return;
         }
 
-        if self.ch3_enabled {
+        if self.ch3_enabled && self.ch3_dac {
             let wave_index = self.ch3_position >> 1;
             let mut output = self.wave_ram[wave_index as usize];
             output = if (self.ch3_position & 0x01) == 0x01 {
