@@ -80,6 +80,10 @@ pub struct Apu {
 
     right_enabled: bool,
     left_enabled: bool,
+    ch1_out_enabled: bool,
+    ch2_out_enabled: bool,
+    ch3_out_enabled: bool,
+    ch4_out_enabled: bool,
 
     wave_ram: [u8; 16],
 
@@ -155,6 +159,10 @@ impl Apu {
 
             left_enabled: true,
             right_enabled: true,
+            ch1_out_enabled: false,
+            ch2_out_enabled: false,
+            ch3_out_enabled: true,
+            ch4_out_enabled: false,
 
             /// The RAM that is used to sore the wave information
             /// to be used in channel 3 audio
@@ -458,23 +466,43 @@ impl Apu {
     }
 
     pub fn output(&self) -> u8 {
-        self.ch1_output + self.ch2_output + self.ch3_output + self.ch4_output
+        self.ch1_output() + self.ch2_output() + self.ch3_output() + self.ch4_output()
     }
 
+    #[inline(always)]
     pub fn ch1_output(&self) -> u8 {
-        self.ch1_output
+        if self.ch1_out_enabled {
+            self.ch1_output
+        } else {
+            0
+        }
     }
 
+    #[inline(always)]
     pub fn ch2_output(&self) -> u8 {
-        self.ch2_output
+        if self.ch2_out_enabled {
+            self.ch2_output
+        } else {
+            0
+        }
     }
 
+    #[inline(always)]
     pub fn ch3_output(&self) -> u8 {
-        self.ch3_output
+        if self.ch3_out_enabled {
+            self.ch3_output
+        } else {
+            0
+        }
     }
 
+    #[inline(always)]
     pub fn ch4_output(&self) -> u8 {
-        self.ch4_output
+        if self.ch4_out_enabled {
+            self.ch4_output
+        } else {
+            0
+        }
     }
 
     pub fn audio_buffer(&self) -> &VecDeque<u8> {
