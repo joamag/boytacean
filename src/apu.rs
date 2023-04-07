@@ -350,6 +350,9 @@ impl Apu {
                     (self.ch1_wave_length & 0x00ff) | (((value & 0x07) as u16) << 8);
                 self.ch1_length_stop |= value & 0x40 == 0x40;
                 self.ch1_enabled |= value & 0x80 == 0x80;
+                if value & 0x80 == 0x80 {
+                    self.trigger_ch1();
+                }
             }
 
             // 0xFF16 — NR21: Channel 2 length timer & duty cycle
@@ -373,6 +376,9 @@ impl Apu {
                     (self.ch2_wave_length & 0x00ff) | (((value & 0x07) as u16) << 8);
                 self.ch2_length_stop |= value & 0x40 == 0x40;
                 self.ch2_enabled |= value & 0x80 == 0x80;
+                if value & 0x80 == 0x80 {
+                    self.trigger_ch2();
+                }
             }
 
             // 0xFF1A — NR30: Channel 3 DAC enable
@@ -397,6 +403,9 @@ impl Apu {
                     (self.ch3_wave_length & 0x00ff) | (((value & 0x07) as u16) << 8);
                 self.ch3_length_stop |= value & 0x40 == 0x40;
                 self.ch3_enabled |= value & 0x80 == 0x80;
+                if value & 0x80 == 0x80 {
+                    self.trigger_ch3();
+                }
             }
 
             // 0xFF20 — NR41: Channel 4 length timer
@@ -422,9 +431,7 @@ impl Apu {
                 self.ch4_length_stop |= value & 0x40 == 0x40;
                 self.ch4_enabled |= value & 0x80 == 0x80;
                 if value & 0x80 == 0x80 {
-                    self.ch4_timer = ((CH4_DIVISORS[self.ch4_divisor as usize] as u16)
-                        << self.ch4_clock_shift) as i16;
-                    self.ch4_lfsr = 0x7ff1;
+                    self.trigger_ch4();
                 }
             }
 
@@ -726,6 +733,33 @@ impl Apu {
 
         self.ch4_timer +=
             ((CH4_DIVISORS[self.ch4_divisor as usize] as u16) << self.ch4_clock_shift) as i16;
+    }
+
+    #[inline(always)]
+    fn trigger_ch1(&mut self) {
+        self.ch1_timer = ((2048 - self.ch1_wave_length) << 2) as i16;
+        self.ch1_envelope_sequence = 0;
+        self.ch1_sweep_sequence = 0;
+    }
+
+    #[inline(always)]
+    fn trigger_ch2(&mut self) {
+        self.ch2_timer = ((2048 - self.ch2_wave_length) << 2) as i16;
+        self.ch2_envelope_sequence = 0;
+    }
+
+    #[inline(always)]
+    fn trigger_ch3(&mut self) {
+        self.ch3_timer = 3;
+        self.ch3_position = 0;
+    }
+
+    #[inline(always)]
+    fn trigger_ch4(&mut self) {
+        self.ch4_timer =
+            ((CH4_DIVISORS[self.ch4_divisor as usize] as u16) << self.ch4_clock_shift) as i16;
+        self.ch4_lfsr = 0x7ff1;
+        self.ch4_envelope_sequence = 0;
     }
 }
 
