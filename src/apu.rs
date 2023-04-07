@@ -159,10 +159,10 @@ impl Apu {
 
             left_enabled: true,
             right_enabled: true,
-            ch1_out_enabled: false,
-            ch2_out_enabled: false,
+            ch1_out_enabled: true,
+            ch2_out_enabled: true,
             ch3_out_enabled: true,
-            ch4_out_enabled: false,
+            ch4_out_enabled: true,
 
             /// The RAM that is used to sore the wave information
             /// to be used in channel 3 audio
@@ -504,6 +504,22 @@ impl Apu {
         } else {
             0
         }
+    }
+
+    pub fn set_ch1_enabled(&mut self, enabled: bool) {
+        self.ch1_out_enabled = enabled;
+    }
+
+    pub fn set_ch2_enabled(&mut self, enabled: bool) {
+        self.ch2_out_enabled = enabled;
+    }
+
+    pub fn set_ch3_enabled(&mut self, enabled: bool) {
+        self.ch3_out_enabled = enabled;
+    }
+
+    pub fn set_ch4_enabled(&mut self, enabled: bool) {
+        self.ch4_out_enabled = enabled;
     }
 
     pub fn audio_buffer(&self) -> &VecDeque<u8> {
