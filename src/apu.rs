@@ -9,6 +9,8 @@ const DUTY_TABLE: [[u8; 8]; 4] = [
     [0, 1, 1, 1, 1, 1, 1, 0],
 ];
 
+const CH4_DIVISORS: [u8; 8] = [8, 16, 32, 48, 64, 80, 96, 112];
+
 pub enum Channel {
     Ch1,
     Ch2,
@@ -58,6 +60,21 @@ pub struct Apu {
     ch3_wave_length: u16,
     ch3_length_stop: bool,
     ch3_enabled: bool,
+
+    ch4_timer: i16,
+    ch4_envelope_sequence: u8,
+    ch4_envelope_enabled: bool,
+    ch4_output: u8,
+    ch4_length_timer: u8,
+    ch4_pace: u8,
+    ch4_direction: u8,
+    ch4_volume: u8,
+    ch4_divisor: u8,
+    ch4_width_mode: bool,
+    ch4_clock_shift: u8,
+    ch4_lfsr: u16,
+    ch4_length_stop: bool,
+    ch4_enabled: bool,
 
     right_enabled: bool,
     left_enabled: bool,
@@ -117,11 +134,32 @@ impl Apu {
             ch3_length_stop: false,
             ch3_enabled: false,
 
+            ch4_timer: 0,
+            ch4_envelope_sequence: 0,
+            ch4_envelope_enabled: false,
+            ch4_output: 0,
+            ch4_length_timer: 0x0,
+            ch4_pace: 0x0,
+            ch4_direction: 0x0,
+            ch4_volume: 0x0,
+            ch4_divisor: 0x0,
+            ch4_width_mode: false,
+            ch4_clock_shift: 0x0,
+            ch4_lfsr: 0x0,
+            ch4_length_stop: false,
+            ch4_enabled: false,
+
             left_enabled: true,
             right_enabled: true,
 
+            /// The RAM that is used to sore the wave information
+            /// to be used in channel 3 audio
             wave_ram: [0u8; 16],
 
+            /// The rate at which audio samples are going to be
+            /// taken, ideally this value should be aligned with
+            /// the sampling rate of the output device. A typical
+            /// sampling rate would be of 44.1kHz.
             sampling_rate,
 
             /// Internal sequencer counter that runs at 512Hz
@@ -178,6 +216,21 @@ impl Apu {
         self.ch3_wave_length = 0x0;
         self.ch3_length_stop = false;
         self.ch3_enabled = false;
+
+        self.ch4_timer = 0;
+        self.ch4_envelope_sequence = 0;
+        self.ch4_envelope_enabled = false;
+        self.ch4_output = 0;
+        self.ch4_length_timer = 0x0;
+        self.ch4_pace = 0x0;
+        self.ch4_direction = 0x0;
+        self.ch4_volume = 0x0;
+        self.ch4_divisor = 0x0;
+        self.ch4_width_mode = false;
+        self.ch4_clock_shift = 0x0;
+        self.ch4_lfsr = 0x0;
+        self.ch4_length_stop = false;
+        self.ch4_enabled = false;
 
         self.left_enabled = true;
         self.right_enabled = true;
@@ -242,7 +295,8 @@ impl Apu {
             }
 
             // @TODO the CPU clock is hardcoded here, we must handle situations
-            // where there's some kind of overclock
+            // where there's some kind of overclock, and for that to happen the
+            // current CPU clock must be propagated here
             self.output_timer += (4194304.0 / self.sampling_rate as f32) as i16;
         }
     }
@@ -335,6 +389,48 @@ impl Apu {
                 self.ch3_enabled |= value & 0x80 == 0x80;
             }
 
+            // 0xFF20 — NR41: Channel 4 length timer
+            0xff20 => {
+                self.ch4_length_timer = value & 0x3f;
+            }
+            // 0xFF21 — NR42: Channel 4 volume & envelope
+            0xff21 => {
+                self.ch4_pace = value & 0x07;
+                self.ch4_direction = (value & 0x08) >> 3;
+                self.ch4_volume = (value & 0xf0) >> 4;
+                self.ch4_envelope_enabled = self.ch4_pace > 0;
+                self.ch4_envelope_sequence = 0;
+            }
+            // 0xFF22 — NR43: Channel 4 frequency & randomness
+            0xff22 => {
+                self.ch4_divisor = value & 0x07;
+                self.ch4_width_mode = value & 0x08 == 0x08;
+                self.ch4_clock_shift = (value & 0xf0) >> 4;
+            }
+            // 0xFF23 — NR44: Channel 4 control
+            0xff23 => {
+                self.ch4_length_stop |= value & 0x40 == 0x40;
+                self.ch4_enabled |= value & 0x80 == 0x80;
+                if value & 0x80 == 0x80 {
+                    self.ch4_timer = ((CH4_DIVISORS[self.ch4_divisor as usize] as u16)
+                        << self.ch4_clock_shift) as i16;
+                    self.ch4_lfsr = 0x7ff1;
+                }
+            }
+
+            // 0xFF24 — NR50: Master volume & VIN panning
+            0xff24 => {
+                //@TODO: Implement master volume & VIN panning
+            }
+            // 0xFF25 — NR51: Sound panning
+            0xff25 => {
+                //@TODO: Implement sound panning
+            }
+            // 0xFF26 — NR52: Sound on/off
+            0xff26 => {
+                //@TODO: Implement sound on/off
+            }
+
             // 0xFF30-0xFF3F — Wave pattern RAM
             0xff30..=0xff3f => {
                 self.wave_ram[addr as usize & 0x000f] = value;
@@ -345,7 +441,7 @@ impl Apu {
     }
 
     pub fn output(&self) -> u8 {
-        self.ch1_output + self.ch2_output + self.ch3_output
+        self.ch1_output + self.ch2_output + self.ch3_output + self.ch4_output
     }
 
     pub fn ch1_output(&self) -> u8 {
@@ -358,6 +454,10 @@ impl Apu {
 
     pub fn ch3_output(&self) -> u8 {
         self.ch3_output
+    }
+
+    pub fn ch4_output(&self) -> u8 {
+        self.ch4_output
     }
 
     pub fn audio_buffer(&self) -> &VecDeque<u8> {
@@ -407,13 +507,21 @@ impl Apu {
                     self.ch3_length_timer = 0;
                 }
             }
-            Channel::Ch4 => (),
+            Channel::Ch4 => {
+                self.ch4_length_timer = self.ch4_length_timer.saturating_add(1);
+                if self.ch4_length_timer >= 64 {
+                    self.ch4_enabled = !self.ch4_length_stop;
+                    self.ch4_length_timer = 0;
+                }
+            }
         }
     }
 
     #[inline(always)]
     fn tick_envelope_all(&mut self) {
         self.tick_envelope(Channel::Ch1);
+        self.tick_envelope(Channel::Ch2);
+        self.tick_envelope(Channel::Ch4);
     }
 
     #[inline(always)]
@@ -454,7 +562,23 @@ impl Apu {
                 }
             }
             Channel::Ch3 => (),
-            Channel::Ch4 => (),
+            Channel::Ch4 => {
+                if !self.ch4_enabled || !self.ch4_envelope_enabled {
+                    return;
+                }
+                self.ch4_envelope_sequence += 1;
+                if self.ch4_envelope_sequence >= self.ch4_pace {
+                    if self.ch4_direction == 0x01 {
+                        self.ch4_volume = self.ch4_volume.saturating_add(1);
+                    } else {
+                        self.ch4_volume = self.ch4_volume.saturating_sub(1);
+                    }
+                    if self.ch4_volume == 0 || self.ch4_volume == 15 {
+                        self.ch4_envelope_enabled = false;
+                    }
+                    self.ch4_envelope_sequence = 0;
+                }
+            }
         }
     }
 
@@ -485,6 +609,7 @@ impl Apu {
         self.tick_ch1(cycles);
         self.tick_ch2(cycles);
         self.tick_ch3(cycles);
+        self.tick_ch4(cycles);
     }
 
     #[inline(always)]
@@ -558,6 +683,39 @@ impl Apu {
 
         self.ch3_timer += ((2048 - self.ch3_wave_length) << 1) as i16;
         self.ch3_position = (self.ch3_position + 1) & 31;
+    }
+
+    #[inline(always)]
+    fn tick_ch4(&mut self, cycles: u8) {
+        self.ch4_timer = self.ch4_timer.saturating_sub(cycles as i16);
+        if self.ch4_timer > 0 {
+            return;
+        }
+
+        if self.ch4_enabled {
+            // obtains the current value of the LFSR based as
+            // the XOR of the 1st and 2nd bit of the LFSR
+            let result = ((self.ch4_lfsr & 0x0001) ^ ((self.ch4_lfsr >> 1) & 0x0001)) == 0x0001;
+
+            // shifts the LFSR to the right and in case the
+            // value is positive sets the 15th bit to 1
+            self.ch4_lfsr >>= 1;
+            self.ch4_lfsr |= if result { 0x0001 << 14 } else { 0x0 };
+
+            // in case the short width mode (7 bits) is set then
+            // the 6th bit will be set to value of the 15th bit
+            if self.ch4_width_mode {
+                self.ch4_lfsr &= 0xbf;
+                self.ch4_lfsr |= if result { 0x40 } else { 0x00 };
+            }
+
+            self.ch4_output = if result { self.ch4_volume } else { 0 };
+        } else {
+            self.ch4_output = 0;
+        }
+
+        self.ch4_timer +=
+            ((CH4_DIVISORS[self.ch4_divisor as usize] as u16) << self.ch4_clock_shift) as i16;
     }
 }
 
