@@ -465,6 +465,7 @@ impl Apu {
         }
     }
 
+    #[inline(always)]
     pub fn output(&self) -> u8 {
         self.ch1_output() + self.ch2_output() + self.ch3_output() + self.ch4_output()
     }
