@@ -79,7 +79,7 @@ const KEYS_NAME: Record<string, number> = {
     B: PadKey.B
 };
 
-const ROM_PATH = require("../../../res/roms/pocket.gb");
+const ROM_PATH = require("../../../res/roms/demo/pocket.gb");
 
 /**
  * Top level class that controls the emulator behaviour
@@ -614,7 +614,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
             ch1: output[1],
             ch2: output[2],
             ch3: output[3],
-            ch4: 0
+            ch4: output[4]
         };
     }
 

@@ -127,7 +127,7 @@ impl Cpu {
             self.halted = false;
         }
 
-        if self.ime {
+        if self.ime && self.mmu.ie != 0x00 {
             // @TODO aggregate all of this interrupts in the MMU, as there's
             // a lot of redundant code involved in here which complicates the
             // readability and maybe performance of this code

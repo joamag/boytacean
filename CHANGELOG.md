@@ -19,6 +19,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 *
 
+## [0.7.4] - 2023-04-08
+
+### Added
+
+* Support for audio channel 4 (noise) 🔈
+* Better trigger support for audio channels 🔈
+
+### Changed
+
+* Added CH4 public API method for WASM
+
+### Fixed
+
+* Envelope support for both channel 2 and 4 🔈
+* Issue related to the wave length stop flag 🔈
+
 ## [0.7.3] - 2023-04-02
 
 ### Added
