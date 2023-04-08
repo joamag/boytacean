@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+*
+
+### Changed
+
+*
+
+### Fixed
+
+*
+
+## [0.7.4] - 2023-04-08
+
+### Added
+
 * Support for audio channel 4 (noise) 🔈
 * Better trigger support for audio channels 🔈
 
