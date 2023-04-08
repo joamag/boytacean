@@ -159,6 +159,7 @@ impl Apu {
 
             left_enabled: true,
             right_enabled: true,
+
             ch1_out_enabled: true,
             ch2_out_enabled: true,
             ch3_out_enabled: true,
@@ -354,12 +355,17 @@ impl Apu {
             }
             // 0xFF14 — NR14: Channel 1 wavelength high & control
             0xff14 => {
+                let length_trigger = value & 0x40 == 0x40;
+                let trigger = value & 0x80 == 0x80;
                 self.ch1_wave_length =
                     (self.ch1_wave_length & 0x00ff) | (((value & 0x07) as u16) << 8);
-                self.ch1_length_stop |= value & 0x40 == 0x40;
+                self.ch1_length_stop = value & 0x40 == 0x40;
                 self.ch1_enabled |= value & 0x80 == 0x80;
-                if value & 0x80 == 0x80 {
+                if trigger {
                     self.trigger_ch1();
+                }
+                if (length_trigger || trigger) && self.ch1_length_timer == 0 {
+                    self.ch1_length_timer = 0;
                 }
             }
 
@@ -380,12 +386,17 @@ impl Apu {
             }
             // 0xFF19 — NR24: Channel 2 wavelength high & control
             0xff19 => {
+                let length_trigger = value & 0x40 == 0x40;
+                let trigger = value & 0x80 == 0x80;
                 self.ch2_wave_length =
                     (self.ch2_wave_length & 0x00ff) | (((value & 0x07) as u16) << 8);
-                self.ch2_length_stop |= value & 0x40 == 0x40;
-                self.ch2_enabled |= value & 0x80 == 0x80;
-                if value & 0x80 == 0x80 {
+                self.ch2_length_stop = length_trigger;
+                self.ch2_enabled |= trigger;
+                if trigger {
                     self.trigger_ch2();
+                }
+                if (length_trigger || trigger) && self.ch2_length_timer == 0 {
+                    self.ch2_length_timer = 0;
                 }
             }
 
@@ -407,12 +418,17 @@ impl Apu {
             }
             // 0xFF1E — NR34: Channel 3 wavelength high & control
             0xff1e => {
+                let length_trigger = value & 0x40 == 0x40;
+                let trigger = value & 0x80 == 0x80;
                 self.ch3_wave_length =
                     (self.ch3_wave_length & 0x00ff) | (((value & 0x07) as u16) << 8);
-                self.ch3_length_stop |= value & 0x40 == 0x40;
-                self.ch3_enabled |= value & 0x80 == 0x80;
-                if value & 0x80 == 0x80 {
+                self.ch3_length_stop = length_trigger;
+                self.ch3_enabled |= trigger;
+                if trigger {
                     self.trigger_ch3();
+                }
+                if (length_trigger || trigger) && self.ch3_length_timer == 0 {
+                    self.ch3_length_timer = 0;
                 }
             }
 
@@ -436,10 +452,15 @@ impl Apu {
             }
             // 0xFF23 — NR44: Channel 4 control
             0xff23 => {
-                self.ch4_length_stop |= value & 0x40 == 0x40;
-                self.ch4_enabled |= value & 0x80 == 0x80;
-                if value & 0x80 == 0x80 {
+                let length_trigger = value & 0x40 == 0x40;
+                let trigger = value & 0x80 == 0x80;
+                self.ch4_length_stop = length_trigger;
+                self.ch4_enabled |= trigger;
+                if trigger {
                     self.trigger_ch4();
+                }
+                if (length_trigger || trigger) && self.ch4_length_timer == 0 {
+                    self.ch4_length_timer = 0;
                 }
             }
 

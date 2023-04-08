@@ -199,6 +199,7 @@ impl GameBoy {
             self.audio_ch1_output(),
             self.audio_ch2_output(),
             self.audio_ch3_output(),
+            self.audio_ch4_output(),
         ]
     }
 
@@ -212,6 +213,10 @@ impl GameBoy {
 
     pub fn audio_ch3_output(&self) -> u8 {
         self.apu_i().ch3_output()
+    }
+
+    pub fn audio_ch4_output(&self) -> u8 {
+        self.apu_i().ch4_output()
     }
 
     pub fn cartridge_eager(&mut self) -> Cartridge {
