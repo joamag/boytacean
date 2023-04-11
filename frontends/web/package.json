@@ -21,9 +21,9 @@
         "@parcel/transformer-typescript-tsc": "^2.8.3",
         "@types/react": "^18.0.34",
         "@types/react-dom": "^18.0.11",
-        "@typescript-eslint/eslint-plugin": "^5.57.1",
-        "@typescript-eslint/parser": "^5.57.1",
-        "emukit": "^0.8.0",
+        "@typescript-eslint/eslint-plugin": "^5.58.0",
+        "@typescript-eslint/parser": "^5.58.0",
+        "emukit": "^0.8.2",
         "eslint": "^8.38.0",
         "nodemon": "^2.0.22",
         "parcel": "^2.8.3",
@@ -31,7 +31,6 @@
         "process": "^0.11.10",
         "react": "^18.2.0",
         "react-dom": "^18.2.0",
-        "typescript": "^5.0.4",
-        "webgl-plot": "^0.7.0"
+        "typescript": "^5.0.4"
     }
 }
