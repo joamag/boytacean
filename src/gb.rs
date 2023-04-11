@@ -34,9 +34,23 @@ use std::{
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 pub struct GameBoy {
     cpu: Cpu,
+
+    /// If the PPU is enabled, it will be clocked.
     ppu_enabled: bool,
+
+    /// If the APU is enabled, it will be clocked.
     apu_enabled: bool,
+
+    /// If the timer is enabled, it will be clocked.
     timer_enabled: bool,
+
+    /// The current frequency at which the Game Boy
+    /// emulator is being handled. This is a "hint" that
+    /// may help components to adjust their internal
+    /// logic to match the current frequency. For example
+    /// the APU will adjust its internal clock to match
+    /// this hint.
+    clock_freq: u32,
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
@@ -79,6 +93,7 @@ impl GameBoy {
             ppu_enabled: true,
             apu_enabled: true,
             timer_enabled: true,
+            clock_freq: GameBoy::CPU_FREQ,
         }
     }
 
@@ -270,23 +285,23 @@ impl GameBoy {
     /// Obtains the name of the compiler that has been
     /// used in the compilation of the base Boytacean
     /// library. Can be used for diagnostics.
-    pub fn get_compiler(&self) -> String {
+    pub fn compiler(&self) -> String {
         String::from(COMPILER)
     }
 
-    pub fn get_compiler_version(&self) -> String {
+    pub fn compiler_version(&self) -> String {
         String::from(COMPILER_VERSION)
     }
 
-    pub fn get_compilation_date(&self) -> String {
+    pub fn compilation_date(&self) -> String {
         String::from(COMPILATION_DATE)
     }
 
-    pub fn get_compilation_time(&self) -> String {
+    pub fn compilation_time(&self) -> String {
         String::from(COMPILATION_TIME)
     }
 
-    pub fn get_ppu_enabled(&self) -> bool {
+    pub fn ppu_enabled(&self) -> bool {
         self.ppu_enabled
     }
 
@@ -294,7 +309,7 @@ impl GameBoy {
         self.ppu_enabled = value;
     }
 
-    pub fn get_apu_enabled(&self) -> bool {
+    pub fn apu_enabled(&self) -> bool {
         self.apu_enabled
     }
 
@@ -302,12 +317,21 @@ impl GameBoy {
         self.apu_enabled = value;
     }
 
-    pub fn get_timer_enabled(&self) -> bool {
+    pub fn timer_enabled(&self) -> bool {
         self.apu_enabled
     }
 
     pub fn set_timer_enabled(&mut self, value: bool) {
         self.timer_enabled = value;
+    }
+
+    pub fn clock_freq(&self) -> u32 {
+        self.clock_freq
+    }
+
+    pub fn set_clock_freq(&mut self, value: u32) {
+        self.clock_freq = value;
+        self.apu().set_clock_freq(value);
     }
 }
 
@@ -426,7 +450,7 @@ impl GameBoy {
         self.ppu().set_palette_colors(&palette);
     }
 
-    pub fn get_wasm_engine_ws(&self) -> Option<String> {
+    pub fn wasm_engine_ws(&self) -> Option<String> {
         let dependencies = dependencies_map();
         if !dependencies.contains_key("wasm-bindgen") {
             return None;

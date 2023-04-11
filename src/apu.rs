@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use crate::warnln;
+use crate::{gb::GameBoy, warnln};
 
 const DUTY_TABLE: [[u8; 8]; 4] = [
     [0, 0, 0, 0, 0, 0, 0, 1],
@@ -93,10 +93,12 @@ pub struct Apu {
     output_timer: i16,
     audio_buffer: VecDeque<u8>,
     audio_buffer_max: usize,
+
+    clock_freq: u32,
 }
 
 impl Apu {
-    pub fn new(sampling_rate: u16, buffer_size: f32) -> Self {
+    pub fn new(sampling_rate: u16, buffer_size: f32, clock_freq: u32) -> Self {
         Self {
             ch1_timer: 0,
             ch1_sequence: 0,
@@ -184,6 +186,7 @@ impl Apu {
                 (sampling_rate as f32 * buffer_size) as usize * 2,
             ),
             audio_buffer_max: (sampling_rate as f32 * buffer_size) as usize * 2,
+            clock_freq: clock_freq,
         }
     }
 
@@ -312,7 +315,7 @@ impl Apu {
             // @TODO the CPU clock is hardcoded here, we must handle situations
             // where there's some kind of overclock, and for that to happen the
             // current CPU clock must be propagated here
-            self.output_timer += (4194304.0 / self.sampling_rate as f32) as i16;
+            self.output_timer += (self.clock_freq as f32 / self.sampling_rate as f32) as i16;
         }
     }
 
@@ -553,6 +556,14 @@ impl Apu {
 
     pub fn clear_audio_buffer(&mut self) {
         self.audio_buffer.clear();
+    }
+
+    pub fn clock_freq(&self) -> u32 {
+        self.clock_freq
+    }
+
+    pub fn set_clock_freq(&mut self, value: u32) {
+        self.clock_freq = value;
     }
 
     #[inline(always)]
@@ -831,6 +842,6 @@ impl Apu {
 
 impl Default for Apu {
     fn default() -> Self {
-        Self::new(44100, 1.0)
+        Self::new(44100, 1.0, GameBoy::CPU_FREQ)
     }
 }

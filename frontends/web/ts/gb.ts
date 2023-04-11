@@ -562,22 +562,22 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     get compiler(): Compiler | null {
         if (!this.gameBoy) return null;
         return {
-            name: this.gameBoy.get_compiler(),
-            version: this.gameBoy.get_compiler_version()
+            name: this.gameBoy.compiler(),
+            version: this.gameBoy.compiler_version()
         };
     }
 
     get compilation(): Compilation | null {
         if (!this.gameBoy) return null;
         return {
-            date: this.gameBoy.get_compilation_date(),
-            time: this.gameBoy.get_compilation_time()
+            date: this.gameBoy.compilation_date(),
+            time: this.gameBoy.compilation_time()
         };
     }
 
     get wasmEngine(): string | null {
         if (!this.gameBoy) return null;
-        return this.gameBoy.get_wasm_engine_ws() ?? null;
+        return this.gameBoy.wasm_engine_ws() ?? null;
     }
 
     get framerate(): number {
@@ -672,7 +672,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     }
 
     getVideoState(): boolean {
-        return this.gameBoy?.get_ppu_enabled() ?? false;
+        return this.gameBoy?.ppu_enabled() ?? false;
     }
 
     pauseAudio() {
@@ -684,7 +684,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     }
 
     getAudioState(): boolean {
-        return this.gameBoy?.get_apu_enabled() ?? false;
+        return this.gameBoy?.apu_enabled() ?? false;
     }
 
     getTile(index: number): Uint8Array {

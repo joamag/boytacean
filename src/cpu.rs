@@ -427,7 +427,7 @@ impl Cpu {
     }
 
     #[inline(always)]
-    pub fn get_zero(&self) -> bool {
+    pub fn zero(&self) -> bool {
         self.zero
     }
 
@@ -437,7 +437,7 @@ impl Cpu {
     }
 
     #[inline(always)]
-    pub fn get_sub(&self) -> bool {
+    pub fn sub(&self) -> bool {
         self.sub
     }
 
@@ -447,7 +447,7 @@ impl Cpu {
     }
 
     #[inline(always)]
-    pub fn get_half_carry(&self) -> bool {
+    pub fn half_carry(&self) -> bool {
         self.half_carry
     }
 
@@ -457,7 +457,7 @@ impl Cpu {
     }
 
     #[inline(always)]
-    pub fn get_carry(&self) -> bool {
+    pub fn carry(&self) -> bool {
         self.carry
     }
 
