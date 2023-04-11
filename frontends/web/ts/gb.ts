@@ -548,6 +548,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     set frequency(value: number) {
         value = Math.max(value, 0);
         this.logicFrequency = value;
+        this.gameBoy?.set_clock_freq(value);
         this.trigger("frequency", value);
     }
 

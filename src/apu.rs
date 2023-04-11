@@ -312,9 +312,10 @@ impl Apu {
                 self.audio_buffer.push_back(self.output());
             }
 
-            // @TODO the CPU clock is hardcoded here, we must handle situations
-            // where there's some kind of overclock, and for that to happen the
-            // current CPU clock must be propagated here
+            // calculates the rate at which a new audio sample should be
+            // created based on the (base/CPU) clock frequency and the
+            // sampling rate, this is basically the amount of APU clock
+            // calls that should be performed until an audio sample is created
             self.output_timer += (self.clock_freq as f32 / self.sampling_rate as f32) as i16;
         }
     }
