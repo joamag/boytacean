@@ -318,7 +318,7 @@ impl GameBoy {
     }
 
     pub fn timer_enabled(&self) -> bool {
-        self.apu_enabled
+        self.timer_enabled
     }
 
     pub fn set_timer_enabled(&mut self, value: bool) {
