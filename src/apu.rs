@@ -186,7 +186,7 @@ impl Apu {
                 (sampling_rate as f32 * buffer_size) as usize * 2,
             ),
             audio_buffer_max: (sampling_rate as f32 * buffer_size) as usize * 2,
-            clock_freq: clock_freq,
+            clock_freq,
         }
     }
 
