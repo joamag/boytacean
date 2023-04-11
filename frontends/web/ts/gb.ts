@@ -3,6 +3,7 @@ import {
     BenchmarkResult,
     Compilation,
     Compiler,
+    DebugPanel,
     Emulator,
     EmulatorBase,
     Entry,
@@ -16,7 +17,7 @@ import {
 } from "emukit";
 import { PALETTES, PALETTES_MAP } from "./palettes";
 import { base64ToBuffer, bufferToBase64 } from "./util";
-import { HelpFaqs, HelpKeyboard } from "../react";
+import { DebugAudio, DebugVideo, HelpFaqs, HelpKeyboard } from "../react";
 
 import {
     Cartridge,
@@ -472,6 +473,19 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
             {
                 name: "FAQs",
                 node: HelpFaqs({})
+            }
+        ];
+    }
+
+    get debug(): DebugPanel[] {
+        return [
+            {
+                name: "Video",
+                node: DebugVideo({ emulator: this })
+            },
+            {
+                name: "Audio",
+                node: DebugAudio({ emulator: this })
             }
         ];
     }
