@@ -1,7 +1,6 @@
 use crate::serial::SerialDevice;
 
-pub struct PrinterDevice {
-}
+pub struct PrinterDevice {}
 
 impl PrinterDevice {
     pub fn new() -> Self {

@@ -2,6 +2,7 @@ use crate::{
     apu::Apu,
     cpu::Cpu,
     data::{BootRom, CGB_BOOT, DMG_BOOT, DMG_BOOTIX, MGB_BOOTIX, SGB_BOOT},
+    devices::{printer::PrinterDevice, stdout::StdoutDevice},
     gen::{COMPILATION_DATE, COMPILATION_TIME, COMPILER, COMPILER_VERSION},
     mmu::Mmu,
     pad::{Pad, PadKey},
@@ -9,7 +10,7 @@ use crate::{
     rom::Cartridge,
     serial::Serial,
     timer::Timer,
-    util::read_file, devices::{stdout::StdoutDevice, printer::PrinterDevice},
+    util::read_file,
 };
 
 use std::collections::VecDeque;

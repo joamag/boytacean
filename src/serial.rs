@@ -159,7 +159,7 @@ impl Serial {
         if self.bit_count == 8 {
             self.transferring = false;
             self.length = 0;
-            self.bit_count  = 0;
+            self.bit_count = 0;
 
             // signals the interrupt for the serial
             // transfer completion, indicating that
@@ -175,8 +175,7 @@ impl Default for Serial {
     }
 }
 
-pub struct NullDevice {
-}
+pub struct NullDevice {}
 
 impl NullDevice {
     pub fn new() -> Self {
@@ -195,6 +194,5 @@ impl SerialDevice for NullDevice {
         0xff
     }
 
-    fn receive(&mut self, _: u8) {
-    }
+    fn receive(&mut self, _: u8) {}
 }

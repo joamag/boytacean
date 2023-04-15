@@ -3,14 +3,12 @@ use std::io::{stdout, Write};
 use crate::serial::SerialDevice;
 
 pub struct StdoutDevice {
-    flush: bool
+    flush: bool,
 }
 
 impl StdoutDevice {
     pub fn new(flush: bool) -> Self {
-        Self {
-            flush
-        }
+        Self { flush }
     }
 }
 
