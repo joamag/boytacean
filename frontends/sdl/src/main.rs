@@ -444,6 +444,7 @@ fn main() {
     // creates a new Game Boy instance and loads both the boot ROM
     // and the initial game ROM to "start the engine"
     let mut game_boy = GameBoy::new();
+    game_boy.attach_stdout_serial();
     game_boy.load_boot_default();
 
     // creates a new generic emulator structure then starts
@@ -451,7 +452,7 @@ fn main() {
     // ROM file and starts running it
     let mut emulator = Emulator::new(game_boy);
     emulator.start(SCREEN_SCALE);
-    emulator.load_rom(Some("../../res/roms/demo/pocket.gb"));
+    emulator.load_rom(Some("../../res/roms/test/gbprinter.gb"));
     emulator.toggle_palette();
     emulator.run();
 }
