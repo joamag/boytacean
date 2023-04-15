@@ -642,26 +642,32 @@ impl Ppu {
         self.frame_index
     }
 
+    #[inline(always)]
     pub fn int_vblank(&self) -> bool {
         self.int_vblank
     }
 
+    #[inline(always)]
     pub fn set_int_vblank(&mut self, value: bool) {
         self.int_vblank = value;
     }
 
+    #[inline(always)]
     pub fn ack_vblank(&mut self) {
         self.set_int_vblank(false);
     }
 
+    #[inline(always)]
     pub fn int_stat(&self) -> bool {
         self.int_stat
     }
 
+    #[inline(always)]
     pub fn set_int_stat(&mut self, value: bool) {
         self.int_stat = value;
     }
 
+    #[inline(always)]
     pub fn ack_stat(&mut self) {
         self.set_int_stat(false);
     }

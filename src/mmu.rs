@@ -150,6 +150,9 @@ impl Mmu {
                 | 0xa00 | 0xb00 | 0xc00 | 0xd00 => self.ram[(addr & 0x1fff) as usize],
                 0xe00 => self.ppu.read(addr),
                 0xf00 => match addr & 0x00ff {
+                    // 0xFF01-0xFF02 - Serial data transfer
+                    0x01..=0x02 => self.serial.read(addr),
+
                     // 0xFF0F — IF: Interrupt flag
                     0x0f =>
                     {
@@ -157,6 +160,7 @@ impl Mmu {
                         (if self.ppu.int_vblank() { 0x01 } else { 0x00 }
                             | if self.ppu.int_stat() { 0x02 } else { 0x00 }
                             | if self.timer.int_tima() { 0x04 } else { 0x00 }
+                            | if self.serial.int_serial() { 0x08 } else { 0x00 }
                             | if self.pad.int_pad() { 0x10 } else { 0x00 })
                     }
 
@@ -225,11 +229,15 @@ impl Mmu {
                 }
                 0xe00 => self.ppu.write(addr, value),
                 0xf00 => match addr & 0x00ff {
+                    // 0xFF01-0xFF02 - Serial data transfer
+                    0x01..=0x02 => self.serial.write(addr, value),
+
                     // 0xFF0F — IF: Interrupt flag
                     0x0f => {
                         self.ppu.set_int_vblank(value & 0x01 == 0x01);
                         self.ppu.set_int_stat(value & 0x02 == 0x02);
                         self.timer.set_int_tima(value & 0x04 == 0x04);
+                        self.serial.set_int_serial(value & 0x08 == 0x08);
                         self.pad.set_int_pad(value & 0x10 == 0x10);
                     }
 
