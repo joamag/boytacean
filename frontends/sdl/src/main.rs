@@ -209,7 +209,7 @@ impl Emulator {
     }
 
     pub fn toggle_audio(&mut self) {
-        let apu_enabled = self.system.get_apu_enabled();
+        let apu_enabled = self.system.apu_enabled();
         self.system.set_apu_enabled(!apu_enabled);
     }
 
