@@ -9,7 +9,7 @@ use crate::{
     rom::Cartridge,
     serial::Serial,
     timer::Timer,
-    util::read_file,
+    util::read_file, devices::{stdout::StdoutDevice, printer::PrinterDevice},
 };
 
 use std::collections::VecDeque;
@@ -355,6 +355,14 @@ impl GameBoy {
     pub fn set_clock_freq(&mut self, value: u32) {
         self.clock_freq = value;
         self.apu().set_clock_freq(value);
+    }
+
+    pub fn attach_stdout_serial(&mut self) {
+        self.serial().set_device(Box::<StdoutDevice>::default());
+    }
+
+    pub fn attach_printer_serial(&mut self) {
+        self.serial().set_device(Box::<PrinterDevice>::default());
     }
 }
 

@@ -2,6 +2,7 @@
 
 pub mod apu;
 pub mod cpu;
+pub mod devices;
 pub mod data;
 pub mod gb;
 pub mod gen;

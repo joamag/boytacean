@@ -1,5 +1,3 @@
-use std::io::{stdout, Write};
-
 use crate::warnln;
 
 pub trait SerialDevice {
@@ -34,7 +32,7 @@ impl Serial {
             bit_count: 0,
             byte_receive: 0x0,
             int_serial: false,
-            device: Box::<PrintDevice>::default(),
+            device: Box::<NullDevice>::default(),
         }
     }
 
@@ -182,7 +180,7 @@ pub struct NullDevice {
 
 impl NullDevice {
     pub fn new() -> Self {
-        Self { }
+        Self {}
     }
 }
 
@@ -198,36 +196,5 @@ impl SerialDevice for NullDevice {
     }
 
     fn receive(&mut self, _: u8) {
-    }
-}
-
-pub struct PrintDevice {
-    flush: bool
-}
-
-impl PrintDevice {
-    pub fn new(flush: bool) -> Self {
-        Self {
-            flush
-        }
-    }
-}
-
-impl Default for PrintDevice {
-    fn default() -> Self {
-        Self::new(true)
-    }
-}
-
-impl SerialDevice for PrintDevice {
-    fn send(&mut self) -> u8 {
-        0xff
-    }
-
-    fn receive(&mut self, byte: u8) {
-        print!("{}", byte as char);
-        if self.flush {
-            stdout().flush().unwrap();
-        }
     }
 }
