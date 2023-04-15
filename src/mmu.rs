@@ -1,4 +1,4 @@
-use crate::{apu::Apu, debugln, pad::Pad, ppu::Ppu, rom::Cartridge, timer::Timer};
+use crate::{apu::Apu, debugln, pad::Pad, ppu::Ppu, rom::Cartridge, serial::Serial, timer::Timer};
 
 pub const BOOT_SIZE: usize = 2304;
 pub const RAM_SIZE: usize = 8192;
@@ -26,6 +26,10 @@ pub struct Mmu {
     /// that is memory mapped.
     timer: Timer,
 
+    /// The serial data transfer controller to be used to control the
+    /// link cable connection, this component is memory mapped.
+    serial: Serial,
+
     /// The cartridge ROM that is currently loaded into the system,
     /// going to be used to access ROM and external RAM banks.
     rom: Cartridge,
@@ -49,12 +53,13 @@ pub struct Mmu {
 }
 
 impl Mmu {
-    pub fn new(ppu: Ppu, apu: Apu, pad: Pad, timer: Timer) -> Self {
+    pub fn new(ppu: Ppu, apu: Apu, pad: Pad, timer: Timer, serial: Serial) -> Self {
         Self {
             ppu,
             apu,
             pad,
             timer,
+            serial,
             rom: Cartridge::new(),
             boot_active: true,
             boot: [0u8; BOOT_SIZE],
@@ -89,6 +94,10 @@ impl Mmu {
 
     pub fn timer(&mut self) -> &mut Timer {
         &mut self.timer
+    }
+
+    pub fn serial(&mut self) -> &mut Serial {
+        &mut self.serial
     }
 
     pub fn boot_active(&self) -> bool {

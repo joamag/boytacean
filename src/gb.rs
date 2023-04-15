@@ -7,6 +7,7 @@ use crate::{
     pad::{Pad, PadKey},
     ppu::{Ppu, PpuMode, Tile, FRAME_BUFFER_SIZE},
     rom::Cartridge,
+    serial::Serial,
     timer::Timer,
     util::read_file,
 };
@@ -43,6 +44,9 @@ pub struct GameBoy {
 
     /// If the timer is enabled, it will be clocked.
     timer_enabled: bool,
+
+    /// If the serial is enabled, it will be clocked.
+    serial_enabled: bool,
 
     /// The current frequency at which the Game Boy
     /// emulator is being handled. This is a "hint" that
@@ -86,13 +90,15 @@ impl GameBoy {
         let apu = Apu::default();
         let pad = Pad::default();
         let timer = Timer::default();
-        let mmu = Mmu::new(ppu, apu, pad, timer);
+        let serial = Serial::default();
+        let mmu = Mmu::new(ppu, apu, pad, timer, serial);
         let cpu = Cpu::new(mmu);
         Self {
             cpu,
             ppu_enabled: true,
             apu_enabled: true,
             timer_enabled: true,
+            serial_enabled: true,
             clock_freq: GameBoy::CPU_FREQ,
         }
     }
@@ -100,6 +106,8 @@ impl GameBoy {
     pub fn reset(&mut self) {
         self.ppu().reset();
         self.apu().reset();
+        self.timer().reset();
+        self.serial().reset();
         self.mmu().reset();
         self.cpu.reset();
     }
@@ -114,6 +122,9 @@ impl GameBoy {
         }
         if self.timer_enabled {
             self.timer_clock(cycles);
+        }
+        if self.serial_enabled {
+            self.serial_clock(cycles);
         }
         cycles
     }
@@ -140,6 +151,10 @@ impl GameBoy {
 
     pub fn timer_clock(&mut self, cycles: u8) {
         self.timer().clock(cycles)
+    }
+
+    pub fn serial_clock(&mut self, cycles: u8) {
+        self.serial().clock(cycles)
     }
 
     pub fn ppu_ly(&mut self) -> u8 {
@@ -325,6 +340,14 @@ impl GameBoy {
         self.timer_enabled = value;
     }
 
+    pub fn serial_enabled(&self) -> bool {
+        self.serial_enabled
+    }
+
+    pub fn set_serial_enabled(&mut self, value: bool) {
+        self.serial_enabled = value;
+    }
+
     pub fn clock_freq(&self) -> u32 {
         self.clock_freq
     }
@@ -376,6 +399,10 @@ impl GameBoy {
 
     pub fn timer(&mut self) -> &mut Timer {
         self.cpu.timer()
+    }
+
+    pub fn serial(&mut self) -> &mut Serial {
+        self.cpu.serial()
     }
 
     pub fn frame_buffer(&mut self) -> &[u8; FRAME_BUFFER_SIZE] {

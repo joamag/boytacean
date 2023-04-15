@@ -7,6 +7,7 @@ use crate::{
     mmu::Mmu,
     pad::Pad,
     ppu::Ppu,
+    serial::Serial,
     timer::Timer,
 };
 
@@ -295,6 +296,11 @@ impl Cpu {
     #[inline(always)]
     pub fn timer(&mut self) -> &mut Timer {
         self.mmu().timer()
+    }
+
+    #[inline(always)]
+    pub fn serial(&mut self) -> &mut Serial {
+        self.mmu().serial()
     }
 
     #[inline(always)]
