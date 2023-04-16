@@ -444,7 +444,7 @@ fn main() {
     // creates a new Game Boy instance and loads both the boot ROM
     // and the initial game ROM to "start the engine"
     let mut game_boy = GameBoy::new();
-    game_boy.attach_stdout_serial();
+    game_boy.attach_printer_serial();
     game_boy.load_boot_default();
 
     // creates a new generic emulator structure then starts

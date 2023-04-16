@@ -51,17 +51,13 @@ impl Serial {
     }
 
     pub fn clock(&mut self, cycles: u8) {
-        if self.shift_clock {
-            return;
-        }
-
         if !self.transferring {
             return;
         }
 
         self.timer = self.timer.saturating_sub(cycles as i16);
         if self.timer <= 0 {
-            let bit = self.byte_receive & (0x01 << self.bit_count);
+            let bit = (self.byte_receive >> (7 - self.bit_count)) & 0x01;
             self.data = (self.data << 1) | bit;
 
             self.tick_transfer();
@@ -93,11 +89,15 @@ impl Serial {
                 self.clock_speed = value & 0x02 == 0x02;
                 self.transferring = value & 0x80 == 0x80;
 
+                // @TODO: THIS SEEMS LIKE A HACK, we'll need to check with
+                // the device driver how to handle no communication and receive
+                // we must simulate no cable communication
+                if self.transferring && !self.shift_clock {
+                    self.transferring = false;
+                }
                 // in case a transfer of byte has been requested and
-                // this is the device responsible for the shifting
-                // of the transfer's clock then we need to start
-                // the transfer setup
-                if self.transferring && self.shift_clock {
+                // this is the then we need to start the transfer setup
+                else if self.transferring {
                     // @TODO: if the GBC mode exists there should
                     // be special check logic here
                     //self.length = if self.gb.is_cgb() && self.clock_speed { 16 } else { 512 };
@@ -183,16 +183,16 @@ impl NullDevice {
     }
 }
 
-impl Default for NullDevice {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl SerialDevice for NullDevice {
     fn send(&mut self) -> u8 {
         0xff
     }
 
     fn receive(&mut self, _: u8) {}
+}
+
+impl Default for NullDevice {
+    fn default() -> Self {
+        Self::new()
+    }
 }

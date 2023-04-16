@@ -12,12 +12,6 @@ impl StdoutDevice {
     }
 }
 
-impl Default for StdoutDevice {
-    fn default() -> Self {
-        Self::new(true)
-    }
-}
-
 impl SerialDevice for StdoutDevice {
     fn send(&mut self) -> u8 {
         0xff
@@ -28,5 +22,11 @@ impl SerialDevice for StdoutDevice {
         if self.flush {
             stdout().flush().unwrap();
         }
+    }
+}
+
+impl Default for StdoutDevice {
+    fn default() -> Self {
+        Self::new(true)
     }
 }
