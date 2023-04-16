@@ -246,6 +246,10 @@ impl SerialDevice for PrinterDevice {
             self.state = PrinterState::from_u8(self.state as u8 + 1);
         }
     }
+
+    fn allow_slave(&self) -> bool {
+        false
+    }
 }
 
 impl Default for PrinterDevice {

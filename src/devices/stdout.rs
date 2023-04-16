@@ -23,6 +23,10 @@ impl SerialDevice for StdoutDevice {
             stdout().flush().unwrap();
         }
     }
+
+    fn allow_slave(&self) -> bool {
+        false
+    }
 }
 
 impl Default for StdoutDevice {
