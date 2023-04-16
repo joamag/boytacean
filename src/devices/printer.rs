@@ -175,7 +175,6 @@ impl PrinterDevice {
             }
             PrinterCommand::Other => {
                 warnln!("Printer: Invalid command: {:02x}", self.state as u8);
-                return;
             }
         }
     }
