@@ -7,6 +7,9 @@ license = "Apache-2.0"
 keywords = ["gameboy", "emulator", "rust", "sdl"]
 edition = "2018"
 
+[features]
+debug = ["boytacean/debug"]
+
 [dependencies.boytacean]
 path = "../.."
 
