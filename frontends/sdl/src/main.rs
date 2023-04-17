@@ -20,11 +20,11 @@ use std::{cmp::max, time::SystemTime};
 const SCREEN_SCALE: f32 = 2.0;
 
 /// The base title to be used in the window.
-static TITLE: &str = "Boytacean";
+const TITLE: &str = "Boytacean";
 
 /// Base audio volume to be used as the basis of the
 /// amplification level of the volume
-static VOLUME: f32 = 64.0;
+const VOLUME: f32 = 64.0;
 
 pub struct Benchmark {
     count: usize,
