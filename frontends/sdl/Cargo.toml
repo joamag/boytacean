@@ -13,6 +13,12 @@ debug = ["boytacean/debug"]
 [dependencies.boytacean]
 path = "../.."
 
+[dependencies.image]
+version = "0.24"
+
+[dependencies.chrono]
+version = "0.4"
+
 [dependencies.sdl2]
 version = "0.35"
 features = ["ttf", "image", "gfx", "mixer", "static-link", "use-vcpkg"]

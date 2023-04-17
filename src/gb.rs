@@ -8,7 +8,7 @@ use crate::{
     pad::{Pad, PadKey},
     ppu::{Ppu, PpuMode, Tile, FRAME_BUFFER_SIZE},
     rom::Cartridge,
-    serial::Serial,
+    serial::{Serial, SerialDevice},
     timer::Timer,
     util::read_file,
 };
@@ -358,12 +358,16 @@ impl GameBoy {
         self.apu().set_clock_freq(value);
     }
 
+    pub fn attach_serial(&mut self, device: Box<dyn SerialDevice>) {
+        self.serial().set_device(device);
+    }
+
     pub fn attach_stdout_serial(&mut self) {
-        self.serial().set_device(Box::<StdoutDevice>::default());
+        self.attach_serial(Box::<StdoutDevice>::default());
     }
 
     pub fn attach_printer_serial(&mut self) {
-        self.serial().set_device(Box::<PrinterDevice>::default());
+        self.attach_serial(Box::<PrinterDevice>::default());
     }
 }
 
