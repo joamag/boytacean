@@ -33,10 +33,15 @@
 
 * [YouTube - The Ultimate Game Boy Talk (33c3)](https://www.youtube.com/watch?v=HyzD8pNlpwI)
 
+## Peripherals
+
+* [In Depth: The Game Boy Printer](https://shonumi.github.io/articles/art2.html)
+
 ## Other
 
 * [GitHub - gbdev/awesome-gbdev](https://github.com/gbdev/awesome-gbdev)
 * [GitHub - Hacktix/Bootix](https://github.com/Hacktix/Bootix)
+* [GitHub - gbdk-2020/gbdk-2020 (Best GB C SDK)](https://github.com/gbdk-2020/gbdk-2020)
 * [GitHub - fcambus/jsemu (Emulators written in JavaScript)](https://github.com/fcambus/jsemu)
 * [Gameboy Doctor: debug and fix your gameboy emulator](https://robertheaton.com/gameboy-doctor)
 * [Game Boy Boot ROMs](https://gbdev.gg8.se/files/roms/bootroms)
