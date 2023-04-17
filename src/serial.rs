@@ -52,7 +52,6 @@ impl Serial {
         self.bit_count = 0;
         self.byte_receive = 0x0;
         self.int_serial = false;
-        self.device = Box::new(NullDevice::new());
     }
 
     pub fn clock(&mut self, cycles: u8) {
