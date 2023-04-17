@@ -14,6 +14,7 @@ pub const HRAM_SIZE: usize = 128;
 pub const OAM_SIZE: usize = 260;
 pub const PALETTE_SIZE: usize = 4;
 pub const RGB_SIZE: usize = 3;
+pub const RGBA_SIZE: usize = 4;
 pub const TILE_WIDTH: usize = 8;
 pub const TILE_HEIGHT: usize = 8;
 pub const TILE_DOUBLE_HEIGHT: usize = 16;
@@ -48,9 +49,17 @@ pub const PALETTE_COLORS: Palette = [[255, 255, 255], [192, 192, 192], [96, 96, 
 /// with the size of RGB (3 bytes).
 pub type Pixel = [u8; RGB_SIZE];
 
+/// Defines a transparent Game Boy pixel type as a buffer
+/// with the size of RGBA (4 bytes).
+pub type PixelAlpha = [u8; RGBA_SIZE];
+
 /// Defines a type that represents a color palette
 /// within the Game Boy context.
 pub type Palette = [Pixel; PALETTE_SIZE];
+
+/// Defines a type that represents a color palette
+/// with alpha within the Game Boy context.
+pub type PaletteAlpha = [PixelAlpha; PALETTE_SIZE];
 
 /// Represents a palette with the metadata that is
 /// associated with it.
