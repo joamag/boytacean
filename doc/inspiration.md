@@ -26,6 +26,7 @@
 * [GitHub - simias/gb-rs (Rust)](https://github.com/simias/gb-rs)
 * [GitHub - RubenG123/frosty (Rust)](https://github.com/RubenG123/frosty)
 * [GitHub - calvinbaart/gameboy (TypeScript)](https://github.com/calvinbaart/gameboy)
+* [GitHub - HFO4/gameboy.live (Go)](https://github.com/HFO4/gameboy.live)
 * [GitHub - djhworld/gomeboycolor-wasm (Go)](https://github.com/djhworld/gomeboycolor-wasm)
 * [GitHub - torch2424/wasmboy (WASM)](https://github.com/torch2424/wasmboy)
 
