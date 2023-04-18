@@ -358,10 +358,6 @@ impl GameBoy {
         self.apu().set_clock_freq(value);
     }
 
-    pub fn attach_serial(&mut self, device: Box<dyn SerialDevice>) {
-        self.serial().set_device(device);
-    }
-
     pub fn attach_stdout_serial(&mut self) {
         self.attach_serial(Box::<StdoutDevice>::default());
     }
@@ -462,6 +458,10 @@ impl GameBoy {
     pub fn load_rom_file(&mut self, path: &str) -> &Cartridge {
         let data = read_file(path);
         self.load_rom(&data)
+    }
+
+    pub fn attach_serial(&mut self, device: Box<dyn SerialDevice>) {
+        self.serial().set_device(device);
     }
 }
 
