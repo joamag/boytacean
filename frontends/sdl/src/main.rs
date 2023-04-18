@@ -371,9 +371,9 @@ impl Emulator {
                         last_frame = self.system.ppu_frame();
                     }
 
+                    // in case the audio subsystem is enabled, then the audio buffer
+                    // must be queued into the SDL audio subsystem
                     if let Some(audio) = self.audio.as_mut() {
-                        // obtains the new audio buffer and queues it into the audio
-                        // subsystem ready to be processed
                         let audio_buffer = self
                             .system
                             .audio_buffer()
@@ -384,7 +384,7 @@ impl Emulator {
                     }
 
                     // clears the audio buffer to prevent it from
-                    // "exploding" in size
+                    // "exploding" in size, this is required GC operation
                     self.system.clear_audio_buffer();
                 }
 

@@ -16,7 +16,7 @@ import {
     Size
 } from "emukit";
 import { PALETTES, PALETTES_MAP } from "./palettes";
-import { base64ToBuffer, bufferToBase64 } from "./util";
+import { base64ToBuffer, bufferToBase64, bufferToDataUrl } from "./util";
 import { DebugAudio, DebugVideo, HelpFaqs, HelpKeyboard } from "../react";
 
 import {
@@ -388,6 +388,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         // a valid state ready to be used
         this.gameBoy.reset();
         this.gameBoy.load_boot_default();
+        this.gameBoy.load_printer_ws();
         const cartridge = this.gameBoy.load_rom_ws(romData);
 
         // updates the name of the currently selected engine
@@ -499,7 +500,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     }
 
     get romExts(): string[] {
-        return ["gb"];
+        return ["gb", "gbc"];
     }
 
     get pixelFormat(): PixelFormat {
@@ -807,12 +808,28 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
 
 declare global {
     interface Window {
+        emulator: GameboyEmulator;
         panic: (message: string) => void;
+        printerCallback: (imageBuffer: Uint8Array) => void;
+    }
+
+    interface Console {
+        image(url: string, size?: number): void;
     }
 }
 
 window.panic = (message: string) => {
     console.error(message);
+};
+
+window.printerCallback = (imageBuffer: Uint8Array) => {
+    const imageUrl = bufferToDataUrl(imageBuffer, 160);
+    console.image(imageUrl, imageBuffer.length / 160 / 3);
+};
+
+console.image = (url: string, size = 80) => {
+    const style = `font-size: ${size}px; background-image: url("${url}"); background-size: contain; background-repeat: no-repeat;`;
+    console.log("%c     ", style);
 };
 
 const wasm = async () => {

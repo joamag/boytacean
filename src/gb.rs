@@ -35,6 +35,10 @@ use std::{
 /// Should serve as the main entry-point API.
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 pub struct GameBoy {
+    /// Reference to the Game Boy CPU component to be
+    /// used as the main element of the system, when
+    /// clocked, the amount of ticks from it will be
+    /// used as reference or the rest of the components.
     cpu: Cpu,
 
     /// If the PPU is enabled, it will be clocked.
@@ -480,6 +484,14 @@ impl GameBoy {
         self.load_rom(data).clone()
     }
 
+    pub fn load_printer_ws(&mut self) {
+        let mut printer = Box::<PrinterDevice>::default();
+        printer.set_callback(|image_buffer| {
+            printer_callback(image_buffer.to_vec());
+        });
+        self.attach_serial(printer);
+    }
+
     pub fn set_palette_colors_ws(&mut self, value: Vec<JsValue>) {
         let palette: Palette = value
             .into_iter()
@@ -521,6 +533,9 @@ impl GameBoy {
 extern "C" {
     #[wasm_bindgen(js_namespace = window)]
     fn panic(message: &str);
+
+    #[wasm_bindgen(js_namespace = window, js_name = printerCallback)]
+    fn printer_callback(image_buffer: Vec<u8>);
 }
 
 #[cfg(feature = "wasm")]
