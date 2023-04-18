@@ -73,7 +73,8 @@ impl Serial {
     pub fn read(&mut self, addr: u16) -> u8 {
         match addr & 0x00ff {
             0x01 => self.data,
-            0x02 => {
+            0x02 =>
+            {
                 #[allow(clippy::bool_to_int_with_if)]
                 (if self.shift_clock { 0x01 } else { 0x00 }
                     | if self.clock_speed { 0x02 } else { 0x00 }
