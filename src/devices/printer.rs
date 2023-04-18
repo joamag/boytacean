@@ -118,7 +118,6 @@ pub struct PrinterDevice {
     data: [u8; 0x280],
     image: [u8; 160 * 200],
     image_offset: u16,
-    image_buffer: Vec<u8>,
     callback: fn(image_buffer: &Vec<u8>)
 }
 
@@ -136,7 +135,6 @@ impl PrinterDevice {
             data: [0x00; 0x280],
             image: [0x00; 160 * 200],
             image_offset: 0,
-            image_buffer: Vec::new(),
             callback: |_| {}
         }
     }
@@ -153,24 +151,10 @@ impl PrinterDevice {
         self.data = [0x00; 0x280];
         self.image = [0x00; 160 * 200];
         self.image_offset = 0;
-        
-        self.clear_image_buffer()
     }
 
     pub fn set_callback(&mut self, callback: fn(image_buffer: &Vec<u8>)) {
         self.callback = callback;
-    }
-
-    pub fn image_buffer(&self) -> &Vec<u8> {
-        &self.image_buffer
-    }
-
-    pub fn image_buffer_mut(&mut self) -> &mut Vec<u8> {
-        &mut self.image_buffer
-    }
-
-    pub fn clear_image_buffer(&mut self) {
-        self.image_buffer.clear();
     }
 
     fn run_command(&mut self, command: PrinterCommand) {
@@ -179,22 +163,22 @@ impl PrinterDevice {
                 self.status = 0x00;
                 self.byte_out = self.status;
                 self.image_offset = 0;
-                self.image_buffer.clear();
             }
             PrinterCommand::Print => {
+                let mut image_buffer = Vec::new();
                 let palette_index = self.data[2];
 
                 for index in 0..self.image_offset {
                     let value = self.image[index as usize];
                     let pixel_offset = (palette_index >> (value << 1)) & 0x03;
                     let pixel = PRINTER_PALETTE[pixel_offset as usize];
-                    self.image_buffer.push(pixel[0]);
-                    self.image_buffer.push(pixel[1]);
-                    self.image_buffer.push(pixel[2]);
-                    self.image_buffer.push(pixel[3]);
+                    image_buffer.push(pixel[0]);
+                    image_buffer.push(pixel[1]);
+                    image_buffer.push(pixel[2]);
+                    image_buffer.push(pixel[3]);
                 }
 
-                (self.callback)(&self.image_buffer);
+                (self.callback)(&image_buffer);
 
                 self.byte_out = self.status;
                 self.status = 0x06;
@@ -222,8 +206,6 @@ impl PrinterDevice {
                 // mark it as done, resetting the status back to
                 // the original value
                 if self.status == 0x06 {
-                    // @TODO: check if this value should be 0x04 instead
-                    // this seems to be a bug with the print demo
                     self.status = 0x00;
                 }
             }
