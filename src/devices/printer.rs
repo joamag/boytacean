@@ -1,6 +1,4 @@
-use std::{
-    fmt::{self, Display, Formatter}
-};
+use std::fmt::{self, Display, Formatter};
 
 use crate::{ppu::PaletteAlpha, serial::SerialDevice, warnln};
 
@@ -118,7 +116,7 @@ pub struct PrinterDevice {
     data: [u8; 0x280],
     image: [u8; 160 * 200],
     image_offset: u16,
-    callback: fn(image_buffer: &Vec<u8>)
+    callback: fn(image_buffer: &Vec<u8>),
 }
 
 impl PrinterDevice {
@@ -135,7 +133,7 @@ impl PrinterDevice {
             data: [0x00; 0x280],
             image: [0x00; 160 * 200],
             image_offset: 0,
-            callback: |_| {}
+            callback: |_| {},
         }
     }
 
