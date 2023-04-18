@@ -7,6 +7,7 @@ use crate::{
     mmu::Mmu,
     pad::Pad,
     ppu::Ppu,
+    serial::Serial,
     timer::Timer,
 };
 
@@ -191,6 +192,26 @@ impl Cpu {
                 return 24;
             }
             // @TODO aggregate the handling of these interrupts
+            else if (self.mmu.ie & 0x08 == 0x08) && self.mmu.serial().int_serial() {
+                debugln!("Going to run Serial interrupt handler (0x58)");
+
+                self.disable_int();
+                self.push_word(pc);
+                self.pc = 0x58;
+
+                // acknowledges that the serial interrupt has been
+                // properly handled
+                self.mmu.serial().ack_serial();
+
+                // in case the CPU is currently halted waiting
+                // for an interrupt, releases it
+                if self.halted {
+                    self.halted = false;
+                }
+
+                return 24;
+            }
+            // @TODO aggregate the handling of these interrupts
             else if (self.mmu.ie & 0x10 == 0x10) && self.mmu.pad().int_pad() {
                 debugln!("Going to run JoyPad interrupt handler (0x60)");
 
@@ -295,6 +316,11 @@ impl Cpu {
     #[inline(always)]
     pub fn timer(&mut self) -> &mut Timer {
         self.mmu().timer()
+    }
+
+    #[inline(always)]
+    pub fn serial(&mut self) -> &mut Serial {
+        self.mmu().serial()
     }
 
     #[inline(always)]

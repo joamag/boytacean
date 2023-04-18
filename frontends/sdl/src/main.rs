@@ -6,13 +6,16 @@ pub mod graphics;
 
 use audio::Audio;
 use boytacean::{
+    devices::printer::PrinterDevice,
     gb::{AudioProvider, GameBoy},
     pad::PadKey,
     ppu::{PaletteInfo, PpuMode, DISPLAY_HEIGHT, DISPLAY_WIDTH},
 };
+use chrono::Utc;
 use graphics::{surface_from_bytes, Graphics};
+use image::ColorType;
 use sdl2::{event::Event, keyboard::Keycode, pixels::PixelFormatEnum, Sdl};
-use std::{cmp::max, time::SystemTime};
+use std::{cmp::max, path::Path, time::SystemTime};
 
 /// The scale at which the screen is going to be drawn
 /// meaning the ratio between Game Boy resolution and
@@ -20,11 +23,11 @@ use std::{cmp::max, time::SystemTime};
 const SCREEN_SCALE: f32 = 2.0;
 
 /// The base title to be used in the window.
-static TITLE: &str = "Boytacean";
+const TITLE: &str = "Boytacean";
 
 /// Base audio volume to be used as the basis of the
 /// amplification level of the volume
-static VOLUME: f32 = 64.0;
+const VOLUME: f32 = 64.0;
 
 pub struct Benchmark {
     count: usize,
@@ -209,7 +212,7 @@ impl Emulator {
     }
 
     pub fn toggle_audio(&mut self) {
-        let apu_enabled = self.system.get_apu_enabled();
+        let apu_enabled = self.system.apu_enabled();
         self.system.set_apu_enabled(!apu_enabled);
     }
 
@@ -444,6 +447,19 @@ fn main() {
     // creates a new Game Boy instance and loads both the boot ROM
     // and the initial game ROM to "start the engine"
     let mut game_boy = GameBoy::new();
+    let mut printer = Box::<PrinterDevice>::default();
+    printer.set_callback(|image_buffer| {
+        let file_name = format!("printer-{}.png", Utc::now().format("%Y%m%d-%H%M%S"));
+        image::save_buffer(
+            Path::new(&file_name),
+            image_buffer,
+            160,
+            (image_buffer.len() / 4 / 160) as u32,
+            ColorType::Rgba8,
+        )
+        .unwrap();
+    });
+    game_boy.attach_serial(printer);
     game_boy.load_boot_default();
 
     // creates a new generic emulator structure then starts
@@ -451,7 +467,7 @@ fn main() {
     // ROM file and starts running it
     let mut emulator = Emulator::new(game_boy);
     emulator.start(SCREEN_SCALE);
-    emulator.load_rom(Some("../../res/roms/demo/pocket.gb"));
+    emulator.load_rom(Some("../../res/roms/test/gbprinter.gb"));
     emulator.toggle_palette();
     emulator.run();
 }

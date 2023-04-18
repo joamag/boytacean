@@ -131,14 +131,17 @@ impl Pad {
         }
     }
 
+    #[inline(always)]
     pub fn int_pad(&self) -> bool {
         self.int_pad
     }
 
+    #[inline(always)]
     pub fn set_int_pad(&mut self, value: bool) {
         self.int_pad = value;
     }
 
+    #[inline(always)]
     pub fn ack_pad(&mut self) {
         self.set_int_pad(false);
     }

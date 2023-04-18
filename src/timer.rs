@@ -100,14 +100,17 @@ impl Timer {
         }
     }
 
+    #[inline(always)]
     pub fn int_tima(&self) -> bool {
         self.int_tima
     }
 
+    #[inline(always)]
     pub fn set_int_tima(&mut self, value: bool) {
         self.int_tima = value;
     }
 
+    #[inline(always)]
     pub fn ack_tima(&mut self) {
         self.set_int_tima(false);
     }
