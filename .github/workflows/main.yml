@@ -82,7 +82,7 @@ jobs:
         run: cd frontends/web && npm install && npm run build && npm run lint
   build-sdl:
     name: Build SDL
-    timeout-minutes: 10
+    timeout-minutes: 30
     strategy:
       matrix:
         rust-version: [
