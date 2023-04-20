@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * Support for serial data transfer - [#19](https://gitlab.stage.hive.pt/joamag/boytacean/-/issues/19)
 * Support for printing of images using Printer emulation - [#19](https://gitlab.stage.hive.pt/joamag/boytacean/-/issues/19)
+* Support for display of logger and printer in Web panels
 
 ### Changed
 
