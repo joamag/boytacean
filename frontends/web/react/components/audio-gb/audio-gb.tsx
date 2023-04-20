@@ -119,10 +119,8 @@ export const AudioGB: FC<AudioGBProps> = ({
             // converts the canvas to the expected size according
             // to the device pixel ratio value
             const devicePixelRatio = window.devicePixelRatio || 1;
-            canvasRef.current.width =
-                canvasRef.current.clientWidth * devicePixelRatio;
-            canvasRef.current.height =
-                canvasRef.current.clientHeight * devicePixelRatio;
+            canvasRef.current.width = range * devicePixelRatio;
+            canvasRef.current.height = rangeVolume * devicePixelRatio;
 
             // creates the WGL Plot object with the canvas element
             // that is associated with the current audio wave

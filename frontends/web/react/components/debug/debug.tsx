@@ -58,10 +58,7 @@ export const DebugAudio: FC<EmulatorProps> = ({ emulator }) => {
                 }}
             >
                 <h3>Audio Waveform</h3>
-                <AudioGB
-                    getAudioOutput={() => emulator.audioOutput}
-                    engine="webgl"
-                />
+                <AudioGB getAudioOutput={() => emulator.audioOutput} />
             </div>
         </>
     );
