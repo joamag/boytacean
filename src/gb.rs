@@ -362,6 +362,10 @@ impl GameBoy {
         self.apu().set_clock_freq(value);
     }
 
+    pub fn attach_null_serial(&mut self) {
+        self.attach_serial(Box::<NullDevice>::default());
+    }
+
     pub fn attach_stdout_serial(&mut self) {
         self.attach_serial(Box::<StdoutDevice>::default());
     }
