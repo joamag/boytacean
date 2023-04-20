@@ -1,5 +1,5 @@
 import React, { FC, useEffect, useRef, useState } from "react";
-import { ButtonSwitch, Info, Pair, PanelTab } from "emukit";
+import { ButtonSwitch, Emulator, Info, Pair, PanelTab } from "emukit";
 import { GameboyEmulator, bufferToDataUrl } from "../../../ts";
 
 import "./serial-section.css";
@@ -10,21 +10,14 @@ const DEVICE_ICON: { [key: string]: string } = {
     Printer: "🖨️"
 };
 
-export type LoggerCallback = (data: Uint8Array) => void;
-export type PrinterCallback = (imageBuffer: Uint8Array) => void;
-
 type SerialSectionProps = {
     emulator: GameboyEmulator;
     style?: string[];
-    onLogger?: (onLoggerData: LoggerCallback) => void;
-    onPrinter?: (onPrinterData: PrinterCallback) => void;
 };
 
 export const SerialSection: FC<SerialSectionProps> = ({
     emulator,
-    style = [],
-    onLogger,
-    onPrinter
+    style = []
 }) => {
     const classes = () => ["serial-section", ...style].join(" ");
     const [loggerData, setLoggerData] = useState<string>();
@@ -34,29 +27,36 @@ export const SerialSection: FC<SerialSectionProps> = ({
     const loggerRef = useRef<HTMLDivElement>(null);
     const imagesRef = useRef<HTMLDivElement>(null);
 
-    const onLoggerData = (data: Uint8Array) => {
-        const byte = data[0];
-        const charByte = String.fromCharCode(byte);
-        loggerDataRef.current.push(charByte);
-        setLoggerData(loggerDataRef.current.join(""));
-    };
-    const onPrinterData = (imageBuffer: Uint8Array) => {
-        const imageUrl = bufferToDataUrl(imageBuffer, 160);
-        printerDataRef.current.unshift(imageUrl);
-        setPrinterImageUrls([...printerDataRef.current]);
-    };
-
     useEffect(() => {
-        if (loggerRef.current) {
-            onLogger && onLogger(onLoggerData);
-        }
-    }, [loggerRef, loggerRef.current]);
+        const onLoggerData = (data: Uint8Array) => {
+            const byte = data[0];
+            const charByte = String.fromCharCode(byte);
+            loggerDataRef.current.push(charByte);
+            setLoggerData(loggerDataRef.current.join(""));
+        };
+        const onPrinterData = (imageBuffer: Uint8Array) => {
+            const imageUrl = bufferToDataUrl(imageBuffer, 160);
+            printerDataRef.current.unshift(imageUrl);
+            setPrinterImageUrls([...printerDataRef.current]);
+        };
 
-    useEffect(() => {
-        if (imagesRef.current) {
-            onPrinter && onPrinter(onPrinterData);
-        }
-    }, [imagesRef, imagesRef.current]);
+        const onLogger = (emulator: Emulator, _params: unknown = {}) => {
+            const params = _params as Record<string, unknown>;
+            onLoggerData(params.data as Uint8Array);
+        };
+        const onPrinter = (emulator: Emulator, _params: unknown = {}) => {
+            const params = _params as Record<string, unknown>;
+            onPrinterData(params.imageBuffer as Uint8Array);
+        };
+
+        emulator.bind("logger", onLogger);
+        emulator.bind("printer", onPrinter);
+
+        return () => {
+            emulator.unbind("logger", onLogger);
+            emulator.unbind("printer", onPrinter);
+        };
+    }, []);
 
     const onEngineChange = (option: string) => {
         switch (option) {

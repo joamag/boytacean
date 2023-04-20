@@ -23,9 +23,7 @@ import {
     DebugVideo,
     HelpFaqs,
     HelpKeyboard,
-    LoggerCallback,
-    PrinterCallback,
-    SerialSection,
+    SerialSection
 } from "../react";
 
 import {
@@ -132,10 +130,6 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
      * name with its value as a string.
      */
     private extraSettings: Record<string, string> = {};
-
-    private onLoggerData: ((data: Uint8Array) => void) | null = null;
-
-    private onPrinterData: ((imageBuffer: Uint8Array) => void) | null = null;
 
     constructor(extraSettings = {}) {
         super();
@@ -484,11 +478,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
                 name: "Serial",
                 icon: require("../res/serial.svg"),
                 node: SerialSection({
-                    emulator: this,
-                    onLogger: (onLoggerData: LoggerCallback) =>
-                        (this.onLoggerData = onLoggerData),
-                    onPrinter: (onPrinterData: PrinterCallback) =>
-                        (this.onPrinterData = onPrinterData)
+                    emulator: this
                 })
             }
         ];
@@ -782,11 +772,11 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     }
 
     onLoggerDevice(data: Uint8Array) {
-        this.onLoggerData?.(data);
+        this.trigger("logger", { data: data });
     }
 
     onPrinterDevice(imageBuffer: Uint8Array) {
-        this.onPrinterData?.(imageBuffer);
+        this.trigger("printer", { imageBuffer: imageBuffer });
     }
 
     /**
