@@ -1,6 +1,7 @@
 import {
     AudioSpecs,
     BenchmarkResult,
+    SectionInfo,
     Compilation,
     Compiler,
     DebugPanel,
@@ -16,8 +17,16 @@ import {
     Size
 } from "emukit";
 import { PALETTES, PALETTES_MAP } from "./palettes";
-import { base64ToBuffer, bufferToBase64, bufferToDataUrl } from "./util";
-import { DebugAudio, DebugVideo, HelpFaqs, HelpKeyboard } from "../react";
+import { base64ToBuffer, bufferToBase64 } from "./util";
+import {
+    DebugAudio,
+    DebugVideo,
+    HelpFaqs,
+    HelpKeyboard,
+    LoggerCallback,
+    PrinterCallback,
+    SerialSection,
+} from "../react";
 
 import {
     Cartridge,
@@ -123,6 +132,10 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
      * name with its value as a string.
      */
     private extraSettings: Record<string, string> = {};
+
+    private onLoggerData: ((data: Uint8Array) => void) | null = null;
+
+    private onPrinterData: ((imageBuffer: Uint8Array) => void) | null = null;
 
     constructor(extraSettings = {}) {
         super();
@@ -388,7 +401,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         // a valid state ready to be used
         this.gameBoy.reset();
         this.gameBoy.load_boot_default();
-        this.gameBoy.load_printer_ws();
+        this.gameBoy.load_null_ws();
         const cartridge = this.gameBoy.load_rom_ws(romData);
 
         // updates the name of the currently selected engine
@@ -462,6 +475,22 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
             Feature.Keyboard,
             Feature.KeyboardGB,
             Feature.RomTypeInfo
+        ];
+    }
+
+    get sections(): SectionInfo[] {
+        return [
+            {
+                name: "Serial",
+                icon: require("../res/serial.svg"),
+                node: SerialSection({
+                    emulator: this,
+                    onLogger: (onLoggerData: LoggerCallback) =>
+                        (this.onLoggerData = onLoggerData),
+                    onPrinter: (onPrinterData: PrinterCallback) =>
+                        (this.onPrinterData = onPrinterData)
+                })
+            }
         ];
     }
 
@@ -740,6 +769,26 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         this.storeSettings();
     }
 
+    loadNullDevice() {
+        this.gameBoy?.load_null_ws();
+    }
+
+    loadLoggerDevice() {
+        this.gameBoy?.load_logger_ws();
+    }
+
+    loadPrinterDevice() {
+        this.gameBoy?.load_printer_ws();
+    }
+
+    onLoggerDevice(data: Uint8Array) {
+        this.onLoggerData?.(data);
+    }
+
+    onPrinterDevice(imageBuffer: Uint8Array) {
+        this.onPrinterData?.(imageBuffer);
+    }
+
     /**
      * Tries to load game RAM from the `localStorage` using the
      * current cartridge title as the name of the item and
@@ -810,6 +859,7 @@ declare global {
     interface Window {
         emulator: GameboyEmulator;
         panic: (message: string) => void;
+        loggerCallback: (data: Uint8Array) => void;
         printerCallback: (imageBuffer: Uint8Array) => void;
     }
 
@@ -822,9 +872,12 @@ window.panic = (message: string) => {
     console.error(message);
 };
 
+window.loggerCallback = (data: Uint8Array) => {
+    window.emulator.onLoggerDevice(data);
+};
+
 window.printerCallback = (imageBuffer: Uint8Array) => {
-    const imageUrl = bufferToDataUrl(imageBuffer, 160);
-    console.image(imageUrl, imageBuffer.length / 160 / 3);
+    window.emulator.onPrinterDevice(imageBuffer);
 };
 
 console.image = (url: string, size = 80) => {

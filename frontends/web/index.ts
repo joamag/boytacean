@@ -50,9 +50,12 @@ const BACKGROUNDS = [
         background: background,
         backgrounds: BACKGROUNDS
     });
-    await emulator.main({ romUrl: romUrl });
 
     // sets the emulator in the global scope this is useful
     // to be able to access the emulator from global functions
     window.emulator = emulator;
+
+    // starts the emulator with the provided ROM URL, this is
+    // going to run the main emulator (infinite) loop
+    await emulator.main({ romUrl: romUrl });
 })();
