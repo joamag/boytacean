@@ -1,6 +1,6 @@
 import React, { FC, useEffect, useRef, useState } from "react";
 import { ButtonSwitch, Emulator, Info, Pair, PanelTab } from "emukit";
-import { GameboyEmulator, bufferToDataUrl } from "../../../ts";
+import { GameboyEmulator, SerialDevice, bufferToDataUrl } from "../../../ts";
 
 import "./serial-section.css";
 
@@ -59,20 +59,7 @@ export const SerialSection: FC<SerialSectionProps> = ({
     }, []);
 
     const onEngineChange = (option: string) => {
-        switch (option) {
-            case "Null":
-                emulator.loadNullDevice();
-                break;
-
-            case "Logger":
-                emulator.loadLoggerDevice();
-                break;
-
-            case "Printer":
-                emulator.loadPrinterDevice();
-                break;
-        }
-
+        emulator.loadSerialDevice(option as SerialDevice);
         const optionIcon = DEVICE_ICON[option] ?? "";
         emulator.handlers.showToast?.(
             `${optionIcon} ${option} attached to the serial port & active`
@@ -87,7 +74,9 @@ export const SerialSection: FC<SerialSectionProps> = ({
                     name={"Device"}
                     valueNode={
                         <ButtonSwitch
-                            options={["Null", "Logger", "Printer"]}
+                            options={["null", "logger", "printer"]}
+                            value={emulator.serialDevice}
+                            uppercase={true}
                             size={"large"}
                             style={["simple"]}
                             onChange={onEngineChange}

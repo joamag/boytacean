@@ -20,7 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-*
+* `ButtonSwitch` issues by updating the value strategy nad bumping `emukit`
 
 ## [0.7.5] - 2023-04-11
 

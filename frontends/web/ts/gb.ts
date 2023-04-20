@@ -90,6 +90,16 @@ const KEYS_NAME: Record<string, number> = {
 const ROM_PATH = require("../../../res/roms/demo/pocket.gb");
 
 /**
+ * Enumeration with the values for the complete set of available
+ * serial devices that can be used in the emulator.
+ */
+export enum SerialDevice {
+    Null = "null",
+    Logger = "logger",
+    Printer = "printer"
+}
+
+/**
  * Top level class that controls the emulator behaviour
  * and "joins" all the elements together to bring input/output
  * of the associated machine.
@@ -123,6 +133,8 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     private romData: Uint8Array | null = null;
     private romSize = 0;
     private cartridge: Cartridge | null = null;
+
+    private _serialDevice: SerialDevice = SerialDevice.Null;
 
     /**
      * Associative map for extra settings to be used in
@@ -395,8 +407,11 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         // a valid state ready to be used
         this.gameBoy.reset();
         this.gameBoy.load_boot_default();
-        this.gameBoy.load_null_ws();
         const cartridge = this.gameBoy.load_rom_ws(romData);
+
+        // in case there's a serial device involved tries to load
+        // it and initialize for the current Game Boy machine
+        this.loadSerialDevice();
 
         // updates the name of the currently selected engine
         // to the one that has been provided (logic change)
@@ -665,6 +680,14 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         this.updatePalette();
     }
 
+    get serialDevice(): SerialDevice {
+        return this._serialDevice;
+    }
+
+    set serialDevice(value: SerialDevice) {
+        this._serialDevice = value;
+    }
+
     toggleRunning() {
         if (this.paused) {
             this.resume();
@@ -759,16 +782,36 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         this.storeSettings();
     }
 
-    loadNullDevice() {
+    loadSerialDevice(device?: SerialDevice) {
+        device = device ?? this.serialDevice;
+        switch (device) {
+            case SerialDevice.Null:
+                this.loadNullDevice();
+                break;
+
+            case SerialDevice.Logger:
+                this.loadLoggerDevice();
+                break;
+
+            case SerialDevice.Printer:
+                this.loadPrinterDevice();
+                break;
+        }
+    }
+
+    loadNullDevice(set = true) {
         this.gameBoy?.load_null_ws();
+        if (set) this.serialDevice = SerialDevice.Null;
     }
 
-    loadLoggerDevice() {
+    loadLoggerDevice(set = true) {
         this.gameBoy?.load_logger_ws();
+        if (set) this.serialDevice = SerialDevice.Logger;
     }
 
-    loadPrinterDevice() {
+    loadPrinterDevice(set = true) {
         this.gameBoy?.load_printer_ws();
+        if (set) this.serialDevice = SerialDevice.Printer;
     }
 
     onLoggerDevice(data: Uint8Array) {
