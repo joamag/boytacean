@@ -8,7 +8,7 @@ use crate::{
     pad::{Pad, PadKey},
     ppu::{Ppu, PpuMode, Tile, FRAME_BUFFER_SIZE},
     rom::Cartridge,
-    serial::{Serial, SerialDevice},
+    serial::{NullDevice, Serial, SerialDevice},
     timer::Timer,
     util::read_file,
 };
@@ -484,6 +484,19 @@ impl GameBoy {
         self.load_rom(data).clone()
     }
 
+    pub fn load_null_ws(&mut self) {
+        let null = Box::<NullDevice>::default();
+        self.attach_serial(null);
+    }
+
+    pub fn load_logger_ws(&mut self) {
+        let mut logger = Box::<StdoutDevice>::default();
+        logger.set_callback(|data| {
+            logger_callback(data.to_vec());
+        });
+        self.attach_serial(logger);
+    }
+
     pub fn load_printer_ws(&mut self) {
         let mut printer = Box::<PrinterDevice>::default();
         printer.set_callback(|image_buffer| {
@@ -533,6 +546,9 @@ impl GameBoy {
 extern "C" {
     #[wasm_bindgen(js_namespace = window)]
     fn panic(message: &str);
+
+    #[wasm_bindgen(js_namespace = window, js_name = loggerCallback)]
+    fn logger_callback(data: Vec<u8>);
 
     #[wasm_bindgen(js_namespace = window, js_name = printerCallback)]
     fn printer_callback(image_buffer: Vec<u8>);
