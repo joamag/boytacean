@@ -33,9 +33,5 @@
         "react-dom": "^18.2.0",
         "typescript": "^5.0.4",
         "webgl-plot": "^0.7.0"
-    },
-    "alias": {
-        "react": "../../../../repo.private/emukit/node_modules/react",
-        "react-dom": "../../../../repo.private/emukit/node_modules/react-dom"
     }
 }
