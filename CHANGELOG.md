@@ -9,14 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-* Support for serial data transfer - [#19](https://gitlab.stage.hive.pt/joamag/boytacean/-/issues/19)
-* Support for printing of images using Printer emulation - [#19](https://gitlab.stage.hive.pt/joamag/boytacean/-/issues/19)
-* Support for display of logger and printer in Web panels
-* Converted serial-sections strategy to event driven
+*
 
 ### Changed
 
 *
+
+### Fixed
+
+*
+
+## [0.8.0] - 2023-04-20
+
+### Added
+
+* Support for serial data transfer - [#19](https://gitlab.stage.hive.pt/joamag/boytacean/-/issues/19)
+* Support for printing of images using Printer emulation - [#19](https://gitlab.stage.hive.pt/joamag/boytacean/-/issues/19)
+* Support for display of logger and printer in Web panels
+* Converted serial-sections strategy to event driven
 
 ### Fixed
 
