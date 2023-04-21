@@ -5,9 +5,9 @@ import { GameboyEmulator, SerialDevice, bufferToDataUrl } from "../../../ts";
 import "./serial-section.css";
 
 const DEVICE_ICON: { [key: string]: string } = {
-    Null: "🛑",
-    Logger: "📜",
-    Printer: "🖨️"
+    null: "🛑",
+    logger: "📜",
+    printer: "🖨️"
 };
 
 type SerialSectionProps = {
