@@ -31,7 +31,8 @@ import {
     default as _wasm,
     GameBoy,
     PadKey,
-    PpuMode
+    PpuMode,
+    GameBoyMode
 } from "../lib/boytacean";
 import info from "../package.json";
 
@@ -389,7 +390,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         // and builds a new instance of it
         switch (engine) {
             case "neo":
-                this.gameBoy = new GameBoy();
+                this.gameBoy = new GameBoy(GameBoyMode.Dmg);
                 break;
             default:
                 if (!this.gameBoy) {
@@ -406,7 +407,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         // resets the Game Boy engine to restore it into
         // a valid state ready to be used
         this.gameBoy.reset();
-        this.gameBoy.load_boot_default();
+        this.gameBoy.load(true);
         const cartridge = this.gameBoy.load_rom_ws(romData);
 
         // in case there's a serial device involved tries to load
