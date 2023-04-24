@@ -1,4 +1,9 @@
-use crate::{apu::Apu, debugln, pad::Pad, ppu::Ppu, rom::Cartridge, serial::Serial, timer::Timer};
+use std::{cell::RefCell, rc::Rc};
+
+use crate::{
+    apu::Apu, debugln, gb::GameBoyConfig, pad::Pad, ppu::Ppu, rom::Cartridge, serial::Serial,
+    timer::Timer,
+};
 
 pub const BOOT_SIZE_DMG: usize = 256;
 pub const BOOT_SIZE_CGB: usize = 2304;
@@ -55,14 +60,23 @@ pub struct Mmu {
     ram: Vec<u8>,
 
     /// The RAM bank to be used in the read and write operation of
-    /// the 0xD000-0xDFFF memory range. CGB Only
+    /// the 0xD000-0xDFFF memory range (CGB Only).
     ram_bank: u8,
 
     ram_offset: u16,
+
+    gbc: Rc<RefCell<GameBoyConfig>>,
 }
 
 impl Mmu {
-    pub fn new(ppu: Ppu, apu: Apu, pad: Pad, timer: Timer, serial: Serial) -> Self {
+    pub fn new(
+        ppu: Ppu,
+        apu: Apu,
+        pad: Pad,
+        timer: Timer,
+        serial: Serial,
+        gbc: Rc<RefCell<GameBoyConfig>>,
+    ) -> Self {
         Self {
             ppu,
             apu,
@@ -76,6 +90,7 @@ impl Mmu {
             ram_bank: 0x1,
             ram_offset: 0x1000,
             ie: 0x0,
+            gbc: gbc,
         }
     }
 

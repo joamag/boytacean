@@ -1,8 +1,10 @@
 use core::panic;
+use std::{cell::RefCell, rc::Rc};
 
 use crate::{
     apu::Apu,
     debugln,
+    gb::GameBoyConfig,
     inst::{EXTENDED, INSTRUCTIONS},
     mmu::Mmu,
     pad::Pad,
@@ -38,10 +40,15 @@ pub struct Cpu {
     /// Temporary counter used to control the number of cycles
     /// taken by the current or last CPU operation.
     pub cycles: u8,
+
+    /// The pointer to the parent configuration of the running
+    /// Game Boy emulator, that can be used to control the behaviour
+    /// of Game Boy emulation.
+    gbc: Rc<RefCell<GameBoyConfig>>,
 }
 
 impl Cpu {
-    pub fn new(mmu: Mmu) -> Self {
+    pub fn new(mmu: Mmu, gbc: Rc<RefCell<GameBoyConfig>>) -> Self {
         Self {
             pc: 0x0,
             sp: 0x0,
@@ -60,6 +67,7 @@ impl Cpu {
             halted: false,
             mmu,
             cycles: 0,
+            gbc: gbc,
         }
     }
 

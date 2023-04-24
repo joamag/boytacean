@@ -13,7 +13,7 @@ use crate::{
     util::read_file,
 };
 
-use std::collections::VecDeque;
+use std::{cell::RefCell, collections::VecDeque, rc::Rc};
 
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
@@ -32,27 +32,21 @@ use std::{
 
 /// Enumeration that describes the multiple running
 // modes of the Game Boy emulator.
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum GBMode {
     Dmg = 1,
     Cgb = 2,
     Sgb = 3,
 }
 
-/// Top level structure that abstracts the usage of the
-/// Game Boy system under the Boytacean emulator.
-/// Should serve as the main entry-point API.
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
-pub struct GameBoy {
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct GameBoyConfig {
     /// The current running mode of the emulator, this
     /// may affect many aspects of the emulation, like
     /// CPU frequency, PPU frequency, Boot rome size, etc.
     mode: GBMode,
-
-    /// Reference to the Game Boy CPU component to be
-    /// used as the main element of the system, when
-    /// clocked, the amount of ticks from it will be
-    /// used as reference or the rest of the components.
-    cpu: Cpu,
 
     /// If the PPU is enabled, it will be clocked.
     ppu_enabled: bool,
@@ -73,6 +67,98 @@ pub struct GameBoy {
     /// the APU will adjust its internal clock to match
     /// this hint.
     clock_freq: u32,
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
+impl GameBoyConfig {
+    #[inline(always)]
+    pub fn is_dmg(&self) -> bool {
+        self.mode == GBMode::Dmg
+    }
+
+    #[inline(always)]
+    pub fn is_cgb(&self) -> bool {
+        self.mode == GBMode::Cgb
+    }
+
+    #[inline(always)]
+    pub fn is_sgb(&self) -> bool {
+        self.mode == GBMode::Sgb
+    }
+
+    #[inline(always)]
+    pub fn mode(&self) -> GBMode {
+        self.mode
+    }
+
+    #[inline(always)]
+    pub fn set_mode(&mut self, value: GBMode) {
+        self.mode = value;
+    }
+
+    #[inline(always)]
+    pub fn ppu_enabled(&self) -> bool {
+        self.ppu_enabled
+    }
+
+    #[inline(always)]
+    pub fn set_ppu_enabled(&mut self, value: bool) {
+        self.ppu_enabled = value;
+    }
+
+    #[inline(always)]
+    pub fn apu_enabled(&self) -> bool {
+        self.apu_enabled
+    }
+
+    #[inline(always)]
+    pub fn set_apu_enabled(&mut self, value: bool) {
+        self.apu_enabled = value;
+    }
+
+    #[inline(always)]
+    pub fn timer_enabled(&self) -> bool {
+        self.timer_enabled
+    }
+
+    #[inline(always)]
+    pub fn set_timer_enabled(&mut self, value: bool) {
+        self.timer_enabled = value;
+    }
+
+    #[inline(always)]
+    pub fn serial_enabled(&self) -> bool {
+        self.serial_enabled
+    }
+
+    #[inline(always)]
+    pub fn set_serial_enabled(&mut self, value: bool) {
+        self.serial_enabled = value;
+    }
+
+    #[inline(always)]
+    pub fn clock_freq(&self) -> u32 {
+        self.clock_freq
+    }
+
+    #[inline(always)]
+    pub fn set_clock_freq(&mut self, value: u32) {
+        self.clock_freq = value;
+    }
+}
+
+/// Top level structure that abstracts the usage of the
+/// Game Boy system under the Boytacean emulator.
+/// Should serve as the main entry-point API.
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
+pub struct GameBoy {
+    /// Reference to the Game Boy CPU component to be
+    /// used as the main element of the system, when
+    /// clocked, the amount of ticks from it will be
+    /// used as reference or the rest of the components.
+    cpu: Cpu,
+
+    gbc: Rc<RefCell<GameBoyConfig>>,
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
@@ -104,22 +190,24 @@ pub trait AudioProvider {
 impl GameBoy {
     #[cfg_attr(feature = "wasm", wasm_bindgen(constructor))]
     pub fn new(mode: GBMode) -> Self {
-        let ppu = Ppu::default();
-        let apu = Apu::default();
-        let pad = Pad::default();
-        let timer = Timer::default();
-        let serial = Serial::default();
-        let mmu = Mmu::new(ppu, apu, pad, timer, serial);
-        let cpu = Cpu::new(mmu);
-        Self {
+        let gbc = Rc::new(RefCell::new(GameBoyConfig {
             mode,
-            cpu,
             ppu_enabled: true,
             apu_enabled: true,
             timer_enabled: true,
             serial_enabled: true,
             clock_freq: GameBoy::CPU_FREQ,
-        }
+        }));
+
+        let ppu = Ppu::default();
+        let apu = Apu::default();
+        let pad = Pad::default();
+        let timer = Timer::default();
+        let serial = Serial::default();
+        let mmu = Mmu::new(ppu, apu, pad, timer, serial, gbc.clone());
+        let cpu = Cpu::new(mmu, gbc.clone());
+
+        Self { cpu, gbc }
     }
 
     pub fn reset(&mut self) {
@@ -133,16 +221,16 @@ impl GameBoy {
 
     pub fn clock(&mut self) -> u8 {
         let cycles = self.cpu_clock();
-        if self.ppu_enabled {
+        if self.ppu_enabled() {
             self.ppu_clock(cycles);
         }
-        if self.apu_enabled {
+        if self.apu_enabled() {
             self.apu_clock(cycles);
         }
-        if self.timer_enabled {
+        if self.timer_enabled() {
             self.timer_clock(cycles);
         }
-        if self.serial_enabled {
+        if self.serial_enabled() {
             self.serial_clock(cycles);
         }
         cycles
@@ -193,7 +281,7 @@ impl GameBoy {
     }
 
     pub fn load(&mut self, boot: bool) {
-        match self.mode {
+        match self.mode() {
             GBMode::Dmg => self.load_dmg(boot),
             GBMode::Cgb => self.load_cgb(boot),
             GBMode::Sgb => todo!(),
@@ -357,44 +445,58 @@ impl GameBoy {
         String::from(COMPILATION_TIME)
     }
 
+    #[inline(always)]
+    pub fn mode(&self) -> GBMode {
+        (*self.gbc).borrow().mode()
+    }
+
+    pub fn set_mode(&mut self, value: GBMode) {
+        (*self.gbc).borrow_mut().set_mode(value);
+    }
+
+    #[inline(always)]
     pub fn ppu_enabled(&self) -> bool {
-        self.ppu_enabled
+        (*self.gbc).borrow().ppu_enabled()
     }
 
     pub fn set_ppu_enabled(&mut self, value: bool) {
-        self.ppu_enabled = value;
+        (*self.gbc).borrow_mut().set_ppu_enabled(value);
     }
 
+    #[inline(always)]
     pub fn apu_enabled(&self) -> bool {
-        self.apu_enabled
+        (*self.gbc).borrow().apu_enabled
     }
 
     pub fn set_apu_enabled(&mut self, value: bool) {
-        self.apu_enabled = value;
+        (*self.gbc).borrow_mut().set_apu_enabled(value);
     }
 
+    #[inline(always)]
     pub fn timer_enabled(&self) -> bool {
-        self.timer_enabled
+        (*self.gbc).borrow().timer_enabled()
     }
 
     pub fn set_timer_enabled(&mut self, value: bool) {
-        self.timer_enabled = value;
+        (*self.gbc).borrow_mut().set_timer_enabled(value);
     }
 
+    #[inline(always)]
     pub fn serial_enabled(&self) -> bool {
-        self.serial_enabled
+        (*self.gbc).borrow().serial_enabled()
     }
 
     pub fn set_serial_enabled(&mut self, value: bool) {
-        self.serial_enabled = value;
+        (*self.gbc).borrow_mut().set_serial_enabled(value);
     }
 
+    #[inline(always)]
     pub fn clock_freq(&self) -> u32 {
-        self.clock_freq
+        (*self.gbc).borrow().clock_freq()
     }
 
     pub fn set_clock_freq(&mut self, value: u32) {
-        self.clock_freq = value;
+        (*self.gbc).borrow_mut().set_clock_freq(value);
         self.apu().set_clock_freq(value);
     }
 
