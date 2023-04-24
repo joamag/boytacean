@@ -32,9 +32,12 @@ use std::{
 
 /// Enumeration that describes the multiple running
 // modes of the Game Boy emulator.
+// DMG = Original Game Boy
+// CGB = Game Boy Color
+// SGB = Super Game Boy
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub enum GBMode {
+pub enum GameBoyMode {
     Dmg = 1,
     Cgb = 2,
     Sgb = 3,
@@ -46,7 +49,7 @@ pub struct GameBoyConfig {
     /// The current running mode of the emulator, this
     /// may affect many aspects of the emulation, like
     /// CPU frequency, PPU frequency, Boot rome size, etc.
-    mode: GBMode,
+    mode: GameBoyMode,
 
     /// If the PPU is enabled, it will be clocked.
     ppu_enabled: bool,
@@ -73,26 +76,26 @@ pub struct GameBoyConfig {
 impl GameBoyConfig {
     #[inline(always)]
     pub fn is_dmg(&self) -> bool {
-        self.mode == GBMode::Dmg
+        self.mode == GameBoyMode::Dmg
     }
 
     #[inline(always)]
     pub fn is_cgb(&self) -> bool {
-        self.mode == GBMode::Cgb
+        self.mode == GameBoyMode::Cgb
     }
 
     #[inline(always)]
     pub fn is_sgb(&self) -> bool {
-        self.mode == GBMode::Sgb
+        self.mode == GameBoyMode::Sgb
     }
 
     #[inline(always)]
-    pub fn mode(&self) -> GBMode {
+    pub fn mode(&self) -> GameBoyMode {
         self.mode
     }
 
     #[inline(always)]
-    pub fn set_mode(&mut self, value: GBMode) {
+    pub fn set_mode(&mut self, value: GameBoyMode) {
         self.mode = value;
     }
 
@@ -189,7 +192,7 @@ pub trait AudioProvider {
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 impl GameBoy {
     #[cfg_attr(feature = "wasm", wasm_bindgen(constructor))]
-    pub fn new(mode: GBMode) -> Self {
+    pub fn new(mode: GameBoyMode) -> Self {
         let gbc = Rc::new(RefCell::new(GameBoyConfig {
             mode,
             ppu_enabled: true,
@@ -282,9 +285,9 @@ impl GameBoy {
 
     pub fn load(&mut self, boot: bool) {
         match self.mode() {
-            GBMode::Dmg => self.load_dmg(boot),
-            GBMode::Cgb => self.load_cgb(boot),
-            GBMode::Sgb => todo!(),
+            GameBoyMode::Dmg => self.load_dmg(boot),
+            GameBoyMode::Cgb => self.load_cgb(boot),
+            GameBoyMode::Sgb => todo!(),
         }
     }
 
@@ -446,11 +449,11 @@ impl GameBoy {
     }
 
     #[inline(always)]
-    pub fn mode(&self) -> GBMode {
+    pub fn mode(&self) -> GameBoyMode {
         (*self.gbc).borrow().mode()
     }
 
-    pub fn set_mode(&mut self, value: GBMode) {
+    pub fn set_mode(&mut self, value: GameBoyMode) {
         (*self.gbc).borrow_mut().set_mode(value);
     }
 
@@ -718,6 +721,6 @@ impl AudioProvider for GameBoy {
 
 impl Default for GameBoy {
     fn default() -> Self {
-        Self::new(GBMode::Dmg)
+        Self::new(GameBoyMode::Dmg)
     }
 }
