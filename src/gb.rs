@@ -155,6 +155,31 @@ impl GameBoyConfig {
 /// Should serve as the main entry-point API.
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 pub struct GameBoy {
+    /// The current running mode of the emulator, this
+    /// may affect many aspects of the emulation, like
+    /// CPU frequency, PPU frequency, Boot rome size, etc.
+    mode: GameBoyMode,
+
+    /// If the PPU is enabled, it will be clocked.
+    ppu_enabled: bool,
+
+    /// If the APU is enabled, it will be clocked.
+    apu_enabled: bool,
+
+    /// If the timer is enabled, it will be clocked.
+    timer_enabled: bool,
+
+    /// If the serial is enabled, it will be clocked.
+    serial_enabled: bool,
+
+    /// The current frequency at which the Game Boy
+    /// emulator is being handled. This is a "hint" that
+    /// may help components to adjust their internal
+    /// logic to match the current frequency. For example
+    /// the APU will adjust its internal clock to match
+    /// this hint.
+    clock_freq: u32,
+
     /// Reference to the Game Boy CPU component to be
     /// used as the main element of the system, when
     /// clocked, the amount of ticks from it will be
@@ -210,7 +235,16 @@ impl GameBoy {
         let mmu = Mmu::new(ppu, apu, pad, timer, serial, gbc.clone());
         let cpu = Cpu::new(mmu, gbc.clone());
 
-        Self { cpu, gbc }
+        Self {
+            mode,
+            ppu_enabled: true,
+            apu_enabled: true,
+            timer_enabled: true,
+            serial_enabled: true,
+            clock_freq: GameBoy::CPU_FREQ,
+            cpu,
+            gbc,
+        }
     }
 
     pub fn reset(&mut self) {
@@ -224,16 +258,16 @@ impl GameBoy {
 
     pub fn clock(&mut self) -> u8 {
         let cycles = self.cpu_clock();
-        if self.ppu_enabled() {
+        if self.ppu_enabled {
             self.ppu_clock(cycles);
         }
-        if self.apu_enabled() {
+        if self.apu_enabled {
             self.apu_clock(cycles);
         }
-        if self.timer_enabled() {
+        if self.timer_enabled {
             self.timer_clock(cycles);
         }
-        if self.serial_enabled() {
+        if self.serial_enabled {
             self.serial_clock(cycles);
         }
         cycles
@@ -448,57 +482,57 @@ impl GameBoy {
         String::from(COMPILATION_TIME)
     }
 
-    #[inline(always)]
     pub fn mode(&self) -> GameBoyMode {
-        (*self.gbc).borrow().mode()
+        self.mode
     }
 
     pub fn set_mode(&mut self, value: GameBoyMode) {
+        self.mode = value;
         (*self.gbc).borrow_mut().set_mode(value);
     }
 
-    #[inline(always)]
     pub fn ppu_enabled(&self) -> bool {
-        (*self.gbc).borrow().ppu_enabled()
+        self.ppu_enabled
     }
 
     pub fn set_ppu_enabled(&mut self, value: bool) {
+        self.ppu_enabled = value;
         (*self.gbc).borrow_mut().set_ppu_enabled(value);
     }
 
-    #[inline(always)]
     pub fn apu_enabled(&self) -> bool {
-        (*self.gbc).borrow().apu_enabled
+        self.apu_enabled
     }
 
     pub fn set_apu_enabled(&mut self, value: bool) {
+        self.apu_enabled = value;
         (*self.gbc).borrow_mut().set_apu_enabled(value);
     }
 
-    #[inline(always)]
     pub fn timer_enabled(&self) -> bool {
-        (*self.gbc).borrow().timer_enabled()
+        self.timer_enabled
     }
 
     pub fn set_timer_enabled(&mut self, value: bool) {
+        self.timer_enabled = value;
         (*self.gbc).borrow_mut().set_timer_enabled(value);
     }
 
-    #[inline(always)]
     pub fn serial_enabled(&self) -> bool {
-        (*self.gbc).borrow().serial_enabled()
+        self.serial_enabled
     }
 
     pub fn set_serial_enabled(&mut self, value: bool) {
+        self.serial_enabled = value;
         (*self.gbc).borrow_mut().set_serial_enabled(value);
     }
 
-    #[inline(always)]
     pub fn clock_freq(&self) -> u32 {
-        (*self.gbc).borrow().clock_freq()
+        self.clock_freq
     }
 
     pub fn set_clock_freq(&mut self, value: u32) {
+        self.clock_freq = value;
         (*self.gbc).borrow_mut().set_clock_freq(value);
         self.apu().set_clock_freq(value);
     }
