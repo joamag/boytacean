@@ -1,0 +1,13 @@
+.audio-gb > .section {
+    display: inline-block;
+    vertical-align: top;
+}
+
+.audio-gb > .section > .audio-wave {
+    display: inline-block;
+    margin-right: 5px;
+}
+
+.audio-gb > .section > .audio-wave > h4 {
+    margin: 4px 0px 4px 0px;
+}

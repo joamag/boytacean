@@ -1,8 +1,10 @@
 import {
     AudioSpecs,
     BenchmarkResult,
+    SectionInfo,
     Compilation,
     Compiler,
+    DebugPanel,
     Emulator,
     EmulatorBase,
     Entry,
@@ -16,7 +18,13 @@ import {
 } from "emukit";
 import { PALETTES, PALETTES_MAP } from "./palettes";
 import { base64ToBuffer, bufferToBase64 } from "./util";
-import { HelpFaqs, HelpKeyboard } from "../react";
+import {
+    DebugAudio,
+    DebugVideo,
+    HelpFaqs,
+    HelpKeyboard,
+    SerialSection
+} from "../react";
 
 import {
     Cartridge,
@@ -79,7 +87,17 @@ const KEYS_NAME: Record<string, number> = {
     B: PadKey.B
 };
 
-const ROM_PATH = require("../../../res/roms/pocket.gb");
+const ROM_PATH = require("../../../res/roms/demo/pocket.gb");
+
+/**
+ * Enumeration with the values for the complete set of available
+ * serial devices that can be used in the emulator.
+ */
+export enum SerialDevice {
+    Null = "null",
+    Logger = "logger",
+    Printer = "printer"
+}
 
 /**
  * Top level class that controls the emulator behaviour
@@ -115,6 +133,8 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     private romData: Uint8Array | null = null;
     private romSize = 0;
     private cartridge: Cartridge | null = null;
+
+    private _serialDevice: SerialDevice = SerialDevice.Null;
 
     /**
      * Associative map for extra settings to be used in
@@ -389,6 +409,10 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         this.gameBoy.load_boot_default();
         const cartridge = this.gameBoy.load_rom_ws(romData);
 
+        // in case there's a serial device involved tries to load
+        // it and initialize for the current Game Boy machine
+        this.loadSerialDevice();
+
         // updates the name of the currently selected engine
         // to the one that has been provided (logic change)
         if (engine) this._engine = engine;
@@ -463,6 +487,18 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         ];
     }
 
+    get sections(): SectionInfo[] {
+        return [
+            {
+                name: "Serial",
+                icon: require("../res/serial.svg"),
+                node: SerialSection({
+                    emulator: this
+                })
+            }
+        ];
+    }
+
     get help(): HelpPanel[] {
         return [
             {
@@ -476,6 +512,19 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         ];
     }
 
+    get debug(): DebugPanel[] {
+        return [
+            {
+                name: "Video",
+                node: DebugVideo({ emulator: this })
+            },
+            {
+                name: "Audio",
+                node: DebugAudio({ emulator: this })
+            }
+        ];
+    }
+
     get engines(): string[] {
         return ["neo"];
     }
@@ -485,7 +534,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     }
 
     get romExts(): string[] {
-        return ["gb"];
+        return ["gb", "gbc"];
     }
 
     get pixelFormat(): PixelFormat {
@@ -548,6 +597,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     set frequency(value: number) {
         value = Math.max(value, 0);
         this.logicFrequency = value;
+        this.gameBoy?.set_clock_freq(value);
         this.trigger("frequency", value);
     }
 
@@ -562,22 +612,22 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     get compiler(): Compiler | null {
         if (!this.gameBoy) return null;
         return {
-            name: this.gameBoy.get_compiler(),
-            version: this.gameBoy.get_compiler_version()
+            name: this.gameBoy.compiler(),
+            version: this.gameBoy.compiler_version()
         };
     }
 
     get compilation(): Compilation | null {
         if (!this.gameBoy) return null;
         return {
-            date: this.gameBoy.get_compilation_date(),
-            time: this.gameBoy.get_compilation_time()
+            date: this.gameBoy.compilation_date(),
+            time: this.gameBoy.compilation_time()
         };
     }
 
     get wasmEngine(): string | null {
         if (!this.gameBoy) return null;
-        return this.gameBoy.get_wasm_engine_ws() ?? null;
+        return this.gameBoy.wasm_engine_ws() ?? null;
     }
 
     get framerate(): number {
@@ -606,6 +656,18 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         };
     }
 
+    get audioOutput(): Record<string, number> {
+        const output = this.gameBoy?.audio_all_output();
+        if (!output) return {};
+        return {
+            master: output[0],
+            ch1: output[1],
+            ch2: output[2],
+            ch3: output[3],
+            ch4: output[4]
+        };
+    }
+
     get palette(): string | undefined {
         const paletteObj = PALETTES[this.paletteIndex];
         return paletteObj.name;
@@ -616,6 +678,14 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         const paletteObj = PALETTES_MAP[value];
         this.paletteIndex = Math.max(PALETTES.indexOf(paletteObj), 0);
         this.updatePalette();
+    }
+
+    get serialDevice(): SerialDevice {
+        return this._serialDevice;
+    }
+
+    set serialDevice(value: SerialDevice) {
+        this._serialDevice = value;
     }
 
     toggleRunning() {
@@ -660,7 +730,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     }
 
     getVideoState(): boolean {
-        return this.gameBoy?.get_ppu_enabled() ?? false;
+        return this.gameBoy?.ppu_enabled() ?? false;
     }
 
     pauseAudio() {
@@ -672,7 +742,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     }
 
     getAudioState(): boolean {
-        return this.gameBoy?.get_apu_enabled() ?? false;
+        return this.gameBoy?.apu_enabled() ?? false;
     }
 
     getTile(index: number): Uint8Array {
@@ -710,6 +780,46 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     onBackground(background: string) {
         this.extraSettings.background = background;
         this.storeSettings();
+    }
+
+    loadSerialDevice(device?: SerialDevice) {
+        device = device ?? this.serialDevice;
+        switch (device) {
+            case SerialDevice.Null:
+                this.loadNullDevice();
+                break;
+
+            case SerialDevice.Logger:
+                this.loadLoggerDevice();
+                break;
+
+            case SerialDevice.Printer:
+                this.loadPrinterDevice();
+                break;
+        }
+    }
+
+    loadNullDevice(set = true) {
+        this.gameBoy?.load_null_ws();
+        if (set) this.serialDevice = SerialDevice.Null;
+    }
+
+    loadLoggerDevice(set = true) {
+        this.gameBoy?.load_logger_ws();
+        if (set) this.serialDevice = SerialDevice.Logger;
+    }
+
+    loadPrinterDevice(set = true) {
+        this.gameBoy?.load_printer_ws();
+        if (set) this.serialDevice = SerialDevice.Printer;
+    }
+
+    onLoggerDevice(data: Uint8Array) {
+        this.trigger("logger", { data: data });
+    }
+
+    onPrinterDevice(imageBuffer: Uint8Array) {
+        this.trigger("printer", { imageBuffer: imageBuffer });
     }
 
     /**
@@ -780,12 +890,32 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
 
 declare global {
     interface Window {
+        emulator: GameboyEmulator;
         panic: (message: string) => void;
+        loggerCallback: (data: Uint8Array) => void;
+        printerCallback: (imageBuffer: Uint8Array) => void;
+    }
+
+    interface Console {
+        image(url: string, size?: number): void;
     }
 }
 
 window.panic = (message: string) => {
     console.error(message);
+};
+
+window.loggerCallback = (data: Uint8Array) => {
+    window.emulator.onLoggerDevice(data);
+};
+
+window.printerCallback = (imageBuffer: Uint8Array) => {
+    window.emulator.onPrinterDevice(imageBuffer);
+};
+
+console.image = (url: string, size = 80) => {
+    const style = `font-size: ${size}px; background-image: url("${url}"); background-size: contain; background-repeat: no-repeat;`;
+    console.log("%c     ", style);
 };
 
 const wasm = async () => {

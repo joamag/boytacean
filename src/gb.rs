@@ -2,11 +2,13 @@ use crate::{
     apu::Apu,
     cpu::Cpu,
     data::{BootRom, CGB_BOOT, DMG_BOOT, DMG_BOOTIX, MGB_BOOTIX, SGB_BOOT},
+    devices::{printer::PrinterDevice, stdout::StdoutDevice},
     gen::{COMPILATION_DATE, COMPILATION_TIME, COMPILER, COMPILER_VERSION},
     mmu::Mmu,
     pad::{Pad, PadKey},
     ppu::{Ppu, PpuMode, Tile, FRAME_BUFFER_SIZE},
     rom::Cartridge,
+    serial::{NullDevice, Serial, SerialDevice},
     timer::Timer,
     util::read_file,
 };
@@ -33,10 +35,31 @@ use std::{
 /// Should serve as the main entry-point API.
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 pub struct GameBoy {
+    /// Reference to the Game Boy CPU component to be
+    /// used as the main element of the system, when
+    /// clocked, the amount of ticks from it will be
+    /// used as reference or the rest of the components.
     cpu: Cpu,
+
+    /// If the PPU is enabled, it will be clocked.
     ppu_enabled: bool,
+
+    /// If the APU is enabled, it will be clocked.
     apu_enabled: bool,
+
+    /// If the timer is enabled, it will be clocked.
     timer_enabled: bool,
+
+    /// If the serial is enabled, it will be clocked.
+    serial_enabled: bool,
+
+    /// The current frequency at which the Game Boy
+    /// emulator is being handled. This is a "hint" that
+    /// may help components to adjust their internal
+    /// logic to match the current frequency. For example
+    /// the APU will adjust its internal clock to match
+    /// this hint.
+    clock_freq: u32,
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
@@ -72,19 +95,24 @@ impl GameBoy {
         let apu = Apu::default();
         let pad = Pad::default();
         let timer = Timer::default();
-        let mmu = Mmu::new(ppu, apu, pad, timer);
+        let serial = Serial::default();
+        let mmu = Mmu::new(ppu, apu, pad, timer, serial);
         let cpu = Cpu::new(mmu);
         Self {
             cpu,
             ppu_enabled: true,
             apu_enabled: true,
             timer_enabled: true,
+            serial_enabled: true,
+            clock_freq: GameBoy::CPU_FREQ,
         }
     }
 
     pub fn reset(&mut self) {
         self.ppu().reset();
         self.apu().reset();
+        self.timer().reset();
+        self.serial().reset();
         self.mmu().reset();
         self.cpu.reset();
     }
@@ -99,6 +127,9 @@ impl GameBoy {
         }
         if self.timer_enabled {
             self.timer_clock(cycles);
+        }
+        if self.serial_enabled {
+            self.serial_clock(cycles);
         }
         cycles
     }
@@ -125,6 +156,10 @@ impl GameBoy {
 
     pub fn timer_clock(&mut self, cycles: u8) {
         self.timer().clock(cycles)
+    }
+
+    pub fn serial_clock(&mut self, cycles: u8) {
+        self.serial().clock(cycles)
     }
 
     pub fn ppu_ly(&mut self) -> u8 {
@@ -210,6 +245,36 @@ impl GameBoy {
         buffer
     }
 
+    pub fn audio_output(&self) -> u8 {
+        self.apu_i().output()
+    }
+
+    pub fn audio_all_output(&self) -> Vec<u8> {
+        vec![
+            self.audio_output(),
+            self.audio_ch1_output(),
+            self.audio_ch2_output(),
+            self.audio_ch3_output(),
+            self.audio_ch4_output(),
+        ]
+    }
+
+    pub fn audio_ch1_output(&self) -> u8 {
+        self.apu_i().ch1_output()
+    }
+
+    pub fn audio_ch2_output(&self) -> u8 {
+        self.apu_i().ch2_output()
+    }
+
+    pub fn audio_ch3_output(&self) -> u8 {
+        self.apu_i().ch3_output()
+    }
+
+    pub fn audio_ch4_output(&self) -> u8 {
+        self.apu_i().ch4_output()
+    }
+
     pub fn cartridge_eager(&mut self) -> Cartridge {
         self.mmu().rom().clone()
     }
@@ -261,23 +326,23 @@ impl GameBoy {
     /// Obtains the name of the compiler that has been
     /// used in the compilation of the base Boytacean
     /// library. Can be used for diagnostics.
-    pub fn get_compiler(&self) -> String {
+    pub fn compiler(&self) -> String {
         String::from(COMPILER)
     }
 
-    pub fn get_compiler_version(&self) -> String {
+    pub fn compiler_version(&self) -> String {
         String::from(COMPILER_VERSION)
     }
 
-    pub fn get_compilation_date(&self) -> String {
+    pub fn compilation_date(&self) -> String {
         String::from(COMPILATION_DATE)
     }
 
-    pub fn get_compilation_time(&self) -> String {
+    pub fn compilation_time(&self) -> String {
         String::from(COMPILATION_TIME)
     }
 
-    pub fn get_ppu_enabled(&self) -> bool {
+    pub fn ppu_enabled(&self) -> bool {
         self.ppu_enabled
     }
 
@@ -285,7 +350,7 @@ impl GameBoy {
         self.ppu_enabled = value;
     }
 
-    pub fn get_apu_enabled(&self) -> bool {
+    pub fn apu_enabled(&self) -> bool {
         self.apu_enabled
     }
 
@@ -293,12 +358,41 @@ impl GameBoy {
         self.apu_enabled = value;
     }
 
-    pub fn get_timer_enabled(&self) -> bool {
-        self.apu_enabled
+    pub fn timer_enabled(&self) -> bool {
+        self.timer_enabled
     }
 
     pub fn set_timer_enabled(&mut self, value: bool) {
         self.timer_enabled = value;
+    }
+
+    pub fn serial_enabled(&self) -> bool {
+        self.serial_enabled
+    }
+
+    pub fn set_serial_enabled(&mut self, value: bool) {
+        self.serial_enabled = value;
+    }
+
+    pub fn clock_freq(&self) -> u32 {
+        self.clock_freq
+    }
+
+    pub fn set_clock_freq(&mut self, value: u32) {
+        self.clock_freq = value;
+        self.apu().set_clock_freq(value);
+    }
+
+    pub fn attach_null_serial(&mut self) {
+        self.attach_serial(Box::<NullDevice>::default());
+    }
+
+    pub fn attach_stdout_serial(&mut self) {
+        self.attach_serial(Box::<StdoutDevice>::default());
+    }
+
+    pub fn attach_printer_serial(&mut self) {
+        self.attach_serial(Box::<PrinterDevice>::default());
     }
 }
 
@@ -343,6 +437,10 @@ impl GameBoy {
 
     pub fn timer(&mut self) -> &mut Timer {
         self.cpu.timer()
+    }
+
+    pub fn serial(&mut self) -> &mut Serial {
+        self.cpu.serial()
     }
 
     pub fn frame_buffer(&mut self) -> &[u8; FRAME_BUFFER_SIZE] {
@@ -390,6 +488,10 @@ impl GameBoy {
         let data = read_file(path);
         self.load_rom(&data)
     }
+
+    pub fn attach_serial(&mut self, device: Box<dyn SerialDevice>) {
+        self.serial().set_device(device);
+    }
 }
 
 #[cfg(feature = "wasm")]
@@ -407,6 +509,27 @@ impl GameBoy {
         self.load_rom(data).clone()
     }
 
+    pub fn load_null_ws(&mut self) {
+        let null = Box::<NullDevice>::default();
+        self.attach_serial(null);
+    }
+
+    pub fn load_logger_ws(&mut self) {
+        let mut logger = Box::<StdoutDevice>::default();
+        logger.set_callback(|data| {
+            logger_callback(data.to_vec());
+        });
+        self.attach_serial(logger);
+    }
+
+    pub fn load_printer_ws(&mut self) {
+        let mut printer = Box::<PrinterDevice>::default();
+        printer.set_callback(|image_buffer| {
+            printer_callback(image_buffer.to_vec());
+        });
+        self.attach_serial(printer);
+    }
+
     pub fn set_palette_colors_ws(&mut self, value: Vec<JsValue>) {
         let palette: Palette = value
             .into_iter()
@@ -417,7 +540,7 @@ impl GameBoy {
         self.ppu().set_palette_colors(&palette);
     }
 
-    pub fn get_wasm_engine_ws(&self) -> Option<String> {
+    pub fn wasm_engine_ws(&self) -> Option<String> {
         let dependencies = dependencies_map();
         if !dependencies.contains_key("wasm-bindgen") {
             return None;
@@ -448,6 +571,12 @@ impl GameBoy {
 extern "C" {
     #[wasm_bindgen(js_namespace = window)]
     fn panic(message: &str);
+
+    #[wasm_bindgen(js_namespace = window, js_name = loggerCallback)]
+    fn logger_callback(data: Vec<u8>);
+
+    #[wasm_bindgen(js_namespace = window, js_name = printerCallback)]
+    fn printer_callback(image_buffer: Vec<u8>);
 }
 
 #[cfg(feature = "wasm")]

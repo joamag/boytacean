@@ -19,6 +19,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 *
 
+## [0.8.0] - 2023-04-20
+
+### Added
+
+* Support for serial data transfer - [#19](https://gitlab.stage.hive.pt/joamag/boytacean/-/issues/19)
+* Support for printing of images using Printer emulation - [#19](https://gitlab.stage.hive.pt/joamag/boytacean/-/issues/19)
+* Support for display of logger and printer in Web panels
+* Converted serial-sections strategy to event driven
+
+### Fixed
+
+* `ButtonSwitch` issues by updating the value strategy nad bumping `emukit`
+* `AudioGB` with display of canvas with no visibility
+
+## [0.7.5] - 2023-04-11
+
+### Added
+
+* Support for variable clock speed for APU, means variable audio speed
+* Moved debug into the base emulator (from emukit)
+
+## [0.7.4] - 2023-04-08
+
+### Added
+
+* Support for audio channel 4 (noise) 🔈
+* Better trigger support for audio channels 🔈
+
+### Changed
+
+* Added CH4 public API method for WASM
+
+### Fixed
+
+* Envelope support for both channel 2 and 4 🔈
+* Issue related to the wave length stop flag 🔈
+
+## [0.7.3] - 2023-04-02
+
+### Added
+
+* Support for CGB flag parsing
+* Waveform plotting support
+
+### Fixed
+
+* Major JoyPad issue with Action/Select read in register
+* Small issue with channel 3 audio and DAC disable
+
+## [0.7.2] - 2023-03-04
+
+### Added
+
+* Support for stereo sound 🔊
+
+### Changed
+
+* APU `clock()` method with `cycles` parameter, improving performance by an order of magnitude 💪
+
+### Fixed
+
+* Added reset of APU, which fixes annoying "garbage" data in buffer when restarting the state of the emulator
+
 ## [0.7.1] - 2023-03-02
 
 ### Changed

@@ -2,8 +2,10 @@
 #[macro_export]
 macro_rules! debugln {
     ($($rest:tt)*) => {
-        std::print!("[DEBUG] ");
-        std::println!($($rest)*)
+        {
+            std::print!("[DEBUG] ");
+            std::println!($($rest)*);
+        }
     }
 }
 

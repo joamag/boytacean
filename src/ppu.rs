@@ -14,6 +14,7 @@ pub const HRAM_SIZE: usize = 128;
 pub const OAM_SIZE: usize = 260;
 pub const PALETTE_SIZE: usize = 4;
 pub const RGB_SIZE: usize = 3;
+pub const RGBA_SIZE: usize = 4;
 pub const TILE_WIDTH: usize = 8;
 pub const TILE_HEIGHT: usize = 8;
 pub const TILE_DOUBLE_HEIGHT: usize = 16;
@@ -48,9 +49,17 @@ pub const PALETTE_COLORS: Palette = [[255, 255, 255], [192, 192, 192], [96, 96, 
 /// with the size of RGB (3 bytes).
 pub type Pixel = [u8; RGB_SIZE];
 
+/// Defines a transparent Game Boy pixel type as a buffer
+/// with the size of RGBA (4 bytes).
+pub type PixelAlpha = [u8; RGBA_SIZE];
+
 /// Defines a type that represents a color palette
 /// within the Game Boy context.
 pub type Palette = [Pixel; PALETTE_SIZE];
+
+/// Defines a type that represents a color palette
+/// with alpha within the Game Boy context.
+pub type PaletteAlpha = [PixelAlpha; PALETTE_SIZE];
 
 /// Represents a palette with the metadata that is
 /// associated with it.
@@ -642,26 +651,32 @@ impl Ppu {
         self.frame_index
     }
 
+    #[inline(always)]
     pub fn int_vblank(&self) -> bool {
         self.int_vblank
     }
 
+    #[inline(always)]
     pub fn set_int_vblank(&mut self, value: bool) {
         self.int_vblank = value;
     }
 
+    #[inline(always)]
     pub fn ack_vblank(&mut self) {
         self.set_int_vblank(false);
     }
 
+    #[inline(always)]
     pub fn int_stat(&self) -> bool {
         self.int_stat
     }
 
+    #[inline(always)]
     pub fn set_int_stat(&mut self, value: bool) {
         self.int_stat = value;
     }
 
+    #[inline(always)]
     pub fn ack_stat(&mut self) {
         self.set_int_stat(false);
     }
@@ -873,7 +888,7 @@ impl Ppu {
         let mut index_buffer = [-256i16; DISPLAY_WIDTH];
 
         for index in 0..OBJ_COUNT {
-            // in case the limit on number of object to be draw per
+            // in case the limit on the number of objects to be draw per
             // line has been reached breaks the loop avoiding more draws
             if draw_count == 10 {
                 break;

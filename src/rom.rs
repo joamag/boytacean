@@ -182,6 +182,29 @@ impl Display for RamSize {
     }
 }
 
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
+pub enum CgbMode {
+    NoCgb = 0x00,
+    CgbCompatible = 0x80,
+    CgbOnly = 0xc0,
+}
+
+impl CgbMode {
+    pub fn description(&self) -> &'static str {
+        match self {
+            CgbMode::NoCgb => "No CGB support",
+            CgbMode::CgbCompatible => "CGB backwards compatible",
+            CgbMode::CgbOnly => "CGB only",
+        }
+    }
+}
+
+impl Display for CgbMode {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.description())
+    }
+}
+
 /// Structure that defines the ROM and ROM contents
 /// of a Game Boy cartridge. Should correctly address
 /// the specifics of all the major MBCs (Memory Bank
@@ -339,6 +362,16 @@ impl Cartridge {
             if *byte == 0u8 {
                 break;
             }
+
+            // in we're at the final byte of the title and the value
+            // is one that is reserved for CGB compatibility testing
+            // then we must ignore it for title processing purposes
+            if offset > 14
+                && (*byte == CgbMode::CgbCompatible as u8 || *byte == CgbMode::CgbOnly as u8)
+            {
+                break;
+            }
+
             offset += 1;
         }
         self.title_offset = 0x0134 + offset;
@@ -358,6 +391,14 @@ impl Cartridge {
                 .unwrap()
                 .trim(),
         )
+    }
+
+    pub fn cgb_flag(&self) -> CgbMode {
+        match self.rom_data[0x0143] {
+            0x80 => CgbMode::CgbCompatible,
+            0xc0 => CgbMode::CgbOnly,
+            _ => CgbMode::NoCgb,
+        }
     }
 
     pub fn rom_type(&self) -> RomType {
@@ -469,11 +510,12 @@ impl Display for Cartridge {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "Name => {}\nType => {}\nROM Size => {}\nRAM Size => {}",
+            "Name => {}\nType => {}\nROM Size => {}\nRAM Size => {}\nCGB Mode => {}",
             self.title(),
             self.rom_type(),
             self.rom_size(),
-            self.ram_size()
+            self.ram_size(),
+            self.cgb_flag()
         )
     }
 }

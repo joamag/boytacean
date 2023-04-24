@@ -711,7 +711,7 @@ fn ld_d_u8(cpu: &mut Cpu) {
 }
 
 fn rla(cpu: &mut Cpu) {
-    let carry = cpu.get_carry();
+    let carry = cpu.carry();
 
     cpu.set_carry(cpu.a & 0x80 == 0x80);
 
@@ -769,7 +769,7 @@ fn ld_e_u8(cpu: &mut Cpu) {
 }
 
 fn rra(cpu: &mut Cpu) {
-    let carry = cpu.get_carry();
+    let carry = cpu.carry();
 
     cpu.set_carry((cpu.a & 0x1) == 0x1);
 
@@ -783,7 +783,7 @@ fn rra(cpu: &mut Cpu) {
 fn jr_nz_i8(cpu: &mut Cpu) {
     let byte = cpu.read_u8() as i8;
 
-    if cpu.get_zero() {
+    if cpu.zero() {
         return;
     }
 
@@ -836,16 +836,16 @@ fn daa(cpu: &mut Cpu) {
     let a = cpu.a;
     let mut adjust = 0;
 
-    if cpu.get_half_carry() {
+    if cpu.half_carry() {
         adjust |= 0x06;
     }
 
-    if cpu.get_carry() {
+    if cpu.carry() {
         // Yes, we have to adjust it.
         adjust |= 0x60;
     }
 
-    let res = if cpu.get_sub() {
+    let res = if cpu.sub() {
         a.wrapping_sub(adjust)
     } else {
         if a & 0x0f > 0x09 {
@@ -869,7 +869,7 @@ fn daa(cpu: &mut Cpu) {
 fn jr_z_i8(cpu: &mut Cpu) {
     let byte = cpu.read_u8() as i8;
 
-    if !cpu.get_zero() {
+    if !cpu.zero() {
         return;
     }
 
@@ -933,7 +933,7 @@ fn ld_sp_u16(cpu: &mut Cpu) {
 fn jr_nc_i8(cpu: &mut Cpu) {
     let byte = cpu.read_u8() as i8;
 
-    if cpu.get_carry() {
+    if cpu.carry() {
         return;
     }
 
@@ -986,7 +986,7 @@ fn scf(cpu: &mut Cpu) {
 fn jr_c_i8(cpu: &mut Cpu) {
     let byte = cpu.read_u8() as i8;
 
-    if !cpu.get_carry() {
+    if !cpu.carry() {
         return;
     }
 
@@ -1039,7 +1039,7 @@ fn ld_a_u8(cpu: &mut Cpu) {
 fn ccf(cpu: &mut Cpu) {
     cpu.set_sub(false);
     cpu.set_half_carry(false);
-    cpu.set_carry(!cpu.get_carry());
+    cpu.set_carry(!cpu.carry());
 }
 
 fn ld_b_b(_cpu: &mut Cpu) {}
@@ -1676,7 +1676,7 @@ fn cp_a_a(cpu: &mut Cpu) {
 }
 
 fn ret_nz(cpu: &mut Cpu) {
-    if cpu.get_zero() {
+    if cpu.zero() {
         return;
     }
 
@@ -1692,7 +1692,7 @@ fn pop_bc(cpu: &mut Cpu) {
 fn jp_nz_u16(cpu: &mut Cpu) {
     let word = cpu.read_u16();
 
-    if cpu.get_zero() {
+    if cpu.zero() {
         return;
     }
 
@@ -1708,7 +1708,7 @@ fn jp_u16(cpu: &mut Cpu) {
 fn call_nz_u16(cpu: &mut Cpu) {
     let word = cpu.read_u16();
 
-    if cpu.get_zero() {
+    if cpu.zero() {
         return;
     }
 
@@ -1731,7 +1731,7 @@ fn rst_00h(cpu: &mut Cpu) {
 }
 
 fn ret_z(cpu: &mut Cpu) {
-    if !cpu.get_zero() {
+    if !cpu.zero() {
         return;
     }
 
@@ -1746,7 +1746,7 @@ fn ret(cpu: &mut Cpu) {
 fn jp_z_u16(cpu: &mut Cpu) {
     let word = cpu.read_u16();
 
-    if !cpu.get_zero() {
+    if !cpu.zero() {
         return;
     }
 
@@ -1757,7 +1757,7 @@ fn jp_z_u16(cpu: &mut Cpu) {
 fn call_z_u16(cpu: &mut Cpu) {
     let word = cpu.read_u16();
 
-    if !cpu.get_zero() {
+    if !cpu.zero() {
         return;
     }
 
@@ -1782,7 +1782,7 @@ fn rst_08h(cpu: &mut Cpu) {
 }
 
 fn ret_nc(cpu: &mut Cpu) {
-    if cpu.get_carry() {
+    if cpu.carry() {
         return;
     }
 
@@ -1798,7 +1798,7 @@ fn pop_de(cpu: &mut Cpu) {
 fn jp_nc_u16(cpu: &mut Cpu) {
     let word = cpu.read_u16();
 
-    if cpu.get_carry() {
+    if cpu.carry() {
         return;
     }
 
@@ -1809,7 +1809,7 @@ fn jp_nc_u16(cpu: &mut Cpu) {
 fn call_nc_u16(cpu: &mut Cpu) {
     let word = cpu.read_u16();
 
-    if cpu.get_carry() {
+    if cpu.carry() {
         return;
     }
 
@@ -1832,7 +1832,7 @@ fn rst_10h(cpu: &mut Cpu) {
 }
 
 fn ret_c(cpu: &mut Cpu) {
-    if !cpu.get_carry() {
+    if !cpu.carry() {
         return;
     }
 
@@ -1848,7 +1848,7 @@ fn reti(cpu: &mut Cpu) {
 fn jp_c_u16(cpu: &mut Cpu) {
     let word = cpu.read_u16();
 
-    if !cpu.get_carry() {
+    if !cpu.carry() {
         return;
     }
 
@@ -1859,7 +1859,7 @@ fn jp_c_u16(cpu: &mut Cpu) {
 fn call_c_u16(cpu: &mut Cpu) {
     let word = cpu.read_u16();
 
-    if !cpu.get_carry() {
+    if !cpu.carry() {
         return;
     }
 
@@ -3132,7 +3132,7 @@ fn res(value: u8, bit: u8) -> u8 {
 /// byte (probably from a register) and updates the
 /// proper flag registers.
 fn rl(cpu: &mut Cpu, value: u8) -> u8 {
-    let carry = cpu.get_carry();
+    let carry = cpu.carry();
 
     cpu.set_carry((value & 0x80) == 0x80);
 
@@ -3161,7 +3161,7 @@ fn rlc(cpu: &mut Cpu, value: u8) -> u8 {
 /// byte (probably from a register) and updates the
 /// proper flag registers.
 fn rr(cpu: &mut Cpu, value: u8) -> u8 {
-    let carry = cpu.get_carry();
+    let carry = cpu.carry();
 
     cpu.set_carry((value & 0x1) == 0x1);
 
@@ -3259,7 +3259,7 @@ fn add_set_flags(cpu: &mut Cpu, first: u8, second: u8) -> u8 {
 fn add_carry_set_flags(cpu: &mut Cpu, first: u8, second: u8) -> u8 {
     let first = first as u32;
     let second = second as u32;
-    let carry = cpu.get_carry() as u32;
+    let carry = cpu.carry() as u32;
 
     let result = first.wrapping_add(second).wrapping_add(carry);
     let result_b = result as u8;
@@ -3290,7 +3290,7 @@ fn sub_set_flags(cpu: &mut Cpu, first: u8, second: u8) -> u8 {
 fn sub_carry_set_flags(cpu: &mut Cpu, first: u8, second: u8) -> u8 {
     let first = first as u32;
     let second = second as u32;
-    let carry = cpu.get_carry() as u32;
+    let carry = cpu.carry() as u32;
 
     let result = first.wrapping_sub(second).wrapping_sub(carry);
     let result_b = result as u8;

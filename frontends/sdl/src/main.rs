@@ -6,13 +6,16 @@ pub mod graphics;
 
 use audio::Audio;
 use boytacean::{
+    devices::printer::PrinterDevice,
     gb::{AudioProvider, GameBoy},
     pad::PadKey,
     ppu::{PaletteInfo, PpuMode, DISPLAY_HEIGHT, DISPLAY_WIDTH},
 };
+use chrono::Utc;
 use graphics::{surface_from_bytes, Graphics};
+use image::ColorType;
 use sdl2::{event::Event, keyboard::Keycode, pixels::PixelFormatEnum, Sdl};
-use std::{cmp::max, time::SystemTime};
+use std::{cmp::max, path::Path, time::SystemTime};
 
 /// The scale at which the screen is going to be drawn
 /// meaning the ratio between Game Boy resolution and
@@ -20,11 +23,11 @@ use std::{cmp::max, time::SystemTime};
 const SCREEN_SCALE: f32 = 2.0;
 
 /// The base title to be used in the window.
-static TITLE: &str = "Boytacean";
+const TITLE: &str = "Boytacean";
 
 /// Base audio volume to be used as the basis of the
 /// amplification level of the volume
-static VOLUME: f32 = 64.0;
+const VOLUME: f32 = 64.0;
 
 pub struct Benchmark {
     count: usize,
@@ -47,12 +50,13 @@ pub struct Emulator {
     graphics: Option<Graphics>,
     audio: Option<Audio>,
     title: &'static str,
+    rom_path: String,
     logic_frequency: u32,
     visual_frequency: f32,
     next_tick_time: f32,
     next_tick_time_i: u32,
     features: Vec<&'static str>,
-    palettes: [PaletteInfo; 3],
+    palettes: [PaletteInfo; 7],
     palette_index: usize,
 }
 
@@ -63,6 +67,7 @@ impl Emulator {
             graphics: None,
             audio: None,
             title: TITLE,
+            rom_path: String::from("invalid"),
             logic_frequency: GameBoy::CPU_FREQ,
             visual_frequency: GameBoy::VISUAL_FREQ,
             next_tick_time: 0.0,
@@ -96,6 +101,42 @@ impl Emulator {
                         [0x53, 0x4d, 0x57],
                     ],
                 ),
+                PaletteInfo::new(
+                    "goldsilver",
+                    [
+                        [0xc5, 0xc6, 0x6d],
+                        [0x97, 0xa1, 0xb0],
+                        [0x58, 0x5e, 0x67],
+                        [0x23, 0x52, 0x29],
+                    ],
+                ),
+                PaletteInfo::new(
+                    "pacman",
+                    [
+                        [0xff, 0xff, 0x00],
+                        [0xff, 0xb8, 0x97],
+                        [0x37, 0x32, 0xff],
+                        [0x00, 0x00, 0x00],
+                    ],
+                ),
+                PaletteInfo::new(
+                    "mariobros",
+                    [
+                        [0xf7, 0xce, 0xc3],
+                        [0xcc, 0x9e, 0x22],
+                        [0x92, 0x34, 0x04],
+                        [0x00, 0x00, 0x00],
+                    ],
+                ),
+                PaletteInfo::new(
+                    "pokemon",
+                    [
+                        [0xf8, 0x78, 0x00],
+                        [0xb8, 0x60, 0x00],
+                        [0x78, 0x38, 0x00],
+                        [0x00, 0x00, 0x00],
+                    ],
+                ),
             ],
             palette_index: 0,
         }
@@ -127,8 +168,9 @@ impl Emulator {
         self.audio = Some(Audio::new(sdl));
     }
 
-    pub fn load_rom(&mut self, path: &str) {
-        let rom = self.system.load_rom_file(path);
+    pub fn load_rom(&mut self, path: Option<&str>) {
+        let path_res = path.unwrap_or(&self.rom_path);
+        let rom = self.system.load_rom_file(path_res);
         println!(
             "========= Cartridge =========\n{}\n=============================",
             rom
@@ -139,6 +181,13 @@ impl Emulator {
             .window_mut()
             .set_title(format!("{} [{}]", self.title, rom.title()).as_str())
             .unwrap();
+        self.rom_path = String::from(path_res);
+    }
+
+    pub fn reset(&mut self) {
+        self.system.reset();
+        self.system.load_boot_default();
+        self.load_rom(None);
     }
 
     pub fn benchmark(&mut self, params: Benchmark) {
@@ -163,7 +212,7 @@ impl Emulator {
     }
 
     pub fn toggle_audio(&mut self) {
-        let apu_enabled = self.system.get_apu_enabled();
+        let apu_enabled = self.system.apu_enabled();
         self.system.set_apu_enabled(!apu_enabled);
     }
 
@@ -227,6 +276,10 @@ impl Emulator {
                         ..
                     } => break 'main,
                     Event::KeyDown {
+                        keycode: Some(Keycode::R),
+                        ..
+                    } => self.reset(),
+                    Event::KeyDown {
                         keycode: Some(Keycode::B),
                         ..
                     } => self.benchmark(Benchmark::default()),
@@ -264,8 +317,8 @@ impl Emulator {
                     }
                     Event::DropFile { filename, .. } => {
                         self.system.reset();
-                        self.system.load_cgb(true);
-                        self.load_rom(&filename);
+                        self.system.load_boot_cgb();
+                        self.load_rom(Some(&filename));
                     }
                     _ => (),
                 }
@@ -318,9 +371,9 @@ impl Emulator {
                         last_frame = self.system.ppu_frame();
                     }
 
+                    // in case the audio subsystem is enabled, then the audio buffer
+                    // must be queued into the SDL audio subsystem
                     if let Some(audio) = self.audio.as_mut() {
-                        // obtains the new audio buffer and queues it into the audio
-                        // subsystem ready to be processed
                         let audio_buffer = self
                             .system
                             .audio_buffer()
@@ -331,7 +384,7 @@ impl Emulator {
                     }
 
                     // clears the audio buffer to prevent it from
-                    // "exploding" in size
+                    // "exploding" in size, this is required GC operation
                     self.system.clear_audio_buffer();
                 }
 
@@ -394,14 +447,27 @@ fn main() {
     // creates a new Game Boy instance and loads both the boot ROM
     // and the initial game ROM to "start the engine"
     let mut game_boy = GameBoy::new();
-    game_boy.load_cgb(true);
+    let mut printer = Box::<PrinterDevice>::default();
+    printer.set_callback(|image_buffer| {
+        let file_name = format!("printer-{}.png", Utc::now().format("%Y%m%d-%H%M%S"));
+        image::save_buffer(
+            Path::new(&file_name),
+            image_buffer,
+            160,
+            (image_buffer.len() / 4 / 160) as u32,
+            ColorType::Rgba8,
+        )
+        .unwrap();
+    });
+    game_boy.attach_serial(printer);
+    game_boy.load_boot_cgb();
 
     // creates a new generic emulator structure then starts
     // both the video and audio sub-systems, loads default
     // ROM file and starts running it
     let mut emulator = Emulator::new(game_boy);
     emulator.start(SCREEN_SCALE);
-    emulator.load_rom("../../res/roms/pocket.gb");
+    emulator.load_rom(Some("../../res/roms/demo/pocket.gb"));
     emulator.toggle_palette();
     emulator.run();
 }

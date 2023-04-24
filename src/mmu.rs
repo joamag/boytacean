@@ -1,4 +1,4 @@
-use crate::{apu::Apu, debugln, pad::Pad, ppu::Ppu, rom::Cartridge, timer::Timer};
+use crate::{apu::Apu, debugln, pad::Pad, ppu::Ppu, rom::Cartridge, serial::Serial, timer::Timer};
 
 pub const BOOT_SIZE_DMG: usize = 256;
 pub const BOOT_SIZE_CGB: usize = 2304;
@@ -29,6 +29,10 @@ pub struct Mmu {
     /// that is memory mapped.
     timer: Timer,
 
+    /// The serial data transfer controller to be used to control the
+    /// link cable connection, this component is memory mapped.
+    serial: Serial,
+
     /// The cartridge ROM that is currently loaded into the system,
     /// going to be used to access ROM and external RAM banks.
     rom: Cartridge,
@@ -58,12 +62,13 @@ pub struct Mmu {
 }
 
 impl Mmu {
-    pub fn new(ppu: Ppu, apu: Apu, pad: Pad, timer: Timer) -> Self {
+    pub fn new(ppu: Ppu, apu: Apu, pad: Pad, timer: Timer, serial: Serial) -> Self {
         Self {
             ppu,
             apu,
             pad,
             timer,
+            serial,
             rom: Cartridge::new(),
             boot_active: true,
             boot: vec![],
@@ -116,6 +121,10 @@ impl Mmu {
 
     pub fn timer(&mut self) -> &mut Timer {
         &mut self.timer
+    }
+
+    pub fn serial(&mut self) -> &mut Serial {
+        &mut self.serial
     }
 
     pub fn boot_active(&self) -> bool {
@@ -171,6 +180,9 @@ impl Mmu {
                 | 0xa00 | 0xb00 | 0xc00 | 0xd00 => self.ram[(addr & 0x1fff) as usize],
                 0xe00 => self.ppu.read(addr),
                 0xf00 => match addr & 0x00ff {
+                    // 0xFF01-0xFF02 - Serial data transfer
+                    0x01..=0x02 => self.serial.read(addr),
+
                     // 0xFF0F — IF: Interrupt flag
                     0x0f =>
                     {
@@ -178,6 +190,7 @@ impl Mmu {
                         (if self.ppu.int_vblank() { 0x01 } else { 0x00 }
                             | if self.ppu.int_stat() { 0x02 } else { 0x00 }
                             | if self.timer.int_tima() { 0x04 } else { 0x00 }
+                            | if self.serial.int_serial() { 0x08 } else { 0x00 }
                             | if self.pad.int_pad() { 0x10 } else { 0x00 })
                     }
 
@@ -200,7 +213,7 @@ impl Mmu {
                                 0x00
                             }
                         },
-                        0x10..=26 | 0x30..=0x37 => self.apu.read(addr),
+                        0x10..=0x26 | 0x30..=0x37 => self.apu.read(addr),
                         0x40 | 0x50 | 0x60 | 0x70 => self.ppu.read(addr),
                         _ => {
                             debugln!("Reading from unknown IO control 0x{:04x}", addr);
@@ -246,11 +259,15 @@ impl Mmu {
                 }
                 0xe00 => self.ppu.write(addr, value),
                 0xf00 => match addr & 0x00ff {
+                    // 0xFF01-0xFF02 - Serial data transfer
+                    0x01..=0x02 => self.serial.write(addr, value),
+
                     // 0xFF0F — IF: Interrupt flag
                     0x0f => {
                         self.ppu.set_int_vblank(value & 0x01 == 0x01);
                         self.ppu.set_int_stat(value & 0x02 == 0x02);
                         self.timer.set_int_tima(value & 0x04 == 0x04);
+                        self.serial.set_int_serial(value & 0x08 == 0x08);
                         self.pad.set_int_pad(value & 0x10 == 0x10);
                     }
 
@@ -281,7 +298,7 @@ impl Mmu {
                                 0x04..=0x07 => self.timer.write(addr, value),
                                 _ => debugln!("Writing to unknown IO control 0x{:04x}", addr),
                             },
-                            0x10..=26 | 0x30..=0x37 => self.apu.write(addr, value),
+                            0x10..=0x26 | 0x30..=0x37 => self.apu.write(addr, value),
                             0x40 | 0x60 | 0x70 => {
                                 match addr & 0x00ff {
                                     // 0xFF46 — DMA: OAM DMA source address & start

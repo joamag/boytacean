@@ -5,6 +5,7 @@ use crate::warnln;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum PadSelection {
+    None,
     Action,
     Direction,
 }
@@ -45,7 +46,7 @@ impl Pad {
             select: false,
             b: false,
             a: false,
-            selection: PadSelection::Action,
+            selection: PadSelection::None,
             int_pad: false,
         }
     }
@@ -70,15 +71,12 @@ impl Pad {
                             | if self.up { 0x00 } else { 0x04 }
                             | if self.down { 0x00 } else { 0x08 })
                     }
+                    PadSelection::None => 0x0f,
                 };
-                value |= if self.selection == PadSelection::Direction {
-                    0x10
-                } else {
-                    0x00
-                } | if self.selection == PadSelection::Action {
-                    0x20
-                } else {
-                    0x00
+                value |= match self.selection {
+                    PadSelection::Action => 0x10,
+                    PadSelection::Direction => 0x20,
+                    PadSelection::None => 0x30,
                 };
                 value
             }
@@ -92,11 +90,12 @@ impl Pad {
     pub fn write(&mut self, addr: u16, value: u8) {
         match addr & 0x00ff {
             0x0000 => {
-                self.selection = if value & 0x10 == 0x00 {
-                    PadSelection::Direction
-                } else {
-                    PadSelection::Action
-                }
+                self.selection = match value & 0x30 {
+                    0x10 => PadSelection::Action,
+                    0x20 => PadSelection::Direction,
+                    0x30 => PadSelection::None,
+                    _ => PadSelection::None,
+                };
             }
             _ => warnln!("Writing to unknown Pad location 0x{:04x}", addr),
         }
@@ -115,7 +114,7 @@ impl Pad {
         }
 
         // signals that a JoyPad interrupt is pending to be
-        // handled as a key pressed has been done
+        // handled as a key press has been performed
         self.int_pad = true;
     }
 
@@ -132,14 +131,17 @@ impl Pad {
         }
     }
 
+    #[inline(always)]
     pub fn int_pad(&self) -> bool {
         self.int_pad
     }
 
+    #[inline(always)]
     pub fn set_int_pad(&mut self, value: bool) {
         self.int_pad = value;
     }
 
+    #[inline(always)]
     pub fn ack_pad(&mut self) {
         self.set_int_pad(false);
     }

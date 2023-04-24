@@ -7,6 +7,7 @@ use crate::{
     mmu::Mmu,
     pad::Pad,
     ppu::Ppu,
+    serial::Serial,
     timer::Timer,
 };
 
@@ -127,7 +128,7 @@ impl Cpu {
             self.halted = false;
         }
 
-        if self.ime {
+        if self.ime && self.mmu.ie != 0x00 {
             // @TODO aggregate all of this interrupts in the MMU, as there's
             // a lot of redundant code involved in here which complicates the
             // readability and maybe performance of this code
@@ -181,6 +182,26 @@ impl Cpu {
                 // acknowledges that the timer interrupt has been
                 // properly handled
                 self.mmu.timer().ack_tima();
+
+                // in case the CPU is currently halted waiting
+                // for an interrupt, releases it
+                if self.halted {
+                    self.halted = false;
+                }
+
+                return 24;
+            }
+            // @TODO aggregate the handling of these interrupts
+            else if (self.mmu.ie & 0x08 == 0x08) && self.mmu.serial().int_serial() {
+                debugln!("Going to run Serial interrupt handler (0x58)");
+
+                self.disable_int();
+                self.push_word(pc);
+                self.pc = 0x58;
+
+                // acknowledges that the serial interrupt has been
+                // properly handled
+                self.mmu.serial().ack_serial();
 
                 // in case the CPU is currently halted waiting
                 // for an interrupt, releases it
@@ -295,6 +316,11 @@ impl Cpu {
     #[inline(always)]
     pub fn timer(&mut self) -> &mut Timer {
         self.mmu().timer()
+    }
+
+    #[inline(always)]
+    pub fn serial(&mut self) -> &mut Serial {
+        self.mmu().serial()
     }
 
     #[inline(always)]
@@ -427,7 +453,7 @@ impl Cpu {
     }
 
     #[inline(always)]
-    pub fn get_zero(&self) -> bool {
+    pub fn zero(&self) -> bool {
         self.zero
     }
 
@@ -437,7 +463,7 @@ impl Cpu {
     }
 
     #[inline(always)]
-    pub fn get_sub(&self) -> bool {
+    pub fn sub(&self) -> bool {
         self.sub
     }
 
@@ -447,7 +473,7 @@ impl Cpu {
     }
 
     #[inline(always)]
-    pub fn get_half_carry(&self) -> bool {
+    pub fn half_carry(&self) -> bool {
         self.half_carry
     }
 
@@ -457,7 +483,7 @@ impl Cpu {
     }
 
     #[inline(always)]
-    pub fn get_carry(&self) -> bool {
+    pub fn carry(&self) -> bool {
         self.carry
     }
 
