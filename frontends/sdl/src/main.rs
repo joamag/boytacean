@@ -7,7 +7,7 @@ pub mod graphics;
 use audio::Audio;
 use boytacean::{
     devices::printer::PrinterDevice,
-    gb::{AudioProvider, GameBoyMode, GameBoy},
+    gb::{AudioProvider, GameBoy, GameBoyMode},
     pad::PadKey,
     ppu::{PaletteInfo, PpuMode, DISPLAY_HEIGHT, DISPLAY_WIDTH},
 };
@@ -206,8 +206,8 @@ impl Emulator {
         let frequency_mhz = cycles as f32 / delta / 1000.0 / 1000.0;
 
         println!(
-            "Took {:.2} seconds to run {} ticks ({:.2} Mhz)!",
-            delta, count, frequency_mhz
+            "Took {:.2} seconds to run {} ticks ({} cycles) ({:.2} Mhz)!",
+            delta, count, cycles, frequency_mhz
         );
     }
 
