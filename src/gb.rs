@@ -143,18 +143,28 @@ pub struct GameBoy {
     /// The current running mode of the emulator, this
     /// may affect many aspects of the emulation, like
     /// CPU frequency, PPU frequency, Boot rome size, etc.
+    /// This is a clone of the configuration value
+    /// kept for performance reasons.
     mode: GameBoyMode,
 
     /// If the PPU is enabled, it will be clocked.
+    /// This is a clone of the configuration value
+    /// kept for performance reasons.
     ppu_enabled: bool,
 
     /// If the APU is enabled, it will be clocked.
+    /// This is a clone of the configuration value
+    /// kept for performance reasons.
     apu_enabled: bool,
 
     /// If the timer is enabled, it will be clocked.
+    /// This is a clone of the configuration value
+    /// kept for performance reasons.
     timer_enabled: bool,
 
     /// If the serial is enabled, it will be clocked.
+    /// This is a clone of the configuration value
+    /// kept for performance reasons.
     serial_enabled: bool,
 
     /// The current frequency at which the Game Boy
@@ -163,6 +173,8 @@ pub struct GameBoy {
     /// logic to match the current frequency. For example
     /// the APU will adjust its internal clock to match
     /// this hint.
+    /// This is a clone of the configuration value
+    /// kept for performance reasons.
     clock_freq: u32,
 
     /// Reference to the Game Boy CPU component to be
@@ -171,6 +183,12 @@ pub struct GameBoy {
     /// used as reference or the rest of the components.
     cpu: Cpu,
 
+    /// Rhe reference counted and mutable reference to
+    /// Game Boy configuration structure that can be
+    /// used by the GB components to access global
+    /// configuration values on the current emulator.
+    /// If performance is required (may value access)
+    /// the values should be cloned and stored locally.
     gbc: Rc<RefCell<GameBoyConfig>>,
 }
 
