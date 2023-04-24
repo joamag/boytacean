@@ -90,7 +90,7 @@ impl Mmu {
             ram_bank: 0x1,
             ram_offset: 0x1000,
             ie: 0x0,
-            gbc: gbc,
+            gbc,
         }
     }
 

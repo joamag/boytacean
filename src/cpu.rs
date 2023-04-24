@@ -67,7 +67,7 @@ impl Cpu {
             halted: false,
             mmu,
             cycles: 0,
-            gbc: gbc,
+            gbc,
         }
     }
 
