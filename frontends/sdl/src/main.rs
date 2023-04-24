@@ -7,7 +7,7 @@ pub mod graphics;
 use audio::Audio;
 use boytacean::{
     devices::printer::PrinterDevice,
-    gb::{AudioProvider, GameBoy},
+    gb::{AudioProvider, GBMode, GameBoy},
     pad::PadKey,
     ppu::{PaletteInfo, PpuMode, DISPLAY_HEIGHT, DISPLAY_WIDTH},
 };
@@ -186,7 +186,7 @@ impl Emulator {
 
     pub fn reset(&mut self) {
         self.system.reset();
-        self.system.load_boot_default();
+        self.system.load(true);
         self.load_rom(None);
     }
 
@@ -317,7 +317,7 @@ impl Emulator {
                     }
                     Event::DropFile { filename, .. } => {
                         self.system.reset();
-                        self.system.load_boot_cgb();
+                        self.system.load(true);
                         self.load_rom(Some(&filename));
                     }
                     _ => (),
@@ -446,7 +446,7 @@ impl Emulator {
 fn main() {
     // creates a new Game Boy instance and loads both the boot ROM
     // and the initial game ROM to "start the engine"
-    let mut game_boy = GameBoy::new();
+    let mut game_boy = GameBoy::new(GBMode::Cgb);
     let mut printer = Box::<PrinterDevice>::default();
     printer.set_callback(|image_buffer| {
         let file_name = format!("printer-{}.png", Utc::now().format("%Y%m%d-%H%M%S"));
@@ -460,7 +460,7 @@ fn main() {
         .unwrap();
     });
     game_boy.attach_serial(printer);
-    game_boy.load_boot_cgb();
+    game_boy.load(true);
 
     // creates a new generic emulator structure then starts
     // both the video and audio sub-systems, loads default

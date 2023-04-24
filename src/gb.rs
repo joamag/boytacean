@@ -30,11 +30,24 @@ use std::{
     panic::{set_hook, take_hook, PanicInfo},
 };
 
+/// Enumeration that describes the multiple running
+// modes of the Game Boy emulator.
+pub enum GBMode {
+    Dmg = 1,
+    Cgb = 2,
+    Sgb = 3,
+}
+
 /// Top level structure that abstracts the usage of the
 /// Game Boy system under the Boytacean emulator.
 /// Should serve as the main entry-point API.
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 pub struct GameBoy {
+    /// The current running mode of the emulator, this
+    /// may affect many aspects of the emulation, like
+    /// CPU frequency, PPU frequency, Boot rome size, etc.
+    mode: GBMode,
+
     /// Reference to the Game Boy CPU component to be
     /// used as the main element of the system, when
     /// clocked, the amount of ticks from it will be
@@ -90,7 +103,7 @@ pub trait AudioProvider {
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 impl GameBoy {
     #[cfg_attr(feature = "wasm", wasm_bindgen(constructor))]
-    pub fn new() -> Self {
+    pub fn new(mode: GBMode) -> Self {
         let ppu = Ppu::default();
         let apu = Apu::default();
         let pad = Pad::default();
@@ -99,6 +112,7 @@ impl GameBoy {
         let mmu = Mmu::new(ppu, apu, pad, timer, serial);
         let cpu = Cpu::new(mmu);
         Self {
+            mode,
             cpu,
             ppu_enabled: true,
             apu_enabled: true,
@@ -178,10 +192,11 @@ impl GameBoy {
         self.cpu.boot();
     }
 
-    pub fn load_default(&mut self, boot: bool) {
-        self.mmu().allocate_default();
-        if boot {
-            self.load_boot_default();
+    pub fn load(&mut self, boot: bool) {
+        match self.mode {
+            GBMode::Dmg => self.load_dmg(boot),
+            GBMode::Cgb => self.load_cgb(boot),
+            GBMode::Sgb => todo!(),
         }
     }
 
@@ -601,6 +616,6 @@ impl AudioProvider for GameBoy {
 
 impl Default for GameBoy {
     fn default() -> Self {
-        Self::new()
+        Self::new(GBMode::Dmg)
     }
 }
