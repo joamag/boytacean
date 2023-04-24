@@ -74,77 +74,62 @@ pub struct GameBoyConfig {
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 impl GameBoyConfig {
-    #[inline(always)]
     pub fn is_dmg(&self) -> bool {
         self.mode == GameBoyMode::Dmg
     }
 
-    #[inline(always)]
     pub fn is_cgb(&self) -> bool {
         self.mode == GameBoyMode::Cgb
     }
 
-    #[inline(always)]
     pub fn is_sgb(&self) -> bool {
         self.mode == GameBoyMode::Sgb
     }
 
-    #[inline(always)]
     pub fn mode(&self) -> GameBoyMode {
         self.mode
     }
 
-    #[inline(always)]
     pub fn set_mode(&mut self, value: GameBoyMode) {
         self.mode = value;
     }
 
-    #[inline(always)]
     pub fn ppu_enabled(&self) -> bool {
         self.ppu_enabled
     }
 
-    #[inline(always)]
     pub fn set_ppu_enabled(&mut self, value: bool) {
         self.ppu_enabled = value;
     }
 
-    #[inline(always)]
     pub fn apu_enabled(&self) -> bool {
         self.apu_enabled
     }
 
-    #[inline(always)]
     pub fn set_apu_enabled(&mut self, value: bool) {
         self.apu_enabled = value;
     }
 
-    #[inline(always)]
     pub fn timer_enabled(&self) -> bool {
         self.timer_enabled
     }
 
-    #[inline(always)]
     pub fn set_timer_enabled(&mut self, value: bool) {
         self.timer_enabled = value;
     }
 
-    #[inline(always)]
     pub fn serial_enabled(&self) -> bool {
         self.serial_enabled
     }
 
-    #[inline(always)]
     pub fn set_serial_enabled(&mut self, value: bool) {
         self.serial_enabled = value;
     }
 
-    #[inline(always)]
     pub fn clock_freq(&self) -> u32 {
         self.clock_freq
     }
 
-    #[inline(always)]
     pub fn set_clock_freq(&mut self, value: u32) {
         self.clock_freq = value;
     }

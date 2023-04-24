@@ -3119,13 +3119,11 @@ fn set_7_a(cpu: &mut Cpu) {
 }
 
 /// Helper function to set one bit in a u8.
-#[inline(always)]
 fn set(value: u8, bit: u8) -> u8 {
     value | (1u8 << (bit as usize))
 }
 
 /// Helper function to clear one bit in a u8.
-#[inline(always)]
 fn res(value: u8, bit: u8) -> u8 {
     value & !(1u8 << (bit as usize))
 }
@@ -3133,7 +3131,6 @@ fn res(value: u8, bit: u8) -> u8 {
 /// Helper function that rotates (shifts) left the given
 /// byte (probably from a register) and updates the
 /// proper flag registers.
-#[inline(always)]
 fn rl(cpu: &mut Cpu, value: u8) -> u8 {
     let carry = cpu.carry();
 
@@ -3148,7 +3145,6 @@ fn rl(cpu: &mut Cpu, value: u8) -> u8 {
     result
 }
 
-#[inline(always)]
 fn rlc(cpu: &mut Cpu, value: u8) -> u8 {
     cpu.set_carry((value & 0x80) == 0x80);
 
@@ -3164,7 +3160,6 @@ fn rlc(cpu: &mut Cpu, value: u8) -> u8 {
 /// Helper function that rotates (shifts) right the given
 /// byte (probably from a register) and updates the
 /// proper flag registers.
-#[inline(always)]
 fn rr(cpu: &mut Cpu, value: u8) -> u8 {
     let carry = cpu.carry();
 
@@ -3179,7 +3174,6 @@ fn rr(cpu: &mut Cpu, value: u8) -> u8 {
     result
 }
 
-#[inline(always)]
 fn rrc(cpu: &mut Cpu, value: u8) -> u8 {
     cpu.set_carry((value & 0x1) == 0x1);
 
@@ -3194,61 +3188,53 @@ fn rrc(cpu: &mut Cpu, value: u8) -> u8 {
 
 /// Helper function to test one bit in a u8.
 /// Returns true if bit is 0.
-#[inline(always)]
 fn bit_zero(val: u8, bit: u8) -> bool {
     (val & (1u8 << (bit as usize))) == 0
 }
 
-#[inline(always)]
 fn bit_a(cpu: &mut Cpu, bit: u8) {
     cpu.set_sub(false);
     cpu.set_zero(bit_zero(cpu.a, bit));
     cpu.set_half_carry(true);
 }
 
-#[inline(always)]
 fn bit_b(cpu: &mut Cpu, bit: u8) {
     cpu.set_sub(false);
     cpu.set_zero(bit_zero(cpu.b, bit));
     cpu.set_half_carry(true);
 }
 
-#[inline(always)]
 fn bit_c(cpu: &mut Cpu, bit: u8) {
     cpu.set_sub(false);
     cpu.set_zero(bit_zero(cpu.c, bit));
     cpu.set_half_carry(true);
 }
 
-#[inline(always)]
 fn bit_d(cpu: &mut Cpu, bit: u8) {
     cpu.set_sub(false);
     cpu.set_zero(bit_zero(cpu.d, bit));
     cpu.set_half_carry(true);
 }
 
-#[inline(always)]
+
 fn bit_e(cpu: &mut Cpu, bit: u8) {
     cpu.set_sub(false);
     cpu.set_zero(bit_zero(cpu.e, bit));
     cpu.set_half_carry(true);
 }
 
-#[inline(always)]
 fn bit_h(cpu: &mut Cpu, bit: u8) {
     cpu.set_sub(false);
     cpu.set_zero(bit_zero(cpu.h, bit));
     cpu.set_half_carry(true);
 }
 
-#[inline(always)]
 fn bit_l(cpu: &mut Cpu, bit: u8) {
     cpu.set_sub(false);
     cpu.set_zero(bit_zero(cpu.l, bit));
     cpu.set_half_carry(true);
 }
 
-#[inline(always)]
 fn bit_mhl(cpu: &mut Cpu, bit: u8) {
     let byte = cpu.mmu.read(cpu.hl());
     cpu.set_sub(false);
@@ -3256,7 +3242,6 @@ fn bit_mhl(cpu: &mut Cpu, bit: u8) {
     cpu.set_half_carry(true);
 }
 
-#[inline(always)]
 fn add_set_flags(cpu: &mut Cpu, first: u8, second: u8) -> u8 {
     let first = first as u32;
     let second = second as u32;
@@ -3272,7 +3257,6 @@ fn add_set_flags(cpu: &mut Cpu, first: u8, second: u8) -> u8 {
     result_b
 }
 
-#[inline(always)]
 fn add_carry_set_flags(cpu: &mut Cpu, first: u8, second: u8) -> u8 {
     let first = first as u32;
     let second = second as u32;
@@ -3289,7 +3273,6 @@ fn add_carry_set_flags(cpu: &mut Cpu, first: u8, second: u8) -> u8 {
     result_b
 }
 
-#[inline(always)]
 fn sub_set_flags(cpu: &mut Cpu, first: u8, second: u8) -> u8 {
     let first = first as u32;
     let second = second as u32;
@@ -3305,7 +3288,6 @@ fn sub_set_flags(cpu: &mut Cpu, first: u8, second: u8) -> u8 {
     result_b
 }
 
-#[inline(always)]
 fn sub_carry_set_flags(cpu: &mut Cpu, first: u8, second: u8) -> u8 {
     let first = first as u32;
     let second = second as u32;
@@ -3322,7 +3304,6 @@ fn sub_carry_set_flags(cpu: &mut Cpu, first: u8, second: u8) -> u8 {
     result_b
 }
 
-#[inline(always)]
 fn add_u16_u16(cpu: &mut Cpu, first: u16, second: u16) -> u16 {
     let first = first as u32;
     let second = second as u32;
@@ -3335,7 +3316,6 @@ fn add_u16_u16(cpu: &mut Cpu, first: u16, second: u16) -> u16 {
     result as u16
 }
 
-#[inline(always)]
 fn swap(cpu: &mut Cpu, value: u8) -> u8 {
     cpu.set_sub(false);
     cpu.set_zero(value == 0);
@@ -3347,7 +3327,6 @@ fn swap(cpu: &mut Cpu, value: u8) -> u8 {
 
 /// Helper function to shift an `u8` to the left and update CPU
 /// flags.
-#[inline(always)]
 fn sla(cpu: &mut Cpu, value: u8) -> u8 {
     let result = value << 1;
 
@@ -3359,7 +3338,6 @@ fn sla(cpu: &mut Cpu, value: u8) -> u8 {
     result
 }
 
-#[inline(always)]
 fn sra(cpu: &mut Cpu, value: u8) -> u8 {
     let result = (value >> 1) | (value & 0x80);
 
@@ -3371,7 +3349,6 @@ fn sra(cpu: &mut Cpu, value: u8) -> u8 {
     result
 }
 
-#[inline(always)]
 fn srl(cpu: &mut Cpu, value: u8) -> u8 {
     let result = value >> 1;
 
@@ -3386,7 +3363,6 @@ fn srl(cpu: &mut Cpu, value: u8) -> u8 {
 /// Helper function for RST instructions, pushes the
 /// current PC to the stack and jumps to the provided
 /// address.
-#[inline(always)]
 fn rst(cpu: &mut Cpu, addr: u16) {
     cpu.push_word(cpu.pc);
     cpu.pc = addr;
