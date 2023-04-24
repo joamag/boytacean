@@ -3216,7 +3216,6 @@ fn bit_d(cpu: &mut Cpu, bit: u8) {
     cpu.set_half_carry(true);
 }
 
-
 fn bit_e(cpu: &mut Cpu, bit: u8) {
     cpu.set_sub(false);
     cpu.set_zero(bit_zero(cpu.e, bit));
