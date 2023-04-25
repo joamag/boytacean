@@ -280,7 +280,12 @@ impl Cpu {
         }
 
         #[cfg(feature = "cpulog")]
-        println!("[0x{:04x}] {}\t({} cycles)", self.pc - 1, inst_str, inst_time);
+        println!(
+            "[0x{:04x}] {}\t({} cycles)",
+            self.pc - 1,
+            inst_str,
+            inst_time
+        );
 
         #[cfg(feature = "secure")]
         if self.mmu.boot_active() && self.pc - 1 > 0x08ff {
