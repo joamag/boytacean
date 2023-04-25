@@ -10,7 +10,7 @@ edition = "2018"
 [features]
 slow = []
 debug = ["boytacean/debug"]
-secure = ["boytacean/secure"]
+pedantic = ["boytacean/pedantic"]
 cpulog = ["boytacean/cpulog"]
 
 [dependencies.boytacean]

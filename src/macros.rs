@@ -17,6 +17,17 @@ macro_rules! debugln {
     };
 }
 
+#[cfg(feature = "pedantic")]
+#[macro_export]
+macro_rules! warnln {
+    ($($rest:tt)*) => {
+        {
+            panic!($($rest)*);
+        }
+    }
+}
+
+#[cfg(not(feature = "pedantic"))]
 #[macro_export]
 macro_rules! warnln {
     ($($rest:tt)*) => {

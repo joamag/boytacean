@@ -264,8 +264,10 @@ impl Cpu {
             inst = &INSTRUCTIONS[opcode as usize];
         }
 
+        #[allow(unused_variables)]
         let (inst_fn, inst_time, inst_str) = inst;
 
+        #[cfg(feature = "cpulog")]
         if *inst_str == "! UNIMP !" || *inst_str == "HALT" {
             if *inst_str == "HALT" {
                 debugln!("HALT with IE=0x{:02x} IME={}", self.mmu.ie, self.ime);
@@ -291,7 +293,7 @@ impl Cpu {
             );
         }
 
-        #[cfg(feature = "secure")]
+        #[cfg(feature = "pedantic")]
         if self.mmu.boot_active() && self.pc - 1 > 0x08ff {
             panic!("Invalid boot address: {:04x}", self.pc - 1);
         }
