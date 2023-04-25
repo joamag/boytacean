@@ -277,8 +277,11 @@ impl Mmu {
             // External RAM (8 KB)
             0xa000 | 0xb000 => self.rom.write(addr, value),
 
-            // Working RAM (8 KB)
-            0xc000 | 0xd000 => self.ram[(addr & 0x1fff) as usize] = value,
+            // Working RAM 0 (4 KB)
+            0xc000 => self.ram[(addr & 0x0fff) as usize] = value,
+
+            // Working RAM 1 (Banked) (4KB)
+            0xd000 => self.ram[(self.ram_offset + (addr & 0x0fff)) as usize] = value,
 
             // Working RAM Shadow
             0xe000 => self.ram[(addr & 0x1fff) as usize] = value,
