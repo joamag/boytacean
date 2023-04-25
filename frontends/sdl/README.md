@@ -32,8 +32,9 @@ cargo run --features debug
 
 ## Features
 
-| Provider | Description                                                                 |
-| -------- | --------------------------------------------------------------------------- |
-| `debug`  | Activates the base `debug` feature from Boytacean.                          |
-| `slow`   | Runs the emulator at a very slow page 60x slower to allow visual debugging. |
-| `cpulog` | Prints a log of the CPU instruction executed.                               |
+| Provider | Description                                                                                       |
+| -------- | ------------------------------------------------------------------------------------------------- |
+| `debug`  | Activates the base `debug` feature from Boytacean.                                                |
+| `secure` | Additional safety instructions are executed to make sure the machine does no run "out of tracks". |
+| `slow`   | Runs the emulator at a very slow page 60x slower to allow visual debugging.                       |
+| `cpulog` | Prints a log of the CPU instruction executed.                                                     |

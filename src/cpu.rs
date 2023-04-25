@@ -280,7 +280,12 @@ impl Cpu {
         }
 
         #[cfg(feature = "cpulog")]
-        println!("[0x{:04x}] {}", self.pc - 1, inst_str);
+        println!("[0x{:04x}] {}\t({} cycles)", self.pc - 1, inst_str, inst_time);
+
+        #[cfg(feature = "secure")]
+        if self.mmu.boot_active() && self.pc - 1 > 0x08ff {
+            panic!("Invalid boot address: {:04x}", self.pc - 1);
+        }
 
         // calls the current instruction and increments the number of
         // cycles executed by the instruction time of the instruction
