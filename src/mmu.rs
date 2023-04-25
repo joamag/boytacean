@@ -180,7 +180,7 @@ impl Mmu {
                     && addr >= 0x0200
                     && addr <= 0x08ff
                 {
-                    return self.boot[(addr - 0x0100) as usize];
+                    return self.boot[addr as usize];
                 }
                 self.rom.read(addr)
             }
