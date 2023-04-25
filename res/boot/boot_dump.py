@@ -8,7 +8,7 @@ def print_buffer(filename):
     try: data = file.read()
     finally: file.close()
 
-    buffer = [str(byte) for byte in data]
+    buffer = [str(ord(byte)) for byte in data]
     buffer_s = ", ".join(buffer)
 
     print("[%s]" % buffer_s)
