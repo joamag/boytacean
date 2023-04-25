@@ -66,7 +66,7 @@ pub struct Mmu {
     ram: Vec<u8>,
 
     /// The RAM bank to be used in the read and write operation of
-    /// the 0xD000-0xDFFF memory range (CGB Only).
+    /// the 0xD000-0xDFFF memory range (CGB only).
     ram_bank: u8,
 
     ram_offset: u16,
@@ -309,7 +309,7 @@ impl Mmu {
                     // 0xFF50 - Boot active flag
                     0x50 => self.boot_active = false,
 
-                    // 0xFF70 - SVBK: WRAM bank (CGB Mode only)
+                    // 0xFF70 - SVBK: WRAM bank (CGB only)
                     0x70 => {
                         let mut ram_bank = value & 0x7;
                         if ram_bank == 0x0 {

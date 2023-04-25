@@ -227,6 +227,14 @@ pub struct Ppu {
     /// The palette that is going to be used for sprites/objects #1.
     palette_obj_1: Palette,
 
+    /// The complete set of background palettes that are going to be
+    /// used in CGB emulation to provide the full set of colors.
+    palettes_color_bg: [Palette; 8],
+
+    /// The complete set of object/sprite palettes that are going to be
+    /// used in CGB emulation to provide the full set of colors.
+    palettes_color_obj: [Palette; 8],
+
     /// The complete set of palettes in binary data so that they can
     /// be re-read if required by the system.
     palettes: [u8; 3],
@@ -293,12 +301,26 @@ pub struct Ppu {
     /// content.
     switch_lcd: bool,
 
-    // Internal window counter value used to control the ines that
+    // Internal window counter value used to control the lines that
     // were effectively rendered as part of the window tile drawing process.
     // A line is only considered rendered when the WX and WY registers
     // are within the valid screen range and the window switch register
     // is valid.
     window_counter: u8,
+
+    /// If the auto increment of the background color palette is enabled
+    /// so that the next address is going to be set on every write.
+    auto_increment_bg: bool,
+
+    /// The current address in usage for the background color palettes.
+    palette_address_bg: u8,
+
+    /// If the auto increment of the object/sprite color palette is enabled
+    /// so that the next address is going to be set on every write.
+    auto_increment_obj: bool,
+
+    /// The current address in usage for the object/sprite color palettes.
+    palette_address_obj: u8,
 
     /// Flag that controls if the frame currently in rendering is the
     /// first one, preventing actions.
@@ -355,6 +377,8 @@ impl Ppu {
             palette: [[0u8; RGB_SIZE]; PALETTE_SIZE],
             palette_obj_0: [[0u8; RGB_SIZE]; PALETTE_SIZE],
             palette_obj_1: [[0u8; RGB_SIZE]; PALETTE_SIZE],
+            palettes_color_bg: [[[0u8; RGB_SIZE]; PALETTE_SIZE]; 8],
+            palettes_color_obj: [[[0u8; RGB_SIZE]; PALETTE_SIZE]; 8],
             palettes: [0u8; 3],
             scy: 0x0,
             scx: 0x0,
@@ -373,6 +397,10 @@ impl Ppu {
             window_map: false,
             switch_lcd: false,
             window_counter: 0x0,
+            auto_increment_bg: false,
+            palette_address_bg: 0x0,
+            auto_increment_obj: false,
+            palette_address_obj: 0x0,
             first_frame: false,
             frame_index: 0,
             stat_hblank: false,
@@ -393,6 +421,8 @@ impl Ppu {
         self.palette = [[0u8; RGB_SIZE]; PALETTE_SIZE];
         self.palette_obj_0 = [[0u8; RGB_SIZE]; PALETTE_SIZE];
         self.palette_obj_1 = [[0u8; RGB_SIZE]; PALETTE_SIZE];
+        self.palettes_color_bg = [[[0u8; RGB_SIZE]; PALETTE_SIZE]; 8];
+        self.palettes_color_obj = [[[0u8; RGB_SIZE]; PALETTE_SIZE]; 8];
         self.palettes = [0u8; 3];
         self.scy = 0x0;
         self.scx = 0x0;
@@ -408,6 +438,11 @@ impl Ppu {
         self.switch_window = false;
         self.window_map = false;
         self.switch_lcd = false;
+        self.window_counter = 0;
+        self.auto_increment_bg = false;
+        self.palette_address_bg = 0x0;
+        self.auto_increment_obj = false;
+        self.palette_address_obj = 0x0;
         self.first_frame = false;
         self.frame_index = 0;
         self.stat_hblank = false;
@@ -537,6 +572,8 @@ impl Ppu {
             0xff4b => self.wx,
             // 0xFF4F — VBK (CGB only)
             0xff4f => 0xff,
+            // 0xFF68 — BCPS/BGPI (CGB only)
+            0xff68 => self.palette_address_bg | if self.auto_increment_bg { 0x80 } else { 0x00 },
             _ => {
                 warnln!("Reading from unknown PPU location 0x{:04x}", addr);
                 0xff
@@ -605,6 +642,11 @@ impl Ppu {
             0xff4b => self.wx = value,
             // 0xFF4F — VBK (CGB only)
             0xff4f => (),
+            // 0xFF68 — BCPS/BGPI (CGB only)
+            0xff68 => {
+                self.palette_address_bg = value & 0x3f;
+                self.auto_increment_bg = value & 0x80 == 0x80;
+            }
             0xff7f => (),
             _ => warnln!("Writing in unknown PPU location 0x{:04x}", addr),
         }

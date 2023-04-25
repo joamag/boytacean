@@ -13,7 +13,12 @@ use crate::{
     util::read_file,
 };
 
-use std::{cell::RefCell, collections::VecDeque, rc::Rc};
+use std::{
+    cell::RefCell,
+    collections::VecDeque,
+    fmt::{self, Display, Formatter},
+    rc::Rc,
+};
 
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
@@ -41,6 +46,22 @@ pub enum GameBoyMode {
     Dmg = 1,
     Cgb = 2,
     Sgb = 3,
+}
+
+impl GameBoyMode {
+    pub fn description(&self) -> &'static str {
+        match self {
+            GameBoyMode::Dmg => "Game Boy (DMG)",
+            GameBoyMode::Cgb => "Game Boy Color (CGB)",
+            GameBoyMode::Sgb => "Super Game Boy (SGB)",
+        }
+    }
+}
+
+impl Display for GameBoyMode {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.description())
+    }
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
