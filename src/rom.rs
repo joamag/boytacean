@@ -601,6 +601,8 @@ pub static MBC1: Mbc = Mbc {
     },
     write_ram: |rom: &mut Cartridge, addr: u16, value: u8| {
         if !rom.ram_enabled {
+            #[cfg(feature = "secure")]
+            panic!("Attempt to write to ERAM while write protect is active");
             debugln!("Attempt to write to ERAM while write protect is active");
             return;
         }
@@ -657,6 +659,8 @@ pub static MBC3: Mbc = Mbc {
     },
     write_ram: |rom: &mut Cartridge, addr: u16, value: u8| {
         if !rom.ram_enabled {
+            #[cfg(feature = "secure")]
+            panic!("Attempt to write to ERAM while write protect is active");
             debugln!("Attempt to write to ERAM while write protect is active");
             return;
         }
@@ -709,6 +713,8 @@ pub static MBC5: Mbc = Mbc {
     },
     write_ram: |rom: &mut Cartridge, addr: u16, value: u8| {
         if !rom.ram_enabled {
+            #[cfg(feature = "secure")]
+            panic!("Attempt to write to ERAM while write protect is active");
             debugln!("Attempt to write to ERAM while write protect is active");
             return;
         }
