@@ -239,6 +239,10 @@ pub struct Ppu {
     /// be re-read if required by the system.
     palettes: [u8; 3],
 
+    /// The raw byte information (64 bytes) for the color palettes,
+    /// both the background and the objects one.
+    palettes_color: [[u8; 64]; 2],
+
     /// The scroll Y register that controls the Y offset
     /// of the background.
     scy: u8,
@@ -380,6 +384,7 @@ impl Ppu {
             palettes_color_bg: [[[0u8; RGB_SIZE]; PALETTE_SIZE]; 8],
             palettes_color_obj: [[[0u8; RGB_SIZE]; PALETTE_SIZE]; 8],
             palettes: [0u8; 3],
+            palettes_color: [[0u8; 64]; 2],
             scy: 0x0,
             scx: 0x0,
             wy: 0x0,
@@ -424,6 +429,7 @@ impl Ppu {
         self.palettes_color_bg = [[[0u8; RGB_SIZE]; PALETTE_SIZE]; 8];
         self.palettes_color_obj = [[[0u8; RGB_SIZE]; PALETTE_SIZE]; 8];
         self.palettes = [0u8; 3];
+        self.palettes_color = [[0u8; 64]; 2];
         self.scy = 0x0;
         self.scx = 0x0;
         self.ly = 0x0;
@@ -574,6 +580,12 @@ impl Ppu {
             0xff4f => 0xff,
             // 0xFF68 — BCPS/BGPI (CGB only)
             0xff68 => self.palette_address_bg | if self.auto_increment_bg { 0x80 } else { 0x00 },
+            // 0xFF69 — BCPD/BGPD (CGB only)
+            0xff69 => self.palettes_color[0][self.palette_address_bg as usize],
+            // 0xFF6A — OCPS/OBPI (CGB only)
+            0xff6A => self.palette_address_obj | if self.auto_increment_obj { 0x80 } else { 0x00 },
+            // 0xFF6B — OCPD/OBPD (CGB only)
+            0xff6b => self.palettes_color[1][self.palette_address_obj as usize],
             _ => {
                 warnln!("Reading from unknown PPU location 0x{:04x}", addr);
                 0xff
@@ -646,6 +658,29 @@ impl Ppu {
             0xff68 => {
                 self.palette_address_bg = value & 0x3f;
                 self.auto_increment_bg = value & 0x80 == 0x80;
+            }
+            // 0xFF69 — BCPD/BGPD (CGB only)
+            0xff69 => {
+                self.palettes_color[0][self.palette_address_bg as usize] = value;
+                //@TODO: update palette background data accordingly for the give update
+                // index - should not be a problem
+                if self.auto_increment_bg {
+                    self.palette_address_bg = (self.palette_address_bg + 1) & 0x3f;
+                }
+            }
+            // 0xFF6A — OCPS/OBPI (CGB only)
+            0xff6a => {
+                self.palette_address_obj = value & 0x3f;
+                self.auto_increment_obj = value & 0x80 == 0x80;
+            }
+            // 0xFF6B — OCPD/OBPD (CGB only)
+            0xff6b => {
+                self.palettes_color[1][self.palette_address_obj as usize] = value;
+                //@TODO: update palette object data accordingly for the give update
+                // index - should not be a problem
+                if self.auto_increment_obj {
+                    self.palette_address_obj = (self.palette_address_obj + 1) & 0x3f;
+                }
             }
             0xff7f => (),
             _ => warnln!("Writing in unknown PPU location 0x{:04x}", addr),
