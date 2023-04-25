@@ -281,16 +281,14 @@ impl Cpu {
 
         #[cfg(feature = "cpulog")]
         {
+            let title_str = format!("[0x{:04x}] {}", self.pc - 1, inst_str);
+            let inst_time_str = format!("({} cycles)", inst_time);
+            let registers_str = format!("[PC=0x{:04x} SP=0x{:04x}] [A=0x{:02x} B=0x{:02x} C=0x{:02x} D=0x{:02x} E=0x{:02x} H=0x{:02x} L=0x{:02x}]",
+            self.pc, self.sp, self.a, self.b, self.c, self.d, self.e, self.h, self.l);
             println!(
-                "[0x{:04x}] {}\t({} cycles)",
-                self.pc - 1,
-                inst_str,
-                inst_time
+                "{0: <24} {1: <11} {2: <10}",
+                title_str, inst_time_str, registers_str
             );
-            println!(
-                "[A=0x{:02x} B=0x{:02x} H=0x{:02x} L=0x{:02x}]",
-                self.a, self.b, self.h, self.l
-            )
         }
 
         #[cfg(feature = "secure")]
