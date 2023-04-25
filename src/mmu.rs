@@ -1,7 +1,13 @@
 use std::{cell::RefCell, rc::Rc};
 
 use crate::{
-    apu::Apu, debugln, gb::GameBoyConfig, pad::Pad, ppu::Ppu, rom::Cartridge, serial::Serial,
+    apu::Apu,
+    debugln,
+    gb::{GameBoyConfig, GameBoyMode},
+    pad::Pad,
+    ppu::Ppu,
+    rom::Cartridge,
+    serial::Serial,
     timer::Timer,
 };
 
@@ -65,6 +71,8 @@ pub struct Mmu {
 
     ram_offset: u16,
 
+    mode: GameBoyMode,
+
     gbc: Rc<RefCell<GameBoyConfig>>,
 }
 
@@ -75,6 +83,7 @@ impl Mmu {
         pad: Pad,
         timer: Timer,
         serial: Serial,
+        mode: GameBoyMode,
         gbc: Rc<RefCell<GameBoyConfig>>,
     ) -> Self {
         Self {
@@ -90,6 +99,7 @@ impl Mmu {
             ram_bank: 0x1,
             ram_offset: 0x1000,
             ie: 0x0,
+            mode,
             gbc,
         }
     }
@@ -164,6 +174,13 @@ impl Mmu {
                         self.boot_active = false;
                     }
                     return self.boot[addr as usize];
+                }
+                if self.boot_active
+                    && self.mode == GameBoyMode::Cgb
+                    && addr >= 0x0200
+                    && addr <= 0x08ff
+                {
+                    return self.boot[(addr - 0x0100) as usize];
                 }
                 self.rom.read(addr)
             }
@@ -380,5 +397,13 @@ impl Mmu {
 
     pub fn set_rom(&mut self, rom: Cartridge) {
         self.rom = rom;
+    }
+
+    pub fn mode(&self) -> GameBoyMode {
+        self.mode
+    }
+
+    pub fn set_mode(&mut self, value: GameBoyMode) {
+        self.mode = value;
     }
 }

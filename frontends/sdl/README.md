@@ -29,3 +29,11 @@ There are some feature flags that control the verbosity of the emulator to run i
 ```bash
 cargo run --features debug
 ```
+
+## Features
+
+| Provider | Description                                                                 |
+| -------- | --------------------------------------------------------------------------- |
+| `debug`  | Activates the base `debug` feature from Boytacean.                          |
+| `slow`   | Runs the emulator at a very slow page 60x slower to allow visual debugging. |
+| `cpulog` | Prints a log of the CPU instruction executed.                               |

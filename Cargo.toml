@@ -17,6 +17,7 @@ crate-type = ["cdylib", "rlib"]
 [features]
 wasm = ["wasm-bindgen"]
 debug = []
+cpulog = []
 gen-mock = []
 
 [dependencies]

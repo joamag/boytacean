@@ -279,6 +279,9 @@ impl Cpu {
             );
         }
 
+        #[cfg(feature = "cpulog")]
+        println!("[0x{:04x}] {}", self.pc - 1, inst_str);
+
         // calls the current instruction and increments the number of
         // cycles executed by the instruction time of the instruction
         // that has just been executed

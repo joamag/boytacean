@@ -8,7 +8,9 @@ keywords = ["gameboy", "emulator", "rust", "sdl"]
 edition = "2018"
 
 [features]
+slow = []
 debug = ["boytacean/debug"]
+cpulog = ["boytacean/cpulog"]
 
 [dependencies.boytacean]
 path = "../.."

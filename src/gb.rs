@@ -235,7 +235,7 @@ impl GameBoy {
         let pad = Pad::default();
         let timer = Timer::default();
         let serial = Serial::default();
-        let mmu = Mmu::new(ppu, apu, pad, timer, serial, gbc.clone());
+        let mmu = Mmu::new(ppu, apu, pad, timer, serial, mode, gbc.clone());
         let cpu = Cpu::new(mmu, gbc.clone());
 
         Self {
@@ -492,6 +492,7 @@ impl GameBoy {
     pub fn set_mode(&mut self, value: GameBoyMode) {
         self.mode = value;
         (*self.gbc).borrow_mut().set_mode(value);
+        self.mmu().set_mode(value);
     }
 
     pub fn ppu_enabled(&self) -> bool {

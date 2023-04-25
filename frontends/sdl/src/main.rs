@@ -143,13 +143,24 @@ impl Emulator {
     }
 
     pub fn start(&mut self, screen_scale: f32) {
+        self.start_base();
+
         let sdl = sdl2::init().unwrap();
+
         if self.features.contains(&"video") {
             self.start_graphics(&sdl, screen_scale);
         }
         if self.features.contains(&"audio") {
             self.start_audio(&sdl);
         }
+    }
+
+    #[cfg(not(feature = "slow"))]
+    pub fn start_base(&mut self) {}
+
+    #[cfg(feature = "slow")]
+    pub fn start_base(&mut self) {
+        self.logic_frequency = 100;
     }
 
     pub fn start_graphics(&mut self, sdl: &Sdl, screen_scale: f32) {
@@ -446,7 +457,7 @@ impl Emulator {
 fn main() {
     // creates a new Game Boy instance and loads both the boot ROM
     // and the initial game ROM to "start the engine"
-    let mut game_boy = GameBoy::new(GameBoyMode::Dmg);
+    let mut game_boy = GameBoy::new(GameBoyMode::Cgb);
     let mut printer = Box::<PrinterDevice>::default();
     printer.set_callback(|image_buffer| {
         let file_name = format!("printer-{}.png", Utc::now().format("%Y%m%d-%H%M%S"));
