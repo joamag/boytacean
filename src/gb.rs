@@ -56,6 +56,24 @@ impl GameBoyMode {
             GameBoyMode::Sgb => "Super Game Boy (SGB)",
         }
     }
+
+    pub fn from_u8(value: u8) -> GameBoyMode {
+        match value {
+            1 => GameBoyMode::Dmg,
+            2 => GameBoyMode::Cgb,
+            3 => GameBoyMode::Sgb,
+            _ => panic!("Invalid mode value: {}", value),
+        }
+    }
+
+    pub fn from_str(value: &str) -> GameBoyMode {
+        match value {
+            "dmg" => GameBoyMode::Dmg,
+            "cgb" => GameBoyMode::Cgb,
+            "sgb" => GameBoyMode::Sgb,
+            _ => panic!("Invalid mode value: {}", value),
+        }
+    }
 }
 
 impl Display for GameBoyMode {

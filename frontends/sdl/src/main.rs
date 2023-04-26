@@ -13,6 +13,7 @@ use boytacean::{
     ppu::{PaletteInfo, PpuMode, DISPLAY_HEIGHT, DISPLAY_WIDTH},
 };
 use chrono::Utc;
+use clap::Parser;
 use graphics::{surface_from_bytes, Graphics};
 use image::ColorType;
 use sdl2::{event::Event, keyboard::Keycode, pixels::PixelFormatEnum, Sdl};
@@ -455,8 +456,21 @@ impl Emulator {
     }
 }
 
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    #[arg(short, long, default_value_t = String::from("cgb"))]
+    mode: String,
+
+    #[arg(short, long, default_value_t = String::from("../../res/roms.prop/tetris_dx.gbc"))]
+    rom_path: String,
+}
+
 fn main() {
-    let mode = GameBoyMode::Cgb;
+    // parses the provided command line arguments and uses them to
+    // obtain structured values
+    let args = Args::parse();
+    let mode = GameBoyMode::from_str(&args.mode);
 
     // prints the current version of the emulator (informational message)
     println!("Boytacean v{} - {}", VERSION, mode);
@@ -484,7 +498,7 @@ fn main() {
     // ROM file and starts running it
     let mut emulator = Emulator::new(game_boy);
     emulator.start(SCREEN_SCALE);
-    emulator.load_rom(Some("../../res/roms.prop/tetris_dx.gbc"));
+    emulator.load_rom(Some(&args.rom_path));
     //emulator.load_rom(Some("../../res/roms/demo/pocket.gb"));
     emulator.toggle_palette();
     emulator.run();
