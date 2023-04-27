@@ -473,7 +473,13 @@ fn main() {
     let mode = GameBoyMode::from_str(&args.mode);
 
     // prints the current version of the emulator (informational message)
-    println!("Boytacean v{} - {}", VERSION, mode);
+    println!("========= Boytacean =========");
+    println!("Version    {}", VERSION);
+    println!("Mode       {}", mode);
+    println!("CPU Freq.  4.34 Mhz");
+    println!("RAM Size   32 KB");
+    println!("ROM Size   32 KB");
+    println!("VRAM Size  32 KB");
 
     // creates a new Game Boy instance and loads both the boot ROM
     // and the initial game ROM to "start the engine"

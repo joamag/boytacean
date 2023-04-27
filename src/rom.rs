@@ -510,7 +510,7 @@ impl Display for Cartridge {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "Name => {}\nType => {}\nROM Size => {}\nRAM Size => {}\nCGB Mode => {}",
+            "Name       {}\nType       {}\nROM Size   {}\nRAM Size   {}\nCGB Mode   {}",
             self.title(),
             self.rom_type(),
             self.rom_size(),
