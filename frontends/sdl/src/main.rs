@@ -6,10 +6,11 @@ pub mod graphics;
 
 use audio::Audio;
 use boytacean::{
-    devices::printer::PrinterDevice,
+    devices::{printer::PrinterDevice, stdout::StdoutDevice},
     gb::{AudioProvider, GameBoy, GameBoyMode},
     pad::PadKey,
     ppu::{PaletteInfo, PpuMode, DISPLAY_HEIGHT, DISPLAY_WIDTH},
+    serial::{NullDevice, SerialDevice},
 };
 use chrono::Utc;
 use clap::Parser;
@@ -461,6 +462,9 @@ struct Args {
     #[arg(short, long, default_value_t = String::from("cgb"))]
     mode: String,
 
+    #[arg(short, long, default_value_t = String::from("printer"))]
+    device: String,
+
     #[arg(short, long, default_value_t = String::from("../../res/roms.prop/tetris_dx.gbc"))]
     rom_path: String,
 }
@@ -469,24 +473,13 @@ fn main() {
     // parses the provided command line arguments and uses them to
     // obtain structured values
     let args = Args::parse();
-    let mode = GameBoyMode::from_str(&args.mode);
+    let mode: GameBoyMode = GameBoyMode::from_str(&args.mode);
 
     // creates a new Game Boy instance and loads both the boot ROM
     // and the initial game ROM to "start the engine"
     let mut game_boy = GameBoy::new(mode);
-    let mut printer = Box::<PrinterDevice>::default();
-    printer.set_callback(|image_buffer| {
-        let file_name = format!("printer-{}.png", Utc::now().format("%Y%m%d-%H%M%S"));
-        image::save_buffer(
-            Path::new(&file_name),
-            image_buffer,
-            160,
-            (image_buffer.len() / 4 / 160) as u32,
-            ColorType::Rgba8,
-        )
-        .unwrap();
-    });
-    game_boy.attach_serial(printer);
+    let device = build_device(&args.device);
+    game_boy.attach_serial(device);
     game_boy.load(true);
 
     // prints the current version of the emulator (informational message)
@@ -501,6 +494,29 @@ fn main() {
     //emulator.load_rom(Some("../../res/roms/demo/pocket.gb"));
     emulator.toggle_palette();
     emulator.run();
+}
+
+fn build_device(device: &str) -> Box<dyn SerialDevice> {
+    match device {
+        "null" => Box::<NullDevice>::default(),
+        "stdout" => Box::<StdoutDevice>::default(),
+        "printer" => {
+            let mut printer = Box::<PrinterDevice>::default();
+            printer.set_callback(|image_buffer| {
+                let file_name = format!("printer-{}.png", Utc::now().format("%Y%m%d-%H%M%S"));
+                image::save_buffer(
+                    Path::new(&file_name),
+                    image_buffer,
+                    160,
+                    (image_buffer.len() / 4 / 160) as u32,
+                    ColorType::Rgba8,
+                )
+                .unwrap();
+            });
+            printer
+        }
+        _ => panic!("Unsupported device: {}", device),
+    }
 }
 
 fn key_to_pad(keycode: Keycode) -> Option<PadKey> {

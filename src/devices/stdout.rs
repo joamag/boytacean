@@ -1,4 +1,7 @@
-use std::io::{stdout, Write};
+use std::{
+    fmt::{self, Display, Formatter},
+    io::{stdout, Write},
+};
 
 use crate::serial::SerialDevice;
 
@@ -37,10 +40,20 @@ impl SerialDevice for StdoutDevice {
     fn allow_slave(&self) -> bool {
         false
     }
+
+    fn description(&self) -> String {
+        String::from("Stdout")
+    }
 }
 
 impl Default for StdoutDevice {
     fn default() -> Self {
         Self::new(true)
+    }
+}
+
+impl Display for StdoutDevice {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "Stdout")
     }
 }

@@ -144,12 +144,24 @@ impl Mmu {
         &mut self.pad
     }
 
+    pub fn pad_i(&self) -> &Pad {
+        &self.pad
+    }
+
     pub fn timer(&mut self) -> &mut Timer {
         &mut self.timer
     }
 
+    pub fn timer_i(&self) -> &Timer {
+        &self.timer
+    }
+
     pub fn serial(&mut self) -> &mut Serial {
         &mut self.serial
+    }
+
+    pub fn serial_i(&self) -> &Serial {
+        &self.serial
     }
 
     pub fn boot_active(&self) -> bool {

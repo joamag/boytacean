@@ -1,6 +1,5 @@
 use core::fmt;
 use std::{
-    any::Any,
     cmp::max,
     fmt::{Display, Formatter},
 };

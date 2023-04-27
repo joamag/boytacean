@@ -341,13 +341,28 @@ impl Cpu {
     }
 
     #[inline(always)]
+    pub fn pad_i(&self) -> &Pad {
+        self.mmu_i().pad_i()
+    }
+
+    #[inline(always)]
     pub fn timer(&mut self) -> &mut Timer {
         self.mmu().timer()
     }
 
     #[inline(always)]
+    pub fn timer_i(&self) -> &Timer {
+        self.mmu_i().timer_i()
+    }
+
+    #[inline(always)]
     pub fn serial(&mut self) -> &mut Serial {
         self.mmu().serial()
+    }
+
+    #[inline(always)]
+    pub fn serial_i(&self) -> &Serial {
+        self.mmu_i().serial_i()
     }
 
     #[inline(always)]

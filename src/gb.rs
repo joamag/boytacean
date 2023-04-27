@@ -610,7 +610,7 @@ impl GameBoy {
 
     pub fn description(&self, column_length: usize) -> String {
         format!(
-            "{}  {}\n{}  {}\n{}  {}\n{}  {}",
+            "{}  {}\n{}  {}\n{}  {}\n{}  {}\n{}  {}",
             format!("{:width$}", "Version", width = column_length),
             VERSION,
             format!("{:width$}", "Mode", width = column_length),
@@ -619,6 +619,8 @@ impl GameBoy {
             self.ram_size(),
             format!("{:width$}", "VRAM Size", width = column_length),
             self.vram_size(),
+            format!("{:width$}", "Serial", width = column_length),
+            self.serial_i().device().description(),
         )
     }
 }
@@ -662,12 +664,24 @@ impl GameBoy {
         self.cpu.pad()
     }
 
+    pub fn pad_i(&self) -> &Pad {
+        self.cpu.pad_i()
+    }
+
     pub fn timer(&mut self) -> &mut Timer {
         self.cpu.timer()
     }
 
+    pub fn timer_i(&self) -> &Timer {
+        self.cpu.timer_i()
+    }
+
     pub fn serial(&mut self) -> &mut Serial {
         self.cpu.serial()
+    }
+
+    pub fn serial_i(&self) -> &Serial {
+        self.cpu.serial_i()
     }
 
     pub fn frame_buffer(&mut self) -> &[u8; FRAME_BUFFER_SIZE] {
