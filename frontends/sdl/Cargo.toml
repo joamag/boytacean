@@ -13,12 +13,12 @@ debug = ["boytacean/debug"]
 pedantic = ["boytacean/pedantic"]
 cpulog = ["boytacean/cpulog"]
 
+[dependencies.boytacean]
+path = "../.."
+
 [dependencies.clap]
 version = "4"
 features = ["derive"]
-
-[dependencies.boytacean]
-path = "../.."
 
 [dependencies.image]
 version = "0.24"
