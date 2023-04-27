@@ -22,6 +22,7 @@ pub struct Serial {
     timer: i16,
     length: u16,
     bit_count: u8,
+    byte_send: u8,
     byte_receive: u8,
     int_serial: bool,
     device: Box<dyn SerialDevice>,
@@ -38,6 +39,7 @@ impl Serial {
             timer: 0,
             length: 512,
             bit_count: 0,
+            byte_send: 0x0,
             byte_receive: 0x0,
             int_serial: false,
             device: Box::<NullDevice>::default(),
@@ -53,6 +55,7 @@ impl Serial {
         self.timer = 0;
         self.length = 512;
         self.bit_count = 0;
+        self.byte_send = 0x0;
         self.byte_receive = 0x0;
         self.int_serial = false;
     }
@@ -120,8 +123,10 @@ impl Serial {
                     // executes the send and receive operation immediately
                     // this is considered an operational optimization with
                     // no real effect on the emulation (ex: no timing issues)
+                    // then stores the byte to be sent to the device so that
+                    // it's sent by the end of the send cycle
                     self.byte_receive = self.device.send();
-                    self.device.receive(self.data);
+                    self.byte_send = self.data;
                 }
             }
             _ => warnln!("Writing to unknown Serial location 0x{:04x}", addr),
@@ -172,6 +177,10 @@ impl Serial {
             self.transferring = false;
             self.length = 0;
             self.bit_count = 0;
+
+            // received the byte on the device as the
+            // complete send operation has been performed
+            self.device.receive(self.byte_send);
 
             // signals the interrupt for the serial
             // transfer completion, indicating that
