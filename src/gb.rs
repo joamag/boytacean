@@ -3,11 +3,11 @@ use crate::{
     cpu::Cpu,
     data::{BootRom, CGB_BOOT, DMG_BOOT, DMG_BOOTIX, MGB_BOOTIX, SGB_BOOT},
     devices::{printer::PrinterDevice, stdout::StdoutDevice},
-    gen::{COMPILATION_DATE, COMPILATION_TIME, COMPILER, COMPILER_VERSION},
+    gen::{COMPILATION_DATE, COMPILATION_TIME, COMPILER, COMPILER_VERSION, VERSION},
     mmu::Mmu,
     pad::{Pad, PadKey},
     ppu::{Ppu, PpuMode, Tile, FRAME_BUFFER_SIZE},
-    rom::Cartridge,
+    rom::{Cartridge, RamSize},
     serial::{NullDevice, Serial, SerialDevice},
     timer::Timer,
     util::read_file,
@@ -591,6 +591,36 @@ impl GameBoy {
     pub fn attach_printer_serial(&mut self) {
         self.attach_serial(Box::<PrinterDevice>::default());
     }
+
+    pub fn ram_size(&self) -> RamSize {
+        match self.mode {
+            GameBoyMode::Dmg => RamSize::Size8K,
+            GameBoyMode::Cgb => RamSize::Size32K,
+            GameBoyMode::Sgb => RamSize::Size8K,
+        }
+    }
+
+    pub fn vram_size(&self) -> RamSize {
+        match self.mode {
+            GameBoyMode::Dmg => RamSize::Size8K,
+            GameBoyMode::Cgb => RamSize::Size16K,
+            GameBoyMode::Sgb => RamSize::Size8K,
+        }
+    }
+
+    pub fn description(&self, column_length: usize) -> String {
+        format!(
+            "{}  {}\n{}  {}\n{}  {}\n{}  {}",
+            format!("{:width$}", "Version", width = column_length),
+            VERSION,
+            format!("{:width$}", "Mode", width = column_length),
+            self.mode(),
+            format!("{:width$}", "RAM Size", width = column_length),
+            self.ram_size(),
+            format!("{:width$}", "VRAM Size", width = column_length),
+            self.vram_size(),
+        )
+    }
 }
 
 /// Gameboy implementations that are meant with performance
@@ -799,5 +829,11 @@ impl AudioProvider for GameBoy {
 impl Default for GameBoy {
     fn default() -> Self {
         Self::new(GameBoyMode::Dmg)
+    }
+}
+
+impl Display for GameBoy {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.description(9))
     }
 }

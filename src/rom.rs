@@ -1,5 +1,6 @@
 use core::fmt;
 use std::{
+    any::Any,
     cmp::max,
     fmt::{Display, Formatter},
 };
@@ -144,6 +145,7 @@ pub enum RamSize {
     NoRam,
     Unused,
     Size8K,
+    Size16K,
     Size32K,
     Size64K,
     Size128K,
@@ -156,6 +158,7 @@ impl RamSize {
             RamSize::NoRam => "No RAM",
             RamSize::Unused => "Unused",
             RamSize::Size8K => "8 KB",
+            RamSize::Size16K => "16 KB",
             RamSize::Size32K => "32 KB",
             RamSize::Size128K => "128 KB",
             RamSize::Size64K => "64 KB",
@@ -168,6 +171,7 @@ impl RamSize {
             RamSize::NoRam => 0,
             RamSize::Unused => 0,
             RamSize::Size8K => 1,
+            RamSize::Size16K => 2,
             RamSize::Size32K => 4,
             RamSize::Size64K => 8,
             RamSize::Size128K => 16,
@@ -498,6 +502,22 @@ impl Cartridge {
     pub fn set_ram_data(&mut self, ram_data: Vec<u8>) {
         self.ram_data = ram_data;
     }
+
+    pub fn description(&self, column_length: usize) -> String {
+        format!(
+            "{}  {}\n{}  {}\n{}  {}\n{}  {}\n{}  {}",
+            format!("{:width$}", "Name", width = column_length),
+            self.title(),
+            format!("{:width$}", "Type", width = column_length),
+            self.rom_type(),
+            format!("{:width$}", "ROM Size", width = column_length),
+            self.rom_size(),
+            format!("{:width$}", "RAM Size", width = column_length),
+            self.ram_size(),
+            format!("{:width$}", "CGB Mode", width = column_length),
+            self.cgb_flag()
+        )
+    }
 }
 
 impl Default for Cartridge {
@@ -508,15 +528,7 @@ impl Default for Cartridge {
 
 impl Display for Cartridge {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "Name       {}\nType       {}\nROM Size   {}\nRAM Size   {}\nCGB Mode   {}",
-            self.title(),
-            self.rom_type(),
-            self.rom_size(),
-            self.ram_size(),
-            self.cgb_flag()
-        )
+        write!(f, "{}", self.description(9))
     }
 }
 
