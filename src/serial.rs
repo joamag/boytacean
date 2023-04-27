@@ -119,7 +119,7 @@ impl Serial {
 
                     // executes the send and receive operation immediately
                     // this is considered an operational optimization with
-                    // no real effect on the emulation (ex: not timing issues)
+                    // no real effect on the emulation (ex: no timing issues)
                     self.byte_receive = self.device.send();
                     self.device.receive(self.data);
                 }
