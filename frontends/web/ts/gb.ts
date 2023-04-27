@@ -20,6 +20,7 @@ import { PALETTES, PALETTES_MAP } from "./palettes";
 import { base64ToBuffer, bufferToBase64 } from "./util";
 import {
     DebugAudio,
+    DebugSettings,
     DebugVideo,
     HelpFaqs,
     HelpKeyboard,
@@ -446,6 +447,10 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         this.cartridge = cartridge;
     }
 
+    get instance(): GameBoy | null {
+        return this.gameBoy;
+    }
+
     get name(): string {
         return "Boytacean";
     }
@@ -493,9 +498,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
             {
                 name: "Serial",
                 icon: require("../res/serial.svg"),
-                node: SerialSection({
-                    emulator: this
-                })
+                node: SerialSection({ emulator: this })
             }
         ];
     }
@@ -522,6 +525,10 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
             {
                 name: "Audio",
                 node: DebugAudio({ emulator: this })
+            },
+            {
+                name: "Settings",
+                node: DebugSettings({ emulator: this })
             }
         ];
     }
@@ -736,10 +743,12 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
 
     pauseAudio() {
         this.gameBoy?.set_apu_enabled(false);
+        this.trigger("audio-state", { state: "paused", stateBool: false });
     }
 
     resumeAudio() {
         this.gameBoy?.set_apu_enabled(true);
+        this.trigger("audio-state", { state: "resumed", stateBool: true });
     }
 
     getAudioState(): boolean {
