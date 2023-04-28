@@ -662,7 +662,7 @@ impl Ppu {
             // 0xFF69 — BCPD/BGPD (CGB only)
             0xff69 => {
                 self.palettes_color[0][self.palette_address_bg as usize] = value;
-                //@TODO: update palette background data accordingly for the give update
+                //@TODO: update palette background data accordingly for the given update
                 // index - should not be a problem
                 if self.auto_increment_bg {
                     self.palette_address_bg = (self.palette_address_bg + 1) & 0x3f;
@@ -676,7 +676,7 @@ impl Ppu {
             // 0xFF6B — OCPD/OBPD (CGB only)
             0xff6b => {
                 self.palettes_color[1][self.palette_address_obj as usize] = value;
-                //@TODO: update palette object data accordingly for the give update
+                //@TODO: update palette object data accordingly for the given update
                 // index - should not be a problem
                 if self.auto_increment_obj {
                     self.palette_address_obj = (self.palette_address_obj + 1) & 0x3f;
