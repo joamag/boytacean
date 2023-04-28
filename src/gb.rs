@@ -610,11 +610,13 @@ impl GameBoy {
 
     pub fn description(&self, column_length: usize) -> String {
         format!(
-            "{}  {}\n{}  {}\n{}  {}\n{}  {}\n{}  {}",
+            "{}  {}\n{}  {}\n{}  {:.02} Mhz\n{}  {}\n{}  {}\n{}  {}",
             format!("{:width$}", "Version", width = column_length),
             VERSION,
             format!("{:width$}", "Mode", width = column_length),
             self.mode(),
+            format!("{:width$}", "Clock", width = column_length),
+            self.clock_freq() as f32 / 1000.0 / 1000.0,
             format!("{:width$}", "RAM Size", width = column_length),
             self.ram_size(),
             format!("{:width$}", "VRAM Size", width = column_length),
