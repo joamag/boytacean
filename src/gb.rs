@@ -580,6 +580,10 @@ impl GameBoy {
         self.apu().set_clock_freq(value);
     }
 
+    pub fn clock_freq_s(&self) -> String {
+        format!("{:.02} Mhz", self.clock_freq() as f32 / 1000.0 / 1000.0)
+    }
+
     pub fn attach_null_serial(&mut self) {
         self.attach_serial(Box::<NullDevice>::default());
     }
@@ -610,13 +614,13 @@ impl GameBoy {
 
     pub fn description(&self, column_length: usize) -> String {
         format!(
-            "{}  {}\n{}  {}\n{}  {:.02} Mhz\n{}  {}\n{}  {}\n{}  {}",
+            "{}  {}\n{}  {}\n{}  {}\n{}  {}\n{}  {}\n{}  {}",
             format!("{:width$}", "Version", width = column_length),
             VERSION,
             format!("{:width$}", "Mode", width = column_length),
             self.mode(),
             format!("{:width$}", "Clock", width = column_length),
-            self.clock_freq() as f32 / 1000.0 / 1000.0,
+            self.clock_freq_s(),
             format!("{:width$}", "RAM Size", width = column_length),
             self.ram_size(),
             format!("{:width$}", "VRAM Size", width = column_length),
