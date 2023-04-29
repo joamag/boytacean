@@ -917,19 +917,18 @@ impl Ppu {
     fn update_bg_map_attrs(&mut self, addr: u16, value: u8) {
         let bg_map = addr > 0x9bff;
         let tile_index = if bg_map { addr - 0x9c00 } else { addr - 0x9800 };
-        let tile_data = TileData {
-            palette: (value & 0x03 == 0x03) as u8,
-            vram_bank: (value & 0x08) >> 4,
-            xflip: value & 0x20 == 0x20,
-            yflip: value & 0x40 == 0x40,
-            priority: value & 0x80 == 0x80,
-        };
         let mut bg_map_attrs = if bg_map {
             self.bg_map_attrs_1
         } else {
             self.bg_map_attrs_0
         };
-        bg_map_attrs[tile_index as usize] = tile_data;
+        let tile_data = bg_map_attrs[tile_index as usize].borrow_mut();
+        tile_data.palette = (value & 0x03 == 0x03) as u8;
+        tile_data.vram_bank = (value & 0x08) >> 4;
+        tile_data.vram_bank = (value & 0x08) >> 4;
+        tile_data.xflip = value & 0x20 == 0x20;
+        tile_data.yflip = value & 0x40 == 0x40;
+        tile_data.priority = value & 0x80 == 0x80;
     }
 
     pub fn registers(&self) -> PpuRegisters {
