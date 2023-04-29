@@ -291,8 +291,8 @@ pub struct Ppu {
     palette_colors: Palette,
 
     /// The palette of colors that is currently loaded in Game Boy
-    /// and used for background (tiles).
-    palette: Palette,
+    /// and used for background (tiles) and window.
+    palette_bg: Palette,
 
     /// The palette that is going to be used for sprites/objects #0.
     palette_obj_0: Palette,
@@ -312,8 +312,9 @@ pub struct Ppu {
     /// be re-read if required by the system.
     palettes: [u8; 3],
 
-    /// The raw byte information (64 bytes) for the color palettes,
-    /// both the background and the objects one (CGB only).
+    /// The raw binary information (64 bytes) for the color palettes,
+    /// contains binary information for both the background and
+    /// the objects palettes (CGB only).
     palettes_color: [[u8; 64]; 2],
 
     /// The complete list of attributes for the first background
@@ -452,7 +453,7 @@ impl Ppu {
             tiles: [Tile { buffer: [0u8; 64] }; TILE_COUNT],
             obj_data: [ObjectData::default(); OBJ_COUNT],
             palette_colors: PALETTE_COLORS,
-            palette: [[0u8; RGB_SIZE]; PALETTE_SIZE],
+            palette_bg: [[0u8; RGB_SIZE]; PALETTE_SIZE],
             palette_obj_0: [[0u8; RGB_SIZE]; PALETTE_SIZE],
             palette_obj_1: [[0u8; RGB_SIZE]; PALETTE_SIZE],
             palettes_color_bg: [[[0u8; RGB_SIZE]; PALETTE_SIZE]; 8],
@@ -501,7 +502,7 @@ impl Ppu {
         self.vram_bank = 0x0;
         self.vram_offset = 0x0000;
         self.tiles = [Tile { buffer: [0u8; 64] }; TILE_COUNT];
-        self.palette = [[0u8; RGB_SIZE]; PALETTE_SIZE];
+        self.palette_bg = [[0u8; RGB_SIZE]; PALETTE_SIZE];
         self.palette_obj_0 = [[0u8; RGB_SIZE]; PALETTE_SIZE];
         self.palette_obj_1 = [[0u8; RGB_SIZE]; PALETTE_SIZE];
         self.palettes_color_bg = [[[0u8; RGB_SIZE]; PALETTE_SIZE]; 8];
@@ -719,7 +720,7 @@ impl Ppu {
             0xff43 => self.scx = value,
             0xff45 => self.lyc = value,
             0xff47 => {
-                Self::compute_palette(&mut self.palette, &self.palette_colors, value);
+                Self::compute_palette(&mut self.palette_bg, &self.palette_colors, value);
                 self.palettes[0] = value;
             }
             0xff48 => {
@@ -744,10 +745,16 @@ impl Ppu {
             }
             // 0xFF69 — BCPD/BGPD (CGB only)
             0xff69 => {
-                self.palettes_color[0][self.palette_address_bg as usize] = value;
-                //@TODO: update palette background data accordingly for the given update
-                // index - should not be a problem
-                // compute_palette_color should probably be the name
+                let mut palette_color = self.palettes_color[0];
+                palette_color[self.palette_address_bg as usize] = value;
+
+                let palette_index = self.palette_address_bg / 8;
+                Self::compute_palette_color(
+                    &mut self.palettes_color_bg[palette_index as usize],
+                    &palette_color,
+                    palette_index,
+                );
+
                 if self.auto_increment_bg {
                     self.palette_address_bg = (self.palette_address_bg + 1) & 0x3f;
                 }
@@ -789,8 +796,8 @@ impl Ppu {
         self.compute_palettes()
     }
 
-    pub fn palette(&self) -> Palette {
-        self.palette
+    pub fn palette_bg(&self) -> Palette {
+        self.palette_bg
     }
 
     pub fn palette_obj_0(&self) -> Palette {
@@ -1013,7 +1020,7 @@ impl Ppu {
                 // obtains the current pixel data from the tile and
                 // re-maps it according to the current palette
                 let pixel = self.tiles[tile_index].get(x, y);
-                let color = self.palette[pixel as usize];
+                let color = self.palette_bg[pixel as usize];
 
                 // updates the pixel in the color buffer, which stores
                 // the raw pixel color information (unmapped)
@@ -1219,7 +1226,7 @@ impl Ppu {
     fn compute_palettes(&mut self) {
         // re-computes the complete set of palettes according to
         // the currently set palette colors (that may have changed)
-        Self::compute_palette(&mut self.palette, &self.palette_colors, self.palettes[0]);
+        Self::compute_palette(&mut self.palette_bg, &self.palette_colors, self.palettes[0]);
         Self::compute_palette(
             &mut self.palette_obj_0,
             &self.palette_colors,
@@ -1248,6 +1255,26 @@ impl Ppu {
                 color_index => panic!("Invalid palette color index {:04x}", color_index),
             }
         }
+    }
+
+    /// Static method that computes an RGB888 color palette ready to
+    /// be used for frame buffer operations from 4 (colors) x 2 bytes (RGB555)
+    /// that represent an RGB555 set of colors. This method should be
+    /// used for CGB mode where colors are represented using RGB555.
+    fn compute_palette_color(palette: &mut Palette, palette_color: &[u8; 64], palette_index: u8) {
+        let palette_offset = palette_index * 4 * 2;
+        for (index, palette_item) in palette.iter_mut().enumerate() {
+            let color_index: usize = palette_offset as usize + index * 2;
+            *palette_item =
+                Self::rgb555_to_rgb888(palette_color[color_index], palette_color[color_index + 1]);
+        }
+    }
+
+    fn rgb555_to_rgb888(first: u8, second: u8) -> Pixel {
+        let r = first & 0x1f << 3;
+        let g = (first & 0xe0 >> 5 | (second & 0x03) << 3) << 3;
+        let b = ((second & 0x7c) >> 2) << 3;
+        [r as u8, g as u8, b as u8]
     }
 }
 

@@ -499,10 +499,10 @@ impl GameBoy {
 
     /// Obtains the pixel buffer for the tile at the
     /// provided index, converting the color buffer
-    /// using the currently loaded palette.
+    /// using the currently loaded (background) palette.
     pub fn get_tile_buffer(&mut self, index: usize) -> Vec<u8> {
         let tile = self.get_tile(index);
-        tile.palette_buffer(self.ppu().palette())
+        tile.palette_buffer(self.ppu().palette_bg())
     }
 
     /// Obtains the name of the compiler that has been
