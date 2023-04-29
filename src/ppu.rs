@@ -747,6 +747,7 @@ impl Ppu {
                 self.palettes_color[0][self.palette_address_bg as usize] = value;
                 //@TODO: update palette background data accordingly for the given update
                 // index - should not be a problem
+                // compute_palette_color should probably be the name
                 if self.auto_increment_bg {
                     self.palette_address_bg = (self.palette_address_bg + 1) & 0x3f;
                 }
@@ -761,6 +762,7 @@ impl Ppu {
                 self.palettes_color[1][self.palette_address_obj as usize] = value;
                 //@TODO: update palette object data accordingly for the given update
                 // index - should not be a problem
+                // compute_palette_color should probably be the name
                 if self.auto_increment_obj {
                     self.palette_address_obj = (self.palette_address_obj + 1) & 0x3f;
                 }
