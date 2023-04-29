@@ -9,7 +9,9 @@ use wasm_bindgen::prelude::*;
 
 use crate::warnln;
 
-pub const VRAM_SIZE: usize = 8192;
+pub const VRAM_SIZE_DMG: usize = 8192;
+pub const VRAM_SIZE_CGB: usize = 16384;
+pub const VRAM_SIZE: usize = VRAM_SIZE_CGB;
 pub const HRAM_SIZE: usize = 128;
 pub const OAM_SIZE: usize = 260;
 pub const PALETTE_SIZE: usize = 4;
@@ -19,9 +21,12 @@ pub const TILE_WIDTH: usize = 8;
 pub const TILE_HEIGHT: usize = 8;
 pub const TILE_DOUBLE_HEIGHT: usize = 16;
 
+pub const TILE_COUNT_DMG: usize = 384;
+pub const TILE_COUNT_CGB: usize = 768;
+
 /// The number of tiles that can be store in Game Boy's
 /// VRAM memory according to specifications.
-pub const TILE_COUNT: usize = 384;
+pub const TILE_COUNT: usize = TILE_COUNT_CGB;
 
 /// The number of objects/sprites that can be handled at
 /// the same time by the Game Boy.
@@ -161,6 +166,26 @@ impl Display for ObjectData {
     }
 }
 
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct TileData {
+    palette: u8,
+    vram_bank: u8,
+    xflip: bool,
+    yflip: bool,
+    priority: bool,
+}
+
+impl Display for TileData {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Palette => {}\nVRAM Bank => {}\nX Flip => {}\nY Flip => {}",
+            self.palette, self.vram_bank, self.xflip, self.yflip
+        )
+    }
+}
+
 pub struct PpuRegisters {
     pub scy: u8,
     pub scx: u8,
@@ -202,6 +227,15 @@ pub struct Ppu {
     /// OAM RAM (Sprite Attribute Table ) used for the storage of the
     /// sprite attributes for each of the 40 sprites of the Game Boy.
     oam: [u8; OAM_SIZE],
+
+    /// The VRAM bank to be used in the read and write operation of
+    /// the 0x8000-0x9FFF memory range (CGB only).
+    vram_bank: u8,
+
+    /// The offset to be used in the read and write operation of
+    /// the VRAM, this value should be consistent with the VRAM bank
+    /// that is currently selected (CGB only).
+    vram_offset: u16,
 
     /// The current set of processed tiles that are store in the
     /// PPU related structures.
@@ -366,6 +400,8 @@ impl Ppu {
             vram: [0u8; VRAM_SIZE],
             hram: [0u8; HRAM_SIZE],
             oam: [0u8; OAM_SIZE],
+            vram_bank: 0x0,
+            vram_offset: 0x0000,
             tiles: [Tile { buffer: [0u8; 64] }; TILE_COUNT],
             obj_data: [ObjectData {
                 x: 0,
@@ -420,8 +456,10 @@ impl Ppu {
     pub fn reset(&mut self) {
         self.color_buffer = Box::new([0u8; COLOR_BUFFER_SIZE]);
         self.frame_buffer = Box::new([0u8; FRAME_BUFFER_SIZE]);
-        self.vram = [0u8; VRAM_SIZE];
+        self.vram = [0u8; VRAM_SIZE_CGB];
         self.hram = [0u8; HRAM_SIZE];
+        self.vram_bank = 0x0;
+        self.vram_offset = 0x0000;
         self.tiles = [Tile { buffer: [0u8; 64] }; TILE_COUNT];
         self.palette = [[0u8; RGB_SIZE]; PALETTE_SIZE];
         self.palette_obj_0 = [[0u8; RGB_SIZE]; PALETTE_SIZE];
@@ -544,7 +582,7 @@ impl Ppu {
 
     pub fn read(&mut self, addr: u16) -> u8 {
         match addr {
-            0x8000..=0x9fff => self.vram[(addr & 0x1fff) as usize],
+            0x8000..=0x9fff => self.vram[(self.vram_offset + (addr & 0x1fff)) as usize],
             0xfe00..=0xfe9f => self.oam[(addr & 0x009f) as usize],
             0xff80..=0xfffe => self.hram[(addr & 0x007f) as usize],
             0xff40 =>
@@ -577,7 +615,7 @@ impl Ppu {
             0xff4a => self.wy,
             0xff4b => self.wx,
             // 0xFF4F — VBK (CGB only)
-            0xff4f => 0xff,
+            0xff4f => self.vram_bank | 0xfe,
             // 0xFF68 — BCPS/BGPI (CGB only)
             0xff68 => self.palette_address_bg | if self.auto_increment_bg { 0x80 } else { 0x00 },
             // 0xFF69 — BCPD/BGPD (CGB only)
@@ -596,7 +634,7 @@ impl Ppu {
     pub fn write(&mut self, addr: u16, value: u8) {
         match addr {
             0x8000..=0x9fff => {
-                self.vram[(addr & 0x1fff) as usize] = value;
+                self.vram[(self.vram_offset + (addr & 0x1fff)) as usize] = value;
                 if addr < 0x9800 {
                     self.update_tile(addr, value);
                 }
@@ -653,7 +691,10 @@ impl Ppu {
             0xff4a => self.wy = value,
             0xff4b => self.wx = value,
             // 0xFF4F — VBK (CGB only)
-            0xff4f => (),
+            0xff4f => {
+                self.vram_bank = value & 0x01;
+                self.vram_offset = self.vram_bank as u16 * 0x2000;
+            }
             // 0xFF68 — BCPS/BGPI (CGB only)
             0xff68 => {
                 self.palette_address_bg = value & 0x3f;
@@ -786,7 +827,7 @@ impl Ppu {
     /// just been written to a location on the VRAM associated
     /// with tiles.
     fn update_tile(&mut self, addr: u16, _value: u8) {
-        let addr = (addr & 0x1ffe) as usize;
+        let addr = (self.vram_offset + (addr & 0x1ffe)) as usize;
         let tile_index = (addr >> 4) & 0x01ff;
         let tile = self.tiles[tile_index].borrow_mut();
         let y = (addr >> 1) & 0x0007;

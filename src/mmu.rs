@@ -69,6 +69,9 @@ pub struct Mmu {
     /// the 0xD000-0xDFFF memory range (CGB only).
     ram_bank: u8,
 
+    /// The offset to be used in the read and write operation of
+    /// the RAM, this value should be consistent with the RAM bank
+    /// that is currently selected (CGB only).
     ram_offset: u16,
 
     mode: GameBoyMode,
@@ -323,7 +326,7 @@ impl Mmu {
 
                     // 0xFF70 - SVBK: WRAM bank (CGB only)
                     0x70 => {
-                        let mut ram_bank = value & 0x7;
+                        let mut ram_bank = value & 0x07;
                         if ram_bank == 0x0 {
                             ram_bank = 0x1;
                         }
