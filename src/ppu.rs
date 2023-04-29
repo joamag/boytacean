@@ -156,6 +156,27 @@ pub struct ObjectData {
     index: u8,
 }
 
+impl ObjectData {
+    pub fn new() -> Self {
+        Self {
+            x: 0,
+            y: 0,
+            tile: 0,
+            palette: 0,
+            xflip: false,
+            yflip: false,
+            bg_over: false,
+            index: 0,
+        }
+    }
+}
+
+impl Default for ObjectData {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Display for ObjectData {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(
@@ -174,6 +195,24 @@ pub struct TileData {
     xflip: bool,
     yflip: bool,
     priority: bool,
+}
+
+impl TileData {
+    pub fn new() -> Self {
+        Self {
+            palette: 0,
+            vram_bank: 0,
+            xflip: false,
+            yflip: false,
+            priority: false,
+        }
+    }
+}
+
+impl Default for TileData {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Display for TileData {
@@ -262,11 +301,11 @@ pub struct Ppu {
     palette_obj_1: Palette,
 
     /// The complete set of background palettes that are going to be
-    /// used in CGB emulation to provide the full set of colors.
+    /// used in CGB emulation to provide the full set of colors (CGB only).
     palettes_color_bg: [Palette; 8],
 
     /// The complete set of object/sprite palettes that are going to be
-    /// used in CGB emulation to provide the full set of colors.
+    /// used in CGB emulation to provide the full set of colors (CGB only).
     palettes_color_obj: [Palette; 8],
 
     /// The complete set of palettes in binary data so that they can
@@ -274,8 +313,16 @@ pub struct Ppu {
     palettes: [u8; 3],
 
     /// The raw byte information (64 bytes) for the color palettes,
-    /// both the background and the objects one.
+    /// both the background and the objects one (CGB only).
     palettes_color: [[u8; 64]; 2],
+
+    /// The complete list of attributes for the first background
+    /// map that is located in 0x9800-0x9BFF (CGB only).
+    bg_map_attrs_0: [TileData; 1024],
+
+    /// The complete list of attributes for the second background
+    /// map that is located in 0x9C00-0x9FFF (CGB only).
+    bg_map_attrs_1: [TileData; 1024],
 
     /// The scroll Y register that controls the Y offset
     /// of the background.
@@ -403,16 +450,7 @@ impl Ppu {
             vram_bank: 0x0,
             vram_offset: 0x0000,
             tiles: [Tile { buffer: [0u8; 64] }; TILE_COUNT],
-            obj_data: [ObjectData {
-                x: 0,
-                y: 0,
-                tile: 0,
-                palette: 0,
-                xflip: false,
-                yflip: false,
-                bg_over: false,
-                index: 0,
-            }; OBJ_COUNT],
+            obj_data: [ObjectData::default(); OBJ_COUNT],
             palette_colors: PALETTE_COLORS,
             palette: [[0u8; RGB_SIZE]; PALETTE_SIZE],
             palette_obj_0: [[0u8; RGB_SIZE]; PALETTE_SIZE],
@@ -421,6 +459,8 @@ impl Ppu {
             palettes_color_obj: [[[0u8; RGB_SIZE]; PALETTE_SIZE]; 8],
             palettes: [0u8; 3],
             palettes_color: [[0u8; 64]; 2],
+            bg_map_attrs_0: [TileData::default(); 1024],
+            bg_map_attrs_1: [TileData::default(); 1024],
             scy: 0x0,
             scx: 0x0,
             wy: 0x0,
@@ -637,6 +677,8 @@ impl Ppu {
                 self.vram[(self.vram_offset + (addr & 0x1fff)) as usize] = value;
                 if addr < 0x9800 {
                     self.update_tile(addr, value);
+                } else if self.vram_bank == 0x1 {
+                    self.update_bg_map_attrs(addr, value);
                 }
             }
             0xfe00..=0xfe9f => {
@@ -870,6 +912,24 @@ impl Ppu {
             }
             _ => (),
         }
+    }
+
+    fn update_bg_map_attrs(&mut self, addr: u16, value: u8) {
+        let bg_map = addr > 0x9bff;
+        let tile_index = if bg_map { addr - 0x9c00 } else { addr - 0x9800 };
+        let tile_data = TileData {
+            palette: (value & 0x03 == 0x03) as u8,
+            vram_bank: (value & 0x08) >> 4,
+            xflip: value & 0x20 == 0x20,
+            yflip: value & 0x40 == 0x40,
+            priority: value & 0x80 == 0x80,
+        };
+        let mut bg_map_attrs = if bg_map {
+            self.bg_map_attrs_1
+        } else {
+            self.bg_map_attrs_0
+        };
+        bg_map_attrs[tile_index as usize] = tile_data;
     }
 
     pub fn registers(&self) -> PpuRegisters {
