@@ -1173,12 +1173,12 @@ impl Ppu {
 
             let palette = if self.gb_mode == GameBoyMode::Cgb {
                 &self.palettes_color_obj[obj.palette_cgb as usize]
+            } else if obj.palette == 0 {
+                &self.palette_obj_0
+            } else if obj.palette == 1 {
+                &self.palette_obj_1
             } else {
-                if obj.palette == 0 {
-                    &self.palette_obj_0
-                } else {
-                    &self.palette_obj_1
-                }
+                panic!("Invalid object palette: {:02x}", obj.palette);
             };
 
             // calculates the offset in the color buffer (raw color information
@@ -1229,7 +1229,7 @@ impl Ppu {
             // the tile directly from the object's tile index
             else {
                 let tile_index = obj.tile as usize + tile_bank_offset;
-                tile = &self.tiles[tile_index as usize];
+                tile = &self.tiles[tile_index];
             }
 
             let tile_row = tile.get_row(tile_offset as usize);
