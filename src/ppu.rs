@@ -99,15 +99,25 @@ impl PaletteInfo {
 
 /// Represents a tile within the Game Boy context,
 /// should contain the pixel buffer of the tile.
+/// The tiles are always 8x8 pixels in size.
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Tile {
+    /// The buffer for the tile, should contain a byte
+    /// per each pixel of the tile with values ranging
+    /// from 0 to 3 (4 colors).
     buffer: [u8; 64],
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 impl Tile {
     pub fn get(&self, x: usize, y: usize) -> u8 {
+        self.buffer[y * TILE_WIDTH + x]
+    }
+
+    pub fn get_flipped(&self, x: usize, y: usize, xflip: bool, yflip: bool) -> u8 {
+        let x: usize = if xflip { 7 - x } else { x };
+        let y = if yflip { 7 - y } else { y };
         self.buffer[y * TILE_WIDTH + x]
     }
 
@@ -1051,6 +1061,11 @@ impl Ppu {
             &self.palette_bg
         };
 
+        // obtains the values of both X and Y flips for the current tile
+        // they will be applied by the get tile pixel method
+        let mut xflip = tile_attr.xflip;
+        let mut yflip = tile_attr.yflip;
+
         // increments the tile index value by the required offset for the VRAM
         // bank in which the tile is stored, this is only required for CGB mode
         tile_index += tile_attr.vram_bank as usize * TILE_COUNT_DMG;
@@ -1075,7 +1090,7 @@ impl Ppu {
             if index as i16 >= wx as i16 - 7 {
                 // obtains the current pixel data from the tile and
                 // re-maps it according to the current palette
-                let pixel = self.tiles[tile_index].get(x, y);
+                let pixel = self.tiles[tile_index].get_flipped(x, y, xflip, yflip);
                 let color = palette[pixel as usize];
 
                 // updates the pixel in the color buffer, which stores
@@ -1119,6 +1134,11 @@ impl Ppu {
                     } else {
                         &self.palette_bg
                     };
+
+                    // obtains the values of both X and Y flips for the current tile
+                    // they will be applied by the get tile pixel method
+                    xflip = tile_attr.xflip;
+                    yflip = tile_attr.yflip;
 
                     // increments the tile index value by the required offset for the VRAM
                     // bank in which the tile is stored, this is only required for CGB mode
