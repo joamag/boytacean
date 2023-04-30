@@ -240,8 +240,17 @@ impl Mmu {
                             | if self.pad.int_pad() { 0x10 } else { 0x00 })
                     }
 
+                    // 0xFF4C - KEY0 (CGB only)
+                    0x4c => todo!("Need to see what to do with KEY0"),
+
+                    // 0xFF4D - KEY1 (CGB only)
+                    0x4d => todo!("CGB speed switch"),
+
                     // 0xFF50 - Boot active flag
                     0x50 => u8::from(self.boot_active),
+
+                    // 0xFF70 - SVBK: WRAM bank (CGB only)
+                    0x70 => self.ram_bank & 0x07,
 
                     // 0xFF80-0xFFFE - High RAM (HRAM)
                     0x80..=0xfe => self.ppu.read(addr),

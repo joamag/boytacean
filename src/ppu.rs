@@ -959,7 +959,7 @@ impl Ppu {
             &mut self.bg_map_attrs_0
         };
         let tile_data: &mut TileData = bg_map_attrs[tile_index as usize].borrow_mut();
-        tile_data.palette = value & 0x03;
+        tile_data.palette = value & 0x07;
         tile_data.vram_bank = (value & 0x08) >> 4;
         tile_data.vram_bank = (value & 0x08) >> 4;
         tile_data.xflip = value & 0x20 == 0x20;

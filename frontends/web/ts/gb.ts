@@ -391,7 +391,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         // and builds a new instance of it
         switch (engine) {
             case "neo":
-                this.gameBoy = new GameBoy(GameBoyMode.Dmg);
+                this.gameBoy = new GameBoy(GameBoyMode.Cgb);
                 break;
             default:
                 if (!this.gameBoy) {

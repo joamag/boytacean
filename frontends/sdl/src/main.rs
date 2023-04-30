@@ -465,6 +465,15 @@ struct Args {
     #[arg(short, long, default_value_t = String::from("printer"))]
     device: String,
 
+    #[arg(long, default_value_t = false)]
+    no_ppu: bool,
+
+    #[arg(long, default_value_t = false)]
+    no_apu: bool,
+
+    #[arg(long, default_value_t = false)]
+    no_timer: bool,
+
     // TODO: change this to emulator.load_rom(Some("../../res/roms/demo/pocket.gb"));
     #[arg(short, long, default_value_t = String::from("../../res/roms.prop/tetris_dx.gbc"))]
     rom_path: String,
@@ -480,6 +489,9 @@ fn main() {
     // and the initial game ROM to "start the engine"
     let mut game_boy = GameBoy::new(mode);
     let device = build_device(&args.device);
+    game_boy.set_ppu_enabled(!args.no_ppu);
+    game_boy.set_apu_enabled(!args.no_apu);
+    game_boy.set_timer_enabled(!args.no_timer);
     game_boy.attach_serial(device);
     game_boy.load(true);
 
