@@ -761,15 +761,12 @@ impl Ppu {
             // 0xFF69 — BCPD/BGPD (CGB only)
             0xff69 => {
                 let palette_index = self.palette_address_bg / 8;
-
-                // @TODO: we can optimize this code to make it so that only
-                // the target color of the target palette is updated, this
-                // should provide us with a 4x speedup in computation
+                let color_index = (self.palette_address_bg % 8) / 2;
 
                 let palette_color = &mut self.palettes_color[0];
                 palette_color[self.palette_address_bg as usize] = value;
                 let palette = &mut self.palettes_color_bg[palette_index as usize];
-                Self::compute_palette_color(palette, palette_color, palette_index);
+                Self::compute_palette_color(palette, palette_color, palette_index, color_index);
 
                 if self.auto_increment_bg {
                     self.palette_address_bg = (self.palette_address_bg + 1) & 0x3f;
@@ -783,11 +780,12 @@ impl Ppu {
             // 0xFF6B — OCPD/OBPD (CGB only)
             0xff6b => {
                 let palette_index = self.palette_address_obj / 8;
+                let color_index = (self.palette_address_obj % 8) / 2;
 
                 let palette_color = &mut self.palettes_color[1];
                 palette_color[self.palette_address_obj as usize] = value;
                 let palette = &mut self.palettes_color_obj[palette_index as usize];
-                Self::compute_palette_color(palette, palette_color, palette_index);
+                Self::compute_palette_color(palette, palette_color, palette_index, color_index);
 
                 if self.auto_increment_obj {
                     self.palette_address_obj = (self.palette_address_obj + 1) & 0x3f;
@@ -1345,13 +1343,18 @@ impl Ppu {
     /// be used for frame buffer operations from 4 (colors) x 2 bytes (RGB555)
     /// that represent an RGB555 set of colors. This method should be
     /// used for CGB mode where colors are represented using RGB555.
-    fn compute_palette_color(palette: &mut Palette, palette_color: &[u8; 64], palette_index: u8) {
-        let palette_offset = palette_index * 4 * 2;
-        for (index, palette_item) in palette.iter_mut().enumerate() {
-            let color_index: usize = palette_offset as usize + index * 2;
-            *palette_item =
-                Self::rgb555_to_rgb888(palette_color[color_index], palette_color[color_index + 1]);
-        }
+    fn compute_palette_color(
+        palette: &mut Palette,
+        palette_color: &[u8; 64],
+        palette_index: u8,
+        color_index: u8,
+    ) {
+        let palette_offset = (palette_index * 4 * 2) as usize;
+        let color_offset = (color_index * 2) as usize;
+        palette[color_index as usize] = Self::rgb555_to_rgb888(
+            palette_color[palette_offset + color_offset],
+            palette_color[palette_offset + color_offset + 1],
+        );
     }
 
     fn rgb555_to_rgb888(first: u8, second: u8) -> Pixel {
