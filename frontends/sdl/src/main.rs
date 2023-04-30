@@ -466,7 +466,7 @@ struct Args {
     device: String,
 
     // TODO: change this to emulator.load_rom(Some("../../res/roms/demo/pocket.gb"));
-    #[arg(short, long, default_value_t = String::from("/Users/joamag/Desktop/repo.other/boytacean/res/roms.prop/tetris_dx.gbc"))]
+    #[arg(short, long, default_value_t = String::from("../../res/roms.prop/tetris_dx.gbc"))]
     rom_path: String,
 }
 
