@@ -33,7 +33,7 @@ build-rust:
     - rustup component add rustfmt
     - rustup component add clippy
     - rustc --version
-    - cargo fmt --all -- --check
+    - if [[ $RUST_VERSION != "1.56.1" ]]; cargo fmt --all -- --check; fi
     - if [[ $RUST_VERSION != nightly ]]; then cargo clippy -- -D warnings -A unknown-lints; fi
     - cargo build
     - cargo build --release
