@@ -934,7 +934,7 @@ impl Ppu {
         if obj_index >= OBJ_COUNT {
             return;
         }
-        let mut obj = self.obj_data[obj_index].borrow_mut();
+        let obj = self.obj_data[obj_index].borrow_mut();
         match addr & 0x03 {
             0x00 => obj.y = value as i16 - 16,
             0x01 => obj.x = value as i16 - 8,
