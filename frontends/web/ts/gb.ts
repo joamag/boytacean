@@ -357,7 +357,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
      * the emulator engine to use.
      */
     async boot({
-        engine = "neo",
+        engine = "cgb",
         restore = true,
         loadRom = false,
         romPath = ROM_PATH,
@@ -390,8 +390,11 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         // selects the proper engine for execution
         // and builds a new instance of it
         switch (engine) {
-            case "neo":
+            case "cgb":
                 this.gameBoy = new GameBoy(GameBoyMode.Cgb);
+                break;
+            case "dmg":
+                this.gameBoy = new GameBoy(GameBoyMode.Dmg);
                 break;
             default:
                 if (!this.gameBoy) {
@@ -534,11 +537,11 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     }
 
     get engines(): string[] {
-        return ["neo"];
+        return ["cgb", "dmg"];
     }
 
     get engine(): string {
-        return this._engine || "neo";
+        return this._engine || "cgb";
     }
 
     get romExts(): string[] {
