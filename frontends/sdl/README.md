@@ -29,7 +29,7 @@ rustup default stable-msvc
 
 For more information check [GitHub - Rust-SDL2/rust-sdl2](https://github.com/Rust-SDL2/rust-sdl2).
 
-## Build binaries
+### Build binaries
 
 Then you can use the following command to build and run Boytacean SDL:
 
