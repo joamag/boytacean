@@ -404,6 +404,14 @@ impl Cartridge {
         }
     }
 
+    /// A cartridge is considered legacy if it does
+    /// not have a CGB flag bit (bit 7 of 0x0143) set.
+    /// These are the monochromatic only Cartridges built
+    /// for the original DMG Game Boy.
+    pub fn is_legacy(&self) -> bool {
+        self.rom_data[0x0143] & 0x80 == 0x00
+    }
+
     pub fn rom_type(&self) -> RomType {
         match self.rom_data[0x0147] {
             0x00 => RomType::RomOnly,
