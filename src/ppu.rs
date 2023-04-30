@@ -745,15 +745,16 @@ impl Ppu {
             }
             // 0xFF69 — BCPD/BGPD (CGB only)
             0xff69 => {
-                let mut palette_color = self.palettes_color[0];
-                palette_color[self.palette_address_bg as usize] = value;
-
                 let palette_index = self.palette_address_bg / 8;
-                Self::compute_palette_color(
-                    &mut self.palettes_color_bg[palette_index as usize],
-                    &palette_color,
-                    palette_index,
-                );
+
+                // @TODO: we can optimize this code to make it so that only
+                // the target color of the target palette is updated, this
+                // should provide us with a 4x speedup in computation
+
+                let palette_color = &mut self.palettes_color[0];
+                palette_color[self.palette_address_bg as usize] = value;
+                let palette = &mut self.palettes_color_bg[palette_index as usize];
+                Self::compute_palette_color(palette, palette_color, palette_index);
 
                 if self.auto_increment_bg {
                     self.palette_address_bg = (self.palette_address_bg + 1) & 0x3f;
@@ -766,10 +767,13 @@ impl Ppu {
             }
             // 0xFF6B — OCPD/OBPD (CGB only)
             0xff6b => {
-                self.palettes_color[1][self.palette_address_obj as usize] = value;
-                //@TODO: update palette object data accordingly for the given update
-                // index - should not be a problem
-                // compute_palette_color should probably be the name
+                let palette_index = self.palette_address_bg / 8;
+
+                let palette_color = &mut self.palettes_color[1];
+                palette_color[self.palette_address_bg as usize] = value;
+                let palette = &mut self.palettes_color_obj[palette_index as usize];
+                Self::compute_palette_color(palette, palette_color, palette_index);
+
                 if self.auto_increment_obj {
                     self.palette_address_obj = (self.palette_address_obj + 1) & 0x3f;
                 }
@@ -926,13 +930,13 @@ impl Ppu {
     fn update_bg_map_attrs(&mut self, addr: u16, value: u8) {
         let bg_map = addr > 0x9bff;
         let tile_index = if bg_map { addr - 0x9c00 } else { addr - 0x9800 };
-        let mut bg_map_attrs = if bg_map {
-            self.bg_map_attrs_1
+        let bg_map_attrs = if bg_map {
+            &mut self.bg_map_attrs_1
         } else {
-            self.bg_map_attrs_0
+            &mut self.bg_map_attrs_0
         };
-        let tile_data = bg_map_attrs[tile_index as usize].borrow_mut();
-        tile_data.palette = (value & 0x03 == 0x03) as u8;
+        let tile_data: &mut TileData = bg_map_attrs[tile_index as usize].borrow_mut();
+        tile_data.palette = value & 0x03;
         tile_data.vram_bank = (value & 0x08) >> 4;
         tile_data.vram_bank = (value & 0x08) >> 4;
         tile_data.xflip = value & 0x20 == 0x20;
@@ -983,6 +987,14 @@ impl Ppu {
         // that control which background map is going to be used
         let mut map_offset: usize = if map { 0x1c00 } else { 0x1800 };
 
+        // selects the correct background attributes map based on the bg map flag
+        // because the attributes are separated according to the map they represent
+        let bg_map_attrs = if map {
+            self.bg_map_attrs_1
+        } else {
+            self.bg_map_attrs_0
+        };
+
         // increments the map offset by the row offset multiplied by the number
         // of tiles in each row (32)
         map_offset += row_offset * 32;
@@ -998,6 +1010,10 @@ impl Ppu {
         if !self.bg_tile && tile_index < 128 {
             tile_index += 256;
         }
+
+        //@TODO: this is conditional to the CG mode!!!
+        let mut tile_attr = bg_map_attrs[tile_index];
+        let mut palette = self.palettes_color_bg[tile_attr.palette as usize];
 
         // calculates the offset that is going to be used in the update of the color buffer
         // which stores Game Boy colors from 0 to 3
@@ -1020,7 +1036,9 @@ impl Ppu {
                 // obtains the current pixel data from the tile and
                 // re-maps it according to the current palette
                 let pixel = self.tiles[tile_index].get(x, y);
-                let color = self.palette_bg[pixel as usize];
+                // TODO: make this color work!!!
+                //let color = self.palette_bg[pixel as usize];
+                let color = palette[pixel as usize];
 
                 // updates the pixel in the color buffer, which stores
                 // the raw pixel color information (unmapped)
@@ -1035,7 +1053,7 @@ impl Ppu {
                 x += 1;
 
                 // in case the end of tile width has been reached then
-                // a new tile must be retrieved for plotting
+                // a new tile must be retrieved for rendering
                 if x == TILE_WIDTH {
                     // resets the tile X position to the base value
                     // as a new tile is going to be drawn
@@ -1051,6 +1069,9 @@ impl Ppu {
                     if !self.bg_tile && tile_index < 128 {
                         tile_index += 256;
                     }
+
+                    tile_attr = bg_map_attrs[tile_index];
+                    palette = self.palettes_color_bg[tile_attr.palette as usize];
                 }
             }
 
@@ -1271,8 +1292,8 @@ impl Ppu {
     }
 
     fn rgb555_to_rgb888(first: u8, second: u8) -> Pixel {
-        let r = first & 0x1f << 3;
-        let g = (first & 0xe0 >> 5 | (second & 0x03) << 3) << 3;
+        let r = (first & 0x1f) << 3;
+        let g = (((first & 0xe0) >> 5) | ((second & 0x03) << 3)) << 3;
         let b = ((second & 0x7c) >> 2) << 3;
         [r as u8, g as u8, b as u8]
     }

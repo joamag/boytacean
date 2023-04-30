@@ -465,7 +465,8 @@ struct Args {
     #[arg(short, long, default_value_t = String::from("printer"))]
     device: String,
 
-    #[arg(short, long, default_value_t = String::from("../../res/roms.prop/tetris_dx.gbc"))]
+    // TODO: change this to emulator.load_rom(Some("../../res/roms/demo/pocket.gb"));
+    #[arg(short, long, default_value_t = String::from("/Users/joamag/Desktop/repo.other/boytacean/res/roms.prop/tetris_dx.gbc"))]
     rom_path: String,
 }
 
@@ -491,7 +492,6 @@ fn main() {
     let mut emulator = Emulator::new(game_boy);
     emulator.start(SCREEN_SCALE);
     emulator.load_rom(Some(&args.rom_path));
-    //emulator.load_rom(Some("../../res/roms/demo/pocket.gb"));
     emulator.toggle_palette();
     emulator.run();
 }
