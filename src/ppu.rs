@@ -248,7 +248,7 @@ pub struct PpuRegisters {
 /// # Basic usage
 /// ```rust
 /// use boytacean::ppu::Ppu;
-/// let mut ppu = Ppu::new();
+/// let mut ppu = Ppu::default();
 /// ppu.clock(8);
 /// ```
 pub struct Ppu {
