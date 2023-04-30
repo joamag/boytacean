@@ -127,12 +127,6 @@ pub struct GameBoyConfig {
     /// CPU frequency, PPU frequency, Boot rome size, etc.
     mode: GameBoyMode,
 
-    /// Flag that controls if the DMG compatibility mode is
-    /// enabled meaning that some of the PPU decisions will
-    /// be made differently to address this special situation
-    /// (CGB only).
-    dmg_compat: bool,
-
     /// If the PPU is enabled, it will be clocked.
     ppu_enabled: bool,
 
@@ -174,14 +168,6 @@ impl GameBoyConfig {
 
     pub fn set_mode(&mut self, value: GameBoyMode) {
         self.mode = value;
-    }
-
-    pub fn dmg_compat(&self) -> bool {
-        self.dmg_compat
-    }
-
-    pub fn set_dmg_compat(&mut self, value: bool) {
-        self.dmg_compat = value;
     }
 
     pub fn ppu_enabled(&self) -> bool {
@@ -229,7 +215,6 @@ impl Default for GameBoyConfig {
     fn default() -> Self {
         Self {
             mode: GameBoyMode::Dmg,
-            dmg_compat: false,
             ppu_enabled: true,
             apu_enabled: true,
             timer_enabled: true,
@@ -250,12 +235,6 @@ pub struct GameBoy {
     /// This is a clone of the configuration value
     /// kept for performance reasons.
     mode: GameBoyMode,
-
-    /// Flag that controls if the DMG compatibility mode is
-    /// enabled meaning that some of the PPU decisions will
-    /// be made differently to address this special situation
-    /// (CGB only).
-    dmg_compat: bool,
 
     /// If the PPU is enabled, it will be clocked.
     /// This is a clone of the configuration value
@@ -333,7 +312,6 @@ impl GameBoy {
     pub fn new(mode: GameBoyMode) -> Self {
         let gbc = Rc::new(RefCell::new(GameBoyConfig {
             mode,
-            dmg_compat: false,
             ppu_enabled: true,
             apu_enabled: true,
             timer_enabled: true,
@@ -351,7 +329,6 @@ impl GameBoy {
 
         Self {
             mode,
-            dmg_compat: false,
             ppu_enabled: true,
             apu_enabled: true,
             timer_enabled: true,
@@ -620,15 +597,6 @@ impl GameBoy {
         self.ppu().set_gb_mode(value);
     }
 
-    pub fn dmg_compat(&self) -> bool {
-        self.dmg_compat
-    }
-
-    pub fn set_dmg_compat(&mut self, value: bool) {
-        self.dmg_compat = value;
-        (*self.gbc).borrow_mut().set_dmg_compat(value);
-    }
-
     pub fn ppu_enabled(&self) -> bool {
         self.ppu_enabled
     }
@@ -828,7 +796,6 @@ impl GameBoy {
 
     pub fn load_rom(&mut self, data: &[u8]) -> &Cartridge {
         let rom = Cartridge::from_data(data);
-        self.set_dmg_compat(self.is_cgb() && rom.is_legacy());
         self.mmu().set_rom(rom);
         self.mmu().rom()
     }

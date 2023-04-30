@@ -347,7 +347,12 @@ impl Mmu {
                     }
 
                     // 0xFF4C - KEY0 (CGB only)
-                    0x4c => self.key0 = value,
+                    0x4c => {
+                        self.key0 = value;
+                        if self.key0 == 0x04 {
+                            self.ppu().set_dmg_compat(true);
+                        }
+                    }
 
                     // 0xFF4D - KEY1 (CGB only)
                     0x4d => {

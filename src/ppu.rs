@@ -55,6 +55,14 @@ pub const FRAME_BUFFER_SIZE: usize = DISPLAY_WIDTH * DISPLAY_HEIGHT * RGB_SIZE;
 /// custom palettes of the Game Boy.
 pub const PALETTE_COLORS: Palette = [[255, 255, 255], [192, 192, 192], [96, 96, 96], [0, 0, 0]];
 
+pub const DEFAULT_TILE_ATTR: TileData = TileData {
+    palette: 0,
+    vram_bank: 0,
+    xflip: false,
+    yflip: false,
+    priority: false,
+};
+
 /// Defines the Game Boy pixel type as a buffer
 /// with the size of RGB (3 bytes).
 pub type Pixel = [u8; RGB_SIZE];
@@ -451,6 +459,12 @@ pub struct Ppu {
     /// the next CPU clock operation.
     int_stat: bool,
 
+    /// Flag that controls if the DMG compatibility mode is
+    /// enabled meaning that some of the PPU decisions will
+    /// be made differently to address this special situation
+    /// (CGB only).
+    dmg_compat: bool,
+
     gb_mode: GameBoyMode,
 
     gbc: Rc<RefCell<GameBoyConfig>>,
@@ -516,6 +530,7 @@ impl Ppu {
             stat_lyc: false,
             int_vblank: false,
             int_stat: false,
+            dmg_compat: false,
             gb_mode: mode,
             gbc,
         }
@@ -563,6 +578,7 @@ impl Ppu {
         self.stat_lyc = false;
         self.int_vblank = false;
         self.int_stat = false;
+        self.dmg_compat = false;
     }
 
     pub fn clock(&mut self, cycles: u8) {
@@ -747,15 +763,35 @@ impl Ppu {
             0xff43 => self.scx = value,
             0xff45 => self.lyc = value,
             0xff47 => {
-                Self::compute_palette(&mut self.palette_bg, &self.palette_colors, value);
+                if self.dmg_compat {
+                    Self::compute_palette(&mut self.palette_bg, &self.palettes_color_bg[0], value);
+                } else {
+                    Self::compute_palette(&mut self.palette_bg, &self.palette_colors, value);
+                }
                 self.palettes[0] = value;
             }
             0xff48 => {
-                Self::compute_palette(&mut self.palette_obj_0, &self.palette_colors, value);
+                if self.dmg_compat {
+                    Self::compute_palette(
+                        &mut self.palette_obj_0,
+                        &self.palettes_color_obj[0],
+                        value,
+                    );
+                } else {
+                    Self::compute_palette(&mut self.palette_obj_0, &self.palette_colors, value);
+                }
                 self.palettes[1] = value;
             }
             0xff49 => {
-                Self::compute_palette(&mut self.palette_obj_1, &self.palette_colors, value);
+                if self.dmg_compat {
+                    Self::compute_palette(
+                        &mut self.palette_obj_1,
+                        &self.palettes_color_obj[1],
+                        value,
+                    );
+                } else {
+                    Self::compute_palette(&mut self.palette_obj_1, &self.palette_colors, value);
+                }
                 self.palettes[2] = value;
             }
             0xff4a => self.wy = value,
@@ -879,6 +915,14 @@ impl Ppu {
         self.set_int_stat(false);
     }
 
+    pub fn dmg_compat(&self) -> bool {
+        self.dmg_compat
+    }
+
+    pub fn set_dmg_compat(&mut self, value: bool) {
+        self.dmg_compat = value;
+    }
+
     pub fn gb_mode(&self) -> GameBoyMode {
         self.gb_mode
     }
@@ -997,7 +1041,7 @@ impl Ppu {
         if self.first_frame {
             return;
         }
-        if self.gb_mode != GameBoyMode::Dmg || self.switch_bg {
+        if (self.gb_mode == GameBoyMode::Cgb && !self.dmg_compat) || self.switch_bg {
             self.render_map(self.bg_map, self.scx, self.scy, 0, 0, self.ly);
         }
         if self.switch_window {
@@ -1051,12 +1095,20 @@ impl Ppu {
 
         // obtains the reference to the attributes of the new tile in
         // drawing for meta processing (CGB only)
-        let mut tile_attr = &bg_map_attrs[row_offset + line_offset];
+        let mut tile_attr = if self.dmg_compat {
+            &DEFAULT_TILE_ATTR
+        } else {
+            &bg_map_attrs[row_offset + line_offset]
+        };
 
         // retrieves the proper palette for the current tile in drawing
         // taking into consideration if we're running in CGB mode or not
         let mut palette = if self.gb_mode == GameBoyMode::Cgb {
-            &self.palettes_color_bg[tile_attr.palette as usize]
+            if self.dmg_compat {
+                &self.palettes_color_bg[0]
+            } else {
+                &self.palettes_color_bg[tile_attr.palette as usize]
+            }
         } else {
             &self.palette_bg
         };
@@ -1125,12 +1177,20 @@ impl Ppu {
 
                     // obtains the reference to the attributes of the new tile in
                     // drawing for meta processing (CGB only)
-                    tile_attr = &bg_map_attrs[row_offset + line_offset];
+                    tile_attr = if self.dmg_compat {
+                        &DEFAULT_TILE_ATTR
+                    } else {
+                        &bg_map_attrs[row_offset + line_offset]
+                    };
 
                     // retrieves the proper palette for the current tile in drawing
                     // taking into consideration if we're running in CGB mode or not
                     palette = if self.gb_mode == GameBoyMode::Cgb {
-                        &self.palettes_color_bg[tile_attr.palette as usize]
+                        if self.dmg_compat {
+                            &self.palettes_color_bg[0]
+                        } else {
+                            &self.palettes_color_bg[tile_attr.palette as usize]
+                        }
                     } else {
                         &self.palette_bg
                     };
@@ -1165,6 +1225,16 @@ impl Ppu {
         // coordinate takes priority in drawing the pixel
         let mut index_buffer = [-256i16; DISPLAY_WIDTH];
 
+        // determines if the object should always be placed over the
+        // possible background, this is only required for CGB mode
+        let always_over = if self.gb_mode == GameBoyMode::Cgb && !self.dmg_compat {
+            !self.switch_bg
+        } else {
+            false
+        };
+
+        let always_over = false;
+
         for index in 0..OBJ_COUNT {
             // in case the limit on the number of objects to be draw per
             // line has been reached breaks the loop avoiding more draws
@@ -1192,7 +1262,17 @@ impl Ppu {
             }
 
             let palette = if self.gb_mode == GameBoyMode::Cgb {
-                &self.palettes_color_obj[obj.palette_cgb as usize]
+                if self.dmg_compat {
+                    if obj.palette == 0 {
+                        &self.palette_obj_0
+                    } else if obj.palette == 1 {
+                        &self.palette_obj_1
+                    } else {
+                        panic!("Invalid object palette: {:02x}", obj.palette);
+                    }
+                } else {
+                    &self.palettes_color_obj[obj.palette_cgb as usize]
+                }
             } else if obj.palette == 0 {
                 &self.palette_obj_0
             } else if obj.palette == 1 {
@@ -1229,7 +1309,11 @@ impl Ppu {
             // "calculates" the index offset that is going to be applied
             // to the tile index to retrieve the proper tile taking into
             // consideration the VRAM in which the tile is stored
-            let tile_bank_offset = obj.tile_bank as usize * TILE_COUNT_DMG;
+            let tile_bank_offset = if self.dmg_compat {
+                0
+            } else {
+                obj.tile_bank as usize * TILE_COUNT_DMG
+            };
 
             // in case we're facing a 8x16 object then we must
             // differentiate between the handling of the top tile
@@ -1254,6 +1338,10 @@ impl Ppu {
 
             let tile_row = tile.get_row(tile_offset as usize);
 
+            // determines if the object should always be placed over the
+            // previously placed background or window pixels
+            let obj_over = always_over || !obj.bg_over;
+
             for tile_x in 0..TILE_WIDTH {
                 let x = obj.x + tile_x as i16;
                 let is_contained = (x >= 0) && (x < DISPLAY_WIDTH as i16);
@@ -1262,7 +1350,7 @@ impl Ppu {
                     // window should be drawn over or if the underlying pixel
                     // is transparent (zero value) meaning there's no background
                     // or window for the provided pixel
-                    let is_visible = !obj.bg_over || self.color_buffer[color_offset as usize] == 0;
+                    let is_visible = obj_over || self.color_buffer[color_offset as usize] == 0;
 
                     // determines if the current pixel has priority over a possible
                     // one that has been drawn by a previous object, this happens
@@ -1328,19 +1416,37 @@ impl Ppu {
     /// is useful to "flush" color computation whenever the base
     /// palette colors are changed.
     fn compute_palettes(&mut self) {
-        // re-computes the complete set of palettes according to
-        // the currently set palette colors (that may have changed)
-        Self::compute_palette(&mut self.palette_bg, &self.palette_colors, self.palettes[0]);
-        Self::compute_palette(
-            &mut self.palette_obj_0,
-            &self.palette_colors,
-            self.palettes[1],
-        );
-        Self::compute_palette(
-            &mut self.palette_obj_1,
-            &self.palette_colors,
-            self.palettes[2],
-        );
+        if self.dmg_compat {
+            Self::compute_palette(
+                &mut self.palette_bg,
+                &self.palettes_color_bg[0],
+                self.palettes[0],
+            );
+            Self::compute_palette(
+                &mut self.palette_obj_0,
+                &self.palettes_color_obj[0],
+                self.palettes[1],
+            );
+            Self::compute_palette(
+                &mut self.palette_obj_1,
+                &self.palettes_color_obj[1],
+                self.palettes[2],
+            );
+        } else {
+            // re-computes the complete set of palettes according to
+            // the currently set palette colors (that may have changed)
+            Self::compute_palette(&mut self.palette_bg, &self.palette_colors, self.palettes[0]);
+            Self::compute_palette(
+                &mut self.palette_obj_0,
+                &self.palette_colors,
+                self.palettes[1],
+            );
+            Self::compute_palette(
+                &mut self.palette_obj_1,
+                &self.palette_colors,
+                self.palettes[2],
+            );
+        }
 
         // clears the frame buffer to allow the new background
         // color to be used
