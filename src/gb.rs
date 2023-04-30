@@ -174,6 +174,19 @@ impl GameBoyConfig {
     }
 }
 
+impl Default for GameBoyConfig {
+    fn default() -> Self {
+        Self {
+            mode: GameBoyMode::Dmg,
+            ppu_enabled: true,
+            apu_enabled: true,
+            timer_enabled: true,
+            serial_enabled: true,
+            clock_freq: GameBoy::CPU_FREQ,
+        }
+    }
+}
+
 /// Top level structure that abstracts the usage of the
 /// Game Boy system under the Boytacean emulator.
 /// Should serve as the main entry-point API.
@@ -269,7 +282,7 @@ impl GameBoy {
             clock_freq: GameBoy::CPU_FREQ,
         }));
 
-        let ppu = Ppu::default();
+        let ppu = Ppu::new(mode, gbc.clone());
         let apu = Apu::default();
         let pad = Pad::default();
         let timer = Timer::default();
@@ -532,6 +545,7 @@ impl GameBoy {
         self.mode = value;
         (*self.gbc).borrow_mut().set_mode(value);
         self.mmu().set_mode(value);
+        self.ppu().set_gb_mode(value);
     }
 
     pub fn ppu_enabled(&self) -> bool {

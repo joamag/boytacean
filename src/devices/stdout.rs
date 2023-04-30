@@ -1,9 +1,9 @@
+use crate::serial::SerialDevice;
+
 use std::{
     fmt::{self, Display, Formatter},
     io::{stdout, Write},
 };
-
-use crate::serial::SerialDevice;
 
 pub struct StdoutDevice {
     flush: bool,

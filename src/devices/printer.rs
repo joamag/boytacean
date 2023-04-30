@@ -1,6 +1,6 @@
-use std::fmt::{self, Display, Formatter};
-
 use crate::{ppu::PaletteAlpha, serial::SerialDevice, warnln};
+
+use std::fmt::{self, Display, Formatter};
 
 const PRINTER_PALETTE: PaletteAlpha = [
     [0xff, 0xff, 0xff, 0xff],

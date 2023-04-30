@@ -1,5 +1,3 @@
-use std::{cell::RefCell, rc::Rc};
-
 use crate::{
     apu::Apu,
     debugln,
@@ -10,6 +8,8 @@ use crate::{
     serial::Serial,
     timer::Timer,
 };
+
+use std::{cell::RefCell, rc::Rc};
 
 pub const BOOT_SIZE_DMG: usize = 256;
 pub const BOOT_SIZE_CGB: usize = 2304;
@@ -423,5 +423,9 @@ impl Mmu {
 
     pub fn set_mode(&mut self, value: GameBoyMode) {
         self.mode = value;
+    }
+
+    pub fn set_gbc(&mut self, value: Rc<RefCell<GameBoyConfig>>) {
+        self.gbc = value;
     }
 }

@@ -1,6 +1,6 @@
-use std::collections::VecDeque;
-
 use crate::{gb::GameBoy, warnln};
+
+use std::collections::VecDeque;
 
 const DUTY_TABLE: [[u8; 8]; 4] = [
     [0, 0, 0, 0, 0, 0, 0, 1],

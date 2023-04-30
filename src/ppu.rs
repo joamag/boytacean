@@ -1,13 +1,18 @@
+use crate::{
+    gb::{GameBoyConfig, GameBoyMode},
+    warnln,
+};
+
 use core::fmt;
 use std::{
     borrow::BorrowMut,
+    cell::RefCell,
     fmt::{Display, Formatter},
+    rc::Rc,
 };
 
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
-
-use crate::warnln;
 
 pub const VRAM_SIZE_DMG: usize = 8192;
 pub const VRAM_SIZE_CGB: usize = 16384;
@@ -429,6 +434,10 @@ pub struct Ppu {
     /// Boolean value when the LCD STAT interrupt should be handled by
     /// the next CPU clock operation.
     int_stat: bool,
+
+    gb_mode: GameBoyMode,
+
+    gbc: Rc<RefCell<GameBoyConfig>>,
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
@@ -441,7 +450,7 @@ pub enum PpuMode {
 }
 
 impl Ppu {
-    pub fn new() -> Self {
+    pub fn new(mode: GameBoyMode, gbc: Rc<RefCell<GameBoyConfig>>) -> Self {
         Self {
             color_buffer: Box::new([0u8; COLOR_BUFFER_SIZE]),
             frame_buffer: Box::new([0u8; FRAME_BUFFER_SIZE]),
@@ -491,6 +500,8 @@ impl Ppu {
             stat_lyc: false,
             int_vblank: false,
             int_stat: false,
+            gb_mode: mode,
+            gbc,
         }
     }
 
@@ -662,7 +673,7 @@ impl Ppu {
             // 0xFF69 — BCPD/BGPD (CGB only)
             0xff69 => self.palettes_color[0][self.palette_address_bg as usize],
             // 0xFF6A — OCPS/OBPI (CGB only)
-            0xff6A => self.palette_address_obj | if self.auto_increment_obj { 0x80 } else { 0x00 },
+            0xff6a => self.palette_address_obj | if self.auto_increment_obj { 0x80 } else { 0x00 },
             // 0xFF6B — OCPD/OBPD (CGB only)
             0xff6b => self.palettes_color[1][self.palette_address_obj as usize],
             _ => {
@@ -854,6 +865,18 @@ impl Ppu {
         self.set_int_stat(false);
     }
 
+    pub fn gb_mode(&self) -> GameBoyMode {
+        self.gb_mode
+    }
+
+    pub fn set_gb_mode(&mut self, value: GameBoyMode) {
+        self.gb_mode = value;
+    }
+
+    pub fn set_gbc(&mut self, value: Rc<RefCell<GameBoyConfig>>) {
+        self.gbc = value;
+    }
+
     /// Fills the frame buffer with pixels of the provided color,
     /// this method must represent the fastest way of achieving
     /// the fill background with color operation.
@@ -928,7 +951,7 @@ impl Ppu {
     }
 
     fn update_bg_map_attrs(&mut self, addr: u16, value: u8) {
-        let bg_map = addr > 0x9bff;
+        let bg_map = addr >= 0x9c00;
         let tile_index = if bg_map { addr - 0x9c00 } else { addr - 0x9800 };
         let bg_map_attrs = if bg_map {
             &mut self.bg_map_attrs_1
@@ -977,16 +1000,6 @@ impl Ppu {
             return;
         }
 
-        // calculates the row offset for the tile by using the current line
-        // index and the DY (scroll Y) divided by 8 (as the tiles are 8x8 pixels),
-        // on top of that ensures that the result is modulus 32 meaning that the
-        // drawing wraps around the Y axis
-        let row_offset = (((ld as usize + scy as usize) & 0xff) >> 3) % 32;
-
-        // obtains the base address of the background map using the bg map flag
-        // that control which background map is going to be used
-        let mut map_offset: usize = if map { 0x1c00 } else { 0x1800 };
-
         // selects the correct background attributes map based on the bg map flag
         // because the attributes are separated according to the map they represent
         let bg_map_attrs = if map {
@@ -995,9 +1008,19 @@ impl Ppu {
             self.bg_map_attrs_0
         };
 
-        // increments the map offset by the row offset multiplied by the number
+        // obtains the base address of the background map using the bg map flag
+        // that control which background map is going to be used
+        let map_offset: usize = if map { 0x1c00 } else { 0x1800 };
+
+        // calculates the map row index for the tile by using the current line
+        // index and the DY (scroll Y) divided by 8 (as the tiles are 8x8 pixels),
+        // on top of that ensures that the result is modulus 32 meaning that the
+        // drawing wraps around the Y axis
+        let row_index = (((ld as usize + scy as usize) & 0xff) >> 3) % 32;
+
+        // calculates the map offset by the row offset multiplied by the number
         // of tiles in each row (32)
-        map_offset += row_offset * 32;
+        let row_offset = row_index * 32;
 
         // calculates the sprite line offset by using the SCX register
         // shifted by 3 meaning that the tiles are 8x8
@@ -1006,14 +1029,22 @@ impl Ppu {
         // calculates the index of the initial tile in drawing,
         // if the tile data set in use is #1, the indexes are
         // signed, then calculates a real tile offset
-        let mut tile_index = self.vram[map_offset + line_offset] as usize;
+        let mut tile_index = self.vram[map_offset + row_offset + line_offset] as usize;
         if !self.bg_tile && tile_index < 128 {
             tile_index += 256;
         }
 
-        //@TODO: this is conditional to the CG mode!!!
-        let mut tile_attr = bg_map_attrs[tile_index];
-        let mut palette = self.palettes_color_bg[tile_attr.palette as usize];
+        // obtains the reference to the attributes of the new tile in
+        // drawing for meta processing (CGB only)
+        let mut tile_attr = &bg_map_attrs[row_offset + line_offset];
+
+        // retrieves the proper palette for the current tile in drawing
+        // taking into consideration if we're running in CGB mode or not
+        let mut palette = if self.gb_mode == GameBoyMode::Cgb {
+            &self.palettes_color_bg[tile_attr.palette as usize]
+        } else {
+            &self.palette_bg
+        };
 
         // calculates the offset that is going to be used in the update of the color buffer
         // which stores Game Boy colors from 0 to 3
@@ -1036,8 +1067,6 @@ impl Ppu {
                 // obtains the current pixel data from the tile and
                 // re-maps it according to the current palette
                 let pixel = self.tiles[tile_index].get(x, y);
-                // TODO: make this color work!!!
-                //let color = self.palette_bg[pixel as usize];
                 let color = palette[pixel as usize];
 
                 // updates the pixel in the color buffer, which stores
@@ -1065,13 +1094,22 @@ impl Ppu {
 
                     // calculates the tile index and makes sure the value
                     // takes into consideration the bg tile value
-                    tile_index = self.vram[map_offset + line_offset] as usize;
+                    tile_index = self.vram[map_offset + row_offset + line_offset] as usize;
                     if !self.bg_tile && tile_index < 128 {
                         tile_index += 256;
                     }
 
-                    tile_attr = bg_map_attrs[tile_index];
-                    palette = self.palettes_color_bg[tile_attr.palette as usize];
+                    // obtains the reference to the attributes of the new tile in
+                    // drawing for meta processing (CGB only)
+                    tile_attr = &bg_map_attrs[row_offset + line_offset];
+
+                    // retrieves the proper palette for the current tile in drawing
+                    // taking into consideration if we're running in CGB mode or not
+                    palette = if self.gb_mode == GameBoyMode::Cgb {
+                        &self.palettes_color_bg[tile_attr.palette as usize]
+                    } else {
+                        &self.palette_bg
+                    };
                 }
             }
 
@@ -1301,7 +1339,10 @@ impl Ppu {
 
 impl Default for Ppu {
     fn default() -> Self {
-        Self::new()
+        Self::new(
+            GameBoyMode::Dmg,
+            Rc::new(RefCell::new(GameBoyConfig::default())),
+        )
     }
 }
 
@@ -1311,7 +1352,7 @@ mod tests {
 
     #[test]
     fn test_update_tile_simple() {
-        let mut ppu = Ppu::new();
+        let mut ppu = Ppu::default();
         ppu.vram[0x0000] = 0xff;
         ppu.vram[0x0001] = 0xff;
 
@@ -1325,7 +1366,7 @@ mod tests {
 
     #[test]
     fn test_update_tile_upper() {
-        let mut ppu = Ppu::new();
+        let mut ppu = Ppu::default();
         ppu.vram[0x1000] = 0xff;
         ppu.vram[0x1001] = 0xff;
 

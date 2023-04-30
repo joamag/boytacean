@@ -1,6 +1,3 @@
-use core::panic;
-use std::{cell::RefCell, rc::Rc};
-
 use crate::{
     apu::Apu,
     debugln,
@@ -12,6 +9,9 @@ use crate::{
     serial::Serial,
     timer::Timer,
 };
+
+use core::panic;
+use std::{cell::RefCell, rc::Rc};
 
 pub const PREFIX: u8 = 0xcb;
 
@@ -552,5 +552,9 @@ impl Cpu {
     #[inline(always)]
     pub fn disable_int(&mut self) {
         self.ime = false;
+    }
+
+    pub fn set_gbc(&mut self, value: Rc<RefCell<GameBoyConfig>>) {
+        self.gbc = value;
     }
 }
