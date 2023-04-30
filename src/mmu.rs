@@ -31,6 +31,8 @@ pub struct Mmu {
 
     pub speed: GameBoySpeed,
 
+    pub switching: bool,
+
     /// Reference to the PPU (Pixel Processing Unit) that is going
     /// to be used both for VRAM reading/writing and to forward
     /// some of the access operations.
@@ -113,6 +115,7 @@ impl Mmu {
             ie: 0x0,
             key0: 0x0,
             speed: GameBoySpeed::Normal,
+            switching: false,
             mode,
             gbc,
         }
@@ -127,6 +130,8 @@ impl Mmu {
         self.ram_offset = 0x1000;
         self.ie = 0x0;
         self.key0 = 0x0;
+        self.speed = GameBoySpeed::Normal;
+        self.switching = false;
     }
 
     pub fn allocate_default(&mut self) {
@@ -345,7 +350,13 @@ impl Mmu {
                     0x4c => self.key0 = value,
 
                     // 0xFF4D - KEY1 (CGB only)
-                    0x4d => todo!("CGB speed switch WRITE"),
+                    0x4d => {
+                        // @TODO: The switching of CPU speed is not yet
+                        // implemented and required more work to be done.
+                        // Inclusive the propagation of the speed to the
+                        // controller emulator.
+                        self.switching = value & 0x01 == 0x01;
+                    }
 
                     // 0xFF50 - Boot active flag
                     0x50 => self.boot_active = false,

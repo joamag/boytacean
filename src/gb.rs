@@ -89,6 +89,36 @@ pub enum GameBoySpeed {
     Double = 1,
 }
 
+impl GameBoySpeed {
+    pub fn description(&self) -> &'static str {
+        match self {
+            GameBoySpeed::Normal => "Normal Speed",
+            GameBoySpeed::Double => "Double Speed",
+        }
+    }
+
+    pub fn switch(&self) -> GameBoySpeed {
+        match self {
+            GameBoySpeed::Normal => GameBoySpeed::Double,
+            GameBoySpeed::Double => GameBoySpeed::Normal,
+        }
+    }
+
+    pub fn from_u8(value: u8) -> GameBoySpeed {
+        match value {
+            0 => GameBoySpeed::Normal,
+            1 => GameBoySpeed::Double,
+            _ => panic!("Invalid speed value: {}", value),
+        }
+    }
+}
+
+impl Display for GameBoySpeed {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.description())
+    }
+}
+
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct GameBoyConfig {

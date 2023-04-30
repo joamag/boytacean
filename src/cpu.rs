@@ -541,7 +541,11 @@ impl Cpu {
 
     #[inline(always)]
     pub fn stop(&mut self) {
-        panic!("STOP is not implemented");
+        let mmu = self.mmu();
+        if mmu.switching {
+            mmu.switching = false;
+            mmu.speed = mmu.speed.switch();
+        }
     }
 
     #[inline(always)]
