@@ -192,8 +192,7 @@ impl Mmu {
                 }
                 if self.boot_active
                     && self.mode == GameBoyMode::Cgb
-                    && addr >= 0x0200
-                    && addr <= 0x08ff
+                    && (0x0200..=0x08ff).contains(&addr)
                 {
                     return self.boot[addr as usize];
                 }

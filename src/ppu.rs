@@ -1333,7 +1333,7 @@ impl Ppu {
         let r = (first & 0x1f) << 3;
         let g = (((first & 0xe0) >> 5) | ((second & 0x03) << 3)) << 3;
         let b = ((second & 0x7c) >> 2) << 3;
-        [r as u8, g as u8, b as u8]
+        [r, g, b]
     }
 }
 
