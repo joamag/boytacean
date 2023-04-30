@@ -84,6 +84,13 @@ impl Display for GameBoyMode {
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 #[derive(Clone, Copy, PartialEq, Eq)]
+pub enum GameBoySpeed {
+    Normal = 0,
+    Double = 1,
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct GameBoyConfig {
     /// The current running mode of the emulator, this
     /// may affect many aspects of the emulation, like

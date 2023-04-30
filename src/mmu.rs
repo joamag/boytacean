@@ -1,7 +1,7 @@
 use crate::{
     apu::Apu,
     debugln,
-    gb::{GameBoyConfig, GameBoyMode},
+    gb::{GameBoyConfig, GameBoyMode, GameBoySpeed},
     pad::Pad,
     ppu::Ppu,
     rom::Cartridge,
@@ -28,6 +28,8 @@ pub struct Mmu {
     /// and 0xC0 for games that are compatible only with a CGB device
     /// (CGB only).
     pub key0: u8,
+
+    pub speed: GameBoySpeed,
 
     /// Reference to the PPU (Pixel Processing Unit) that is going
     /// to be used both for VRAM reading/writing and to forward
@@ -110,6 +112,7 @@ impl Mmu {
             ram_offset: 0x1000,
             ie: 0x0,
             key0: 0x0,
+            speed: GameBoySpeed::Normal,
             mode,
             gbc,
         }
@@ -253,7 +256,7 @@ impl Mmu {
                     0x4c => self.key0,
 
                     // 0xFF4D - KEY1 (CGB only)
-                    0x4d => todo!("CGB speed switch"),
+                    0x4d => (false as u8) | ((self.speed as u8) << 7),
 
                     // 0xFF50 - Boot active flag
                     0x50 => u8::from(self.boot_active),
