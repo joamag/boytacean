@@ -782,10 +782,10 @@ impl Ppu {
             }
             // 0xFF6B — OCPD/OBPD (CGB only)
             0xff6b => {
-                let palette_index = self.palette_address_bg / 8;
+                let palette_index = self.palette_address_obj / 8;
 
                 let palette_color = &mut self.palettes_color[1];
-                palette_color[self.palette_address_bg as usize] = value;
+                palette_color[self.palette_address_obj as usize] = value;
                 let palette = &mut self.palettes_color_obj[palette_index as usize];
                 Self::compute_palette_color(palette, palette_color, palette_index);
 
@@ -910,7 +910,7 @@ impl Ppu {
     /// with tiles.
     fn update_tile(&mut self, addr: u16, _value: u8) {
         let addr = (self.vram_offset + (addr & 0x1ffe)) as usize;
-        let tile_index = (addr >> 4) & 0x01ff;
+        let tile_index = ((addr >> 4) & 0x01ff) + (self.vram_bank as usize * TILE_COUNT_DMG);
         let tile = self.tiles[tile_index].borrow_mut();
         let y = (addr >> 1) & 0x0007;
 
@@ -966,8 +966,7 @@ impl Ppu {
         };
         let tile_data: &mut TileData = bg_map_attrs[tile_index as usize].borrow_mut();
         tile_data.palette = value & 0x07;
-        tile_data.vram_bank = (value & 0x08) >> 4;
-        tile_data.vram_bank = (value & 0x08) >> 4;
+        tile_data.vram_bank = (value & 0x08 == 0x08) as u8;
         tile_data.xflip = value & 0x20 == 0x20;
         tile_data.yflip = value & 0x40 == 0x40;
         tile_data.priority = value & 0x80 == 0x80;
@@ -1052,6 +1051,10 @@ impl Ppu {
             &self.palette_bg
         };
 
+        // increments the tile index value by the required offset for the VRAM
+        // bank in which the tile is stored, this is only required for CGB mode
+        tile_index += tile_attr.vram_bank as usize * TILE_COUNT_DMG;
+
         // calculates the offset that is going to be used in the update of the color buffer
         // which stores Game Boy colors from 0 to 3
         let mut color_offset = self.ly as usize * DISPLAY_WIDTH;
@@ -1116,6 +1119,10 @@ impl Ppu {
                     } else {
                         &self.palette_bg
                     };
+
+                    // increments the tile index value by the required offset for the VRAM
+                    // bank in which the tile is stored, this is only required for CGB mode
+                    tile_index += tile_attr.vram_bank as usize * TILE_COUNT_DMG;
                 }
             }
 
@@ -1199,22 +1206,30 @@ impl Ppu {
             // is going to be used in the current operation
             let tile: &Tile;
 
+            // "calculates" the index offset that is going to be applied
+            // to the tile index to retrieve the proper tile taking into
+            // consideration the VRAM in which the tile is stored
+            let tile_bank_offset = obj.tile_bank as usize * TILE_COUNT_DMG;
+
             // in case we're facing a 8x16 object then we must
             // differentiate between the handling of the top tile
             // and the bottom tile through bitwise manipulation
             // of the tile index
             if self.obj_size {
                 if tile_offset < 8 {
-                    tile = &self.tiles[obj.tile as usize & 0xfe];
+                    let tile_index = (obj.tile as usize & 0xfe) + tile_bank_offset;
+                    tile = &self.tiles[tile_index];
                 } else {
-                    tile = &self.tiles[obj.tile as usize | 0x01];
+                    let tile_index = (obj.tile as usize | 0x01) + tile_bank_offset;
+                    tile = &self.tiles[tile_index];
                     tile_offset -= 8;
                 }
             }
             // otherwise we're facing a 8x8 sprite and we should grab
             // the tile directly from the object's tile index
             else {
-                tile = &self.tiles[obj.tile as usize];
+                let tile_index = obj.tile as usize + tile_bank_offset;
+                tile = &self.tiles[tile_index as usize];
             }
 
             let tile_row = tile.get_row(tile_offset as usize);

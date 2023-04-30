@@ -22,6 +22,13 @@ pub struct Mmu {
     /// to be enabled and should be triggered.
     pub ie: u8,
 
+    /// Register that controls the compatibility mode in use, this
+    /// value comes directly from 0x0143 (CGB flag). The possible (and
+    /// valid) values are: 0x80 for games that support CGB enhancements
+    /// and 0xC0 for games that are compatible only with a CGB device
+    /// (CGB only).
+    pub key0: u8,
+
     /// Reference to the PPU (Pixel Processing Unit) that is going
     /// to be used both for VRAM reading/writing and to forward
     /// some of the access operations.
@@ -102,6 +109,7 @@ impl Mmu {
             ram_bank: 0x1,
             ram_offset: 0x1000,
             ie: 0x0,
+            key0: 0x0,
             mode,
             gbc,
         }
@@ -115,6 +123,7 @@ impl Mmu {
         self.ram_bank = 0x1;
         self.ram_offset = 0x1000;
         self.ie = 0x0;
+        self.key0 = 0x0;
     }
 
     pub fn allocate_default(&mut self) {
@@ -241,7 +250,7 @@ impl Mmu {
                     }
 
                     // 0xFF4C - KEY0 (CGB only)
-                    0x4c => todo!("Need to see what to do with KEY0"),
+                    0x4c => self.key0,
 
                     // 0xFF4D - KEY1 (CGB only)
                     0x4d => todo!("CGB speed switch"),
@@ -328,6 +337,12 @@ impl Mmu {
                         self.serial.set_int_serial(value & 0x08 == 0x08);
                         self.pad.set_int_pad(value & 0x10 == 0x10);
                     }
+
+                    // 0xFF4C - KEY0 (CGB only)
+                    0x4c => self.key0 = value,
+
+                    // 0xFF4D - KEY1 (CGB only)
+                    0x4d => todo!("CGB speed switch WRITE"),
 
                     // 0xFF50 - Boot active flag
                     0x50 => self.boot_active = false,
