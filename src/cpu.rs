@@ -10,7 +10,6 @@ use crate::{
     timer::Timer,
 };
 
-use core::panic;
 use std::{cell::RefCell, rc::Rc};
 
 pub const PREFIX: u8 = 0xcb;
