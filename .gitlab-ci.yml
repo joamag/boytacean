@@ -26,15 +26,15 @@ build-rust:
   stage: build
   parallel:
     matrix:
-      - RUST_VERSION: ["1.56.1", "1.60.0", "stable", "nightly"]
+      - RUST_VERSION: ["1.60.0", "stable", "nightly"]
   script:
     - rustup toolchain install $RUST_VERSION
     - rustup override set $RUST_VERSION
     - rustup component add rustfmt
     - rustup component add clippy
     - rustc --version
-    - if [[ $RUST_VERSION != "1.56.1" ]]; then cargo fmt --all -- --check; fi
-    - if [[ $RUST_VERSION != "1.56.1" ]] && [[ $RUST_VERSION != nightly ]]; then cargo clippy -- -D warnings -A unknown-lints; fi
+    - cargo fmt --all -- --check
+    - if [[ $RUST_VERSION != nightly ]]; then cargo clippy -- -D warnings -A unknown-lints; fi
     - cargo build
     - cargo build --release
 
@@ -60,7 +60,7 @@ test-rust:
   stage: test
   parallel:
     matrix:
-      - RUST_VERSION: ["1.56.1", "1.60.0", "stable", "nightly"]
+      - RUST_VERSION: ["1.60.0", "stable", "nightly"]
   script:
     - rustup toolchain install $RUST_VERSION
     - rustup override set $RUST_VERSION

@@ -35,10 +35,7 @@ lto = true
 opt-level = 3
 
 [workspace]
-members = [
-    ".",
-    "frontends/sdl",
-]
+members = [".", "frontends/sdl"]
 
 [package.metadata.docs.rs]
 features = ["wasm", "gen-mock"]
