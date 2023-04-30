@@ -368,6 +368,8 @@ pub struct Ppu {
     mode_clock: u16,
 
     /// Controls if the background is going to be drawn to screen.
+    /// In CGB mode this flag controls the master priority instead
+    /// enabling or disabling complex priority rules.
     switch_bg: bool,
 
     /// Controls if the sprites/objects are going to be drawn to screen.
@@ -985,7 +987,7 @@ impl Ppu {
         if self.first_frame {
             return;
         }
-        if self.switch_bg {
+        if self.gb_mode != GameBoyMode::Dmg || self.switch_bg {
             self.render_map(self.bg_map, self.scx, self.scy, 0, 0, self.ly);
         }
         if self.switch_window {
