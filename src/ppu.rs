@@ -154,6 +154,8 @@ pub struct ObjectData {
     x: i16,
     y: i16,
     tile: u8,
+    palette_cgb: u8,
+    tile_bank: u8,
     palette: u8,
     xflip: bool,
     yflip: bool,
@@ -167,6 +169,8 @@ impl ObjectData {
             x: 0,
             y: 0,
             tile: 0,
+            palette_cgb: 0,
+            tile_bank: 0,
             palette: 0,
             xflip: false,
             yflip: false,
@@ -940,6 +944,8 @@ impl Ppu {
             0x01 => obj.x = value as i16 - 8,
             0x02 => obj.tile = value,
             0x03 => {
+                obj.palette_cgb = value & 0x07;
+                obj.tile_bank = (value & 0x08 == 0x08) as u8;
                 obj.palette = (value & 0x10 == 0x10) as u8;
                 obj.xflip = value & 0x20 == 0x20;
                 obj.yflip = value & 0x40 == 0x40;
@@ -1158,10 +1164,14 @@ impl Ppu {
                 continue;
             }
 
-            let palette = if obj.palette == 0 {
-                self.palette_obj_0
+            let palette = if self.gb_mode == GameBoyMode::Cgb {
+                &self.palettes_color_obj[obj.palette_cgb as usize]
             } else {
-                self.palette_obj_1
+                if obj.palette == 0 {
+                    &self.palette_obj_0
+                } else {
+                    &self.palette_obj_1
+                }
             };
 
             // calculates the offset in the color buffer (raw color information
