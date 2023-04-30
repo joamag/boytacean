@@ -503,17 +503,22 @@ impl Cartridge {
     }
 
     pub fn description(&self, column_length: usize) -> String {
+        let name_l = format!("{:width$}", "Name", width = column_length);
+        let type_l = format!("{:width$}", "Type", width = column_length);
+        let rom_size_l = format!("{:width$}", "ROM Size", width = column_length);
+        let ram_size_l = format!("{:width$}", "RAM Size", width = column_length);
+        let cgb_l = format!("{:width$}", "CGB Mode", width = column_length);
         format!(
             "{}  {}\n{}  {}\n{}  {}\n{}  {}\n{}  {}",
-            format!("{:width$}", "Name", width = column_length),
+            name_l,
             self.title(),
-            format!("{:width$}", "Type", width = column_length),
+            type_l,
             self.rom_type(),
-            format!("{:width$}", "ROM Size", width = column_length),
+            rom_size_l,
             self.rom_size(),
-            format!("{:width$}", "RAM Size", width = column_length),
+            ram_size_l,
             self.ram_size(),
-            format!("{:width$}", "CGB Mode", width = column_length),
+            cgb_l,
             self.cgb_flag()
         )
     }

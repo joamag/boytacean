@@ -474,7 +474,7 @@ fn main() {
     // parses the provided command line arguments and uses them to
     // obtain structured values
     let args = Args::parse();
-    let mode: GameBoyMode = GameBoyMode::from_str(&args.mode);
+    let mode: GameBoyMode = GameBoyMode::from_string(&args.mode);
 
     // creates a new Game Boy instance and loads both the boot ROM
     // and the initial game ROM to "start the engine"

@@ -66,7 +66,7 @@ impl GameBoyMode {
         }
     }
 
-    pub fn from_str(value: &str) -> GameBoyMode {
+    pub fn from_string(value: &str) -> GameBoyMode {
         match value {
             "dmg" => GameBoyMode::Dmg,
             "cgb" => GameBoyMode::Cgb,
@@ -627,19 +627,25 @@ impl GameBoy {
     }
 
     pub fn description(&self, column_length: usize) -> String {
+        let version_l = format!("{:width$}", "Version", width = column_length);
+        let mode_l = format!("{:width$}", "Mode", width = column_length);
+        let clock_l = format!("{:width$}", "Clock", width = column_length);
+        let ram_size_l = format!("{:width$}", "RAM Size", width = column_length);
+        let vram_size_l = format!("{:width$}", "VRAM Size", width = column_length);
+        let serial_l = format!("{:width$}", "Serial", width = column_length);
         format!(
             "{}  {}\n{}  {}\n{}  {}\n{}  {}\n{}  {}\n{}  {}",
-            format!("{:width$}", "Version", width = column_length),
+            version_l,
             VERSION,
-            format!("{:width$}", "Mode", width = column_length),
+            mode_l,
             self.mode(),
-            format!("{:width$}", "Clock", width = column_length),
+            clock_l,
             self.clock_freq_s(),
-            format!("{:width$}", "RAM Size", width = column_length),
+            ram_size_l,
             self.ram_size(),
-            format!("{:width$}", "VRAM Size", width = column_length),
+            vram_size_l,
             self.vram_size(),
-            format!("{:width$}", "Serial", width = column_length),
+            serial_l,
             self.serial_i().device().description(),
         )
     }
