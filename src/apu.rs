@@ -61,7 +61,7 @@ pub struct Apu {
     ch3_length_stop: bool,
     ch3_enabled: bool,
 
-    ch4_timer: i16,
+    ch4_timer: i32,
     ch4_envelope_sequence: u8,
     ch4_envelope_enabled: bool,
     ch4_output: u8,
@@ -782,7 +782,7 @@ impl Apu {
 
     #[inline(always)]
     fn tick_ch4(&mut self, cycles: u8) {
-        self.ch4_timer = self.ch4_timer.saturating_sub(cycles as i16);
+        self.ch4_timer = self.ch4_timer.saturating_sub(cycles as i32);
         if self.ch4_timer > 0 {
             return;
         }
@@ -810,7 +810,7 @@ impl Apu {
         }
 
         self.ch4_timer +=
-            ((CH4_DIVISORS[self.ch4_divisor as usize] as u16) << self.ch4_clock_shift) as i16;
+            ((CH4_DIVISORS[self.ch4_divisor as usize] as u16) << self.ch4_clock_shift) as i32;
     }
 
     #[inline(always)]
@@ -835,7 +835,7 @@ impl Apu {
     #[inline(always)]
     fn trigger_ch4(&mut self) {
         self.ch4_timer =
-            ((CH4_DIVISORS[self.ch4_divisor as usize] as u16) << self.ch4_clock_shift) as i16;
+            ((CH4_DIVISORS[self.ch4_divisor as usize] as u16) << self.ch4_clock_shift) as i32;
         self.ch4_lfsr = 0x7ff1;
         self.ch4_envelope_sequence = 0;
     }
