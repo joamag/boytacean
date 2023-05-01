@@ -1114,6 +1114,8 @@ impl Ppu {
 
         // obtains the reference to the attributes of the new tile in
         // drawing for meta processing (CGB only)
+        // @TODO: This strategy seems a bit naive, need to figure out
+        // if there's a better way to do this and a more performant one
         let mut tile_attr = if self.dmg_compat {
             &DEFAULT_TILE_ATTR
         } else {
