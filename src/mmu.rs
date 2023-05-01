@@ -1,3 +1,5 @@
+use std::{cell::RefCell, rc::Rc};
+
 use crate::{
     apu::Apu,
     debugln,
@@ -8,8 +10,6 @@ use crate::{
     serial::Serial,
     timer::Timer,
 };
-
-use std::{cell::RefCell, rc::Rc};
 
 pub const BOOT_SIZE_DMG: usize = 256;
 pub const BOOT_SIZE_CGB: usize = 2304;

@@ -1,3 +1,5 @@
+use std::{cell::RefCell, rc::Rc};
+
 use crate::{
     apu::Apu,
     debugln,
@@ -9,8 +11,6 @@ use crate::{
     serial::Serial,
     timer::Timer,
 };
-
-use std::{cell::RefCell, rc::Rc};
 
 pub const PREFIX: u8 = 0xcb;
 

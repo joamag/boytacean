@@ -1,14 +1,14 @@
-use crate::{
-    gb::{GameBoyConfig, GameBoyMode},
-    warnln,
-};
-
 use core::fmt;
 use std::{
     borrow::BorrowMut,
     cell::RefCell,
     fmt::{Display, Formatter},
     rc::Rc,
+};
+
+use crate::{
+    gb::{GameBoyConfig, GameBoyMode},
+    warnln,
 };
 
 #[cfg(feature = "wasm")]

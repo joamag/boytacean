@@ -1,3 +1,10 @@
+use std::{
+    cell::RefCell,
+    collections::VecDeque,
+    fmt::{self, Display, Formatter},
+    rc::Rc,
+};
+
 use crate::{
     apu::Apu,
     cpu::Cpu,
@@ -11,13 +18,6 @@ use crate::{
     serial::{NullDevice, Serial, SerialDevice},
     timer::Timer,
     util::read_file,
-};
-
-use std::{
-    cell::RefCell,
-    collections::VecDeque,
-    fmt::{self, Display, Formatter},
-    rc::Rc,
 };
 
 #[cfg(feature = "wasm")]
