@@ -763,6 +763,9 @@ impl Ppu {
             0xff43 => self.scx = value,
             0xff45 => self.lyc = value,
             0xff47 => {
+                if value == self.palettes[0] {
+                    return;
+                }
                 if self.dmg_compat {
                     Self::compute_palette(&mut self.palette_bg, &self.palettes_color_bg[0], value);
                 } else {
@@ -771,6 +774,9 @@ impl Ppu {
                 self.palettes[0] = value;
             }
             0xff48 => {
+                if value == self.palettes[1] {
+                    return;
+                }
                 if self.dmg_compat {
                     Self::compute_palette(
                         &mut self.palette_obj_0,
@@ -783,6 +789,9 @@ impl Ppu {
                 self.palettes[1] = value;
             }
             0xff49 => {
+                if value == self.palettes[2] {
+                    return;
+                }
                 if self.dmg_compat {
                     Self::compute_palette(
                         &mut self.palette_obj_1,
@@ -1041,10 +1050,12 @@ impl Ppu {
         if self.first_frame {
             return;
         }
-        if (self.gb_mode == GameBoyMode::Cgb && !self.dmg_compat) || self.switch_bg {
+        let switch_bg_window =
+            (self.gb_mode == GameBoyMode::Cgb && !self.dmg_compat) || self.switch_bg;
+        if switch_bg_window {
             self.render_map(self.bg_map, self.scx, self.scy, 0, 0, self.ly);
         }
-        if self.switch_window {
+        if switch_bg_window && self.switch_window {
             self.render_map(self.window_map, 0, 0, self.wx, self.wy, self.window_counter);
         }
         if self.switch_obj {
@@ -1105,7 +1116,7 @@ impl Ppu {
         // taking into consideration if we're running in CGB mode or not
         let mut palette = if self.gb_mode == GameBoyMode::Cgb {
             if self.dmg_compat {
-                &self.palettes_color_bg[0]
+                &self.palette_bg
             } else {
                 &self.palettes_color_bg[tile_attr.palette as usize]
             }
@@ -1187,7 +1198,7 @@ impl Ppu {
                     // taking into consideration if we're running in CGB mode or not
                     palette = if self.gb_mode == GameBoyMode::Cgb {
                         if self.dmg_compat {
-                            &self.palettes_color_bg[0]
+                            &self.palette_bg
                         } else {
                             &self.palettes_color_bg[tile_attr.palette as usize]
                         }
@@ -1232,8 +1243,6 @@ impl Ppu {
         } else {
             false
         };
-
-        let always_over = false;
 
         for index in 0..OBJ_COUNT {
             // in case the limit on the number of objects to be draw per
