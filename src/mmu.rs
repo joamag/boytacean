@@ -8,7 +8,7 @@ use crate::{
     ppu::Ppu,
     rom::Cartridge,
     serial::Serial,
-    timer::Timer,
+    timer::Timer, warnln,
 };
 
 pub const BOOT_SIZE_DMG: usize = 256;
@@ -257,10 +257,10 @@ impl Mmu {
                             | if self.pad.int_pad() { 0x10 } else { 0x00 })
                     }
 
-                    // 0xFF4C - KEY0 (CGB only)
+                    // 0xFF4C - KEY0: Compatibility flag (CGB only)
                     0x4c => self.key0,
 
-                    // 0xFF4D - KEY1 (CGB only)
+                    // 0xFF4D - KEY1: Speed switching (CGB only)
                     0x4d => (false as u8) | ((self.speed as u8) << 7),
 
                     // 0xFF50 - Boot active flag
@@ -346,7 +346,7 @@ impl Mmu {
                         self.pad.set_int_pad(value & 0x10 == 0x10);
                     }
 
-                    // 0xFF4C - KEY0 (CGB only)
+                    // 0xFF4C - KEY0: Compatibility flag (CGB only)
                     0x4c => {
                         self.key0 = value;
                         if value == 0x04 {
@@ -354,8 +354,10 @@ impl Mmu {
                         }
                     }
 
-                    // 0xFF4D - KEY1 (CGB only)
+                    // 0xFF4D - KEY1: Speed switching (CGB only)
                     0x4d => {
+                        warnln!("Switching speed is not yet implemented");
+
                         // @TODO: The switching of CPU speed is not yet
                         // implemented and required more work to be done.
                         // Inclusive the propagation of the speed to the
