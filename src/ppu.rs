@@ -933,7 +933,7 @@ impl Ppu {
 
         // if we're switching to the DMG compat mode
         // then we need to recompute the palettes so
-        // that the colors are correct according to 
+        // that the colors are correct according to
         // the compat palettes set by the Boot ROM
         if value {
             self.compute_palettes();
