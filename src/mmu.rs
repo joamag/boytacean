@@ -8,7 +8,8 @@ use crate::{
     ppu::Ppu,
     rom::Cartridge,
     serial::Serial,
-    timer::Timer, warnln,
+    timer::Timer,
+    warnln,
 };
 
 pub const BOOT_SIZE_DMG: usize = 256;
