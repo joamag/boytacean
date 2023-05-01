@@ -1,7 +1,7 @@
+use crate::warnln;
+
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
-
-use crate::warnln;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum PadSelection {
