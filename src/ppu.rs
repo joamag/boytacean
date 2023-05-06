@@ -1143,6 +1143,9 @@ impl Ppu {
         // bank in which the tile is stored, this is only required for CGB mode
         tile_index += tile_attr.vram_bank as usize * TILE_COUNT_DMG;
 
+        // obtains the reference to the tile that is going to be drawn
+        let mut tile = &self.tiles[tile_index];
+
         // calculates the offset that is going to be used in the update of the color buffer
         // which stores Game Boy colors from 0 to 3
         let mut color_offset = self.ly as usize * DISPLAY_WIDTH;
@@ -1163,8 +1166,8 @@ impl Ppu {
             if index as i16 >= wx as i16 - 7 {
                 // obtains the current pixel data from the tile and
                 // re-maps it according to the current palette
-                let pixel = self.tiles[tile_index].get_flipped(x, y, xflip, yflip);
-                let color = palette[pixel as usize];
+                let pixel = tile.get_flipped(x, y, xflip, yflip);
+                let color = &palette[pixel as usize];
 
                 // updates the pixel in the color buffer, which stores
                 // the raw pixel color information (unmapped)
@@ -1196,34 +1199,19 @@ impl Ppu {
                         tile_index += 256;
                     }
 
-                    // obtains the reference to the attributes of the new tile in
-                    // drawing for meta processing (CGB only)
-                    tile_attr = if self.dmg_compat {
-                        &DEFAULT_TILE_ATTR
-                    } else {
-                        &bg_map_attrs[row_offset + line_offset]
-                    };
+                    // in case the current mode is CGB and the DMG compatibility
+                    // flag is not set then a series of tile values must be
+                    // updated according to the tile attributes field
+                    if self.gb_mode == GameBoyMode::Cgb && !self.dmg_compat {
+                        tile_attr = &bg_map_attrs[row_offset + line_offset];
+                        palette = &self.palettes_color_bg[tile_attr.palette as usize];
+                        xflip = tile_attr.xflip;
+                        yflip = tile_attr.yflip;
+                        tile_index += tile_attr.vram_bank as usize * TILE_COUNT_DMG;
+                    }
 
-                    // retrieves the proper palette for the current tile in drawing
-                    // taking into consideration if we're running in CGB mode or not
-                    palette = if self.gb_mode == GameBoyMode::Cgb {
-                        if self.dmg_compat {
-                            &self.palette_bg
-                        } else {
-                            &self.palettes_color_bg[tile_attr.palette as usize]
-                        }
-                    } else {
-                        &self.palette_bg
-                    };
-
-                    // obtains the values of both X and Y flips for the current tile
-                    // they will be applied by the get tile pixel method
-                    xflip = tile_attr.xflip;
-                    yflip = tile_attr.yflip;
-
-                    // increments the tile index value by the required offset for the VRAM
-                    // bank in which the tile is stored, this is only required for CGB mode
-                    tile_index += tile_attr.vram_bank as usize * TILE_COUNT_DMG;
+                    // obtains the reference to the new tile in drawing
+                    tile = &self.tiles[tile_index];
                 }
             }
 
