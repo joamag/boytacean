@@ -10,6 +10,7 @@ use crate::{
     cpu::Cpu,
     data::{BootRom, CGB_BOOT, DMG_BOOT, DMG_BOOTIX, MGB_BOOTIX, SGB_BOOT},
     devices::{printer::PrinterDevice, stdout::StdoutDevice},
+    dma::Dma,
     gen::{COMPILATION_DATE, COMPILATION_TIME, COMPILER, COMPILER_VERSION, VERSION},
     mmu::Mmu,
     pad::{Pad, PadKey},
@@ -133,6 +134,9 @@ pub struct GameBoyConfig {
     /// If the APU is enabled, it will be clocked.
     apu_enabled: bool,
 
+    /// if the DMA is enabled, it will be clocked.
+    dma_enabled: bool,
+
     /// If the timer is enabled, it will be clocked.
     timer_enabled: bool,
 
@@ -186,6 +190,14 @@ impl GameBoyConfig {
         self.apu_enabled = value;
     }
 
+    pub fn dma_enabled(&self) -> bool {
+        self.dma_enabled
+    }
+
+    pub fn set_dma_enabled(&mut self, value: bool) {
+        self.dma_enabled = value;
+    }
+
     pub fn timer_enabled(&self) -> bool {
         self.timer_enabled
     }
@@ -217,6 +229,7 @@ impl Default for GameBoyConfig {
             mode: GameBoyMode::Dmg,
             ppu_enabled: true,
             apu_enabled: true,
+            dma_enabled: true,
             timer_enabled: true,
             serial_enabled: true,
             clock_freq: GameBoy::CPU_FREQ,
@@ -245,6 +258,11 @@ pub struct GameBoy {
     /// This is a clone of the configuration value
     /// kept for performance reasons.
     apu_enabled: bool,
+
+    /// If the DMA is enabled, it will be clocked.
+    /// This is a clone of the configuration value
+    /// kept for performance reasons.
+    dma_enabled: bool,
 
     /// If the timer is enabled, it will be clocked.
     /// This is a clone of the configuration value
@@ -314,6 +332,7 @@ impl GameBoy {
             mode,
             ppu_enabled: true,
             apu_enabled: true,
+            dma_enabled: true,
             timer_enabled: true,
             serial_enabled: true,
             clock_freq: GameBoy::CPU_FREQ,
@@ -321,16 +340,18 @@ impl GameBoy {
 
         let ppu = Ppu::new(mode, gbc.clone());
         let apu = Apu::default();
+        let dma = Dma::default();
         let pad = Pad::default();
         let timer = Timer::default();
         let serial = Serial::default();
-        let mmu = Mmu::new(ppu, apu, pad, timer, serial, mode, gbc.clone());
+        let mmu = Mmu::new(ppu, apu, dma, pad, timer, serial, mode, gbc.clone());
         let cpu = Cpu::new(mmu, gbc.clone());
 
         Self {
             mode,
             ppu_enabled: true,
             apu_enabled: true,
+            dma_enabled: true,
             timer_enabled: true,
             serial_enabled: true,
             clock_freq: GameBoy::CPU_FREQ,
@@ -355,6 +376,9 @@ impl GameBoy {
         }
         if self.apu_enabled {
             self.apu_clock(cycles);
+        }
+        if self.dma_enabled {
+            self.dma_clock(cycles);
         }
         if self.timer_enabled {
             self.timer_clock(cycles);
@@ -383,6 +407,10 @@ impl GameBoy {
 
     pub fn apu_clock(&mut self, cycles: u8) {
         self.apu().clock(cycles)
+    }
+
+    pub fn dma_clock(&mut self, cycles: u8) {
+        self.dma().clock(cycles)
     }
 
     pub fn timer_clock(&mut self, cycles: u8) {
@@ -733,6 +761,14 @@ impl GameBoy {
 
     pub fn apu_i(&self) -> &Apu {
         self.cpu.apu_i()
+    }
+
+    pub fn dma(&mut self) -> &mut Dma {
+        self.cpu.dma()
+    }
+
+    pub fn dma_i(&self) -> &Dma {
+        self.cpu.dma_i()
     }
 
     pub fn pad(&mut self) -> &mut Pad {

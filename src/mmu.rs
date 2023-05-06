@@ -3,6 +3,7 @@ use std::{cell::RefCell, rc::Rc};
 use crate::{
     apu::Apu,
     debugln,
+    dma::Dma,
     gb::{GameBoyConfig, GameBoyMode, GameBoySpeed},
     pad::Pad,
     ppu::Ppu,
@@ -43,6 +44,11 @@ pub struct Mmu {
     /// to be used both for register reading/writing and to forward
     /// some of the access operations.
     apu: Apu,
+
+    /// Reference to the DMA (Direct Memory Access) controller that is going
+    /// to be used for quick and CPU offloaded memory transfers.
+    /// There are multiple execution modes for the DMA.
+    dma: Dma,
 
     /// Reference to the Gamepad structure that is going to control
     /// the I/O access to this device.
@@ -95,6 +101,7 @@ impl Mmu {
     pub fn new(
         ppu: Ppu,
         apu: Apu,
+        dma: Dma,
         pad: Pad,
         timer: Timer,
         serial: Serial,
@@ -104,6 +111,7 @@ impl Mmu {
         Self {
             ppu,
             apu,
+            dma,
             pad,
             timer,
             serial,
@@ -159,6 +167,14 @@ impl Mmu {
 
     pub fn apu_i(&self) -> &Apu {
         &self.apu
+    }
+
+    pub fn dma(&mut self) -> &mut Dma {
+        &mut self.dma
+    }
+
+    pub fn dma_i(&self) -> &Dma {
+        &self.dma
     }
 
     pub fn pad(&mut self) -> &mut Pad {

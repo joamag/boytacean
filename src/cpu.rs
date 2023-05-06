@@ -3,6 +3,7 @@ use std::{cell::RefCell, rc::Rc};
 use crate::{
     apu::Apu,
     debugln,
+    dma::Dma,
     gb::GameBoyConfig,
     inst::{EXTENDED, INSTRUCTIONS},
     mmu::Mmu,
@@ -332,6 +333,16 @@ impl Cpu {
     #[inline(always)]
     pub fn apu_i(&self) -> &Apu {
         self.mmu_i().apu_i()
+    }
+
+    #[inline(always)]
+    pub fn dma(&mut self) -> &mut Dma {
+        self.mmu().dma()
+    }
+
+    #[inline(always)]
+    pub fn dma_i(&self) -> &Dma {
+        self.mmu_i().dma_i()
     }
 
     #[inline(always)]
