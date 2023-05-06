@@ -1254,6 +1254,8 @@ impl Ppu {
             false
         };
 
+        // iterates over the complete set of available object to checks
+        // the ones that required drawing and draws them
         for index in 0..OBJ_COUNT {
             // in case the limit on the number of objects to be draw per
             // line has been reached breaks the loop avoiding more draws
