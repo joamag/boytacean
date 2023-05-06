@@ -472,6 +472,9 @@ struct Args {
     no_apu: bool,
 
     #[arg(long, default_value_t = false)]
+    no_dma: bool,
+
+    #[arg(long, default_value_t = false)]
     no_timer: bool,
 
     #[arg(short, long, default_value_t = String::from("../../res/roms/demo/pocket.gb"))]
@@ -490,6 +493,7 @@ fn main() {
     let device = build_device(&args.device);
     game_boy.set_ppu_enabled(!args.no_ppu);
     game_boy.set_apu_enabled(!args.no_apu);
+    game_boy.set_dma_enabled(!args.no_dma);
     game_boy.set_timer_enabled(!args.no_timer);
     game_boy.attach_serial(device);
     game_boy.load(true);

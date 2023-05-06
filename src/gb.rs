@@ -643,6 +643,15 @@ impl GameBoy {
         (*self.gbc).borrow_mut().set_apu_enabled(value);
     }
 
+    pub fn dma_enabled(&self) -> bool {
+        self.dma_enabled
+    }
+
+    pub fn set_dma_enabled(&mut self, value: bool) {
+        self.dma_enabled = value;
+        (*self.gbc).borrow_mut().set_dma_enabled(value);
+    }
+
     pub fn timer_enabled(&self) -> bool {
         self.timer_enabled
     }
