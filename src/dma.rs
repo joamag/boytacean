@@ -7,7 +7,7 @@ impl Dma {
 
     pub fn reset(&mut self) {}
 
-    pub fn clock(&mut self, cycles: u8) {}
+    pub fn clock(&mut self, _cycles: u8) {}
 }
 
 impl Default for Dma {
