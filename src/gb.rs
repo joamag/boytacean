@@ -237,6 +237,44 @@ impl Default for GameBoyConfig {
     }
 }
 
+/// Aggregation structure tha allows the bundling of
+/// all the components of a gameboy into a single a
+/// single element for easy access.
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
+pub struct GameBoyComponents {
+    pub ppu: Ppu,
+    pub apu: Apu,
+    pub dma: Dma,
+    pub pad: Pad,
+    pub timer: Timer,
+    pub serial: Serial,
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
+pub struct Registers {
+    pub pc: u16,
+    pub sp: u16,
+    pub a: u8,
+    pub b: u8,
+    pub c: u8,
+    pub d: u8,
+    pub e: u8,
+    pub h: u8,
+    pub l: u8,
+    pub scy: u8,
+    pub scx: u8,
+    pub wy: u8,
+    pub wx: u8,
+    pub ly: u8,
+    pub lyc: u8,
+}
+
+pub trait AudioProvider {
+    fn audio_output(&self) -> u8;
+    fn audio_buffer(&self) -> &VecDeque<u8>;
+    fn clear_audio_buffer(&mut self);
+}
+
 /// Top level structure that abstracts the usage of the
 /// Game Boy system under the Boytacean emulator.
 /// Should serve as the main entry-point API.
@@ -300,31 +338,6 @@ pub struct GameBoy {
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
-pub struct Registers {
-    pub pc: u16,
-    pub sp: u16,
-    pub a: u8,
-    pub b: u8,
-    pub c: u8,
-    pub d: u8,
-    pub e: u8,
-    pub h: u8,
-    pub l: u8,
-    pub scy: u8,
-    pub scx: u8,
-    pub wy: u8,
-    pub wx: u8,
-    pub ly: u8,
-    pub lyc: u8,
-}
-
-pub trait AudioProvider {
-    fn audio_output(&self) -> u8;
-    fn audio_buffer(&self) -> &VecDeque<u8>;
-    fn clear_audio_buffer(&mut self);
-}
-
-#[cfg_attr(feature = "wasm", wasm_bindgen)]
 impl GameBoy {
     #[cfg_attr(feature = "wasm", wasm_bindgen(constructor))]
     pub fn new(mode: GameBoyMode) -> Self {
@@ -338,13 +351,15 @@ impl GameBoy {
             clock_freq: GameBoy::CPU_FREQ,
         }));
 
-        let ppu = Ppu::new(mode, gbc.clone());
-        let apu = Apu::default();
-        let dma = Dma::default();
-        let pad = Pad::default();
-        let timer = Timer::default();
-        let serial = Serial::default();
-        let mmu = Mmu::new(ppu, apu, dma, pad, timer, serial, mode, gbc.clone());
+        let components = GameBoyComponents {
+            ppu: Ppu::new(mode, gbc.clone()),
+            apu: Apu::default(),
+            dma: Dma::default(),
+            pad: Pad::default(),
+            timer: Timer::default(),
+            serial: Serial::default(),
+        };
+        let mmu = Mmu::new(components, mode, gbc.clone());
         let cpu = Cpu::new(mmu, gbc.clone());
 
         Self {

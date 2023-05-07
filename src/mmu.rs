@@ -4,7 +4,7 @@ use crate::{
     apu::Apu,
     debugln,
     dma::Dma,
-    gb::{GameBoyConfig, GameBoyMode, GameBoySpeed},
+    gb::{GameBoyComponents, GameBoyConfig, GameBoyMode, GameBoySpeed},
     pad::Pad,
     ppu::Ppu,
     rom::Cartridge,
@@ -104,22 +104,17 @@ pub struct Mmu {
 
 impl Mmu {
     pub fn new(
-        ppu: Ppu,
-        apu: Apu,
-        dma: Dma,
-        pad: Pad,
-        timer: Timer,
-        serial: Serial,
+        components: GameBoyComponents,
         mode: GameBoyMode,
         gbc: Rc<RefCell<GameBoyConfig>>,
     ) -> Self {
         Self {
-            ppu,
-            apu,
-            dma,
-            pad,
-            timer,
-            serial,
+            ppu: components.ppu,
+            apu: components.apu,
+            dma: components.dma,
+            pad: components.pad,
+            timer: components.timer,
+            serial: components.serial,
             rom: Cartridge::new(),
             boot_active: true,
             boot: vec![],
