@@ -2,6 +2,7 @@ use core::fmt;
 use std::{
     borrow::BorrowMut,
     cell::RefCell,
+    cmp::max,
     fmt::{Display, Formatter},
     rc::Rc,
 };
@@ -24,6 +25,8 @@ pub const RGB_SIZE: usize = 3;
 pub const RGBA_SIZE: usize = 4;
 pub const TILE_WIDTH: usize = 8;
 pub const TILE_HEIGHT: usize = 8;
+pub const TILE_WIDTH_I: usize = 7;
+pub const TILE_HEIGHT_I: usize = 7;
 pub const TILE_DOUBLE_HEIGHT: usize = 16;
 
 pub const TILE_COUNT_DMG: usize = 384;
@@ -124,8 +127,8 @@ impl Tile {
     }
 
     pub fn get_flipped(&self, x: usize, y: usize, xflip: bool, yflip: bool) -> u8 {
-        let x: usize = if xflip { 7 - x } else { x };
-        let y = if yflip { 7 - y } else { y };
+        let x: usize = if xflip { TILE_WIDTH_I - x } else { x };
+        let y = if yflip { TILE_HEIGHT_I - y } else { y };
         self.buffer[y * TILE_WIDTH + x]
     }
 
@@ -988,7 +991,7 @@ impl Ppu {
         let mut mask;
 
         for x in 0..TILE_WIDTH {
-            mask = 1 << (7 - x);
+            mask = 1 << (TILE_WIDTH_I - x);
             #[allow(clippy::bool_to_int_with_if)]
             tile.set(
                 x,
@@ -1159,60 +1162,64 @@ impl Ppu {
         let y = (ld as usize + scy as usize) & 0x07;
         let mut x = (scx & 0x07) as usize;
 
-        for index in 0..DISPLAY_WIDTH {
-            // in case the current pixel to be drawn for the line
-            // is visible within the window draws it an increments
-            // the X coordinate of the tile
-            if index as i16 >= wx as i16 - 7 {
-                // obtains the current pixel data from the tile and
-                // re-maps it according to the current palette
-                let pixel = tile.get_flipped(x, y, xflip, yflip);
-                let color = &palette[pixel as usize];
+        // calculates the initial tile X position in drawing, doing this
+        // allows us to position the background map properly in the display
+        let initial_index = max(wx as i16 - 7, 0) as usize;
+        color_offset += initial_index;
+        frame_offset += initial_index * RGB_SIZE;
 
-                // updates the pixel in the color buffer, which stores
-                // the raw pixel color information (unmapped)
-                self.color_buffer[color_offset] = pixel;
+        // iterates over all the pixels in the current line of the display
+        // to draw the background map, note that the initial index is used
+        // to skip the drawing of the tiles that are not visible (WX)
+        for _ in initial_index..DISPLAY_WIDTH {
+            // obtains the current pixel data from the tile and
+            // re-maps it according to the current palette
+            let pixel = tile.get_flipped(x, y, xflip, yflip);
+            let color = &palette[pixel as usize];
 
-                // set the color pixel in the frame buffer
-                self.frame_buffer[frame_offset] = color[0];
-                self.frame_buffer[frame_offset + 1] = color[1];
-                self.frame_buffer[frame_offset + 2] = color[2];
+            // updates the pixel in the color buffer, which stores
+            // the raw pixel color information (unmapped)
+            self.color_buffer[color_offset] = pixel;
 
-                // increments the current tile X position in drawing
-                x += 1;
+            // set the color pixel in the frame buffer
+            self.frame_buffer[frame_offset] = color[0];
+            self.frame_buffer[frame_offset + 1] = color[1];
+            self.frame_buffer[frame_offset + 2] = color[2];
 
-                // in case the end of tile width has been reached then
-                // a new tile must be retrieved for rendering
-                if x == TILE_WIDTH {
-                    // resets the tile X position to the base value
-                    // as a new tile is going to be drawn
-                    x = 0;
+            // increments the current tile X position in drawing
+            x += 1;
 
-                    // calculates the new line tile offset making sure that
-                    // the maximum of 32 is not overflown
-                    line_offset = (line_offset + 1) % 32;
+            // in case the end of tile width has been reached then
+            // a new tile must be retrieved for rendering
+            if x == TILE_WIDTH {
+                // resets the tile X position to the base value
+                // as a new tile is going to be drawn
+                x = 0;
 
-                    // calculates the tile index and makes sure the value
-                    // takes into consideration the bg tile value
-                    tile_index = self.vram[map_offset + row_offset + line_offset] as usize;
-                    if !self.bg_tile && tile_index < 128 {
-                        tile_index += 256;
-                    }
+                // calculates the new line tile offset making sure that
+                // the maximum of 32 is not overflown
+                line_offset = (line_offset + 1) % 32;
 
-                    // in case the current mode is CGB and the DMG compatibility
-                    // flag is not set then a series of tile values must be
-                    // updated according to the tile attributes field
-                    if self.gb_mode == GameBoyMode::Cgb && !self.dmg_compat {
-                        tile_attr = &bg_map_attrs[row_offset + line_offset];
-                        palette = &self.palettes_color_bg[tile_attr.palette as usize];
-                        xflip = tile_attr.xflip;
-                        yflip = tile_attr.yflip;
-                        tile_index += tile_attr.vram_bank as usize * TILE_COUNT_DMG;
-                    }
-
-                    // obtains the reference to the new tile in drawing
-                    tile = &self.tiles[tile_index];
+                // calculates the tile index and makes sure the value
+                // takes into consideration the bg tile value
+                tile_index = self.vram[map_offset + row_offset + line_offset] as usize;
+                if !self.bg_tile && tile_index < 128 {
+                    tile_index += 256;
                 }
+
+                // in case the current mode is CGB and the DMG compatibility
+                // flag is not set then a series of tile values must be
+                // updated according to the tile attributes field
+                if self.gb_mode == GameBoyMode::Cgb && !self.dmg_compat {
+                    tile_attr = &bg_map_attrs[row_offset + line_offset];
+                    palette = &self.palettes_color_bg[tile_attr.palette as usize];
+                    xflip = tile_attr.xflip;
+                    yflip = tile_attr.yflip;
+                    tile_index += tile_attr.vram_bank as usize * TILE_COUNT_DMG;
+                }
+
+                // obtains the reference to the new tile in drawing
+                tile = &self.tiles[tile_index];
             }
 
             // increments the color offset by one, representing
@@ -1368,7 +1375,11 @@ impl Ppu {
                     let has_priority =
                         index_buffer[x as usize] == -256 || obj.x < index_buffer[x as usize];
 
-                    let pixel = tile_row[if obj.xflip { 7 - tile_x } else { tile_x }];
+                    let pixel = tile_row[if obj.xflip {
+                        TILE_WIDTH_I - tile_x
+                    } else {
+                        tile_x
+                    }];
                     if is_visible && has_priority && pixel != 0 {
                         // marks the current pixel in iteration as "owned"
                         // by the object with the defined X base position,
