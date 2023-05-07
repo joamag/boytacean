@@ -290,7 +290,7 @@ pub struct GameBoy {
     /// used as reference or the rest of the components.
     cpu: Cpu,
 
-    /// Rhe reference counted and mutable reference to
+    /// The reference counted and mutable reference to
     /// Game Boy configuration structure that can be
     /// used by the GB components to access global
     /// configuration values on the current emulator.

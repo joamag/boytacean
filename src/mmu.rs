@@ -92,8 +92,13 @@ pub struct Mmu {
     /// that is currently selected (CGB only).
     ram_offset: u16,
 
+    /// The current running mode of the emulator, this
+    /// may affect many aspects of the emulation.
     mode: GameBoyMode,
 
+    /// The pointer to the parent configuration of the running
+    /// Game Boy emulator, that can be used to control the behaviour
+    /// of Game Boy emulation.
     gbc: Rc<RefCell<GameBoyConfig>>,
 }
 
