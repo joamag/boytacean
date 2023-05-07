@@ -240,8 +240,7 @@ impl Default for GameBoyConfig {
 /// Aggregation structure tha allows the bundling of
 /// all the components of a gameboy into a single a
 /// single element for easy access.
-#[cfg_attr(feature = "wasm", wasm_bindgen)]
-pub struct GameBoyComponents {
+pub struct Components {
     pub ppu: Ppu,
     pub apu: Apu,
     pub dma: Dma,
@@ -351,7 +350,7 @@ impl GameBoy {
             clock_freq: GameBoy::CPU_FREQ,
         }));
 
-        let components = GameBoyComponents {
+        let components = Components {
             ppu: Ppu::new(mode, gbc.clone()),
             apu: Apu::default(),
             dma: Dma::default(),

@@ -4,7 +4,7 @@ use crate::{
     apu::Apu,
     debugln,
     dma::Dma,
-    gb::{GameBoyComponents, GameBoyConfig, GameBoyMode, GameBoySpeed},
+    gb::{Components, GameBoyConfig, GameBoyMode, GameBoySpeed},
     pad::Pad,
     ppu::Ppu,
     rom::Cartridge,
@@ -104,7 +104,7 @@ pub struct Mmu {
 
 impl Mmu {
     pub fn new(
-        components: GameBoyComponents,
+        components: Components,
         mode: GameBoyMode,
         gbc: Rc<RefCell<GameBoyConfig>>,
     ) -> Self {
