@@ -1260,7 +1260,7 @@ impl Ppu {
 
             // obtains the meta data of the object that is currently
             // under iteration to be checked for drawing
-            let obj = self.obj_data[index];
+            let obj = &self.obj_data[index];
 
             let obj_height = if self.obj_size {
                 TILE_DOUBLE_HEIGHT
