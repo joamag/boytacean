@@ -103,11 +103,7 @@ pub struct Mmu {
 }
 
 impl Mmu {
-    pub fn new(
-        components: Components,
-        mode: GameBoyMode,
-        gbc: Rc<RefCell<GameBoyConfig>>,
-    ) -> Self {
+    pub fn new(components: Components, mode: GameBoyMode, gbc: Rc<RefCell<GameBoyConfig>>) -> Self {
         Self {
             ppu: components.ppu,
             apu: components.apu,
