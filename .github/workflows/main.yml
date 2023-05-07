@@ -20,6 +20,7 @@ jobs:
           "1.66.0",
           "1.67.0",
           "1.68.0",
+          "1.69.0",
           "latest"
         ]
     runs-on: ubuntu-latest
@@ -47,11 +48,11 @@ jobs:
     strategy:
       matrix:
         rust-version: [
-          "1.64.0",
           "1.65.0",
           "1.66.0",
           "1.67.0",
           "1.68.0",
+          "1.69.0",
           "latest"
         ]
         node-version: ["16"]
@@ -94,6 +95,7 @@ jobs:
           "1.66.0",
           "1.67.0",
           "1.68.0",
+          "1.69.0",
           "latest"
         ]
     runs-on: ubuntu-latest
