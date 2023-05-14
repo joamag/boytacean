@@ -121,7 +121,7 @@ impl Cpu {
         let pc = self.pc;
 
         #[cfg(feature = "debug")]
-        if pc >= 0x8000 && pc < 0x9fff {
+        if (0x8000..0x9fff).contains(&pc) {
             panic!("Invalid PC area at 0x{:04x}", pc);
         }
 

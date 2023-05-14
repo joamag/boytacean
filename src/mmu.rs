@@ -439,6 +439,7 @@ impl Mmu {
                                     _ => self.ppu.write(addr, value),
                                 }
                             }
+                            #[allow(clippy::single_match)]
                             0x50 => match addr & 0x00ff {
                                 0x51..=0x55 => self.dma.write(addr, value),
                                 _ => debugln!("Writing to unknown IO control 0x{:04x}", addr),
