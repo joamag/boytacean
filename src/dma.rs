@@ -10,7 +10,7 @@ pub struct Dma {
     destination: u16,
     length: u8,
     mode: DmaMode,
-    finished: bool,
+    active: bool,
 }
 
 impl Dma {
@@ -20,7 +20,7 @@ impl Dma {
             destination: 0x0,
             length: 0x0,
             mode: DmaMode::General,
-            finished: false,
+            active: false,
         }
     }
 
@@ -29,7 +29,7 @@ impl Dma {
         self.destination = 0x0;
         self.length = 0x0;
         self.mode = DmaMode::General;
-        self.finished = false;
+        self.active = false;
     }
 
     pub fn clock(&mut self, _cycles: u8) {}
@@ -37,7 +37,7 @@ impl Dma {
     pub fn read(&mut self, addr: u16) -> u8 {
         match addr {
             // 0xFF55 — HDMA5: VRAM DMA length/mode/start (CGB only)
-            0xff45 => self.length | ((self.finished as u8) << 7),
+            0xff45 => self.length | ((self.active as u8) << 7),
             _ => {
                 warnln!("Reading from unknown DMA location 0x{:04x}", addr);
                 0xff
