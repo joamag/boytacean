@@ -136,10 +136,12 @@ impl Cpu {
             self.halted = false;
         }
 
+        // checks the IME (interrupt master flag) is enabled and then checks
+        // if there's any interrupt to be handled, in case there's one, tries
+        // to check which one should be handled and then handles it
+        // this code assumes that the're no more that one interrupt triggered
+        // per clock cycle, this is a limitation of the current implementation
         if self.ime && self.mmu.ie != 0x00 {
-            // @TODO aggregate all of this interrupts in the MMU, as there's
-            // a lot of redundant code involved in here which complicates the
-            // readability and maybe performance of this code
             if (self.mmu.ie & 0x01 == 0x01) && self.mmu.ppu().int_vblank() {
                 debugln!("Going to run V-Blank interrupt handler (0x40)");
 
@@ -158,9 +160,7 @@ impl Cpu {
                 }
 
                 return 24;
-            }
-            // @TODO aggregate the handling of these interrupts
-            else if (self.mmu.ie & 0x02 == 0x02) && self.mmu.ppu().int_stat() {
+            } else if (self.mmu.ie & 0x02 == 0x02) && self.mmu.ppu().int_stat() {
                 debugln!("Going to run LCD STAT interrupt handler (0x48)");
 
                 self.disable_int();
@@ -178,9 +178,7 @@ impl Cpu {
                 }
 
                 return 24;
-            }
-            // @TODO aggregate the handling of these interrupts
-            else if (self.mmu.ie & 0x04 == 0x04) && self.mmu.timer().int_tima() {
+            } else if (self.mmu.ie & 0x04 == 0x04) && self.mmu.timer().int_tima() {
                 debugln!("Going to run Timer interrupt handler (0x50)");
 
                 self.disable_int();
@@ -198,9 +196,7 @@ impl Cpu {
                 }
 
                 return 24;
-            }
-            // @TODO aggregate the handling of these interrupts
-            else if (self.mmu.ie & 0x08 == 0x08) && self.mmu.serial().int_serial() {
+            } else if (self.mmu.ie & 0x08 == 0x08) && self.mmu.serial().int_serial() {
                 debugln!("Going to run Serial interrupt handler (0x58)");
 
                 self.disable_int();
@@ -218,9 +214,7 @@ impl Cpu {
                 }
 
                 return 24;
-            }
-            // @TODO aggregate the handling of these interrupts
-            else if (self.mmu.ie & 0x10 == 0x10) && self.mmu.pad().int_pad() {
+            } else if (self.mmu.ie & 0x10 == 0x10) && self.mmu.pad().int_pad() {
                 debugln!("Going to run JoyPad interrupt handler (0x60)");
 
                 self.disable_int();

@@ -424,7 +424,7 @@ impl GameBoy {
     }
 
     pub fn dma_clock(&mut self, cycles: u8) {
-        self.dma().clock(cycles)
+        self.mmu().clock_dma(cycles);
     }
 
     pub fn timer_clock(&mut self, cycles: u8) {

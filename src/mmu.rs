@@ -205,6 +205,17 @@ impl Mmu {
         self.boot_active = value;
     }
 
+    pub fn clock_dma(&mut self, _cycles: u8) {
+        if !self.dma.active() {
+            return;
+        }
+
+        // @TODO: Implement DMA transfer in a better way
+        let data = self.read_many(self.dma.source(), self.dma.length());
+        self.write_many(self.dma.destination(), &data);
+        self.dma.set_active(false);
+    }
+
     pub fn read(&mut self, addr: u16) -> u8 {
         match addr & 0xf000 {
             // BOOT (256 B) + ROM0 (4 KB/16 KB)
@@ -299,7 +310,14 @@ impl Mmu {
                             }
                         },
                         0x10..=0x26 | 0x30..=0x37 => self.apu.read(addr),
-                        0x40 | 0x50 | 0x60 | 0x70 => self.ppu.read(addr),
+                        0x40 | 0x60 | 0x70 => self.ppu.read(addr),
+                        0x50 => match addr & 0x00ff {
+                            0x51..=0x55 => self.dma.read(addr),
+                            _ => {
+                                debugln!("Reading from unknown IO control 0x{:04x}", addr);
+                                0x00
+                            }
+                        },
                         _ => {
                             debugln!("Reading from unknown IO control 0x{:04x}", addr);
                             0x00
@@ -422,12 +440,7 @@ impl Mmu {
                                 }
                             }
                             0x50 => match addr & 0x00ff {
-                                // 0xFF51-0xFF52 - VRAM DMA source (CGB only)
-                                0x51..=0x52 => (),
-
-                                // 0xFF53-0xFF54 - VRAM DMA destination (CGB only)
-                                0x53..=0x54 => (),
-
+                                0x51..=0x55 => self.dma.write(addr, value),
                                 _ => debugln!("Writing to unknown IO control 0x{:04x}", addr),
                             },
                             _ => debugln!("Writing to unknown IO control 0x{:04x}", addr),
