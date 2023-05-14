@@ -131,6 +131,7 @@ impl Cpu {
             && (((self.mmu.ie & 0x01 == 0x01) && self.mmu.ppu().int_vblank())
                 || ((self.mmu.ie & 0x02 == 0x02) && self.mmu.ppu().int_stat())
                 || ((self.mmu.ie & 0x04 == 0x04) && self.mmu.timer().int_tima())
+                || ((self.mmu.ie & 0x08 == 0x08) && self.mmu.serial().int_serial())
                 || ((self.mmu.ie & 0x10 == 0x10) && self.mmu.pad().int_pad()))
         {
             self.halted = false;
