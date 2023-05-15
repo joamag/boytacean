@@ -331,7 +331,13 @@ impl Apu {
     pub fn read(&mut self, addr: u16) -> u8 {
         match addr {
             // 0xFF1A — NR30: Channel 3 DAC enable
-            0xff1a => if self.ch3_dac { 0x80 } else { 0x00 },
+            0xff1a => {
+                if self.ch3_dac {
+                    0x80
+                } else {
+                    0x00
+                }
+            }
 
             // 0xFF25 — NR51: Sound panning
             0xff25 => self.glob_panning,
