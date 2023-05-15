@@ -334,7 +334,6 @@ impl Apu {
             0xff25 => self.glob_panning,
             // 0xFF26 — NR52: Sound on/off
             0xff26 => {
-                println!("Reading from NR52");
                 (if self.ch1_enabled { 0x01 } else { 0x00 }
                     | if self.ch2_enabled { 0x02 } else { 0x00 }
                     | if self.ch3_enabled && self.ch3_dac {
@@ -500,7 +499,6 @@ impl Apu {
             }
             // 0xFF26 — NR52: Sound on/off
             0xff26 => {
-                println!("Writing in NR52: 0x{:02x}", value);
                 self.sound_enabled = value & 0x80 == 0x80;
                 if !self.sound_enabled {
                     self.reset();
