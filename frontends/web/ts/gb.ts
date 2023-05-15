@@ -192,7 +192,11 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
                 pending = this.tick(
                     currentTime,
                     pending,
-                    Math.round(this.logicFrequency / this.visualFrequency)
+                    Math.round(
+                        (this.logicFrequency *
+                            (this.gameBoy?.multiplier() ?? 1)) /
+                            this.visualFrequency
+                    )
                 );
             } catch (err) {
                 // sets the default error message to be displayed

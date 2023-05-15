@@ -392,7 +392,7 @@ impl GameBoy {
 
     pub fn clock(&mut self) -> u8 {
         let cycles = self.cpu_clock();
-        let cycles_n = cycles / self.mmu().speed.multiplier();
+        let cycles_n = cycles / self.multiplier();
         if self.ppu_enabled {
             self.ppu_clock(cycles_n);
         }
@@ -638,6 +638,10 @@ impl GameBoy {
 
     pub fn speed(&self) -> GameBoySpeed {
         self.mmu_i().speed
+    }
+
+    pub fn multiplier(&self) -> u8 {
+        self.mmu_i().speed.multiplier()
     }
 
     pub fn mode(&self) -> GameBoyMode {
