@@ -129,7 +129,11 @@ impl Cpu {
         // of magnitude, to be able to have better performance
         // in case the CPU execution halted and there's an interrupt
         // to be handled, releases the CPU from the halted state
+        // this verification is only done in case the IME (interrupt
+        // master enable) is disabled, otherwise the CPU halt disabled
+        // is going to be handled ahead
         if self.halted
+            && !self.ime
             && self.mmu.ie != 0x00
             && (((self.mmu.ie & 0x01 == 0x01) && self.mmu.ppu().int_vblank())
                 || ((self.mmu.ie & 0x02 == 0x02) && self.mmu.ppu().int_stat())
@@ -140,7 +144,7 @@ impl Cpu {
             self.halted = false;
         }
 
-        // checks the IME (interrupt master flag) is enabled and then checks
+        // checks the IME (interrupt master enable) is enabled and then checks
         // if there's any interrupt to be handled, in case there's one, tries
         // to check which one should be handled and then handles it
         // this code assumes that the're no more that one interrupt triggered
