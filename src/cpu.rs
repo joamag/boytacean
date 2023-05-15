@@ -328,6 +328,11 @@ impl Cpu {
     }
 
     #[inline(always)]
+    pub fn ppu_i(&self) -> &Ppu {
+        self.mmu_i().ppu_i()
+    }
+
+    #[inline(always)]
     pub fn apu(&mut self) -> &mut Apu {
         self.mmu().apu()
     }

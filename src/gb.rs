@@ -105,6 +105,13 @@ impl GameBoySpeed {
         }
     }
 
+    pub fn multiplier(&self) -> u8 {
+        match self {
+            GameBoySpeed::Normal => 1,
+            GameBoySpeed::Double => 2,
+        }
+    }
+
     pub fn from_u8(value: u8) -> GameBoySpeed {
         match value {
             0 => GameBoySpeed::Normal,
@@ -385,11 +392,12 @@ impl GameBoy {
 
     pub fn clock(&mut self) -> u8 {
         let cycles = self.cpu_clock();
+        let cycles_n = cycles / self.mmu().speed.multiplier();
         if self.ppu_enabled {
-            self.ppu_clock(cycles);
+            self.ppu_clock(cycles_n);
         }
         if self.apu_enabled {
-            self.apu_clock(cycles);
+            self.apu_clock(cycles_n);
         }
         if self.dma_enabled {
             self.dma_clock(cycles);
@@ -628,6 +636,10 @@ impl GameBoy {
         self.mode == GameBoyMode::Sgb
     }
 
+    pub fn speed(&self) -> GameBoySpeed {
+        self.mmu_i().speed
+    }
+
     pub fn mode(&self) -> GameBoyMode {
         self.mode
     }
@@ -774,8 +786,16 @@ impl GameBoy {
         self.cpu.mmu()
     }
 
+    pub fn mmu_i(&self) -> &Mmu {
+        self.cpu.mmu_i()
+    }
+
     pub fn ppu(&mut self) -> &mut Ppu {
         self.cpu.ppu()
+    }
+
+    pub fn ppu_i(&self) -> &Ppu {
+        self.cpu.ppu_i()
     }
 
     pub fn apu(&mut self) -> &mut Apu {

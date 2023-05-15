@@ -330,6 +330,24 @@ impl Apu {
 
     pub fn read(&mut self, addr: u16) -> u8 {
         match addr {
+            // 0xFF11 — NR11: Channel 1 length timer & duty cycle
+            0xff11 => (self.ch1_wave_duty & 0x03) << 6,
+            // 0xFF12 — NR12: Channel 1 volume & envelope
+            0xff12 => {
+                (self.ch1_pace & 0x07)
+                    | ((self.ch1_direction & 0x01) << 3)
+                    | ((self.ch1_volume & 0x0f) << 4)
+            }
+
+            // 0xFF16 — NR21: Channel 2 length timer & duty cycle
+            0xff16 => (self.ch2_wave_duty & 0x03) << 6,
+            // 0xFF17 — NR22: Channel 2 volume & envelope
+            0xff17 => {
+                (self.ch2_pace & 0x07)
+                    | ((self.ch2_direction & 0x01) << 3)
+                    | ((self.ch2_volume & 0x0f) << 4)
+            }
+
             // 0xFF1A — NR30: Channel 3 DAC enable
             0xff1a => {
                 if self.ch3_dac {
@@ -337,6 +355,19 @@ impl Apu {
                 } else {
                     0x00
                 }
+            }
+            // 0xFF1B — NR31: Channel 3 length timer
+            0xff1b => 0x00,
+            // 0xFF1C — NR32: Channel 3 output level
+            0xff1c => (self.ch3_output_level & 0x03) << 5,
+
+            // 0xFF20 — NR41: Channel 4 length timer
+            0xff20 => 0x00,
+            // 0xFF21 — NR42: Channel 4 volume & envelope
+            0xff21 => {
+                (self.ch4_pace & 0x07)
+                    | ((self.ch4_direction & 0x01) << 3)
+                    | ((self.ch4_volume & 0x0f) << 4)
             }
 
             // 0xFF25 — NR51: Sound panning

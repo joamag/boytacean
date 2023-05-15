@@ -349,9 +349,12 @@ impl Emulator {
 
                 // calculates the number of cycles that are meant to be the target
                 // for the current "tick" operation this is basically the current
-                // logic frequency divided by the visual one
-                let cycle_limit =
-                    (self.logic_frequency as f32 / self.visual_frequency).round() as u32;
+                // logic frequency divided by the visual one, this operation also
+                // takes into account the current Game Boy speed multiplier (GBC)
+                let cycle_limit = (self.logic_frequency as f32
+                    * self.system.speed().multiplier() as f32
+                    / self.visual_frequency)
+                    .round() as u32;
 
                 loop {
                     // limits the number of ticks to the typical number

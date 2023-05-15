@@ -10,7 +10,6 @@ use crate::{
     rom::Cartridge,
     serial::Serial,
     timer::Timer,
-    warnln,
 };
 
 pub const BOOT_SIZE_DMG: usize = 256;
@@ -155,6 +154,10 @@ impl Mmu {
 
     pub fn ppu(&mut self) -> &mut Ppu {
         &mut self.ppu
+    }
+
+    pub fn ppu_i(&self) -> &Ppu {
+        &self.ppu
     }
 
     pub fn apu(&mut self) -> &mut Apu {
@@ -387,12 +390,6 @@ impl Mmu {
 
                     // 0xFF4D - KEY1: Speed switching (CGB only)
                     0x4d => {
-                        warnln!("Switching speed is not yet implemented");
-
-                        // @TODO: The switching of CPU speed is not yet
-                        // implemented and required more work to be done.
-                        // Inclusive the propagation of the speed to the
-                        // controller emulator.
                         self.switching = value & 0x01 == 0x01;
                     }
 
