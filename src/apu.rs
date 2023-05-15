@@ -80,6 +80,8 @@ pub struct Apu {
 
     right_enabled: bool,
     left_enabled: bool,
+    sound_enabled: bool,
+
     ch1_out_enabled: bool,
     ch2_out_enabled: bool,
     ch3_out_enabled: bool,
@@ -161,6 +163,7 @@ impl Apu {
 
             left_enabled: true,
             right_enabled: true,
+            sound_enabled: true,
 
             ch1_out_enabled: true,
             ch2_out_enabled: true,
@@ -252,6 +255,7 @@ impl Apu {
 
         self.left_enabled = true;
         self.right_enabled = true;
+        self.sound_enabled = true;
 
         self.sequencer = 0;
         self.sequencer_step = 0;
@@ -261,6 +265,10 @@ impl Apu {
     }
 
     pub fn clock(&mut self, cycles: u8) {
+        if !self.sound_enabled {
+            return;
+        }
+
         self.sequencer += cycles as u16;
         if self.sequencer >= 8192 {
             // each of these steps runs at 512/8 Hz = 64Hz,
@@ -324,6 +332,20 @@ impl Apu {
         match addr {
             // 0xFF25 — NR51: Sound panning
             0xff25 => self.glob_panning,
+            // 0xFF26 — NR52: Sound on/off
+            0xff26 => {
+                println!("Reading from NR52");
+                (if self.ch1_enabled { 0x01 } else { 0x00 }
+                    | if self.ch2_enabled { 0x02 } else { 0x00 }
+                    | if self.ch3_enabled && self.ch3_dac {
+                        0x04
+                    } else {
+                        0x00
+                    }
+                    | if self.ch4_enabled { 0x08 } else { 0x00 }
+                    | if self.sound_enabled { 0x80 } else { 0x00 })
+            }
+
             _ => {
                 warnln!("Reading from unknown APU location 0x{:04x}", addr);
                 0xff
@@ -478,7 +500,12 @@ impl Apu {
             }
             // 0xFF26 — NR52: Sound on/off
             0xff26 => {
-                //@TODO: Implement sound on/off
+                println!("Writing in NR52: 0x{:02x}", value);
+                self.sound_enabled = value & 0x80 == 0x80;
+                if !self.sound_enabled {
+                    self.reset();
+                    self.sound_enabled = false;
+                }
             }
 
             // 0xFF30-0xFF3F — Wave pattern RAM
