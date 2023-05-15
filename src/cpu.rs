@@ -127,7 +127,10 @@ impl Cpu {
 
         // @TODO this is so bad, need to improve this by an order
         // of magnitude, to be able to have better performance
+        // in case the CPU execution halted and there's an interrupt
+        // to be handled, releases the CPU from the halted state
         if self.halted
+            && self.mmu.ie != 0x00
             && (((self.mmu.ie & 0x01 == 0x01) && self.mmu.ppu().int_vblank())
                 || ((self.mmu.ie & 0x02 == 0x02) && self.mmu.ppu().int_stat())
                 || ((self.mmu.ie & 0x04 == 0x04) && self.mmu.timer().int_tima())
