@@ -34,10 +34,18 @@ export const AudioGB: FC<AudioGBProps> = ({
     const [audioOutput, setAudioOutput] = useState<Record<string, number[]>>(
         {}
     );
-    const [ch1Enabled, setCh1Enabled] = useState(true);
-    const [ch2Enabled, setCh2Enabled] = useState(true);
-    const [ch3Enabled, setCh3Enabled] = useState(true);
-    const [ch4Enabled, setCh4Enabled] = useState(true);
+    const [ch1Enabled, setCh1Enabled] = useState(
+        emulator.instance?.audio_ch1_enabled() ?? true
+    );
+    const [ch2Enabled, setCh2Enabled] = useState(
+        emulator.instance?.audio_ch2_enabled() ?? true
+    );
+    const [ch3Enabled, setCh3Enabled] = useState(
+        emulator.instance?.audio_ch3_enabled() ?? true
+    );
+    const [ch4Enabled, setCh4Enabled] = useState(
+        emulator.instance?.audio_ch4_enabled() ?? true
+    );
     const intervalsRef = useRef<number>();
     const intervalsExtraRef = useRef<number>();
 
@@ -184,7 +192,7 @@ export const AudioGB: FC<AudioGBProps> = ({
                     "ch1",
                     ["selector", ch1Enabled ? "" : "disabled"],
                     () => {
-                        emulator.instance?.audio_ch1_enabled(!ch1Enabled);
+                        emulator.instance?.set_audio_ch1_enabled(!ch1Enabled);
                         setCh1Enabled(!ch1Enabled);
                     }
                 )}
@@ -193,7 +201,7 @@ export const AudioGB: FC<AudioGBProps> = ({
                     "ch2",
                     ["selector", ch2Enabled ? "" : "disabled"],
                     () => {
-                        emulator.instance?.audio_ch2_enabled(!ch2Enabled);
+                        emulator.instance?.set_audio_ch2_enabled(!ch2Enabled);
                         setCh2Enabled(!ch2Enabled);
                     }
                 )}
@@ -202,7 +210,7 @@ export const AudioGB: FC<AudioGBProps> = ({
                     "ch3",
                     ["selector", ch3Enabled ? "" : "disabled"],
                     () => {
-                        emulator.instance?.audio_ch3_enabled(!ch3Enabled);
+                        emulator.instance?.set_audio_ch3_enabled(!ch3Enabled);
                         setCh3Enabled(!ch3Enabled);
                     }
                 )}
@@ -211,7 +219,7 @@ export const AudioGB: FC<AudioGBProps> = ({
                     "ch4",
                     ["selector", ch4Enabled ? "" : "disabled"],
                     () => {
-                        emulator.instance?.audio_ch4_enabled(!ch4Enabled);
+                        emulator.instance?.set_audio_ch4_enabled(!ch4Enabled);
                         setCh4Enabled(!ch4Enabled);
                     }
                 )}
