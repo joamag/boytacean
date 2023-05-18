@@ -110,7 +110,7 @@ jobs:
       - name: Print Rust information
         run: rustc --version
       - name: Install SDL dependencies
-        run: cd frontends/sdl && cargo install cargo-vcpkg && cargo vcpkg build
+        run: cd frontends/sdl && cargo install cargo-vcpkg && cargo vcpkg -v build
       - name: Verify Rust code format
         run: cd frontends/sdl && cargo fmt --all -- --check
       - name: Verify Rust code linting
