@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-* Support for auto emulation mode selection
+*
 
 ### Changed
 
@@ -18,6 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 *
+
+## [0.9.2] - 2023-05-18
+
+### Added
+
+* Support for auto emulation mode selection
 
 ## [0.9.1] - 2023-05-18
 
