@@ -237,11 +237,10 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
                 this.pause();
 
                 // if we're talking about a panic, proper action must be taken
-                // which in this case it means restarting both the WASM sub
+                // which in this case means restarting both the WASM sub
                 // system and the machine state (to be able to recover)
-                // also sets the default color on screen to indicate the issue
                 if (isPanic) {
-                    await wasm();
+                    await wasm(true);
                     await this.boot({ restore: false });
 
                     this.trigger("error");
@@ -957,7 +956,19 @@ console.image = (url: string, size = 80) => {
     console.log("%c     ", style);
 };
 
-const wasm = async () => {
+const wasm = async (setHook = true) => {
     await _wasm();
-    GameBoy.set_panic_hook_ws();
+
+    // in case the set hook flag is set, then tries to
+    // set the panic hook for the WASM module, this call
+    // may fail in some versions of wasm-bindgen as the
+    // thread is still marked as "panicking", so we need to
+    // wrap the call around try/catch
+    if (setHook) {
+        try {
+            GameBoy.set_panic_hook_ws();
+        } catch (err) {
+            console.error(err);
+        }
+    }
 };
