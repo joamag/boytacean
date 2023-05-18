@@ -374,6 +374,7 @@ impl Apu {
             0xff25 => self.glob_panning,
             // 0xFF26 — NR52: Sound on/off
             0xff26 => {
+                #[allow(clippy::bool_to_int_with_if)]
                 (if self.ch1_enabled { 0x01 } else { 0x00 }
                     | if self.ch2_enabled { 0x02 } else { 0x00 }
                     | if self.ch3_enabled && self.ch3_dac {
