@@ -598,16 +598,32 @@ impl Apu {
         }
     }
 
+    pub fn ch1_enabled(&mut self) -> bool {
+        return self.ch1_out_enabled;
+    }
+
     pub fn set_ch1_enabled(&mut self, enabled: bool) {
         self.ch1_out_enabled = enabled;
+    }
+
+    pub fn ch2_enabled(&mut self) -> bool {
+        return self.ch2_out_enabled;
     }
 
     pub fn set_ch2_enabled(&mut self, enabled: bool) {
         self.ch2_out_enabled = enabled;
     }
 
+    pub fn ch3_enabled(&mut self) -> bool {
+        return self.ch3_out_enabled;
+    }
+
     pub fn set_ch3_enabled(&mut self, enabled: bool) {
         self.ch3_out_enabled = enabled;
+    }
+
+    pub fn ch4_enabled(&mut self) -> bool {
+        return self.ch4_out_enabled;
     }
 
     pub fn set_ch4_enabled(&mut self, enabled: bool) {

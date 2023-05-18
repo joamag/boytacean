@@ -1,10 +1,12 @@
 import React, { FC, useEffect, useRef, useState } from "react";
 import { Canvas, CanvasStructure, PixelFormat } from "emukit";
 import { WebglPlot, WebglLine, ColorRGBA } from "webgl-plot";
+import { GameboyEmulator } from "../../../ts";
 
 import "./audio-gb.css";
 
 type AudioGBProps = {
+    emulator: GameboyEmulator;
     getAudioOutput: () => Record<string, number>;
     interval?: number;
     drawInterval?: number;
@@ -17,6 +19,7 @@ type AudioGBProps = {
 };
 
 export const AudioGB: FC<AudioGBProps> = ({
+    emulator,
     getAudioOutput,
     interval = 1,
     drawInterval = 1000 / 60,
@@ -31,6 +34,10 @@ export const AudioGB: FC<AudioGBProps> = ({
     const [audioOutput, setAudioOutput] = useState<Record<string, number[]>>(
         {}
     );
+    const [ch1Enabled, setCh1Enabled] = useState(true);
+    const [ch2Enabled, setCh2Enabled] = useState(true);
+    const [ch3Enabled, setCh3Enabled] = useState(true);
+    const [ch4Enabled, setCh4Enabled] = useState(true);
     const intervalsRef = useRef<number>();
     const intervalsExtraRef = useRef<number>();
 
@@ -61,7 +68,8 @@ export const AudioGB: FC<AudioGBProps> = ({
     const renderAudioWave = (
         name: string,
         key: string,
-        styles: string[] = []
+        styles: string[] = [],
+        onClick?: (key: string) => void
     ) => {
         const classes = ["audio-wave", ...styles].join(" ");
         const onCanvas = (structure: CanvasStructure) => {
@@ -96,7 +104,7 @@ export const AudioGB: FC<AudioGBProps> = ({
             );
         };
         return (
-            <div className={classes}>
+            <div className={classes} onClick={() => onClick && onClick(key)}>
                 <h4>{name}</h4>
                 <Canvas
                     width={range}
@@ -109,7 +117,8 @@ export const AudioGB: FC<AudioGBProps> = ({
     const renderAudioWaveWgl = (
         name: string,
         key: string,
-        styles: string[] = []
+        styles: string[] = [],
+        onClick?: (key: string) => void
     ) => {
         const canvasRef = useRef<HTMLCanvasElement>(null);
         const classes = ["audio-wave", ...styles].join(" ");
@@ -152,7 +161,7 @@ export const AudioGB: FC<AudioGBProps> = ({
             );
         }, [canvasRef]);
         return (
-            <div className={classes}>
+            <div className={classes} onClick={() => onClick && onClick(key)}>
                 <h4>{name}</h4>
                 <Canvas
                     canvasRef={canvasRef}
@@ -170,10 +179,42 @@ export const AudioGB: FC<AudioGBProps> = ({
         <div className={classes()}>
             <div className="section">
                 {renderMethod("Master", "master")}
-                {renderMethod("CH1", "ch1")}
-                {renderMethod("CH2", "ch2")}
-                {renderMethod("CH3", "ch3")}
-                {renderMethod("CH4", "ch4")}
+                {renderMethod(
+                    "CH1",
+                    "ch1",
+                    ["selector", ch1Enabled ? "" : "disabled"],
+                    () => {
+                        emulator.instance?.audio_ch1_enabled(!ch1Enabled);
+                        setCh1Enabled(!ch1Enabled);
+                    }
+                )}
+                {renderMethod(
+                    "CH2",
+                    "ch2",
+                    ["selector", ch2Enabled ? "" : "disabled"],
+                    () => {
+                        emulator.instance?.audio_ch2_enabled(!ch2Enabled);
+                        setCh2Enabled(!ch2Enabled);
+                    }
+                )}
+                {renderMethod(
+                    "CH3",
+                    "ch3",
+                    ["selector", ch3Enabled ? "" : "disabled"],
+                    () => {
+                        emulator.instance?.audio_ch3_enabled(!ch3Enabled);
+                        setCh3Enabled(!ch3Enabled);
+                    }
+                )}
+                {renderMethod(
+                    "CH4",
+                    "ch4",
+                    ["selector", ch4Enabled ? "" : "disabled"],
+                    () => {
+                        emulator.instance?.audio_ch4_enabled(!ch4Enabled);
+                        setCh4Enabled(!ch4Enabled);
+                    }
+                )}
             </div>
         </div>
     );

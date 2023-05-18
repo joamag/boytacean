@@ -557,6 +557,22 @@ impl GameBoy {
         self.apu_i().ch4_output()
     }
 
+    pub fn audio_ch1_enabled(&mut self, enabled: bool) {
+        self.apu().set_ch1_enabled(enabled)
+    }
+
+    pub fn audio_ch2_enabled(&mut self, enabled: bool) {
+        self.apu().set_ch2_enabled(enabled)
+    }
+
+    pub fn audio_ch3_enabled(&mut self, enabled: bool) {
+        self.apu().set_ch3_enabled(enabled)
+    }
+
+    pub fn audio_ch4_enabled(&mut self, enabled: bool) {
+        self.apu().set_ch4_enabled(enabled)
+    }
+
     pub fn cartridge_eager(&mut self) -> Cartridge {
         self.mmu().rom().clone()
     }

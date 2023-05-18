@@ -8,6 +8,19 @@
     margin-right: 5px;
 }
 
+.audio-gb > .section > .audio-wave {
+    display: inline-block;
+    margin-right: 5px;
+}
+
+.audio-gb > .section > .audio-wave.selector {
+    cursor: pointer;
+}
+
+.audio-gb > .section > .audio-wave.disabled {
+    opacity: 0.6;
+}
+
 .audio-gb > .section > .audio-wave > h4 {
     margin: 4px 0px 4px 0px;
 }
