@@ -8,7 +8,7 @@ A Game Boy emulator that is written in Rust 🦀.
 
 ## Features
 
-* Game Boy (DMG) emulation
+* Game Boy (DMG) and Game Boy Color (CGB) emulation
 * Simple navigable source-code
 * Web and SDL front-ends
 * Audio, with a pretty accurate APU
