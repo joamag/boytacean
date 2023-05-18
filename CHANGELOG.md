@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * Support for Game Boy Color (CGB) emulation! 🥳 - [#8](https://gitlab.stage.hive.pt/joamag/boytacean/-/issues/8)
 * Support for CLI params in Boytacean SDL
+* Support for `GameBoyConfig` structure that is passed to some comments
+* New `DMA` component
 
 ### Changed
 
