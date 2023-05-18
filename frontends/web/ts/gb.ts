@@ -119,9 +119,18 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
      */
     private _engine: string | null = null;
 
-    private logicFrequency: number = LOGIC_HZ;
-    private visualFrequency: number = VISUAL_HZ;
-    private idleFrequency: number = IDLE_HZ;
+    /**
+     * If the GB running mode should be automatically inferred
+     * from the GBC flag in the cartridge. Meaning that if the
+     * cartridge is a GBC compatible or GBC only the GBC emulation
+     * mode is going to be used, otherwise the DMG mode is used
+     * instead. This should provide an optimal usage experience.
+     */
+    private autoMode = false;
+
+    private logicFrequency = LOGIC_HZ;
+    private visualFrequency = VISUAL_HZ;
+    private idleFrequency = IDLE_HZ;
 
     private paused = false;
     private nextTickTime = 0;
@@ -361,7 +370,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
      * the emulator engine to use.
      */
     async boot({
-        engine = "cgb",
+        engine = "auto",
         restore = true,
         loadRom = false,
         romPath = ROM_PATH,
@@ -394,11 +403,17 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         // selects the proper engine for execution
         // and builds a new instance of it
         switch (engine) {
+            case "auto":
+                this.gameBoy = new GameBoy(GameBoyMode.Dmg);
+                this.autoMode = true;
+                break;
             case "cgb":
                 this.gameBoy = new GameBoy(GameBoyMode.Cgb);
+                this.autoMode = false;
                 break;
             case "dmg":
                 this.gameBoy = new GameBoy(GameBoyMode.Dmg);
+                this.autoMode = false;
                 break;
             default:
                 if (!this.gameBoy) {
@@ -411,6 +426,13 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         // the palette of the emulator according to the currently
         // selected one
         this.updatePalette();
+
+        // in case the auto emulation mode is enabled runs the
+        // inference logic to try to infer the best mode from the
+        // GBC header in the cartridge data
+        if (this.autoMode) {
+            this.gameBoy.infer_mode_ws(romData);
+        }
 
         // resets the Game Boy engine to restore it into
         // a valid state ready to be used
@@ -541,11 +563,11 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     }
 
     get engines(): string[] {
-        return ["cgb", "dmg"];
+        return ["auto", "cgb", "dmg"];
     }
 
     get engine(): string {
-        return this._engine || "cgb";
+        return this._engine || "auto";
     }
 
     get romExts(): string[] {

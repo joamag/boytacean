@@ -4,7 +4,7 @@ use std::{
     fmt::{Display, Formatter},
 };
 
-use crate::{debugln, warnln};
+use crate::{debugln, gb::GameBoyMode, util::read_file, warnln};
 
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
@@ -276,6 +276,11 @@ impl Cartridge {
         cartridge
     }
 
+    pub fn from_file(path: &str) -> Self {
+        let data = read_file(path);
+        Self::from_data(&data)
+    }
+
     pub fn read(&self, addr: u16) -> u8 {
         match addr & 0xf000 {
             0x0000 | 0x1000 | 0x2000 | 0x3000 | 0x4000 | 0x5000 | 0x6000 | 0x7000 => {
@@ -401,6 +406,13 @@ impl Cartridge {
             0x80 => CgbMode::CgbCompatible,
             0xc0 => CgbMode::CgbOnly,
             _ => CgbMode::NoCgb,
+        }
+    }
+
+    pub fn gb_mode(&self) -> GameBoyMode {
+        match self.cgb_flag() {
+            CgbMode::CgbCompatible | CgbMode::CgbOnly => GameBoyMode::Cgb,
+            _ => GameBoyMode::Dmg,
         }
     }
 

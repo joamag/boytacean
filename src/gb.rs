@@ -936,6 +936,11 @@ impl GameBoy {
         }));
     }
 
+    pub fn infer_mode_ws(&mut self, data: &[u8]) {
+        let mode = Cartridge::from_data(data).gb_mode();
+        self.set_mode(mode);
+    }
+
     pub fn load_rom_ws(&mut self, data: &[u8]) -> Cartridge {
         self.load_rom(data).clone()
     }

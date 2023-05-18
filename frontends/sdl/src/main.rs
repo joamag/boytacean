@@ -10,6 +10,7 @@ use boytacean::{
     gb::{AudioProvider, GameBoy, GameBoyMode},
     pad::PadKey,
     ppu::{PaletteInfo, PpuMode, DISPLAY_HEIGHT, DISPLAY_WIDTH},
+    rom::Cartridge,
     serial::{NullDevice, SerialDevice},
 };
 use chrono::Utc;
@@ -49,6 +50,7 @@ impl Default for Benchmark {
 
 pub struct Emulator {
     system: GameBoy,
+    auto_mode: bool,
     graphics: Option<Graphics>,
     audio: Option<Audio>,
     title: &'static str,
@@ -63,9 +65,10 @@ pub struct Emulator {
 }
 
 impl Emulator {
-    pub fn new(system: GameBoy) -> Self {
+    pub fn new(system: GameBoy, auto_mode: bool) -> Self {
         Self {
             system,
+            auto_mode,
             graphics: None,
             audio: None,
             title: TITLE,
@@ -183,7 +186,7 @@ impl Emulator {
 
     pub fn load_rom(&mut self, path: Option<&str>) {
         let path_res = path.unwrap_or(&self.rom_path);
-        let rom = self.system.load_rom_file(path_res);
+        let rom: &boytacean::rom::Cartridge = self.system.load_rom_file(path_res);
         println!(
             "========= Cartridge =========\n{}\n=============================",
             rom
@@ -329,6 +332,10 @@ impl Emulator {
                         }
                     }
                     Event::DropFile { filename, .. } => {
+                        if self.auto_mode {
+                            let mode = Cartridge::from_file(&filename).gb_mode();
+                            self.system.set_mode(mode);
+                        }
                         self.system.reset();
                         self.system.load(true);
                         self.load_rom(Some(&filename));
@@ -461,7 +468,7 @@ impl Emulator {
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
-    #[arg(short, long, default_value_t = String::from("cgb"))]
+    #[arg(short, long, default_value_t = String::from("auto"))]
     mode: String,
 
     #[arg(short, long, default_value_t = String::from("printer"))]
@@ -487,7 +494,12 @@ fn main() {
     // parses the provided command line arguments and uses them to
     // obtain structured values
     let args = Args::parse();
-    let mode: GameBoyMode = GameBoyMode::from_string(&args.mode);
+    let mode: GameBoyMode = if args.mode == "auto" {
+        GameBoyMode::Dmg
+    } else {
+        GameBoyMode::from_string(&args.mode)
+    };
+    let auto_mode = args.mode == "auto";
 
     // creates a new Game Boy instance and loads both the boot ROM
     // and the initial game ROM to "start the engine"
@@ -506,7 +518,7 @@ fn main() {
     // creates a new generic emulator structure then starts
     // both the video and audio sub-systems, loads default
     // ROM file and starts running it
-    let mut emulator = Emulator::new(game_boy);
+    let mut emulator = Emulator::new(game_boy, auto_mode);
     emulator.start(SCREEN_SCALE);
     emulator.load_rom(Some(&args.rom_path));
     emulator.toggle_palette();

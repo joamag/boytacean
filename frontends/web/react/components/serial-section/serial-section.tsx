@@ -58,7 +58,7 @@ export const SerialSection: FC<SerialSectionProps> = ({
         };
     }, []);
 
-    const onEngineChange = (option: string) => {
+    const onDeviceChange = (option: string) => {
         emulator.loadSerialDevice(option as SerialDevice);
         const optionIcon = DEVICE_ICON[option] ?? "";
         emulator.handlers.showToast?.(
@@ -79,7 +79,7 @@ export const SerialSection: FC<SerialSectionProps> = ({
                             uppercase={true}
                             size={"large"}
                             style={["simple"]}
-                            onChange={onEngineChange}
+                            onChange={onDeviceChange}
                         />
                     }
                 />
