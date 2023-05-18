@@ -446,6 +446,8 @@ impl Apu {
                 self.ch2_pace = value & 0x07;
                 self.ch2_direction = (value & 0x08) >> 3;
                 self.ch2_volume = (value & 0xf0) >> 4;
+                self.ch2_envelope_enabled = self.ch2_pace > 0;
+                self.ch2_envelope_sequence = 0;
             }
             // 0xFF18 — NR23: Channel 2 wavelength low
             0xff18 => {
