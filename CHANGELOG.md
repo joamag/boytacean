@@ -9,11 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-* Support for enabling and disabling audio channels
+*
 
 ### Changed
 
 *
+
+### Fixed
+
+*
+
+## [0.9.1] - 2023-05-18
+
+### Added
+
+* Support for enabling and disabling audio channels
 
 ### Fixed
 
