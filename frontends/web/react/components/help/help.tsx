@@ -109,7 +109,7 @@ export const HelpFaqs: FC = () => (
             🕹️.
         </p>
         <h3>Will it ever play Game Boy Color games?</h3>
-        <p>Eventually...</p>
+        <p>It already does!</p>
         <h3>I've found a bug, where can I report it?</h3>
         <p>
             Use the{" "}
