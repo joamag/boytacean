@@ -20,7 +20,7 @@ export const AudioGB: FC<AudioGBProps> = ({
     getAudioOutput,
     interval = 1,
     drawInterval = 1000 / 60,
-    color = 0x50cb93ff,
+    color = 0x58b09cff,
     range = 128,
     rangeVolume = 32,
     engine = "webgl",

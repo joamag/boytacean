@@ -1,15 +1,23 @@
 use core::fmt;
 use std::{
     borrow::BorrowMut,
+    cell::RefCell,
+    cmp::max,
     fmt::{Display, Formatter},
+    rc::Rc,
+};
+
+use crate::{
+    gb::{GameBoyConfig, GameBoyMode},
+    warnln,
 };
 
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
 
-use crate::warnln;
-
-pub const VRAM_SIZE: usize = 8192;
+pub const VRAM_SIZE_DMG: usize = 8192;
+pub const VRAM_SIZE_CGB: usize = 16384;
+pub const VRAM_SIZE: usize = VRAM_SIZE_CGB;
 pub const HRAM_SIZE: usize = 128;
 pub const OAM_SIZE: usize = 260;
 pub const PALETTE_SIZE: usize = 4;
@@ -17,11 +25,16 @@ pub const RGB_SIZE: usize = 3;
 pub const RGBA_SIZE: usize = 4;
 pub const TILE_WIDTH: usize = 8;
 pub const TILE_HEIGHT: usize = 8;
+pub const TILE_WIDTH_I: usize = 7;
+pub const TILE_HEIGHT_I: usize = 7;
 pub const TILE_DOUBLE_HEIGHT: usize = 16;
+
+pub const TILE_COUNT_DMG: usize = 384;
+pub const TILE_COUNT_CGB: usize = 768;
 
 /// The number of tiles that can be store in Game Boy's
 /// VRAM memory according to specifications.
-pub const TILE_COUNT: usize = 384;
+pub const TILE_COUNT: usize = TILE_COUNT_CGB;
 
 /// The number of objects/sprites that can be handled at
 /// the same time by the Game Boy.
@@ -44,6 +57,14 @@ pub const FRAME_BUFFER_SIZE: usize = DISPLAY_WIDTH * DISPLAY_HEIGHT * RGB_SIZE;
 /// The base colors to be used to populate the
 /// custom palettes of the Game Boy.
 pub const PALETTE_COLORS: Palette = [[255, 255, 255], [192, 192, 192], [96, 96, 96], [0, 0, 0]];
+
+pub const DEFAULT_TILE_ATTR: TileData = TileData {
+    palette: 0,
+    vram_bank: 0,
+    xflip: false,
+    yflip: false,
+    priority: false,
+};
 
 /// Defines the Game Boy pixel type as a buffer
 /// with the size of RGB (3 bytes).
@@ -89,15 +110,25 @@ impl PaletteInfo {
 
 /// Represents a tile within the Game Boy context,
 /// should contain the pixel buffer of the tile.
+/// The tiles are always 8x8 pixels in size.
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Tile {
+    /// The buffer for the tile, should contain a byte
+    /// per each pixel of the tile with values ranging
+    /// from 0 to 3 (4 colors).
     buffer: [u8; 64],
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 impl Tile {
     pub fn get(&self, x: usize, y: usize) -> u8 {
+        self.buffer[y * TILE_WIDTH + x]
+    }
+
+    pub fn get_flipped(&self, x: usize, y: usize, xflip: bool, yflip: bool) -> u8 {
+        let x: usize = if xflip { TILE_WIDTH_I - x } else { x };
+        let y = if yflip { TILE_HEIGHT_I - y } else { y };
         self.buffer[y * TILE_WIDTH + x]
     }
 
@@ -144,11 +175,36 @@ pub struct ObjectData {
     x: i16,
     y: i16,
     tile: u8,
+    palette_cgb: u8,
+    tile_bank: u8,
     palette: u8,
     xflip: bool,
     yflip: bool,
     bg_over: bool,
     index: u8,
+}
+
+impl ObjectData {
+    pub fn new() -> Self {
+        Self {
+            x: 0,
+            y: 0,
+            tile: 0,
+            palette_cgb: 0,
+            tile_bank: 0,
+            palette: 0,
+            xflip: false,
+            yflip: false,
+            bg_over: false,
+            index: 0,
+        }
+    }
+}
+
+impl Default for ObjectData {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Display for ObjectData {
@@ -157,6 +213,44 @@ impl Display for ObjectData {
             f,
             "Index => {}\nX => {}\nY => {}\nTile => {}",
             self.index, self.x, self.y, self.tile
+        )
+    }
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct TileData {
+    palette: u8,
+    vram_bank: u8,
+    xflip: bool,
+    yflip: bool,
+    priority: bool,
+}
+
+impl TileData {
+    pub fn new() -> Self {
+        Self {
+            palette: 0,
+            vram_bank: 0,
+            xflip: false,
+            yflip: false,
+            priority: false,
+        }
+    }
+}
+
+impl Default for TileData {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Display for TileData {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Palette => {}\nVRAM Bank => {}\nX Flip => {}\nY Flip => {}",
+            self.palette, self.vram_bank, self.xflip, self.yflip
         )
     }
 }
@@ -179,7 +273,7 @@ pub struct PpuRegisters {
 /// # Basic usage
 /// ```rust
 /// use boytacean::ppu::Ppu;
-/// let mut ppu = Ppu::new();
+/// let mut ppu = Ppu::default();
 /// ppu.clock(8);
 /// ```
 pub struct Ppu {
@@ -203,6 +297,15 @@ pub struct Ppu {
     /// sprite attributes for each of the 40 sprites of the Game Boy.
     oam: [u8; OAM_SIZE],
 
+    /// The VRAM bank to be used in the read and write operation of
+    /// the 0x8000-0x9FFF memory range (CGB only).
+    vram_bank: u8,
+
+    /// The offset to be used in the read and write operation of
+    /// the VRAM, this value should be consistent with the VRAM bank
+    /// that is currently selected (CGB only).
+    vram_offset: u16,
+
     /// The current set of processed tiles that are store in the
     /// PPU related structures.
     tiles: [Tile; TILE_COUNT],
@@ -218,8 +321,8 @@ pub struct Ppu {
     palette_colors: Palette,
 
     /// The palette of colors that is currently loaded in Game Boy
-    /// and used for background (tiles).
-    palette: Palette,
+    /// and used for background (tiles) and window.
+    palette_bg: Palette,
 
     /// The palette that is going to be used for sprites/objects #0.
     palette_obj_0: Palette,
@@ -227,9 +330,30 @@ pub struct Ppu {
     /// The palette that is going to be used for sprites/objects #1.
     palette_obj_1: Palette,
 
+    /// The complete set of background palettes that are going to be
+    /// used in CGB emulation to provide the full set of colors (CGB only).
+    palettes_color_bg: [Palette; 8],
+
+    /// The complete set of object/sprite palettes that are going to be
+    /// used in CGB emulation to provide the full set of colors (CGB only).
+    palettes_color_obj: [Palette; 8],
+
     /// The complete set of palettes in binary data so that they can
     /// be re-read if required by the system.
     palettes: [u8; 3],
+
+    /// The raw binary information (64 bytes) for the color palettes,
+    /// contains binary information for both the background and
+    /// the objects palettes (CGB only).
+    palettes_color: [[u8; 64]; 2],
+
+    /// The complete list of attributes for the first background
+    /// map that is located in 0x9800-0x9BFF (CGB only).
+    bg_map_attrs_0: [TileData; 1024],
+
+    /// The complete list of attributes for the second background
+    /// map that is located in 0x9C00-0x9FFF (CGB only).
+    bg_map_attrs_1: [TileData; 1024],
 
     /// The scroll Y register that controls the Y offset
     /// of the background.
@@ -265,6 +389,8 @@ pub struct Ppu {
     mode_clock: u16,
 
     /// Controls if the background is going to be drawn to screen.
+    /// In CGB mode this flag controls the master priority instead
+    /// enabling or disabling complex priority rules.
     switch_bg: bool,
 
     /// Controls if the sprites/objects are going to be drawn to screen.
@@ -293,12 +419,26 @@ pub struct Ppu {
     /// content.
     switch_lcd: bool,
 
-    // Internal window counter value used to control the ines that
+    // Internal window counter value used to control the lines that
     // were effectively rendered as part of the window tile drawing process.
     // A line is only considered rendered when the WX and WY registers
     // are within the valid screen range and the window switch register
     // is valid.
     window_counter: u8,
+
+    /// If the auto increment of the background color palette is enabled
+    /// so that the next address is going to be set on every write.
+    auto_increment_bg: bool,
+
+    /// The current address in usage for the background color palettes.
+    palette_address_bg: u8,
+
+    /// If the auto increment of the object/sprite color palette is enabled
+    /// so that the next address is going to be set on every write.
+    auto_increment_obj: bool,
+
+    /// The current address in usage for the object/sprite color palettes.
+    palette_address_obj: u8,
 
     /// Flag that controls if the frame currently in rendering is the
     /// first one, preventing actions.
@@ -321,6 +461,21 @@ pub struct Ppu {
     /// Boolean value when the LCD STAT interrupt should be handled by
     /// the next CPU clock operation.
     int_stat: bool,
+
+    /// Flag that controls if the DMG compatibility mode is
+    /// enabled meaning that some of the PPU decisions will
+    /// be made differently to address this special situation
+    /// (CGB only).
+    dmg_compat: bool,
+
+    /// The current running mode of the emulator, this
+    /// may affect many aspects of the emulation.
+    gb_mode: GameBoyMode,
+
+    /// The pointer to the parent configuration of the running
+    /// Game Boy emulator, that can be used to control the behaviour
+    /// of Game Boy emulation.
+    gbc: Rc<RefCell<GameBoyConfig>>,
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
@@ -333,29 +488,27 @@ pub enum PpuMode {
 }
 
 impl Ppu {
-    pub fn new() -> Self {
+    pub fn new(mode: GameBoyMode, gbc: Rc<RefCell<GameBoyConfig>>) -> Self {
         Self {
             color_buffer: Box::new([0u8; COLOR_BUFFER_SIZE]),
             frame_buffer: Box::new([0u8; FRAME_BUFFER_SIZE]),
             vram: [0u8; VRAM_SIZE],
             hram: [0u8; HRAM_SIZE],
             oam: [0u8; OAM_SIZE],
+            vram_bank: 0x0,
+            vram_offset: 0x0000,
             tiles: [Tile { buffer: [0u8; 64] }; TILE_COUNT],
-            obj_data: [ObjectData {
-                x: 0,
-                y: 0,
-                tile: 0,
-                palette: 0,
-                xflip: false,
-                yflip: false,
-                bg_over: false,
-                index: 0,
-            }; OBJ_COUNT],
+            obj_data: [ObjectData::default(); OBJ_COUNT],
             palette_colors: PALETTE_COLORS,
-            palette: [[0u8; RGB_SIZE]; PALETTE_SIZE],
+            palette_bg: [[0u8; RGB_SIZE]; PALETTE_SIZE],
             palette_obj_0: [[0u8; RGB_SIZE]; PALETTE_SIZE],
             palette_obj_1: [[0u8; RGB_SIZE]; PALETTE_SIZE],
+            palettes_color_bg: [[[0u8; RGB_SIZE]; PALETTE_SIZE]; 8],
+            palettes_color_obj: [[[0u8; RGB_SIZE]; PALETTE_SIZE]; 8],
             palettes: [0u8; 3],
+            palettes_color: [[0u8; 64]; 2],
+            bg_map_attrs_0: [TileData::default(); 1024],
+            bg_map_attrs_1: [TileData::default(); 1024],
             scy: 0x0,
             scx: 0x0,
             wy: 0x0,
@@ -373,6 +526,10 @@ impl Ppu {
             window_map: false,
             switch_lcd: false,
             window_counter: 0x0,
+            auto_increment_bg: false,
+            palette_address_bg: 0x0,
+            auto_increment_obj: false,
+            palette_address_obj: 0x0,
             first_frame: false,
             frame_index: 0,
             stat_hblank: false,
@@ -381,19 +538,27 @@ impl Ppu {
             stat_lyc: false,
             int_vblank: false,
             int_stat: false,
+            dmg_compat: false,
+            gb_mode: mode,
+            gbc,
         }
     }
 
     pub fn reset(&mut self) {
         self.color_buffer = Box::new([0u8; COLOR_BUFFER_SIZE]);
         self.frame_buffer = Box::new([0u8; FRAME_BUFFER_SIZE]);
-        self.vram = [0u8; VRAM_SIZE];
+        self.vram = [0u8; VRAM_SIZE_CGB];
         self.hram = [0u8; HRAM_SIZE];
+        self.vram_bank = 0x0;
+        self.vram_offset = 0x0000;
         self.tiles = [Tile { buffer: [0u8; 64] }; TILE_COUNT];
-        self.palette = [[0u8; RGB_SIZE]; PALETTE_SIZE];
+        self.palette_bg = [[0u8; RGB_SIZE]; PALETTE_SIZE];
         self.palette_obj_0 = [[0u8; RGB_SIZE]; PALETTE_SIZE];
         self.palette_obj_1 = [[0u8; RGB_SIZE]; PALETTE_SIZE];
+        self.palettes_color_bg = [[[0u8; RGB_SIZE]; PALETTE_SIZE]; 8];
+        self.palettes_color_obj = [[[0u8; RGB_SIZE]; PALETTE_SIZE]; 8];
         self.palettes = [0u8; 3];
+        self.palettes_color = [[0u8; 64]; 2];
         self.scy = 0x0;
         self.scx = 0x0;
         self.ly = 0x0;
@@ -408,6 +573,11 @@ impl Ppu {
         self.switch_window = false;
         self.window_map = false;
         self.switch_lcd = false;
+        self.window_counter = 0;
+        self.auto_increment_bg = false;
+        self.palette_address_bg = 0x0;
+        self.auto_increment_obj = false;
+        self.palette_address_obj = 0x0;
         self.first_frame = false;
         self.frame_index = 0;
         self.stat_hblank = false;
@@ -416,6 +586,7 @@ impl Ppu {
         self.stat_lyc = false;
         self.int_vblank = false;
         self.int_stat = false;
+        self.dmg_compat = false;
     }
 
     pub fn clock(&mut self, cycles: u8) {
@@ -503,7 +674,7 @@ impl Ppu {
 
     pub fn read(&mut self, addr: u16) -> u8 {
         match addr {
-            0x8000..=0x9fff => self.vram[(addr & 0x1fff) as usize],
+            0x8000..=0x9fff => self.vram[(self.vram_offset + (addr & 0x1fff)) as usize],
             0xfe00..=0xfe9f => self.oam[(addr & 0x009f) as usize],
             0xff80..=0xfffe => self.hram[(addr & 0x007f) as usize],
             0xff40 =>
@@ -536,7 +707,15 @@ impl Ppu {
             0xff4a => self.wy,
             0xff4b => self.wx,
             // 0xFF4F — VBK (CGB only)
-            0xff4f => 0xff,
+            0xff4f => self.vram_bank | 0xfe,
+            // 0xFF68 — BCPS/BGPI (CGB only)
+            0xff68 => self.palette_address_bg | if self.auto_increment_bg { 0x80 } else { 0x00 },
+            // 0xFF69 — BCPD/BGPD (CGB only)
+            0xff69 => self.palettes_color[0][self.palette_address_bg as usize],
+            // 0xFF6A — OCPS/OBPI (CGB only)
+            0xff6a => self.palette_address_obj | if self.auto_increment_obj { 0x80 } else { 0x00 },
+            // 0xFF6B — OCPD/OBPD (CGB only)
+            0xff6b => self.palettes_color[1][self.palette_address_obj as usize],
             _ => {
                 warnln!("Reading from unknown PPU location 0x{:04x}", addr);
                 0xff
@@ -547,9 +726,11 @@ impl Ppu {
     pub fn write(&mut self, addr: u16, value: u8) {
         match addr {
             0x8000..=0x9fff => {
-                self.vram[(addr & 0x1fff) as usize] = value;
+                self.vram[(self.vram_offset + (addr & 0x1fff)) as usize] = value;
                 if addr < 0x9800 {
                     self.update_tile(addr, value);
+                } else if self.vram_bank == 0x1 {
+                    self.update_bg_map_attrs(addr, value);
                 }
             }
             0xfe00..=0xfe9f => {
@@ -590,21 +771,91 @@ impl Ppu {
             0xff43 => self.scx = value,
             0xff45 => self.lyc = value,
             0xff47 => {
-                Self::compute_palette(&mut self.palette, &self.palette_colors, value);
+                if value == self.palettes[0] {
+                    return;
+                }
+                if self.dmg_compat {
+                    Self::compute_palette(&mut self.palette_bg, &self.palettes_color_bg[0], value);
+                } else {
+                    Self::compute_palette(&mut self.palette_bg, &self.palette_colors, value);
+                }
                 self.palettes[0] = value;
             }
             0xff48 => {
-                Self::compute_palette(&mut self.palette_obj_0, &self.palette_colors, value);
+                if value == self.palettes[1] {
+                    return;
+                }
+                if self.dmg_compat {
+                    Self::compute_palette(
+                        &mut self.palette_obj_0,
+                        &self.palettes_color_obj[0],
+                        value,
+                    );
+                } else {
+                    Self::compute_palette(&mut self.palette_obj_0, &self.palette_colors, value);
+                }
                 self.palettes[1] = value;
             }
             0xff49 => {
-                Self::compute_palette(&mut self.palette_obj_1, &self.palette_colors, value);
+                if value == self.palettes[2] {
+                    return;
+                }
+                if self.dmg_compat {
+                    Self::compute_palette(
+                        &mut self.palette_obj_1,
+                        &self.palettes_color_obj[1],
+                        value,
+                    );
+                } else {
+                    Self::compute_palette(&mut self.palette_obj_1, &self.palette_colors, value);
+                }
                 self.palettes[2] = value;
             }
             0xff4a => self.wy = value,
             0xff4b => self.wx = value,
             // 0xFF4F — VBK (CGB only)
-            0xff4f => (),
+            0xff4f => {
+                self.vram_bank = value & 0x01;
+                self.vram_offset = self.vram_bank as u16 * 0x2000;
+            }
+            // 0xFF68 — BCPS/BGPI (CGB only)
+            0xff68 => {
+                self.palette_address_bg = value & 0x3f;
+                self.auto_increment_bg = value & 0x80 == 0x80;
+            }
+            // 0xFF69 — BCPD/BGPD (CGB only)
+            0xff69 => {
+                let palette_index = self.palette_address_bg / 8;
+                let color_index = (self.palette_address_bg % 8) / 2;
+
+                let palette_color = &mut self.palettes_color[0];
+                palette_color[self.palette_address_bg as usize] = value;
+                let palette = &mut self.palettes_color_bg[palette_index as usize];
+                Self::compute_palette_color(palette, palette_color, palette_index, color_index);
+
+                if self.auto_increment_bg {
+                    self.palette_address_bg = (self.palette_address_bg + 1) & 0x3f;
+                }
+            }
+            // 0xFF6A — OCPS/OBPI (CGB only)
+            0xff6a => {
+                self.palette_address_obj = value & 0x3f;
+                self.auto_increment_obj = value & 0x80 == 0x80;
+            }
+            // 0xFF6B — OCPD/OBPD (CGB only)
+            0xff6b => {
+                let palette_index = self.palette_address_obj / 8;
+                let color_index = (self.palette_address_obj % 8) / 2;
+
+                let palette_color = &mut self.palettes_color[1];
+                palette_color[self.palette_address_obj as usize] = value;
+                let palette = &mut self.palettes_color_obj[palette_index as usize];
+                Self::compute_palette_color(palette, palette_color, palette_index, color_index);
+
+                if self.auto_increment_obj {
+                    self.palette_address_obj = (self.palette_address_obj + 1) & 0x3f;
+                }
+            }
             0xff7f => (),
             _ => warnln!("Writing in unknown PPU location 0x{:04x}", addr),
         }
@@ -627,8 +878,8 @@ impl Ppu {
         self.compute_palettes()
     }
 
-    pub fn palette(&self) -> Palette {
-        self.palette
+    pub fn palette_bg(&self) -> Palette {
+        self.palette_bg
     }
 
     pub fn palette_obj_0(&self) -> Palette {
@@ -681,6 +932,34 @@ impl Ppu {
         self.set_int_stat(false);
     }
 
+    pub fn dmg_compat(&self) -> bool {
+        self.dmg_compat
+    }
+
+    pub fn set_dmg_compat(&mut self, value: bool) {
+        self.dmg_compat = value;
+
+        // if we're switching to the DMG compat mode
+        // then we need to recompute the palettes so
+        // that the colors are correct according to
+        // the compat palettes set by the Boot ROM
+        if value {
+            self.compute_palettes();
+        }
+    }
+
+    pub fn gb_mode(&self) -> GameBoyMode {
+        self.gb_mode
+    }
+
+    pub fn set_gb_mode(&mut self, value: GameBoyMode) {
+        self.gb_mode = value;
+    }
+
+    pub fn set_gbc(&mut self, value: Rc<RefCell<GameBoyConfig>>) {
+        self.gbc = value;
+    }
+
     /// Fills the frame buffer with pixels of the provided color,
     /// this method must represent the fastest way of achieving
     /// the fill background with color operation.
@@ -709,15 +988,15 @@ impl Ppu {
     /// just been written to a location on the VRAM associated
     /// with tiles.
     fn update_tile(&mut self, addr: u16, _value: u8) {
-        let addr = (addr & 0x1ffe) as usize;
-        let tile_index = (addr >> 4) & 0x01ff;
+        let addr = (self.vram_offset + (addr & 0x1ffe)) as usize;
+        let tile_index = ((addr >> 4) & 0x01ff) + (self.vram_bank as usize * TILE_COUNT_DMG);
         let tile = self.tiles[tile_index].borrow_mut();
         let y = (addr >> 1) & 0x0007;
 
         let mut mask;
 
         for x in 0..TILE_WIDTH {
-            mask = 1 << (7 - x);
+            mask = 1 << (TILE_WIDTH_I - x);
             #[allow(clippy::bool_to_int_with_if)]
             tile.set(
                 x,
@@ -738,12 +1017,14 @@ impl Ppu {
         if obj_index >= OBJ_COUNT {
             return;
         }
-        let mut obj = self.obj_data[obj_index].borrow_mut();
+        let obj = self.obj_data[obj_index].borrow_mut();
         match addr & 0x03 {
             0x00 => obj.y = value as i16 - 16,
             0x01 => obj.x = value as i16 - 8,
             0x02 => obj.tile = value,
             0x03 => {
+                obj.palette_cgb = value & 0x07;
+                obj.tile_bank = (value & 0x08 == 0x08) as u8;
                 obj.palette = (value & 0x10 == 0x10) as u8;
                 obj.xflip = value & 0x20 == 0x20;
                 obj.yflip = value & 0x40 == 0x40;
@@ -752,6 +1033,22 @@ impl Ppu {
             }
             _ => (),
         }
+    }
+
+    fn update_bg_map_attrs(&mut self, addr: u16, value: u8) {
+        let bg_map = addr >= 0x9c00;
+        let tile_index = if bg_map { addr - 0x9c00 } else { addr - 0x9800 };
+        let bg_map_attrs = if bg_map {
+            &mut self.bg_map_attrs_1
+        } else {
+            &mut self.bg_map_attrs_0
+        };
+        let tile_data: &mut TileData = bg_map_attrs[tile_index as usize].borrow_mut();
+        tile_data.palette = value & 0x07;
+        tile_data.vram_bank = (value & 0x08 == 0x08) as u8;
+        tile_data.xflip = value & 0x20 == 0x20;
+        tile_data.yflip = value & 0x40 == 0x40;
+        tile_data.priority = value & 0x80 == 0x80;
     }
 
     pub fn registers(&self) -> PpuRegisters {
@@ -769,10 +1066,12 @@ impl Ppu {
         if self.first_frame {
             return;
         }
-        if self.switch_bg {
+        let switch_bg_window =
+            (self.gb_mode == GameBoyMode::Cgb && !self.dmg_compat) || self.switch_bg;
+        if switch_bg_window {
             self.render_map(self.bg_map, self.scx, self.scy, 0, 0, self.ly);
         }
-        if self.switch_window {
+        if switch_bg_window && self.switch_window {
             self.render_map(self.window_map, 0, 0, self.wx, self.wy, self.window_counter);
         }
         if self.switch_obj {
@@ -787,19 +1086,27 @@ impl Ppu {
             return;
         }
 
-        // calculates the row offset for the tile by using the current line
-        // index and the DY (scroll Y) divided by 8 (as the tiles are 8x8 pixels),
-        // on top of that ensures that the result is modulus 32 meaning that the
-        // drawing wraps around the Y axis
-        let row_offset = (((ld as usize + scy as usize) & 0xff) >> 3) % 32;
+        // selects the correct background attributes map based on the bg map flag
+        // because the attributes are separated according to the map they represent
+        let bg_map_attrs = if map {
+            self.bg_map_attrs_1
+        } else {
+            self.bg_map_attrs_0
+        };
 
         // obtains the base address of the background map using the bg map flag
         // that control which background map is going to be used
-        let mut map_offset: usize = if map { 0x1c00 } else { 0x1800 };
+        let map_offset: usize = if map { 0x1c00 } else { 0x1800 };
 
-        // increments the map offset by the row offset multiplied by the number
+        // calculates the map row index for the tile by using the current line
+        // index and the DY (scroll Y) divided by 8 (as the tiles are 8x8 pixels),
+        // on top of that ensures that the result is modulus 32 meaning that the
+        // drawing wraps around the Y axis
+        let row_index = (((ld as usize + scy as usize) & 0xff) >> 3) % 32;
+
+        // calculates the map offset by the row offset multiplied by the number
         // of tiles in each row (32)
-        map_offset += row_offset * 32;
+        let row_offset = row_index * 32;
 
         // calculates the sprite line offset by using the SCX register
         // shifted by 3 meaning that the tiles are 8x8
@@ -808,10 +1115,44 @@ impl Ppu {
         // calculates the index of the initial tile in drawing,
         // if the tile data set in use is #1, the indexes are
         // signed, then calculates a real tile offset
-        let mut tile_index = self.vram[map_offset + line_offset] as usize;
+        let mut tile_index = self.vram[map_offset + row_offset + line_offset] as usize;
         if !self.bg_tile && tile_index < 128 {
             tile_index += 256;
         }
+
+        // obtains the reference to the attributes of the new tile in
+        // drawing for meta processing (CGB only)
+        // @TODO: This strategy seems a bit naive, need to figure out
+        // if there's a better way to do this and a more performant one
+        let mut tile_attr = if self.dmg_compat {
+            &DEFAULT_TILE_ATTR
+        } else {
+            &bg_map_attrs[row_offset + line_offset]
+        };
+
+        // retrieves the proper palette for the current tile in drawing
+        // taking into consideration if we're running in CGB mode or not
+        let mut palette = if self.gb_mode == GameBoyMode::Cgb {
+            if self.dmg_compat {
+                &self.palette_bg
+            } else {
+                &self.palettes_color_bg[tile_attr.palette as usize]
+            }
+        } else {
+            &self.palette_bg
+        };
+
+        // obtains the values of both X and Y flips for the current tile
+        // they will be applied by the get tile pixel method
+        let mut xflip = tile_attr.xflip;
+        let mut yflip = tile_attr.yflip;
+
+        // increments the tile index value by the required offset for the VRAM
+        // bank in which the tile is stored, this is only required for CGB mode
+        tile_index += tile_attr.vram_bank as usize * TILE_COUNT_DMG;
+
+        // obtains the reference to the tile that is going to be drawn
+        let mut tile = &self.tiles[tile_index];
 
         // calculates the offset that is going to be used in the update of the color buffer
         // which stores Game Boy colors from 0 to 3
@@ -826,46 +1167,64 @@ impl Ppu {
         let y = (ld as usize + scy as usize) & 0x07;
         let mut x = (scx & 0x07) as usize;
 
-        for index in 0..DISPLAY_WIDTH {
-            // in case the current pixel to be drawn for the line
-            // is visible within the window draws it an increments
-            // the X coordinate of the tile
-            if index as i16 >= wx as i16 - 7 {
-                // obtains the current pixel data from the tile and
-                // re-maps it according to the current palette
-                let pixel = self.tiles[tile_index].get(x, y);
-                let color = self.palette[pixel as usize];
+        // calculates the initial tile X position in drawing, doing this
+        // allows us to position the background map properly in the display
+        let initial_index = max(wx as i16 - 7, 0) as usize;
+        color_offset += initial_index;
+        frame_offset += initial_index * RGB_SIZE;
 
-                // updates the pixel in the color buffer, which stores
-                // the raw pixel color information (unmapped)
-                self.color_buffer[color_offset] = pixel;
+        // iterates over all the pixels in the current line of the display
+        // to draw the background map, note that the initial index is used
+        // to skip the drawing of the tiles that are not visible (WX)
+        for _ in initial_index..DISPLAY_WIDTH {
+            // obtains the current pixel data from the tile and
+            // re-maps it according to the current palette
+            let pixel = tile.get_flipped(x, y, xflip, yflip);
+            let color = &palette[pixel as usize];
 
-                // set the color pixel in the frame buffer
-                self.frame_buffer[frame_offset] = color[0];
-                self.frame_buffer[frame_offset + 1] = color[1];
-                self.frame_buffer[frame_offset + 2] = color[2];
+            // updates the pixel in the color buffer, which stores
+            // the raw pixel color information (unmapped)
+            self.color_buffer[color_offset] = pixel;
 
-                // increments the current tile X position in drawing
-                x += 1;
+            // set the color pixel in the frame buffer
+            self.frame_buffer[frame_offset] = color[0];
+            self.frame_buffer[frame_offset + 1] = color[1];
+            self.frame_buffer[frame_offset + 2] = color[2];
 
-                // in case the end of tile width has been reached then
-                // a new tile must be retrieved for plotting
-                if x == TILE_WIDTH {
-                    // resets the tile X position to the base value
-                    // as a new tile is going to be drawn
-                    x = 0;
+            // increments the current tile X position in drawing
+            x += 1;
 
-                    // calculates the new line tile offset making sure that
-                    // the maximum of 32 is not overflown
-                    line_offset = (line_offset + 1) % 32;
+            // in case the end of tile width has been reached then
+            // a new tile must be retrieved for rendering
+            if x == TILE_WIDTH {
+                // resets the tile X position to the base value
+                // as a new tile is going to be drawn
+                x = 0;
 
-                    // calculates the tile index and makes sure the value
-                    // takes into consideration the bg tile value
-                    tile_index = self.vram[map_offset + line_offset] as usize;
-                    if !self.bg_tile && tile_index < 128 {
-                        tile_index += 256;
-                    }
+                // calculates the new line tile offset making sure that
+                // the maximum of 32 is not overflown
+                line_offset = (line_offset + 1) % 32;
+
+                // calculates the tile index and makes sure the value
+                // takes into consideration the bg tile value
+                tile_index = self.vram[map_offset + row_offset + line_offset] as usize;
+                if !self.bg_tile && tile_index < 128 {
+                    tile_index += 256;
                 }
+
+                // in case the current mode is CGB and the DMG compatibility
+                // flag is not set then a series of tile values must be
+                // updated according to the tile attributes field
+                if self.gb_mode == GameBoyMode::Cgb && !self.dmg_compat {
+                    tile_attr = &bg_map_attrs[row_offset + line_offset];
+                    palette = &self.palettes_color_bg[tile_attr.palette as usize];
+                    xflip = tile_attr.xflip;
+                    yflip = tile_attr.yflip;
+                    tile_index += tile_attr.vram_bank as usize * TILE_COUNT_DMG;
+                }
+
+                // obtains the reference to the new tile in drawing
+                tile = &self.tiles[tile_index];
             }
 
             // increments the color offset by one, representing
@@ -887,6 +1246,16 @@ impl Ppu {
         // coordinate takes priority in drawing the pixel
         let mut index_buffer = [-256i16; DISPLAY_WIDTH];
 
+        // determines if the object should always be placed over the
+        // possible background, this is only required for CGB mode
+        let always_over = if self.gb_mode == GameBoyMode::Cgb && !self.dmg_compat {
+            !self.switch_bg
+        } else {
+            false
+        };
+
+        // iterates over the complete set of available object to checks
+        // the ones that required drawing and draws them
         for index in 0..OBJ_COUNT {
             // in case the limit on the number of objects to be draw per
             // line has been reached breaks the loop avoiding more draws
@@ -896,7 +1265,7 @@ impl Ppu {
 
             // obtains the meta data of the object that is currently
             // under iteration to be checked for drawing
-            let obj = self.obj_data[index];
+            let obj = &self.obj_data[index];
 
             let obj_height = if self.obj_size {
                 TILE_DOUBLE_HEIGHT
@@ -913,10 +1282,24 @@ impl Ppu {
                 continue;
             }
 
-            let palette = if obj.palette == 0 {
-                self.palette_obj_0
+            let palette = if self.gb_mode == GameBoyMode::Cgb {
+                if self.dmg_compat {
+                    if obj.palette == 0 {
+                        &self.palette_obj_0
+                    } else if obj.palette == 1 {
+                        &self.palette_obj_1
+                    } else {
+                        panic!("Invalid object palette: {:02x}", obj.palette);
+                    }
+                } else {
+                    &self.palettes_color_obj[obj.palette_cgb as usize]
+                }
+            } else if obj.palette == 0 {
+                &self.palette_obj_0
+            } else if obj.palette == 1 {
+                &self.palette_obj_1
             } else {
-                self.palette_obj_1
+                panic!("Invalid object palette: {:02x}", obj.palette);
             };
 
             // calculates the offset in the color buffer (raw color information
@@ -944,25 +1327,41 @@ impl Ppu {
             // is going to be used in the current operation
             let tile: &Tile;
 
+            // "calculates" the index offset that is going to be applied
+            // to the tile index to retrieve the proper tile taking into
+            // consideration the VRAM in which the tile is stored
+            let tile_bank_offset = if self.dmg_compat {
+                0
+            } else {
+                obj.tile_bank as usize * TILE_COUNT_DMG
+            };
+
             // in case we're facing a 8x16 object then we must
             // differentiate between the handling of the top tile
             // and the bottom tile through bitwise manipulation
             // of the tile index
             if self.obj_size {
                 if tile_offset < 8 {
-                    tile = &self.tiles[obj.tile as usize & 0xfe];
+                    let tile_index = (obj.tile as usize & 0xfe) + tile_bank_offset;
+                    tile = &self.tiles[tile_index];
                 } else {
-                    tile = &self.tiles[obj.tile as usize | 0x01];
+                    let tile_index = (obj.tile as usize | 0x01) + tile_bank_offset;
+                    tile = &self.tiles[tile_index];
                     tile_offset -= 8;
                 }
             }
             // otherwise we're facing a 8x8 sprite and we should grab
             // the tile directly from the object's tile index
             else {
-                tile = &self.tiles[obj.tile as usize];
+                let tile_index = obj.tile as usize + tile_bank_offset;
+                tile = &self.tiles[tile_index];
             }
 
             let tile_row = tile.get_row(tile_offset as usize);
+
+            // determines if the object should always be placed over the
+            // previously placed background or window pixels
+            let obj_over = always_over || !obj.bg_over;
 
             for tile_x in 0..TILE_WIDTH {
                 let x = obj.x + tile_x as i16;
@@ -972,7 +1371,7 @@ impl Ppu {
                     // window should be drawn over or if the underlying pixel
                     // is transparent (zero value) meaning there's no background
                     // or window for the provided pixel
-                    let is_visible = !obj.bg_over || self.color_buffer[color_offset as usize] == 0;
+                    let is_visible = obj_over || self.color_buffer[color_offset as usize] == 0;
 
                     // determines if the current pixel has priority over a possible
                     // one that has been drawn by a previous object, this happens
@@ -981,7 +1380,11 @@ impl Ppu {
                     let has_priority =
                         index_buffer[x as usize] == -256 || obj.x < index_buffer[x as usize];
 
-                    let pixel = tile_row[if obj.xflip { 7 - tile_x } else { tile_x }];
+                    let pixel = tile_row[if obj.xflip {
+                        TILE_WIDTH_I - tile_x
+                    } else {
+                        tile_x
+                    }];
                     if is_visible && has_priority && pixel != 0 {
                         // marks the current pixel in iteration as "owned"
                         // by the object with the defined X base position,
@@ -1038,19 +1441,37 @@ impl Ppu {
     /// is useful to "flush" color computation whenever the base
     /// palette colors are changed.
     fn compute_palettes(&mut self) {
-        // re-computes the complete set of palettes according to
-        // the currently set palette colors (that may have changed)
-        Self::compute_palette(&mut self.palette, &self.palette_colors, self.palettes[0]);
-        Self::compute_palette(
-            &mut self.palette_obj_0,
-            &self.palette_colors,
-            self.palettes[1],
-        );
-        Self::compute_palette(
-            &mut self.palette_obj_1,
-            &self.palette_colors,
-            self.palettes[2],
-        );
+        if self.dmg_compat {
+            Self::compute_palette(
+                &mut self.palette_bg,
+                &self.palettes_color_bg[0],
+                self.palettes[0],
+            );
+            Self::compute_palette(
+                &mut self.palette_obj_0,
+                &self.palettes_color_obj[0],
+                self.palettes[1],
+            );
+            Self::compute_palette(
+                &mut self.palette_obj_1,
+                &self.palettes_color_obj[1],
+                self.palettes[2],
+            );
+        } else {
+            // re-computes the complete set of palettes according to
+            // the currently set palette colors (that may have changed)
+            Self::compute_palette(&mut self.palette_bg, &self.palette_colors, self.palettes[0]);
+            Self::compute_palette(
+                &mut self.palette_obj_0,
+                &self.palette_colors,
+                self.palettes[1],
+            );
+            Self::compute_palette(
+                &mut self.palette_obj_1,
+                &self.palette_colors,
+                self.palettes[2],
+            );
+        }
 
         // clears the frame buffer to allow the new background
         // color to be used
@@ -1070,11 +1491,39 @@ impl Ppu {
             }
         }
     }
+
+    /// Static method that computes an RGB888 color palette ready to
+    /// be used for frame buffer operations from 4 (colors) x 2 bytes (RGB555)
+    /// that represent an RGB555 set of colors. This method should be
+    /// used for CGB mode where colors are represented using RGB555.
+    fn compute_palette_color(
+        palette: &mut Palette,
+        palette_color: &[u8; 64],
+        palette_index: u8,
+        color_index: u8,
+    ) {
+        let palette_offset = (palette_index * 4 * 2) as usize;
+        let color_offset = (color_index * 2) as usize;
+        palette[color_index as usize] = Self::rgb555_to_rgb888(
+            palette_color[palette_offset + color_offset],
+            palette_color[palette_offset + color_offset + 1],
+        );
+    }
+
+    fn rgb555_to_rgb888(first: u8, second: u8) -> Pixel {
+        let r = (first & 0x1f) << 3;
+        let g = (((first & 0xe0) >> 5) | ((second & 0x03) << 3)) << 3;
+        let b = ((second & 0x7c) >> 2) << 3;
+        [r, g, b]
+    }
 }
 
 impl Default for Ppu {
     fn default() -> Self {
-        Self::new()
+        Self::new(
+            GameBoyMode::Dmg,
+            Rc::new(RefCell::new(GameBoyConfig::default())),
+        )
     }
 }
 
@@ -1084,7 +1533,7 @@ mod tests {
 
     #[test]
     fn test_update_tile_simple() {
-        let mut ppu = Ppu::new();
+        let mut ppu = Ppu::default();
         ppu.vram[0x0000] = 0xff;
         ppu.vram[0x0001] = 0xff;
 
@@ -1098,7 +1547,7 @@ mod tests {
 
     #[test]
     fn test_update_tile_upper() {
-        let mut ppu = Ppu::new();
+        let mut ppu = Ppu::default();
         ppu.vram[0x1000] = 0xff;
         ppu.vram[0x1001] = 0xff;
 

@@ -61,7 +61,7 @@ pub struct Apu {
     ch3_length_stop: bool,
     ch3_enabled: bool,
 
-    ch4_timer: i16,
+    ch4_timer: i32,
     ch4_envelope_sequence: u8,
     ch4_envelope_enabled: bool,
     ch4_output: u8,
@@ -80,6 +80,8 @@ pub struct Apu {
 
     right_enabled: bool,
     left_enabled: bool,
+    sound_enabled: bool,
+
     ch1_out_enabled: bool,
     ch2_out_enabled: bool,
     ch3_out_enabled: bool,
@@ -161,6 +163,7 @@ impl Apu {
 
             left_enabled: true,
             right_enabled: true,
+            sound_enabled: true,
 
             ch1_out_enabled: true,
             ch2_out_enabled: true,
@@ -252,6 +255,7 @@ impl Apu {
 
         self.left_enabled = true;
         self.right_enabled = true;
+        self.sound_enabled = true;
 
         self.sequencer = 0;
         self.sequencer_step = 0;
@@ -261,6 +265,10 @@ impl Apu {
     }
 
     pub fn clock(&mut self, cycles: u8) {
+        if !self.sound_enabled {
+            return;
+        }
+
         self.sequencer += cycles as u16;
         if self.sequencer >= 8192 {
             // each of these steps runs at 512/8 Hz = 64Hz,
@@ -322,8 +330,61 @@ impl Apu {
 
     pub fn read(&mut self, addr: u16) -> u8 {
         match addr {
+            // 0xFF11 — NR11: Channel 1 length timer & duty cycle
+            0xff11 => (self.ch1_wave_duty & 0x03) << 6,
+            // 0xFF12 — NR12: Channel 1 volume & envelope
+            0xff12 => {
+                (self.ch1_pace & 0x07)
+                    | ((self.ch1_direction & 0x01) << 3)
+                    | ((self.ch1_volume & 0x0f) << 4)
+            }
+
+            // 0xFF16 — NR21: Channel 2 length timer & duty cycle
+            0xff16 => (self.ch2_wave_duty & 0x03) << 6,
+            // 0xFF17 — NR22: Channel 2 volume & envelope
+            0xff17 => {
+                (self.ch2_pace & 0x07)
+                    | ((self.ch2_direction & 0x01) << 3)
+                    | ((self.ch2_volume & 0x0f) << 4)
+            }
+
+            // 0xFF1A — NR30: Channel 3 DAC enable
+            0xff1a => {
+                if self.ch3_dac {
+                    0x80
+                } else {
+                    0x00
+                }
+            }
+            // 0xFF1B — NR31: Channel 3 length timer
+            0xff1b => 0x00,
+            // 0xFF1C — NR32: Channel 3 output level
+            0xff1c => (self.ch3_output_level & 0x03) << 5,
+
+            // 0xFF20 — NR41: Channel 4 length timer
+            0xff20 => 0x00,
+            // 0xFF21 — NR42: Channel 4 volume & envelope
+            0xff21 => {
+                (self.ch4_pace & 0x07)
+                    | ((self.ch4_direction & 0x01) << 3)
+                    | ((self.ch4_volume & 0x0f) << 4)
+            }
+
             // 0xFF25 — NR51: Sound panning
             0xff25 => self.glob_panning,
+            // 0xFF26 — NR52: Sound on/off
+            0xff26 => {
+                (if self.ch1_enabled { 0x01 } else { 0x00 }
+                    | if self.ch2_enabled { 0x02 } else { 0x00 }
+                    | if self.ch3_enabled && self.ch3_dac {
+                        0x04
+                    } else {
+                        0x00
+                    }
+                    | if self.ch4_enabled { 0x08 } else { 0x00 }
+                    | if self.sound_enabled { 0x80 } else { 0x00 })
+            }
+
             _ => {
                 warnln!("Reading from unknown APU location 0x{:04x}", addr);
                 0xff
@@ -478,7 +539,11 @@ impl Apu {
             }
             // 0xFF26 — NR52: Sound on/off
             0xff26 => {
-                //@TODO: Implement sound on/off
+                self.sound_enabled = value & 0x80 == 0x80;
+                if !self.sound_enabled {
+                    self.reset();
+                    self.sound_enabled = false;
+                }
             }
 
             // 0xFF30-0xFF3F — Wave pattern RAM
@@ -782,7 +847,7 @@ impl Apu {
 
     #[inline(always)]
     fn tick_ch4(&mut self, cycles: u8) {
-        self.ch4_timer = self.ch4_timer.saturating_sub(cycles as i16);
+        self.ch4_timer = self.ch4_timer.saturating_sub(cycles as i32);
         if self.ch4_timer > 0 {
             return;
         }
@@ -810,7 +875,7 @@ impl Apu {
         }
 
         self.ch4_timer +=
-            ((CH4_DIVISORS[self.ch4_divisor as usize] as u16) << self.ch4_clock_shift) as i16;
+            ((CH4_DIVISORS[self.ch4_divisor as usize] as u16) << self.ch4_clock_shift) as i32;
     }
 
     #[inline(always)]
@@ -835,7 +900,7 @@ impl Apu {
     #[inline(always)]
     fn trigger_ch4(&mut self) {
         self.ch4_timer =
-            ((CH4_DIVISORS[self.ch4_divisor as usize] as u16) << self.ch4_clock_shift) as i16;
+            ((CH4_DIVISORS[self.ch4_divisor as usize] as u16) << self.ch4_clock_shift) as i32;
         self.ch4_lfsr = 0x7ff1;
         self.ch4_envelope_sequence = 0;
     }

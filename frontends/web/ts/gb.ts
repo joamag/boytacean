@@ -20,6 +20,7 @@ import { PALETTES, PALETTES_MAP } from "./palettes";
 import { base64ToBuffer, bufferToBase64 } from "./util";
 import {
     DebugAudio,
+    DebugSettings,
     DebugVideo,
     HelpFaqs,
     HelpKeyboard,
@@ -31,7 +32,8 @@ import {
     default as _wasm,
     GameBoy,
     PadKey,
-    PpuMode
+    PpuMode,
+    GameBoyMode
 } from "../lib/boytacean";
 import info from "../package.json";
 
@@ -190,7 +192,11 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
                 pending = this.tick(
                     currentTime,
                     pending,
-                    Math.round(this.logicFrequency / this.visualFrequency)
+                    Math.round(
+                        (this.logicFrequency *
+                            (this.gameBoy?.multiplier() ?? 1)) /
+                            this.visualFrequency
+                    )
                 );
             } catch (err) {
                 // sets the default error message to be displayed
@@ -355,7 +361,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
      * the emulator engine to use.
      */
     async boot({
-        engine = "neo",
+        engine = "cgb",
         restore = true,
         loadRom = false,
         romPath = ROM_PATH,
@@ -388,8 +394,11 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         // selects the proper engine for execution
         // and builds a new instance of it
         switch (engine) {
-            case "neo":
-                this.gameBoy = new GameBoy();
+            case "cgb":
+                this.gameBoy = new GameBoy(GameBoyMode.Cgb);
+                break;
+            case "dmg":
+                this.gameBoy = new GameBoy(GameBoyMode.Dmg);
                 break;
             default:
                 if (!this.gameBoy) {
@@ -406,7 +415,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         // resets the Game Boy engine to restore it into
         // a valid state ready to be used
         this.gameBoy.reset();
-        this.gameBoy.load_boot_default();
+        this.gameBoy.load(true);
         const cartridge = this.gameBoy.load_rom_ws(romData);
 
         // in case there's a serial device involved tries to load
@@ -443,6 +452,10 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         this.romData = data;
         this.romSize = data.length;
         this.cartridge = cartridge;
+    }
+
+    get instance(): GameBoy | null {
+        return this.gameBoy;
     }
 
     get name(): string {
@@ -492,9 +505,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
             {
                 name: "Serial",
                 icon: require("../res/serial.svg"),
-                node: SerialSection({
-                    emulator: this
-                })
+                node: SerialSection({ emulator: this })
             }
         ];
     }
@@ -521,16 +532,20 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
             {
                 name: "Audio",
                 node: DebugAudio({ emulator: this })
+            },
+            {
+                name: "Settings",
+                node: DebugSettings({ emulator: this })
             }
         ];
     }
 
     get engines(): string[] {
-        return ["neo"];
+        return ["cgb", "dmg"];
     }
 
     get engine(): string {
-        return this._engine || "neo";
+        return this._engine || "cgb";
     }
 
     get romExts(): string[] {
@@ -735,10 +750,12 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
 
     pauseAudio() {
         this.gameBoy?.set_apu_enabled(false);
+        this.trigger("audio-state", { state: "paused", stateBool: false });
     }
 
     resumeAudio() {
         this.gameBoy?.set_apu_enabled(true);
+        this.trigger("audio-state", { state: "resumed", stateBool: true });
     }
 
     getAudioState(): boolean {

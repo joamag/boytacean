@@ -1,7 +1,7 @@
+use crate::warnln;
+
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
-
-use crate::warnln;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum PadSelection {
@@ -52,8 +52,9 @@ impl Pad {
     }
 
     pub fn read(&mut self, addr: u16) -> u8 {
-        match addr & 0x00ff {
-            0x0000 => {
+        match addr {
+            // 0xFF00 — P1/JOYP: Joypad
+            0xff00 => {
                 let mut value = match self.selection {
                     PadSelection::Action =>
                     {
@@ -88,8 +89,9 @@ impl Pad {
     }
 
     pub fn write(&mut self, addr: u16, value: u8) {
-        match addr & 0x00ff {
-            0x0000 => {
+        match addr {
+            // 0xFF00 — P1/JOYP: Joypad
+            0xff00 => {
                 self.selection = match value & 0x30 {
                     0x10 => PadSelection::Action,
                     0x20 => PadSelection::Direction,

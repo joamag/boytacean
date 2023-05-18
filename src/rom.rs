@@ -144,6 +144,7 @@ pub enum RamSize {
     NoRam,
     Unused,
     Size8K,
+    Size16K,
     Size32K,
     Size64K,
     Size128K,
@@ -156,6 +157,7 @@ impl RamSize {
             RamSize::NoRam => "No RAM",
             RamSize::Unused => "Unused",
             RamSize::Size8K => "8 KB",
+            RamSize::Size16K => "16 KB",
             RamSize::Size32K => "32 KB",
             RamSize::Size128K => "128 KB",
             RamSize::Size64K => "64 KB",
@@ -168,6 +170,7 @@ impl RamSize {
             RamSize::NoRam => 0,
             RamSize::Unused => 0,
             RamSize::Size8K => 1,
+            RamSize::Size16K => 2,
             RamSize::Size32K => 4,
             RamSize::Size64K => 8,
             RamSize::Size128K => 16,
@@ -401,6 +404,14 @@ impl Cartridge {
         }
     }
 
+    /// A cartridge is considered legacy if it does
+    /// not have a CGB flag bit (bit 7 of 0x0143) set.
+    /// These are the monochromatic only Cartridges built
+    /// for the original DMG Game Boy.
+    pub fn is_legacy(&self) -> bool {
+        self.rom_data[0x0143] & 0x80 == 0x00
+    }
+
     pub fn rom_type(&self) -> RomType {
         match self.rom_data[0x0147] {
             0x00 => RomType::RomOnly,
@@ -498,6 +509,27 @@ impl Cartridge {
     pub fn set_ram_data(&mut self, ram_data: Vec<u8>) {
         self.ram_data = ram_data;
     }
+
+    pub fn description(&self, column_length: usize) -> String {
+        let name_l = format!("{:width$}", "Name", width = column_length);
+        let type_l = format!("{:width$}", "Type", width = column_length);
+        let rom_size_l = format!("{:width$}", "ROM Size", width = column_length);
+        let ram_size_l = format!("{:width$}", "RAM Size", width = column_length);
+        let cgb_l = format!("{:width$}", "CGB Mode", width = column_length);
+        format!(
+            "{}  {}\n{}  {}\n{}  {}\n{}  {}\n{}  {}",
+            name_l,
+            self.title(),
+            type_l,
+            self.rom_type(),
+            rom_size_l,
+            self.rom_size(),
+            ram_size_l,
+            self.ram_size(),
+            cgb_l,
+            self.cgb_flag()
+        )
+    }
 }
 
 impl Default for Cartridge {
@@ -508,15 +540,7 @@ impl Default for Cartridge {
 
 impl Display for Cartridge {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "Name => {}\nType => {}\nROM Size => {}\nRAM Size => {}\nCGB Mode => {}",
-            self.title(),
-            self.rom_type(),
-            self.rom_size(),
-            self.ram_size(),
-            self.cgb_flag()
-        )
+        write!(f, "{}", self.description(9))
     }
 }
 
@@ -601,7 +625,7 @@ pub static MBC1: Mbc = Mbc {
     },
     write_ram: |rom: &mut Cartridge, addr: u16, value: u8| {
         if !rom.ram_enabled {
-            debugln!("Attempt to write to ERAM while write protect is active");
+            warnln!("Attempt to write to ERAM while write protect is active");
             return;
         }
         rom.ram_data[rom.ram_offset + (addr - 0xa000) as usize] = value;
@@ -657,7 +681,7 @@ pub static MBC3: Mbc = Mbc {
     },
     write_ram: |rom: &mut Cartridge, addr: u16, value: u8| {
         if !rom.ram_enabled {
-            debugln!("Attempt to write to ERAM while write protect is active");
+            warnln!("Attempt to write to ERAM while write protect is active");
             return;
         }
         rom.ram_data[rom.ram_offset + (addr - 0xa000) as usize] = value;
@@ -709,7 +733,7 @@ pub static MBC5: Mbc = Mbc {
     },
     write_ram: |rom: &mut Cartridge, addr: u16, value: u8| {
         if !rom.ram_enabled {
-            debugln!("Attempt to write to ERAM while write protect is active");
+            warnln!("Attempt to write to ERAM while write protect is active");
             return;
         }
         rom.ram_data[rom.ram_offset + (addr - 0xa000) as usize] = value;

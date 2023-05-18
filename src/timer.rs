@@ -68,11 +68,15 @@ impl Timer {
     }
 
     pub fn read(&mut self, addr: u16) -> u8 {
-        match addr & 0x00ff {
-            0x04 => self.div,
-            0x05 => self.tima,
-            0x06 => self.tma,
-            0x07 => self.tac,
+        match addr {
+            // 0xFF04 — DIV: Divider register
+            0xff04 => self.div,
+            // 0xFF05 — TIMA: Timer counter
+            0xff05 => self.tima,
+            // 0xFF06 — TMA: Timer modulo
+            0xff06 => self.tma,
+            // 0xFF07 — TAC: Timer control
+            0xff07 => self.tac,
             _ => {
                 warnln!("Reding from unknown Timer location 0x{:04x}", addr);
                 0xff
@@ -81,11 +85,15 @@ impl Timer {
     }
 
     pub fn write(&mut self, addr: u16, value: u8) {
-        match addr & 0x00ff {
-            0x04 => self.div = 0,
-            0x05 => self.tima = value,
-            0x06 => self.tma = value,
-            0x07 => {
+        match addr {
+            // 0xFF04 — DIV: Divider register
+            0xff04 => self.div = 0,
+            // 0xFF05 — TIMA: Timer counter
+            0xff05 => self.tima = value,
+            // 0xFF06 — TMA: Timer modulo
+            0xff06 => self.tma = value,
+            // 0xFF07 — TAC: Timer control
+            0xff07 => {
                 self.tac = value;
                 match value & 0x03 {
                     0x00 => self.tima_ratio = 1024,

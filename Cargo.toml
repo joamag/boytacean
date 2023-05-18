@@ -17,6 +17,8 @@ crate-type = ["cdylib", "rlib"]
 [features]
 wasm = ["wasm-bindgen"]
 debug = []
+pedantic = []
+cpulog = []
 gen-mock = []
 
 [dependencies]
@@ -33,10 +35,7 @@ lto = true
 opt-level = 3
 
 [workspace]
-members = [
-    ".",
-    "frontends/sdl",
-]
+members = [".", "frontends/sdl"]
 
 [package.metadata.docs.rs]
 features = ["wasm", "gen-mock"]

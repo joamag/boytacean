@@ -6,12 +6,14 @@ pub mod graphics;
 
 use audio::Audio;
 use boytacean::{
-    devices::printer::PrinterDevice,
-    gb::{AudioProvider, GameBoy},
+    devices::{printer::PrinterDevice, stdout::StdoutDevice},
+    gb::{AudioProvider, GameBoy, GameBoyMode},
     pad::PadKey,
     ppu::{PaletteInfo, PpuMode, DISPLAY_HEIGHT, DISPLAY_WIDTH},
+    serial::{NullDevice, SerialDevice},
 };
 use chrono::Utc;
+use clap::Parser;
 use graphics::{surface_from_bytes, Graphics};
 use image::ColorType;
 use sdl2::{event::Event, keyboard::Keycode, pixels::PixelFormatEnum, Sdl};
@@ -143,13 +145,24 @@ impl Emulator {
     }
 
     pub fn start(&mut self, screen_scale: f32) {
+        self.start_base();
+
         let sdl = sdl2::init().unwrap();
+
         if self.features.contains(&"video") {
             self.start_graphics(&sdl, screen_scale);
         }
         if self.features.contains(&"audio") {
             self.start_audio(&sdl);
         }
+    }
+
+    #[cfg(not(feature = "slow"))]
+    pub fn start_base(&mut self) {}
+
+    #[cfg(feature = "slow")]
+    pub fn start_base(&mut self) {
+        self.logic_frequency = 100;
     }
 
     pub fn start_graphics(&mut self, sdl: &Sdl, screen_scale: f32) {
@@ -186,7 +199,7 @@ impl Emulator {
 
     pub fn reset(&mut self) {
         self.system.reset();
-        self.system.load_boot_default();
+        self.system.load(true);
         self.load_rom(None);
     }
 
@@ -206,8 +219,8 @@ impl Emulator {
         let frequency_mhz = cycles as f32 / delta / 1000.0 / 1000.0;
 
         println!(
-            "Took {:.2} seconds to run {} ticks ({:.2} Mhz)!",
-            delta, count, frequency_mhz
+            "Took {:.2} seconds to run {} ticks ({} cycles) ({:.2} Mhz)!",
+            delta, count, cycles, frequency_mhz
         );
     }
 
@@ -317,7 +330,7 @@ impl Emulator {
                     }
                     Event::DropFile { filename, .. } => {
                         self.system.reset();
-                        self.system.load_boot_default();
+                        self.system.load(true);
                         self.load_rom(Some(&filename));
                     }
                     _ => (),
@@ -336,9 +349,11 @@ impl Emulator {
 
                 // calculates the number of cycles that are meant to be the target
                 // for the current "tick" operation this is basically the current
-                // logic frequency divided by the visual one
-                let cycle_limit =
-                    (self.logic_frequency as f32 / self.visual_frequency).round() as u32;
+                // logic frequency divided by the visual one, this operation also
+                // takes into account the current Game Boy speed multiplier (GBC)
+                let cycle_limit = (self.logic_frequency as f32 * self.system.multiplier() as f32
+                    / self.visual_frequency)
+                    .round() as u32;
 
                 loop {
                     // limits the number of ticks to the typical number
@@ -443,33 +458,82 @@ impl Emulator {
     }
 }
 
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    #[arg(short, long, default_value_t = String::from("cgb"))]
+    mode: String,
+
+    #[arg(short, long, default_value_t = String::from("printer"))]
+    device: String,
+
+    #[arg(long, default_value_t = false)]
+    no_ppu: bool,
+
+    #[arg(long, default_value_t = false)]
+    no_apu: bool,
+
+    #[arg(long, default_value_t = false)]
+    no_dma: bool,
+
+    #[arg(long, default_value_t = false)]
+    no_timer: bool,
+
+    #[arg(short, long, default_value_t = String::from("../../res/roms/demo/pocket.gb"))]
+    rom_path: String,
+}
+
 fn main() {
+    // parses the provided command line arguments and uses them to
+    // obtain structured values
+    let args = Args::parse();
+    let mode: GameBoyMode = GameBoyMode::from_string(&args.mode);
+
     // creates a new Game Boy instance and loads both the boot ROM
     // and the initial game ROM to "start the engine"
-    let mut game_boy = GameBoy::new();
-    let mut printer = Box::<PrinterDevice>::default();
-    printer.set_callback(|image_buffer| {
-        let file_name = format!("printer-{}.png", Utc::now().format("%Y%m%d-%H%M%S"));
-        image::save_buffer(
-            Path::new(&file_name),
-            image_buffer,
-            160,
-            (image_buffer.len() / 4 / 160) as u32,
-            ColorType::Rgba8,
-        )
-        .unwrap();
-    });
-    game_boy.attach_serial(printer);
-    game_boy.load_boot_default();
+    let mut game_boy = GameBoy::new(mode);
+    let device = build_device(&args.device);
+    game_boy.set_ppu_enabled(!args.no_ppu);
+    game_boy.set_apu_enabled(!args.no_apu);
+    game_boy.set_dma_enabled(!args.no_dma);
+    game_boy.set_timer_enabled(!args.no_timer);
+    game_boy.attach_serial(device);
+    game_boy.load(true);
+
+    // prints the current version of the emulator (informational message)
+    println!("========= Boytacean =========\n{}", game_boy);
 
     // creates a new generic emulator structure then starts
     // both the video and audio sub-systems, loads default
     // ROM file and starts running it
     let mut emulator = Emulator::new(game_boy);
     emulator.start(SCREEN_SCALE);
-    emulator.load_rom(Some("../../res/roms/demo/pocket.gb"));
+    emulator.load_rom(Some(&args.rom_path));
     emulator.toggle_palette();
     emulator.run();
+}
+
+fn build_device(device: &str) -> Box<dyn SerialDevice> {
+    match device {
+        "null" => Box::<NullDevice>::default(),
+        "stdout" => Box::<StdoutDevice>::default(),
+        "printer" => {
+            let mut printer = Box::<PrinterDevice>::default();
+            printer.set_callback(|image_buffer| {
+                let file_name = format!("printer-{}.png", Utc::now().format("%Y%m%d-%H%M%S"));
+                image::save_buffer(
+                    Path::new(&file_name),
+                    image_buffer,
+                    160,
+                    (image_buffer.len() / 4 / 160) as u32,
+                    ColorType::Rgba8,
+                )
+                .unwrap();
+            });
+            printer
+        }
+        _ => panic!("Unsupported device: {}", device),
+    }
 }
 
 fn key_to_pad(keycode: Keycode) -> Option<PadKey> {

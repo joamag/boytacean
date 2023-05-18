@@ -1,19 +1,25 @@
+use std::{
+    cell::RefCell,
+    collections::VecDeque,
+    fmt::{self, Display, Formatter},
+    rc::Rc,
+};
+
 use crate::{
     apu::Apu,
     cpu::Cpu,
     data::{BootRom, CGB_BOOT, DMG_BOOT, DMG_BOOTIX, MGB_BOOTIX, SGB_BOOT},
     devices::{printer::PrinterDevice, stdout::StdoutDevice},
-    gen::{COMPILATION_DATE, COMPILATION_TIME, COMPILER, COMPILER_VERSION},
+    dma::Dma,
+    gen::{COMPILATION_DATE, COMPILATION_TIME, COMPILER, COMPILER_VERSION, VERSION},
     mmu::Mmu,
     pad::{Pad, PadKey},
     ppu::{Ppu, PpuMode, Tile, FRAME_BUFFER_SIZE},
-    rom::Cartridge,
+    rom::{Cartridge, RamSize},
     serial::{NullDevice, Serial, SerialDevice},
     timer::Timer,
     util::read_file,
 };
-
-use std::collections::VecDeque;
 
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
@@ -30,22 +36,113 @@ use std::{
     panic::{set_hook, take_hook, PanicInfo},
 };
 
-/// Top level structure that abstracts the usage of the
-/// Game Boy system under the Boytacean emulator.
-/// Should serve as the main entry-point API.
+/// Enumeration that describes the multiple running
+// modes of the Game Boy emulator.
+// DMG = Original Game Boy
+// CGB = Game Boy Color
+// SGB = Super Game Boy
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
-pub struct GameBoy {
-    /// Reference to the Game Boy CPU component to be
-    /// used as the main element of the system, when
-    /// clocked, the amount of ticks from it will be
-    /// used as reference or the rest of the components.
-    cpu: Cpu,
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum GameBoyMode {
+    Dmg = 1,
+    Cgb = 2,
+    Sgb = 3,
+}
+
+impl GameBoyMode {
+    pub fn description(&self) -> &'static str {
+        match self {
+            GameBoyMode::Dmg => "Game Boy (DMG)",
+            GameBoyMode::Cgb => "Game Boy Color (CGB)",
+            GameBoyMode::Sgb => "Super Game Boy (SGB)",
+        }
+    }
+
+    pub fn from_u8(value: u8) -> GameBoyMode {
+        match value {
+            1 => GameBoyMode::Dmg,
+            2 => GameBoyMode::Cgb,
+            3 => GameBoyMode::Sgb,
+            _ => panic!("Invalid mode value: {}", value),
+        }
+    }
+
+    pub fn from_string(value: &str) -> GameBoyMode {
+        match value {
+            "dmg" => GameBoyMode::Dmg,
+            "cgb" => GameBoyMode::Cgb,
+            "sgb" => GameBoyMode::Sgb,
+            _ => panic!("Invalid mode value: {}", value),
+        }
+    }
+}
+
+impl Display for GameBoyMode {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.description())
+    }
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum GameBoySpeed {
+    Normal = 0,
+    Double = 1,
+}
+
+impl GameBoySpeed {
+    pub fn description(&self) -> &'static str {
+        match self {
+            GameBoySpeed::Normal => "Normal Speed",
+            GameBoySpeed::Double => "Double Speed",
+        }
+    }
+
+    pub fn switch(&self) -> GameBoySpeed {
+        match self {
+            GameBoySpeed::Normal => GameBoySpeed::Double,
+            GameBoySpeed::Double => GameBoySpeed::Normal,
+        }
+    }
+
+    pub fn multiplier(&self) -> u8 {
+        match self {
+            GameBoySpeed::Normal => 1,
+            GameBoySpeed::Double => 2,
+        }
+    }
+
+    pub fn from_u8(value: u8) -> GameBoySpeed {
+        match value {
+            0 => GameBoySpeed::Normal,
+            1 => GameBoySpeed::Double,
+            _ => panic!("Invalid speed value: {}", value),
+        }
+    }
+}
+
+impl Display for GameBoySpeed {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.description())
+    }
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct GameBoyConfig {
+    /// The current running mode of the emulator, this
+    /// may affect many aspects of the emulation, like
+    /// CPU frequency, PPU frequency, Boot rome size, etc.
+    mode: GameBoyMode,
 
     /// If the PPU is enabled, it will be clocked.
     ppu_enabled: bool,
 
     /// If the APU is enabled, it will be clocked.
     apu_enabled: bool,
+
+    /// if the DMA is enabled, it will be clocked.
+    dma_enabled: bool,
 
     /// If the timer is enabled, it will be clocked.
     timer_enabled: bool,
@@ -60,6 +157,103 @@ pub struct GameBoy {
     /// the APU will adjust its internal clock to match
     /// this hint.
     clock_freq: u32,
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
+impl GameBoyConfig {
+    pub fn is_dmg(&self) -> bool {
+        self.mode == GameBoyMode::Dmg
+    }
+
+    pub fn is_cgb(&self) -> bool {
+        self.mode == GameBoyMode::Cgb
+    }
+
+    pub fn is_sgb(&self) -> bool {
+        self.mode == GameBoyMode::Sgb
+    }
+
+    pub fn mode(&self) -> GameBoyMode {
+        self.mode
+    }
+
+    pub fn set_mode(&mut self, value: GameBoyMode) {
+        self.mode = value;
+    }
+
+    pub fn ppu_enabled(&self) -> bool {
+        self.ppu_enabled
+    }
+
+    pub fn set_ppu_enabled(&mut self, value: bool) {
+        self.ppu_enabled = value;
+    }
+
+    pub fn apu_enabled(&self) -> bool {
+        self.apu_enabled
+    }
+
+    pub fn set_apu_enabled(&mut self, value: bool) {
+        self.apu_enabled = value;
+    }
+
+    pub fn dma_enabled(&self) -> bool {
+        self.dma_enabled
+    }
+
+    pub fn set_dma_enabled(&mut self, value: bool) {
+        self.dma_enabled = value;
+    }
+
+    pub fn timer_enabled(&self) -> bool {
+        self.timer_enabled
+    }
+
+    pub fn set_timer_enabled(&mut self, value: bool) {
+        self.timer_enabled = value;
+    }
+
+    pub fn serial_enabled(&self) -> bool {
+        self.serial_enabled
+    }
+
+    pub fn set_serial_enabled(&mut self, value: bool) {
+        self.serial_enabled = value;
+    }
+
+    pub fn clock_freq(&self) -> u32 {
+        self.clock_freq
+    }
+
+    pub fn set_clock_freq(&mut self, value: u32) {
+        self.clock_freq = value;
+    }
+}
+
+impl Default for GameBoyConfig {
+    fn default() -> Self {
+        Self {
+            mode: GameBoyMode::Dmg,
+            ppu_enabled: true,
+            apu_enabled: true,
+            dma_enabled: true,
+            timer_enabled: true,
+            serial_enabled: true,
+            clock_freq: GameBoy::CPU_FREQ,
+        }
+    }
+}
+
+/// Aggregation structure tha allows the bundling of
+/// all the components of a gameboy into a single a
+/// single element for easy access.
+pub struct Components {
+    pub ppu: Ppu,
+    pub apu: Apu,
+    pub dma: Dma,
+    pub pad: Pad,
+    pub timer: Timer,
+    pub serial: Serial,
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
@@ -87,24 +281,103 @@ pub trait AudioProvider {
     fn clear_audio_buffer(&mut self);
 }
 
+/// Top level structure that abstracts the usage of the
+/// Game Boy system under the Boytacean emulator.
+/// Should serve as the main entry-point API.
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
+pub struct GameBoy {
+    /// The current running mode of the emulator, this
+    /// may affect many aspects of the emulation, like
+    /// CPU frequency, PPU frequency, Boot rome size, etc.
+    /// This is a clone of the configuration value
+    /// kept for performance reasons.
+    mode: GameBoyMode,
+
+    /// If the PPU is enabled, it will be clocked.
+    /// This is a clone of the configuration value
+    /// kept for performance reasons.
+    ppu_enabled: bool,
+
+    /// If the APU is enabled, it will be clocked.
+    /// This is a clone of the configuration value
+    /// kept for performance reasons.
+    apu_enabled: bool,
+
+    /// If the DMA is enabled, it will be clocked.
+    /// This is a clone of the configuration value
+    /// kept for performance reasons.
+    dma_enabled: bool,
+
+    /// If the timer is enabled, it will be clocked.
+    /// This is a clone of the configuration value
+    /// kept for performance reasons.
+    timer_enabled: bool,
+
+    /// If the serial is enabled, it will be clocked.
+    /// This is a clone of the configuration value
+    /// kept for performance reasons.
+    serial_enabled: bool,
+
+    /// The current frequency at which the Game Boy
+    /// emulator is being handled. This is a "hint" that
+    /// may help components to adjust their internal
+    /// logic to match the current frequency. For example
+    /// the APU will adjust its internal clock to match
+    /// this hint.
+    /// This is a clone of the configuration value
+    /// kept for performance reasons.
+    clock_freq: u32,
+
+    /// Reference to the Game Boy CPU component to be
+    /// used as the main element of the system, when
+    /// clocked, the amount of ticks from it will be
+    /// used as reference or the rest of the components.
+    cpu: Cpu,
+
+    /// The reference counted and mutable reference to
+    /// Game Boy configuration structure that can be
+    /// used by the GB components to access global
+    /// configuration values on the current emulator.
+    /// If performance is required (may value access)
+    /// the values should be cloned and stored locally.
+    gbc: Rc<RefCell<GameBoyConfig>>,
+}
+
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 impl GameBoy {
     #[cfg_attr(feature = "wasm", wasm_bindgen(constructor))]
-    pub fn new() -> Self {
-        let ppu = Ppu::default();
-        let apu = Apu::default();
-        let pad = Pad::default();
-        let timer = Timer::default();
-        let serial = Serial::default();
-        let mmu = Mmu::new(ppu, apu, pad, timer, serial);
-        let cpu = Cpu::new(mmu);
-        Self {
-            cpu,
+    pub fn new(mode: GameBoyMode) -> Self {
+        let gbc = Rc::new(RefCell::new(GameBoyConfig {
+            mode,
             ppu_enabled: true,
             apu_enabled: true,
+            dma_enabled: true,
             timer_enabled: true,
             serial_enabled: true,
             clock_freq: GameBoy::CPU_FREQ,
+        }));
+
+        let components = Components {
+            ppu: Ppu::new(mode, gbc.clone()),
+            apu: Apu::default(),
+            dma: Dma::default(),
+            pad: Pad::default(),
+            timer: Timer::default(),
+            serial: Serial::default(),
+        };
+        let mmu = Mmu::new(components, mode, gbc.clone());
+        let cpu = Cpu::new(mmu, gbc.clone());
+
+        Self {
+            mode,
+            ppu_enabled: true,
+            apu_enabled: true,
+            dma_enabled: true,
+            timer_enabled: true,
+            serial_enabled: true,
+            clock_freq: GameBoy::CPU_FREQ,
+            cpu,
+            gbc,
         }
     }
 
@@ -119,11 +392,15 @@ impl GameBoy {
 
     pub fn clock(&mut self) -> u8 {
         let cycles = self.cpu_clock();
+        let cycles_n = cycles / self.multiplier();
         if self.ppu_enabled {
-            self.ppu_clock(cycles);
+            self.ppu_clock(cycles_n);
         }
         if self.apu_enabled {
-            self.apu_clock(cycles);
+            self.apu_clock(cycles_n);
+        }
+        if self.dma_enabled {
+            self.dma_clock(cycles);
         }
         if self.timer_enabled {
             self.timer_clock(cycles);
@@ -154,6 +431,10 @@ impl GameBoy {
         self.apu().clock(cycles)
     }
 
+    pub fn dma_clock(&mut self, cycles: u8) {
+        self.mmu().clock_dma(cycles);
+    }
+
     pub fn timer_clock(&mut self, cycles: u8) {
         self.timer().clock(cycles)
     }
@@ -176,6 +457,28 @@ impl GameBoy {
 
     pub fn boot(&mut self) {
         self.cpu.boot();
+    }
+
+    pub fn load(&mut self, boot: bool) {
+        match self.mode() {
+            GameBoyMode::Dmg => self.load_dmg(boot),
+            GameBoyMode::Cgb => self.load_cgb(boot),
+            GameBoyMode::Sgb => todo!(),
+        }
+    }
+
+    pub fn load_dmg(&mut self, boot: bool) {
+        self.mmu().allocate_dmg();
+        if boot {
+            self.load_boot_dmg();
+        }
+    }
+
+    pub fn load_cgb(&mut self, boot: bool) {
+        self.mmu().allocate_cgb();
+        if boot {
+            self.load_boot_cgb();
+        }
     }
 
     pub fn load_boot(&mut self, data: &[u8]) {
@@ -296,10 +599,10 @@ impl GameBoy {
 
     /// Obtains the pixel buffer for the tile at the
     /// provided index, converting the color buffer
-    /// using the currently loaded palette.
+    /// using the currently loaded (background) palette.
     pub fn get_tile_buffer(&mut self, index: usize) -> Vec<u8> {
         let tile = self.get_tile(index);
-        tile.palette_buffer(self.ppu().palette())
+        tile.palette_buffer(self.ppu().palette_bg())
     }
 
     /// Obtains the name of the compiler that has been
@@ -321,12 +624,44 @@ impl GameBoy {
         String::from(COMPILATION_TIME)
     }
 
+    pub fn is_dmg(&self) -> bool {
+        self.mode == GameBoyMode::Dmg
+    }
+
+    pub fn is_cgb(&self) -> bool {
+        self.mode == GameBoyMode::Cgb
+    }
+
+    pub fn is_sgb(&self) -> bool {
+        self.mode == GameBoyMode::Sgb
+    }
+
+    pub fn speed(&self) -> GameBoySpeed {
+        self.mmu_i().speed
+    }
+
+    pub fn multiplier(&self) -> u8 {
+        self.mmu_i().speed.multiplier()
+    }
+
+    pub fn mode(&self) -> GameBoyMode {
+        self.mode
+    }
+
+    pub fn set_mode(&mut self, value: GameBoyMode) {
+        self.mode = value;
+        (*self.gbc).borrow_mut().set_mode(value);
+        self.mmu().set_mode(value);
+        self.ppu().set_gb_mode(value);
+    }
+
     pub fn ppu_enabled(&self) -> bool {
         self.ppu_enabled
     }
 
     pub fn set_ppu_enabled(&mut self, value: bool) {
         self.ppu_enabled = value;
+        (*self.gbc).borrow_mut().set_ppu_enabled(value);
     }
 
     pub fn apu_enabled(&self) -> bool {
@@ -335,6 +670,16 @@ impl GameBoy {
 
     pub fn set_apu_enabled(&mut self, value: bool) {
         self.apu_enabled = value;
+        (*self.gbc).borrow_mut().set_apu_enabled(value);
+    }
+
+    pub fn dma_enabled(&self) -> bool {
+        self.dma_enabled
+    }
+
+    pub fn set_dma_enabled(&mut self, value: bool) {
+        self.dma_enabled = value;
+        (*self.gbc).borrow_mut().set_dma_enabled(value);
     }
 
     pub fn timer_enabled(&self) -> bool {
@@ -343,6 +688,7 @@ impl GameBoy {
 
     pub fn set_timer_enabled(&mut self, value: bool) {
         self.timer_enabled = value;
+        (*self.gbc).borrow_mut().set_timer_enabled(value);
     }
 
     pub fn serial_enabled(&self) -> bool {
@@ -351,6 +697,7 @@ impl GameBoy {
 
     pub fn set_serial_enabled(&mut self, value: bool) {
         self.serial_enabled = value;
+        (*self.gbc).borrow_mut().set_serial_enabled(value);
     }
 
     pub fn clock_freq(&self) -> u32 {
@@ -359,7 +706,12 @@ impl GameBoy {
 
     pub fn set_clock_freq(&mut self, value: u32) {
         self.clock_freq = value;
+        (*self.gbc).borrow_mut().set_clock_freq(value);
         self.apu().set_clock_freq(value);
+    }
+
+    pub fn clock_freq_s(&self) -> String {
+        format!("{:.02} Mhz", self.clock_freq() as f32 / 1000.0 / 1000.0)
     }
 
     pub fn attach_null_serial(&mut self) {
@@ -372,6 +724,46 @@ impl GameBoy {
 
     pub fn attach_printer_serial(&mut self) {
         self.attach_serial(Box::<PrinterDevice>::default());
+    }
+
+    pub fn ram_size(&self) -> RamSize {
+        match self.mode {
+            GameBoyMode::Dmg => RamSize::Size8K,
+            GameBoyMode::Cgb => RamSize::Size32K,
+            GameBoyMode::Sgb => RamSize::Size8K,
+        }
+    }
+
+    pub fn vram_size(&self) -> RamSize {
+        match self.mode {
+            GameBoyMode::Dmg => RamSize::Size8K,
+            GameBoyMode::Cgb => RamSize::Size16K,
+            GameBoyMode::Sgb => RamSize::Size8K,
+        }
+    }
+
+    pub fn description(&self, column_length: usize) -> String {
+        let version_l = format!("{:width$}", "Version", width = column_length);
+        let mode_l = format!("{:width$}", "Mode", width = column_length);
+        let clock_l = format!("{:width$}", "Clock", width = column_length);
+        let ram_size_l = format!("{:width$}", "RAM Size", width = column_length);
+        let vram_size_l = format!("{:width$}", "VRAM Size", width = column_length);
+        let serial_l = format!("{:width$}", "Serial", width = column_length);
+        format!(
+            "{}  {}\n{}  {}\n{}  {}\n{}  {}\n{}  {}\n{}  {}",
+            version_l,
+            VERSION,
+            mode_l,
+            self.mode(),
+            clock_l,
+            self.clock_freq_s(),
+            ram_size_l,
+            self.ram_size(),
+            vram_size_l,
+            self.vram_size(),
+            serial_l,
+            self.serial_i().device().description(),
+        )
     }
 }
 
@@ -398,8 +790,16 @@ impl GameBoy {
         self.cpu.mmu()
     }
 
+    pub fn mmu_i(&self) -> &Mmu {
+        self.cpu.mmu_i()
+    }
+
     pub fn ppu(&mut self) -> &mut Ppu {
         self.cpu.ppu()
+    }
+
+    pub fn ppu_i(&self) -> &Ppu {
+        self.cpu.ppu_i()
     }
 
     pub fn apu(&mut self) -> &mut Apu {
@@ -410,16 +810,36 @@ impl GameBoy {
         self.cpu.apu_i()
     }
 
+    pub fn dma(&mut self) -> &mut Dma {
+        self.cpu.dma()
+    }
+
+    pub fn dma_i(&self) -> &Dma {
+        self.cpu.dma_i()
+    }
+
     pub fn pad(&mut self) -> &mut Pad {
         self.cpu.pad()
+    }
+
+    pub fn pad_i(&self) -> &Pad {
+        self.cpu.pad_i()
     }
 
     pub fn timer(&mut self) -> &mut Timer {
         self.cpu.timer()
     }
 
+    pub fn timer_i(&self) -> &Timer {
+        self.cpu.timer_i()
+    }
+
     pub fn serial(&mut self) -> &mut Serial {
         self.cpu.serial()
+    }
+
+    pub fn serial_i(&self) -> &Serial {
+        self.cpu.serial_i()
     }
 
     pub fn frame_buffer(&mut self) -> &[u8; FRAME_BUFFER_SIZE] {
@@ -580,6 +1000,12 @@ impl AudioProvider for GameBoy {
 
 impl Default for GameBoy {
     fn default() -> Self {
-        Self::new()
+        Self::new(GameBoyMode::Dmg)
+    }
+}
+
+impl Display for GameBoy {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.description(9))
     }
 }

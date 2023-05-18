@@ -1,6 +1,7 @@
 .tiles-gb > .canvas {
-    background-color: #1b1a17;
-    border: 2px solid #50cb93;
+    background-color: #000000;
+    border: 2px solid #58b09c;
+    border-radius: 8px 8px 8px 8px;
     padding: 8px 8px 8px 8px;
 }
 
