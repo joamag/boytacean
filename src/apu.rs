@@ -931,3 +931,51 @@ impl Default for Apu {
         Self::new(44100, 1.0, GameBoy::CPU_FREQ)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_trigger_ch1() {
+        let mut apu = Apu::default();
+        apu.ch1_wave_length = 1024;
+        apu.trigger_ch1();
+
+        assert_eq!(apu.ch1_timer, 4096);
+        assert_eq!(apu.ch1_envelope_sequence, 0);
+        assert_eq!(apu.ch1_sweep_sequence, 0);
+    }
+
+    #[test]
+    fn test_trigger_ch2() {
+        let mut apu = Apu::default();
+        apu.ch2_wave_length = 1024;
+        apu.trigger_ch2();
+
+        assert_eq!(apu.ch2_timer, 4096);
+        assert_eq!(apu.ch2_envelope_sequence, 0);
+    }
+
+    #[test]
+    fn test_trigger_ch3() {
+        let mut apu = Apu::default();
+        apu.ch3_wave_length = 1024;
+        apu.trigger_ch3();
+
+        assert_eq!(apu.ch3_timer, 3);
+        assert_eq!(apu.ch3_position, 0);
+    }
+
+    #[test]
+    fn test_trigger_ch4() {
+        let mut apu = Apu::default();
+        apu.ch4_divisor = 3;
+        apu.ch4_clock_shift = 2;
+        apu.trigger_ch4();
+
+        assert_eq!(apu.ch4_timer, 192);
+        assert_eq!(apu.ch4_lfsr, 0x7ff1);
+        assert_eq!(apu.ch4_envelope_sequence, 0);
+    }
+}
