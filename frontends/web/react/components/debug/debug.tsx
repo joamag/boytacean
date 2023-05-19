@@ -11,7 +11,7 @@ type EmulatorProps = {
     emulator: GameboyEmulator;
 };
 
-export const DebugVideo: FC<EmulatorProps> = ({ emulator }) => {
+export const DebugGeneral: FC<EmulatorProps> = ({ emulator }) => {
     return (
         <>
             {emulator.getTile && (
@@ -43,7 +43,10 @@ export const DebugVideo: FC<EmulatorProps> = ({ emulator }) => {
                 }}
             >
                 <h3>Registers</h3>
-                <RegistersGB getRegisters={() => emulator.registers} />
+                <RegistersGB
+                    getRegisters={() => emulator.registers}
+                    getSpeed={() => emulator.speed}
+                />
             </div>
         </>
     );

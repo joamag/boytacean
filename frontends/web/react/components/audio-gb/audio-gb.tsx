@@ -186,7 +186,7 @@ export const AudioGB: FC<AudioGBProps> = ({
     return (
         <div className={classes()}>
             <div className="section">
-                {renderMethod("Master", "master")}
+                {renderMethod("Master", "master", ["master"])}
                 {renderMethod(
                     "CH1",
                     "ch1",

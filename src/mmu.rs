@@ -30,9 +30,17 @@ pub struct Mmu {
     /// (CGB only).
     pub key0: u8,
 
-    pub speed: GameBoySpeed,
-
+    /// Flags that controls if the system is currently in the process
+    /// of switching between the double and single speed modes.
     pub switching: bool,
+
+    /// The speed (frequency) at which the system is currently running,
+    /// it may be either normal (4.194304 MHz) or double (8.388608 MHz).
+    speed: GameBoySpeed,
+
+    /// Callback to be called when the speed of the system changes, it
+    /// should provide visibility over the current speed of the system.
+    speed_callback: fn(speed: GameBoySpeed),
 
     /// Reference to the PPU (Pixel Processing Unit) that is going
     /// to be used both for VRAM reading/writing and to forward
@@ -80,6 +88,9 @@ pub struct Mmu {
     /// overwritten byte the cartridge header.
     boot: Vec<u8>,
 
+    /// Buffer that is used to store the RAM of the system, this
+    /// value varies between DMG and CGB emulation, being 8KB for
+    /// the DMG and 32KB for the CGB. Mapped in range 0xC000-0xDFFF.
     ram: Vec<u8>,
 
     /// The RAM bank to be used in the read and write operation of
@@ -120,6 +131,7 @@ impl Mmu {
             key0: 0x0,
             speed: GameBoySpeed::Normal,
             switching: false,
+            speed_callback: |_| {},
             mode,
             gbc,
         }
@@ -150,6 +162,22 @@ impl Mmu {
     pub fn allocate_cgb(&mut self) {
         self.boot = vec![0x00; BOOT_SIZE_CGB];
         self.ram = vec![0x00; RAM_SIZE_CGB];
+    }
+
+    /// Switches the current system's speed toggling between
+    /// the normal and double speed modes.
+    pub fn switch_speed(&mut self) {
+        self.speed = self.speed.switch();
+        self.switching = false;
+        (self.speed_callback)(self.speed);
+    }
+
+    pub fn speed(&self) -> GameBoySpeed {
+        self.speed
+    }
+
+    pub fn set_speed_callback(&mut self, callback: fn(speed: GameBoySpeed)) {
+        self.speed_callback = callback;
     }
 
     pub fn ppu(&mut self) -> &mut Ppu {

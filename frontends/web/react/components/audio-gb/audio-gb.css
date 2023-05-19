@@ -13,6 +13,11 @@
     margin-right: 5px;
 }
 
+.audio-gb > .section > .audio-wave.master {
+    display: block;
+    margin-bottom: 16px;
+}
+
 .audio-gb > .section > .audio-wave.selector {
     cursor: pointer;
 }

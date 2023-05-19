@@ -21,7 +21,7 @@ import { base64ToBuffer, bufferToBase64 } from "./util";
 import {
     DebugAudio,
     DebugSettings,
-    DebugVideo,
+    DebugGeneral,
     HelpFaqs,
     HelpKeyboard,
     SerialSection
@@ -33,7 +33,8 @@ import {
     GameBoy,
     PadKey,
     PpuMode,
-    GameBoyMode
+    GameBoyMode,
+    GameBoySpeed
 } from "../lib/boytacean";
 import info from "../package.json";
 
@@ -437,7 +438,15 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         // a valid state ready to be used
         this.gameBoy.reset();
         this.gameBoy.load(true);
+
+        // loads the ROM file into the system and retrieves
+        // the cartridge instance associated with it
         const cartridge = this.gameBoy.load_rom_ws(romData);
+
+        // loads the callbacks so that the Typescript code
+        // gets notified about the various events triggered
+        // in the WASM side
+        this.gameBoy.load_callbacks_ws();
 
         // in case there's a serial device involved tries to load
         // it and initialize for the current Game Boy machine
@@ -547,8 +556,8 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     get debug(): DebugPanel[] {
         return [
             {
-                name: "Video",
-                node: DebugVideo({ emulator: this })
+                name: "General",
+                node: DebugGeneral({ emulator: this })
             },
             {
                 name: "Audio",
@@ -690,6 +699,10 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
             ly: registers.ly,
             lyc: registers.lyc
         };
+    }
+
+    get speed(): GameBoySpeed {
+        return this.gameBoy?.speed() ?? GameBoySpeed.Normal;
     }
 
     get audioOutput(): Record<string, number> {
@@ -852,6 +865,10 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         if (set) this.serialDevice = SerialDevice.Printer;
     }
 
+    onSpeedSwitch(speed: GameBoySpeed) {
+        this.trigger("speed", { data: speed });
+    }
+
     onLoggerDevice(data: Uint8Array) {
         this.trigger("logger", { data: data });
     }
@@ -930,6 +947,7 @@ declare global {
     interface Window {
         emulator: GameboyEmulator;
         panic: (message: string) => void;
+        speedCallback: (speed: GameBoySpeed) => void;
         loggerCallback: (data: Uint8Array) => void;
         printerCallback: (imageBuffer: Uint8Array) => void;
     }
@@ -941,6 +959,10 @@ declare global {
 
 window.panic = (message: string) => {
     console.error(message);
+};
+
+window.speedCallback = (speed: GameBoySpeed) => {
+    window.emulator.onSpeedSwitch(speed);
 };
 
 window.loggerCallback = (data: Uint8Array) => {

@@ -560,8 +560,7 @@ impl Cpu {
     pub fn stop(&mut self) {
         let mmu = self.mmu();
         if mmu.switching {
-            mmu.switching = false;
-            mmu.speed = mmu.speed.switch();
+            mmu.switch_speed()
         }
     }
 

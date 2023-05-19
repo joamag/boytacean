@@ -1,15 +1,18 @@
 import React, { FC, useEffect, useRef, useState } from "react";
+import { GameBoySpeed } from "../../../lib/boytacean";
 
 import "./registers-gb.css";
 
 type RegistersGBProps = {
     getRegisters: () => Record<string, string | number>;
+    getSpeed?: () => GameBoySpeed;
     interval?: number;
     style?: string[];
 };
 
 export const RegistersGB: FC<RegistersGBProps> = ({
     getRegisters,
+    getSpeed = () => GameBoySpeed.Normal,
     interval = 50,
     style = []
 }) => {
@@ -17,14 +20,17 @@ export const RegistersGB: FC<RegistersGBProps> = ({
     const [registers, setRegisters] = useState<Record<string, string | number>>(
         {}
     );
+    const [speed, setSpeed] = useState<GameBoySpeed>(GameBoySpeed.Normal);
     const intervalsRef = useRef<number>();
     useEffect(() => {
-        const updateRegisters = () => {
+        const updateValues = () => {
             const registers = getRegisters();
+            const speed = getSpeed();
             setRegisters(registers);
+            setSpeed(speed);
         };
-        setInterval(() => updateRegisters(), interval);
-        updateRegisters();
+        setInterval(() => updateValues(), interval);
+        updateValues();
         return () => {
             if (intervalsRef.current) {
                 clearInterval(intervalsRef.current);
@@ -52,7 +58,7 @@ export const RegistersGB: FC<RegistersGBProps> = ({
     return (
         <div className={classes()}>
             <div className="section">
-                <h4>CPU</h4>
+                <h4>CPU {speed == GameBoySpeed.Double ? "2x" : ""}</h4>
                 {renderRegister("PC", registers.pc as number, 4)}
                 {renderRegister("SP", registers.sp as number, 4)}
                 {renderRegister("A", registers.a as number)}

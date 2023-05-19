@@ -669,11 +669,11 @@ impl GameBoy {
     }
 
     pub fn speed(&self) -> GameBoySpeed {
-        self.mmu_i().speed
+        self.mmu_i().speed()
     }
 
     pub fn multiplier(&self) -> u8 {
-        self.mmu_i().speed.multiplier()
+        self.mmu_i().speed().multiplier()
     }
 
     pub fn mode(&self) -> GameBoyMode {
@@ -923,6 +923,10 @@ impl GameBoy {
     pub fn attach_serial(&mut self, device: Box<dyn SerialDevice>) {
         self.serial().set_device(device);
     }
+
+    pub fn set_speed_callback(&mut self, callback: fn(speed: GameBoySpeed)) {
+        self.mmu().set_speed_callback(callback);
+    }
 }
 
 #[cfg(feature = "wasm")]
@@ -936,13 +940,14 @@ impl GameBoy {
         }));
     }
 
-    pub fn infer_mode_ws(&mut self, data: &[u8]) {
-        let mode = Cartridge::from_data(data).gb_mode();
-        self.set_mode(mode);
-    }
-
     pub fn load_rom_ws(&mut self, data: &[u8]) -> Cartridge {
         self.load_rom(data).clone()
+    }
+
+    pub fn load_callbacks_ws(&mut self) {
+        self.set_speed_callback(|speed| {
+            speed_callback(speed);
+        });
     }
 
     pub fn load_null_ws(&mut self) {
@@ -964,6 +969,13 @@ impl GameBoy {
             printer_callback(image_buffer.to_vec());
         });
         self.attach_serial(printer);
+    }
+
+    /// Updates the emulation mode using the cartridge
+    /// of the provided data to obtain the CGB flag value.
+    pub fn infer_mode_ws(&mut self, data: &[u8]) {
+        let mode = Cartridge::from_data(data).gb_mode();
+        self.set_mode(mode);
     }
 
     pub fn set_palette_colors_ws(&mut self, value: Vec<JsValue>) {
@@ -1007,6 +1019,9 @@ impl GameBoy {
 extern "C" {
     #[wasm_bindgen(js_namespace = window)]
     fn panic(message: &str);
+
+    #[wasm_bindgen(js_namespace = window, js_name = speedCallback)]
+    fn speed_callback(speed: GameBoySpeed);
 
     #[wasm_bindgen(js_namespace = window, js_name = loggerCallback)]
     fn logger_callback(data: Vec<u8>);
