@@ -483,7 +483,7 @@ impl Emulator {
         }
     }
 
-    pub fn run_headless(&mut self) {
+    pub fn run_headless(&mut self, allowed_cycles: Option<u64>) {
         // starts the variable that will control the number of cycles that
         // are going to move (because of overflow) from one tick to another
         let mut pending_cycles = 0u32;
@@ -492,7 +492,13 @@ impl Emulator {
         // iteration cycle
         let mut counter = 0u32;
 
+        // creates the reference instant that is going to be used to
+        // calculate the elapsed time
         let reference = Instant::now();
+
+        // creates the total cycles counter that is going to be used
+        // to control the number of cycles that have been executed
+        let mut total_cycles = 0u64;
 
         // the main loop to execute the multiple machine clocks, in
         // theory the emulator should keep an infinite loop here
@@ -530,6 +536,14 @@ impl Emulator {
                     counter_cycles += self.system.clock() as u32;
                 }
 
+                // increments the total number of cycles with the cycle limit
+                // fot the current tick an in case the total number of cycles
+                // exceeds the allowed cycles then the loop is broken
+                total_cycles += cycle_limit as u64;
+                if total_cycles >= allowed_cycles.unwrap_or(u64::MAX) {
+                    break;
+                }
+
                 // calculates the number of ticks that have elapsed since the
                 // last draw operation, this is critical to be able to properly
                 // operate the clock of the CPU in frame drop situations, meaning
@@ -565,31 +579,46 @@ impl Emulator {
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
-    #[arg(short, long, default_value_t = String::from("auto"))]
+    #[arg(short, long, default_value_t = String::from("auto"), help = "GB execution mode (ex: dmg, cgb, sgb) to be used")]
     mode: String,
 
-    #[arg(short, long, default_value_t = String::from("printer"))]
+    #[arg(short, long, default_value_t = String::from("printer"), help = "Serial device to be used")]
     device: String,
 
-    #[arg(long, default_value_t = false)]
+    #[arg(long, default_value_t = false, help = "If set no PPU will be used")]
     no_ppu: bool,
 
-    #[arg(long, default_value_t = false)]
+    #[arg(long, default_value_t = false, help = "If set no APU will be used")]
     no_apu: bool,
 
-    #[arg(long, default_value_t = false)]
+    #[arg(long, default_value_t = false, help = "If set no DMA will be used")]
     no_dma: bool,
 
-    #[arg(long, default_value_t = false)]
+    #[arg(long, default_value_t = false, help = "If set no timer will be used")]
     no_timer: bool,
 
-    #[arg(long, default_value_t = false)]
+    #[arg(
+        long,
+        default_value_t = false,
+        help = "Run in headless mode, with no UI"
+    )]
     headless: bool,
 
-    #[arg(long, default_value_t = false)]
+    #[arg(
+        long,
+        default_value_t = false,
+        help = "If set no CPU speed limit will be imposed"
+    )]
     unlimited: bool,
 
-    #[arg(short, long, default_value_t = String::from("../../res/roms/demo/pocket.gb"))]
+    #[arg(
+        long,
+        default_value_t = 0,
+        help = "Number of CPU cycles to run in headless mode"
+    )]
+    cycles: u64,
+
+    #[arg(short, long, default_value_t = String::from("../../res/roms/demo/pocket.gb"), help = "Path to the ROM file to be loaded")]
     rom_path: String,
 }
 
@@ -635,7 +664,11 @@ fn main() {
     emulator.load_rom(Some(&args.rom_path));
     emulator.toggle_palette();
     if args.headless {
-        emulator.run_headless();
+        emulator.run_headless(if args.cycles > 0 {
+            Some(args.cycles)
+        } else {
+            None
+        });
     } else {
         emulator.run();
     }
@@ -678,3 +711,5 @@ fn key_to_pad(keycode: Keycode) -> Option<PadKey> {
         _ => None,
     }
 }
+
+fn build_test() {}
