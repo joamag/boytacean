@@ -711,5 +711,3 @@ fn key_to_pad(keycode: Keycode) -> Option<PadKey> {
         _ => None,
     }
 }
-
-fn build_test() {}
