@@ -48,6 +48,11 @@ impl Default for Benchmark {
     }
 }
 
+pub struct EmulatorOptions {
+    auto_mode: bool,
+    features: Option<Vec<&'static str>>,
+}
+
 pub struct Emulator {
     system: GameBoy,
     auto_mode: bool,
@@ -65,10 +70,10 @@ pub struct Emulator {
 }
 
 impl Emulator {
-    pub fn new(system: GameBoy, auto_mode: bool) -> Self {
+    pub fn new(system: GameBoy, options: EmulatorOptions) -> Self {
         Self {
             system,
-            auto_mode,
+            auto_mode: options.auto_mode,
             graphics: None,
             audio: None,
             title: TITLE,
@@ -77,7 +82,9 @@ impl Emulator {
             visual_frequency: GameBoy::VISUAL_FREQ,
             next_tick_time: 0.0,
             next_tick_time_i: 0,
-            features: vec!["video", "audio", "no-vsync"],
+            features: options
+                .features
+                .unwrap_or(vec!["video", "audio", "no-vsync"]),
             palettes: [
                 PaletteInfo::new(
                     "basic",
@@ -486,6 +493,9 @@ struct Args {
     #[arg(long, default_value_t = false)]
     no_timer: bool,
 
+    #[arg(long, default_value_t = false)]
+    headless: bool,
+
     #[arg(short, long, default_value_t = String::from("../../res/roms/demo/pocket.gb"))]
     rom_path: String,
 }
@@ -518,7 +528,15 @@ fn main() {
     // creates a new generic emulator structure then starts
     // both the video and audio sub-systems, loads default
     // ROM file and starts running it
-    let mut emulator = Emulator::new(game_boy, auto_mode);
+    let options = EmulatorOptions {
+        auto_mode,
+        features: if args.headless {
+            Some(vec![])
+        } else {
+            Some(vec!["video", "audio", "no-vsync"])
+        },
+    };
+    let mut emulator = Emulator::new(game_boy, options);
     emulator.start(SCREEN_SCALE);
     emulator.load_rom(Some(&args.rom_path));
     emulator.toggle_palette();
