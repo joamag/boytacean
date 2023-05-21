@@ -48,10 +48,20 @@ cargo watch -x run
 There are some feature flags that control the verbosity of the emulator to run in debug mode use:
 
 ```bash
-cargo run --features debug
+cargo build --features debug
 ```
 
 To obtain more information about the issues.
+
+## Execution
+
+### Headless
+
+It's possible to run the emulator in headless mode using the `--headless` parameter:
+
+```bash
+cargo run  -- --rom-path ../../res/roms/test/blargg/cpu/cpu_instrs.gb --cycles 100000000  --headless --device stdout --unlimited
+```
 
 ## Features
 
