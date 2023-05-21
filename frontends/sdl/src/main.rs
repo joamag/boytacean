@@ -84,7 +84,7 @@ impl Emulator {
             next_tick_time_i: 0,
             features: options
                 .features
-                .unwrap_or(vec!["video", "audio", "no-vsync"]),
+                .unwrap_or_else(|| vec!["video", "audio", "no-vsync"]),
             palettes: [
                 PaletteInfo::new(
                     "basic",
