@@ -1,7 +1,11 @@
 use crate::warnln;
 
 pub trait SerialDevice {
+    /// Sends a byte (u8) to the attached serial connection.
     fn send(&mut self) -> u8;
+
+    /// Receives a byte (u8) from the attached serial connection,
+    /// can be either another device or the host.
     fn receive(&mut self, byte: u8);
 
     /// Whether the serial device "driver" supports slave mode
@@ -11,6 +15,10 @@ pub trait SerialDevice {
 
     /// Returns a short description of the serial device.
     fn description(&self) -> String;
+
+    /// Returns a string describing the current state of the
+    /// serial device. Could be used for debugging purposes.
+    fn state(&self) -> String;
 }
 
 pub struct Serial {
@@ -221,6 +229,10 @@ impl SerialDevice for NullDevice {
 
     fn description(&self) -> String {
         String::from("Null")
+    }
+
+    fn state(&self) -> String {
+        String::from("")
     }
 }
 

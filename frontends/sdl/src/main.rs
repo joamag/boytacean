@@ -484,6 +484,8 @@ impl Emulator {
     }
 
     pub fn run_headless(&mut self, allowed_cycles: Option<u64>) {
+        let allowed_cycles = allowed_cycles.unwrap_or(u64::MAX);
+
         // starts the variable that will control the number of cycles that
         // are going to move (because of overflow) from one tick to another
         let mut pending_cycles = 0u32;
@@ -540,7 +542,7 @@ impl Emulator {
                 // fot the current tick an in case the total number of cycles
                 // exceeds the allowed cycles then the loop is broken
                 total_cycles += cycle_limit as u64;
-                if total_cycles >= allowed_cycles.unwrap_or(u64::MAX) {
+                if total_cycles >= allowed_cycles {
                     break;
                 }
 
@@ -635,7 +637,7 @@ fn main() {
 
     // creates a new Game Boy instance and loads both the boot ROM
     // and the initial game ROM to "start the engine"
-    let mut game_boy = GameBoy::new(mode);
+    let mut game_boy = GameBoy::new(Some(mode));
     let device = build_device(&args.device);
     game_boy.set_ppu_enabled(!args.no_ppu);
     game_boy.set_apu_enabled(!args.no_apu);
@@ -663,6 +665,10 @@ fn main() {
     emulator.start(SCREEN_SCALE);
     emulator.load_rom(Some(&args.rom_path));
     emulator.toggle_palette();
+
+    // determines if the emulator should run in headless mode or
+    // not and runs it accordingly, note that if running in headless
+    // mode the number of cycles to be run may be specified
     if args.headless {
         emulator.run_headless(if args.cycles > 0 {
             Some(args.cycles)

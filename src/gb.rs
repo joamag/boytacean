@@ -346,7 +346,8 @@ pub struct GameBoy {
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 impl GameBoy {
     #[cfg_attr(feature = "wasm", wasm_bindgen(constructor))]
-    pub fn new(mode: GameBoyMode) -> Self {
+    pub fn new(mode: Option<GameBoyMode>) -> Self {
+        let mode = mode.unwrap_or(GameBoyMode::Dmg);
         let gbc = Rc::new(RefCell::new(GameBoyConfig {
             mode,
             ppu_enabled: true,
@@ -1052,7 +1053,7 @@ impl AudioProvider for GameBoy {
 
 impl Default for GameBoy {
     fn default() -> Self {
-        Self::new(GameBoyMode::Dmg)
+        Self::new(None)
     }
 }
 

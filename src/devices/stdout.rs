@@ -7,7 +7,7 @@ use std::{
 
 pub struct StdoutDevice {
     flush: bool,
-    callback: fn(image_buffer: &Vec<u8>),
+    callback: fn(buffer: &Vec<u8>),
 }
 
 impl StdoutDevice {
@@ -18,7 +18,7 @@ impl StdoutDevice {
         }
     }
 
-    pub fn set_callback(&mut self, callback: fn(image_buffer: &Vec<u8>)) {
+    pub fn set_callback(&mut self, callback: fn(buffer: &Vec<u8>)) {
         self.callback = callback;
     }
 }
@@ -43,6 +43,10 @@ impl SerialDevice for StdoutDevice {
 
     fn description(&self) -> String {
         String::from("Stdout")
+    }
+
+    fn state(&self) -> String {
+        String::from("")
     }
 }
 
