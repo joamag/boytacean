@@ -339,6 +339,8 @@ impl Apu {
                     | ((self.ch1_volume & 0x0f) << 4)
             }
 
+            // 0xFF15 — Not used
+            0xff15 => 0xff,
             // 0xFF16 — NR21: Channel 2 length timer & duty cycle
             0xff16 => (self.ch2_wave_duty & 0x03) << 6,
             // 0xFF17 — NR22: Channel 2 volume & envelope
@@ -361,6 +363,8 @@ impl Apu {
             // 0xFF1C — NR32: Channel 3 output level
             0xff1c => (self.ch3_output_level & 0x03) << 5,
 
+            // 0xFF1F — Not used
+            0xff1f => 0xff,
             // 0xFF20 — NR41: Channel 4 length timer
             0xff20 => 0x00,
             // 0xFF21 — NR42: Channel 4 volume & envelope
@@ -436,6 +440,8 @@ impl Apu {
                 }
             }
 
+            // 0xFF15 — Not used
+            0xff15 => (),
             // 0xFF16 — NR21: Channel 2 length timer & duty cycle
             0xff16 => {
                 self.ch2_length_timer = value & 0x3f;
@@ -501,6 +507,8 @@ impl Apu {
                 }
             }
 
+            // 0xFF1F — Not used
+            0xff1f => (),
             // 0xFF20 — NR41: Channel 4 length timer
             0xff20 => {
                 self.ch4_length_timer = value & 0x3f;
