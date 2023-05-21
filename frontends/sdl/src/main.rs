@@ -203,13 +203,10 @@ impl Emulator {
             "========= Cartridge =========\n{}\n=============================",
             rom
         );
-        match self.sdl {
-            Some(ref mut sdl) => {
-                sdl.window_mut()
-                    .set_title(format!("{} [{}]", self.title, rom.title()).as_str())
-                    .unwrap();
-            }
-            None => (),
+        if let Some(ref mut sdl) = self.sdl {
+            sdl.window_mut()
+                .set_title(format!("{} [{}]", self.title, rom.title()).as_str())
+                .unwrap();
         }
         self.rom_path = String::from(path_res);
     }
