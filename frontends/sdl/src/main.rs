@@ -54,13 +54,15 @@ impl Default for Benchmark {
 }
 
 pub struct EmulatorOptions {
-    auto_mode: bool,
+    auto_mode: Option<bool>,
+    unlimited: Option<bool>,
     features: Option<Vec<&'static str>>,
 }
 
 pub struct Emulator {
     system: GameBoy,
     auto_mode: bool,
+    unlimited: bool,
     sdl: Option<SdlSystem>,
     audio: Option<Audio>,
     title: &'static str,
@@ -78,7 +80,8 @@ impl Emulator {
     pub fn new(system: GameBoy, options: EmulatorOptions) -> Self {
         Self {
             system,
-            auto_mode: options.auto_mode,
+            auto_mode: options.auto_mode.unwrap_or(true),
+            unlimited: options.unlimited.unwrap_or(false),
             sdl: None,
             audio: None,
             title: TITLE,
@@ -248,6 +251,10 @@ impl Emulator {
             .ppu()
             .set_palette_colors(self.palettes[self.palette_index].colors());
         self.palette_index = (self.palette_index + 1) % self.palettes.len();
+    }
+
+    pub fn limited(&self) -> bool {
+        !self.unlimited
     }
 
     pub fn run(&mut self) {
@@ -455,10 +462,15 @@ impl Emulator {
                     .ceil() as u8;
                 ticks = max(ticks, 1);
 
-                // updates the next update time reference to the current
-                // time so that it can be used from game loop control
-                self.next_tick_time += (1000.0 / self.visual_frequency) * ticks as f32;
-                self.next_tick_time_i = self.next_tick_time.ceil() as u32;
+                // in case the limited (speed) mode is set then we must calculate
+                // a new next tick time reference, this is required to prevent the
+                // machine from running too fast (eg: 50x)
+                if self.limited() {
+                    // updates the next update time reference to the current
+                    // time so that it can be used from game loop control
+                    self.next_tick_time += (1000.0 / self.visual_frequency) * ticks as f32;
+                    self.next_tick_time_i = self.next_tick_time.ceil() as u32;
+                }
             }
 
             let current_time = self.sdl.as_mut().unwrap().timer_subsystem.ticks();
@@ -531,10 +543,15 @@ impl Emulator {
                     .ceil() as u8;
                 ticks = max(ticks, 1);
 
-                // updates the next update time reference to the current
-                // time so that it can be used from game loop control
-                self.next_tick_time += (1000.0 / self.visual_frequency) * ticks as f32;
-                self.next_tick_time_i = self.next_tick_time.ceil() as u32;
+                // in case the limited (speed) mode is set then we must calculate
+                // a new next tick time reference, this is required to prevent the
+                // machine from running too fast (eg: 50x)
+                if self.limited() {
+                    // updates the next update time reference to the current
+                    // time so that it can be used from game loop control
+                    self.next_tick_time += (1000.0 / self.visual_frequency) * ticks as f32;
+                    self.next_tick_time_i = self.next_tick_time.ceil() as u32;
+                }
             }
 
             let current_time = reference.elapsed().as_millis() as u32;
@@ -569,6 +586,9 @@ struct Args {
     #[arg(long, default_value_t = false)]
     headless: bool,
 
+    #[arg(long, default_value_t = false)]
+    unlimited: bool,
+
     #[arg(short, long, default_value_t = String::from("../../res/roms/demo/pocket.gb"))]
     rom_path: String,
 }
@@ -602,7 +622,8 @@ fn main() {
     // both the video and audio sub-systems, loads default
     // ROM file and starts running it
     let options = EmulatorOptions {
-        auto_mode,
+        auto_mode: Some(auto_mode),
+        unlimited: Some(args.unlimited),
         features: if args.headless {
             Some(vec![])
         } else {
