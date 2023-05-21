@@ -2,7 +2,7 @@
 
 pub mod audio;
 pub mod data;
-pub mod graphics;
+pub mod sdl;
 
 use audio::Audio;
 use boytacean::{
@@ -15,10 +15,15 @@ use boytacean::{
 };
 use chrono::Utc;
 use clap::Parser;
-use graphics::{surface_from_bytes, Graphics};
 use image::ColorType;
+use sdl::{surface_from_bytes, SdlSystem};
 use sdl2::{event::Event, keyboard::Keycode, pixels::PixelFormatEnum, Sdl};
-use std::{cmp::max, path::Path, time::SystemTime};
+use std::{
+    cmp::max,
+    path::Path,
+    thread,
+    time::{Duration, Instant, SystemTime},
+};
 
 /// The scale at which the screen is going to be drawn
 /// meaning the ratio between Game Boy resolution and
@@ -56,7 +61,7 @@ pub struct EmulatorOptions {
 pub struct Emulator {
     system: GameBoy,
     auto_mode: bool,
-    graphics: Option<Graphics>,
+    sdl: Option<SdlSystem>,
     audio: Option<Audio>,
     title: &'static str,
     rom_path: String,
@@ -74,7 +79,7 @@ impl Emulator {
         Self {
             system,
             auto_mode: options.auto_mode,
-            graphics: None,
+            sdl: None,
             audio: None,
             title: TITLE,
             rom_path: String::from("invalid"),
@@ -176,7 +181,7 @@ impl Emulator {
     }
 
     pub fn start_graphics(&mut self, sdl: &Sdl, screen_scale: f32) {
-        self.graphics = Some(Graphics::new(
+        self.sdl = Some(SdlSystem::new(
             sdl,
             self.title,
             DISPLAY_WIDTH as u32,
@@ -198,12 +203,14 @@ impl Emulator {
             "========= Cartridge =========\n{}\n=============================",
             rom
         );
-        self.graphics
-            .as_mut()
-            .unwrap()
-            .window_mut()
-            .set_title(format!("{} [{}]", self.title, rom.title()).as_str())
-            .unwrap();
+        match self.sdl {
+            Some(ref mut sdl) => {
+                sdl.window_mut()
+                    .set_title(format!("{} [{}]", self.title, rom.title()).as_str())
+                    .unwrap();
+            }
+            None => (),
+        }
         self.rom_path = String::from(path_res);
     }
 
@@ -250,19 +257,15 @@ impl Emulator {
         // updates the icon of the window to reflect the image
         // and style of the emulator
         let surface = surface_from_bytes(&data::ICON);
-        self.graphics
-            .as_mut()
-            .unwrap()
-            .window_mut()
-            .set_icon(&surface);
+        self.sdl.as_mut().unwrap().window_mut().set_icon(&surface);
 
         // creates an accelerated canvas to be used in the drawing
         // then clears it and presents it
-        self.graphics.as_mut().unwrap().canvas.present();
+        self.sdl.as_mut().unwrap().canvas.present();
 
         // creates a texture creator for the current canvas, required
         // for the creation of dynamic and static textures
-        let texture_creator = self.graphics.as_mut().unwrap().canvas.texture_creator();
+        let texture_creator = self.sdl.as_mut().unwrap().canvas.texture_creator();
 
         // creates the texture streaming that is going to be used
         // as the target for the pixel buffer
@@ -291,7 +294,7 @@ impl Emulator {
 
             // obtains an event from the SDL sub-system to be
             // processed under the current emulation context
-            while let Some(event) = self.graphics.as_mut().unwrap().event_pump.poll_event() {
+            while let Some(event) = self.sdl.as_mut().unwrap().event_pump.poll_event() {
                 match event {
                     Event::Quit { .. } => break 'main,
                     Event::KeyDown {
@@ -351,7 +354,7 @@ impl Emulator {
                 }
             }
 
-            let current_time = self.graphics.as_mut().unwrap().timer_subsystem.ticks();
+            let current_time = self.sdl.as_mut().unwrap().timer_subsystem.ticks();
 
             if current_time >= self.next_tick_time_i {
                 // re-starts the counter cycles with the number of pending cycles
@@ -426,11 +429,11 @@ impl Emulator {
                     // clears the graphics canvas, making sure that no garbage
                     // pixel data remaining in the pixel buffer, not doing this would
                     // create visual glitches in OSs like Mac OS X
-                    self.graphics.as_mut().unwrap().canvas.clear();
+                    self.sdl.as_mut().unwrap().canvas.clear();
 
                     // copies the texture that was created for the frame (during
                     // the loop part of the tick) to the canvas
-                    self.graphics
+                    self.sdl
                         .as_mut()
                         .unwrap()
                         .canvas
@@ -439,7 +442,7 @@ impl Emulator {
 
                     // presents the canvas effectively updating the screen
                     // information presented to the user
-                    self.graphics.as_mut().unwrap().canvas.present();
+                    self.sdl.as_mut().unwrap().canvas.present();
                 }
 
                 // calculates the number of ticks that have elapsed since the
@@ -461,13 +464,86 @@ impl Emulator {
                 self.next_tick_time_i = self.next_tick_time.ceil() as u32;
             }
 
-            let current_time = self.graphics.as_mut().unwrap().timer_subsystem.ticks();
+            let current_time = self.sdl.as_mut().unwrap().timer_subsystem.ticks();
             let pending_time = self.next_tick_time_i.saturating_sub(current_time);
-            self.graphics
+            self.sdl
                 .as_mut()
                 .unwrap()
                 .timer_subsystem
                 .delay(pending_time);
+        }
+    }
+
+    pub fn run_headless(&mut self) {
+        // starts the variable that will control the number of cycles that
+        // are going to move (because of overflow) from one tick to another
+        let mut pending_cycles = 0u32;
+
+        // allocates space for the loop ticks counter to be used in each
+        // iteration cycle
+        let mut counter = 0u32;
+
+        let reference = Instant::now();
+
+        // the main loop to execute the multiple machine clocks, in
+        // theory the emulator should keep an infinite loop here
+        loop {
+            // increments the counter that will keep track
+            // on the number of visual ticks since beginning
+            counter = counter.wrapping_add(1);
+
+            let current_time = reference.elapsed().as_millis() as u32;
+
+            if current_time >= self.next_tick_time_i {
+                // re-starts the counter cycles with the number of pending cycles
+                // from the previous tick
+                let mut counter_cycles = pending_cycles;
+
+                // calculates the number of cycles that are meant to be the target
+                // for the current "tick" operation this is basically the current
+                // logic frequency divided by the visual one, this operation also
+                // takes into account the current Game Boy speed multiplier (GBC)
+                let cycle_limit = (self.logic_frequency as f32 * self.system.multiplier() as f32
+                    / self.visual_frequency)
+                    .round() as u32;
+
+                loop {
+                    // limits the number of ticks to the typical number
+                    // of cycles expected for the current logic cycle
+                    if counter_cycles >= cycle_limit {
+                        pending_cycles = counter_cycles - cycle_limit;
+                        break;
+                    }
+
+                    // runs the Game Boy clock, this operation should
+                    // include the advance of both the CPU, PPU, APU
+                    // and any other frequency based component of the system
+                    counter_cycles += self.system.clock() as u32;
+                }
+
+                // calculates the number of ticks that have elapsed since the
+                // last draw operation, this is critical to be able to properly
+                // operate the clock of the CPU in frame drop situations, meaning
+                // a situation where the system resources are no able to emulate
+                // the system on time and frames must be skipped (ticks > 1)
+                if self.next_tick_time == 0.0 {
+                    self.next_tick_time = current_time as f32;
+                }
+                let mut ticks = ((current_time as f32 - self.next_tick_time)
+                    / ((1.0 / self.visual_frequency) * 1000.0))
+                    .ceil() as u8;
+                ticks = max(ticks, 1);
+
+                // updates the next update time reference to the current
+                // time so that it can be used from game loop control
+                self.next_tick_time += (1000.0 / self.visual_frequency) * ticks as f32;
+                self.next_tick_time_i = self.next_tick_time.ceil() as u32;
+            }
+
+            let current_time = reference.elapsed().as_millis() as u32;
+            let pending_time = self.next_tick_time_i.saturating_sub(current_time);
+            let ten_millis = Duration::from_millis(pending_time as u64);
+            thread::sleep(ten_millis);
         }
     }
 }
@@ -540,7 +616,11 @@ fn main() {
     emulator.start(SCREEN_SCALE);
     emulator.load_rom(Some(&args.rom_path));
     emulator.toggle_palette();
-    emulator.run();
+    if args.headless {
+        emulator.run_headless();
+    } else {
+        emulator.run();
+    }
 }
 
 fn build_device(device: &str) -> Box<dyn SerialDevice> {
