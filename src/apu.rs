@@ -330,6 +330,12 @@ impl Apu {
 
     pub fn read(&mut self, addr: u16) -> u8 {
         match addr {
+            // 0xFF10 — NR10: Channel 1 sweep
+            0xff10 => {
+                (self.ch1_sweep_slope & 0x07)
+                    | (if self.ch1_sweep_increase { 0x08 } else { 0x00 })
+                    | ((self.ch1_sweep_pace & 0x07) << 4)
+            }
             // 0xFF11 — NR11: Channel 1 length timer & duty cycle
             0xff11 => (self.ch1_wave_duty & 0x03) << 6,
             // 0xFF12 — NR12: Channel 1 volume & envelope
@@ -390,6 +396,9 @@ impl Apu {
                     | if self.ch4_enabled { 0x08 } else { 0x00 }
                     | if self.sound_enabled { 0x80 } else { 0x00 })
             }
+
+            // 0xFF30-0xFF3F — Wave pattern RAM
+            0xff30..=0xff3f => self.wave_ram[addr as usize & 0x000f],
 
             _ => {
                 warnln!("Reading from unknown APU location 0x{:04x}", addr);
