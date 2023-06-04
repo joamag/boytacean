@@ -1110,7 +1110,7 @@ impl Ppu {
 
         // calculates the sprite line offset by using the SCX register
         // shifted by 3 meaning that the tiles are 8x8
-        let mut line_offset: usize = (scx >> 3) as usize;
+        let mut line_offset = (scx >> 3) as usize;
 
         // calculates the index of the initial tile in drawing,
         // if the tile data set in use is #1, the indexes are
