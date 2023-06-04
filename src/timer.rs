@@ -39,7 +39,7 @@ impl Timer {
         self.int_tima = false;
     }
 
-    pub fn clock(&mut self, cycles: u8) {
+    pub fn clock(&mut self, cycles: u16) {
         self.div_clock += cycles as u16;
         while self.div_clock >= 256 {
             self.div = self.div.wrapping_add(1);

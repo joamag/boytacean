@@ -391,9 +391,33 @@ impl GameBoy {
         self.cpu.reset();
     }
 
-    pub fn clock(&mut self) -> u8 {
-        let cycles = self.cpu_clock();
-        let cycles_n = cycles / self.multiplier();
+    pub fn clock(&mut self) -> u16 {
+        let cycles = self.cpu_clock() as u16;
+        let cycles_n = cycles / self.multiplier() as u16;
+        if self.ppu_enabled {
+            self.ppu_clock(cycles_n);
+        }
+        if self.apu_enabled {
+            self.apu_clock(cycles_n);
+        }
+        if self.dma_enabled {
+            self.dma_clock(cycles);
+        }
+        if self.timer_enabled {
+            self.timer_clock(cycles);
+        }
+        if self.serial_enabled {
+            self.serial_clock(cycles);
+        }
+        cycles
+    }
+
+    pub fn clock_m(&mut self, count: usize) -> u16 {
+        let mut cycles = 0u16;
+        for _ in 0..count {
+            cycles += self.clock() as u16;
+        }
+        let cycles_n = cycles / self.multiplier() as u16;
         if self.ppu_enabled {
             self.ppu_clock(cycles_n);
         }
@@ -424,23 +448,23 @@ impl GameBoy {
         self.cpu.clock()
     }
 
-    pub fn ppu_clock(&mut self, cycles: u8) {
+    pub fn ppu_clock(&mut self, cycles: u16) {
         self.ppu().clock(cycles)
     }
 
-    pub fn apu_clock(&mut self, cycles: u8) {
+    pub fn apu_clock(&mut self, cycles: u16) {
         self.apu().clock(cycles)
     }
 
-    pub fn dma_clock(&mut self, cycles: u8) {
+    pub fn dma_clock(&mut self, cycles: u16) {
         self.mmu().clock_dma(cycles);
     }
 
-    pub fn timer_clock(&mut self, cycles: u8) {
+    pub fn timer_clock(&mut self, cycles: u16) {
         self.timer().clock(cycles)
     }
 
-    pub fn serial_clock(&mut self, cycles: u8) {
+    pub fn serial_clock(&mut self, cycles: u16) {
         self.serial().clock(cycles)
     }
 

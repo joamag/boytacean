@@ -264,7 +264,7 @@ impl Apu {
         self.clear_audio_buffer()
     }
 
-    pub fn clock(&mut self, cycles: u8) {
+    pub fn clock(&mut self, cycles: u16) {
         if !self.sound_enabled {
             return;
         }
@@ -802,7 +802,7 @@ impl Apu {
     }
 
     #[inline(always)]
-    fn tick_ch_all(&mut self, cycles: u8) {
+    fn tick_ch_all(&mut self, cycles: u16) {
         self.tick_ch1(cycles);
         self.tick_ch2(cycles);
         self.tick_ch3(cycles);
@@ -810,7 +810,7 @@ impl Apu {
     }
 
     #[inline(always)]
-    fn tick_ch1(&mut self, cycles: u8) {
+    fn tick_ch1(&mut self, cycles: u16) {
         self.ch1_timer = self.ch1_timer.saturating_sub(cycles as i16);
         if self.ch1_timer > 0 {
             return;
@@ -832,7 +832,7 @@ impl Apu {
     }
 
     #[inline(always)]
-    fn tick_ch2(&mut self, cycles: u8) {
+    fn tick_ch2(&mut self, cycles: u16) {
         self.ch2_timer = self.ch2_timer.saturating_sub(cycles as i16);
         if self.ch2_timer > 0 {
             return;
@@ -854,7 +854,7 @@ impl Apu {
     }
 
     #[inline(always)]
-    fn tick_ch3(&mut self, cycles: u8) {
+    fn tick_ch3(&mut self, cycles: u16) {
         self.ch3_timer = self.ch3_timer.saturating_sub(cycles as i16);
         if self.ch3_timer > 0 {
             return;
@@ -883,7 +883,7 @@ impl Apu {
     }
 
     #[inline(always)]
-    fn tick_ch4(&mut self, cycles: u8) {
+    fn tick_ch4(&mut self, cycles: u16) {
         self.ch4_timer = self.ch4_timer.saturating_sub(cycles as i32);
         if self.ch4_timer > 0 {
             return;

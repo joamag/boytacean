@@ -236,7 +236,7 @@ impl Mmu {
         self.boot_active = value;
     }
 
-    pub fn clock_dma(&mut self, _cycles: u8) {
+    pub fn clock_dma(&mut self, _cycles: u16) {
         if !self.dma.active() {
             return;
         }

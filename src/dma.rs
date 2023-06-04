@@ -33,7 +33,7 @@ impl Dma {
         self.active = false;
     }
 
-    pub fn clock(&mut self, _cycles: u8) {}
+    pub fn clock(&mut self, _cycles: u16) {}
 
     pub fn read(&mut self, addr: u16) -> u8 {
         match addr {

@@ -589,7 +589,7 @@ impl Ppu {
         self.dmg_compat = false;
     }
 
-    pub fn clock(&mut self, cycles: u8) {
+    pub fn clock(&mut self, cycles: u16) {
         // in case the LCD is currently off then we skip the current
         // clock operation the PPU should not work
         if !self.switch_lcd {

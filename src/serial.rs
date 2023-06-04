@@ -68,7 +68,7 @@ impl Serial {
         self.int_serial = false;
     }
 
-    pub fn clock(&mut self, cycles: u8) {
+    pub fn clock(&mut self, cycles: u16) {
         if !self.transferring {
             return;
         }
