@@ -1063,136 +1063,41 @@ impl Ppu {
     }
 
     fn render_line(&mut self) {
+        if self.gb_mode == GameBoyMode::Dmg {
+            self.render_line_dmg();
+        } else {
+            self.render_line_cgb();
+        }
+    }
+
+    fn render_line_dmg(&mut self) {
         if self.first_frame {
             return;
         }
-        let switch_bg_window =
-            (self.gb_mode == GameBoyMode::Cgb && !self.dmg_compat) || self.switch_bg;
-
-        if switch_bg_window {
-            if self.gb_mode == GameBoyMode::Dmg {
-                self.render_map_dmg(self.bg_map, self.scx, self.scy, 0, 0, self.ly);
-            } else {
-                self.render_map(self.bg_map, self.scx, self.scy, 0, 0, self.ly);
-            }
+        if self.switch_bg {
+            self.render_map_dmg(self.bg_map, self.scx, self.scy, 0, 0, self.ly);
         }
-        if switch_bg_window && self.switch_window {
-            if self.gb_mode == GameBoyMode::Dmg {
-                self.render_map_dmg(self.window_map, 0, 0, self.wx, self.wy, self.window_counter);
-            } else {
-                self.render_map(self.window_map, 0, 0, self.wx, self.wy, self.window_counter);
-            }
+        if self.switch_bg && self.switch_window {
+            self.render_map_dmg(self.window_map, 0, 0, self.wx, self.wy, self.window_counter);
         }
         if self.switch_obj {
             self.render_objects();
         }
     }
 
-    fn render_map_dmg(&mut self, map: bool, scx: u8, scy: u8, wx: u8, wy: u8, ld: u8) {
-        // in case the target window Y position has not yet been reached
-        // then there's nothing to be done, returns control flow immediately
-        if self.ly < wy {
+    fn render_line_cgb(&mut self) {
+        if self.first_frame {
             return;
         }
-
-        // obtains the base address of the background map using the bg map flag
-        // that control which background map is going to be used
-        let map_offset: usize = if map { 0x1c00 } else { 0x1800 };
-
-        // calculates the map row index for the tile by using the current line
-        // index and the DY (scroll Y) divided by 8 (as the tiles are 8x8 pixels),
-        // on top of that ensures that the result is modulus 32 meaning that the
-        // drawing wraps around the Y axis
-        let row_index = (((ld as usize + scy as usize) & 0xff) >> 3) % 32;
-
-        // calculates the map offset by the row offset multiplied by the number
-        // of tiles in each row (32)
-        let row_offset = row_index * 32;
-
-        // calculates the sprite line offset by using the SCX register
-        // shifted by 3 meaning that the tiles are 8x8
-        let mut line_offset = (scx >> 3) as usize;
-
-        // calculates the index of the initial tile in drawing,
-        // if the tile data set in use is #1, the indexes are
-        // signed, then calculates a real tile offset
-        let mut tile_index = self.vram[map_offset + row_offset + line_offset] as usize;
-        if !self.bg_tile && tile_index < 128 {
-            tile_index += 256;
+        let switch_bg_window = (self.gb_mode.is_cgb() && !self.dmg_compat) || self.switch_bg;
+        if switch_bg_window {
+            self.render_map(self.bg_map, self.scx, self.scy, 0, 0, self.ly);
         }
-
-        // obtains the reference to the tile that is going to be drawn
-        let mut tile = &self.tiles[tile_index];
-
-        // calculates the offset that is going to be used in the update of the color buffer
-        // which stores Game Boy colors from 0 to 3
-        let mut color_offset = self.ly as usize * DISPLAY_WIDTH;
-
-        // calculates the frame buffer offset position assuming the proper
-        // Game Boy screen width and RGB pixel (3 bytes) size
-        let mut frame_offset = self.ly as usize * DISPLAY_WIDTH * RGB_SIZE;
-
-        // calculates both the current Y and X positions within the tiles
-        // using the bitwise and operation as an effective modulus 8
-        let y = (ld as usize + scy as usize) & 0x07;
-        let mut x = (scx & 0x07) as usize;
-
-        // calculates the initial tile X position in drawing, doing this
-        // allows us to position the background map properly in the display
-        let initial_index = max(wx as i16 - 7, 0) as usize;
-        color_offset += initial_index;
-        frame_offset += initial_index * RGB_SIZE;
-
-        // iterates over all the pixels in the current line of the display
-        // to draw the background map, note that the initial index is used
-        // to skip the drawing of the tiles that are not visible (WX)
-        for _ in initial_index..DISPLAY_WIDTH {
-            // obtains the current pixel data from the tile and
-            // re-maps it according to the current palette
-            let pixel = tile.get(x, y);
-            let color = &self.palette_bg[pixel as usize];
-
-            // updates the pixel in the color buffer, which stores
-            // the raw pixel color information (unmapped)
-            self.color_buffer[color_offset] = pixel;
-
-            // set the color pixel in the frame buffer
-            self.frame_buffer[frame_offset] = color[0];
-            self.frame_buffer[frame_offset + 1] = color[1];
-            self.frame_buffer[frame_offset + 2] = color[2];
-
-            // increments the current tile X position in drawing
-            x += 1;
-
-            // in case the end of tile width has been reached then
-            // a new tile must be retrieved for rendering
-            if x == TILE_WIDTH {
-                // resets the tile X position to the base value
-                // as a new tile is going to be drawn
-                x = 0;
-
-                // calculates the new line tile offset making sure that
-                // the maximum of 32 is not overflown
-                line_offset = (line_offset + 1) % 32;
-
-                // calculates the tile index and makes sure the value
-                // takes into consideration the bg tile value
-                tile_index = self.vram[map_offset + row_offset + line_offset] as usize;
-                if !self.bg_tile && tile_index < 128 {
-                    tile_index += 256;
-                }
-
-                // obtains the reference to the new tile in drawing
-                tile = &self.tiles[tile_index];
-            }
-
-            // increments the color offset by one, representing
-            // the drawing of one pixel
-            color_offset += 1;
-
-            // increments the offset of the frame buffer by the
-            // size of an RGB pixel (which is 3 bytes)
-            frame_offset += RGB_SIZE;
+        if switch_bg_window && self.switch_window {
+            self.render_map(self.window_map, 0, 0, self.wx, self.wy, self.window_counter);
+        }
+        if self.switch_obj {
+            self.render_objects();
         }
     }
 
@@ -1337,6 +1242,114 @@ impl Ppu {
                     xflip = tile_attr.xflip;
                     yflip = tile_attr.yflip;
                     tile_index += tile_attr.vram_bank as usize * TILE_COUNT_DMG;
+                }
+
+                // obtains the reference to the new tile in drawing
+                tile = &self.tiles[tile_index];
+            }
+
+            // increments the color offset by one, representing
+            // the drawing of one pixel
+            color_offset += 1;
+
+            // increments the offset of the frame buffer by the
+            // size of an RGB pixel (which is 3 bytes)
+            frame_offset += RGB_SIZE;
+        }
+    }
+
+    fn render_map_dmg(&mut self, map: bool, scx: u8, scy: u8, wx: u8, wy: u8, ld: u8) {
+        // in case the target window Y position has not yet been reached
+        // then there's nothing to be done, returns control flow immediately
+        if self.ly < wy {
+            return;
+        }
+
+        // obtains the base address of the background map using the bg map flag
+        // that control which background map is going to be used
+        let map_offset: usize = if map { 0x1c00 } else { 0x1800 };
+
+        // calculates the map row index for the tile by using the current line
+        // index and the DY (scroll Y) divided by 8 (as the tiles are 8x8 pixels),
+        // on top of that ensures that the result is modulus 32 meaning that the
+        // drawing wraps around the Y axis
+        let row_index = (((ld as usize + scy as usize) & 0xff) >> 3) % 32;
+
+        // calculates the map offset by the row offset multiplied by the number
+        // of tiles in each row (32)
+        let row_offset = row_index * 32;
+
+        // calculates the sprite line offset by using the SCX register
+        // shifted by 3 meaning that the tiles are 8x8
+        let mut line_offset = (scx >> 3) as usize;
+
+        // calculates the index of the initial tile in drawing,
+        // if the tile data set in use is #1, the indexes are
+        // signed, then calculates a real tile offset
+        let mut tile_index = self.vram[map_offset + row_offset + line_offset] as usize;
+        if !self.bg_tile && tile_index < 128 {
+            tile_index += 256;
+        }
+
+        // obtains the reference to the tile that is going to be drawn
+        let mut tile = &self.tiles[tile_index];
+
+        // calculates the offset that is going to be used in the update of the color buffer
+        // which stores Game Boy colors from 0 to 3
+        let mut color_offset = self.ly as usize * DISPLAY_WIDTH;
+
+        // calculates the frame buffer offset position assuming the proper
+        // Game Boy screen width and RGB pixel (3 bytes) size
+        let mut frame_offset = self.ly as usize * DISPLAY_WIDTH * RGB_SIZE;
+
+        // calculates both the current Y and X positions within the tiles
+        // using the bitwise and operation as an effective modulus 8
+        let y = (ld as usize + scy as usize) & 0x07;
+        let mut x = (scx & 0x07) as usize;
+
+        // calculates the initial tile X position in drawing, doing this
+        // allows us to position the background map properly in the display
+        let initial_index = max(wx as i16 - 7, 0) as usize;
+        color_offset += initial_index;
+        frame_offset += initial_index * RGB_SIZE;
+
+        // iterates over all the pixels in the current line of the display
+        // to draw the background map, note that the initial index is used
+        // to skip the drawing of the tiles that are not visible (WX)
+        for _ in initial_index..DISPLAY_WIDTH {
+            // obtains the current pixel data from the tile and
+            // re-maps it according to the current palette
+            let pixel = tile.get(x, y);
+            let color = &self.palette_bg[pixel as usize];
+
+            // updates the pixel in the color buffer, which stores
+            // the raw pixel color information (unmapped)
+            self.color_buffer[color_offset] = pixel;
+
+            // set the color pixel in the frame buffer
+            self.frame_buffer[frame_offset] = color[0];
+            self.frame_buffer[frame_offset + 1] = color[1];
+            self.frame_buffer[frame_offset + 2] = color[2];
+
+            // increments the current tile X position in drawing
+            x += 1;
+
+            // in case the end of tile width has been reached then
+            // a new tile must be retrieved for rendering
+            if x == TILE_WIDTH {
+                // resets the tile X position to the base value
+                // as a new tile is going to be drawn
+                x = 0;
+
+                // calculates the new line tile offset making sure that
+                // the maximum of 32 is not overflown
+                line_offset = (line_offset + 1) % 32;
+
+                // calculates the tile index and makes sure the value
+                // takes into consideration the bg tile value
+                tile_index = self.vram[map_offset + row_offset + line_offset] as usize;
+                if !self.bg_tile && tile_index < 128 {
+                    tile_index += 256;
                 }
 
                 // obtains the reference to the new tile in drawing
