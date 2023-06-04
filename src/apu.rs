@@ -955,8 +955,10 @@ mod tests {
 
     #[test]
     fn test_trigger_ch1() {
-        let mut apu = Apu::default();
-        apu.ch1_wave_length = 1024;
+        let mut apu = Apu {
+            ch1_wave_length: 1024,
+            ..Default::default()
+        };
         apu.trigger_ch1();
 
         assert_eq!(apu.ch1_timer, 4096);
@@ -966,8 +968,10 @@ mod tests {
 
     #[test]
     fn test_trigger_ch2() {
-        let mut apu = Apu::default();
-        apu.ch2_wave_length = 1024;
+        let mut apu = Apu {
+            ch2_wave_length: 1024,
+            ..Default::default()
+        };
         apu.trigger_ch2();
 
         assert_eq!(apu.ch2_timer, 4096);
@@ -976,8 +980,10 @@ mod tests {
 
     #[test]
     fn test_trigger_ch3() {
-        let mut apu = Apu::default();
-        apu.ch3_wave_length = 1024;
+        let mut apu = Apu {
+            ch3_wave_length: 1024,
+            ..Default::default()
+        };
         apu.trigger_ch3();
 
         assert_eq!(apu.ch3_timer, 3);
@@ -986,9 +992,11 @@ mod tests {
 
     #[test]
     fn test_trigger_ch4() {
-        let mut apu = Apu::default();
-        apu.ch4_divisor = 3;
-        apu.ch4_clock_shift = 2;
+        let mut apu = Apu {
+            ch4_divisor: 3,
+            ch4_clock_shift: 2,
+            ..Default::default()
+        };
         apu.trigger_ch4();
 
         assert_eq!(apu.ch4_timer, 192);
