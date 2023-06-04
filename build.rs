@@ -129,16 +129,20 @@ fn main() {
     );
 
     let mut features = vec!["cpu"];
-
-    if cfg!(feature = "wasm-extension") {
+    if cfg!(feature = "wasm") {
         features.push("wasm")
     }
-
-    if cfg!(feature = "python-extension") {
-        features.push("python")
+    if cfg!(feature = "debug") {
+        features.push("debug")
+    }
+    if cfg!(feature = "pedantic") {
+        features.push("pedantic")
+    }
+    if cfg!(feature = "cpulog") {
+        features.push("cpulog")
     }
 
-    write_vec_constant(&mut file, "FEATURES", features);
+    write_vec_constant(&mut file, "FEATURES_SEQ", features);
 
     write_str_constant(
         &mut file,
