@@ -491,6 +491,32 @@ impl Emulator {
         }
     }
 
+    pub fn run_benchmark(&mut self, params: Benchmark) {
+        let count = params.count;
+        let chunk_size = params.chunk_size.unwrap_or(1);
+        let mut cycles = 0u64;
+
+        let initial = SystemTime::now();
+
+        if chunk_size > 1 {
+            for _ in 0..(count / chunk_size) {
+                cycles += self.system.clock_m(chunk_size) as u64;
+            }
+        } else {
+            for _ in 0..count {
+                cycles += self.system.clock() as u64;
+            }
+        }
+
+        let delta = initial.elapsed().unwrap().as_millis() as f64 / 1000.0;
+        let frequency_mhz = cycles as f64 / delta / 1000.0 / 1000.0;
+
+        println!(
+            "Took {:.2} seconds to run {} ticks ({} cycles) ({:.2} Mhz)!",
+            delta, count, cycles, frequency_mhz
+        );
+    }
+
     pub fn run_headless(&mut self, allowed_cycles: Option<u64>) {
         let allowed_cycles = allowed_cycles.unwrap_or(u64::MAX);
 
@@ -685,7 +711,7 @@ fn main() {
     // not and runs it accordingly, note that if running in headless
     // mode the number of cycles to be run may be specified
     if args.benchmark {
-        emulator.benchmark(Benchmark::new(500000000, None));
+        emulator.run_benchmark(Benchmark::new(500000000, None));
     } else if args.headless {
         emulator.run_headless(if args.cycles > 0 {
             Some(args.cycles)
