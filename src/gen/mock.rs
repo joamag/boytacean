@@ -11,7 +11,7 @@ pub const TARGET: &str = "-";
 pub const PROFILE: &str = "-";
 pub const OPT_LEVEL: &str = "-";
 pub const MAKEFLAGS: &str = "-";
-pub const FEATURES: [&str; 1] = ["cpu"];
+pub const FEATURES_SEQ: [&str; 1] = ["cpu"];
 pub const PLATFORM_CPU_BITS: &str = "64";
 pub const PLATFORM_CPU_BITS_INT: usize = 64;
 
