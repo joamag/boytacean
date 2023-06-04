@@ -598,7 +598,7 @@ impl Ppu {
 
         // increments the current mode clock by the provided amount
         // of CPU cycles (probably coming from a previous CPU clock)
-        self.mode_clock += cycles as u16;
+        self.mode_clock += cycles;
 
         match self.mode {
             PpuMode::OamRead => {

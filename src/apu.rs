@@ -269,7 +269,7 @@ impl Apu {
             return;
         }
 
-        self.sequencer += cycles as u16;
+        self.sequencer += cycles;
         if self.sequencer >= 8192 {
             // each of these steps runs at 512/8 Hz = 64Hz,
             // meaning a complete loop runs at 512 Hz

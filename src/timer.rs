@@ -40,14 +40,14 @@ impl Timer {
     }
 
     pub fn clock(&mut self, cycles: u16) {
-        self.div_clock += cycles as u16;
+        self.div_clock += cycles;
         while self.div_clock >= 256 {
             self.div = self.div.wrapping_add(1);
             self.div_clock -= 256;
         }
 
         if self.tima_enabled {
-            self.tima_clock += cycles as u16;
+            self.tima_clock += cycles;
             while self.tima_clock >= self.tima_ratio {
                 // in case TIMA value overflows must set the
                 // interrupt and update the TIMA value to
