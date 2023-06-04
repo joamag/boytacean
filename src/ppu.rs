@@ -1068,18 +1068,27 @@ impl Ppu {
         }
         let switch_bg_window =
             (self.gb_mode == GameBoyMode::Cgb && !self.dmg_compat) || self.switch_bg;
+
         if switch_bg_window {
-            self.render_map_no_cgb(self.bg_map, self.scx, self.scy, 0, 0, self.ly);
+            if self.gb_mode == GameBoyMode::Dmg {
+                self.render_map_dmg(self.bg_map, self.scx, self.scy, 0, 0, self.ly);
+            } else {
+                self.render_map(self.bg_map, self.scx, self.scy, 0, 0, self.ly);
+            }
         }
         if switch_bg_window && self.switch_window {
-            self.render_map_no_cgb(self.window_map, 0, 0, self.wx, self.wy, self.window_counter);
+            if self.gb_mode == GameBoyMode::Dmg {
+                self.render_map_dmg(self.window_map, 0, 0, self.wx, self.wy, self.window_counter);
+            } else {
+                self.render_map(self.window_map, 0, 0, self.wx, self.wy, self.window_counter);
+            }
         }
         if self.switch_obj {
             self.render_objects();
         }
     }
 
-    fn render_map_no_cgb(&mut self, map: bool, scx: u8, scy: u8, wx: u8, wy: u8, ld: u8) {
+    fn render_map_dmg(&mut self, map: bool, scx: u8, scy: u8, wx: u8, wy: u8, ld: u8) {
         // in case the target window Y position has not yet been reached
         // then there's nothing to be done, returns control flow immediately
         if self.ly < wy {
@@ -1231,8 +1240,6 @@ impl Ppu {
 
         // obtains the reference to the attributes of the new tile in
         // drawing for meta processing (CGB only)
-        // @TODO: This strategy seems a bit naive, need to figure out
-        // if there's a better way to do this and a more performant one
         let mut tile_attr = if self.dmg_compat {
             &DEFAULT_TILE_ATTR
         } else {
