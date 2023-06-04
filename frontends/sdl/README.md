@@ -14,14 +14,14 @@ cargo build
 
 #### Build SDL in Windows
 
-For windows the vcpk based SDL building is simpler:
+For windows the vcpkg based SDL building is simpler:
 
 ```bash
 cargo install cargo-vcpkg
 cargo build
 ```
 
-Make sure that the current Rust in use is msvc based using:
+Make sure that the current Rust in use is MSVC based using:
 
 ```bash
 rustup default stable-msvc
@@ -52,6 +52,17 @@ cargo build --features debug
 ```
 
 To obtain more information about the issues.
+
+### Troubleshooting
+
+#### I'm facing issues with the vcpkg binaries
+
+If there're issues with the `cargo vcpkg build` build process you may need to remove the `~/.vcpkg-root` and re rung the process to re-build the whole set of packages.
+
+### I'm having difficulties building SDL for arm64
+
+Try the above strategy.
+If that does not work try to remove the `Cargo.lock` file to flush dependencies.
 
 ## Execution
 
