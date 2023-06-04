@@ -57,12 +57,20 @@ To obtain more information about the issues.
 
 #### I'm facing issues with the vcpkg binaries
 
-If there're issues with the `cargo vcpkg build` build process you may need to remove the `~/.vcpkg-root` and re rung the process to re-build the whole set of packages.
+If there're issues with the `cargo vcpkg build` build process you may need to remove the `~/.vcpkg-root` and re-run the process to re-build the whole set of packages.
 
-### I'm having difficulties building SDL for arm64
+### I'm having difficulties building SDL for arm64 in Mac OS
 
-Try the above strategy.
+Try the above strategy and also try to remove `~/.cache/vcpkg`.
 If that does not work try to remove the `Cargo.lock` file to flush dependencies.
+
+A quick shortcut to the complete set of operations would be:
+
+```bash
+rm -rf ~/.vcpkg-root
+rm -rf ~/.cache/vcpkg
+cargo vcpkg -v build
+```
 
 ## Execution
 
