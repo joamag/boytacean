@@ -30,6 +30,11 @@ version = "0.4"
 version = "0.35"
 features = ["ttf", "image", "gfx", "mixer", "static-link", "use-vcpkg"]
 
+# For MacOS running under arm64 architecture there may be linking issues
+# if that's the case try to lock the SDL2 version to the following Git revision
+# git = "https://github.com/Rust-SDL2/rust-sdl2"
+# rev = "27cd1fd67c811e06b9d997a77bb6089a1b65070d"
+
 # If the vcpkg version of SDL2 does not work (eg: display not found error)
 # then try dynamic linking SDL2 using the following features
 # features = ["ttf", "image", "gfx", "mixer", "bundled"]
