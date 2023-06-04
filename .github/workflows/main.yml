@@ -127,3 +127,5 @@ jobs:
         run: cd frontends/sdl && cargo build --release
       - name: Run release version
         run: cd frontends/sdl && cargo run --release -- --headless --cycles 10000000
+      - name: Run benchmark
+        run: cd frontends/sdl && cargo run --release -- --benchmark

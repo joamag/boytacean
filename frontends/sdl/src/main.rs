@@ -226,22 +226,22 @@ impl Emulator {
 
         let count = params.count;
         let chunk_size = params.chunk_size.unwrap_or(1);
-        let mut cycles = 0;
+        let mut cycles = 0u64;
 
         let initial = SystemTime::now();
 
         if chunk_size > 1 {
             for _ in 0..(count / chunk_size) {
-                cycles += self.system.clock_m(chunk_size) as u32;
+                cycles += self.system.clock_m(chunk_size) as u64;
             }
         } else {
             for _ in 0..count {
-                cycles += self.system.clock() as u32;
+                cycles += self.system.clock() as u64;
             }
         }
 
-        let delta = initial.elapsed().unwrap().as_millis() as f32 / 1000.0;
-        let frequency_mhz = cycles as f32 / delta / 1000.0 / 1000.0;
+        let delta = initial.elapsed().unwrap().as_millis() as f64 / 1000.0;
+        let frequency_mhz = cycles as f64 / delta / 1000.0 / 1000.0;
 
         println!(
             "Took {:.2} seconds to run {} ticks ({} cycles) ({:.2} Mhz)!",
@@ -610,6 +610,13 @@ struct Args {
     #[arg(
         long,
         default_value_t = false,
+        help = "Run in benchmark mode, with no UI"
+    )]
+    benchmark: bool,
+
+    #[arg(
+        long,
+        default_value_t = false,
         help = "Run in headless mode, with no UI"
     )]
     headless: bool,
@@ -663,7 +670,7 @@ fn main() {
     let options = EmulatorOptions {
         auto_mode: Some(auto_mode),
         unlimited: Some(args.unlimited),
-        features: if args.headless {
+        features: if args.headless || args.benchmark {
             Some(vec![])
         } else {
             Some(vec!["video", "audio", "no-vsync"])
@@ -677,7 +684,9 @@ fn main() {
     // determines if the emulator should run in headless mode or
     // not and runs it accordingly, note that if running in headless
     // mode the number of cycles to be run may be specified
-    if args.headless {
+    if args.benchmark {
+        emulator.benchmark(Benchmark::new(500000000, None));
+    } else if args.headless {
         emulator.run_headless(if args.cycles > 0 {
             Some(args.cycles)
         } else {
