@@ -412,10 +412,16 @@ impl GameBoy {
         cycles
     }
 
+    /// Risky function that will clock the CPU multiple times
+    /// allowing an undefined number of cycles to be executed
+    /// in the other Game Boy components.
+    /// This can cause unwanted behaviour in components like
+    /// the PPU where only one mode switch operation is expected
+    /// per each clock call.
     pub fn clock_m(&mut self, count: usize) -> u16 {
         let mut cycles = 0u16;
         for _ in 0..count {
-            cycles += self.clock() as u16;
+            cycles += self.cpu_clock() as u16;
         }
         let cycles_n = cycles / self.multiplier() as u16;
         if self.ppu_enabled {

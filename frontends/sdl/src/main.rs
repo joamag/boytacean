@@ -39,17 +39,18 @@ const VOLUME: f32 = 64.0;
 
 pub struct Benchmark {
     count: usize,
+    chunk_size: Option<usize>,
 }
 
 impl Benchmark {
-    pub fn new(count: usize) -> Self {
-        Self { count }
+    pub fn new(count: usize, chunk_size: Option<usize>) -> Self {
+        Self { count, chunk_size }
     }
 }
 
 impl Default for Benchmark {
     fn default() -> Self {
-        Self::new(50000000)
+        Self::new(50000000, None)
     }
 }
 
@@ -224,12 +225,19 @@ impl Emulator {
         println!("Going to run benchmark...");
 
         let count = params.count;
+        let chunk_size = params.chunk_size.unwrap_or(1);
         let mut cycles = 0;
 
         let initial = SystemTime::now();
 
-        for _ in 0..count {
-            cycles += self.system.clock() as u32;
+        if chunk_size > 1 {
+            for _ in 0..(count / chunk_size) {
+                cycles += self.system.clock_m(chunk_size) as u32;
+            }
+        } else {
+            for _ in 0..count {
+                cycles += self.system.clock() as u32;
+            }
         }
 
         let delta = initial.elapsed().unwrap().as_millis() as f32 / 1000.0;
