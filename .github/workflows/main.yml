@@ -130,4 +130,4 @@ jobs:
       - name: Run benchmark
         run: cd frontends/sdl && cargo run --release -- --benchmark
       - name: Run benchmark, only for CPU
-        run: cd frontends/sdl && cargo run --release -- --benchmark --cpu-only
+        run: cd frontends/sdl && cargo run --release -- --benchmark --benchmark-cpu
