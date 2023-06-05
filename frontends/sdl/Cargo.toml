@@ -28,6 +28,8 @@ version = "0.4"
 
 [dependencies.sdl2]
 version = "0.35"
+git = "https://github.com/Rust-SDL2/rust-sdl2"
+rev = "27cd1fd67c811e06b9d997a77bb6089a1b65070d"
 features = ["ttf", "image", "gfx", "mixer", "static-link", "use-vcpkg"]
 
 # For MacOS running under arm64 architecture there may be linking issues

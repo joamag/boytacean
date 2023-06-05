@@ -58,7 +58,7 @@ impl GameBoyMode {
         }
     }
 
-    pub fn from_u8(value: u8) -> GameBoyMode {
+    pub fn from_u8(value: u8) -> Self {
         match value {
             1 => GameBoyMode::Dmg,
             2 => GameBoyMode::Cgb,
@@ -67,13 +67,25 @@ impl GameBoyMode {
         }
     }
 
-    pub fn from_string(value: &str) -> GameBoyMode {
+    pub fn from_string(value: &str) -> Self {
         match value {
             "dmg" => GameBoyMode::Dmg,
             "cgb" => GameBoyMode::Cgb,
             "sgb" => GameBoyMode::Sgb,
             _ => panic!("Invalid mode value: {}", value),
         }
+    }
+
+    pub fn is_dmg(&self) -> bool {
+        *self == GameBoyMode::Dmg
+    }
+
+    pub fn is_cgb(&self) -> bool {
+        *self == GameBoyMode::Cgb
+    }
+
+    pub fn is_sgb(&self) -> bool {
+        *self == GameBoyMode::Sgb
     }
 }
 
@@ -98,7 +110,7 @@ impl GameBoySpeed {
         }
     }
 
-    pub fn switch(&self) -> GameBoySpeed {
+    pub fn switch(&self) -> Self {
         match self {
             GameBoySpeed::Normal => GameBoySpeed::Double,
             GameBoySpeed::Double => GameBoySpeed::Normal,
@@ -112,7 +124,7 @@ impl GameBoySpeed {
         }
     }
 
-    pub fn from_u8(value: u8) -> GameBoySpeed {
+    pub fn from_u8(value: u8) -> Self {
         match value {
             0 => GameBoySpeed::Normal,
             1 => GameBoySpeed::Double,
@@ -761,6 +773,14 @@ impl GameBoy {
     pub fn set_serial_enabled(&mut self, value: bool) {
         self.serial_enabled = value;
         (*self.gbc).borrow_mut().set_serial_enabled(value);
+    }
+
+    pub fn set_all_enabled(&mut self, value: bool) {
+        self.set_ppu_enabled(value);
+        self.set_apu_enabled(value);
+        self.set_dma_enabled(value);
+        self.set_timer_enabled(value);
+        self.set_serial_enabled(value);
     }
 
     pub fn clock_freq(&self) -> u32 {

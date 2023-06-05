@@ -39,12 +39,12 @@ const VOLUME: f32 = 64.0;
 
 pub struct Benchmark {
     count: usize,
-    chunk_size: Option<usize>,
+    cpu_only: Option<bool>,
 }
 
 impl Benchmark {
-    pub fn new(count: usize, chunk_size: Option<usize>) -> Self {
-        Self { count, chunk_size }
+    pub fn new(count: usize, cpu_only: Option<bool>) -> Self {
+        Self { count, cpu_only }
     }
 }
 
@@ -221,23 +221,21 @@ impl Emulator {
         self.load_rom(None);
     }
 
-    pub fn benchmark(&mut self, params: Benchmark) {
+    pub fn benchmark(&mut self, params: &Benchmark) {
         println!("Going to run benchmark...");
 
         let count = params.count;
-        let chunk_size = params.chunk_size.unwrap_or(1);
+        let cpu_only = params.cpu_only.unwrap_or(false);
         let mut cycles = 0u64;
+
+        if cpu_only {
+            self.system.set_all_enabled(false);
+        }
 
         let initial = SystemTime::now();
 
-        if chunk_size > 1 {
-            for _ in 0..(count / chunk_size) {
-                cycles += self.system.clock_m(chunk_size) as u64;
-            }
-        } else {
-            for _ in 0..count {
-                cycles += self.system.clock() as u64;
-            }
+        for _ in 0..count {
+            cycles += self.system.clock() as u64;
         }
 
         let delta = initial.elapsed().unwrap().as_millis() as f64 / 1000.0;
@@ -320,7 +318,7 @@ impl Emulator {
                     Event::KeyDown {
                         keycode: Some(Keycode::B),
                         ..
-                    } => self.benchmark(Benchmark::default()),
+                    } => self.benchmark(&Benchmark::default()),
                     Event::KeyDown {
                         keycode: Some(Keycode::T),
                         ..
@@ -491,21 +489,19 @@ impl Emulator {
         }
     }
 
-    pub fn run_benchmark(&mut self, params: Benchmark) {
+    pub fn run_benchmark(&mut self, params: &Benchmark) {
         let count = params.count;
-        let chunk_size = params.chunk_size.unwrap_or(1);
+        let cpu_only = params.cpu_only.unwrap_or(false);
         let mut cycles = 0u64;
+
+        if cpu_only {
+            self.system.set_all_enabled(false);
+        }
 
         let initial = SystemTime::now();
 
-        if chunk_size > 1 {
-            for _ in 0..(count / chunk_size) {
-                cycles += self.system.clock_m(chunk_size) as u64;
-            }
-        } else {
-            for _ in 0..count {
-                cycles += self.system.clock() as u64;
-            }
+        for _ in 0..count {
+            cycles += self.system.clock() as u64;
         }
 
         let delta = initial.elapsed().unwrap().as_millis() as f64 / 1000.0;
@@ -642,6 +638,16 @@ struct Args {
 
     #[arg(
         long,
+        default_value_t = 500000000,
+        help = "The size of the benchmark in clock ticks"
+    )]
+    benchmark_count: usize,
+
+    #[arg(long, default_value_t = false, help = "Run benchmark only for the CPU")]
+    benchmark_cpu: bool,
+
+    #[arg(
+        long,
         default_value_t = false,
         help = "Run in headless mode, with no UI"
     )]
@@ -663,6 +669,26 @@ struct Args {
 
     #[arg(short, long, default_value_t = String::from("../../res/roms/demo/pocket.gb"), help = "Path to the ROM file to be loaded")]
     rom_path: String,
+}
+
+fn run(args: Args, emulator: &mut Emulator) {
+    // determines if the emulator should run in headless mode or
+    // not and runs it accordingly, note that if running in headless
+    // mode the number of cycles to be run may be specified
+    if args.benchmark {
+        emulator.run_benchmark(&Benchmark::new(
+            args.benchmark_count,
+            Some(args.benchmark_cpu),
+        ));
+    } else if args.headless {
+        emulator.run_headless(if args.cycles > 0 {
+            Some(args.cycles)
+        } else {
+            None
+        });
+    } else {
+        emulator.run();
+    }
 }
 
 fn main() {
@@ -707,20 +733,7 @@ fn main() {
     emulator.load_rom(Some(&args.rom_path));
     emulator.toggle_palette();
 
-    // determines if the emulator should run in headless mode or
-    // not and runs it accordingly, note that if running in headless
-    // mode the number of cycles to be run may be specified
-    if args.benchmark {
-        emulator.run_benchmark(Benchmark::new(500000000, None));
-    } else if args.headless {
-        emulator.run_headless(if args.cycles > 0 {
-            Some(args.cycles)
-        } else {
-            None
-        });
-    } else {
-        emulator.run();
-    }
+    run(args, &mut emulator);
 }
 
 fn build_device(device: &str) -> Box<dyn SerialDevice> {

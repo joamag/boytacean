@@ -129,3 +129,5 @@ jobs:
         run: cd frontends/sdl && cargo run --release -- --headless --cycles 10000000
       - name: Run benchmark
         run: cd frontends/sdl && cargo run --release -- --benchmark
+      - name: Run benchmark, only for CPU
+        run: cd frontends/sdl && cargo run --release -- --benchmark --cpu-only
