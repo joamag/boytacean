@@ -775,6 +775,14 @@ impl GameBoy {
         (*self.gbc).borrow_mut().set_serial_enabled(value);
     }
 
+    pub fn set_all_enabled(&mut self, value: bool) {
+        self.set_ppu_enabled(value);
+        self.set_apu_enabled(value);
+        self.set_dma_enabled(value);
+        self.set_timer_enabled(value);
+        self.set_serial_enabled(value);
+    }
+
     pub fn clock_freq(&self) -> u32 {
         self.clock_freq
     }

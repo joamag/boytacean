@@ -40,17 +40,22 @@ const VOLUME: f32 = 64.0;
 pub struct Benchmark {
     count: usize,
     chunk_size: Option<usize>,
+    cpu_only: Option<bool>,
 }
 
 impl Benchmark {
-    pub fn new(count: usize, chunk_size: Option<usize>) -> Self {
-        Self { count, chunk_size }
+    pub fn new(count: usize, cpu_only: Option<bool>, chunk_size: Option<usize>) -> Self {
+        Self {
+            count,
+            cpu_only,
+            chunk_size,
+        }
     }
 }
 
 impl Default for Benchmark {
     fn default() -> Self {
-        Self::new(50000000, None)
+        Self::new(50000000, None, None)
     }
 }
 
@@ -221,12 +226,17 @@ impl Emulator {
         self.load_rom(None);
     }
 
-    pub fn benchmark(&mut self, params: Benchmark) {
+    pub fn benchmark(&mut self, params: &Benchmark) {
         println!("Going to run benchmark...");
 
         let count = params.count;
         let chunk_size = params.chunk_size.unwrap_or(1);
+        let cpu_only = params.cpu_only.unwrap_or(false);
         let mut cycles = 0u64;
+
+        if cpu_only {
+            self.system.set_all_enabled(false);
+        }
 
         let initial = SystemTime::now();
 
@@ -320,7 +330,7 @@ impl Emulator {
                     Event::KeyDown {
                         keycode: Some(Keycode::B),
                         ..
-                    } => self.benchmark(Benchmark::default()),
+                    } => self.benchmark(&Benchmark::default()),
                     Event::KeyDown {
                         keycode: Some(Keycode::T),
                         ..
@@ -491,10 +501,15 @@ impl Emulator {
         }
     }
 
-    pub fn run_benchmark(&mut self, params: Benchmark) {
+    pub fn run_benchmark(&mut self, params: &Benchmark) {
         let count = params.count;
         let chunk_size = params.chunk_size.unwrap_or(1);
+        let cpu_only = params.cpu_only.unwrap_or(false);
         let mut cycles = 0u64;
+
+        if cpu_only {
+            self.system.set_all_enabled(false);
+        }
 
         let initial = SystemTime::now();
 
@@ -642,6 +657,16 @@ struct Args {
 
     #[arg(
         long,
+        default_value_t = 500000000,
+        help = "The size of the benchmark in clock ticks"
+    )]
+    bench_count: usize,
+
+    #[arg(long, default_value_t = false, help = "Run benchmark only for the CPU")]
+    cpu_only: bool,
+
+    #[arg(
+        long,
         default_value_t = false,
         help = "Run in headless mode, with no UI"
     )]
@@ -711,7 +736,7 @@ fn main() {
     // not and runs it accordingly, note that if running in headless
     // mode the number of cycles to be run may be specified
     if args.benchmark {
-        emulator.run_benchmark(Benchmark::new(500000000, None));
+        emulator.run_benchmark(&Benchmark::new(args.bench_count, Some(args.cpu_only), None));
     } else if args.headless {
         emulator.run_headless(if args.cycles > 0 {
             Some(args.cycles)
