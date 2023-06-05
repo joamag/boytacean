@@ -662,13 +662,6 @@ struct Args {
     )]
     benchmark_count: usize,
 
-    #[arg(
-        long,
-        default_value_t = 1,
-        help = "The size of the benchmark in chunks"
-    )]
-    benchmark_chunk: usize,
-
     #[arg(long, default_value_t = false, help = "Run benchmark only for the CPU")]
     benchmark_cpu: bool,
 
@@ -745,7 +738,7 @@ fn main() {
     if args.benchmark {
         emulator.run_benchmark(&Benchmark::new(
             args.benchmark_count,
-            Some(args.benchmark_chunk),
+            None,
             Some(args.benchmark_cpu),
         ));
     } else if args.headless {

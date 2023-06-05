@@ -33,6 +33,7 @@ built = "0.5"
 debug = false
 lto = true
 opt-level = 3
+codegen-units = 1
 
 [workspace]
 members = [".", "frontends/sdl"]
