@@ -44,11 +44,11 @@ pub struct Benchmark {
 }
 
 impl Benchmark {
-    pub fn new(count: usize, cpu_only: Option<bool>, chunk_size: Option<usize>) -> Self {
+    pub fn new(count: usize, chunk_size: Option<usize>, cpu_only: Option<bool>) -> Self {
         Self {
             count,
-            cpu_only,
             chunk_size,
+            cpu_only,
         }
     }
 }
@@ -660,10 +660,17 @@ struct Args {
         default_value_t = 500000000,
         help = "The size of the benchmark in clock ticks"
     )]
-    bench_count: usize,
+    benchmark_count: usize,
+
+    #[arg(
+        long,
+        default_value_t = 1,
+        help = "The size of the benchmark in chunks"
+    )]
+    benchmark_chunk: usize,
 
     #[arg(long, default_value_t = false, help = "Run benchmark only for the CPU")]
-    cpu_only: bool,
+    benchmark_cpu: bool,
 
     #[arg(
         long,
@@ -736,7 +743,11 @@ fn main() {
     // not and runs it accordingly, note that if running in headless
     // mode the number of cycles to be run may be specified
     if args.benchmark {
-        emulator.run_benchmark(&Benchmark::new(args.bench_count, Some(args.cpu_only), None));
+        emulator.run_benchmark(&Benchmark::new(
+            args.benchmark_count,
+            Some(args.benchmark_chunk),
+            Some(args.benchmark_cpu),
+        ));
     } else if args.headless {
         emulator.run_headless(if args.cycles > 0 {
             Some(args.cycles)
