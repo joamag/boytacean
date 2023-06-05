@@ -39,23 +39,18 @@ const VOLUME: f32 = 64.0;
 
 pub struct Benchmark {
     count: usize,
-    chunk_size: Option<usize>,
     cpu_only: Option<bool>,
 }
 
 impl Benchmark {
-    pub fn new(count: usize, chunk_size: Option<usize>, cpu_only: Option<bool>) -> Self {
-        Self {
-            count,
-            chunk_size,
-            cpu_only,
-        }
+    pub fn new(count: usize, cpu_only: Option<bool>) -> Self {
+        Self { count, cpu_only }
     }
 }
 
 impl Default for Benchmark {
     fn default() -> Self {
-        Self::new(50000000, None, None)
+        Self::new(50000000, None)
     }
 }
 
@@ -230,7 +225,6 @@ impl Emulator {
         println!("Going to run benchmark...");
 
         let count = params.count;
-        let chunk_size = params.chunk_size.unwrap_or(1);
         let cpu_only = params.cpu_only.unwrap_or(false);
         let mut cycles = 0u64;
 
@@ -240,14 +234,8 @@ impl Emulator {
 
         let initial = SystemTime::now();
 
-        if chunk_size > 1 {
-            for _ in 0..(count / chunk_size) {
-                cycles += self.system.clock_m(chunk_size) as u64;
-            }
-        } else {
-            for _ in 0..count {
-                cycles += self.system.clock() as u64;
-            }
+        for _ in 0..count {
+            cycles += self.system.clock() as u64;
         }
 
         let delta = initial.elapsed().unwrap().as_millis() as f64 / 1000.0;
@@ -503,7 +491,6 @@ impl Emulator {
 
     pub fn run_benchmark(&mut self, params: &Benchmark) {
         let count = params.count;
-        let chunk_size = params.chunk_size.unwrap_or(1);
         let cpu_only = params.cpu_only.unwrap_or(false);
         let mut cycles = 0u64;
 
@@ -513,14 +500,8 @@ impl Emulator {
 
         let initial = SystemTime::now();
 
-        if chunk_size > 1 {
-            for _ in 0..(count / chunk_size) {
-                cycles += self.system.clock_m(chunk_size) as u64;
-            }
-        } else {
-            for _ in 0..count {
-                cycles += self.system.clock() as u64;
-            }
+        for _ in 0..count {
+            cycles += self.system.clock() as u64;
         }
 
         let delta = initial.elapsed().unwrap().as_millis() as f64 / 1000.0;
@@ -690,6 +671,26 @@ struct Args {
     rom_path: String,
 }
 
+fn run(args: Args, emulator: &mut Emulator) {
+    // determines if the emulator should run in headless mode or
+    // not and runs it accordingly, note that if running in headless
+    // mode the number of cycles to be run may be specified
+    if args.benchmark {
+        emulator.run_benchmark(&Benchmark::new(
+            args.benchmark_count,
+            Some(args.benchmark_cpu),
+        ));
+    } else if args.headless {
+        emulator.run_headless(if args.cycles > 0 {
+            Some(args.cycles)
+        } else {
+            None
+        });
+    } else {
+        emulator.run();
+    }
+}
+
 fn main() {
     // parses the provided command line arguments and uses them to
     // obtain structured values
@@ -732,24 +733,7 @@ fn main() {
     emulator.load_rom(Some(&args.rom_path));
     emulator.toggle_palette();
 
-    // determines if the emulator should run in headless mode or
-    // not and runs it accordingly, note that if running in headless
-    // mode the number of cycles to be run may be specified
-    if args.benchmark {
-        emulator.run_benchmark(&Benchmark::new(
-            args.benchmark_count,
-            None,
-            Some(args.benchmark_cpu),
-        ));
-    } else if args.headless {
-        emulator.run_headless(if args.cycles > 0 {
-            Some(args.cycles)
-        } else {
-            None
-        });
-    } else {
-        emulator.run();
-    }
+    run(args, &mut emulator);
 }
 
 fn build_device(device: &str) -> Box<dyn SerialDevice> {
