@@ -9,16 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+*
+
+### Changed
+
+*
+
+### Fixed
+
+*
+
+## [0.9.5] - 2023-06-05
+
+### Added
+
 * Support for the `clock_m()` function
 * Benchmark CLI option in SDL
 
 ### Changed
 
 * Major performance improvements for the DMG specific code
-
-### Fixed
-
-*
 
 ## [0.9.4] - 2023-06-04
 
