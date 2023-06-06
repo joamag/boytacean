@@ -578,3 +578,146 @@ impl Cpu {
         self.gbc = value;
     }
 }
+
+impl Default for Cpu {
+    fn default() -> Self {
+        let gbc: Rc<RefCell<GameBoyConfig>> = Rc::new(RefCell::new(GameBoyConfig::default()));
+        Cpu::new(Mmu::default(), gbc.clone())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::cpu::Cpu;
+
+    #[test]
+    fn test_cpu_clock() {
+        let mut cpu = Cpu::default();
+        cpu.boot();
+        cpu.mmu.allocate_default();
+
+        // test NOP instruction
+        cpu.pc = 0xc000;
+        cpu.mmu.write(0xc000, 0x00);
+        let cycles = cpu.clock();
+        assert_eq!(cycles, 4);
+        assert_eq!(cpu.pc, 0xc001);
+
+        // test LD A, d8 instruction
+        cpu.pc = 0xc000;
+        cpu.mmu.write(0xc000, 0x3e);
+        cpu.mmu.write(0xc001, 0x42);
+        let cycles = cpu.clock();
+        assert_eq!(cycles, 8);
+        assert_eq!(cpu.pc, 0xc002);
+        assert_eq!(cpu.a, 0x42);
+
+        // test LD (HL+), A instruction
+        cpu.pc = 0xc000;
+        cpu.mmu.write(0xc000, 0x22);
+        cpu.set_hl(0xc000);
+        let cycles = cpu.clock();
+        assert_eq!(cycles, 8);
+        assert_eq!(cpu.pc, 0xc001);
+        assert_eq!(cpu.hl(), 0xc001);
+        assert_eq!(cpu.mmu.read(cpu.hl()), 0x42);
+
+        // test INC A instruction
+        cpu.pc = 0xc000;
+        cpu.mmu.write(0xc000, 0x3c);
+        cpu.a = 0x42;
+        let cycles = cpu.clock();
+        assert_eq!(cycles, 4);
+        assert_eq!(cpu.pc, 0xc001);
+        assert_eq!(cpu.a, 0x43);
+
+        // test DEC A instruction
+        cpu.pc = 0xc000;
+        cpu.mmu.write(0xc000, 0x3d);
+        cpu.a = 0x42;
+        let cycles = cpu.clock();
+        assert_eq!(cycles, 4);
+        assert_eq!(cpu.pc, 0xc001);
+        assert_eq!(cpu.a, 0x41);
+
+        // test LD A, (HL) instruction
+        cpu.pc = 0xc000;
+        cpu.mmu.write(0xc000, 0x7e);
+        cpu.set_hl(0xc001);
+        cpu.mmu.write(0xc001, 0x42);
+        let cycles = cpu.clock();
+        assert_eq!(cycles, 8);
+        assert_eq!(cpu.pc, 0xc001);
+        assert_eq!(cpu.a, 0x42);
+        assert_eq!(cpu.hl(), 0xc001);
+
+        // test LD (HL), d8 instruction
+        cpu.pc = 0xc000;
+        cpu.mmu.write(0xc000, 0x36);
+        cpu.set_hl(0xc000);
+        cpu.mmu.write(0xc001, 0x42);
+        let cycles = cpu.clock();
+        assert_eq!(cycles, 12);
+        assert_eq!(cpu.pc, 0xc002);
+        assert_eq!(cpu.hl(), 0xc000);
+        assert_eq!(cpu.mmu.read(cpu.hl()), 0x42);
+
+        // test JR n instruction
+        cpu.pc = 0xc000;
+        cpu.mmu.write(0xc000, 0x18);
+        cpu.mmu.write(0xc001, 0x03);
+        let cycles = cpu.clock();
+        assert_eq!(cycles, 12);
+        assert_eq!(cpu.pc, 0xc005);
+
+        // test ADD A, d8 instruction
+        cpu.pc = 0xc000;
+        cpu.mmu.write(0xc000, 0xc6);
+        cpu.mmu.write(0xc001, 0x01);
+        cpu.a = 0x42;
+        let cycles = cpu.clock();
+        assert_eq!(cycles, 8);
+        assert_eq!(cpu.pc, 0xc002);
+        assert_eq!(cpu.a, 0x43);
+
+        // test SUB A, d8 instruction
+        cpu.pc = 0xc000;
+        cpu.mmu.write(0xc000, 0xd6);
+        cpu.mmu.write(0xc001, 0x01);
+        cpu.a = 0x42;
+        let cycles = cpu.clock();
+        assert_eq!(cycles, 8);
+        assert_eq!(cpu.pc, 0xc002);
+        assert_eq!(cpu.a, 0x41);
+
+        // test AND A, d8 instruction
+        cpu.pc = 0xc000;
+        cpu.mmu.write(0xc000, 0xe6);
+        cpu.mmu.write(0xc001, 0x0f);
+        cpu.a = 0x0a;
+        let cycles = cpu.clock();
+        assert_eq!(cycles, 8);
+        assert_eq!(cpu.pc, 0xc002);
+        assert_eq!(cpu.a, 0x0a & 0x0f);
+
+        // test OR A, d8 instruction
+        cpu.pc = 0xc000;
+        cpu.mmu.write(0xc000, 0xf6);
+        cpu.mmu.write(0xc001, 0x0f);
+        cpu.a = 0x0a;
+        let cycles = cpu.clock();
+        assert_eq!(cycles, 8);
+        assert_eq!(cpu.pc, 0xc002);
+        assert_eq!(cpu.a, 0x0a | 0x0f);
+
+        // test XOR A, d8 instruction
+        cpu.pc = 0xc000;
+        cpu.mmu.write(0xc000, 0xee);
+        cpu.mmu.write(0xc001, 0x0f);
+        cpu.a = 0x0a;
+        let cycles = cpu.clock();
+        assert_eq!(cycles, 8);
+        assert_eq!(cpu.pc, 0xc002);
+        assert_eq!(cpu.a, 0x0a ^ 0x0f);
+    }
+}

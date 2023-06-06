@@ -525,3 +525,19 @@ impl Mmu {
         self.gbc = value;
     }
 }
+
+impl Default for Mmu {
+    fn default() -> Self {
+        let mode = GameBoyMode::Dmg;
+        let gbc = Rc::new(RefCell::new(GameBoyConfig::default()));
+        let components = Components {
+            ppu: Ppu::new(mode, gbc.clone()),
+            apu: Apu::default(),
+            dma: Dma::default(),
+            pad: Pad::default(),
+            timer: Timer::default(),
+            serial: Serial::default(),
+        };
+        Mmu::new(components, mode, gbc.clone())
+    }
+}
