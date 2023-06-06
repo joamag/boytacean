@@ -582,7 +582,7 @@ impl Cpu {
 impl Default for Cpu {
     fn default() -> Self {
         let gbc: Rc<RefCell<GameBoyConfig>> = Rc::new(RefCell::new(GameBoyConfig::default()));
-        Cpu::new(Mmu::default(), gbc.clone())
+        Cpu::new(Mmu::default(), gbc)
     }
 }
 

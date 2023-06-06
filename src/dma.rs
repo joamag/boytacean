@@ -124,7 +124,7 @@ mod tests {
     #[test]
     fn test_dma_default() {
         let dma = Dma::default();
-        assert_eq!(dma.active, false);
+        assert!(!dma.active);
     }
 
     #[test]
@@ -142,13 +142,13 @@ mod tests {
         assert_eq!(dma.destination, 0x0);
         assert_eq!(dma.length, 0x0);
         assert_eq!(dma.mode, DmaMode::General);
-        assert_eq!(dma.active, false);
+        assert!(!dma.active);
     }
 
     #[test]
     fn test_dma_set_active() {
         let mut dma = Dma::new();
         dma.set_active(true);
-        assert_eq!(dma.active, true);
+        assert!(dma.active);
     }
 }

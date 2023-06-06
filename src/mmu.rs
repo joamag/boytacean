@@ -538,6 +538,6 @@ impl Default for Mmu {
             timer: Timer::default(),
             serial: Serial::default(),
         };
-        Mmu::new(components, mode, gbc.clone())
+        Mmu::new(components, mode, gbc)
     }
 }
