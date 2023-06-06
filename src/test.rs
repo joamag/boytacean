@@ -1,4 +1,4 @@
-use crate::{devices::buffer::BufferDevice, gb::GameBoy};
+use crate::{devices::buffer::BufferDevice, gb::GameBoy, ppu::FRAME_BUFFER_SIZE};
 
 #[derive(Default)]
 pub struct TestOptions {
@@ -20,7 +20,7 @@ pub fn build_test(options: TestOptions) -> GameBoy {
     game_boy
 }
 
-pub fn run_test(rom_path: &str, max_cycles: Option<u64>, options: TestOptions) -> String {
+pub fn run_test(rom_path: &str, max_cycles: Option<u64>, options: TestOptions) -> GameBoy {
     let mut cycles = 0u64;
     let max_cycles = max_cycles.unwrap_or(u64::MAX);
 
@@ -34,16 +34,26 @@ pub fn run_test(rom_path: &str, max_cycles: Option<u64>, options: TestOptions) -
         }
     }
 
+    game_boy
+}
+
+pub fn run_serial_test(rom_path: &str, max_cycles: Option<u64>, options: TestOptions) -> String {
+    let mut game_boy = run_test(rom_path, max_cycles, options);
     game_boy.serial().device().state()
+}
+
+pub fn run_image_test(rom_path: &str, max_cycles: Option<u64>, options: TestOptions) -> [u8; FRAME_BUFFER_SIZE] {
+    let mut game_boy = run_test(rom_path, max_cycles, options);
+    *game_boy.frame_buffer()
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{run_test, TestOptions};
+    use super::{run_serial_test, TestOptions};
 
     #[test]
     fn test_blargg_cpu_instrs() {
-        let result = run_test(
+        let result = run_serial_test(
             "res/roms/test/blargg/cpu/cpu_instrs.gb",
             Some(300000000),
             TestOptions::default(),

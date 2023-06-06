@@ -3,13 +3,14 @@
 pub mod audio;
 pub mod data;
 pub mod sdl;
+pub mod test;
 
 use audio::Audio;
 use boytacean::{
     devices::{printer::PrinterDevice, stdout::StdoutDevice},
     gb::{AudioProvider, GameBoy, GameBoyMode},
     pad::PadKey,
-    ppu::{PaletteInfo, PpuMode, DISPLAY_HEIGHT, DISPLAY_WIDTH},
+    ppu::{PaletteInfo, PpuMode},
     rom::Cartridge,
     serial::{NullDevice, SerialDevice},
 };
@@ -188,8 +189,8 @@ impl Emulator {
         self.sdl = Some(SdlSystem::new(
             sdl,
             self.title,
-            DISPLAY_WIDTH as u32,
-            DISPLAY_HEIGHT as u32,
+            self.system.display_width() as u32,
+            self.system.display_height() as u32,
             screen_scale,
             !self.features.contains(&"no-accelerated"),
             !self.features.contains(&"no-vsync"),
@@ -248,8 +249,8 @@ impl Emulator {
     }
 
     fn save_image(&mut self, file_path: &str) {
-        let width = DISPLAY_WIDTH as u32;
-        let height = DISPLAY_HEIGHT as u32;
+        let width = self.system.display_width() as u32;
+        let height = self.system.display_height() as u32;
         let pixels = self.system.frame_buffer();
 
         let mut image_buffer: ImageBuffer<Rgb<u8>, Vec<u8>> = ImageBuffer::new(width, height);
@@ -281,6 +282,10 @@ impl Emulator {
     }
 
     pub fn run(&mut self) {
+        // obtains the dimensions of the display that are going
+        // to be used for the graphics rendering
+        let (width, height) = (self.system.display_width(), self.system.display_height());
+
         // updates the icon of the window to reflect the image
         // and style of the emulator
         let surface = surface_from_bytes(&data::ICON);
@@ -297,11 +302,7 @@ impl Emulator {
         // creates the texture streaming that is going to be used
         // as the target for the pixel buffer
         let mut texture = texture_creator
-            .create_texture_streaming(
-                PixelFormatEnum::RGB24,
-                DISPLAY_WIDTH as u32,
-                DISPLAY_HEIGHT as u32,
-            )
+            .create_texture_streaming(PixelFormatEnum::RGB24, width as u32, height as u32)
             .unwrap();
 
         // starts the variable that will control the number of cycles that
@@ -425,9 +426,7 @@ impl Emulator {
                         // to update the stream texture, that will latter be copied
                         // to the canvas
                         let frame_buffer = self.system.frame_buffer().as_ref();
-                        texture
-                            .update(None, frame_buffer, DISPLAY_WIDTH * 3)
-                            .unwrap();
+                        texture.update(None, frame_buffer, width * 3).unwrap();
 
                         // obtains the index of the current PPU frame, this value
                         // is going to be used to detect for new frame presence

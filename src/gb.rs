@@ -14,7 +14,7 @@ use crate::{
     gen::{COMPILATION_DATE, COMPILATION_TIME, COMPILER, COMPILER_VERSION, VERSION},
     mmu::Mmu,
     pad::{Pad, PadKey},
-    ppu::{Ppu, PpuMode, Tile, FRAME_BUFFER_SIZE},
+    ppu::{Ppu, PpuMode, Tile, FRAME_BUFFER_SIZE, DISPLAY_WIDTH, DISPLAY_HEIGHT},
     rom::{Cartridge, RamSize},
     serial::{NullDevice, Serial, SerialDevice},
     timer::Timer,
@@ -807,6 +807,14 @@ impl GameBoy {
 
     pub fn attach_printer_serial(&mut self) {
         self.attach_serial(Box::<PrinterDevice>::default());
+    }
+
+    pub fn display_width(&self) -> usize {
+        DISPLAY_WIDTH
+    }
+
+    pub fn display_height(&self) -> usize {
+        DISPLAY_HEIGHT
     }
 
     pub fn ram_size(&self) -> RamSize {
