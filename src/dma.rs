@@ -1,6 +1,6 @@
 use crate::warnln;
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum DmaMode {
     General = 0x00,
     HBlank = 0x01,
@@ -114,5 +114,41 @@ impl Dma {
 impl Default for Dma {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::dma::{Dma, DmaMode};
+
+    #[test]
+    fn test_dma_default() {
+        let dma = Dma::default();
+        assert_eq!(dma.active, false);
+    }
+
+    #[test]
+    fn test_dma_reset() {
+        let mut dma = Dma::new();
+        dma.source = 0x1234;
+        dma.destination = 0x5678;
+        dma.length = 0x9abc;
+        dma.mode = DmaMode::HBlank;
+        dma.active = true;
+
+        dma.reset();
+
+        assert_eq!(dma.source, 0x0);
+        assert_eq!(dma.destination, 0x0);
+        assert_eq!(dma.length, 0x0);
+        assert_eq!(dma.mode, DmaMode::General);
+        assert_eq!(dma.active, false);
+    }
+
+    #[test]
+    fn test_dma_set_active() {
+        let mut dma = Dma::new();
+        dma.set_active(true);
+        assert_eq!(dma.active, true);
     }
 }
