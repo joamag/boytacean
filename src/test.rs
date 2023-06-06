@@ -42,7 +42,11 @@ pub fn run_serial_test(rom_path: &str, max_cycles: Option<u64>, options: TestOpt
     game_boy.serial().device().state()
 }
 
-pub fn run_image_test(rom_path: &str, max_cycles: Option<u64>, options: TestOptions) -> [u8; FRAME_BUFFER_SIZE] {
+pub fn run_image_test(
+    rom_path: &str,
+    max_cycles: Option<u64>,
+    options: TestOptions,
+) -> [u8; FRAME_BUFFER_SIZE] {
     let mut game_boy = run_test(rom_path, max_cycles, options);
     *game_boy.frame_buffer()
 }

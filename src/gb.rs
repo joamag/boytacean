@@ -14,7 +14,7 @@ use crate::{
     gen::{COMPILATION_DATE, COMPILATION_TIME, COMPILER, COMPILER_VERSION, VERSION},
     mmu::Mmu,
     pad::{Pad, PadKey},
-    ppu::{Ppu, PpuMode, Tile, FRAME_BUFFER_SIZE, DISPLAY_WIDTH, DISPLAY_HEIGHT},
+    ppu::{Ppu, PpuMode, Tile, DISPLAY_HEIGHT, DISPLAY_WIDTH, FRAME_BUFFER_SIZE},
     rom::{Cartridge, RamSize},
     serial::{NullDevice, Serial, SerialDevice},
     timer::Timer,
