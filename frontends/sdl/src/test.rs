@@ -53,4 +53,15 @@ mod tests {
         let image_result = compare_images(&result, "res/test/dmg_acid2.png");
         assert_eq!(image_result, true);
     }
+
+    #[test]
+    fn test_firstwhite() {
+        let result: [u8; FRAME_BUFFER_SIZE] = run_image_test(
+            "../../res/roms/test/firstwhite.gb",
+            Some(50000000),
+            TestOptions::default(),
+        );
+        let image_result = compare_images(&result, "res/test/firstwhite.png");
+        assert_eq!(image_result, true);
+    }
 }
