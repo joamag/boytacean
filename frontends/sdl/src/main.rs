@@ -15,7 +15,7 @@ use boytacean::{
 };
 use chrono::Utc;
 use clap::Parser;
-use image::ColorType;
+use image::{ColorType, ImageBuffer, Rgb};
 use sdl::{surface_from_bytes, SdlSystem};
 use sdl2::{event::Event, keyboard::Keycode, pixels::PixelFormatEnum, Sdl};
 use std::{
@@ -247,6 +247,23 @@ impl Emulator {
         );
     }
 
+    fn save_image(&mut self, file_path: &str) {
+        let width = DISPLAY_WIDTH as u32;
+        let height = DISPLAY_HEIGHT as u32;
+        let pixels = self.system.frame_buffer();
+
+        let mut image_buffer: ImageBuffer<Rgb<u8>, Vec<u8>> = ImageBuffer::new(width, height);
+
+        for (x, y, pixel) in image_buffer.enumerate_pixels_mut() {
+            let base = ((y * width + x) * 3) as usize;
+            *pixel = Rgb([pixels[base], pixels[base + 1], pixels[base + 2]])
+        }
+
+        image_buffer
+            .save_with_format(file_path, image::ImageFormat::Png)
+            .unwrap();
+    }
+
     pub fn toggle_audio(&mut self) {
         let apu_enabled = self.system.apu_enabled();
         self.system.set_apu_enabled(!apu_enabled);
@@ -319,6 +336,10 @@ impl Emulator {
                         keycode: Some(Keycode::B),
                         ..
                     } => self.benchmark(&Benchmark::default()),
+                    Event::KeyDown {
+                        keycode: Some(Keycode::I),
+                        ..
+                    } => self.save_image("screen.png"),
                     Event::KeyDown {
                         keycode: Some(Keycode::T),
                         ..
