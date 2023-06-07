@@ -340,7 +340,7 @@ impl Emulator {
                     Event::KeyDown {
                         keycode: Some(Keycode::I),
                         ..
-                    } => self.save_image("screen.png"),
+                    } => self.save_image(&self.image_name(Some("png"))),
                     Event::KeyDown {
                         keycode: Some(Keycode::T),
                         ..
@@ -625,6 +625,31 @@ impl Emulator {
             let ten_millis = Duration::from_millis(pending_time as u64);
             thread::sleep(ten_millis);
         }
+    }
+
+    fn rom_name(&self) -> &str {
+        Path::new(&self.rom_path)
+            .file_stem()
+            .unwrap()
+            .to_str()
+            .unwrap()
+    }
+
+    fn image_name(&self, ext: Option<&str>) -> String {
+        let ext = ext.unwrap_or("png");
+        self.best_name(self.rom_name(), ext)
+    }
+
+    fn best_name(&self, base: &str, ext: &str) -> String {
+        let mut index = 0_usize;
+        let mut name = format!("{}.{}", base, ext);
+
+        while Path::new(&name).exists() {
+            index += 1;
+            name = format!("{}-{}.{}", base, index, ext);
+        }
+
+        name
     }
 }
 
