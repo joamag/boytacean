@@ -1,6 +1,7 @@
 use core::fmt;
 use std::{
     cmp::max,
+    collections::HashMap,
     fmt::{Display, Formatter},
 };
 
@@ -208,6 +209,14 @@ impl Display for CgbMode {
     }
 }
 
+#[derive(Clone)]
+pub struct GameGenieCode {
+    code: String,
+    address: u16,
+    new_data: u8,
+    old_data: u8,
+}
+
 /// Structure that defines the ROM and ROM contents
 /// of a Game Boy cartridge. Should correctly address
 /// the specifics of all the major MBCs (Memory Bank
@@ -226,6 +235,8 @@ pub struct Cartridge {
     /// The MBC (Memory Bank Controller) to be used for
     /// RAM and ROM access on the current cartridge.
     mbc: &'static Mbc,
+
+    genie_codes: HashMap<u16, GameGenieCode>,
 
     /// The number of ROM banks (of 8KB) that are available
     /// to the current cartridge, this is a computed value
@@ -261,6 +272,7 @@ impl Cartridge {
             rom_data: vec![],
             ram_data: vec![],
             mbc: &NO_MBC,
+            genie_codes: HashMap::new(),
             rom_bank_count: 0,
             ram_bank_count: 0,
             rom_offset: 0x4000,
@@ -282,6 +294,16 @@ impl Cartridge {
     }
 
     pub fn read(&self, addr: u16) -> u8 {
+        //if addr == 0x4A17 {
+        //    println!("cenas");
+        //    return 0x00;
+        //} // @todo hack for gamegenie
+
+        if self.genie_codes.contains_key(&addr) {
+            let game_genie_code = self.genie_codes.get(&addr).unwrap();
+            return game_genie_code.new_data;
+        }
+
         match addr & 0xf000 {
             0x0000 | 0x1000 | 0x2000 | 0x3000 | 0x4000 | 0x5000 | 0x6000 | 0x7000 => {
                 (self.mbc.read_rom)(self, addr)
@@ -388,6 +410,29 @@ impl Cartridge {
     fn allocate_ram(&mut self) {
         let ram_banks = max(self.ram_size().ram_banks(), 1);
         self.ram_data = vec![0u8; ram_banks as usize * RAM_BANK_SIZE];
+    }
+
+    pub fn add_genie_code(&mut self, code: &str) -> Result<&GameGenieCode, &str> {
+        if code.len() != 11 {
+            return Err("Invalid Game Genie code length");
+        }
+
+        let new_data_slice = &code[0..=1];
+        let new_data = u8::from_str_radix(new_data_slice, 16).unwrap();
+
+        let address_slice = format!("{}{}{}", &code[6..=6], &code[2..=2], &code[4..=5]);
+        let address = u16::from_str_radix(address_slice.as_str(), 16).unwrap() ^ 0xf000;
+
+        let game_genie_code = GameGenieCode {
+            code: String::from(code),
+            address: address,
+            new_data: new_data,
+            old_data: new_data,
+        };
+
+        self.genie_codes.insert(address, game_genie_code);
+
+        Ok(self.genie_codes.get(&address).unwrap())
     }
 }
 
