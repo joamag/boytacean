@@ -1,11 +1,10 @@
 use core::fmt;
 use std::{
     cmp::max,
-    collections::HashMap,
     fmt::{Display, Formatter},
 };
 
-use crate::{debugln, gb::GameBoyMode, util::read_file, warnln};
+use crate::{debugln, gb::GameBoyMode, genie::GameGenie, util::read_file, warnln};
 
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
@@ -255,6 +254,13 @@ pub struct Cartridge {
     /// RAM and ROM access on the current cartridge.
     mbc: &'static Mbc,
 
+    /// The current memory handler in charge of handling the
+    /// memory access for the current cartridge.
+    /// Typically this is the same as the MBC, but to allow
+    /// memory patching (ex: Game Genie) we may need another
+    /// level of indirection.
+    handler: &'static Mbc,
+
     /// The number of ROM banks (of 8KB) that are available
     /// to the current cartridge, this is a computed value
     /// to allow improved performance.
@@ -277,16 +283,15 @@ pub struct Cartridge {
     /// control of memory access to avoid corruption.
     ram_enabled: bool,
 
-    // The final offset of the last character of the title
-    // that is considered to be non zero (0x0) so that a
-    // proper safe conversion to UTF-8 string can be done.
+    /// The final offset of the last character of the title
+    /// that is considered to be non zero (0x0) so that a
+    /// proper safe conversion to UTF-8 string can be done.
     title_offset: usize,
 
-    /// Hash map that contains the complete set of Game Genie
-    /// codes that have been registered for the current ROM.
-    /// These codes are going to apply a series of patches to
-    /// the ROM effectively allowing the user to cheat.
-    genie_codes: HashMap<u16, GameGenieCode>,
+    /// Optional reference to the Game Genie instance that
+    /// would be used for the "cheating" by patching the
+    /// current ROM's cartridge data.
+    game_genie: Option<GameGenie>,
 }
 
 impl Cartridge {
@@ -295,13 +300,14 @@ impl Cartridge {
             rom_data: vec![],
             ram_data: vec![],
             mbc: &NO_MBC,
+            handler: &NO_MBC,
             rom_bank_count: 0,
             ram_bank_count: 0,
             rom_offset: 0x4000,
             ram_offset: 0x0000,
             ram_enabled: false,
             title_offset: 0x0143,
-            genie_codes: HashMap::new(),
+            game_genie: None,
         }
     }
 
@@ -317,24 +323,11 @@ impl Cartridge {
     }
 
     pub fn read(&self, addr: u16) -> u8 {
-        if self.genie_codes.contains_key(&addr) {
-            let genie_code = self.genie_codes.get(&addr).unwrap();
-
-            // checks if the current data at the address is the same as the
-            // one that is expected by the Game Genie code, if that's the case
-            // applies the patch, otherwise returns the original strategy is
-            // going to be used
-            if genie_code.old_data == (self.mbc.read_rom)(self, addr) {
-                debugln!("Applying Game Genie code: {}", game_genie_code);
-                return genie_code.new_data;
-            }
-        }
-
         match addr & 0xf000 {
             0x0000 | 0x1000 | 0x2000 | 0x3000 | 0x4000 | 0x5000 | 0x6000 | 0x7000 => {
-                (self.mbc.read_rom)(self, addr)
+                (self.handler.read_rom)(self, addr)
             }
-            0xa000 | 0xb000 => (self.mbc.read_ram)(self, addr),
+            0xa000 | 0xb000 => (self.handler.read_ram)(self, addr),
             _ => {
                 debugln!("Reading from unknown Cartridge control 0x{:04x}", addr);
                 0x00
@@ -345,9 +338,9 @@ impl Cartridge {
     pub fn write(&mut self, addr: u16, value: u8) {
         match addr & 0xf000 {
             0x0000 | 0x1000 | 0x2000 | 0x3000 | 0x4000 | 0x5000 | 0x6000 | 0x7000 => {
-                (self.mbc.write_rom)(self, addr, value)
+                (self.handler.write_rom)(self, addr, value)
             }
-            0xa000 | 0xb000 => (self.mbc.write_ram)(self, addr, value),
+            0xa000 | 0xb000 => (self.handler.write_ram)(self, addr, value),
             _ => debugln!("Writing to unknown Cartridge address 0x{:04x}", addr),
         }
     }
@@ -405,6 +398,7 @@ impl Cartridge {
 
     fn set_mbc(&mut self) {
         self.mbc = self.get_mbc();
+        self.handler = self.mbc;
     }
 
     fn set_computed(&mut self) {
@@ -436,36 +430,6 @@ impl Cartridge {
     fn allocate_ram(&mut self) {
         let ram_banks = max(self.ram_size().ram_banks(), 1);
         self.ram_data = vec![0u8; ram_banks as usize * RAM_BANK_SIZE];
-    }
-
-    pub fn add_genie_code(&mut self, code: &str) -> Result<&GameGenieCode, &str> {
-        if code.len() != 11 {
-            return Err("Invalid Game Genie code length");
-        }
-
-        let code_u = code.to_uppercase();
-
-        let new_data_slice = &code_u[0..=1];
-        let new_data = u8::from_str_radix(new_data_slice, 16).unwrap();
-
-        let old_data_slice = format!("{}{}", &code_u[8..=8], &code_u[10..=10]);
-        let old_data: u8 = u8::from_str_radix(old_data_slice.as_str(), 16)
-            .unwrap()
-            .rotate_right(2)
-            ^ 0xba;
-
-        let address_slice = format!("{}{}{}", &code_u[6..=6], &code_u[2..=2], &code_u[4..=5]);
-        let address = u16::from_str_radix(address_slice.as_str(), 16).unwrap() ^ 0xf000;
-
-        let genie_code = GameGenieCode {
-            code: code_u,
-            address,
-            new_data,
-            old_data,
-        };
-
-        self.genie_codes.insert(address, genie_code);
-        Ok(self.genie_codes.get(&address).unwrap())
     }
 }
 
@@ -598,6 +562,16 @@ impl Cartridge {
 
     pub fn set_ram_data(&mut self, ram_data: Vec<u8>) {
         self.ram_data = ram_data;
+    }
+
+    pub fn attach_genie(&mut self, game_genie: GameGenie) {
+        self.game_genie = Some(game_genie);
+        self.handler = &GAME_GENIE;
+    }
+
+    pub fn detach_genie(&mut self) {
+        self.game_genie = None;
+        self.handler = self.mbc;
     }
 
     pub fn description(&self, column_length: usize) -> String {
@@ -828,4 +802,27 @@ pub static MBC5: Mbc = Mbc {
         }
         rom.ram_data[rom.ram_offset + (addr - 0xa000) as usize] = value;
     },
+};
+
+pub static GAME_GENIE: Mbc = Mbc {
+    name: "GameGenie",
+    read_rom: |rom: &Cartridge, addr: u16| -> u8 {
+        let game_genie = rom.game_genie.as_ref().unwrap();
+        if game_genie.contains_addr(addr) {
+            let genie_code = game_genie.get_addr(addr);
+
+            // checks if the current data at the address is the same as the
+            // one that is expected by the Game Genie code, if that's the case
+            // applies the patch, otherwise returns the original strategy is
+            // going to be used
+            if genie_code.old_data == (rom.mbc.read_rom)(rom, addr) {
+                debugln!("Applying Game Genie code: {}", game_genie_code);
+                return genie_code.new_data;
+            }
+        }
+        (rom.mbc.read_rom)(rom, addr)
+    },
+    write_rom: |rom: &mut Cartridge, addr: u16, value: u8| (rom.mbc.write_rom)(rom, addr, value),
+    read_ram: |rom: &Cartridge, addr: u16| -> u8 { (rom.mbc.read_ram)(rom, addr) },
+    write_ram: |rom: &mut Cartridge, addr: u16, value: u8| (rom.mbc.write_ram)(rom, addr, value),
 };

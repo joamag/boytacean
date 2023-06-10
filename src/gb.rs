@@ -12,6 +12,7 @@ use crate::{
     devices::{printer::PrinterDevice, stdout::StdoutDevice},
     dma::Dma,
     gen::{COMPILATION_DATE, COMPILATION_TIME, COMPILER, COMPILER_VERSION, VERSION},
+    genie::GameGenie,
     mmu::Mmu,
     pad::{Pad, PadKey},
     ppu::{Ppu, PpuMode, Tile, DISPLAY_HEIGHT, DISPLAY_WIDTH, FRAME_BUFFER_SIZE},
@@ -970,8 +971,10 @@ impl GameBoy {
 
     pub fn load_rom(&mut self, data: &[u8]) -> &Cartridge {
         let mut rom = Cartridge::from_data(data);
-        rom.add_genie_code("00A-17B-C49").unwrap(); // SML
-        rom.add_genie_code("008-60A-E6E").unwrap(); // SML
+        let mut game_genie = GameGenie::default();
+        game_genie.add_code("00A-17B-C49").unwrap(); // SML
+        game_genie.add_code("008-60A-E6E").unwrap(); // SML
+        rom.attach_genie(game_genie);
         self.mmu().set_rom(rom);
         self.mmu().rom()
     }
