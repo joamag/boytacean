@@ -3,7 +3,11 @@ use std::{
     fmt::{self, Display, Formatter},
 };
 
+#[cfg(feature = "wasm")]
+use wasm_bindgen::prelude::*;
+
 #[derive(Clone)]
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
 pub struct GameGenie {
     /// Hash map that contains the complete set of Game Genie
     /// codes that have been registered for the current ROM.
