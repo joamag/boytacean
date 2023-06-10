@@ -217,6 +217,21 @@ pub struct GameGenieCode {
     old_data: u8,
 }
 
+impl GameGenieCode {
+    pub fn description(&self) -> String {
+        format!(
+            "Code: {}, Address: 0x{:04x}, New Data: 0x{:04x}, Old Data: 0x{:04x}",
+            self.code, self.address, self.new_data, self.old_data
+        )
+    }
+}
+
+impl Display for GameGenieCode {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.description())
+    }
+}
+
 /// Structure that defines the ROM and ROM contents
 /// of a Game Boy cartridge. Should correctly address
 /// the specifics of all the major MBCs (Memory Bank
@@ -235,8 +250,6 @@ pub struct Cartridge {
     /// The MBC (Memory Bank Controller) to be used for
     /// RAM and ROM access on the current cartridge.
     mbc: &'static Mbc,
-
-    genie_codes: HashMap<u16, GameGenieCode>,
 
     /// The number of ROM banks (of 8KB) that are available
     /// to the current cartridge, this is a computed value
@@ -264,6 +277,12 @@ pub struct Cartridge {
     // that is considered to be non zero (0x0) so that a
     // proper safe conversion to UTF-8 string can be done.
     title_offset: usize,
+
+    /// Hash map that contains the complete set of Game Genie
+    /// codes that have been registered for the current ROM.
+    /// These codes are going to apply a series of patches to
+    /// the ROM effectively allowing the user to cheat.
+    genie_codes: HashMap<u16, GameGenieCode>,
 }
 
 impl Cartridge {
@@ -272,13 +291,13 @@ impl Cartridge {
             rom_data: vec![],
             ram_data: vec![],
             mbc: &NO_MBC,
-            genie_codes: HashMap::new(),
             rom_bank_count: 0,
             ram_bank_count: 0,
             rom_offset: 0x4000,
             ram_offset: 0x0000,
             ram_enabled: false,
             title_offset: 0x0143,
+            genie_codes: HashMap::new(),
         }
     }
 
@@ -294,14 +313,10 @@ impl Cartridge {
     }
 
     pub fn read(&self, addr: u16) -> u8 {
-        //if addr == 0x4A17 {
-        //    println!("cenas");
-        //    return 0x00;
-        //} // @todo hack for gamegenie
-
         if self.genie_codes.contains_key(&addr) {
-            let game_genie_code = self.genie_codes.get(&addr).unwrap();
-            return game_genie_code.new_data;
+            let genie_code = self.genie_codes.get(&addr).unwrap();
+            debugln!("Applying Game Genie code: {}", game_genie_code);
+            return genie_code.new_data;
         }
 
         match addr & 0xf000 {
@@ -420,14 +435,17 @@ impl Cartridge {
         let new_data_slice = &code[0..=1];
         let new_data = u8::from_str_radix(new_data_slice, 16).unwrap();
 
+        let old_data_slice = format!("{}{}", &code[8..=8], &code[10..=10]);
+        let old_data: u8 = (u8::from_str_radix(old_data_slice.as_str(), 16).unwrap() ^ 0xba) << 2;
+
         let address_slice = format!("{}{}{}", &code[6..=6], &code[2..=2], &code[4..=5]);
         let address = u16::from_str_radix(address_slice.as_str(), 16).unwrap() ^ 0xf000;
 
         let game_genie_code = GameGenieCode {
             code: String::from(code),
-            address: address,
-            new_data: new_data,
-            old_data: new_data,
+            address,
+            new_data,
+            old_data,
         };
 
         self.genie_codes.insert(address, game_genie_code);
