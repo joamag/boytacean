@@ -1,6 +1,6 @@
 use std::{
     collections::HashMap,
-    fmt::{Display, Formatter, self},
+    fmt::{self, Display, Formatter},
 };
 
 #[derive(Clone)]
