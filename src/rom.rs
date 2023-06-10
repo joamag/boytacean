@@ -809,6 +809,9 @@ pub static GAME_GENIE: Mbc = Mbc {
     read_rom: |rom: &Cartridge, addr: u16| -> u8 {
         let game_genie = rom.game_genie.as_ref().unwrap();
         if game_genie.contains_addr(addr) {
+            // retrieves the Game Genie code that matches the current address
+            // keep in mind that this assumes that no more that one code is
+            // registered for the same memory address
             let genie_code = game_genie.get_addr(addr);
 
             // checks if the current data at the address is the same as the
