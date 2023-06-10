@@ -676,6 +676,8 @@ impl Ppu {
         match addr {
             0x8000..=0x9fff => self.vram[(self.vram_offset + (addr & 0x1fff)) as usize],
             0xfe00..=0xfe9f => self.oam[(addr & 0x009f) as usize],
+            // Not Usable
+            0xfea0..=0xfeff => 0xff,
             0xff80..=0xfffe => self.hram[(addr & 0x007f) as usize],
             0xff40 =>
             {
@@ -737,6 +739,8 @@ impl Ppu {
                 self.oam[(addr & 0x009f) as usize] = value;
                 self.update_object(addr, value);
             }
+            // Not Usable
+            0xfea0..=0xfeff => (),
             0xff80..=0xfffe => self.hram[(addr & 0x007f) as usize] = value,
             0xff40 => {
                 self.switch_bg = value & 0x01 == 0x01;
