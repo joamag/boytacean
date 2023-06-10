@@ -66,13 +66,21 @@ impl Default for GameGenie {
 
 #[derive(Clone)]
 pub struct GameGenieCode {
-    pub code: String,
-    pub addr: u16,
-    pub new_data: u8,
-    pub old_data: u8,
+    code: String,
+    addr: u16,
+    new_data: u8,
+    old_data: u8,
 }
 
 impl GameGenieCode {
+    pub fn is_valid(&self, value: u8) -> bool {
+        self.old_data == value
+    }
+
+    pub fn new_data(&self) -> u8 {
+        self.new_data
+    }
+
     pub fn short_description(&self) -> String {
         self.code.to_string()
     }
