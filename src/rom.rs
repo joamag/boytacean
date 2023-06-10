@@ -218,6 +218,10 @@ pub struct GameGenieCode {
 }
 
 impl GameGenieCode {
+    pub fn short_description(&self) -> String {
+        self.code.to_string()
+    }
+
     pub fn description(&self) -> String {
         format!(
             "Code: {}, Address: 0x{:04x}, New Data: 0x{:04x}, Old Data: 0x{:04x}",
@@ -228,7 +232,7 @@ impl GameGenieCode {
 
 impl Display for GameGenieCode {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.description())
+        write!(f, "{}", self.short_description())
     }
 }
 
@@ -315,8 +319,15 @@ impl Cartridge {
     pub fn read(&self, addr: u16) -> u8 {
         if self.genie_codes.contains_key(&addr) {
             let genie_code = self.genie_codes.get(&addr).unwrap();
-            debugln!("Applying Game Genie code: {}", game_genie_code);
-            return genie_code.new_data;
+
+            // checks if the current data at the address is the same as the
+            // one that is expected by the Game Genie code, if that's the case
+            // applies the patch, otherwise returns the original strategy is
+            // going to be used
+            if genie_code.old_data == (self.mbc.read_rom)(self, addr) {
+                debugln!("Applying Game Genie code: {}", game_genie_code);
+                return genie_code.new_data;
+            }
         }
 
         match addr & 0xf000 {
@@ -432,24 +443,28 @@ impl Cartridge {
             return Err("Invalid Game Genie code length");
         }
 
-        let new_data_slice = &code[0..=1];
+        let code_u = code.to_uppercase();
+
+        let new_data_slice = &code_u[0..=1];
         let new_data = u8::from_str_radix(new_data_slice, 16).unwrap();
 
-        let old_data_slice = format!("{}{}", &code[8..=8], &code[10..=10]);
-        let old_data: u8 = (u8::from_str_radix(old_data_slice.as_str(), 16).unwrap() ^ 0xba) << 2;
+        let old_data_slice = format!("{}{}", &code_u[8..=8], &code_u[10..=10]);
+        let old_data: u8 = u8::from_str_radix(old_data_slice.as_str(), 16)
+            .unwrap()
+            .rotate_right(2)
+            ^ 0xba;
 
-        let address_slice = format!("{}{}{}", &code[6..=6], &code[2..=2], &code[4..=5]);
+        let address_slice = format!("{}{}{}", &code_u[6..=6], &code_u[2..=2], &code_u[4..=5]);
         let address = u16::from_str_radix(address_slice.as_str(), 16).unwrap() ^ 0xf000;
 
-        let game_genie_code = GameGenieCode {
-            code: String::from(code),
+        let genie_code = GameGenieCode {
+            code: code_u,
             address,
             new_data,
             old_data,
         };
 
-        self.genie_codes.insert(address, game_genie_code);
-
+        self.genie_codes.insert(address, genie_code);
         Ok(self.genie_codes.get(&address).unwrap())
     }
 }

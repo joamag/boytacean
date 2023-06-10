@@ -970,9 +970,8 @@ impl GameBoy {
 
     pub fn load_rom(&mut self, data: &[u8]) -> &Cartridge {
         let mut rom = Cartridge::from_data(data);
-        //rom.add_genie_code("00A-17B-C49").unwrap();  // SML
-        //rom.add_genie_code("008-60A-E6E").unwrap();  // SML
-        rom.add_genie_code("001-40C-E6E").unwrap();
+        rom.add_genie_code("00A-17B-C49").unwrap(); // SML
+        rom.add_genie_code("008-60A-E6E").unwrap(); // SML
         self.mmu().set_rom(rom);
         self.mmu().rom()
     }

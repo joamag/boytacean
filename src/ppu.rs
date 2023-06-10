@@ -211,7 +211,7 @@ impl Display for ObjectData {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "Index => {}\nX => {}\nY => {}\nTile => {}",
+            "Index: {}, X: {}, Y: {}, Tile: {}",
             self.index, self.x, self.y, self.tile
         )
     }
@@ -249,7 +249,7 @@ impl Display for TileData {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "Palette => {}\nVRAM Bank => {}\nX Flip => {}\nY Flip => {}",
+            "Palette: {}, VRAM Bank: {}, X Flip: {}, Y Flip: {}",
             self.palette, self.vram_bank, self.xflip, self.yflip
         )
     }
