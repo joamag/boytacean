@@ -564,16 +564,6 @@ impl Cartridge {
         self.ram_data = ram_data;
     }
 
-    pub fn attach_genie(&mut self, game_genie: GameGenie) {
-        self.game_genie = Some(game_genie);
-        self.handler = &GAME_GENIE;
-    }
-
-    pub fn detach_genie(&mut self) {
-        self.game_genie = None;
-        self.handler = self.mbc;
-    }
-
     pub fn description(&self, column_length: usize) -> String {
         let name_l = format!("{:width$}", "Name", width = column_length);
         let type_l = format!("{:width$}", "Type", width = column_length);
@@ -593,6 +583,18 @@ impl Cartridge {
             cgb_l,
             self.cgb_flag()
         )
+    }
+}
+
+impl Cartridge {
+    pub fn attach_genie(&mut self, game_genie: GameGenie) {
+        self.game_genie = Some(game_genie);
+        self.handler = &GAME_GENIE;
+    }
+
+    pub fn detach_genie(&mut self) {
+        self.game_genie = None;
+        self.handler = self.mbc;
     }
 }
 
