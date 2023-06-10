@@ -31,34 +31,14 @@ impl GameGenie {
         self.codes.get(&addr).unwrap()
     }
 
-    pub fn add_code(&mut self, code: &str) -> Result<&GameGenieCode, &str> {
-        if code.len() != 11 {
-            return Err("Invalid Game Genie code length");
-        }
-
-        let code_u = code.to_uppercase();
-
-        let new_data_slice = &code_u[0..=1];
-        let new_data = u8::from_str_radix(new_data_slice, 16).unwrap();
-
-        let old_data_slice = format!("{}{}", &code_u[8..=8], &code_u[10..=10]);
-        let old_data: u8 = u8::from_str_radix(old_data_slice.as_str(), 16)
-            .unwrap()
-            .rotate_right(2)
-            ^ 0xba;
-
-        let addr_slice = format!("{}{}{}", &code_u[6..=6], &code_u[2..=2], &code_u[4..=5]);
-        let addr = u16::from_str_radix(addr_slice.as_str(), 16).unwrap() ^ 0xf000;
-
-        let genie_code = GameGenieCode {
-            code: code_u,
-            addr,
-            new_data,
-            old_data,
+    pub fn add_code(&mut self, code: &str) -> Result<&GameGenieCode, String> {
+        let genie_code = match GameGenieCode::from_code(code) {
+            Ok(genie_code) => genie_code,
+            Err(e) => return Err(e),
         };
-
+        let addr = genie_code.addr;
         self.codes.insert(addr, genie_code);
-        Ok(self.codes.get(&addr).unwrap())
+        Ok(self.get_addr(addr))
     }
 }
 
@@ -77,6 +57,33 @@ pub struct GameGenieCode {
 }
 
 impl GameGenieCode {
+    pub fn from_code(code: &str) -> Result<Self, String> {
+        if code.len() != 11 {
+            return Err(String::from("Invalid Game Genie code length"));
+        }
+
+        let code_u = code.to_uppercase();
+
+        let new_data_slice = &code_u[0..=1];
+        let new_data = u8::from_str_radix(new_data_slice, 16).unwrap();
+
+        let old_data_slice = format!("{}{}", &code_u[8..=8], &code_u[10..=10]);
+        let old_data: u8 = u8::from_str_radix(old_data_slice.as_str(), 16)
+            .unwrap()
+            .rotate_right(2)
+            ^ 0xba;
+
+        let addr_slice = format!("{}{}{}", &code_u[6..=6], &code_u[2..=2], &code_u[4..=5]);
+        let addr = u16::from_str_radix(addr_slice.as_str(), 16).unwrap() ^ 0xf000;
+
+        Ok(Self {
+            code: code_u,
+            addr,
+            new_data,
+            old_data,
+        })
+    }
+
     pub fn is_valid(&self, value: u8) -> bool {
         self.old_data == value
     }
@@ -100,5 +107,21 @@ impl GameGenieCode {
 impl Display for GameGenieCode {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.short_description())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::genie::GameGenieCode;
+
+    #[test]
+    fn test_from_code() {
+        let code = "00A-17B-C49";
+        let game_genie_code = GameGenieCode::from_code(code).unwrap();
+
+        assert_eq!(game_genie_code.code, "00A-17B-C49");
+        assert_eq!(game_genie_code.addr, 0x4a17);
+        assert_eq!(game_genie_code.new_data, 0x00);
+        assert_eq!(game_genie_code.old_data, 0xc8);
     }
 }
