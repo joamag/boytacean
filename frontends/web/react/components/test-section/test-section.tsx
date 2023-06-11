@@ -11,7 +11,7 @@ export const TestSection: FC<TestSectionProps> = ({ style = [] }) => {
     const classes = () => ["test-section", ...style].join(" ");
     return (
         <div className={classes()}>
-            <TextInput />
+            <TextInput placeholder="XXX-XXX-XXX" />
         </div>
     );
 };
