@@ -94,7 +94,7 @@ deploy-cloudfare-master:
   script:
     - cd frontends/web/dist
     - cp -rp ../static/* .
-    - npm_config_yes=true npx --loglevel silly wrangler pages deploy . --project-name=boytacean --branch master
+    - npm_config_yes=true npx wrangler pages deploy . --project-name=boytacean --branch master
   dependencies:
     - build-wasm
   only:
