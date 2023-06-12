@@ -13,7 +13,7 @@ stages:
   - deploy
 
 before_script:
-  - apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y -q pkg-config
+  - apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y -q pkg-config g++
   - curl -sf -L https://static.rust-lang.org/rustup.sh | sh -s -- -y
   - export PATH=$PATH:$HOME/.cargo/bin
   - curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.1/install.sh | bash
