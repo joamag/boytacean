@@ -712,7 +712,7 @@ struct Args {
     )]
     cycles: u64,
 
-    #[arg(short, long, default_value_t = String::from("../../res/roms/demo/pocket.gb"), help = "Path to the ROM file to be loaded")]
+    #[arg(short, long, default_value_t = String::from("C:/Users/joamag/Desktop/gb-test-roms/dmg_sound/rom_singles/01-registers.gb"), help = "Path to the ROM file to be loaded")]
     rom_path: String,
 }
 

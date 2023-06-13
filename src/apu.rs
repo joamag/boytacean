@@ -329,26 +329,31 @@ impl Apu {
     }
 
     pub fn read(&mut self, addr: u16) -> u8 {
-        match addr {
+        let value = match addr {
             // 0xFF10 — NR10: Channel 1 sweep
             0xff10 => {
                 (self.ch1_sweep_slope & 0x07)
-                    | (if self.ch1_sweep_increase { 0x08 } else { 0x00 })
+                    | (if self.ch1_sweep_increase { 0x00 } else { 0x08 })
                     | ((self.ch1_sweep_pace & 0x07) << 4)
+                    | 0x80
             }
             // 0xFF11 — NR11: Channel 1 length timer & duty cycle
-            0xff11 => (self.ch1_wave_duty & 0x03) << 6,
+            0xff11 => ((self.ch1_wave_duty & 0x03) << 6) | 0x3f,
             // 0xFF12 — NR12: Channel 1 volume & envelope
             0xff12 => {
                 (self.ch1_pace & 0x07)
                     | ((self.ch1_direction & 0x01) << 3)
                     | ((self.ch1_volume & 0x0f) << 4)
             }
+            // 0xFF13 — NR13: Channel 1 wavelength low
+            0xff13 => 0xff,
+            // 0xFF14 — NR14: Channel 1 wavelength high & control
+            0xff14 => (if self.ch1_length_stop { 0x40 } else { 0x00 }) | 0xbf,
 
             // 0xFF15 — Not used
             0xff15 => 0xff,
             // 0xFF16 — NR21: Channel 2 length timer & duty cycle
-            0xff16 => (self.ch2_wave_duty & 0x03) << 6,
+            0xff16 => (self.ch2_wave_duty & 0x03) << 6 | 0x3f,
             // 0xFF17 — NR22: Channel 2 volume & envelope
             0xff17 => {
                 (self.ch2_pace & 0x07)
@@ -404,10 +409,15 @@ impl Apu {
                 warnln!("Reading from unknown APU location 0x{:04x}", addr);
                 0xff
             }
-        }
+        };
+
+        println!("APU read: {:04x} = {:02x}", addr, value);
+
+        value
     }
 
     pub fn write(&mut self, addr: u16, value: u8) {
+        println!("APU write: {:04x} = {:02x}", addr, value);
         match addr {
             // 0xFF10 — NR10: Channel 1 sweep
             0xff10 => {
@@ -444,8 +454,8 @@ impl Apu {
                 if trigger {
                     self.trigger_ch1();
                 }
-                if (length_trigger || trigger) && self.ch1_length_timer == 0 {
-                    self.ch1_length_timer = 0;
+                if length_trigger && self.ch1_length_timer == 0 {
+                    self.ch1_enabled = false;
                 }
             }
 
@@ -479,8 +489,8 @@ impl Apu {
                 if trigger {
                     self.trigger_ch2();
                 }
-                if (length_trigger || trigger) && self.ch2_length_timer == 0 {
-                    self.ch2_length_timer = 0;
+                if length_trigger && self.ch2_length_timer == 0 {
+                    self.ch2_enabled = false;
                 }
             }
 
@@ -511,8 +521,8 @@ impl Apu {
                 if trigger {
                     self.trigger_ch3();
                 }
-                if (length_trigger || trigger) && self.ch3_length_timer == 0 {
-                    self.ch3_length_timer = 0;
+                if length_trigger && self.ch3_length_timer == 0 {
+                    self.ch3_enabled = false;
                 }
             }
 
@@ -545,8 +555,8 @@ impl Apu {
                 if trigger {
                     self.trigger_ch4();
                 }
-                if (length_trigger || trigger) && self.ch4_length_timer == 0 {
-                    self.ch4_length_timer = 0;
+                if length_trigger && self.ch4_length_timer == 0 {
+                    self.ch4_enabled = false;
                 }
             }
 
