@@ -353,7 +353,7 @@ impl Apu {
             // 0xFF15 — Not used
             0xff15 => 0xff,
             // 0xFF16 — NR21: Channel 2 length timer & duty cycle
-            0xff16 => (self.ch2_wave_duty & 0x03) << 6 | 0x3f,
+            0xff16 => ((self.ch2_wave_duty & 0x03) << 6) | 0x3f,
             // 0xFF17 — NR22: Channel 2 volume & envelope
             0xff17 => {
                 (self.ch2_pace & 0x07)
