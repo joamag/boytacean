@@ -1,12 +1,15 @@
-use core::panic;
+use std::{cell::RefCell, rc::Rc};
 
 use crate::{
     apu::Apu,
     debugln,
+    dma::Dma,
+    gb::GameBoyConfig,
     inst::{EXTENDED, INSTRUCTIONS},
     mmu::Mmu,
     pad::Pad,
     ppu::Ppu,
+    serial::Serial,
     timer::Timer,
 };
 
@@ -37,10 +40,15 @@ pub struct Cpu {
     /// Temporary counter used to control the number of cycles
     /// taken by the current or last CPU operation.
     pub cycles: u8,
+
+    /// The pointer to the parent configuration of the running
+    /// Game Boy emulator, that can be used to control the behaviour
+    /// of Game Boy emulation.
+    gbc: Rc<RefCell<GameBoyConfig>>,
 }
 
 impl Cpu {
-    pub fn new(mmu: Mmu) -> Self {
+    pub fn new(mmu: Mmu, gbc: Rc<RefCell<GameBoyConfig>>) -> Self {
         Self {
             pc: 0x0,
             sp: 0x0,
@@ -59,6 +67,7 @@ impl Cpu {
             halted: false,
             mmu,
             cycles: 0,
+            gbc,
         }
     }
 
@@ -112,25 +121,35 @@ impl Cpu {
         let pc = self.pc;
 
         #[cfg(feature = "debug")]
-        if pc >= 0x8000 && pc < 0x9fff {
+        if (0x8000..0x9fff).contains(&pc) {
             panic!("Invalid PC area at 0x{:04x}", pc);
         }
 
         // @TODO this is so bad, need to improve this by an order
         // of magnitude, to be able to have better performance
+        // in case the CPU execution halted and there's an interrupt
+        // to be handled, releases the CPU from the halted state
+        // this verification is only done in case the IME (interrupt
+        // master enable) is disabled, otherwise the CPU halt disabled
+        // is going to be handled ahead
         if self.halted
+            && !self.ime
+            && self.mmu.ie != 0x00
             && (((self.mmu.ie & 0x01 == 0x01) && self.mmu.ppu().int_vblank())
                 || ((self.mmu.ie & 0x02 == 0x02) && self.mmu.ppu().int_stat())
                 || ((self.mmu.ie & 0x04 == 0x04) && self.mmu.timer().int_tima())
+                || ((self.mmu.ie & 0x08 == 0x08) && self.mmu.serial().int_serial())
                 || ((self.mmu.ie & 0x10 == 0x10) && self.mmu.pad().int_pad()))
         {
             self.halted = false;
         }
 
+        // checks the IME (interrupt master enable) is enabled and then checks
+        // if there's any interrupt to be handled, in case there's one, tries
+        // to check which one should be handled and then handles it
+        // this code assumes that the're no more that one interrupt triggered
+        // per clock cycle, this is a limitation of the current implementation
         if self.ime && self.mmu.ie != 0x00 {
-            // @TODO aggregate all of this interrupts in the MMU, as there's
-            // a lot of redundant code involved in here which complicates the
-            // readability and maybe performance of this code
             if (self.mmu.ie & 0x01 == 0x01) && self.mmu.ppu().int_vblank() {
                 debugln!("Going to run V-Blank interrupt handler (0x40)");
 
@@ -149,9 +168,7 @@ impl Cpu {
                 }
 
                 return 24;
-            }
-            // @TODO aggregate the handling of these interrupts
-            else if (self.mmu.ie & 0x02 == 0x02) && self.mmu.ppu().int_stat() {
+            } else if (self.mmu.ie & 0x02 == 0x02) && self.mmu.ppu().int_stat() {
                 debugln!("Going to run LCD STAT interrupt handler (0x48)");
 
                 self.disable_int();
@@ -169,9 +186,7 @@ impl Cpu {
                 }
 
                 return 24;
-            }
-            // @TODO aggregate the handling of these interrupts
-            else if (self.mmu.ie & 0x04 == 0x04) && self.mmu.timer().int_tima() {
+            } else if (self.mmu.ie & 0x04 == 0x04) && self.mmu.timer().int_tima() {
                 debugln!("Going to run Timer interrupt handler (0x50)");
 
                 self.disable_int();
@@ -189,9 +204,25 @@ impl Cpu {
                 }
 
                 return 24;
-            }
-            // @TODO aggregate the handling of these interrupts
-            else if (self.mmu.ie & 0x10 == 0x10) && self.mmu.pad().int_pad() {
+            } else if (self.mmu.ie & 0x08 == 0x08) && self.mmu.serial().int_serial() {
+                debugln!("Going to run Serial interrupt handler (0x58)");
+
+                self.disable_int();
+                self.push_word(pc);
+                self.pc = 0x58;
+
+                // acknowledges that the serial interrupt has been
+                // properly handled
+                self.mmu.serial().ack_serial();
+
+                // in case the CPU is currently halted waiting
+                // for an interrupt, releases it
+                if self.halted {
+                    self.halted = false;
+                }
+
+                return 24;
+            } else if (self.mmu.ie & 0x10 == 0x10) && self.mmu.pad().int_pad() {
                 debugln!("Going to run JoyPad interrupt handler (0x60)");
 
                 self.disable_int();
@@ -235,8 +266,10 @@ impl Cpu {
             inst = &INSTRUCTIONS[opcode as usize];
         }
 
+        #[allow(unused_variables)]
         let (inst_fn, inst_time, inst_str) = inst;
 
+        #[cfg(feature = "cpulog")]
         if *inst_str == "! UNIMP !" || *inst_str == "HALT" {
             if *inst_str == "HALT" {
                 debugln!("HALT with IE=0x{:02x} IME={}", self.mmu.ie, self.ime);
@@ -248,6 +281,23 @@ impl Cpu {
                 pc,
                 is_prefix
             );
+        }
+
+        #[cfg(feature = "cpulog")]
+        {
+            let title_str = format!("[0x{:04x}] {}", self.pc - 1, inst_str);
+            let inst_time_str = format!("({} cycles)", inst_time);
+            let registers_str = format!("[PC=0x{:04x} SP=0x{:04x}] [A=0x{:02x} B=0x{:02x} C=0x{:02x} D=0x{:02x} E=0x{:02x} H=0x{:02x} L=0x{:02x}]",
+            self.pc, self.sp, self.a, self.b, self.c, self.d, self.e, self.h, self.l);
+            println!(
+                "{0: <24} {1: <11} {2: <10}",
+                title_str, inst_time_str, registers_str
+            );
+        }
+
+        #[cfg(feature = "pedantic")]
+        if self.mmu.boot_active() && self.pc - 1 > 0x08ff {
+            panic!("Invalid boot address: {:04x}", self.pc - 1);
         }
 
         // calls the current instruction and increments the number of
@@ -278,6 +328,11 @@ impl Cpu {
     }
 
     #[inline(always)]
+    pub fn ppu_i(&self) -> &Ppu {
+        self.mmu_i().ppu_i()
+    }
+
+    #[inline(always)]
     pub fn apu(&mut self) -> &mut Apu {
         self.mmu().apu()
     }
@@ -288,13 +343,43 @@ impl Cpu {
     }
 
     #[inline(always)]
+    pub fn dma(&mut self) -> &mut Dma {
+        self.mmu().dma()
+    }
+
+    #[inline(always)]
+    pub fn dma_i(&self) -> &Dma {
+        self.mmu_i().dma_i()
+    }
+
+    #[inline(always)]
     pub fn pad(&mut self) -> &mut Pad {
         self.mmu().pad()
     }
 
     #[inline(always)]
+    pub fn pad_i(&self) -> &Pad {
+        self.mmu_i().pad_i()
+    }
+
+    #[inline(always)]
     pub fn timer(&mut self) -> &mut Timer {
         self.mmu().timer()
+    }
+
+    #[inline(always)]
+    pub fn timer_i(&self) -> &Timer {
+        self.mmu_i().timer_i()
+    }
+
+    #[inline(always)]
+    pub fn serial(&mut self) -> &mut Serial {
+        self.mmu().serial()
+    }
+
+    #[inline(always)]
+    pub fn serial_i(&self) -> &Serial {
+        self.mmu_i().serial_i()
     }
 
     #[inline(always)]
@@ -427,7 +512,7 @@ impl Cpu {
     }
 
     #[inline(always)]
-    pub fn get_zero(&self) -> bool {
+    pub fn zero(&self) -> bool {
         self.zero
     }
 
@@ -437,7 +522,7 @@ impl Cpu {
     }
 
     #[inline(always)]
-    pub fn get_sub(&self) -> bool {
+    pub fn sub(&self) -> bool {
         self.sub
     }
 
@@ -447,7 +532,7 @@ impl Cpu {
     }
 
     #[inline(always)]
-    pub fn get_half_carry(&self) -> bool {
+    pub fn half_carry(&self) -> bool {
         self.half_carry
     }
 
@@ -457,7 +542,7 @@ impl Cpu {
     }
 
     #[inline(always)]
-    pub fn get_carry(&self) -> bool {
+    pub fn carry(&self) -> bool {
         self.carry
     }
 
@@ -473,7 +558,10 @@ impl Cpu {
 
     #[inline(always)]
     pub fn stop(&mut self) {
-        panic!("STOP is not implemented");
+        let mmu = self.mmu();
+        if mmu.switching {
+            mmu.switch_speed()
+        }
     }
 
     #[inline(always)]
@@ -484,5 +572,152 @@ impl Cpu {
     #[inline(always)]
     pub fn disable_int(&mut self) {
         self.ime = false;
+    }
+
+    pub fn set_gbc(&mut self, value: Rc<RefCell<GameBoyConfig>>) {
+        self.gbc = value;
+    }
+}
+
+impl Default for Cpu {
+    fn default() -> Self {
+        let gbc: Rc<RefCell<GameBoyConfig>> = Rc::new(RefCell::new(GameBoyConfig::default()));
+        Cpu::new(Mmu::default(), gbc)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::cpu::Cpu;
+
+    #[test]
+    fn test_cpu_clock() {
+        let mut cpu = Cpu::default();
+        cpu.boot();
+        cpu.mmu.allocate_default();
+
+        // test NOP instruction
+        cpu.pc = 0xc000;
+        cpu.mmu.write(0xc000, 0x00);
+        let cycles = cpu.clock();
+        assert_eq!(cycles, 4);
+        assert_eq!(cpu.pc, 0xc001);
+
+        // test LD A, d8 instruction
+        cpu.pc = 0xc000;
+        cpu.mmu.write(0xc000, 0x3e);
+        cpu.mmu.write(0xc001, 0x42);
+        let cycles = cpu.clock();
+        assert_eq!(cycles, 8);
+        assert_eq!(cpu.pc, 0xc002);
+        assert_eq!(cpu.a, 0x42);
+
+        // test LD (HL+), A instruction
+        cpu.pc = 0xc000;
+        cpu.mmu.write(0xc000, 0x22);
+        cpu.set_hl(0xc000);
+        let cycles = cpu.clock();
+        assert_eq!(cycles, 8);
+        assert_eq!(cpu.pc, 0xc001);
+        assert_eq!(cpu.hl(), 0xc001);
+        assert_eq!(cpu.mmu.read(cpu.hl()), 0x42);
+
+        // test INC A instruction
+        cpu.pc = 0xc000;
+        cpu.mmu.write(0xc000, 0x3c);
+        cpu.a = 0x42;
+        let cycles = cpu.clock();
+        assert_eq!(cycles, 4);
+        assert_eq!(cpu.pc, 0xc001);
+        assert_eq!(cpu.a, 0x43);
+
+        // test DEC A instruction
+        cpu.pc = 0xc000;
+        cpu.mmu.write(0xc000, 0x3d);
+        cpu.a = 0x42;
+        let cycles = cpu.clock();
+        assert_eq!(cycles, 4);
+        assert_eq!(cpu.pc, 0xc001);
+        assert_eq!(cpu.a, 0x41);
+
+        // test LD A, (HL) instruction
+        cpu.pc = 0xc000;
+        cpu.mmu.write(0xc000, 0x7e);
+        cpu.set_hl(0xc001);
+        cpu.mmu.write(0xc001, 0x42);
+        let cycles = cpu.clock();
+        assert_eq!(cycles, 8);
+        assert_eq!(cpu.pc, 0xc001);
+        assert_eq!(cpu.a, 0x42);
+        assert_eq!(cpu.hl(), 0xc001);
+
+        // test LD (HL), d8 instruction
+        cpu.pc = 0xc000;
+        cpu.mmu.write(0xc000, 0x36);
+        cpu.set_hl(0xc000);
+        cpu.mmu.write(0xc001, 0x42);
+        let cycles = cpu.clock();
+        assert_eq!(cycles, 12);
+        assert_eq!(cpu.pc, 0xc002);
+        assert_eq!(cpu.hl(), 0xc000);
+        assert_eq!(cpu.mmu.read(cpu.hl()), 0x42);
+
+        // test JR n instruction
+        cpu.pc = 0xc000;
+        cpu.mmu.write(0xc000, 0x18);
+        cpu.mmu.write(0xc001, 0x03);
+        let cycles = cpu.clock();
+        assert_eq!(cycles, 12);
+        assert_eq!(cpu.pc, 0xc005);
+
+        // test ADD A, d8 instruction
+        cpu.pc = 0xc000;
+        cpu.mmu.write(0xc000, 0xc6);
+        cpu.mmu.write(0xc001, 0x01);
+        cpu.a = 0x42;
+        let cycles = cpu.clock();
+        assert_eq!(cycles, 8);
+        assert_eq!(cpu.pc, 0xc002);
+        assert_eq!(cpu.a, 0x43);
+
+        // test SUB A, d8 instruction
+        cpu.pc = 0xc000;
+        cpu.mmu.write(0xc000, 0xd6);
+        cpu.mmu.write(0xc001, 0x01);
+        cpu.a = 0x42;
+        let cycles = cpu.clock();
+        assert_eq!(cycles, 8);
+        assert_eq!(cpu.pc, 0xc002);
+        assert_eq!(cpu.a, 0x41);
+
+        // test AND A, d8 instruction
+        cpu.pc = 0xc000;
+        cpu.mmu.write(0xc000, 0xe6);
+        cpu.mmu.write(0xc001, 0x0f);
+        cpu.a = 0x0a;
+        let cycles = cpu.clock();
+        assert_eq!(cycles, 8);
+        assert_eq!(cpu.pc, 0xc002);
+        assert_eq!(cpu.a, 0x0a & 0x0f);
+
+        // test OR A, d8 instruction
+        cpu.pc = 0xc000;
+        cpu.mmu.write(0xc000, 0xf6);
+        cpu.mmu.write(0xc001, 0x0f);
+        cpu.a = 0x0a;
+        let cycles = cpu.clock();
+        assert_eq!(cycles, 8);
+        assert_eq!(cpu.pc, 0xc002);
+        assert_eq!(cpu.a, 0x0a | 0x0f);
+
+        // test XOR A, d8 instruction
+        cpu.pc = 0xc000;
+        cpu.mmu.write(0xc000, 0xee);
+        cpu.mmu.write(0xc001, 0x0f);
+        cpu.a = 0x0a;
+        let cycles = cpu.clock();
+        assert_eq!(cycles, 8);
+        assert_eq!(cpu.pc, 0xc002);
+        assert_eq!(cpu.a, 0x0a ^ 0x0f);
     }
 }

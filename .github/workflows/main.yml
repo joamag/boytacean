@@ -10,7 +10,6 @@ jobs:
     strategy:
       matrix:
         rust-version: [
-          "1.56.1",
           "1.60.0",
           "1.61.0",
           "1.62.0",
@@ -20,6 +19,7 @@ jobs:
           "1.66.0",
           "1.67.0",
           "1.68.0",
+          "1.69.0",
           "latest"
         ]
     runs-on: ubuntu-latest
@@ -37,6 +37,8 @@ jobs:
         run: cargo fmt --all -- --check
       - name: Verify Rust code linting
         run: cargo clippy -- -D warnings -A unknown-lints
+      - name: Run unit tests
+        run: cargo test
       - name: Build development version
         run: cargo build
       - name: Build release version
@@ -47,11 +49,11 @@ jobs:
     strategy:
       matrix:
         rust-version: [
-          "1.64.0",
           "1.65.0",
           "1.66.0",
           "1.67.0",
           "1.68.0",
+          "1.69.0",
           "latest"
         ]
         node-version: ["16"]
@@ -70,6 +72,8 @@ jobs:
         run: cargo fmt --all -- --check
       - name: Verify Rust code linting
         run: cargo clippy -- -D warnings -A unknown-lints
+      - name: Run unit tests
+        run: cargo test
       - name: Install wasm-pack
         run: cargo install wasm-pack
       - name: Build WASM Web binary
@@ -80,3 +84,50 @@ jobs:
           node-version: ${{ matrix.node-version }}
       - name: Build and lint Web code
         run: cd frontends/web && npm install && npm run build && npm run lint
+  build-sdl:
+    name: Build SDL
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        rust-version: [
+          "1.64.0",
+          "1.65.0",
+          "1.66.0",
+          "1.67.0",
+          "1.68.0",
+          "1.69.0",
+          "latest"
+        ]
+    runs-on: ubuntu-latest
+    container: rust:${{ matrix.rust-version }}
+    steps:
+      - name: Checkout code from repository
+        uses: actions/checkout@v3
+      - name: Install Dependencies
+        run: |
+          apt-get update
+          apt-get install -y -q zip
+      - name: Install Rust components
+        run: |
+          rustup component add rustfmt
+          rustup component add clippy
+      - name: Print Rust information
+        run: rustc --version
+      - name: Install SDL dependencies
+        run: cd frontends/sdl && cargo install cargo-vcpkg && cargo vcpkg -v build
+      - name: Verify Rust code format
+        run: cd frontends/sdl && cargo fmt --all -- --check
+      - name: Verify Rust code linting
+        run: cd frontends/sdl && cargo clippy -- -D warnings -A unknown-lints
+      - name: Run unit tests
+        run: cd frontends/sdl && cargo test
+      - name: Build development version
+        run: cd frontends/sdl && cargo build
+      - name: Build release version
+        run: cd frontends/sdl && cargo build --release
+      - name: Run release version
+        run: cd frontends/sdl && cargo run --release -- --headless --cycles 10000000
+      - name: Run benchmark
+        run: cd frontends/sdl && cargo run --release -- --benchmark
+      - name: Run benchmark, only for CPU
+        run: cd frontends/sdl && cargo run --release -- --benchmark --benchmark-cpu

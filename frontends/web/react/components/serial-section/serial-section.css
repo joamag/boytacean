@@ -1,0 +1,11 @@
+.serial-section .printer > .printer-lines {
+    font-size: 0px;
+}
+
+.serial-section .printer > .printer-lines > .printer-line {
+    display: block;
+}
+
+.serial-section .printer > .printer-lines > .placeholder {
+    font-size: initial;
+}

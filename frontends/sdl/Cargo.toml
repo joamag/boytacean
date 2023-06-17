@@ -1,18 +1,41 @@
 [package]
 name = "boytacean-sdl"
-version = "0.7.4"
+version = "0.9.5"
 authors = ["João Magalhães <joamag@gmail.com>"]
 description = "An SDL frontend for Boytacen"
 license = "Apache-2.0"
 keywords = ["gameboy", "emulator", "rust", "sdl"]
 edition = "2018"
 
+[features]
+slow = []
+debug = ["boytacean/debug"]
+pedantic = ["boytacean/pedantic"]
+cpulog = ["boytacean/cpulog"]
+
 [dependencies.boytacean]
 path = "../.."
 
+[dependencies.clap]
+version = "4"
+features = ["derive"]
+
+[dependencies.image]
+version = "0.24"
+
+[dependencies.chrono]
+version = "0.4"
+
 [dependencies.sdl2]
 version = "0.35"
+git = "https://github.com/Rust-SDL2/rust-sdl2"
+rev = "27cd1fd67c811e06b9d997a77bb6089a1b65070d"
 features = ["ttf", "image", "gfx", "mixer", "static-link", "use-vcpkg"]
+
+# For MacOS running under arm64 architecture there may be linking issues
+# if that's the case try to lock the SDL2 version to the following Git revision
+# git = "https://github.com/Rust-SDL2/rust-sdl2"
+# rev = "27cd1fd67c811e06b9d997a77bb6089a1b65070d"
 
 # If the vcpkg version of SDL2 does not work (eg: display not found error)
 # then try dynamic linking SDL2 using the following features
@@ -21,7 +44,11 @@ features = ["ttf", "image", "gfx", "mixer", "static-link", "use-vcpkg"]
 [package.metadata.vcpkg]
 dependencies = ["sdl2", "sdl2-image[libjpeg-turbo,tiff,libwebp]", "sdl2-ttf", "sdl2-gfx", "sdl2-mixer"]
 git = "https://github.com/microsoft/vcpkg"
-rev = "261c458af6e3eed5d099144aff95d2b5035f656b"
+rev = "2023.04.15"
+
+# If you face issues with the SDL2 libraries linking process
+# try to use the following revision instead
+# rev = "2022.10.19"
 
 [package.metadata.vcpkg.target]
 x86_64-pc-windows-msvc = { triplet = "x64-windows-static-md" }

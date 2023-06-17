@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-*
+* Support for image based testing
 
 ### Changed
 
@@ -18,6 +18,77 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 *
+
+## [0.9.5] - 2023-06-05
+
+### Added
+
+* Support for the `clock_m()` function
+* Benchmark CLI option in SDL
+
+### Changed
+
+* Major performance improvements for the DMG specific code
+
+## [0.9.4] - 2023-06-04
+
+### Added
+
+* Support for displaying speed at which the CPU is running in Web mode, for debug purposes
+* Headless execution mode in Boytacean SDL
+* Many more parameters added for Boytacean SDL
+
+## [0.9.3] - 2023-05-18
+
+### Fixed
+
+* Small panic recovering issue
+
+## [0.9.2] - 2023-05-18
+
+### Added
+
+* Support for auto emulation mode selection
+
+## [0.9.1] - 2023-05-18
+
+### Added
+
+* Support for enabling and disabling audio channels
+
+### Fixed
+
+* Issue with CH2 envelope initialization
+
+## [0.9.0] - 2023-05-18
+
+### Added
+
+* Support for Game Boy Color (CGB) emulation! 🥳 - [#8](https://gitlab.stage.hive.pt/joamag/boytacean/-/issues/8)
+* Support for CLI params in Boytacean SDL
+* Support for `GameBoyConfig` structure that is passed to some comments
+* New `DMA` component
+
+## [0.8.0] - 2023-04-20
+
+### Added
+
+* Support for serial data transfer - [#19](https://gitlab.stage.hive.pt/joamag/boytacean/-/issues/19)
+* Support for printing of images using Printer emulation - [#19](https://gitlab.stage.hive.pt/joamag/boytacean/-/issues/19)
+* Support for display of logger and printer in Web panels
+* Converted serial-sections strategy to event driven
+
+### Fixed
+
+* `ButtonSwitch` issues by updating the value strategy nad bumping `emukit`
+* `AudioGB` with display of canvas with no visibility
+
+## [0.7.5] - 2023-04-11
+
+### Added
+
+* Support for variable clock speed for APU, means variable audio speed
+* Moved debug into the base emulator (from emukit)
 
 ## [0.7.4] - 2023-04-08
 

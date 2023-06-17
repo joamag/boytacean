@@ -39,15 +39,15 @@ impl Timer {
         self.int_tima = false;
     }
 
-    pub fn clock(&mut self, cycles: u8) {
-        self.div_clock += cycles as u16;
+    pub fn clock(&mut self, cycles: u16) {
+        self.div_clock += cycles;
         while self.div_clock >= 256 {
             self.div = self.div.wrapping_add(1);
             self.div_clock -= 256;
         }
 
         if self.tima_enabled {
-            self.tima_clock += cycles as u16;
+            self.tima_clock += cycles;
             while self.tima_clock >= self.tima_ratio {
                 // in case TIMA value overflows must set the
                 // interrupt and update the TIMA value to
@@ -68,11 +68,15 @@ impl Timer {
     }
 
     pub fn read(&mut self, addr: u16) -> u8 {
-        match addr & 0x00ff {
-            0x04 => self.div,
-            0x05 => self.tima,
-            0x06 => self.tma,
-            0x07 => self.tac,
+        match addr {
+            // 0xFF04 — DIV: Divider register
+            0xff04 => self.div,
+            // 0xFF05 — TIMA: Timer counter
+            0xff05 => self.tima,
+            // 0xFF06 — TMA: Timer modulo
+            0xff06 => self.tma,
+            // 0xFF07 — TAC: Timer control
+            0xff07 => self.tac,
             _ => {
                 warnln!("Reding from unknown Timer location 0x{:04x}", addr);
                 0xff
@@ -81,11 +85,15 @@ impl Timer {
     }
 
     pub fn write(&mut self, addr: u16, value: u8) {
-        match addr & 0x00ff {
-            0x04 => self.div = 0,
-            0x05 => self.tima = value,
-            0x06 => self.tma = value,
-            0x07 => {
+        match addr {
+            // 0xFF04 — DIV: Divider register
+            0xff04 => self.div = 0,
+            // 0xFF05 — TIMA: Timer counter
+            0xff05 => self.tima = value,
+            // 0xFF06 — TMA: Timer modulo
+            0xff06 => self.tma = value,
+            // 0xFF07 — TAC: Timer control
+            0xff07 => {
                 self.tac = value;
                 match value & 0x03 {
                     0x00 => self.tima_ratio = 1024,
@@ -100,14 +108,17 @@ impl Timer {
         }
     }
 
+    #[inline(always)]
     pub fn int_tima(&self) -> bool {
         self.int_tima
     }
 
+    #[inline(always)]
     pub fn set_int_tima(&mut self, value: bool) {
         self.int_tima = value;
     }
 
+    #[inline(always)]
     pub fn ack_tima(&mut self) {
         self.set_int_tima(false);
     }

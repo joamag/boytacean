@@ -1,12 +1,46 @@
-use crate::{apu::Apu, debugln, pad::Pad, ppu::Ppu, rom::Cartridge, timer::Timer};
+use std::{cell::RefCell, rc::Rc};
 
-pub const BOOT_SIZE: usize = 2304;
-pub const RAM_SIZE: usize = 8192;
+use crate::{
+    apu::Apu,
+    debugln,
+    dma::Dma,
+    gb::{Components, GameBoyConfig, GameBoyMode, GameBoySpeed},
+    pad::Pad,
+    ppu::Ppu,
+    rom::Cartridge,
+    serial::Serial,
+    timer::Timer,
+};
+
+pub const BOOT_SIZE_DMG: usize = 256;
+pub const BOOT_SIZE_CGB: usize = 2304;
+
+pub const RAM_SIZE_DMG: usize = 8192;
+pub const RAM_SIZE_CGB: usize = 32768;
 
 pub struct Mmu {
     /// Register that controls the interrupts that are considered
     /// to be enabled and should be triggered.
     pub ie: u8,
+
+    /// Register that controls the compatibility mode in use, this
+    /// value comes directly from 0x0143 (CGB flag). The possible (and
+    /// valid) values are: 0x80 for games that support CGB enhancements
+    /// and 0xC0 for games that are compatible only with a CGB device
+    /// (CGB only).
+    pub key0: u8,
+
+    /// Flags that controls if the system is currently in the process
+    /// of switching between the double and single speed modes.
+    pub switching: bool,
+
+    /// The speed (frequency) at which the system is currently running,
+    /// it may be either normal (4.194304 MHz) or double (8.388608 MHz).
+    speed: GameBoySpeed,
+
+    /// Callback to be called when the speed of the system changes, it
+    /// should provide visibility over the current speed of the system.
+    speed_callback: fn(speed: GameBoySpeed),
 
     /// Reference to the PPU (Pixel Processing Unit) that is going
     /// to be used both for VRAM reading/writing and to forward
@@ -18,6 +52,11 @@ pub struct Mmu {
     /// some of the access operations.
     apu: Apu,
 
+    /// Reference to the DMA (Direct Memory Access) controller that is going
+    /// to be used for quick and CPU offloaded memory transfers.
+    /// There are multiple execution modes for the DMA.
+    dma: Dma,
+
     /// Reference to the Gamepad structure that is going to control
     /// the I/O access to this device.
     pad: Pad,
@@ -25,6 +64,10 @@ pub struct Mmu {
     /// The timer controller to be used as part of the I/O access
     /// that is memory mapped.
     timer: Timer,
+
+    /// The serial data transfer controller to be used to control the
+    /// link cable connection, this component is memory mapped.
+    serial: Serial,
 
     /// The cartridge ROM that is currently loaded into the system,
     /// going to be used to access ROM and external RAM banks.
@@ -43,36 +86,106 @@ pub struct Mmu {
     /// the bios which is 2308 bytes long is in fact only 2048 bytes
     /// as the 256 bytes in range 0x100-0x1FF are meant to be
     /// overwritten byte the cartridge header.
-    boot: [u8; BOOT_SIZE],
+    boot: Vec<u8>,
 
-    ram: [u8; RAM_SIZE],
+    /// Buffer that is used to store the RAM of the system, this
+    /// value varies between DMG and CGB emulation, being 8KB for
+    /// the DMG and 32KB for the CGB. Mapped in range 0xC000-0xDFFF.
+    ram: Vec<u8>,
+
+    /// The RAM bank to be used in the read and write operation of
+    /// the 0xD000-0xDFFF memory range (CGB only).
+    ram_bank: u8,
+
+    /// The offset to be used in the read and write operation of
+    /// the RAM, this value should be consistent with the RAM bank
+    /// that is currently selected (CGB only).
+    ram_offset: u16,
+
+    /// The current running mode of the emulator, this
+    /// may affect many aspects of the emulation.
+    mode: GameBoyMode,
+
+    /// The pointer to the parent configuration of the running
+    /// Game Boy emulator, that can be used to control the behaviour
+    /// of Game Boy emulation.
+    gbc: Rc<RefCell<GameBoyConfig>>,
 }
 
 impl Mmu {
-    pub fn new(ppu: Ppu, apu: Apu, pad: Pad, timer: Timer) -> Self {
+    pub fn new(components: Components, mode: GameBoyMode, gbc: Rc<RefCell<GameBoyConfig>>) -> Self {
         Self {
-            ppu,
-            apu,
-            pad,
-            timer,
+            ppu: components.ppu,
+            apu: components.apu,
+            dma: components.dma,
+            pad: components.pad,
+            timer: components.timer,
+            serial: components.serial,
             rom: Cartridge::new(),
             boot_active: true,
-            boot: [0u8; BOOT_SIZE],
-            ram: [0u8; RAM_SIZE],
+            boot: vec![],
+            ram: vec![],
+            ram_bank: 0x1,
+            ram_offset: 0x1000,
             ie: 0x0,
+            key0: 0x0,
+            speed: GameBoySpeed::Normal,
+            switching: false,
+            speed_callback: |_| {},
+            mode,
+            gbc,
         }
     }
 
     pub fn reset(&mut self) {
         self.rom = Cartridge::new();
         self.boot_active = true;
-        self.boot = [0u8; BOOT_SIZE];
-        self.ram = [0u8; RAM_SIZE];
+        self.boot = vec![];
+        self.ram = vec![];
+        self.ram_bank = 0x1;
+        self.ram_offset = 0x1000;
         self.ie = 0x0;
+        self.key0 = 0x0;
+        self.speed = GameBoySpeed::Normal;
+        self.switching = false;
+    }
+
+    pub fn allocate_default(&mut self) {
+        self.allocate_dmg();
+    }
+
+    pub fn allocate_dmg(&mut self) {
+        self.boot = vec![0x00; BOOT_SIZE_DMG];
+        self.ram = vec![0x00; RAM_SIZE_DMG];
+    }
+
+    pub fn allocate_cgb(&mut self) {
+        self.boot = vec![0x00; BOOT_SIZE_CGB];
+        self.ram = vec![0x00; RAM_SIZE_CGB];
+    }
+
+    /// Switches the current system's speed toggling between
+    /// the normal and double speed modes.
+    pub fn switch_speed(&mut self) {
+        self.speed = self.speed.switch();
+        self.switching = false;
+        (self.speed_callback)(self.speed);
+    }
+
+    pub fn speed(&self) -> GameBoySpeed {
+        self.speed
+    }
+
+    pub fn set_speed_callback(&mut self, callback: fn(speed: GameBoySpeed)) {
+        self.speed_callback = callback;
     }
 
     pub fn ppu(&mut self) -> &mut Ppu {
         &mut self.ppu
+    }
+
+    pub fn ppu_i(&self) -> &Ppu {
+        &self.ppu
     }
 
     pub fn apu(&mut self) -> &mut Apu {
@@ -83,12 +196,36 @@ impl Mmu {
         &self.apu
     }
 
+    pub fn dma(&mut self) -> &mut Dma {
+        &mut self.dma
+    }
+
+    pub fn dma_i(&self) -> &Dma {
+        &self.dma
+    }
+
     pub fn pad(&mut self) -> &mut Pad {
         &mut self.pad
     }
 
+    pub fn pad_i(&self) -> &Pad {
+        &self.pad
+    }
+
     pub fn timer(&mut self) -> &mut Timer {
         &mut self.timer
+    }
+
+    pub fn timer_i(&self) -> &Timer {
+        &self.timer
+    }
+
+    pub fn serial(&mut self) -> &mut Serial {
+        &mut self.serial
+    }
+
+    pub fn serial_i(&self) -> &Serial {
+        &self.serial
     }
 
     pub fn boot_active(&self) -> bool {
@@ -97,6 +234,17 @@ impl Mmu {
 
     pub fn set_boot_active(&mut self, value: bool) {
         self.boot_active = value;
+    }
+
+    pub fn clock_dma(&mut self, _cycles: u16) {
+        if !self.dma.active() {
+            return;
+        }
+
+        // @TODO: Implement DMA transfer in a better way
+        let data = self.read_many(self.dma.source(), self.dma.length());
+        self.write_many(self.dma.destination(), &data);
+        self.dma.set_active(false);
     }
 
     pub fn read(&mut self, addr: u16) -> u8 {
@@ -114,13 +262,19 @@ impl Mmu {
                     }
                     return self.boot[addr as usize];
                 }
+                if self.boot_active
+                    && self.mode == GameBoyMode::Cgb
+                    && (0x0200..=0x08ff).contains(&addr)
+                {
+                    return self.boot[addr as usize];
+                }
                 self.rom.read(addr)
             }
 
             // ROM 0 (12 KB/16 KB)
             0x1000 | 0x2000 | 0x3000 => self.rom.read(addr),
 
-            // ROM 1 (Unbanked) (16 KB)
+            // ROM 1 (Banked) (16 KB)
             0x4000 | 0x5000 | 0x6000 | 0x7000 => self.rom.read(addr),
 
             // Graphics: VRAM (8 KB)
@@ -129,8 +283,11 @@ impl Mmu {
             // External RAM (8 KB)
             0xa000 | 0xb000 => self.rom.read(addr),
 
-            // Working RAM (8 KB)
-            0xc000 | 0xd000 => self.ram[(addr & 0x1fff) as usize],
+            // Working RAM 0 (4 KB)
+            0xc000 => self.ram[(addr & 0x0fff) as usize],
+
+            // Working RAM 1 (Banked) (4KB)
+            0xd000 => self.ram[(self.ram_offset + (addr & 0x0fff)) as usize],
 
             // Working RAM Shadow
             0xe000 => self.ram[(addr & 0x1fff) as usize],
@@ -141,6 +298,9 @@ impl Mmu {
                 | 0xa00 | 0xb00 | 0xc00 | 0xd00 => self.ram[(addr & 0x1fff) as usize],
                 0xe00 => self.ppu.read(addr),
                 0xf00 => match addr & 0x00ff {
+                    // 0xFF01-0xFF02 - Serial data transfer
+                    0x01..=0x02 => self.serial.read(addr),
+
                     // 0xFF0F — IF: Interrupt flag
                     0x0f =>
                     {
@@ -148,11 +308,21 @@ impl Mmu {
                         (if self.ppu.int_vblank() { 0x01 } else { 0x00 }
                             | if self.ppu.int_stat() { 0x02 } else { 0x00 }
                             | if self.timer.int_tima() { 0x04 } else { 0x00 }
+                            | if self.serial.int_serial() { 0x08 } else { 0x00 }
                             | if self.pad.int_pad() { 0x10 } else { 0x00 })
                     }
 
+                    // 0xFF4C - KEY0: Compatibility flag (CGB only)
+                    0x4c => self.key0,
+
+                    // 0xFF4D - KEY1: Speed switching (CGB only)
+                    0x4d => (false as u8) | ((self.speed as u8) << 7),
+
                     // 0xFF50 - Boot active flag
                     0x50 => u8::from(self.boot_active),
+
+                    // 0xFF70 - SVBK: WRAM bank (CGB only)
+                    0x70 => self.ram_bank & 0x07,
 
                     // 0xFF80-0xFFFE - High RAM (HRAM)
                     0x80..=0xfe => self.ppu.read(addr),
@@ -171,7 +341,14 @@ impl Mmu {
                             }
                         },
                         0x10..=0x26 | 0x30..=0x37 => self.apu.read(addr),
-                        0x40 | 0x50 | 0x60 | 0x70 => self.ppu.read(addr),
+                        0x40 | 0x60 | 0x70 => self.ppu.read(addr),
+                        0x50 => match addr & 0x00ff {
+                            0x51..=0x55 => self.dma.read(addr),
+                            _ => {
+                                debugln!("Reading from unknown IO control 0x{:04x}", addr);
+                                0x00
+                            }
+                        },
                         _ => {
                             debugln!("Reading from unknown IO control 0x{:04x}", addr);
                             0x00
@@ -193,7 +370,7 @@ impl Mmu {
             // ROM 0 (12 KB/16 KB)
             0x1000 | 0x2000 | 0x3000 => self.rom.write(addr, value),
 
-            // ROM 1 (Unbanked) (16 KB)
+            // ROM 1 (Banked) (16 KB)
             0x4000 | 0x5000 | 0x6000 | 0x7000 => self.rom.write(addr, value),
 
             // Graphics: VRAM (8 KB)
@@ -202,8 +379,11 @@ impl Mmu {
             // External RAM (8 KB)
             0xa000 | 0xb000 => self.rom.write(addr, value),
 
-            // Working RAM (8 KB)
-            0xc000 | 0xd000 => self.ram[(addr & 0x1fff) as usize] = value,
+            // Working RAM 0 (4 KB)
+            0xc000 => self.ram[(addr & 0x0fff) as usize] = value,
+
+            // Working RAM 1 (Banked) (4KB)
+            0xd000 => self.ram[(self.ram_offset + (addr & 0x0fff)) as usize] = value,
 
             // Working RAM Shadow
             0xe000 => self.ram[(addr & 0x1fff) as usize] = value,
@@ -216,16 +396,43 @@ impl Mmu {
                 }
                 0xe00 => self.ppu.write(addr, value),
                 0xf00 => match addr & 0x00ff {
+                    // 0xFF01-0xFF02 - Serial data transfer
+                    0x01..=0x02 => self.serial.write(addr, value),
+
                     // 0xFF0F — IF: Interrupt flag
                     0x0f => {
                         self.ppu.set_int_vblank(value & 0x01 == 0x01);
                         self.ppu.set_int_stat(value & 0x02 == 0x02);
                         self.timer.set_int_tima(value & 0x04 == 0x04);
+                        self.serial.set_int_serial(value & 0x08 == 0x08);
                         self.pad.set_int_pad(value & 0x10 == 0x10);
+                    }
+
+                    // 0xFF4C - KEY0: Compatibility flag (CGB only)
+                    0x4c => {
+                        self.key0 = value;
+                        if value == 0x04 {
+                            self.ppu().set_dmg_compat(true);
+                        }
+                    }
+
+                    // 0xFF4D - KEY1: Speed switching (CGB only)
+                    0x4d => {
+                        self.switching = value & 0x01 == 0x01;
                     }
 
                     // 0xFF50 - Boot active flag
                     0x50 => self.boot_active = false,
+
+                    // 0xFF70 - SVBK: WRAM bank (CGB only)
+                    0x70 => {
+                        let mut ram_bank = value & 0x07;
+                        if ram_bank == 0x0 {
+                            ram_bank = 0x1;
+                        }
+                        self.ram_bank = ram_bank;
+                        self.ram_offset = self.ram_bank as u16 * 0x1000;
+                    }
 
                     // 0xFF80-0xFFFE - High RAM (HRAM)
                     0x80..=0xfe => self.ppu.write(addr, value),
@@ -257,13 +464,9 @@ impl Mmu {
                                     _ => self.ppu.write(addr, value),
                                 }
                             }
+                            #[allow(clippy::single_match)]
                             0x50 => match addr & 0x00ff {
-                                // 0xFF51-0xFF52 - VRAM DMA source (CGB only)
-                                0x51..=0x52 => (),
-
-                                // 0xFF53-0xFF54 - VRAM DMA destination (CGB only)
-                                0x53..=0x54 => (),
-
+                                0x51..=0x55 => self.dma.write(addr, value),
                                 _ => debugln!("Writing to unknown IO control 0x{:04x}", addr),
                             },
                             _ => debugln!("Writing to unknown IO control 0x{:04x}", addr),
@@ -308,5 +511,33 @@ impl Mmu {
 
     pub fn set_rom(&mut self, rom: Cartridge) {
         self.rom = rom;
+    }
+
+    pub fn mode(&self) -> GameBoyMode {
+        self.mode
+    }
+
+    pub fn set_mode(&mut self, value: GameBoyMode) {
+        self.mode = value;
+    }
+
+    pub fn set_gbc(&mut self, value: Rc<RefCell<GameBoyConfig>>) {
+        self.gbc = value;
+    }
+}
+
+impl Default for Mmu {
+    fn default() -> Self {
+        let mode = GameBoyMode::Dmg;
+        let gbc = Rc::new(RefCell::new(GameBoyConfig::default()));
+        let components = Components {
+            ppu: Ppu::new(mode, gbc.clone()),
+            apu: Apu::default(),
+            dma: Dma::default(),
+            pad: Pad::default(),
+            timer: Timer::default(),
+            serial: Serial::default(),
+        };
+        Mmu::new(components, mode, gbc)
     }
 }

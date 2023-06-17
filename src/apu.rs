@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use crate::warnln;
+use crate::{gb::GameBoy, warnln};
 
 const DUTY_TABLE: [[u8; 8]; 4] = [
     [0, 0, 0, 0, 0, 0, 0, 1],
@@ -61,7 +61,7 @@ pub struct Apu {
     ch3_length_stop: bool,
     ch3_enabled: bool,
 
-    ch4_timer: i16,
+    ch4_timer: i32,
     ch4_envelope_sequence: u8,
     ch4_envelope_enabled: bool,
     ch4_output: u8,
@@ -80,6 +80,8 @@ pub struct Apu {
 
     right_enabled: bool,
     left_enabled: bool,
+    sound_enabled: bool,
+
     ch1_out_enabled: bool,
     ch2_out_enabled: bool,
     ch3_out_enabled: bool,
@@ -93,10 +95,12 @@ pub struct Apu {
     output_timer: i16,
     audio_buffer: VecDeque<u8>,
     audio_buffer_max: usize,
+
+    clock_freq: u32,
 }
 
 impl Apu {
-    pub fn new(sampling_rate: u16, buffer_size: f32) -> Self {
+    pub fn new(sampling_rate: u16, buffer_size: f32, clock_freq: u32) -> Self {
         Self {
             ch1_timer: 0,
             ch1_sequence: 0,
@@ -159,6 +163,7 @@ impl Apu {
 
             left_enabled: true,
             right_enabled: true,
+            sound_enabled: true,
 
             ch1_out_enabled: true,
             ch2_out_enabled: true,
@@ -184,6 +189,7 @@ impl Apu {
                 (sampling_rate as f32 * buffer_size) as usize * 2,
             ),
             audio_buffer_max: (sampling_rate as f32 * buffer_size) as usize * 2,
+            clock_freq,
         }
     }
 
@@ -249,6 +255,7 @@ impl Apu {
 
         self.left_enabled = true;
         self.right_enabled = true;
+        self.sound_enabled = true;
 
         self.sequencer = 0;
         self.sequencer_step = 0;
@@ -257,8 +264,12 @@ impl Apu {
         self.clear_audio_buffer()
     }
 
-    pub fn clock(&mut self, cycles: u8) {
-        self.sequencer += cycles as u16;
+    pub fn clock(&mut self, cycles: u16) {
+        if !self.sound_enabled {
+            return;
+        }
+
+        self.sequencer += cycles;
         if self.sequencer >= 8192 {
             // each of these steps runs at 512/8 Hz = 64Hz,
             // meaning a complete loop runs at 512 Hz
@@ -309,17 +320,86 @@ impl Apu {
                 self.audio_buffer.push_back(self.output());
             }
 
-            // @TODO the CPU clock is hardcoded here, we must handle situations
-            // where there's some kind of overclock, and for that to happen the
-            // current CPU clock must be propagated here
-            self.output_timer += (4194304.0 / self.sampling_rate as f32) as i16;
+            // calculates the rate at which a new audio sample should be
+            // created based on the (base/CPU) clock frequency and the
+            // sampling rate, this is basically the amount of APU clock
+            // calls that should be performed until an audio sample is created
+            self.output_timer += (self.clock_freq as f32 / self.sampling_rate as f32) as i16;
         }
     }
 
     pub fn read(&mut self, addr: u16) -> u8 {
         match addr {
+            // 0xFF10 — NR10: Channel 1 sweep
+            0xff10 => {
+                (self.ch1_sweep_slope & 0x07)
+                    | (if self.ch1_sweep_increase { 0x08 } else { 0x00 })
+                    | ((self.ch1_sweep_pace & 0x07) << 4)
+            }
+            // 0xFF11 — NR11: Channel 1 length timer & duty cycle
+            0xff11 => (self.ch1_wave_duty & 0x03) << 6,
+            // 0xFF12 — NR12: Channel 1 volume & envelope
+            0xff12 => {
+                (self.ch1_pace & 0x07)
+                    | ((self.ch1_direction & 0x01) << 3)
+                    | ((self.ch1_volume & 0x0f) << 4)
+            }
+
+            // 0xFF15 — Not used
+            0xff15 => 0xff,
+            // 0xFF16 — NR21: Channel 2 length timer & duty cycle
+            0xff16 => (self.ch2_wave_duty & 0x03) << 6,
+            // 0xFF17 — NR22: Channel 2 volume & envelope
+            0xff17 => {
+                (self.ch2_pace & 0x07)
+                    | ((self.ch2_direction & 0x01) << 3)
+                    | ((self.ch2_volume & 0x0f) << 4)
+            }
+
+            // 0xFF1A — NR30: Channel 3 DAC enable
+            0xff1a => {
+                if self.ch3_dac {
+                    0x80
+                } else {
+                    0x00
+                }
+            }
+            // 0xFF1B — NR31: Channel 3 length timer
+            0xff1b => 0x00,
+            // 0xFF1C — NR32: Channel 3 output level
+            0xff1c => (self.ch3_output_level & 0x03) << 5,
+
+            // 0xFF1F — Not used
+            0xff1f => 0xff,
+            // 0xFF20 — NR41: Channel 4 length timer
+            0xff20 => 0x00,
+            // 0xFF21 — NR42: Channel 4 volume & envelope
+            0xff21 => {
+                (self.ch4_pace & 0x07)
+                    | ((self.ch4_direction & 0x01) << 3)
+                    | ((self.ch4_volume & 0x0f) << 4)
+            }
+
             // 0xFF25 — NR51: Sound panning
             0xff25 => self.glob_panning,
+            // 0xFF26 — NR52: Sound on/off
+            0xff26 =>
+            {
+                #[allow(clippy::bool_to_int_with_if)]
+                (if self.ch1_enabled { 0x01 } else { 0x00 }
+                    | if self.ch2_enabled { 0x02 } else { 0x00 }
+                    | if self.ch3_enabled && self.ch3_dac {
+                        0x04
+                    } else {
+                        0x00
+                    }
+                    | if self.ch4_enabled { 0x08 } else { 0x00 }
+                    | if self.sound_enabled { 0x80 } else { 0x00 })
+            }
+
+            // 0xFF30-0xFF3F — Wave pattern RAM
+            0xff30..=0xff3f => self.wave_ram[addr as usize & 0x000f],
+
             _ => {
                 warnln!("Reading from unknown APU location 0x{:04x}", addr);
                 0xff
@@ -369,6 +449,8 @@ impl Apu {
                 }
             }
 
+            // 0xFF15 — Not used
+            0xff15 => (),
             // 0xFF16 — NR21: Channel 2 length timer & duty cycle
             0xff16 => {
                 self.ch2_length_timer = value & 0x3f;
@@ -379,6 +461,8 @@ impl Apu {
                 self.ch2_pace = value & 0x07;
                 self.ch2_direction = (value & 0x08) >> 3;
                 self.ch2_volume = (value & 0xf0) >> 4;
+                self.ch2_envelope_enabled = self.ch2_pace > 0;
+                self.ch2_envelope_sequence = 0;
             }
             // 0xFF18 — NR23: Channel 2 wavelength low
             0xff18 => {
@@ -432,6 +516,8 @@ impl Apu {
                 }
             }
 
+            // 0xFF1F — Not used
+            0xff1f => (),
             // 0xFF20 — NR41: Channel 4 length timer
             0xff20 => {
                 self.ch4_length_timer = value & 0x3f;
@@ -474,7 +560,11 @@ impl Apu {
             }
             // 0xFF26 — NR52: Sound on/off
             0xff26 => {
-                //@TODO: Implement sound on/off
+                self.sound_enabled = value & 0x80 == 0x80;
+                if !self.sound_enabled {
+                    self.reset();
+                    self.sound_enabled = false;
+                }
             }
 
             // 0xFF30-0xFF3F — Wave pattern RAM
@@ -527,16 +617,32 @@ impl Apu {
         }
     }
 
+    pub fn ch1_enabled(&mut self) -> bool {
+        self.ch1_out_enabled
+    }
+
     pub fn set_ch1_enabled(&mut self, enabled: bool) {
         self.ch1_out_enabled = enabled;
+    }
+
+    pub fn ch2_enabled(&mut self) -> bool {
+        self.ch2_out_enabled
     }
 
     pub fn set_ch2_enabled(&mut self, enabled: bool) {
         self.ch2_out_enabled = enabled;
     }
 
+    pub fn ch3_enabled(&mut self) -> bool {
+        self.ch3_out_enabled
+    }
+
     pub fn set_ch3_enabled(&mut self, enabled: bool) {
         self.ch3_out_enabled = enabled;
+    }
+
+    pub fn ch4_enabled(&mut self) -> bool {
+        self.ch4_out_enabled
     }
 
     pub fn set_ch4_enabled(&mut self, enabled: bool) {
@@ -553,6 +659,14 @@ impl Apu {
 
     pub fn clear_audio_buffer(&mut self) {
         self.audio_buffer.clear();
+    }
+
+    pub fn clock_freq(&self) -> u32 {
+        self.clock_freq
+    }
+
+    pub fn set_clock_freq(&mut self, value: u32) {
+        self.clock_freq = value;
     }
 
     #[inline(always)]
@@ -688,7 +802,7 @@ impl Apu {
     }
 
     #[inline(always)]
-    fn tick_ch_all(&mut self, cycles: u8) {
+    fn tick_ch_all(&mut self, cycles: u16) {
         self.tick_ch1(cycles);
         self.tick_ch2(cycles);
         self.tick_ch3(cycles);
@@ -696,7 +810,7 @@ impl Apu {
     }
 
     #[inline(always)]
-    fn tick_ch1(&mut self, cycles: u8) {
+    fn tick_ch1(&mut self, cycles: u16) {
         self.ch1_timer = self.ch1_timer.saturating_sub(cycles as i16);
         if self.ch1_timer > 0 {
             return;
@@ -718,7 +832,7 @@ impl Apu {
     }
 
     #[inline(always)]
-    fn tick_ch2(&mut self, cycles: u8) {
+    fn tick_ch2(&mut self, cycles: u16) {
         self.ch2_timer = self.ch2_timer.saturating_sub(cycles as i16);
         if self.ch2_timer > 0 {
             return;
@@ -740,7 +854,7 @@ impl Apu {
     }
 
     #[inline(always)]
-    fn tick_ch3(&mut self, cycles: u8) {
+    fn tick_ch3(&mut self, cycles: u16) {
         self.ch3_timer = self.ch3_timer.saturating_sub(cycles as i16);
         if self.ch3_timer > 0 {
             return;
@@ -769,8 +883,8 @@ impl Apu {
     }
 
     #[inline(always)]
-    fn tick_ch4(&mut self, cycles: u8) {
-        self.ch4_timer = self.ch4_timer.saturating_sub(cycles as i16);
+    fn tick_ch4(&mut self, cycles: u16) {
+        self.ch4_timer = self.ch4_timer.saturating_sub(cycles as i32);
         if self.ch4_timer > 0 {
             return;
         }
@@ -798,7 +912,7 @@ impl Apu {
         }
 
         self.ch4_timer +=
-            ((CH4_DIVISORS[self.ch4_divisor as usize] as u16) << self.ch4_clock_shift) as i16;
+            ((CH4_DIVISORS[self.ch4_divisor as usize] as u16) << self.ch4_clock_shift) as i32;
     }
 
     #[inline(always)]
@@ -823,7 +937,7 @@ impl Apu {
     #[inline(always)]
     fn trigger_ch4(&mut self) {
         self.ch4_timer =
-            ((CH4_DIVISORS[self.ch4_divisor as usize] as u16) << self.ch4_clock_shift) as i16;
+            ((CH4_DIVISORS[self.ch4_divisor as usize] as u16) << self.ch4_clock_shift) as i32;
         self.ch4_lfsr = 0x7ff1;
         self.ch4_envelope_sequence = 0;
     }
@@ -831,6 +945,62 @@ impl Apu {
 
 impl Default for Apu {
     fn default() -> Self {
-        Self::new(44100, 1.0)
+        Self::new(44100, 1.0, GameBoy::CPU_FREQ)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_trigger_ch1() {
+        let mut apu = Apu {
+            ch1_wave_length: 1024,
+            ..Default::default()
+        };
+        apu.trigger_ch1();
+
+        assert_eq!(apu.ch1_timer, 4096);
+        assert_eq!(apu.ch1_envelope_sequence, 0);
+        assert_eq!(apu.ch1_sweep_sequence, 0);
+    }
+
+    #[test]
+    fn test_trigger_ch2() {
+        let mut apu = Apu {
+            ch2_wave_length: 1024,
+            ..Default::default()
+        };
+        apu.trigger_ch2();
+
+        assert_eq!(apu.ch2_timer, 4096);
+        assert_eq!(apu.ch2_envelope_sequence, 0);
+    }
+
+    #[test]
+    fn test_trigger_ch3() {
+        let mut apu = Apu {
+            ch3_wave_length: 1024,
+            ..Default::default()
+        };
+        apu.trigger_ch3();
+
+        assert_eq!(apu.ch3_timer, 3);
+        assert_eq!(apu.ch3_position, 0);
+    }
+
+    #[test]
+    fn test_trigger_ch4() {
+        let mut apu = Apu {
+            ch4_divisor: 3,
+            ch4_clock_shift: 2,
+            ..Default::default()
+        };
+        apu.trigger_ch4();
+
+        assert_eq!(apu.ch4_timer, 192);
+        assert_eq!(apu.ch4_lfsr, 0x7ff1);
+        assert_eq!(apu.ch4_envelope_sequence, 0);
     }
 }
