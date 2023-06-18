@@ -568,7 +568,7 @@ impl Ppu {
         self.palettes_color_obj = [[[0u8; RGB_SIZE]; PALETTE_SIZE]; 8];
         self.palettes = [0u8; 3];
         self.palettes_color = [[0u8; 64]; 2];
-        self.bg_map_attrs_0 =[TileData::default(); 1024];
+        self.bg_map_attrs_0 = [TileData::default(); 1024];
         self.bg_map_attrs_1 = [TileData::default(); 1024];
         self.obj_priority = false;
         self.scy = 0x0;
@@ -731,8 +731,15 @@ impl Ppu {
             // 0xFF6B — OCPD/OBPD (CGB only)
             0xff6b => self.palettes_color[1][self.palette_address_obj as usize],
             // 0xFF6C — OPRI (CGB only)
-            #[allow(clippy::bool_to_int_with_if)]
-            0xff6c => if self.obj_priority { 0x01 } else { 0x00 },
+           
+            0xff6c => {
+                #[allow(clippy::bool_to_int_with_if)]
+                if self.obj_priority {
+                    0x01
+                } else {
+                    0x00
+                }
+            }
             _ => {
                 warnln!("Reading from unknown PPU location 0x{:04x}", addr);
                 0xff
@@ -1539,8 +1546,8 @@ impl Ppu {
                     // one that has been drawn by a previous object, this happens
                     // in case the current object has a small X coordinate according
                     // to the MBR algorithm
-                    let has_priority =
-                        index_buffer[x as usize] == -256 || (obj_priority_mode && obj.x < index_buffer[x as usize]);
+                    let has_priority = index_buffer[x as usize] == -256
+                        || (obj_priority_mode && obj.x < index_buffer[x as usize]);
 
                     let pixel = tile_row[if obj.xflip {
                         TILE_WIDTH_I - tile_x
