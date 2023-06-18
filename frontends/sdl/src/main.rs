@@ -712,7 +712,7 @@ struct Args {
     )]
     cycles: u64,
 
-    #[arg(short, long, default_value_t = String::from("../../res/roms/demo/pocket.gb"), help = "Path to the ROM file to be loaded")]
+    #[arg(short, long, default_value_t = String::from("../../res/roms/test/cgb_acid2.gbc"), help = "Path to the ROM file to be loaded")]
     rom_path: String,
 }
 
@@ -750,7 +750,11 @@ fn main() {
     // creates a new Game Boy instance and loads both the boot ROM
     // and the initial game ROM to "start the engine"
     let mut game_boy = GameBoy::new(Some(mode));
-    let device = build_device(&args.device);
+    if auto_mode {
+        let mode = Cartridge::from_file(&args.rom_path).gb_mode();
+        game_boy.set_mode(mode);
+    }
+    let device: Box<dyn SerialDevice> = build_device(&args.device);
     game_boy.set_ppu_enabled(!args.no_ppu);
     game_boy.set_apu_enabled(!args.no_apu);
     game_boy.set_dma_enabled(!args.no_dma);
