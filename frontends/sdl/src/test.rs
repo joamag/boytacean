@@ -26,6 +26,7 @@ pub fn compare_images(source_pixels: &[u8], target_path: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use boytacean::{
+        gb::GameBoyMode,
         ppu::FRAME_BUFFER_SIZE,
         test::{run_image_test, TestOptions},
     };
@@ -51,6 +52,20 @@ mod tests {
             TestOptions::default(),
         );
         let image_result = compare_images(&result, "res/test/dmg_acid2.png");
+        assert_eq!(image_result, true);
+    }
+
+    #[test]
+    fn test_cgb_acid2() {
+        let result: [u8; FRAME_BUFFER_SIZE] = run_image_test(
+            "../../res/roms/test/cgb_acid2.gbc",
+            Some(50000000),
+            TestOptions {
+                mode: Some(GameBoyMode::Cgb),
+                ..Default::default()
+            },
+        );
+        let image_result = compare_images(&result, "res/test/cgb_acid2.png");
         assert_eq!(image_result, true);
     }
 

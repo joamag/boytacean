@@ -285,6 +285,11 @@ pub struct Ppu {
     /// processed set of pixels ready to be displayed on screen.
     pub frame_buffer: Box<[u8; FRAME_BUFFER_SIZE]>,
 
+    /// The buffer that will control the background to OAM
+    /// priority, allowing the background to be drawn over
+    /// the sprites/objects if necessary.
+    priority_buffer: Box<[bool; COLOR_BUFFER_SIZE]>,
+
     /// Video dedicated memory (VRAM) where both the tiles and
     /// the sprites/objects are going to be stored.
     vram: [u8; VRAM_SIZE],
@@ -499,6 +504,7 @@ impl Ppu {
         Self {
             color_buffer: Box::new([0u8; COLOR_BUFFER_SIZE]),
             frame_buffer: Box::new([0u8; FRAME_BUFFER_SIZE]),
+            priority_buffer: Box::new([false; COLOR_BUFFER_SIZE]),
             vram: [0u8; VRAM_SIZE],
             hram: [0u8; HRAM_SIZE],
             oam: [0u8; OAM_SIZE],
@@ -555,6 +561,7 @@ impl Ppu {
     pub fn reset(&mut self) {
         self.color_buffer = Box::new([0u8; COLOR_BUFFER_SIZE]);
         self.frame_buffer = Box::new([0u8; FRAME_BUFFER_SIZE]);
+        self.priority_buffer = Box::new([false; COLOR_BUFFER_SIZE]);
         self.vram = [0u8; VRAM_SIZE_CGB];
         self.hram = [0u8; HRAM_SIZE];
         self.vram_bank = 0x0;
@@ -1196,6 +1203,10 @@ impl Ppu {
         let mut xflip = tile_attr.xflip;
         let mut yflip = tile_attr.yflip;
 
+        // obtains the value the BG-to-OAM priority to be used in the computation
+        // of the final pixel value (CGB only)
+        let mut priority = tile_attr.priority;
+
         // increments the tile index value by the required offset for the VRAM
         // bank in which the tile is stored, this is only required for CGB mode
         tile_index += tile_attr.vram_bank as usize * TILE_COUNT_DMG;
@@ -1240,6 +1251,12 @@ impl Ppu {
             self.frame_buffer[frame_offset + 1] = color[1];
             self.frame_buffer[frame_offset + 2] = color[2];
 
+            // updates the priority buffer with the current pixel
+            // the priority is only set in case the priority of
+            // the background (over OAM) is set in the attributes
+            // and the pixel is not transparent
+            self.priority_buffer[color_offset] = priority && pixel > 0;
+
             // increments the current tile X position in drawing
             x += 1;
 
@@ -1269,6 +1286,7 @@ impl Ppu {
                     palette = &self.palettes_color_bg[tile_attr.palette as usize];
                     xflip = tile_attr.xflip;
                     yflip = tile_attr.yflip;
+                    priority = tile_attr.priority;
                     tile_index += tile_attr.vram_bank as usize * TILE_COUNT_DMG;
                 }
 
@@ -1540,7 +1558,13 @@ impl Ppu {
                     // window should be drawn over or if the underlying pixel
                     // is transparent (zero value) meaning there's no background
                     // or window for the provided pixel
-                    let is_visible = obj_over || self.color_buffer[color_offset as usize] == 0;
+                    let mut is_visible = obj_over || self.color_buffer[color_offset as usize] == 0;
+
+                    // additionally (in CCG mode) the object is only considered to
+                    // be visible if the priority buffer is not set for the current
+                    // pixel, this means that the background is capturing priority
+                    // by having the BG-to-OAM priority bit set in the bg map attributes
+                    is_visible &= always_over || !self.priority_buffer[color_offset as usize];
 
                     // determines if the current pixel has priority over a possible
                     // one that has been drawn by a previous object, this happens
