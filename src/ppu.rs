@@ -1255,7 +1255,7 @@ impl Ppu {
             // the priority is only set in case the priority of
             // the background (over OAM) is set in the attributes
             // and the pixel is not transparent
-            self.priority_buffer[color_offset] = priority && pixel > 0;
+            self.priority_buffer[color_offset] = priority && pixel != 0;
 
             // increments the current tile X position in drawing
             x += 1;
