@@ -731,6 +731,7 @@ impl Ppu {
             // 0xFF6B — OCPD/OBPD (CGB only)
             0xff6b => self.palettes_color[1][self.palette_address_obj as usize],
             // 0xFF6C — OPRI (CGB only)
+            #[allow(clippy::bool_to_int_with_if)]
             0xff6c => if self.obj_priority { 0x01 } else { 0x00 },
             _ => {
                 warnln!("Reading from unknown PPU location 0x{:04x}", addr);
