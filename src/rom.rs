@@ -335,6 +335,13 @@ impl Cartridge {
         }
     }
 
+    pub fn has_rumble(&mut self) -> bool {
+        matches!(
+            self.rom_type(),
+            RomType::Mbc5Rumble | RomType::Mbc5RumbleRam | RomType::Mbc5RumbleRamBattery
+        )
+    }
+
     pub fn set_rom_bank(&mut self, rom_bank: u8) {
         self.rom_offset = rom_bank as usize * ROM_BANK_SIZE;
     }
@@ -456,6 +463,40 @@ impl Cartridge {
             0xff => RomType::HuC1RamBattery,
             _ => RomType::Unknown,
         }
+    }
+
+    pub fn set_rom_type(&mut self, rom_type: RomType) {
+        self.rom_data[0x0147] = match rom_type {
+            RomType::RomOnly => 0x00,
+            RomType::Mbc1 => 0x01,
+            RomType::Mbc1Ram => 0x02,
+            RomType::Mbc1RamBattery => 0x03,
+            RomType::Mbc2 => 0x05,
+            RomType::Mbc2Battery => 0x06,
+            RomType::RomRam => 0x08,
+            RomType::RomRamBattery => 0x09,
+            RomType::Mmm01 => 0x0b,
+            RomType::Mmm01Ram => 0x0c,
+            RomType::Mmm01RamBattery => 0x0d,
+            RomType::Mbc3TimerBattery => 0x0f,
+            RomType::Mbc3TimerRamBattery => 0x10,
+            RomType::Mbc3 => 0x11,
+            RomType::Mbc3Ram => 0x12,
+            RomType::Mbc3RamBattery => 0x13,
+            RomType::Mbc5 => 0x19,
+            RomType::Mbc5Ram => 0x1a,
+            RomType::Mbc5RamBattery => 0x1b,
+            RomType::Mbc5Rumble => 0x1c,
+            RomType::Mbc5RumbleRam => 0x1d,
+            RomType::Mbc5RumbleRamBattery => 0x1e,
+            RomType::Mbc6 => 0x20,
+            RomType::Mbc7SensorRumbleRamBattery => 0x22,
+            RomType::PocketCamera => 0xfc,
+            RomType::BandaiTama5 => 0xfd,
+            RomType::HuC3 => 0xfe,
+            RomType::HuC1RamBattery => 0xff,
+            RomType::Unknown => panic!("Unknown ROM type"),
+        };
     }
 
     pub fn rom_size(&self) -> RomSize {
@@ -751,3 +792,27 @@ pub static MBC5: Mbc = Mbc {
         rom.ram_data[rom.ram_offset + (addr - 0xa000) as usize] = value;
     },
 };
+
+#[cfg(test)]
+mod tests {
+    use super::{Cartridge, RomType};
+
+    #[test]
+    fn test_has_rumble() {
+        let mut rom = Cartridge::new();
+        rom.set_data(&vec![0; 0x8000]);
+        assert!(!rom.has_rumble());
+
+        rom.set_rom_type(RomType::Mbc5Rumble);
+        assert!(rom.has_rumble());
+
+        rom.set_rom_type(RomType::Mbc5RumbleRam);
+        assert!(rom.has_rumble());
+
+        rom.set_rom_type(RomType::Mbc5RumbleRamBattery);
+        assert!(rom.has_rumble());
+
+        rom.set_rom_type(RomType::Mbc1);
+        assert!(!rom.has_rumble());
+    }
+}
