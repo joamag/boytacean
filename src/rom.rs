@@ -808,7 +808,7 @@ pub static MBC5: Mbc = Mbc {
                 if rom.has_rumble() {
                     ram_bank = value & 0x07;
                     let rumble = (value & 0x08) == 0x08;
-                    if (rom.rumble_active && !rumble) || (!rom.rumble_active && rumble) {
+                    if rom.rumble_active != rumble {
                         rom.rumble_active = rumble;
                         rom.trigger_rumble();
                     }
