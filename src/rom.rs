@@ -253,6 +253,14 @@ pub struct Cartridge {
     // that is considered to be non zero (0x0) so that a
     // proper safe conversion to UTF-8 string can be done.
     title_offset: usize,
+
+    /// The current rumble state of the cartridge, this
+    /// boolean value controls if vibration is currently active.
+    rumble_active: bool,
+
+    /// Callback function to be called whenever there's a new
+    /// rumble vibration triggered or when it's disabled.
+    rumble_cb: fn(active: bool),
 }
 
 impl Cartridge {
@@ -267,6 +275,8 @@ impl Cartridge {
             ram_offset: 0x0000,
             ram_enabled: false,
             title_offset: 0x0143,
+            rumble_active: false,
+            rumble_cb: |_| {},
         }
     }
 
@@ -302,6 +312,20 @@ impl Cartridge {
             0xa000 | 0xb000 => (self.mbc.write_ram)(self, addr, value),
             _ => debugln!("Writing to unknown Cartridge address 0x{:04x}", addr),
         }
+    }
+
+    pub fn reset(&mut self) {
+        self.rom_data = vec![];
+        self.ram_data = vec![];
+        self.mbc = &NO_MBC;
+        self.rom_bank_count = 0;
+        self.ram_bank_count = 0;
+        self.rom_offset = 0x4000;
+        self.ram_offset = 0x0000;
+        self.ram_enabled = false;
+        self.title_offset = 0x0143;
+        self.rumble_active = false;
+        self.rumble_cb = |_| {};
     }
 
     pub fn data(&self) -> &Vec<u8> {
@@ -348,6 +372,14 @@ impl Cartridge {
 
     pub fn set_ram_bank(&mut self, ram_bank: u8) {
         self.ram_offset = ram_bank as usize * RAM_BANK_SIZE;
+    }
+
+    pub fn set_rumble_cb(&mut self, rumble_cb: fn(active: bool)) {
+        self.rumble_cb = rumble_cb;
+    }
+
+    pub fn trigger_rumble(&self) {
+        (self.rumble_cb)(self.rumble_active);
     }
 
     fn set_data(&mut self, data: &[u8]) {
@@ -769,10 +801,23 @@ pub static MBC5: Mbc = Mbc {
             }
             // RAM bank selection
             0x4000 | 0x5000 => {
-                let ram_bank = value & 0x0f;
+                let mut ram_bank = value & 0x0f;
+
+                // handles the rumble flag for the cartridges
+                // that support the rumble operation
+                if rom.has_rumble() {
+                    ram_bank = value & 0x07;
+                    let rumble = (value & 0x08) == 0x08;
+                    if (rom.rumble_active && !rumble) || (!rom.rumble_active && rumble) {
+                        rom.rumble_active = rumble;
+                        rom.trigger_rumble();
+                    }
+                }
+
                 if ram_bank as u16 >= rom.ram_bank_count {
                     return;
                 }
+
                 rom.set_ram_bank(ram_bank);
             }
             _ => warnln!("Writing to unknown Cartridge ROM location 0x{:04x}", addr),

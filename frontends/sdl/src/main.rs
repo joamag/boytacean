@@ -203,7 +203,7 @@ impl Emulator {
 
     pub fn load_rom(&mut self, path: Option<&str>) {
         let path_res = path.unwrap_or(&self.rom_path);
-        let rom: &boytacean::rom::Cartridge = self.system.load_rom_file(path_res);
+        let rom = self.system.load_rom_file(path_res);
         println!(
             "========= Cartridge =========\n{}\n=============================",
             rom
