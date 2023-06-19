@@ -16,7 +16,7 @@ A Game Boy emulator that is written in Rust 🦀.
 * Game Boy Printer emulation
 * Support for multiple MBCs: MBC1, MBC2, MBC3, and MBC5
 * Variable CPU clock speed
-* Accurate PPU - passes [dmg-acid2](https://github.com/mattcurrie/dmg-acid2) tests
+* Accurate PPU - passes [dmg-acid2](https://github.com/mattcurrie/dmg-acid2) and [cgb-acid2](https://github.com/mattcurrie/cgb-acid2) tests
 
 For the Web front-end...
 

@@ -1,16 +1,21 @@
-use crate::{devices::buffer::BufferDevice, gb::GameBoy, ppu::FRAME_BUFFER_SIZE};
+use crate::{
+    devices::buffer::BufferDevice,
+    gb::{GameBoy, GameBoyMode},
+    ppu::FRAME_BUFFER_SIZE,
+};
 
 #[derive(Default)]
 pub struct TestOptions {
-    ppu_enabled: Option<bool>,
-    apu_enabled: Option<bool>,
-    dma_enabled: Option<bool>,
-    timer_enabled: Option<bool>,
+    pub mode: Option<GameBoyMode>,
+    pub ppu_enabled: Option<bool>,
+    pub apu_enabled: Option<bool>,
+    pub dma_enabled: Option<bool>,
+    pub timer_enabled: Option<bool>,
 }
 
 pub fn build_test(options: TestOptions) -> GameBoy {
     let device = Box::<BufferDevice>::default();
-    let mut game_boy = GameBoy::new(None);
+    let mut game_boy = GameBoy::new(options.mode);
     game_boy.set_ppu_enabled(options.ppu_enabled.unwrap_or(true));
     game_boy.set_apu_enabled(options.apu_enabled.unwrap_or(true));
     game_boy.set_dma_enabled(options.dma_enabled.unwrap_or(true));
