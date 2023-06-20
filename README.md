@@ -24,6 +24,7 @@ For the Web front-end...
 * Transparent RAM saving using [Web Storage API](https://developer.mozilla.org/docs/Web/API/Window/localStorage)
 * GamePad support using [Web Gamepad API](https://developer.mozilla.org/docs/Web/API/Gamepad_API)
 * Unobstructive and effective on-screen GamePad
+* Rumble emulation and haptic feedback
 * Cool bespoke display palettes built by [TheWolfBunny64](https://www.deviantart.com/thewolfbunny).
 * Fullscreen browser mode
 * Debug mode - VRAM and registers
