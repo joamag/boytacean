@@ -29,9 +29,10 @@ For the Web front-end...
 * Fullscreen browser mode
 * Debug mode - VRAM and registers
 
-What's missing...
+What's still missing...
 
-* Game Boy Color (GBC) emulation
+* Machine state saving and loading (.sav files)
+* [Libretro](https://www.libretro.com/) integration
 
 ## Deployments
 
