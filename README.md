@@ -17,7 +17,7 @@ A Game Boy emulator that is written in Rust 🦀.
 * Support for multiple MBCs: MBC1, MBC2, MBC3, and MBC5
 * Cheat support using [Game Genie](https://en.wikipedia.org/wiki/Game_Genie) codes
 * Variable CPU clock speed
-* Accurate PPU - passes [dmg-acid2](https://github.com/mattcurrie/dmg-acid2) tests
+* Accurate PPU - passes [dmg-acid2](https://github.com/mattcurrie/dmg-acid2) and [cgb-acid2](https://github.com/mattcurrie/cgb-acid2) tests
 
 For the Web front-end...
 
@@ -25,13 +25,15 @@ For the Web front-end...
 * Transparent RAM saving using [Web Storage API](https://developer.mozilla.org/docs/Web/API/Window/localStorage)
 * GamePad support using [Web Gamepad API](https://developer.mozilla.org/docs/Web/API/Gamepad_API)
 * Unobstructive and effective on-screen GamePad
+* Rumble emulation and haptic feedback
 * Cool bespoke display palettes built by [TheWolfBunny64](https://www.deviantart.com/thewolfbunny).
 * Fullscreen browser mode
 * Debug mode - VRAM and registers
 
-What's missing...
+What's still missing...
 
-* Game Boy Color (GBC) emulation
+* Machine state saving and loading (.sav files)
+* [Libretro](https://www.libretro.com/) integration
 
 ## Deployments
 

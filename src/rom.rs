@@ -288,6 +288,14 @@ pub struct Cartridge {
     /// proper safe conversion to UTF-8 string can be done.
     title_offset: usize,
 
+    /// The current rumble state of the cartridge, this
+    /// boolean value controls if vibration is currently active.
+    rumble_active: bool,
+
+    /// Callback function to be called whenever there's a new
+    /// rumble vibration triggered or when it's disabled.
+    rumble_cb: fn(active: bool),
+
     /// Optional reference to the Game Genie instance that
     /// would be used for the "cheating" by patching the
     /// current ROM's cartridge data.
@@ -307,6 +315,8 @@ impl Cartridge {
             ram_offset: 0x0000,
             ram_enabled: false,
             title_offset: 0x0143,
+            rumble_active: false,
+            rumble_cb: |_| {},
             game_genie: None,
         }
     }
@@ -345,6 +355,20 @@ impl Cartridge {
         }
     }
 
+    pub fn reset(&mut self) {
+        self.rom_data = vec![];
+        self.ram_data = vec![];
+        self.mbc = &NO_MBC;
+        self.rom_bank_count = 0;
+        self.ram_bank_count = 0;
+        self.rom_offset = 0x4000;
+        self.ram_offset = 0x0000;
+        self.ram_enabled = false;
+        self.title_offset = 0x0143;
+        self.rumble_active = false;
+        self.rumble_cb = |_| {};
+    }
+
     pub fn data(&self) -> &Vec<u8> {
         &self.rom_data
     }
@@ -376,12 +400,27 @@ impl Cartridge {
         }
     }
 
+    pub fn has_rumble(&mut self) -> bool {
+        matches!(
+            self.rom_type(),
+            RomType::Mbc5Rumble | RomType::Mbc5RumbleRam | RomType::Mbc5RumbleRamBattery
+        )
+    }
+
     pub fn set_rom_bank(&mut self, rom_bank: u8) {
         self.rom_offset = rom_bank as usize * ROM_BANK_SIZE;
     }
 
     pub fn set_ram_bank(&mut self, ram_bank: u8) {
         self.ram_offset = ram_bank as usize * RAM_BANK_SIZE;
+    }
+
+    pub fn set_rumble_cb(&mut self, rumble_cb: fn(active: bool)) {
+        self.rumble_cb = rumble_cb;
+    }
+
+    pub fn trigger_rumble(&self) {
+        (self.rumble_cb)(self.rumble_active);
     }
 
     fn set_data(&mut self, data: &[u8]) {
@@ -498,6 +537,40 @@ impl Cartridge {
             0xff => RomType::HuC1RamBattery,
             _ => RomType::Unknown,
         }
+    }
+
+    pub fn set_rom_type(&mut self, rom_type: RomType) {
+        self.rom_data[0x0147] = match rom_type {
+            RomType::RomOnly => 0x00,
+            RomType::Mbc1 => 0x01,
+            RomType::Mbc1Ram => 0x02,
+            RomType::Mbc1RamBattery => 0x03,
+            RomType::Mbc2 => 0x05,
+            RomType::Mbc2Battery => 0x06,
+            RomType::RomRam => 0x08,
+            RomType::RomRamBattery => 0x09,
+            RomType::Mmm01 => 0x0b,
+            RomType::Mmm01Ram => 0x0c,
+            RomType::Mmm01RamBattery => 0x0d,
+            RomType::Mbc3TimerBattery => 0x0f,
+            RomType::Mbc3TimerRamBattery => 0x10,
+            RomType::Mbc3 => 0x11,
+            RomType::Mbc3Ram => 0x12,
+            RomType::Mbc3RamBattery => 0x13,
+            RomType::Mbc5 => 0x19,
+            RomType::Mbc5Ram => 0x1a,
+            RomType::Mbc5RamBattery => 0x1b,
+            RomType::Mbc5Rumble => 0x1c,
+            RomType::Mbc5RumbleRam => 0x1d,
+            RomType::Mbc5RumbleRamBattery => 0x1e,
+            RomType::Mbc6 => 0x20,
+            RomType::Mbc7SensorRumbleRamBattery => 0x22,
+            RomType::PocketCamera => 0xfc,
+            RomType::BandaiTama5 => 0xfd,
+            RomType::HuC3 => 0xfe,
+            RomType::HuC1RamBattery => 0xff,
+            RomType::Unknown => panic!("Unknown ROM type"),
+        };
     }
 
     pub fn rom_size(&self) -> RomSize {
@@ -780,10 +853,23 @@ pub static MBC5: Mbc = Mbc {
             }
             // RAM bank selection
             0x4000 | 0x5000 => {
-                let ram_bank = value & 0x0f;
+                let mut ram_bank = value & 0x0f;
+
+                // handles the rumble flag for the cartridges
+                // that support the rumble operation
+                if rom.has_rumble() {
+                    ram_bank = value & 0x07;
+                    let rumble = (value & 0x08) == 0x08;
+                    if rom.rumble_active != rumble {
+                        rom.rumble_active = rumble;
+                        rom.trigger_rumble();
+                    }
+                }
+
                 if ram_bank as u16 >= rom.ram_bank_count {
                     return;
                 }
+
                 rom.set_ram_bank(ram_bank);
             }
             _ => warnln!("Writing to unknown Cartridge ROM location 0x{:04x}", addr),
@@ -829,3 +915,27 @@ pub static GAME_GENIE: Mbc = Mbc {
     read_ram: |rom: &Cartridge, addr: u16| -> u8 { (rom.mbc.read_ram)(rom, addr) },
     write_ram: |rom: &mut Cartridge, addr: u16, value: u8| (rom.mbc.write_ram)(rom, addr, value),
 };
+
+#[cfg(test)]
+mod tests {
+    use super::{Cartridge, RomType};
+
+    #[test]
+    fn test_has_rumble() {
+        let mut rom = Cartridge::new();
+        rom.set_data(&vec![0; 0x8000]);
+        assert!(!rom.has_rumble());
+
+        rom.set_rom_type(RomType::Mbc5Rumble);
+        assert!(rom.has_rumble());
+
+        rom.set_rom_type(RomType::Mbc5RumbleRam);
+        assert!(rom.has_rumble());
+
+        rom.set_rom_type(RomType::Mbc5RumbleRamBattery);
+        assert!(rom.has_rumble());
+
+        rom.set_rom_type(RomType::Mbc1);
+        assert!(!rom.has_rumble());
+    }
+}

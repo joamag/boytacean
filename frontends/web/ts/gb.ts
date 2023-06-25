@@ -955,6 +955,7 @@ declare global {
         speedCallback: (speed: GameBoySpeed) => void;
         loggerCallback: (data: Uint8Array) => void;
         printerCallback: (imageBuffer: Uint8Array) => void;
+        rumbleCallback: (active: boolean) => void;
     }
 
     interface Console {
@@ -976,6 +977,29 @@ window.loggerCallback = (data: Uint8Array) => {
 
 window.printerCallback = (imageBuffer: Uint8Array) => {
     window.emulator.onPrinterDevice(imageBuffer);
+};
+
+window.rumbleCallback = (active: boolean) => {
+    if (!active) return;
+
+    // runs the vibration actuator on the current window
+    // this will probably affect only mobile devices
+    window?.navigator?.vibrate?.(250);
+
+    // iterates over all the available gamepads to run
+    // the vibration actuator on each of them
+    let gamepadIndex = 0;
+    while (true) {
+        const gamepad = navigator.getGamepads()[gamepadIndex];
+        if (!gamepad) break;
+        gamepad?.vibrationActuator?.playEffect?.("dual-rumble", {
+            startDelay: 0,
+            duration: 150,
+            weakMagnitude: 0.8,
+            strongMagnitude: 0.0
+        });
+        gamepadIndex++;
+    }
 };
 
 console.image = (url: string, size = 80) => {

@@ -13,14 +13,14 @@ stages:
   - deploy
 
 before_script:
-  - apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y -q pkg-config
+  - apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y -q pkg-config g++
   - curl -sf -L https://static.rust-lang.org/rustup.sh | sh -s -- -y
   - export PATH=$PATH:$HOME/.cargo/bin
   - curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.1/install.sh | bash
   - export NVM_DIR="$HOME/.nvm"
   - \[ -s "$NVM_DIR/nvm.sh" \] && \. "$NVM_DIR/nvm.sh"
   - \[ -s "$NVM_DIR/bash_completion" \] && \. "$NVM_DIR/bash_completion"
-  - nvm install stable
+  - nvm install --lts
 
 build-rust:
   stage: build
@@ -72,7 +72,7 @@ deploy-netlify-preview:
   script:
     - cd frontends/web/dist
     - cp -rp ../static/* .
-    - npm_config_yes=true npx --package=netlify-cli netlify deploy --dir=.
+    - npm_config_yes=true npx --loglevel verbose --package=netlify-cli netlify deploy --dir=.
   dependencies:
     - build-wasm
   only:
@@ -83,7 +83,7 @@ deploy-netlify-prod:
   script:
     - cd frontends/web/dist
     - cp -rp ../static/* .
-    - npm_config_yes=true npx --package=netlify-cli netlify deploy --dir=. --prod
+    - npm_config_yes=true npx --loglevel verbose --package=netlify-cli netlify deploy --dir=. --prod
   dependencies:
     - build-wasm
   only:
@@ -94,7 +94,7 @@ deploy-cloudfare-master:
   script:
     - cd frontends/web/dist
     - cp -rp ../static/* .
-    - npm_config_yes=true npx wrangler@^2 pages publish . --project-name=boytacean --branch master
+    - npm_config_yes=true npx --loglevel verbose wrangler pages deploy . --project-name=boytacean --branch master
   dependencies:
     - build-wasm
   only:
@@ -105,7 +105,7 @@ deploy-cloudfare-stable:
   script:
     - cd frontends/web/dist
     - cp -rp ../static/* .
-    - npm_config_yes=true npx wrangler@^2 pages publish . --project-name=boytacean --branch stable
+    - npm_config_yes=true npx --loglevel verbose wrangler pages deploy . --project-name=boytacean --branch stable
   dependencies:
     - build-wasm
   only:
@@ -116,9 +116,9 @@ deploy-cloudfare-prod:
   script:
     - cd frontends/web/dist
     - cp -rp ../static/* .
-    - npm_config_yes=true npx wrangler@^2 pages publish . --project-name=boytacean --branch prod
-    - npm_config_yes=true npx wrangler@^2 pages publish . --project-name=boytacean --branch production
-    - npm_config_yes=true npx wrangler@^2 pages publish . --project-name=boytacean --branch main
+    - npm_config_yes=true npx --loglevel verbose wrangler pages deploy . --project-name=boytacean --branch prod
+    - npm_config_yes=true npx --loglevel verbose wrangler pages deploy . --project-name=boytacean --branch production
+    - npm_config_yes=true npx --loglevel verbose wrangler pages deploy . --project-name=boytacean --branch main
   dependencies:
     - build-wasm
   only:
