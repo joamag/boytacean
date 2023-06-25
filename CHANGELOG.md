@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-* Support for image based testing
+*
 
 ### Changed
 
@@ -18,6 +18,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 *
+
+## [0.9.6] - 2023-06-20
+
+### Added
+
+* Support for image based testing
+* Support for rumble, works for both mobile devices and Gamepads (web APIs)
+
+### Changed
+
+* Bumped emukit to 0.8.8
+
+### Fixed
+
+* CGB-ACID2 test passing - [#30](https://gitlab.stage.hive.pt/joamag/boytacean/-/issues/30)
 
 ## [0.9.5] - 2023-06-05
 

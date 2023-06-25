@@ -285,6 +285,11 @@ pub struct Ppu {
     /// processed set of pixels ready to be displayed on screen.
     pub frame_buffer: Box<[u8; FRAME_BUFFER_SIZE]>,
 
+    /// The buffer that will control the background to OAM
+    /// priority, allowing the background to be drawn over
+    /// the sprites/objects if necessary.
+    priority_buffer: Box<[bool; COLOR_BUFFER_SIZE]>,
+
     /// Video dedicated memory (VRAM) where both the tiles and
     /// the sprites/objects are going to be stored.
     vram: [u8; VRAM_SIZE],
@@ -354,6 +359,13 @@ pub struct Ppu {
     /// The complete list of attributes for the second background
     /// map that is located in 0x9C00-0x9FFF (CGB only).
     bg_map_attrs_1: [TileData; 1024],
+
+    /// The flag that controls if the object/sprite priority
+    /// if set means that the priority mode to be used is the
+    /// X coordinate otherwise the normal CGB OAM memory mode
+    /// mode is used, the value of this flag is controlled by
+    /// the OPRI register (CGB only)
+    obj_priority: bool,
 
     /// The scroll Y register that controls the Y offset
     /// of the background.
@@ -492,6 +504,7 @@ impl Ppu {
         Self {
             color_buffer: Box::new([0u8; COLOR_BUFFER_SIZE]),
             frame_buffer: Box::new([0u8; FRAME_BUFFER_SIZE]),
+            priority_buffer: Box::new([false; COLOR_BUFFER_SIZE]),
             vram: [0u8; VRAM_SIZE],
             hram: [0u8; HRAM_SIZE],
             oam: [0u8; OAM_SIZE],
@@ -509,6 +522,7 @@ impl Ppu {
             palettes_color: [[0u8; 64]; 2],
             bg_map_attrs_0: [TileData::default(); 1024],
             bg_map_attrs_1: [TileData::default(); 1024],
+            obj_priority: false,
             scy: 0x0,
             scx: 0x0,
             wy: 0x0,
@@ -547,11 +561,13 @@ impl Ppu {
     pub fn reset(&mut self) {
         self.color_buffer = Box::new([0u8; COLOR_BUFFER_SIZE]);
         self.frame_buffer = Box::new([0u8; FRAME_BUFFER_SIZE]);
+        self.priority_buffer = Box::new([false; COLOR_BUFFER_SIZE]);
         self.vram = [0u8; VRAM_SIZE_CGB];
         self.hram = [0u8; HRAM_SIZE];
         self.vram_bank = 0x0;
         self.vram_offset = 0x0000;
         self.tiles = [Tile { buffer: [0u8; 64] }; TILE_COUNT];
+        self.obj_data = [ObjectData::default(); OBJ_COUNT];
         self.palette_bg = [[0u8; RGB_SIZE]; PALETTE_SIZE];
         self.palette_obj_0 = [[0u8; RGB_SIZE]; PALETTE_SIZE];
         self.palette_obj_1 = [[0u8; RGB_SIZE]; PALETTE_SIZE];
@@ -559,6 +575,9 @@ impl Ppu {
         self.palettes_color_obj = [[[0u8; RGB_SIZE]; PALETTE_SIZE]; 8];
         self.palettes = [0u8; 3];
         self.palettes_color = [[0u8; 64]; 2];
+        self.bg_map_attrs_0 = [TileData::default(); 1024];
+        self.bg_map_attrs_1 = [TileData::default(); 1024];
+        self.obj_priority = false;
         self.scy = 0x0;
         self.scx = 0x0;
         self.ly = 0x0;
@@ -718,6 +737,16 @@ impl Ppu {
             0xff6a => self.palette_address_obj | if self.auto_increment_obj { 0x80 } else { 0x00 },
             // 0xFF6B — OCPD/OBPD (CGB only)
             0xff6b => self.palettes_color[1][self.palette_address_obj as usize],
+            // 0xFF6C — OPRI (CGB only)
+            0xff6c =>
+            {
+                #[allow(clippy::bool_to_int_with_if)]
+                if self.obj_priority {
+                    0x01
+                } else {
+                    0x00
+                }
+            }
             _ => {
                 warnln!("Reading from unknown PPU location 0x{:04x}", addr);
                 0xff
@@ -860,6 +889,8 @@ impl Ppu {
                     self.palette_address_obj = (self.palette_address_obj + 1) & 0x3f;
                 }
             }
+            // 0xFF6C — OPRI (CGB only)
+            0xff6c => self.obj_priority = value & 0x01 == 0x01,
             0xff7f => (),
             _ => warnln!("Writing in unknown PPU location 0x{:04x}", addr),
         }
@@ -1172,6 +1203,10 @@ impl Ppu {
         let mut xflip = tile_attr.xflip;
         let mut yflip = tile_attr.yflip;
 
+        // obtains the value the BG-to-OAM priority to be used in the computation
+        // of the final pixel value (CGB only)
+        let mut priority = tile_attr.priority;
+
         // increments the tile index value by the required offset for the VRAM
         // bank in which the tile is stored, this is only required for CGB mode
         tile_index += tile_attr.vram_bank as usize * TILE_COUNT_DMG;
@@ -1216,6 +1251,12 @@ impl Ppu {
             self.frame_buffer[frame_offset + 1] = color[1];
             self.frame_buffer[frame_offset + 2] = color[2];
 
+            // updates the priority buffer with the current pixel
+            // the priority is only set in case the priority of
+            // the background (over OAM) is set in the attributes
+            // and the pixel is not transparent
+            self.priority_buffer[color_offset] = priority && pixel != 0;
+
             // increments the current tile X position in drawing
             x += 1;
 
@@ -1245,6 +1286,7 @@ impl Ppu {
                     palette = &self.palettes_color_bg[tile_attr.palette as usize];
                     xflip = tile_attr.xflip;
                     yflip = tile_attr.yflip;
+                    priority = tile_attr.priority;
                     tile_index += tile_attr.vram_bank as usize * TILE_COUNT_DMG;
                 }
 
@@ -1371,6 +1413,18 @@ impl Ppu {
     }
 
     fn render_objects(&mut self) {
+        // the mode in which the object priority should be computed
+        // if true this means that the X coordinate priority mode will
+        // be used otherwise the object priority will be defined according
+        // to the object's index in the OAM memory, notice that this
+        // control of priority is only present in the CGB and to be able
+        // to offer retro-compatibility with DMG
+        let obj_priority_mode = self.gb_mode != GameBoyMode::Cgb || self.obj_priority;
+
+        // creates a local counter object to count the total number
+        // of object that were drawn in the current line, this will
+        // be used for instance to limit the total number of objects
+        // to 10 per line (Game Boy limitation)
         let mut draw_count = 0u8;
 
         // allocates the buffer that is going to be used to determine
@@ -1387,8 +1441,8 @@ impl Ppu {
             false
         };
 
-        // iterates over the complete set of available object to checks
-        // the ones that required drawing and draws them
+        // iterates over the complete set of available object to check
+        // the ones that require drawing and draws them
         for index in 0..OBJ_COUNT {
             // in case the limit on the number of objects to be draw per
             // line has been reached breaks the loop avoiding more draws
@@ -1504,14 +1558,20 @@ impl Ppu {
                     // window should be drawn over or if the underlying pixel
                     // is transparent (zero value) meaning there's no background
                     // or window for the provided pixel
-                    let is_visible = obj_over || self.color_buffer[color_offset as usize] == 0;
+                    let mut is_visible = obj_over || self.color_buffer[color_offset as usize] == 0;
+
+                    // additionally (in CCG mode) the object is only considered to
+                    // be visible if the priority buffer is not set for the current
+                    // pixel, this means that the background is capturing priority
+                    // by having the BG-to-OAM priority bit set in the bg map attributes
+                    is_visible &= always_over || !self.priority_buffer[color_offset as usize];
 
                     // determines if the current pixel has priority over a possible
                     // one that has been drawn by a previous object, this happens
                     // in case the current object has a small X coordinate according
                     // to the MBR algorithm
-                    let has_priority =
-                        index_buffer[x as usize] == -256 || obj.x < index_buffer[x as usize];
+                    let has_priority = index_buffer[x as usize] == -256
+                        || (obj_priority_mode && obj.x < index_buffer[x as usize]);
 
                     let pixel = tile_row[if obj.xflip {
                         TILE_WIDTH_I - tile_x

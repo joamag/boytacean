@@ -933,6 +933,10 @@ impl GameBoy {
         self.cpu.serial_i()
     }
 
+    pub fn rom(&mut self) -> &mut Cartridge {
+        self.mmu().rom()
+    }
+
     pub fn frame_buffer(&mut self) -> &[u8; FRAME_BUFFER_SIZE] {
         &(self.ppu().frame_buffer)
     }
@@ -968,13 +972,13 @@ impl GameBoy {
         self.load_boot_file(BootRom::Cgb);
     }
 
-    pub fn load_rom(&mut self, data: &[u8]) -> &Cartridge {
+    pub fn load_rom(&mut self, data: &[u8]) -> &mut Cartridge {
         let rom = Cartridge::from_data(data);
         self.mmu().set_rom(rom);
         self.mmu().rom()
     }
 
-    pub fn load_rom_file(&mut self, path: &str) -> &Cartridge {
+    pub fn load_rom_file(&mut self, path: &str) -> &mut Cartridge {
         let data = read_file(path);
         self.load_rom(&data)
     }
@@ -1000,7 +1004,11 @@ impl GameBoy {
     }
 
     pub fn load_rom_ws(&mut self, data: &[u8]) -> Cartridge {
-        self.load_rom(data).clone()
+        let rom = self.load_rom(data);
+        rom.set_rumble_cb(|active| {
+            rumble_callback(active);
+        });
+        rom.clone()
     }
 
     pub fn load_callbacks_ws(&mut self) {
@@ -1087,6 +1095,9 @@ extern "C" {
 
     #[wasm_bindgen(js_namespace = window, js_name = printerCallback)]
     fn printer_callback(image_buffer: Vec<u8>);
+
+    #[wasm_bindgen(js_namespace = window, js_name = rumbleCallback)]
+    fn rumble_callback(active: bool);
 }
 
 #[cfg(feature = "wasm")]
