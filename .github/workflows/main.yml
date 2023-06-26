@@ -118,7 +118,7 @@ jobs:
       - name: Verify Rust code format
         run: cd frontends/sdl && cargo fmt --all -- --check
       - name: Verify Rust code linting
-        run: cd frontends/sdl && cargo clippy -- -D warnings -A unknown-lints
+        run: cd frontends/sdl && cargo update -p half --precise 2.2.1 && cargo clippy -- -D warnings -A unknown-lints
       - name: Run unit tests
         run: cd frontends/sdl && cargo test
       - name: Build development version
