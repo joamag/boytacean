@@ -69,4 +69,14 @@ mod tests {
         );
         assert_eq!(result, "cpu_instrs\n\n01:ok  02:ok  03:ok  04:ok  05:ok  06:ok  07:ok  08:ok  09:ok  10:ok  11:ok  \n\nPassed all tests\n");
     }
+
+    #[test]
+    fn test_blargg_instr_timing() {
+        let result = run_serial_test(
+            "res/roms/test/blargg/instr_timing/instr_timing.gb",
+            Some(50000000),
+            TestOptions::default(),
+        );
+        assert_eq!(result, "instr_timing\n\n\nPassed\n");
+    }
 }
