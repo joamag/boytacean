@@ -44,7 +44,7 @@ mod tests {
         test::{run_image_test, TestOptions},
     };
 
-    use super::{compare_images, save_image};
+    use super::compare_images;
 
     #[test]
     fn test_blargg_cpu_instrs() {
