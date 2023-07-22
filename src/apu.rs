@@ -57,7 +57,7 @@ pub struct Apu {
     ch3_position: u8,
     ch3_output: u8,
     ch3_dac: bool,
-    ch3_length_timer: u8,
+    ch3_length_timer: u16,
     ch3_output_level: u8,
     ch3_wave_length: u16,
     ch3_length_enabled: bool,
@@ -551,7 +551,7 @@ impl Apu {
             }
             // 0xFF1B — NR31: Channel 3 length timer
             0xff1b => {
-                self.ch3_length_timer = value;
+                self.ch3_length_timer = value as u16;
             }
             // 0xFF1C — NR32: Channel 3 output level
             0xff1c => {
@@ -572,7 +572,7 @@ impl Apu {
                 if trigger {
                     self.trigger_ch3();
                 }
-                if length_trigger && self.ch3_length_timer >= 64 {
+                if length_trigger && self.ch3_length_timer >= 256 {
                     self.ch3_enabled = false;
                 }
             }
@@ -770,7 +770,7 @@ impl Apu {
                     return;
                 }
                 self.ch3_length_timer = self.ch3_length_timer.saturating_add(1);
-                if self.ch3_length_timer >= 64 {
+                if self.ch3_length_timer >= 256 {
                     self.ch3_enabled = false;
                     self.ch3_length_timer = 0;
                 }
