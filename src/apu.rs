@@ -649,9 +649,7 @@ impl Apu {
             }
 
             // 0xFF30-0xFF3F — Wave pattern RAM
-            0xff30..=0xff3f => {
-                self.wave_ram[addr as usize & 0x000f] = value;
-            }
+            0xff30..=0xff3f => self.wave_ram[addr as usize & 0x000f] = value,
 
             _ => warnln!("Writing in unknown APU location 0x{:04x}", addr),
         }
@@ -1007,8 +1005,7 @@ impl Apu {
         self.ch1_envelope_sequence = 0;
         self.ch1_sweep_sequence = 0;
 
-        let unfreeze = self.ch1_length_timer == 0;
-        if unfreeze {
+        if self.ch1_length_timer == 0 {
             self.ch1_length_timer = 64;
             if self.ch1_length_enabled && self.sequencer_step % 2 == 1 {
                 self.tick_length(Channel::Ch1);
@@ -1021,8 +1018,7 @@ impl Apu {
         self.ch2_timer = ((2048 - self.ch2_wave_length) << 2) as i16;
         self.ch2_envelope_sequence = 0;
 
-        let unfreeze = self.ch2_length_timer == 0;
-        if unfreeze {
+        if self.ch2_length_timer == 0 {
             self.ch2_length_timer = 64;
             if self.ch2_length_enabled && self.sequencer_step % 2 == 1 {
                 self.tick_length(Channel::Ch2);
@@ -1035,8 +1031,7 @@ impl Apu {
         self.ch3_timer = 3;
         self.ch3_position = 0;
 
-        let unfreeze = self.ch3_length_timer == 0;
-        if unfreeze {
+        if self.ch3_length_timer == 0 {
             self.ch3_length_timer = 256;
             if self.ch3_length_enabled && self.sequencer_step % 2 == 1 {
                 self.tick_length(Channel::Ch3);
@@ -1051,8 +1046,7 @@ impl Apu {
         self.ch4_lfsr = 0x7ff1;
         self.ch4_envelope_sequence = 0;
 
-        let unfreeze = self.ch4_length_timer == 0;
-        if unfreeze {
+        if self.ch4_length_timer == 0 {
             self.ch4_length_timer = 64;
             if self.ch4_length_enabled && self.sequencer_step % 2 == 1 {
                 self.tick_length(Channel::Ch4);
