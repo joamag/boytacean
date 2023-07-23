@@ -976,9 +976,8 @@ impl GameBoy {
 
     pub fn load_rom(&mut self, data: &[u8], ram_data: Option<&[u8]>) -> &mut Cartridge {
         let mut rom = Cartridge::from_data(data);
-        match ram_data {
-            Some(ram_data) => rom.set_ram_data(ram_data),
-            None => (),
+        if let Some(ram_data) = ram_data {
+            rom.set_ram_data(ram_data)
         }
         self.mmu().set_rom(rom);
         self.mmu().rom()
