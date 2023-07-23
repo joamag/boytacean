@@ -13,6 +13,7 @@ use boytacean::{
     ppu::{PaletteInfo, PpuMode},
     rom::Cartridge,
     serial::{NullDevice, SerialDevice},
+    util::replace_ext,
 };
 use chrono::Utc;
 use clap::Parser;
@@ -202,10 +203,15 @@ impl Emulator {
     }
 
     pub fn load_rom(&mut self, path: Option<&str>) {
-        let path_res = path.unwrap_or(&self.rom_path);
+        let rom_path: &str = path.unwrap_or(&self.rom_path);
+        let ram_path = replace_ext(rom_path, "sav").unwrap_or("".to_string());
         let rom = self.system.load_rom_file(
-            path_res,
-            Some("C:/repo.other/boytacean/res/roms.prop/super_mario_2.sav"),
+            rom_path,
+            if Path::new(&ram_path).exists() {
+                Some(&ram_path)
+            } else {
+                None
+            },
         );
         println!(
             "========= Cartridge =========\n{}\n=============================",
@@ -216,7 +222,7 @@ impl Emulator {
                 .set_title(format!("{} [{}]", self.title, rom.title()).as_str())
                 .unwrap();
         }
-        self.rom_path = String::from(path_res);
+        self.rom_path = String::from(rom_path);
     }
 
     pub fn reset(&mut self) {
