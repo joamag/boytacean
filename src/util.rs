@@ -18,7 +18,7 @@ pub fn read_file(path: &str) -> Vec<u8> {
     data
 }
 
-pub fn write_file(path: &str, data: Vec<u8>) {
+pub fn write_file(path: &str, data: &Vec<u8>) {
     let mut file = match File::create(path) {
         Ok(file) => file,
         Err(_) => panic!("Failed to open file: {}", path),
