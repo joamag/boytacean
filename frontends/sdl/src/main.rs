@@ -203,7 +203,10 @@ impl Emulator {
 
     pub fn load_rom(&mut self, path: Option<&str>) {
         let path_res = path.unwrap_or(&self.rom_path);
-        let rom = self.system.load_rom_file(path_res);
+        let rom = self.system.load_rom_file(
+            path_res,
+            Some("C:/repo.other/boytacean/res/roms.prop/super_mario_2.sav"),
+        );
         println!(
             "========= Cartridge =========\n{}\n=============================",
             rom

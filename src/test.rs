@@ -30,7 +30,7 @@ pub fn run_test(rom_path: &str, max_cycles: Option<u64>, options: TestOptions) -
     let max_cycles = max_cycles.unwrap_or(u64::MAX);
 
     let mut game_boy = build_test(options);
-    game_boy.load_rom_file(rom_path);
+    game_boy.load_rom_file(rom_path, None);
 
     loop {
         cycles += game_boy.clock() as u64;

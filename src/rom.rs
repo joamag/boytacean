@@ -587,12 +587,16 @@ impl Cartridge {
         )
     }
 
+    pub fn rom_data_eager(&self) -> Vec<u8> {
+        self.rom_data.clone()
+    }
+
     pub fn ram_data_eager(&self) -> Vec<u8> {
         self.ram_data.clone()
     }
 
-    pub fn set_ram_data(&mut self, ram_data: Vec<u8>) {
-        self.ram_data = ram_data;
+    pub fn set_ram_data(&mut self, data: &[u8]) {
+        self.ram_data = data.to_vec();
     }
 
     pub fn description(&self, column_length: usize) -> String {
