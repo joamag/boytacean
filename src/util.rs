@@ -1,4 +1,10 @@
-use std::{cell::RefCell, fs::File, io::Read, path::Path, rc::Rc};
+use std::{
+    cell::RefCell,
+    fs::File,
+    io::{Read, Write},
+    path::Path,
+    rc::Rc,
+};
 
 pub type SharedMut<T> = Rc<RefCell<T>>;
 
@@ -10,6 +16,14 @@ pub fn read_file(path: &str) -> Vec<u8> {
     let mut data = Vec::new();
     file.read_to_end(&mut data).unwrap();
     data
+}
+
+pub fn write_file(path: &str, data: Vec<u8>) {
+    let mut file = match File::create(path) {
+        Ok(file) => file,
+        Err(_) => panic!("Failed to open file: {}", path),
+    };
+    file.write_all(&data).unwrap()
 }
 
 /// Replaces the extension in the given path with the provided extension.

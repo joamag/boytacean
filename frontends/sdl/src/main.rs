@@ -13,7 +13,7 @@ use boytacean::{
     ppu::{PaletteInfo, PpuMode},
     rom::Cartridge,
     serial::{NullDevice, SerialDevice},
-    util::replace_ext,
+    util::{replace_ext, write_file},
 };
 use chrono::Utc;
 use clap::Parser;
@@ -38,6 +38,10 @@ const TITLE: &str = "Boytacean";
 /// Base audio volume to be used as the basis of the
 /// amplification level of the volume
 const VOLUME: f32 = 64.0;
+
+/// The rate (in seconds) at which the current battery
+/// backed RAM is going to be stored into the file system.
+const STORE_RATE: u8 = 5;
 
 pub struct Benchmark {
     count: usize,
@@ -317,6 +321,10 @@ impl Emulator {
             .create_texture_streaming(PixelFormatEnum::RGB24, width as u32, height as u32)
             .unwrap();
 
+        // calculates the rate as visual cycles that will take from
+        // the current visual frequency to re-save the battery backed RAM
+        let store_count = (self.visual_frequency * STORE_RATE as f32).round() as u32;
+
         // starts the variable that will control the number of cycles that
         // are going to move (because of overflow) from one tick to another
         let mut pending_cycles = 0u32;
@@ -331,6 +339,14 @@ impl Emulator {
             // increments the counter that will keep track
             // on the number of visual ticks since beginning
             counter = counter.wrapping_add(1);
+
+            // in case the current counter is a multiple of the store rate
+            // then we've reached the time to re-save the battery backed RAM
+            // into a *.sav file in the file system
+            if counter % store_count == 0 && self.system.rom().has_battery() {
+                let ram_data = self.system.ram_data_eager();
+                write_file(&self.ram_path, ram_data);
+            }
 
             // obtains an event from the SDL sub-system to be
             // processed under the current emulation context
