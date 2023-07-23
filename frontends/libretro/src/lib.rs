@@ -1,6 +1,6 @@
 #![allow(clippy::uninlined_format_args)]
 
-use std::os::raw::{c_char, c_void};
+use std::os::raw::{c_char, c_void, c_uint};
 
 const RETRO_API_VERSION: u32 = 1;
 
@@ -43,10 +43,11 @@ pub struct retro_system_api {
 
 #[no_mangle]
 extern "C" fn retro_get_system_info(info: *mut retro_system_info) {
+    println!("retro_get_system_info");
     unsafe {
         (*info).library_name = "Boytacean\0".as_ptr() as *const c_char;
-        (*info).library_version = "0.9.6\0".as_ptr() as *const c_char;
-        (*info).valid_extensions = "gb\0gbc\0\0".as_ptr() as *const c_char;
+        (*info).library_version = "v0.9.6\0".as_ptr() as *const c_char;
+        (*info).valid_extensions = "gb|gbc\0".as_ptr() as *const c_char;
         (*info).need_fullpath = false;
         (*info).block_extract = false;
     }
@@ -61,26 +62,18 @@ extern "C" fn retro_set_environment(
     // For example, you might handle system RAM allocation using this function
 }
 
-// Add other core functions here as needed
-
-// Call this function to initialize the libretro core
 #[no_mangle]
-pub extern "C" fn retro_api_version() -> u32 {
+pub extern "C" fn retro_api_version() -> c_uint {
+    println!("retro_api_version()");
     RETRO_API_VERSION
 }
 
-// Define other core functions here as needed
-
-// Add your Game Boy emulator code here
-// ...
-
-// Entry point for the libretro core
 #[no_mangle]
-pub extern "C" fn retro_init() {}
+pub extern "C" fn retro_init() {
+    println!("retro_init()");
+}
 
-// Other libretro core functions
-// ...
-
-// Entry point to deinitialize the libretro core
 #[no_mangle]
-pub extern "C" fn retro_deinit() {}
+pub extern "C" fn retro_deinit() {
+    println!("retro_deinit()");
+}
