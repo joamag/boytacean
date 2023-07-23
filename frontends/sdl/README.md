@@ -79,7 +79,7 @@ cargo vcpkg -v build
 It's possible to run the emulator in headless mode using the `--headless` parameter:
 
 ```bash
-cargo run  -- --rom-path ../../res/roms/test/blargg/cpu/cpu_instrs.gb --cycles 100000000  --headless --device stdout --unlimited
+cargo run -- --rom-path ../../res/roms/test/blargg/cpu/cpu_instrs.gb --cycles 100000000 --headless --device stdout --unlimited
 ```
 
 ## Features

@@ -444,14 +444,10 @@ impl Apu {
             }
         };
 
-        println!("APU read: 0x{:04X} = 0x{:02X}", addr, value);
-
         value
     }
 
     pub fn write(&mut self, addr: u16, value: u8) {
-        println!("APU write: 0x{:04X} = 0x{:02X}", addr, value);
-
         // in case the sound is disabled then ignores writes
         // to any register aside from the sound on/off
         if !self.sound_enabled && addr != 0xff26 {
