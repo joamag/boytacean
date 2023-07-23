@@ -341,7 +341,7 @@ impl Apu {
     }
 
     pub fn read(&mut self, addr: u16) -> u8 {
-        let value = match addr {
+        match addr {
             // 0xFF10 — NR10: Channel 1 sweep
             0xff10 => {
                 (self.ch1_sweep_slope & 0x07)
@@ -442,9 +442,7 @@ impl Apu {
                 warnln!("Reading from unknown APU location 0x{:04x}", addr);
                 0xff
             }
-        };
-
-        value
+        }
     }
 
     pub fn write(&mut self, addr: u16, value: u8) {
