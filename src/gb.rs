@@ -642,7 +642,7 @@ impl GameBoy {
     }
 
     pub fn set_ram_data(&mut self, ram_data: Vec<u8>) {
-        self.mmu().rom().set_ram_data(ram_data)
+        self.mmu().rom().set_ram_data(&ram_data)
     }
 
     pub fn registers(&mut self) -> Registers {
@@ -974,15 +974,24 @@ impl GameBoy {
         self.load_boot_file(BootRom::Cgb);
     }
 
-    pub fn load_rom(&mut self, data: &[u8]) -> &mut Cartridge {
-        let rom = Cartridge::from_data(data);
+    pub fn load_rom(&mut self, data: &[u8], ram_data: Option<&[u8]>) -> &mut Cartridge {
+        let mut rom = Cartridge::from_data(data);
+        if let Some(ram_data) = ram_data {
+            rom.set_ram_data(ram_data)
+        }
         self.mmu().set_rom(rom);
         self.mmu().rom()
     }
 
-    pub fn load_rom_file(&mut self, path: &str) -> &mut Cartridge {
+    pub fn load_rom_file(&mut self, path: &str, ram_path: Option<&str>) -> &mut Cartridge {
         let data = read_file(path);
-        self.load_rom(&data)
+        match ram_path {
+            Some(ram_path) => {
+                let ram_data = read_file(ram_path);
+                self.load_rom(&data, Some(&ram_data))
+            }
+            None => self.load_rom(&data, None),
+        }
     }
 
     pub fn attach_serial(&mut self, device: Box<dyn SerialDevice>) {
@@ -1006,7 +1015,7 @@ impl GameBoy {
     }
 
     pub fn load_rom_ws(&mut self, data: &[u8]) -> Cartridge {
-        let rom = self.load_rom(data);
+        let rom = self.load_rom(data, None);
         rom.set_rumble_cb(|active| {
             rumble_callback(active);
         });
