@@ -1015,7 +1015,7 @@ impl GameBoy {
     }
 
     pub fn load_rom_ws(&mut self, data: &[u8]) -> Cartridge {
-        let rom = self.load_rom(data);
+        let rom = self.load_rom(data, None);
         rom.set_rumble_cb(|active| {
             rumble_callback(active);
         });
