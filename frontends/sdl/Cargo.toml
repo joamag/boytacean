@@ -6,6 +6,7 @@ description = "An SDL frontend for Boytacen"
 license = "Apache-2.0"
 keywords = ["gameboy", "emulator", "rust", "sdl"]
 edition = "2018"
+readme = "README.md"
 
 [features]
 slow = []
