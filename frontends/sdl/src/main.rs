@@ -344,8 +344,8 @@ impl Emulator {
             // then we've reached the time to re-save the battery backed RAM
             // into a *.sav file in the file system
             if counter % store_count == 0 && self.system.rom().has_battery() {
-                let ram_data = self.system.ram_data_eager();
-                write_file(&self.ram_path, &ram_data);
+                let ram_data = self.system.rom().ram_data();
+                write_file(&self.ram_path, ram_data);
             }
 
             // obtains an event from the SDL sub-system to be

@@ -621,6 +621,16 @@ impl Cartridge {
     }
 }
 
+impl Cartridge {
+    pub fn rom_data(&self) -> &Vec<u8> {
+        &self.rom_data
+    }
+
+    pub fn ram_data(&self) -> &Vec<u8> {
+        &self.ram_data
+    }
+}
+
 impl Default for Cartridge {
     fn default() -> Self {
         Self::new()
