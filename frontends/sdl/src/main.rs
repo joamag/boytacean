@@ -70,6 +70,7 @@ pub struct Emulator {
     audio: Option<Audio>,
     title: &'static str,
     rom_path: String,
+    ram_path: String,
     logic_frequency: u32,
     visual_frequency: f32,
     next_tick_time: f32,
@@ -89,6 +90,7 @@ impl Emulator {
             audio: None,
             title: TITLE,
             rom_path: String::from("invalid"),
+            ram_path: String::from("invalid"),
             logic_frequency: GameBoy::CPU_FREQ,
             visual_frequency: GameBoy::VISUAL_FREQ,
             next_tick_time: 0.0,
@@ -204,7 +206,7 @@ impl Emulator {
 
     pub fn load_rom(&mut self, path: Option<&str>) {
         let rom_path: &str = path.unwrap_or(&self.rom_path);
-        let ram_path = replace_ext(rom_path, "sav").unwrap_or("".to_string());
+        let ram_path = replace_ext(rom_path, "sav").unwrap_or("invalid".to_string());
         let rom = self.system.load_rom_file(
             rom_path,
             if Path::new(&ram_path).exists() {
@@ -223,6 +225,7 @@ impl Emulator {
                 .unwrap();
         }
         self.rom_path = String::from(rom_path);
+        self.ram_path = ram_path;
     }
 
     pub fn reset(&mut self) {
