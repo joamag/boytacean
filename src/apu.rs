@@ -25,6 +25,7 @@ pub struct Apu {
     ch1_envelope_enabled: bool,
     ch1_sweep_sequence: u8,
     ch1_output: u8,
+    ch1_dac: bool,
     ch1_sweep_slope: u8,
     ch1_sweep_increase: bool,
     ch1_sweep_pace: u8,
@@ -34,7 +35,7 @@ pub struct Apu {
     ch1_direction: u8,
     ch1_volume: u8,
     ch1_wave_length: u16,
-    ch1_length_stop: bool,
+    ch1_length_enabled: bool,
     ch1_enabled: bool,
 
     ch2_timer: i16,
@@ -42,29 +43,31 @@ pub struct Apu {
     ch2_envelope_sequence: u8,
     ch2_envelope_enabled: bool,
     ch2_output: u8,
+    ch2_dac: bool,
     ch2_length_timer: u8,
     ch2_wave_duty: u8,
     ch2_pace: u8,
     ch2_direction: u8,
     ch2_volume: u8,
     ch2_wave_length: u16,
-    ch2_length_stop: bool,
+    ch2_length_enabled: bool,
     ch2_enabled: bool,
 
     ch3_timer: i16,
     ch3_position: u8,
     ch3_output: u8,
     ch3_dac: bool,
-    ch3_length_timer: u8,
+    ch3_length_timer: u16,
     ch3_output_level: u8,
     ch3_wave_length: u16,
-    ch3_length_stop: bool,
+    ch3_length_enabled: bool,
     ch3_enabled: bool,
 
     ch4_timer: i32,
     ch4_envelope_sequence: u8,
     ch4_envelope_enabled: bool,
     ch4_output: u8,
+    ch4_dac: bool,
     ch4_length_timer: u8,
     ch4_pace: u8,
     ch4_direction: u8,
@@ -73,9 +76,10 @@ pub struct Apu {
     ch4_width_mode: bool,
     ch4_clock_shift: u8,
     ch4_lfsr: u16,
-    ch4_length_stop: bool,
+    ch4_length_enabled: bool,
     ch4_enabled: bool,
 
+    master: u8,
     glob_panning: u8,
 
     right_enabled: bool,
@@ -108,8 +112,9 @@ impl Apu {
             ch1_envelope_enabled: false,
             ch1_sweep_sequence: 0,
             ch1_output: 0,
+            ch1_dac: false,
             ch1_sweep_slope: 0x0,
-            ch1_sweep_increase: false,
+            ch1_sweep_increase: true,
             ch1_sweep_pace: 0x0,
             ch1_length_timer: 0x0,
             ch1_wave_duty: 0x0,
@@ -117,7 +122,7 @@ impl Apu {
             ch1_direction: 0x0,
             ch1_volume: 0x0,
             ch1_wave_length: 0x0,
-            ch1_length_stop: false,
+            ch1_length_enabled: false,
             ch1_enabled: false,
 
             ch2_timer: 0,
@@ -125,13 +130,14 @@ impl Apu {
             ch2_envelope_sequence: 0,
             ch2_envelope_enabled: false,
             ch2_output: 0,
+            ch2_dac: false,
             ch2_length_timer: 0x0,
             ch2_wave_duty: 0x0,
             ch2_pace: 0x0,
             ch2_direction: 0x0,
             ch2_volume: 0x0,
             ch2_wave_length: 0x0,
-            ch2_length_stop: false,
+            ch2_length_enabled: false,
             ch2_enabled: false,
 
             ch3_timer: 0,
@@ -141,13 +147,14 @@ impl Apu {
             ch3_length_timer: 0x0,
             ch3_output_level: 0x0,
             ch3_wave_length: 0x0,
-            ch3_length_stop: false,
+            ch3_length_enabled: false,
             ch3_enabled: false,
 
             ch4_timer: 0,
             ch4_envelope_sequence: 0,
             ch4_envelope_enabled: false,
             ch4_output: 0,
+            ch4_dac: false,
             ch4_length_timer: 0x0,
             ch4_pace: 0x0,
             ch4_direction: 0x0,
@@ -156,9 +163,10 @@ impl Apu {
             ch4_width_mode: false,
             ch4_clock_shift: 0x0,
             ch4_lfsr: 0x0,
-            ch4_length_stop: false,
+            ch4_length_enabled: false,
             ch4_enabled: false,
 
+            master: 0x0,
             glob_panning: 0x0,
 
             left_enabled: true,
@@ -200,8 +208,9 @@ impl Apu {
         self.ch1_envelope_enabled = false;
         self.ch1_sweep_sequence = 0;
         self.ch1_output = 0;
+        self.ch1_dac = false;
         self.ch1_sweep_slope = 0x0;
-        self.ch1_sweep_increase = false;
+        self.ch1_sweep_increase = true;
         self.ch1_sweep_pace = 0x0;
         self.ch1_length_timer = 0x0;
         self.ch1_wave_duty = 0x0;
@@ -209,7 +218,7 @@ impl Apu {
         self.ch1_direction = 0x0;
         self.ch1_volume = 0x0;
         self.ch1_wave_length = 0x0;
-        self.ch1_length_stop = false;
+        self.ch1_length_enabled = false;
         self.ch1_enabled = false;
 
         self.ch2_timer = 0;
@@ -217,13 +226,14 @@ impl Apu {
         self.ch2_envelope_sequence = 0;
         self.ch2_envelope_enabled = false;
         self.ch2_output = 0;
+        self.ch2_dac = false;
         self.ch2_length_timer = 0x0;
         self.ch2_wave_duty = 0x0;
         self.ch2_pace = 0x0;
         self.ch2_direction = 0x0;
         self.ch2_volume = 0x0;
         self.ch2_wave_length = 0x0;
-        self.ch2_length_stop = false;
+        self.ch2_length_enabled = false;
         self.ch2_enabled = false;
 
         self.ch3_timer = 0;
@@ -233,13 +243,14 @@ impl Apu {
         self.ch3_length_timer = 0x0;
         self.ch3_output_level = 0x0;
         self.ch3_wave_length = 0x0;
-        self.ch3_length_stop = false;
+        self.ch3_length_enabled = false;
         self.ch3_enabled = false;
 
         self.ch4_timer = 0;
         self.ch4_envelope_sequence = 0;
         self.ch4_envelope_enabled = false;
         self.ch4_output = 0;
+        self.ch4_dac = false;
         self.ch4_length_timer = 0x0;
         self.ch4_pace = 0x0;
         self.ch4_direction = 0x0;
@@ -248,9 +259,10 @@ impl Apu {
         self.ch4_width_mode = false;
         self.ch4_clock_shift = 0x0;
         self.ch4_lfsr = 0x0;
-        self.ch4_length_stop = false;
+        self.ch4_length_enabled = false;
         self.ch4_enabled = false;
 
+        self.master = 0x0;
         self.glob_panning = 0x0;
 
         self.left_enabled = true;
@@ -333,68 +345,94 @@ impl Apu {
             // 0xFF10 — NR10: Channel 1 sweep
             0xff10 => {
                 (self.ch1_sweep_slope & 0x07)
-                    | (if self.ch1_sweep_increase { 0x08 } else { 0x00 })
+                    | (if self.ch1_sweep_increase { 0x00 } else { 0x08 })
                     | ((self.ch1_sweep_pace & 0x07) << 4)
+                    | 0x80
             }
             // 0xFF11 — NR11: Channel 1 length timer & duty cycle
-            0xff11 => (self.ch1_wave_duty & 0x03) << 6,
+            0xff11 => ((self.ch1_wave_duty & 0x03) << 6) | 0x3f,
             // 0xFF12 — NR12: Channel 1 volume & envelope
             0xff12 => {
                 (self.ch1_pace & 0x07)
                     | ((self.ch1_direction & 0x01) << 3)
                     | ((self.ch1_volume & 0x0f) << 4)
             }
+            // 0xFF13 — NR13: Channel 1 wavelength low
+            0xff13 => 0xff,
+            // 0xFF14 — NR14: Channel 1 wavelength high & control
+            0xff14 => (if self.ch1_length_enabled { 0x40 } else { 0x00 }) | 0xbf,
 
             // 0xFF15 — Not used
             0xff15 => 0xff,
             // 0xFF16 — NR21: Channel 2 length timer & duty cycle
-            0xff16 => (self.ch2_wave_duty & 0x03) << 6,
+            0xff16 => ((self.ch2_wave_duty & 0x03) << 6) | 0x3f,
             // 0xFF17 — NR22: Channel 2 volume & envelope
             0xff17 => {
                 (self.ch2_pace & 0x07)
                     | ((self.ch2_direction & 0x01) << 3)
                     | ((self.ch2_volume & 0x0f) << 4)
             }
+            // 0xFF18 — NR23: Channel 2 wavelength low
+            0xff18 => 0xff,
+            // 0xFF19 — NR24: Channel 2 wavelength high & control
+            0xff19 => (if self.ch2_length_enabled { 0x40 } else { 0x00 }) | 0xbf,
 
             // 0xFF1A — NR30: Channel 3 DAC enable
-            0xff1a => {
-                if self.ch3_dac {
-                    0x80
-                } else {
-                    0x00
-                }
-            }
+            0xff1a => (if self.ch3_dac { 0x80 } else { 0x00 }) | 0x7f,
             // 0xFF1B — NR31: Channel 3 length timer
-            0xff1b => 0x00,
+            0xff1b => 0xff,
             // 0xFF1C — NR32: Channel 3 output level
-            0xff1c => (self.ch3_output_level & 0x03) << 5,
+            0xff1c => ((self.ch3_output_level & 0x03) << 5) | 0x9f,
+            // 0xFF1D — NR33: Channel 3 wavelength low
+            0xff1d => 0xff,
+            // 0xFF1E — NR34: Channel 3 wavelength high & control
+            0xff1e => (if self.ch3_length_enabled { 0x40 } else { 0x00 }) | 0xbf,
 
             // 0xFF1F — Not used
             0xff1f => 0xff,
             // 0xFF20 — NR41: Channel 4 length timer
-            0xff20 => 0x00,
+            0xff20 => 0xff,
             // 0xFF21 — NR42: Channel 4 volume & envelope
             0xff21 => {
                 (self.ch4_pace & 0x07)
                     | ((self.ch4_direction & 0x01) << 3)
                     | ((self.ch4_volume & 0x0f) << 4)
             }
+            // 0xFF22 — NR43: Channel 4 frequency & randomness
+            0xff22 => {
+                (self.ch4_divisor & 0x07)
+                    | if self.ch4_width_mode { 0x08 } else { 0x00 }
+                    | ((self.ch4_clock_shift & 0x0f) << 4)
+            }
+            // 0xFF23 — NR44: Channel 4 control
+            0xff23 => (if self.ch4_length_enabled { 0x40 } else { 0x00 }) | 0xbf,
 
+            // 0xFF24 — NR50: Master volume & VIN panning
+            0xff24 => self.master,
             // 0xFF25 — NR51: Sound panning
             0xff25 => self.glob_panning,
             // 0xFF26 — NR52: Sound on/off
             0xff26 =>
             {
                 #[allow(clippy::bool_to_int_with_if)]
-                (if self.ch1_enabled { 0x01 } else { 0x00 }
-                    | if self.ch2_enabled { 0x02 } else { 0x00 }
-                    | if self.ch3_enabled && self.ch3_dac {
-                        0x04
-                    } else {
-                        0x00
-                    }
-                    | if self.ch4_enabled { 0x08 } else { 0x00 }
-                    | if self.sound_enabled { 0x80 } else { 0x00 })
+                ((if self.ch1_enabled && self.ch1_dac {
+                    0x01
+                } else {
+                    0x00
+                } | if self.ch2_enabled && self.ch2_dac {
+                    0x02
+                } else {
+                    0x00
+                } | if self.ch3_enabled && self.ch3_dac {
+                    0x04
+                } else {
+                    0x00
+                } | if self.ch4_enabled && self.ch4_dac {
+                    0x08
+                } else {
+                    0x00
+                } | if self.sound_enabled { 0x80 } else { 0x00 })
+                    | 0x70)
             }
 
             // 0xFF30-0xFF3F — Wave pattern RAM
@@ -408,6 +446,12 @@ impl Apu {
     }
 
     pub fn write(&mut self, addr: u16, value: u8) {
+        // in case the sound is disabled then ignores writes
+        // to any register aside from the sound on/off
+        if !self.sound_enabled && addr != 0xff26 {
+            return;
+        }
+
         match addr {
             // 0xFF10 — NR10: Channel 1 sweep
             0xff10 => {
@@ -418,7 +462,7 @@ impl Apu {
             }
             // 0xFF11 — NR11: Channel 1 length timer & duty cycle
             0xff11 => {
-                self.ch1_length_timer = value & 0x3f;
+                self.ch1_length_timer = 64 - (value & 0x3f);
                 self.ch1_wave_duty = (value & 0xc0) >> 6;
             }
             // 0xFF12 — NR12: Channel 1 volume & envelope
@@ -428,6 +472,10 @@ impl Apu {
                 self.ch1_volume = (value & 0xf0) >> 4;
                 self.ch1_envelope_enabled = self.ch1_pace > 0;
                 self.ch1_envelope_sequence = 0;
+                self.ch1_dac = value & 0xf8 != 0x00;
+                if !self.ch1_dac {
+                    self.ch1_enabled = false;
+                }
             }
             // 0xFF13 — NR13: Channel 1 wavelength low
             0xff13 => {
@@ -437,15 +485,19 @@ impl Apu {
             0xff14 => {
                 let length_trigger = value & 0x40 == 0x40;
                 let trigger = value & 0x80 == 0x80;
+                let length_edge = length_trigger && !self.ch1_length_enabled;
                 self.ch1_wave_length =
                     (self.ch1_wave_length & 0x00ff) | (((value & 0x07) as u16) << 8);
-                self.ch1_length_stop = value & 0x40 == 0x40;
+                self.ch1_length_enabled = value & 0x40 == 0x40;
                 self.ch1_enabled |= value & 0x80 == 0x80;
+                if length_edge && self.sequencer_step % 2 == 1 {
+                    self.tick_length(Channel::Ch1);
+                }
                 if trigger {
                     self.trigger_ch1();
                 }
-                if (length_trigger || trigger) && self.ch1_length_timer == 0 {
-                    self.ch1_length_timer = 0;
+                if length_trigger && self.ch1_length_timer == 0 {
+                    self.ch1_enabled = false;
                 }
             }
 
@@ -453,7 +505,7 @@ impl Apu {
             0xff15 => (),
             // 0xFF16 — NR21: Channel 2 length timer & duty cycle
             0xff16 => {
-                self.ch2_length_timer = value & 0x3f;
+                self.ch2_length_timer = 64 - (value & 0x3f);
                 self.ch2_wave_duty = (value & 0xc0) >> 6;
             }
             // 0xFF17 — NR22: Channel 2 volume & envelope
@@ -463,6 +515,10 @@ impl Apu {
                 self.ch2_volume = (value & 0xf0) >> 4;
                 self.ch2_envelope_enabled = self.ch2_pace > 0;
                 self.ch2_envelope_sequence = 0;
+                self.ch2_dac = value & 0xf8 != 0x00;
+                if !self.ch2_dac {
+                    self.ch2_enabled = false;
+                }
             }
             // 0xFF18 — NR23: Channel 2 wavelength low
             0xff18 => {
@@ -472,31 +528,38 @@ impl Apu {
             0xff19 => {
                 let length_trigger = value & 0x40 == 0x40;
                 let trigger = value & 0x80 == 0x80;
+                let length_edge = length_trigger && !self.ch2_length_enabled;
                 self.ch2_wave_length =
                     (self.ch2_wave_length & 0x00ff) | (((value & 0x07) as u16) << 8);
-                self.ch2_length_stop = length_trigger;
+                self.ch2_length_enabled = length_trigger;
                 self.ch2_enabled |= trigger;
+                if length_edge && self.sequencer_step % 2 == 1 {
+                    self.tick_length(Channel::Ch2);
+                }
                 if trigger {
                     self.trigger_ch2();
                 }
-                if (length_trigger || trigger) && self.ch2_length_timer == 0 {
-                    self.ch2_length_timer = 0;
+                if length_trigger && self.ch2_length_timer == 0 {
+                    self.ch2_enabled = false;
                 }
             }
 
             // 0xFF1A — NR30: Channel 3 DAC enable
             0xff1a => {
                 self.ch3_dac = value & 0x80 == 0x80;
+                if !self.ch3_dac {
+                    self.ch3_enabled = false;
+                }
             }
             // 0xFF1B — NR31: Channel 3 length timer
             0xff1b => {
-                self.ch3_length_timer = value;
+                self.ch3_length_timer = 256 - (value as u16);
             }
             // 0xFF1C — NR32: Channel 3 output level
             0xff1c => {
                 self.ch3_output_level = (value & 0x60) >> 5;
             }
-            // 0xFF1D — NR33: Channel 3 wavelength low [write-only]
+            // 0xFF1D — NR33: Channel 3 wavelength low
             0xff1d => {
                 self.ch3_wave_length = (self.ch3_wave_length & 0xff00) | value as u16;
             }
@@ -504,15 +567,19 @@ impl Apu {
             0xff1e => {
                 let length_trigger = value & 0x40 == 0x40;
                 let trigger = value & 0x80 == 0x80;
+                let length_edge = length_trigger && !self.ch3_length_enabled;
                 self.ch3_wave_length =
                     (self.ch3_wave_length & 0x00ff) | (((value & 0x07) as u16) << 8);
-                self.ch3_length_stop = length_trigger;
+                self.ch3_length_enabled = length_trigger;
                 self.ch3_enabled |= trigger;
+                if length_edge && self.sequencer_step % 2 == 1 {
+                    self.tick_length(Channel::Ch3);
+                }
                 if trigger {
                     self.trigger_ch3();
                 }
-                if (length_trigger || trigger) && self.ch3_length_timer == 0 {
-                    self.ch3_length_timer = 0;
+                if length_trigger && self.ch3_length_timer == 0 {
+                    self.ch3_enabled = false;
                 }
             }
 
@@ -520,7 +587,7 @@ impl Apu {
             0xff1f => (),
             // 0xFF20 — NR41: Channel 4 length timer
             0xff20 => {
-                self.ch4_length_timer = value & 0x3f;
+                self.ch4_length_timer = 64 - (value & 0x3f);
             }
             // 0xFF21 — NR42: Channel 4 volume & envelope
             0xff21 => {
@@ -529,6 +596,10 @@ impl Apu {
                 self.ch4_volume = (value & 0xf0) >> 4;
                 self.ch4_envelope_enabled = self.ch4_pace > 0;
                 self.ch4_envelope_sequence = 0;
+                self.ch4_dac = value & 0xf8 != 0x00;
+                if !self.ch4_dac {
+                    self.ch4_enabled = false;
+                }
             }
             // 0xFF22 — NR43: Channel 4 frequency & randomness
             0xff22 => {
@@ -540,19 +611,23 @@ impl Apu {
             0xff23 => {
                 let length_trigger = value & 0x40 == 0x40;
                 let trigger = value & 0x80 == 0x80;
-                self.ch4_length_stop = length_trigger;
+                let length_edge = length_trigger && !self.ch4_length_enabled;
+                self.ch4_length_enabled = length_trigger;
                 self.ch4_enabled |= trigger;
+                if length_edge && self.sequencer_step % 2 == 1 {
+                    self.tick_length(Channel::Ch4);
+                }
                 if trigger {
                     self.trigger_ch4();
                 }
-                if (length_trigger || trigger) && self.ch4_length_timer == 0 {
-                    self.ch4_length_timer = 0;
+                if length_trigger && self.ch4_length_timer == 0 {
+                    self.ch4_enabled = false;
                 }
             }
 
             // 0xFF24 — NR50: Master volume & VIN panning
             0xff24 => {
-                //@TODO: Implement master volume & VIN panning
+                self.master = value;
             }
             // 0xFF25 — NR51: Sound panning
             0xff25 => {
@@ -568,9 +643,7 @@ impl Apu {
             }
 
             // 0xFF30-0xFF3F — Wave pattern RAM
-            0xff30..=0xff3f => {
-                self.wave_ram[addr as usize & 0x000f] = value;
-            }
+            0xff30..=0xff3f => self.wave_ram[addr as usize & 0x000f] = value,
 
             _ => warnln!("Writing in unknown APU location 0x{:04x}", addr),
         }
@@ -681,34 +754,39 @@ impl Apu {
     fn tick_length(&mut self, channel: Channel) {
         match channel {
             Channel::Ch1 => {
-                if !self.ch1_enabled {
+                if !self.ch1_length_enabled || self.ch1_length_timer == 0 {
                     return;
                 }
-                self.ch1_length_timer = self.ch1_length_timer.saturating_add(1);
-                if self.ch1_length_timer >= 64 {
-                    self.ch1_enabled = !self.ch1_length_stop;
-                    self.ch1_length_timer = 0;
+                self.ch1_length_timer = self.ch1_length_timer.saturating_sub(1);
+                if self.ch1_length_timer == 0 {
+                    self.ch1_enabled = false;
                 }
             }
             Channel::Ch2 => {
-                self.ch2_length_timer = self.ch2_length_timer.saturating_add(1);
-                if self.ch2_length_timer >= 64 {
-                    self.ch2_enabled = !self.ch2_length_stop;
-                    self.ch2_length_timer = 0;
+                if !self.ch2_length_enabled || self.ch2_length_timer == 0 {
+                    return;
+                }
+                self.ch2_length_timer = self.ch2_length_timer.saturating_sub(1);
+                if self.ch2_length_timer == 0 {
+                    self.ch2_enabled = false;
                 }
             }
             Channel::Ch3 => {
-                self.ch3_length_timer = self.ch3_length_timer.saturating_add(1);
-                if self.ch3_length_timer >= 64 {
-                    self.ch3_enabled = !self.ch3_length_stop;
-                    self.ch3_length_timer = 0;
+                if !self.ch3_length_enabled || self.ch3_length_timer == 0 {
+                    return;
+                }
+                self.ch3_length_timer = self.ch3_length_timer.saturating_sub(1);
+                if self.ch3_length_timer == 0 {
+                    self.ch3_enabled = false;
                 }
             }
             Channel::Ch4 => {
-                self.ch4_length_timer = self.ch4_length_timer.saturating_add(1);
-                if self.ch4_length_timer >= 64 {
-                    self.ch4_enabled = !self.ch4_length_stop;
-                    self.ch4_length_timer = 0;
+                if !self.ch4_length_enabled || self.ch4_length_timer == 0 {
+                    return;
+                }
+                self.ch4_length_timer = self.ch4_length_timer.saturating_sub(1);
+                if self.ch4_length_timer == 0 {
+                    self.ch4_enabled = false;
                 }
             }
         }
@@ -920,18 +998,39 @@ impl Apu {
         self.ch1_timer = ((2048 - self.ch1_wave_length) << 2) as i16;
         self.ch1_envelope_sequence = 0;
         self.ch1_sweep_sequence = 0;
+
+        if self.ch1_length_timer == 0 {
+            self.ch1_length_timer = 64;
+            if self.ch1_length_enabled && self.sequencer_step % 2 == 1 {
+                self.tick_length(Channel::Ch1);
+            }
+        }
     }
 
     #[inline(always)]
     fn trigger_ch2(&mut self) {
         self.ch2_timer = ((2048 - self.ch2_wave_length) << 2) as i16;
         self.ch2_envelope_sequence = 0;
+
+        if self.ch2_length_timer == 0 {
+            self.ch2_length_timer = 64;
+            if self.ch2_length_enabled && self.sequencer_step % 2 == 1 {
+                self.tick_length(Channel::Ch2);
+            }
+        }
     }
 
     #[inline(always)]
     fn trigger_ch3(&mut self) {
         self.ch3_timer = 3;
         self.ch3_position = 0;
+
+        if self.ch3_length_timer == 0 {
+            self.ch3_length_timer = 256;
+            if self.ch3_length_enabled && self.sequencer_step % 2 == 1 {
+                self.tick_length(Channel::Ch3);
+            }
+        }
     }
 
     #[inline(always)]
@@ -940,6 +1039,13 @@ impl Apu {
             ((CH4_DIVISORS[self.ch4_divisor as usize] as u16) << self.ch4_clock_shift) as i32;
         self.ch4_lfsr = 0x7ff1;
         self.ch4_envelope_sequence = 0;
+
+        if self.ch4_length_timer == 0 {
+            self.ch4_length_timer = 64;
+            if self.ch4_length_enabled && self.sequencer_step % 2 == 1 {
+                self.tick_length(Channel::Ch4);
+            }
+        }
     }
 }
 

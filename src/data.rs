@@ -8,6 +8,7 @@ pub enum BootRom {
     DmgBootix,
     MgbBootix,
     Cgb,
+    None,
 }
 
 pub const DMG_BOOT: [u8; 256] = [

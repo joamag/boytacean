@@ -64,8 +64,34 @@ mod tests {
             Some(50000000),
             TestOptions::default(),
         );
-        compare_images(&result, "res/test/blargg/instr_timing/instr_timing.png");
         let image_result = compare_images(&result, "res/test/blargg/instr_timing/instr_timing.png");
+        assert_eq!(image_result, true);
+    }
+
+    #[test]
+    fn test_blargg_dmg_sound() {
+        let result: [u8; FRAME_BUFFER_SIZE] = run_image_test(
+            "../../res/roms/test/blargg/dmg_sound/01-registers.gb",
+            Some(50000000),
+            TestOptions::default(),
+        );
+        let image_result = compare_images(&result, "res/test/blargg/dmg_sound/01-registers.png");
+        assert_eq!(image_result, true);
+
+        let result: [u8; FRAME_BUFFER_SIZE] = run_image_test(
+            "../../res/roms/test/blargg/dmg_sound/02-len ctr.gb",
+            Some(50000000),
+            TestOptions::default(),
+        );
+        let image_result = compare_images(&result, "res/test/blargg/dmg_sound/02-len ctr.png");
+        assert_eq!(image_result, true);
+
+        let result: [u8; FRAME_BUFFER_SIZE] = run_image_test(
+            "../../res/roms/test/blargg/dmg_sound/03-trigger.gb",
+            Some(100000000),
+            TestOptions::default(),
+        );
+        let image_result = compare_images(&result, "res/test/blargg/dmg_sound/03-trigger.png");
         assert_eq!(image_result, true);
     }
 

@@ -535,6 +535,7 @@ impl GameBoy {
             BootRom::DmgBootix => self.load_boot(&DMG_BOOTIX),
             BootRom::MgbBootix => self.load_boot(&MGB_BOOTIX),
             BootRom::Cgb => self.load_boot(&CGB_BOOT),
+            BootRom::None => (),
         }
     }
 
@@ -957,6 +958,7 @@ impl GameBoy {
             BootRom::DmgBootix => self.load_boot_path("./res/boot/dmg_bootix.bin"),
             BootRom::MgbBootix => self.load_boot_path("./res/boot/mgb_bootix.bin"),
             BootRom::Cgb => self.load_boot_path("./res/boot/cgb_boot.bin"),
+            BootRom::None => (),
         }
     }
 

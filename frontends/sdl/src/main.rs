@@ -662,6 +662,13 @@ struct Args {
     #[arg(short, long, default_value_t = String::from("printer"), help = "Serial device to be used")]
     device: String,
 
+    #[arg(
+        long,
+        default_value_t = false,
+        help = "If set no boot ROM will be loaded"
+    )]
+    no_boot: bool,
+
     #[arg(long, default_value_t = false, help = "If set no PPU will be used")]
     no_ppu: bool,
 
@@ -740,7 +747,7 @@ fn main() {
     // parses the provided command line arguments and uses them to
     // obtain structured values
     let args = Args::parse();
-    let mode: GameBoyMode = if args.mode == "auto" {
+    let mode = if args.mode == "auto" {
         GameBoyMode::Dmg
     } else {
         GameBoyMode::from_string(&args.mode)
@@ -760,7 +767,7 @@ fn main() {
     game_boy.set_dma_enabled(!args.no_dma);
     game_boy.set_timer_enabled(!args.no_timer);
     game_boy.attach_serial(device);
-    game_boy.load(true);
+    game_boy.load(!args.no_boot);
 
     // prints the current version of the emulator (informational message)
     println!("========= Boytacean =========\n{}", game_boy);
