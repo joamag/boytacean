@@ -1,6 +1,6 @@
 #![allow(clippy::uninlined_format_args)]
 
-use std::os::raw::{c_char, c_void, c_uint};
+use std::os::raw::{c_char, c_uint, c_void};
 
 const RETRO_API_VERSION: u32 = 1;
 
