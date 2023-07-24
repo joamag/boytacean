@@ -11,7 +11,7 @@ use std::{
 use boytacean::{
     gb::{AudioProvider, GameBoy},
     pad::PadKey,
-    ppu::{DISPLAY_HEIGHT, DISPLAY_WIDTH, RGB1555_SIZE},
+    ppu::{DISPLAY_HEIGHT, DISPLAY_WIDTH, FRAME_BUFFER_RGB155_SIZE, RGB1555_SIZE},
     rom::Cartridge,
 };
 
@@ -31,6 +31,7 @@ const RETRO_DEVICE_JOYPAD: usize = 1;
 
 static mut EMULATOR: Option<GameBoy> = None;
 static mut KEY_STATES: Option<HashMap<RetroJoypad, bool>> = None;
+static mut FRAME_BUFFER: [u8; FRAME_BUFFER_RGB155_SIZE] = [0x00; FRAME_BUFFER_RGB155_SIZE];
 
 static mut ENVIRONMENT_CALLBACK: Option<extern "C" fn(u32, *const c_void) -> bool> = None;
 static mut VIDEO_REFRESH_CALLBACK: Option<extern "C" fn(*const u8, c_uint, c_uint, usize)> = None;
@@ -176,6 +177,8 @@ pub extern "C" fn retro_deinit() {
 #[no_mangle]
 pub extern "C" fn retro_reset() {
     println!("retro_reset()");
+    let emulator = unsafe { EMULATOR.as_mut().unwrap() };
+    emulator.reload();
 }
 
 #[no_mangle]
@@ -348,8 +351,9 @@ pub extern "C" fn retro_run() {
 
     let frame_buffer = emulator.frame_buffer_rgb1555();
     unsafe {
+        FRAME_BUFFER.copy_from_slice(&frame_buffer);
         VIDEO_REFRESH_CALLBACK.unwrap()(
-            frame_buffer.as_ptr(),
+            FRAME_BUFFER.as_ptr(),
             DISPLAY_WIDTH as u32,
             DISPLAY_HEIGHT as u32,
             DISPLAY_WIDTH * RGB1555_SIZE,

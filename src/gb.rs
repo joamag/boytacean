@@ -406,6 +406,13 @@ impl GameBoy {
         self.cpu.reset();
     }
 
+    pub fn reload(&mut self) {
+        let rom = self.rom().clone();
+        self.reset();
+        self.load(true);
+        self.load_cartridge(rom);
+    }
+
     pub fn clock(&mut self) -> u16 {
         let cycles = self.cpu_clock() as u16;
         let cycles_n = cycles / self.multiplier() as u16;
@@ -989,13 +996,17 @@ impl GameBoy {
         self.load_boot_file(BootRom::Cgb);
     }
 
+    pub fn load_cartridge(&mut self, rom: Cartridge) -> &mut Cartridge {
+        self.mmu().set_rom(rom);
+        self.mmu().rom()
+    }
+
     pub fn load_rom(&mut self, data: &[u8], ram_data: Option<&[u8]>) -> &mut Cartridge {
         let mut rom = Cartridge::from_data(data);
         if let Some(ram_data) = ram_data {
             rom.set_ram_data(ram_data)
         }
-        self.mmu().set_rom(rom);
-        self.mmu().rom()
+        self.load_cartridge(rom)
     }
 
     pub fn load_rom_file(&mut self, path: &str, ram_path: Option<&str>) -> &mut Cartridge {
