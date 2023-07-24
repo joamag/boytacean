@@ -1737,12 +1737,12 @@ impl Ppu {
     }
 
     fn rgb888_to_rgb1555(first: u8, second: u8, third: u8) -> PixelRgb1555 {
-        let r = (first as u16 >> 3) & 0x1F;
-        let g = (second as u16 >> 3) & 0x1F;
-        let b = (third as u16 >> 3) & 0x1F;
+        let r = (first as u16 >> 3) & 0x1f;
+        let g = (second as u16 >> 3) & 0x1f;
+        let b = (third as u16 >> 3) & 0x1f;
         let a = 1;
 
-        let pixel = (a << 15) | (b << 10) | (g << 5) | r;
+        let pixel = (a << 15) | (r << 10) | (g << 5) | b;
         [pixel as u8, (pixel >> 8) as u8]
     }
 }

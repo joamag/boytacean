@@ -1,13 +1,16 @@
 #![allow(clippy::uninlined_format_args)]
 
 use std::{
+    collections::HashMap,
     ffi::CStr,
+    fmt::{self, Display, Formatter},
     os::raw::{c_char, c_float, c_uint, c_void},
     slice::from_raw_parts,
 };
 
 use boytacean::{
     gb::GameBoy,
+    pad::PadKey,
     ppu::{DISPLAY_HEIGHT, DISPLAY_WIDTH, RGB1555_SIZE},
     rom::Cartridge,
 };
@@ -24,7 +27,10 @@ const REGION_NTSC: u32 = 0;
 //const RETRO_MEMORY_SAVE_RAM: u32 = 0;
 //const RETRO_MEMORY_SYSTEM_RAM: u32 = 0;
 
+const RETRO_DEVICE_JOYPAD: usize = 1;
+
 static mut EMULATOR: Option<GameBoy> = None;
+static mut KEY_STATES: Option<HashMap<RetroJoypad, bool>> = None;
 
 static mut ENVIRONMENT_CALLBACK: Option<extern "C" fn(u32, *const c_void) -> bool> = None;
 static mut VIDEO_REFRESH_CALLBACK: Option<extern "C" fn(*const u8, c_uint, c_uint, usize)> = None;
@@ -34,6 +40,83 @@ static mut INPUT_POLL_CALLBACK: Option<extern "C" fn()> = None;
 static mut INPUT_STATE_CALLBACK: Option<
     extern "C" fn(port: u32, device: u32, index: u32, id: u32) -> i16,
 > = None;
+
+const RETRO_DEVICE_ID_JOYPAD_B: isize = 0;
+const RETRO_DEVICE_ID_JOYPAD_Y: isize = 1;
+const RETRO_DEVICE_ID_JOYPAD_SELECT: isize = 2;
+const RETRO_DEVICE_ID_JOYPAD_START: isize = 3;
+const RETRO_DEVICE_ID_JOYPAD_UP: isize = 4;
+const RETRO_DEVICE_ID_JOYPAD_DOWN: isize = 5;
+const RETRO_DEVICE_ID_JOYPAD_LEFT: isize = 6;
+const RETRO_DEVICE_ID_JOYPAD_RIGHT: isize = 7;
+const RETRO_DEVICE_ID_JOYPAD_A: isize = 8;
+const RETRO_DEVICE_ID_JOYPAD_X: isize = 9;
+const RETRO_DEVICE_ID_JOYPAD_L: isize = 10;
+const RETRO_DEVICE_ID_JOYPAD_R: isize = 11;
+const RETRO_DEVICE_ID_JOYPAD_L2: isize = 12;
+const RETRO_DEVICE_ID_JOYPAD_R2: isize = 13;
+const RETRO_DEVICE_ID_JOYPAD_L3: isize = 14;
+const RETRO_DEVICE_ID_JOYPAD_R3: isize = 15;
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub enum RetroJoypad {
+    RetroDeviceIdJoypadY = RETRO_DEVICE_ID_JOYPAD_B,
+    RetroDeviceIdJoypadB = RETRO_DEVICE_ID_JOYPAD_Y,
+    RetroDeviceIdJoypadSelect = RETRO_DEVICE_ID_JOYPAD_SELECT,
+    RetroDeviceIdJoypadStart = RETRO_DEVICE_ID_JOYPAD_START,
+    RetroDeviceIdJoypadUp = RETRO_DEVICE_ID_JOYPAD_UP,
+    RetroDeviceIdJoypadDown = RETRO_DEVICE_ID_JOYPAD_DOWN,
+    RetroDeviceIdJoypadLeft = RETRO_DEVICE_ID_JOYPAD_LEFT,
+    RetroDeviceIdJoypadRight = RETRO_DEVICE_ID_JOYPAD_RIGHT,
+    RetroDeviceIdJoypadA = RETRO_DEVICE_ID_JOYPAD_A,
+    RetroDeviceIdJoypadX = RETRO_DEVICE_ID_JOYPAD_X,
+    RetroDeviceIdJoypadL = RETRO_DEVICE_ID_JOYPAD_L,
+    RetroDeviceIdJoypadR = RETRO_DEVICE_ID_JOYPAD_R,
+    RetroDeviceIdJoypadL2 = RETRO_DEVICE_ID_JOYPAD_L2,
+    RetroDeviceIdJoypadR2 = RETRO_DEVICE_ID_JOYPAD_R2,
+    RetroDeviceIdJoypadL3 = RETRO_DEVICE_ID_JOYPAD_L3,
+    RetroDeviceIdJoypadR3 = RETRO_DEVICE_ID_JOYPAD_R3,
+}
+
+impl RetroJoypad {
+    pub fn description(&self) -> &'static str {
+        match self {
+            RetroJoypad::RetroDeviceIdJoypadY => "Y",
+            RetroJoypad::RetroDeviceIdJoypadB => "B",
+            RetroJoypad::RetroDeviceIdJoypadSelect => "Select",
+            RetroJoypad::RetroDeviceIdJoypadStart => "Start",
+            RetroJoypad::RetroDeviceIdJoypadUp => "Up",
+            RetroJoypad::RetroDeviceIdJoypadDown => "Down",
+            RetroJoypad::RetroDeviceIdJoypadLeft => "Left",
+            RetroJoypad::RetroDeviceIdJoypadRight => "Right",
+            RetroJoypad::RetroDeviceIdJoypadA => "A",
+            RetroJoypad::RetroDeviceIdJoypadX => "X",
+            RetroJoypad::RetroDeviceIdJoypadL => "L",
+            RetroJoypad::RetroDeviceIdJoypadR => "R",
+            RetroJoypad::RetroDeviceIdJoypadL2 => "L2",
+            RetroJoypad::RetroDeviceIdJoypadR2 => "R2",
+            RetroJoypad::RetroDeviceIdJoypadL3 => "L3",
+            RetroJoypad::RetroDeviceIdJoypadR3 => "R3",
+        }
+    }
+}
+
+impl Display for RetroJoypad {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.description())
+    }
+}
+
+const KEYS: [RetroJoypad; 8] = [
+    RetroJoypad::RetroDeviceIdJoypadUp,
+    RetroJoypad::RetroDeviceIdJoypadDown,
+    RetroJoypad::RetroDeviceIdJoypadLeft,
+    RetroJoypad::RetroDeviceIdJoypadRight,
+    RetroJoypad::RetroDeviceIdJoypadStart,
+    RetroJoypad::RetroDeviceIdJoypadSelect,
+    RetroJoypad::RetroDeviceIdJoypadA,
+    RetroJoypad::RetroDeviceIdJoypadB,
+];
 
 #[repr(C)]
 pub struct RetroGameInfo {
@@ -81,6 +164,7 @@ pub unsafe extern "C" fn retro_init() {
     println!("retro_init()");
     unsafe {
         EMULATOR = Some(GameBoy::new(None));
+        KEY_STATES = Some(HashMap::new());
     }
 }
 
@@ -124,8 +208,8 @@ pub unsafe extern "C" fn retro_get_system_av_info(info: *mut RetroSystemAvInfo) 
     unsafe {
         (*info).geometry.base_width = DISPLAY_WIDTH as u32;
         (*info).geometry.base_height = DISPLAY_HEIGHT as u32;
-        (*info).geometry.max_width = DISPLAY_WIDTH as u32 * 32;
-        (*info).geometry.max_height = DISPLAY_HEIGHT as u32 * 32;
+        (*info).geometry.max_width = DISPLAY_WIDTH as u32 * 64;
+        (*info).geometry.max_height = DISPLAY_HEIGHT as u32 * 64;
         (*info).geometry.aspect_ratio = DISPLAY_WIDTH as f32 / DISPLAY_HEIGHT as f32;
         (*info).timing.fps = GameBoy::VISUAL_FREQ as f64;
         (*info).timing.sample_rate = EMULATOR.as_ref().unwrap().audio_sampling_rate() as f64;
@@ -222,8 +306,30 @@ pub extern "C" fn retro_run() {
         counter_cycles += emulator.clock() as u32;
     }
 
-    let frame_buffer = emulator.frame_buffer_rgb1555();
+    unsafe {
+        INPUT_POLL_CALLBACK.as_ref().unwrap()();
+        let key_states = KEY_STATES.as_mut().unwrap();
+        for key in KEYS {
+            let key_pad = retro_key_to_pad(key).unwrap();
+            let current = INPUT_STATE_CALLBACK.as_ref().unwrap()(
+                0,
+                RETRO_DEVICE_JOYPAD as u32,
+                0,
+                key as u32,
+            ) > 0;
+            let previous = key_states.get(&key).unwrap_or(&false);
+            if current != *previous {
+                if current {
+                    emulator.key_press(key_pad);
+                } else {
+                    emulator.key_lift(key_pad);
+                }
+            }
+            key_states.insert(key, current);
+        }
+    }
 
+    let frame_buffer = emulator.frame_buffer_rgb1555();
     unsafe {
         VIDEO_REFRESH_CALLBACK.unwrap()(
             frame_buffer.as_ptr(),
@@ -300,4 +406,18 @@ pub extern "C" fn retro_cheat_reset() {
 #[no_mangle]
 pub extern "C" fn retro_cheat_set() {
     println!("retro_cheat_set()");
+}
+
+fn retro_key_to_pad(retro_key: RetroJoypad) -> Option<PadKey> {
+    match retro_key {
+        RetroJoypad::RetroDeviceIdJoypadUp => Some(PadKey::Up),
+        RetroJoypad::RetroDeviceIdJoypadDown => Some(PadKey::Down),
+        RetroJoypad::RetroDeviceIdJoypadLeft => Some(PadKey::Left),
+        RetroJoypad::RetroDeviceIdJoypadRight => Some(PadKey::Right),
+        RetroJoypad::RetroDeviceIdJoypadStart => Some(PadKey::Start),
+        RetroJoypad::RetroDeviceIdJoypadSelect => Some(PadKey::Select),
+        RetroJoypad::RetroDeviceIdJoypadA => Some(PadKey::A),
+        RetroJoypad::RetroDeviceIdJoypadB => Some(PadKey::B),
+        _ => None,
+    }
 }
