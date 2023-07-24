@@ -42,7 +42,7 @@ pub struct retro_system_api {
 }
 
 #[no_mangle]
-extern "C" fn retro_get_system_info(info: *mut retro_system_info) {
+pub extern "C" fn retro_get_system_info(info: *mut retro_system_info) {
     println!("retro_get_system_info");
     unsafe {
         (*info).library_name = "Boytacean\0".as_ptr() as *const c_char;
@@ -54,7 +54,7 @@ extern "C" fn retro_get_system_info(info: *mut retro_system_info) {
 }
 
 #[no_mangle]
-extern "C" fn retro_set_environment(
+pub extern "C" fn retro_set_environment(
     _callback: extern "C" fn(u32, *const c_void),
     _data: *const c_void,
 ) {
