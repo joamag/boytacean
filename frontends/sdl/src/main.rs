@@ -207,8 +207,8 @@ impl Emulator {
     pub fn start_audio(&mut self, sdl: &Sdl) {
         self.audio = Some(Audio::new(
             sdl,
-            Some(self.system.audio_sampling_rate() as i32),
-            Some(self.system.audio_channels()),
+            self.system.audio_sampling_rate() as i32,
+            self.system.audio_channels(),
             None,
         ));
     }

@@ -9,12 +9,12 @@ pub struct Audio {
 }
 
 impl Audio {
-    pub fn new(sdl: &Sdl, freq: Option<i32>, channels: Option<u8>, samples: Option<u16>) -> Self {
+    pub fn new(sdl: &Sdl, freq: i32, channels: u8, samples: Option<u16>) -> Self {
         let audio_subsystem = sdl.audio().unwrap();
 
         let desired_spec = AudioSpecDesired {
-            freq: Some(freq.unwrap_or(44100)),
-            channels: Some(channels.unwrap_or(2)),
+            freq: Some(freq),
+            channels: Some(channels),
             samples: Some(samples.unwrap_or(4096)),
         };
 
