@@ -77,3 +77,8 @@ pub extern "C" fn retro_init() {
 pub extern "C" fn retro_deinit() {
     println!("retro_deinit()");
 }
+
+#[no_mangle]
+pub extern "C" fn retro_reset() {
+    println!("retro_reset()");
+}
