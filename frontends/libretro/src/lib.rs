@@ -68,8 +68,11 @@ pub struct RetroSystemTiming {
     sample_rate: f64,
 }
 
+/// # Safety
+///
+/// This function should not be called only within Lib Retro context.
 #[no_mangle]
-pub extern "C" fn retro_init() {
+pub unsafe extern "C" fn retro_init() {
     println!("retro_init()");
     unsafe {
         EMULATOR = Some(GameBoy::new(None));
@@ -93,8 +96,11 @@ pub extern "C" fn retro_api_version() -> c_uint {
     RETRO_API_VERSION
 }
 
+/// # Safety
+///
+/// This function should not be called only within Lib Retro context.
 #[no_mangle]
-pub extern "C" fn retro_get_system_info(info: *mut RetroSystemInfo) {
+pub unsafe extern "C" fn retro_get_system_info(info: *mut RetroSystemInfo) {
     println!("retro_get_system_info()");
     unsafe {
         (*info).library_name = "Boytacean\0".as_ptr() as *const c_char;
@@ -105,8 +111,11 @@ pub extern "C" fn retro_get_system_info(info: *mut RetroSystemInfo) {
     }
 }
 
+/// # Safety
+///
+/// This function should not be called only within Lib Retro context.
 #[no_mangle]
-pub extern "C" fn retro_get_system_av_info(info: *mut RetroSystemAvInfo) {
+pub unsafe extern "C" fn retro_get_system_av_info(info: *mut RetroSystemAvInfo) {
     println!("retro_get_system_av_info()");
     unsafe {
         (*info).geometry.base_width = DISPLAY_WIDTH as u32;
@@ -227,8 +236,11 @@ pub extern "C" fn retro_get_region() -> u32 {
     REGION_NTSC
 }
 
+/// # Safety
+///
+/// This function should not be called only within Lib Retro context.
 #[no_mangle]
-pub extern "C" fn retro_load_game(game: *const RetroGameInfo) -> bool {
+pub unsafe extern "C" fn retro_load_game(game: *const RetroGameInfo) -> bool {
     println!("retro_load_game()");
     unsafe {
         let data_buffer = std::slice::from_raw_parts((*game).data as *const u8, (*game).size);
