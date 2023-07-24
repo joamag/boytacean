@@ -61,8 +61,8 @@ const RETRO_DEVICE_ID_JOYPAD_R3: isize = 15;
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum RetroJoypad {
-    RetroDeviceIdJoypadY = RETRO_DEVICE_ID_JOYPAD_B,
-    RetroDeviceIdJoypadB = RETRO_DEVICE_ID_JOYPAD_Y,
+    RetroDeviceIdJoypadB = RETRO_DEVICE_ID_JOYPAD_B,
+    RetroDeviceIdJoypadY = RETRO_DEVICE_ID_JOYPAD_Y,
     RetroDeviceIdJoypadSelect = RETRO_DEVICE_ID_JOYPAD_SELECT,
     RetroDeviceIdJoypadStart = RETRO_DEVICE_ID_JOYPAD_START,
     RetroDeviceIdJoypadUp = RETRO_DEVICE_ID_JOYPAD_UP,
