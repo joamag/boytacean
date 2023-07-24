@@ -9,13 +9,13 @@ pub struct Audio {
 }
 
 impl Audio {
-    pub fn new(sdl: &Sdl) -> Self {
+    pub fn new(sdl: &Sdl, freq: i32, channels: u8, samples: Option<u16>) -> Self {
         let audio_subsystem = sdl.audio().unwrap();
 
         let desired_spec = AudioSpecDesired {
-            freq: Some(44100),
-            channels: Some(2),
-            samples: Some(4096),
+            freq: Some(freq),
+            channels: Some(channels),
+            samples: Some(samples.unwrap_or(4096)),
         };
 
         // creates the queue that is going to be used to update the

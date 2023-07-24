@@ -601,36 +601,44 @@ impl GameBoy {
         self.apu_i().ch4_output()
     }
 
-    pub fn audio_ch1_enabled(&mut self) -> bool {
-        self.apu().ch2_enabled()
+    pub fn audio_ch1_enabled(&self) -> bool {
+        self.apu_i().ch2_out_enabled()
     }
 
     pub fn set_audio_ch1_enabled(&mut self, enabled: bool) {
-        self.apu().set_ch1_enabled(enabled)
+        self.apu().set_ch1_out_enabled(enabled)
     }
 
-    pub fn audio_ch2_enabled(&mut self) -> bool {
-        self.apu().ch2_enabled()
+    pub fn audio_ch2_enabled(&self) -> bool {
+        self.apu_i().ch2_out_enabled()
     }
 
     pub fn set_audio_ch2_enabled(&mut self, enabled: bool) {
-        self.apu().set_ch2_enabled(enabled)
+        self.apu().set_ch2_out_enabled(enabled)
     }
 
-    pub fn audio_ch3_enabled(&mut self) -> bool {
-        self.apu().ch3_enabled()
+    pub fn audio_ch3_enabled(&self) -> bool {
+        self.apu_i().ch3_out_enabled()
     }
 
     pub fn set_audio_ch3_enabled(&mut self, enabled: bool) {
-        self.apu().set_ch3_enabled(enabled)
+        self.apu().set_ch3_out_enabled(enabled)
     }
 
-    pub fn audio_ch4_enabled(&mut self) -> bool {
-        self.apu().ch4_enabled()
+    pub fn audio_ch4_enabled(&self) -> bool {
+        self.apu_i().ch4_out_enabled()
     }
 
     pub fn set_audio_ch4_enabled(&mut self, enabled: bool) {
-        self.apu().set_ch4_enabled(enabled)
+        self.apu().set_ch4_out_enabled(enabled)
+    }
+
+    pub fn audio_sampling_rate(&self) -> u16 {
+        self.apu_i().sampling_rate()
+    }
+
+    pub fn audio_channels(&self) -> u8 {
+        self.apu_i().channels()
     }
 
     pub fn cartridge_eager(&mut self) -> Cartridge {

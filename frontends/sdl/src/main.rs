@@ -205,7 +205,12 @@ impl Emulator {
     }
 
     pub fn start_audio(&mut self, sdl: &Sdl) {
-        self.audio = Some(Audio::new(sdl));
+        self.audio = Some(Audio::new(
+            sdl,
+            self.system.audio_sampling_rate() as i32,
+            self.system.audio_channels(),
+            None,
+        ));
     }
 
     pub fn load_rom(&mut self, path: Option<&str>) {

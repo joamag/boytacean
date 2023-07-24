@@ -2,6 +2,8 @@ use std::collections::VecDeque;
 
 use crate::{gb::GameBoy, warnln};
 
+const CHANNELS: u8 = 2;
+
 const DUTY_TABLE: [[u8; 8]; 4] = [
     [0, 0, 0, 0, 0, 0, 0, 1],
     [1, 0, 0, 0, 0, 0, 0, 1],
@@ -194,9 +196,9 @@ impl Apu {
             sequencer_step: 0,
             output_timer: 0,
             audio_buffer: VecDeque::with_capacity(
-                (sampling_rate as f32 * buffer_size) as usize * 2,
+                (sampling_rate as f32 * buffer_size) as usize * CHANNELS as usize,
             ),
-            audio_buffer_max: (sampling_rate as f32 * buffer_size) as usize * 2,
+            audio_buffer_max: (sampling_rate as f32 * buffer_size) as usize * CHANNELS as usize,
             clock_freq,
         }
     }
@@ -690,36 +692,44 @@ impl Apu {
         }
     }
 
-    pub fn ch1_enabled(&mut self) -> bool {
+    pub fn ch1_out_enabled(&self) -> bool {
         self.ch1_out_enabled
     }
 
-    pub fn set_ch1_enabled(&mut self, enabled: bool) {
+    pub fn set_ch1_out_enabled(&mut self, enabled: bool) {
         self.ch1_out_enabled = enabled;
     }
 
-    pub fn ch2_enabled(&mut self) -> bool {
+    pub fn ch2_out_enabled(&self) -> bool {
         self.ch2_out_enabled
     }
 
-    pub fn set_ch2_enabled(&mut self, enabled: bool) {
+    pub fn set_ch2_out_enabled(&mut self, enabled: bool) {
         self.ch2_out_enabled = enabled;
     }
 
-    pub fn ch3_enabled(&mut self) -> bool {
+    pub fn ch3_out_enabled(&self) -> bool {
         self.ch3_out_enabled
     }
 
-    pub fn set_ch3_enabled(&mut self, enabled: bool) {
+    pub fn set_ch3_out_enabled(&mut self, enabled: bool) {
         self.ch3_out_enabled = enabled;
     }
 
-    pub fn ch4_enabled(&mut self) -> bool {
+    pub fn ch4_out_enabled(&self) -> bool {
         self.ch4_out_enabled
     }
 
-    pub fn set_ch4_enabled(&mut self, enabled: bool) {
+    pub fn set_ch4_out_enabled(&mut self, enabled: bool) {
         self.ch4_out_enabled = enabled;
+    }
+
+    pub fn sampling_rate(&self) -> u16 {
+        self.sampling_rate
+    }
+
+    pub fn channels(&self) -> u8 {
+        CHANNELS
     }
 
     pub fn audio_buffer(&self) -> &VecDeque<u8> {
