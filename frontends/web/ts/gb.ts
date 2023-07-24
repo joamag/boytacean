@@ -606,8 +606,8 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
 
     get audioSpecs(): AudioSpecs {
         return {
-            samplingRate: 44100,
-            channels: 2
+            samplingRate: this.gameBoy?.audio_sampling_rate() ?? 44100,
+            channels: this.gameBoy?.audio_channels() ?? 2
         };
     }
 
