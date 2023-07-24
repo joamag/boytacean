@@ -234,7 +234,7 @@ pub extern "C" fn retro_load_game(game: *const RetroGameInfo) -> bool {
         let data_buffer = std::slice::from_raw_parts((*game).data as *const u8, (*game).size);
         EMULATOR.as_mut().unwrap().load_rom(data_buffer, None);
     }
-    return true;
+    true
 }
 
 #[no_mangle]
@@ -243,23 +243,15 @@ pub extern "C" fn retro_unload_game() {
 }
 
 #[no_mangle]
-pub extern "C" fn retro_get_memory_data(memory_id: u32) -> *mut c_void {
+pub extern "C" fn retro_get_memory_data(_memory_id: u32) -> *mut c_void {
     println!("retro_get_memory_data()");
-    match memory_id {
-        //RETRO_MEMORY_SAVE_RAM => SAVE_RAM.as_mut_ptr() as *mut c_void,
-        //RETRO_MEMORY_SYSTEM_RAM => SYSTEM_RAM.as_mut_ptr() as *mut c_void,
-        _ => std::ptr::null_mut(),
-    }
+    std::ptr::null_mut()
 }
 
 #[no_mangle]
-pub extern "C" fn retro_get_memory_size(memory_id: u32) -> usize {
+pub extern "C" fn retro_get_memory_size(_memory_id: u32) -> usize {
     println!("retro_get_memory_size()");
-    match memory_id {
-        //RETRO_MEMORY_SAVE_RAM => 0,
-        //RETRO_MEMORY_SYSTEM_RAM => 0,
-        _ => 0,
-    }
+    0
 }
 
 #[no_mangle]
