@@ -14,7 +14,10 @@ use crate::{
     gen::{COMPILATION_DATE, COMPILATION_TIME, COMPILER, COMPILER_VERSION, VERSION},
     mmu::Mmu,
     pad::{Pad, PadKey},
-    ppu::{Ppu, PpuMode, Tile, DISPLAY_HEIGHT, DISPLAY_WIDTH, FRAME_BUFFER_SIZE},
+    ppu::{
+        Ppu, PpuMode, Tile, DISPLAY_HEIGHT, DISPLAY_WIDTH, FRAME_BUFFER_RGB155_SIZE,
+        FRAME_BUFFER_SIZE,
+    },
     rom::{Cartridge, RamSize},
     serial::{NullDevice, Serial, SerialDevice},
     timer::Timer,
@@ -948,6 +951,10 @@ impl GameBoy {
 
     pub fn frame_buffer(&mut self) -> &[u8; FRAME_BUFFER_SIZE] {
         &(self.ppu().frame_buffer)
+    }
+
+    pub fn frame_buffer_rgb1555(&mut self) -> [u8; FRAME_BUFFER_RGB155_SIZE] {
+        self.ppu().frame_buffer_rgb1555()
     }
 
     pub fn audio_buffer(&mut self) -> &VecDeque<u8> {

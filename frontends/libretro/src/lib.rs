@@ -4,17 +4,25 @@ use std::os::raw::{c_char, c_float, c_uint, c_void};
 
 use boytacean::{
     gb::GameBoy,
-    ppu::{DISPLAY_HEIGHT, DISPLAY_WIDTH},
+    ppu::{DISPLAY_HEIGHT, DISPLAY_WIDTH, RGB1555_SIZE},
 };
 
 const RETRO_API_VERSION: u32 = 1;
 const REGION_NTSC: u32 = 0;
 
+//const RETRO_ENVIRONMENT_SET_PIXEL_FORMAT: u32 = 10;
+
+//const RETRO_PIXEL_FORMAT_0RGB1555: usize = 0;
+//const RETRO_PIXEL_FORMAT_XRGB8888: usize = 1;
+//const RETRO_PIXEL_FORMAT_RGB565: usize = 2;
+
 //const RETRO_MEMORY_SAVE_RAM: u32 = 0;
 //const RETRO_MEMORY_SYSTEM_RAM: u32 = 0;
 
+static mut EMULATOR: Option<GameBoy> = None;
+
 static mut ENVIRONMENT_CALLBACK: Option<extern "C" fn(u32, *const c_void) -> bool> = None;
-static mut VIDEO_REFRESH_CALLBACK: Option<extern "C" fn(*const u8)> = None;
+static mut VIDEO_REFRESH_CALLBACK: Option<extern "C" fn(*const u8, c_uint, c_uint, usize)> = None;
 static mut AUDIO_SAMPLE_CALLBACK: Option<extern "C" fn(i16, i16)> = None;
 static mut AUDIO_SAMPLE_BATCH_CALLBACK: Option<extern "C" fn(*const i16, usize)> = None;
 static mut INPUT_POLL_CALLBACK: Option<extern "C" fn()> = None;
@@ -63,6 +71,10 @@ pub struct RetroSystemTiming {
 #[no_mangle]
 pub extern "C" fn retro_init() {
     println!("retro_init()");
+    unsafe {
+        EMULATOR = Some(GameBoy::new(None));
+        EMULATOR.as_mut().unwrap().load(true);
+    }
 }
 
 #[no_mangle]
@@ -118,7 +130,9 @@ pub extern "C" fn retro_set_environment(
 }
 
 #[no_mangle]
-pub extern "C" fn retro_set_video_refresh(callback: Option<extern "C" fn(*const u8)>) {
+pub extern "C" fn retro_set_video_refresh(
+    callback: Option<extern "C" fn(*const u8, c_uint, c_uint, usize)>,
+) {
     println!("retro_set_video_refresh()");
     unsafe {
         VIDEO_REFRESH_CALLBACK = callback;
@@ -176,7 +190,35 @@ pub extern "C" fn retro_set_controller_port_device() {
 
 #[no_mangle]
 pub extern "C" fn retro_run() {
-    println!("retro_run()");
+    let emulator = unsafe { EMULATOR.as_mut().unwrap() };
+
+    let mut counter_cycles = 0_u32;
+    let cycle_limit = 4194304 / 60; //@TODO this is super tricky
+
+    loop {
+        // limits the number of ticks to the typical number
+        // of cycles expected for the current logic cycle
+        if counter_cycles >= cycle_limit {
+            //pending_cycles = counter_cycles - cycle_limit;
+            break;
+        }
+
+        // runs the Game Boy clock, this operation should
+        // include the advance of both the CPU, PPU, APU
+        // and any other frequency based component of the system
+        counter_cycles += emulator.clock() as u32;
+    }
+
+    let frame_buffer = emulator.frame_buffer_rgb1555();
+
+    unsafe {
+        VIDEO_REFRESH_CALLBACK.unwrap()(
+            frame_buffer.as_ptr(),
+            DISPLAY_WIDTH as u32,
+            DISPLAY_HEIGHT as u32,
+            DISPLAY_WIDTH * RGB1555_SIZE,
+        );
+    }
 }
 
 #[no_mangle]
@@ -186,8 +228,12 @@ pub extern "C" fn retro_get_region() -> u32 {
 }
 
 #[no_mangle]
-pub extern "C" fn retro_load_game(_game: *const RetroGameInfo) -> bool {
+pub extern "C" fn retro_load_game(game: *const RetroGameInfo) -> bool {
     println!("retro_load_game()");
+    unsafe {
+        let data_buffer = std::slice::from_raw_parts((*game).data as *const u8, (*game).size);
+        EMULATOR.as_mut().unwrap().load_rom(data_buffer, None);
+    }
     return true;
 }
 
