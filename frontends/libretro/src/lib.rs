@@ -115,7 +115,7 @@ pub extern "C" fn retro_get_system_av_info(info: *mut RetroSystemAvInfo) {
         (*info).geometry.max_height = DISPLAY_HEIGHT as u32 * 32;
         (*info).geometry.aspect_ratio = DISPLAY_WIDTH as f32 / DISPLAY_HEIGHT as f32;
         (*info).timing.fps = GameBoy::VISUAL_FREQ as f64;
-        (*info).timing.sample_rate = 44100.0;
+        (*info).timing.sample_rate = EMULATOR.as_ref().unwrap().audio_sampling_rate() as f64;
     }
 }
 
