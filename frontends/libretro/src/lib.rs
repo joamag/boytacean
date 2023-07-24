@@ -9,7 +9,7 @@ use std::{
 };
 
 use boytacean::{
-    gb::GameBoy,
+    gb::{AudioProvider, GameBoy},
     pad::PadKey,
     ppu::{DISPLAY_HEIGHT, DISPLAY_WIDTH, RGB1555_SIZE},
     rom::Cartridge,
@@ -288,6 +288,8 @@ pub extern "C" fn retro_set_controller_port_device() {
 #[no_mangle]
 pub extern "C" fn retro_run() {
     let emulator = unsafe { EMULATOR.as_mut().unwrap() };
+    let sample_batch_cb = unsafe { AUDIO_SAMPLE_BATCH_CALLBACK.as_ref().unwrap() };
+    let channels = emulator.audio_channels();
 
     let mut counter_cycles = 0_u32;
     let cycle_limit = 4194304 / 60; //@TODO this is super tricky
@@ -304,6 +306,21 @@ pub extern "C" fn retro_run() {
         // include the advance of both the CPU, PPU, APU
         // and any other frequency based component of the system
         counter_cycles += emulator.clock() as u32;
+
+        // obtains the audio buffer reference and queues it
+        // in a batch manner using the audio callback at the
+        // the end of the operation clears the buffer
+        let audio_buffer = emulator
+            .audio_buffer()
+            .iter()
+            .map(|v| *v as i16 * 256)
+            .collect::<Vec<i16>>();
+
+        sample_batch_cb(
+            audio_buffer.as_ptr(),
+            audio_buffer.len() / channels as usize,
+        );
+        emulator.clear_audio_buffer();
     }
 
     unsafe {
