@@ -1,10 +1,15 @@
 #![allow(clippy::uninlined_format_args)]
 
-use std::os::raw::{c_char, c_float, c_uint, c_void};
+use std::{
+    ffi::CStr,
+    os::raw::{c_char, c_float, c_uint, c_void},
+    slice::from_raw_parts,
+};
 
 use boytacean::{
     gb::GameBoy,
     ppu::{DISPLAY_HEIGHT, DISPLAY_WIDTH, RGB1555_SIZE},
+    rom::Cartridge,
 };
 
 const RETRO_API_VERSION: u32 = 1;
@@ -76,7 +81,6 @@ pub unsafe extern "C" fn retro_init() {
     println!("retro_init()");
     unsafe {
         EMULATOR = Some(GameBoy::new(None));
-        EMULATOR.as_mut().unwrap().load(true);
     }
 }
 
@@ -243,8 +247,15 @@ pub extern "C" fn retro_get_region() -> u32 {
 pub unsafe extern "C" fn retro_load_game(game: *const RetroGameInfo) -> bool {
     println!("retro_load_game()");
     unsafe {
-        let data_buffer = std::slice::from_raw_parts((*game).data as *const u8, (*game).size);
-        EMULATOR.as_mut().unwrap().load_rom(data_buffer, None);
+        let instance = EMULATOR.as_mut().unwrap();
+        let data_buffer = from_raw_parts((*game).data as *const u8, (*game).size);
+        let file_path_c = CStr::from_ptr((*game).path);
+        let file_path = file_path_c.to_str().unwrap();
+        let mode = Cartridge::from_file(file_path).gb_mode();
+        instance.set_mode(mode);
+        instance.reset();
+        instance.load(true);
+        instance.load_rom(data_buffer, None);
     }
     true
 }
