@@ -210,7 +210,7 @@ impl Emulator {
 
     pub fn load_rom(&mut self, path: Option<&str>) {
         let rom_path: &str = path.unwrap_or(&self.rom_path);
-        let ram_path = replace_ext(rom_path, "sav").unwrap_or("invalid".to_string());
+        let ram_path = replace_ext(rom_path, "sav").unwrap_or_else(|| "invalid".to_string());
         let rom = self.system.load_rom_file(
             rom_path,
             if Path::new(&ram_path).exists() {
