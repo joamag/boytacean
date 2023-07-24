@@ -295,7 +295,9 @@ pub extern "C" fn retro_run() {
     let channels = emulator.audio_channels();
 
     let mut counter_cycles = 0_u32;
-    let cycle_limit = 4194304 / 60; //@TODO this is super tricky
+    let cycle_limit = (GameBoy::CPU_FREQ as f32 * emulator.multiplier() as f32
+        / GameBoy::VISUAL_FREQ)
+        .round() as u32;
 
     loop {
         // limits the number of ticks to the typical number
