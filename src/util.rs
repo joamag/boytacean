@@ -23,7 +23,7 @@ pub fn write_file(path: &str, data: &Vec<u8>) {
         Ok(file) => file,
         Err(_) => panic!("Failed to open file: {}", path),
     };
-    file.write_all(&data).unwrap()
+    file.write_all(data).unwrap()
 }
 
 /// Replaces the extension in the given path with the provided extension.
