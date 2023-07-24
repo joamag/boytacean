@@ -45,3 +45,68 @@ pub extern "C" fn retro_get_system_info(info: *mut RetroSystemInfo) {
         (*info).block_extract = false;
     }
 }
+
+#[no_mangle]
+pub extern "C" fn retro_get_system_av_info() {
+    println!("retro_get_system_av_info()");
+}
+
+#[no_mangle]
+pub extern "C" fn retro_set_environment() {
+    println!("retro_set_environment()");
+}
+
+#[no_mangle]
+pub extern "C" fn retro_set_controller_port_device() {
+    println!("retro_set_controller_port_device()");
+}
+
+#[no_mangle]
+pub extern "C" fn retro_run() {
+    println!("retro_run()");
+}
+
+#[no_mangle]
+pub extern "C" fn retro_load_game() {
+    println!("retro_load_game()");
+}
+
+#[no_mangle]
+pub extern "C" fn retro_unload_game() {
+    println!("retro_unload_game()");
+}
+
+#[no_mangle]
+pub extern "C" fn retro_get_memory_data() {
+    println!("retro_get_memory_data()");
+}
+
+#[no_mangle]
+pub extern "C" fn retro_get_memory_size() {
+    println!("retro_get_memory_size()");
+}
+
+#[no_mangle]
+pub extern "C" fn retro_serialize_size() {
+    println!("retro_serialize_size()");
+}
+
+#[no_mangle]
+pub extern "C" fn retro_serialize() {
+    println!("retro_serialize()");
+}
+
+#[no_mangle]
+pub extern "C" fn retro_unserialize() {
+    println!("retro_unserialize()");
+}
+
+#[no_mangle]
+pub extern "C" fn retro_cheat_reset() {
+    println!("retro_cheat_reset()");
+}
+
+#[no_mangle]
+pub extern "C" fn retro_cheat_set() {
+    println!("retro_cheat_set()");
+}
