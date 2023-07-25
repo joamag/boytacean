@@ -10,10 +10,11 @@ use std::{
 };
 
 use boytacean::{
+    debugln,
     gb::{AudioProvider, GameBoy},
     pad::PadKey,
     ppu::{DISPLAY_HEIGHT, DISPLAY_WIDTH, FRAME_BUFFER_RGB155_SIZE, RGB1555_SIZE},
-    rom::Cartridge, debugln,
+    rom::Cartridge,
 };
 use consts::{
     RETRO_DEVICE_ID_JOYPAD_A, RETRO_DEVICE_ID_JOYPAD_B, RETRO_DEVICE_ID_JOYPAD_DOWN,
