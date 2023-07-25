@@ -12,7 +12,7 @@ use std::{
 use boytacean::{
     gb::{AudioProvider, GameBoy},
     pad::PadKey,
-    ppu::{DISPLAY_HEIGHT, DISPLAY_WIDTH, FRAME_BUFFER_RGB155_SIZE, RGB1555_SIZE},
+    ppu::{PpuMode, DISPLAY_HEIGHT, DISPLAY_WIDTH, FRAME_BUFFER_RGB155_SIZE, RGB1555_SIZE},
     rom::Cartridge,
 };
 use consts::{
@@ -38,6 +38,17 @@ static mut INPUT_POLL_CALLBACK: Option<extern "C" fn()> = None;
 static mut INPUT_STATE_CALLBACK: Option<
     extern "C" fn(port: u32, device: u32, index: u32, id: u32) -> i16,
 > = None;
+
+const KEYS: [RetroJoypad; 8] = [
+    RetroJoypad::RetroDeviceIdJoypadUp,
+    RetroJoypad::RetroDeviceIdJoypadDown,
+    RetroJoypad::RetroDeviceIdJoypadLeft,
+    RetroJoypad::RetroDeviceIdJoypadRight,
+    RetroJoypad::RetroDeviceIdJoypadStart,
+    RetroJoypad::RetroDeviceIdJoypadSelect,
+    RetroJoypad::RetroDeviceIdJoypadA,
+    RetroJoypad::RetroDeviceIdJoypadB,
+];
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum RetroJoypad {
@@ -88,17 +99,6 @@ impl Display for RetroJoypad {
     }
 }
 
-const KEYS: [RetroJoypad; 8] = [
-    RetroJoypad::RetroDeviceIdJoypadUp,
-    RetroJoypad::RetroDeviceIdJoypadDown,
-    RetroJoypad::RetroDeviceIdJoypadLeft,
-    RetroJoypad::RetroDeviceIdJoypadRight,
-    RetroJoypad::RetroDeviceIdJoypadStart,
-    RetroJoypad::RetroDeviceIdJoypadSelect,
-    RetroJoypad::RetroDeviceIdJoypadA,
-    RetroJoypad::RetroDeviceIdJoypadB,
-];
-
 #[repr(C)]
 pub struct RetroGameInfo {
     pub path: *const c_char,
@@ -138,6 +138,12 @@ pub struct RetroSystemTiming {
 }
 
 #[no_mangle]
+pub extern "C" fn retro_api_version() -> c_uint {
+    println!("retro_api_version()");
+    RETRO_API_VERSION
+}
+
+#[no_mangle]
 pub extern "C" fn retro_init() {
     println!("retro_init()");
     unsafe {
@@ -156,12 +162,6 @@ pub extern "C" fn retro_reset() {
     println!("retro_reset()");
     let emulator = unsafe { EMULATOR.as_mut().unwrap() };
     emulator.reload();
-}
-
-#[no_mangle]
-pub extern "C" fn retro_api_version() -> c_uint {
-    println!("retro_api_version()");
-    RETRO_API_VERSION
 }
 
 /// # Safety
@@ -200,6 +200,168 @@ pub extern "C" fn retro_set_environment(
     unsafe {
         ENVIRONMENT_CALLBACK = callback;
     }
+}
+
+#[no_mangle]
+pub extern "C" fn retro_set_controller_port_device() {
+    println!("retro_set_controller_port_device()");
+}
+
+#[no_mangle]
+pub extern "C" fn retro_run() {
+    let emulator = unsafe { EMULATOR.as_mut().unwrap() };
+    let video_refresh_cb = unsafe { VIDEO_REFRESH_CALLBACK.as_ref().unwrap() };
+    let sample_batch_cb = unsafe { AUDIO_SAMPLE_BATCH_CALLBACK.as_ref().unwrap() };
+    let input_poll_cb = unsafe { INPUT_POLL_CALLBACK.as_ref().unwrap() };
+    let input_state_cb = unsafe { INPUT_STATE_CALLBACK.as_ref().unwrap() };
+    let key_states = unsafe { KEY_STATES.as_mut().unwrap() };
+    let channels = emulator.audio_channels();
+
+    let mut last_frame = emulator.ppu_frame();
+
+    let mut counter_cycles = 0_u32;
+    let cycle_limit = (GameBoy::CPU_FREQ as f32 * emulator.multiplier() as f32
+        / GameBoy::VISUAL_FREQ)
+        .round() as u32;
+
+    loop {
+        // limits the number of ticks to the typical number
+        // of cycles expected for the current logic cycle
+        if counter_cycles >= cycle_limit {
+            //pending_cycles = counter_cycles - cycle_limit;
+            break;
+        }
+
+        // runs the Game Boy clock, this operation should
+        // include the advance of both the CPU, PPU, APU
+        // and any other frequency based component of the system
+        counter_cycles += emulator.clock() as u32;
+
+        // in case a new frame is available in the emulator
+        // then the frame must be pushed into display
+        if emulator.ppu_frame() != last_frame {
+            let frame_buffer = emulator.frame_buffer_rgb1555();
+            unsafe {
+                FRAME_BUFFER.copy_from_slice(&frame_buffer);
+                video_refresh_cb(
+                    FRAME_BUFFER.as_ptr(),
+                    DISPLAY_WIDTH as u32,
+                    DISPLAY_HEIGHT as u32,
+                    DISPLAY_WIDTH * RGB1555_SIZE,
+                );
+            }
+
+            // obtains the index of the current PPU frame, this value
+            // is going to be used to detect for new frame presence
+            last_frame = emulator.ppu_frame();
+        }
+
+        // obtains the audio buffer reference and queues it
+        // in a batch manner using the audio callback at the
+        // the end of the operation clears the buffer
+        let audio_buffer = emulator
+            .audio_buffer()
+            .iter()
+            .map(|v| *v as i16 * 256)
+            .collect::<Vec<i16>>();
+
+        sample_batch_cb(
+            audio_buffer.as_ptr(),
+            audio_buffer.len() / channels as usize,
+        );
+        emulator.clear_audio_buffer();
+    }
+
+    input_poll_cb();
+
+    for key in KEYS {
+        let key_pad = retro_key_to_pad(key).unwrap();
+        let current = input_state_cb(0, RETRO_DEVICE_JOYPAD as u32, 0, key as u32) > 0;
+        let previous = key_states.get(&key).unwrap_or(&false);
+        if current != *previous {
+            if current {
+                emulator.key_press(key_pad);
+            } else {
+                emulator.key_lift(key_pad);
+            }
+        }
+        key_states.insert(key, current);
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn retro_get_region() -> u32 {
+    println!("retro_get_region()");
+    REGION_NTSC
+}
+
+/// # Safety
+///
+/// This function should not be called only within Lib Retro context.
+#[no_mangle]
+pub unsafe extern "C" fn retro_load_game(game: *const RetroGameInfo) -> bool {
+    println!("retro_load_game()");
+    let instance = EMULATOR.as_mut().unwrap();
+    let data_buffer = from_raw_parts((*game).data as *const u8, (*game).size);
+    let rom = Cartridge::from_data(data_buffer);
+    let mode = rom.gb_mode();
+    instance.set_mode(mode);
+    instance.reset();
+    instance.load(true);
+    instance.load_cartridge(rom);
+    true
+}
+
+#[no_mangle]
+pub extern "C" fn retro_load_game_special(
+    _system: u32,
+    _info: *const RetroGameInfo,
+    _num_info: usize,
+) -> bool {
+    println!("retro_load_game_special()");
+    false
+}
+
+#[no_mangle]
+pub extern "C" fn retro_unload_game() {
+    println!("retro_unload_game()");
+}
+
+#[no_mangle]
+pub extern "C" fn retro_get_memory_data(_memory_id: u32) -> *mut c_void {
+    println!("retro_get_memory_data()");
+    std::ptr::null_mut()
+}
+
+#[no_mangle]
+pub extern "C" fn retro_get_memory_size(_memory_id: u32) -> usize {
+    println!("retro_get_memory_size()");
+    0
+}
+
+#[no_mangle]
+pub extern "C" fn retro_serialize_size() {
+    println!("retro_serialize_size()");
+}
+
+#[no_mangle]
+pub extern "C" fn retro_serialize() {
+    println!("retro_serialize()");
+}
+
+#[no_mangle]
+pub extern "C" fn retro_unserialize() {
+    println!("retro_unserialize()");
+}
+
+#[no_mangle]
+pub extern "C" fn retro_cheat_reset() {
+    println!("retro_cheat_reset()");
+}
+
+#[no_mangle]
+pub extern "C" fn retro_cheat_set() {
+    println!("retro_cheat_set()");
 }
 
 #[no_mangle]
@@ -244,158 +406,6 @@ pub extern "C" fn retro_set_input_state(
     unsafe {
         INPUT_STATE_CALLBACK = callback;
     }
-}
-
-#[no_mangle]
-pub extern "C" fn retro_load_game_special(
-    _system: u32,
-    _info: *const RetroGameInfo,
-    _num_info: usize,
-) -> bool {
-    println!("retro_load_game_special()");
-    false
-}
-
-#[no_mangle]
-pub extern "C" fn retro_set_controller_port_device() {
-    println!("retro_set_controller_port_device()");
-}
-
-#[no_mangle]
-pub extern "C" fn retro_run() {
-    let emulator = unsafe { EMULATOR.as_mut().unwrap() };
-    let video_refresh_cb = unsafe { VIDEO_REFRESH_CALLBACK.as_ref().unwrap() };
-    let sample_batch_cb = unsafe { AUDIO_SAMPLE_BATCH_CALLBACK.as_ref().unwrap() };
-    let input_poll_cb = unsafe { INPUT_POLL_CALLBACK.as_ref().unwrap() };
-    let input_state_cb = unsafe { INPUT_STATE_CALLBACK.as_ref().unwrap() };
-    let key_states = unsafe { KEY_STATES.as_mut().unwrap() };
-    let channels = emulator.audio_channels();
-
-    let mut counter_cycles = 0_u32;
-    let cycle_limit = (GameBoy::CPU_FREQ as f32 * emulator.multiplier() as f32
-        / GameBoy::VISUAL_FREQ)
-        .round() as u32;
-
-    loop {
-        // limits the number of ticks to the typical number
-        // of cycles expected for the current logic cycle
-        if counter_cycles >= cycle_limit {
-            //pending_cycles = counter_cycles - cycle_limit;
-            break;
-        }
-
-        // runs the Game Boy clock, this operation should
-        // include the advance of both the CPU, PPU, APU
-        // and any other frequency based component of the system
-        counter_cycles += emulator.clock() as u32;
-
-        // obtains the audio buffer reference and queues it
-        // in a batch manner using the audio callback at the
-        // the end of the operation clears the buffer
-        let audio_buffer = emulator
-            .audio_buffer()
-            .iter()
-            .map(|v| *v as i16 * 256)
-            .collect::<Vec<i16>>();
-
-        sample_batch_cb(
-            audio_buffer.as_ptr(),
-            audio_buffer.len() / channels as usize,
-        );
-        emulator.clear_audio_buffer();
-    }
-
-    input_poll_cb();
-
-    for key in KEYS {
-        let key_pad = retro_key_to_pad(key).unwrap();
-        let current = input_state_cb(0, RETRO_DEVICE_JOYPAD as u32, 0, key as u32) > 0;
-        let previous = key_states.get(&key).unwrap_or(&false);
-        if current != *previous {
-            if current {
-                emulator.key_press(key_pad);
-            } else {
-                emulator.key_lift(key_pad);
-            }
-        }
-        key_states.insert(key, current);
-    }
-
-    let frame_buffer = emulator.frame_buffer_rgb1555();
-    unsafe {
-        FRAME_BUFFER.copy_from_slice(&frame_buffer);
-        video_refresh_cb(
-            FRAME_BUFFER.as_ptr(),
-            DISPLAY_WIDTH as u32,
-            DISPLAY_HEIGHT as u32,
-            DISPLAY_WIDTH * RGB1555_SIZE,
-        );
-    }
-}
-
-#[no_mangle]
-pub extern "C" fn retro_get_region() -> u32 {
-    println!("retro_get_region()");
-    REGION_NTSC
-}
-
-/// # Safety
-///
-/// This function should not be called only within Lib Retro context.
-#[no_mangle]
-pub unsafe extern "C" fn retro_load_game(game: *const RetroGameInfo) -> bool {
-    println!("retro_load_game()");
-    let instance = EMULATOR.as_mut().unwrap();
-    let data_buffer = from_raw_parts((*game).data as *const u8, (*game).size);
-    let rom = Cartridge::from_data(data_buffer);
-    let mode = rom.gb_mode();
-    instance.set_mode(mode);
-    instance.reset();
-    instance.load(true);
-    instance.load_cartridge(rom);
-    true
-}
-
-#[no_mangle]
-pub extern "C" fn retro_unload_game() {
-    println!("retro_unload_game()");
-}
-
-#[no_mangle]
-pub extern "C" fn retro_get_memory_data(_memory_id: u32) -> *mut c_void {
-    println!("retro_get_memory_data()");
-    std::ptr::null_mut()
-}
-
-#[no_mangle]
-pub extern "C" fn retro_get_memory_size(_memory_id: u32) -> usize {
-    println!("retro_get_memory_size()");
-    0
-}
-
-#[no_mangle]
-pub extern "C" fn retro_serialize_size() {
-    println!("retro_serialize_size()");
-}
-
-#[no_mangle]
-pub extern "C" fn retro_serialize() {
-    println!("retro_serialize()");
-}
-
-#[no_mangle]
-pub extern "C" fn retro_unserialize() {
-    println!("retro_unserialize()");
-}
-
-#[no_mangle]
-pub extern "C" fn retro_cheat_reset() {
-    println!("retro_cheat_reset()");
-}
-
-#[no_mangle]
-pub extern "C" fn retro_cheat_set() {
-    println!("retro_cheat_set()");
 }
 
 fn retro_key_to_pad(retro_key: RetroJoypad) -> Option<PadKey> {

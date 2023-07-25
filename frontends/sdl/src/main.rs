@@ -423,11 +423,12 @@ impl Emulator {
 
             if current_time >= self.next_tick_time_i {
                 // re-starts the counter cycles with the number of pending cycles
-                // from the previous tick and the last frame with a dummy value
-                // meant to be overridden in case there's at least one new frame
+                // from the previous tick and the last frame with the system PPU
+                // frame index to be overridden in case there's at least one new frame
                 // being drawn in the current tick
                 let mut counter_cycles = pending_cycles;
-                let mut last_frame = 0xffffu16;
+                let mut last_frame = self.system.ppu_frame();
+                let mut frame_dirty = false;
 
                 // calculates the number of cycles that are meant to be the target
                 // for the current "tick" operation this is basically the current
@@ -450,11 +451,9 @@ impl Emulator {
                     // and any other frequency based component of the system
                     counter_cycles += self.system.clock() as u32;
 
-                    // in case a V-Blank state has been reached a new frame is available
+                    // in case a new frame is available from the emulator
                     // then the frame must be pushed into SDL for display
-                    if self.system.ppu_mode() == PpuMode::VBlank
-                        && self.system.ppu_frame() != last_frame
-                    {
+                    if self.system.ppu_frame() != last_frame {
                         // obtains the frame buffer of the Game Boy PPU and uses it
                         // to update the stream texture, that will latter be copied
                         // to the canvas
@@ -464,6 +463,7 @@ impl Emulator {
                         // obtains the index of the current PPU frame, this value
                         // is going to be used to detect for new frame presence
                         last_frame = self.system.ppu_frame();
+                        frame_dirty = true;
                     }
 
                     // in case the audio subsystem is enabled, then the audio buffer
@@ -488,7 +488,7 @@ impl Emulator {
                 // this separation between texture creation and canvas flush prevents
                 // resources from being over-used in situations where multiple frames
                 // are generated during the same tick cycle
-                if last_frame != 0xffffu16 {
+                if frame_dirty {
                     // clears the graphics canvas, making sure that no garbage
                     // pixel data remaining in the pixel buffer, not doing this would
                     // create visual glitches in OSs like Mac OS X
