@@ -4,7 +4,6 @@ pub mod consts;
 
 use std::{
     collections::HashMap,
-    ffi::CStr,
     fmt::{self, Display, Formatter},
     os::raw::{c_char, c_float, c_uint, c_void},
     slice::from_raw_parts,
@@ -348,13 +347,12 @@ pub unsafe extern "C" fn retro_load_game(game: *const RetroGameInfo) -> bool {
     println!("retro_load_game()");
     let instance = EMULATOR.as_mut().unwrap();
     let data_buffer = from_raw_parts((*game).data as *const u8, (*game).size);
-    let file_path_c = CStr::from_ptr((*game).path);
-    let file_path = file_path_c.to_str().unwrap();
-    let mode = Cartridge::from_file(file_path).gb_mode();
+    let rom = Cartridge::from_data(data_buffer);
+    let mode = rom.gb_mode();
     instance.set_mode(mode);
     instance.reset();
     instance.load(true);
-    instance.load_rom(data_buffer, None);
+    instance.load_cartridge(rom);
     true
 }
 
