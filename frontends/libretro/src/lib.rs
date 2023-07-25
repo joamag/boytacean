@@ -1,5 +1,7 @@
 #![allow(clippy::uninlined_format_args)]
 
+pub mod consts;
+
 use std::{
     collections::HashMap,
     ffi::CStr,
@@ -14,20 +16,16 @@ use boytacean::{
     ppu::{DISPLAY_HEIGHT, DISPLAY_WIDTH, FRAME_BUFFER_RGB155_SIZE, RGB1555_SIZE},
     rom::Cartridge,
 };
+use consts::{
+    RETRO_DEVICE_ID_JOYPAD_A, RETRO_DEVICE_ID_JOYPAD_B, RETRO_DEVICE_ID_JOYPAD_DOWN,
+    RETRO_DEVICE_ID_JOYPAD_L, RETRO_DEVICE_ID_JOYPAD_L2, RETRO_DEVICE_ID_JOYPAD_L3,
+    RETRO_DEVICE_ID_JOYPAD_LEFT, RETRO_DEVICE_ID_JOYPAD_R, RETRO_DEVICE_ID_JOYPAD_R2,
+    RETRO_DEVICE_ID_JOYPAD_R3, RETRO_DEVICE_ID_JOYPAD_RIGHT, RETRO_DEVICE_ID_JOYPAD_SELECT,
+    RETRO_DEVICE_ID_JOYPAD_START, RETRO_DEVICE_ID_JOYPAD_UP, RETRO_DEVICE_ID_JOYPAD_X,
+    RETRO_DEVICE_ID_JOYPAD_Y, RETRO_DEVICE_JOYPAD,
+};
 
-const RETRO_API_VERSION: u32 = 1;
-const REGION_NTSC: u32 = 0;
-
-//const RETRO_ENVIRONMENT_SET_PIXEL_FORMAT: u32 = 10;
-
-//const RETRO_PIXEL_FORMAT_0RGB1555: usize = 0;
-//const RETRO_PIXEL_FORMAT_XRGB8888: usize = 1;
-//const RETRO_PIXEL_FORMAT_RGB565: usize = 2;
-
-//const RETRO_MEMORY_SAVE_RAM: u32 = 0;
-//const RETRO_MEMORY_SYSTEM_RAM: u32 = 0;
-
-const RETRO_DEVICE_JOYPAD: usize = 1;
+use crate::consts::{REGION_NTSC, RETRO_API_VERSION};
 
 static mut EMULATOR: Option<GameBoy> = None;
 static mut KEY_STATES: Option<HashMap<RetroJoypad, bool>> = None;
@@ -41,23 +39,6 @@ static mut INPUT_POLL_CALLBACK: Option<extern "C" fn()> = None;
 static mut INPUT_STATE_CALLBACK: Option<
     extern "C" fn(port: u32, device: u32, index: u32, id: u32) -> i16,
 > = None;
-
-const RETRO_DEVICE_ID_JOYPAD_B: isize = 0;
-const RETRO_DEVICE_ID_JOYPAD_Y: isize = 1;
-const RETRO_DEVICE_ID_JOYPAD_SELECT: isize = 2;
-const RETRO_DEVICE_ID_JOYPAD_START: isize = 3;
-const RETRO_DEVICE_ID_JOYPAD_UP: isize = 4;
-const RETRO_DEVICE_ID_JOYPAD_DOWN: isize = 5;
-const RETRO_DEVICE_ID_JOYPAD_LEFT: isize = 6;
-const RETRO_DEVICE_ID_JOYPAD_RIGHT: isize = 7;
-const RETRO_DEVICE_ID_JOYPAD_A: isize = 8;
-const RETRO_DEVICE_ID_JOYPAD_X: isize = 9;
-const RETRO_DEVICE_ID_JOYPAD_L: isize = 10;
-const RETRO_DEVICE_ID_JOYPAD_R: isize = 11;
-const RETRO_DEVICE_ID_JOYPAD_L2: isize = 12;
-const RETRO_DEVICE_ID_JOYPAD_R2: isize = 13;
-const RETRO_DEVICE_ID_JOYPAD_L3: isize = 14;
-const RETRO_DEVICE_ID_JOYPAD_R3: isize = 15;
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum RetroJoypad {
@@ -157,11 +138,8 @@ pub struct RetroSystemTiming {
     sample_rate: f64,
 }
 
-/// # Safety
-///
-/// This function should not be called only within Lib Retro context.
 #[no_mangle]
-pub unsafe extern "C" fn retro_init() {
+pub extern "C" fn retro_init() {
     println!("retro_init()");
     unsafe {
         EMULATOR = Some(GameBoy::new(None));
@@ -193,13 +171,11 @@ pub extern "C" fn retro_api_version() -> c_uint {
 #[no_mangle]
 pub unsafe extern "C" fn retro_get_system_info(info: *mut RetroSystemInfo) {
     println!("retro_get_system_info()");
-    unsafe {
-        (*info).library_name = "Boytacean\0".as_ptr() as *const c_char;
-        (*info).library_version = "v0.9.6\0".as_ptr() as *const c_char;
-        (*info).valid_extensions = "gb|gbc\0".as_ptr() as *const c_char;
-        (*info).need_fullpath = false;
-        (*info).block_extract = false;
-    }
+    (*info).library_name = "Boytacean\0".as_ptr() as *const c_char;
+    (*info).library_version = "v0.9.6\0".as_ptr() as *const c_char;
+    (*info).valid_extensions = "gb|gbc\0".as_ptr() as *const c_char;
+    (*info).need_fullpath = false;
+    (*info).block_extract = false;
 }
 
 /// # Safety
@@ -208,15 +184,13 @@ pub unsafe extern "C" fn retro_get_system_info(info: *mut RetroSystemInfo) {
 #[no_mangle]
 pub unsafe extern "C" fn retro_get_system_av_info(info: *mut RetroSystemAvInfo) {
     println!("retro_get_system_av_info()");
-    unsafe {
-        (*info).geometry.base_width = DISPLAY_WIDTH as u32;
-        (*info).geometry.base_height = DISPLAY_HEIGHT as u32;
-        (*info).geometry.max_width = DISPLAY_WIDTH as u32 * 64;
-        (*info).geometry.max_height = DISPLAY_HEIGHT as u32 * 64;
-        (*info).geometry.aspect_ratio = DISPLAY_WIDTH as f32 / DISPLAY_HEIGHT as f32;
-        (*info).timing.fps = GameBoy::VISUAL_FREQ as f64;
-        (*info).timing.sample_rate = EMULATOR.as_ref().unwrap().audio_sampling_rate() as f64;
-    }
+    (*info).geometry.base_width = DISPLAY_WIDTH as u32;
+    (*info).geometry.base_height = DISPLAY_HEIGHT as u32;
+    (*info).geometry.max_width = DISPLAY_WIDTH as u32 * 64;
+    (*info).geometry.max_height = DISPLAY_HEIGHT as u32 * 64;
+    (*info).geometry.aspect_ratio = DISPLAY_WIDTH as f32 / DISPLAY_HEIGHT as f32;
+    (*info).timing.fps = GameBoy::VISUAL_FREQ as f64;
+    (*info).timing.sample_rate = EMULATOR.as_ref().unwrap().audio_sampling_rate() as f64;
 }
 
 #[no_mangle]
@@ -291,7 +265,11 @@ pub extern "C" fn retro_set_controller_port_device() {
 #[no_mangle]
 pub extern "C" fn retro_run() {
     let emulator = unsafe { EMULATOR.as_mut().unwrap() };
+    let video_refresh_cb = unsafe { VIDEO_REFRESH_CALLBACK.as_ref().unwrap() };
     let sample_batch_cb = unsafe { AUDIO_SAMPLE_BATCH_CALLBACK.as_ref().unwrap() };
+    let input_poll_cb = unsafe { INPUT_POLL_CALLBACK.as_ref().unwrap() };
+    let input_state_cb = unsafe { INPUT_STATE_CALLBACK.as_ref().unwrap() };
+    let key_states = unsafe { KEY_STATES.as_mut().unwrap() };
     let channels = emulator.audio_channels();
 
     let mut counter_cycles = 0_u32;
@@ -328,33 +306,26 @@ pub extern "C" fn retro_run() {
         emulator.clear_audio_buffer();
     }
 
-    unsafe {
-        INPUT_POLL_CALLBACK.as_ref().unwrap()();
-        let key_states = KEY_STATES.as_mut().unwrap();
-        for key in KEYS {
-            let key_pad = retro_key_to_pad(key).unwrap();
-            let current = INPUT_STATE_CALLBACK.as_ref().unwrap()(
-                0,
-                RETRO_DEVICE_JOYPAD as u32,
-                0,
-                key as u32,
-            ) > 0;
-            let previous = key_states.get(&key).unwrap_or(&false);
-            if current != *previous {
-                if current {
-                    emulator.key_press(key_pad);
-                } else {
-                    emulator.key_lift(key_pad);
-                }
+    input_poll_cb();
+
+    for key in KEYS {
+        let key_pad = retro_key_to_pad(key).unwrap();
+        let current = input_state_cb(0, RETRO_DEVICE_JOYPAD as u32, 0, key as u32) > 0;
+        let previous = key_states.get(&key).unwrap_or(&false);
+        if current != *previous {
+            if current {
+                emulator.key_press(key_pad);
+            } else {
+                emulator.key_lift(key_pad);
             }
-            key_states.insert(key, current);
         }
+        key_states.insert(key, current);
     }
 
     let frame_buffer = emulator.frame_buffer_rgb1555();
     unsafe {
         FRAME_BUFFER.copy_from_slice(&frame_buffer);
-        VIDEO_REFRESH_CALLBACK.unwrap()(
+        video_refresh_cb(
             FRAME_BUFFER.as_ptr(),
             DISPLAY_WIDTH as u32,
             DISPLAY_HEIGHT as u32,
@@ -375,17 +346,15 @@ pub extern "C" fn retro_get_region() -> u32 {
 #[no_mangle]
 pub unsafe extern "C" fn retro_load_game(game: *const RetroGameInfo) -> bool {
     println!("retro_load_game()");
-    unsafe {
-        let instance = EMULATOR.as_mut().unwrap();
-        let data_buffer = from_raw_parts((*game).data as *const u8, (*game).size);
-        let file_path_c = CStr::from_ptr((*game).path);
-        let file_path = file_path_c.to_str().unwrap();
-        let mode = Cartridge::from_file(file_path).gb_mode();
-        instance.set_mode(mode);
-        instance.reset();
-        instance.load(true);
-        instance.load_rom(data_buffer, None);
-    }
+    let instance = EMULATOR.as_mut().unwrap();
+    let data_buffer = from_raw_parts((*game).data as *const u8, (*game).size);
+    let file_path_c = CStr::from_ptr((*game).path);
+    let file_path = file_path_c.to_str().unwrap();
+    let mode = Cartridge::from_file(file_path).gb_mode();
+    instance.set_mode(mode);
+    instance.reset();
+    instance.load(true);
+    instance.load_rom(data_buffer, None);
     true
 }
 
