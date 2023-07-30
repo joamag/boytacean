@@ -2,8 +2,6 @@ use std::collections::VecDeque;
 
 use crate::{gb::GameBoy, warnln};
 
-const CHANNELS: u8 = 2;
-
 const DUTY_TABLE: [[u8; 8]; 4] = [
     [0, 0, 0, 0, 0, 0, 0, 1],
     [1, 0, 0, 0, 0, 0, 0, 1],
@@ -93,9 +91,22 @@ pub struct Apu {
     ch3_out_enabled: bool,
     ch4_out_enabled: bool,
 
+    /// The RAM that is used to sore the wave information
+    /// to be used in channel 3 audio
     wave_ram: [u8; 16],
 
+    /// The rate at which audio samples are going to be
+    /// taken, ideally this value should be aligned with
+    /// the sampling rate of the output device. A typical
+    /// sampling rate would be of 44.1kHz.
     sampling_rate: u16,
+
+    /// The number of audion channels that are going to be
+    /// outputted as part fo the audio buffer)  
+    channels: u8,
+
+    /// Internal sequencer counter that runs at 512Hz
+    /// used for the activation of the tick actions.
     sequencer: u16,
     sequencer_step: u8,
     output_timer: i16,
@@ -106,7 +117,7 @@ pub struct Apu {
 }
 
 impl Apu {
-    pub fn new(sampling_rate: u16, buffer_size: f32, clock_freq: u32) -> Self {
+    pub fn new(sampling_rate: u16, channels: u8, buffer_size: f32, clock_freq: u32) -> Self {
         Self {
             ch1_timer: 0,
             ch1_sequence: 0,
@@ -180,25 +191,18 @@ impl Apu {
             ch3_out_enabled: true,
             ch4_out_enabled: true,
 
-            /// The RAM that is used to sore the wave information
-            /// to be used in channel 3 audio
             wave_ram: [0u8; 16],
 
-            /// The rate at which audio samples are going to be
-            /// taken, ideally this value should be aligned with
-            /// the sampling rate of the output device. A typical
-            /// sampling rate would be of 44.1kHz.
             sampling_rate,
+            channels,
 
-            /// Internal sequencer counter that runs at 512Hz
-            /// used for the activation of the tick actions.
             sequencer: 0,
             sequencer_step: 0,
             output_timer: 0,
             audio_buffer: VecDeque::with_capacity(
-                (sampling_rate as f32 * buffer_size) as usize * CHANNELS as usize,
+                (sampling_rate as f32 * buffer_size) as usize * channels as usize,
             ),
-            audio_buffer_max: (sampling_rate as f32 * buffer_size) as usize * CHANNELS as usize,
+            audio_buffer_max: (sampling_rate as f32 * buffer_size) as usize * channels as usize,
             clock_freq,
         }
     }
@@ -324,13 +328,14 @@ impl Apu {
             // the buffer (avoiding overflow) and then then the new audio
             // volume item is added to the queue
             if self.audio_buffer.len() >= self.audio_buffer_max {
-                self.audio_buffer.pop_front();
-                self.audio_buffer.pop_front();
+                for _ in 0..self.channels {
+                    self.audio_buffer.pop_front();
+                }
             }
             if self.left_enabled {
                 self.audio_buffer.push_back(self.output());
             }
-            if self.right_enabled {
+            if self.right_enabled && self.channels > 1 {
                 self.audio_buffer.push_back(self.output());
             }
 
@@ -729,7 +734,7 @@ impl Apu {
     }
 
     pub fn channels(&self) -> u8 {
-        CHANNELS
+        self.channels
     }
 
     pub fn audio_buffer(&self) -> &VecDeque<u8> {
@@ -1061,7 +1066,7 @@ impl Apu {
 
 impl Default for Apu {
     fn default() -> Self {
-        Self::new(44100, 1.0, GameBoy::CPU_FREQ)
+        Self::new(44100, 2, 1.0, GameBoy::CPU_FREQ)
     }
 }
 

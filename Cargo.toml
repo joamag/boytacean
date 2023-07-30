@@ -36,7 +36,7 @@ opt-level = 3
 codegen-units = 1
 
 [workspace]
-members = [".", "frontends/sdl"]
+members = [".", "frontends/libretro", "frontends/sdl"]
 
 [package.metadata.docs.rs]
 features = ["wasm", "gen-mock"]

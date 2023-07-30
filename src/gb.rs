@@ -14,7 +14,10 @@ use crate::{
     gen::{COMPILATION_DATE, COMPILATION_TIME, COMPILER, COMPILER_VERSION, VERSION},
     mmu::Mmu,
     pad::{Pad, PadKey},
-    ppu::{Ppu, PpuMode, Tile, DISPLAY_HEIGHT, DISPLAY_WIDTH, FRAME_BUFFER_SIZE},
+    ppu::{
+        Ppu, PpuMode, Tile, DISPLAY_HEIGHT, DISPLAY_WIDTH, FRAME_BUFFER_RGB155_SIZE,
+        FRAME_BUFFER_SIZE,
+    },
     rom::{Cartridge, RamSize},
     serial::{NullDevice, Serial, SerialDevice},
     timer::Timer,
@@ -401,6 +404,13 @@ impl GameBoy {
         self.serial().reset();
         self.mmu().reset();
         self.cpu.reset();
+    }
+
+    pub fn reload(&mut self) {
+        let rom = self.rom().clone();
+        self.reset();
+        self.load(true);
+        self.load_cartridge(rom);
     }
 
     pub fn clock(&mut self) -> u16 {
@@ -950,6 +960,10 @@ impl GameBoy {
         &(self.ppu().frame_buffer)
     }
 
+    pub fn frame_buffer_rgb1555(&mut self) -> [u8; FRAME_BUFFER_RGB155_SIZE] {
+        self.ppu().frame_buffer_rgb1555()
+    }
+
     pub fn audio_buffer(&mut self) -> &VecDeque<u8> {
         self.apu().audio_buffer()
     }
@@ -982,13 +996,17 @@ impl GameBoy {
         self.load_boot_file(BootRom::Cgb);
     }
 
+    pub fn load_cartridge(&mut self, rom: Cartridge) -> &mut Cartridge {
+        self.mmu().set_rom(rom);
+        self.mmu().rom()
+    }
+
     pub fn load_rom(&mut self, data: &[u8], ram_data: Option<&[u8]>) -> &mut Cartridge {
         let mut rom = Cartridge::from_data(data);
         if let Some(ram_data) = ram_data {
             rom.set_ram_data(ram_data)
         }
-        self.mmu().set_rom(rom);
-        self.mmu().rom()
+        self.load_cartridge(rom)
     }
 
     pub fn load_rom_file(&mut self, path: &str, ram_path: Option<&str>) -> &mut Cartridge {

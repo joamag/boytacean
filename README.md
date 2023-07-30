@@ -10,7 +10,7 @@ A Game Boy emulator that is written in Rust 🦀.
 
 * Game Boy (DMG) and Game Boy Color (CGB) emulation
 * Simple navigable source-code
-* Web and SDL front-ends
+* Web, SDL and Libretro front-ends
 * Audio, with a pretty accurate APU
 * Serial Data Transfer ([Link Cable](https://en.wikipedia.org/wiki/Game_Link_Cable)) support
 * Game Boy Printer emulation

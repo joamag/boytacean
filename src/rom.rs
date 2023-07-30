@@ -599,6 +599,10 @@ impl Cartridge {
         self.ram_data = data.to_vec();
     }
 
+    pub fn clear_ram_data(&mut self) {
+        self.ram_data = vec![0u8; self.ram_data.len()];
+    }
+
     pub fn description(&self, column_length: usize) -> String {
         let name_l = format!("{:width$}", "Name", width = column_length);
         let type_l = format!("{:width$}", "Type", width = column_length);
