@@ -30,6 +30,7 @@ use crate::consts::{REGION_NTSC, RETRO_API_VERSION};
 static mut EMULATOR: Option<GameBoy> = None;
 static mut KEY_STATES: Option<HashMap<RetroJoypad, bool>> = None;
 static mut FRAME_BUFFER: [u8; FRAME_BUFFER_RGB155_SIZE] = [0x00; FRAME_BUFFER_RGB155_SIZE];
+static mut PENDING_CYCLES: u32 = 0_u32;
 
 static mut ENVIRONMENT_CALLBACK: Option<extern "C" fn(u32, *const c_void) -> bool> = None;
 static mut VIDEO_REFRESH_CALLBACK: Option<extern "C" fn(*const u8, c_uint, c_uint, usize)> = None;
@@ -220,7 +221,7 @@ pub extern "C" fn retro_run() {
 
     let mut last_frame = emulator.ppu_frame();
 
-    let mut counter_cycles = 0_u32;
+    let mut counter_cycles = unsafe { PENDING_CYCLES };
     let cycle_limit = (GameBoy::CPU_FREQ as f32 * emulator.multiplier() as f32
         / GameBoy::VISUAL_FREQ)
         .round() as u32;
@@ -229,7 +230,7 @@ pub extern "C" fn retro_run() {
         // limits the number of ticks to the typical number
         // of cycles expected for the current logic cycle
         if counter_cycles >= cycle_limit {
-            //pending_cycles = counter_cycles - cycle_limit;
+            unsafe { PENDING_CYCLES = counter_cycles - cycle_limit };
             break;
         }
 
