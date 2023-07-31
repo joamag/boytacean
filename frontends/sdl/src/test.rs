@@ -54,7 +54,7 @@ mod tests {
             TestOptions::default(),
         );
         let image_result = compare_images(&result, "res/test/blargg/cpu/cpu_instrs.png");
-        assert_eq!(image_result, true);
+        assert!(image_result);
     }
 
     #[test]
@@ -65,7 +65,7 @@ mod tests {
             TestOptions::default(),
         );
         let image_result = compare_images(&result, "res/test/blargg/instr_timing/instr_timing.png");
-        assert_eq!(image_result, true);
+        assert!(image_result);
     }
 
     #[test]
@@ -76,7 +76,7 @@ mod tests {
             TestOptions::default(),
         );
         let image_result = compare_images(&result, "res/test/blargg/dmg_sound/01-registers.png");
-        assert_eq!(image_result, true);
+        assert!(image_result);
 
         let result: [u8; FRAME_BUFFER_SIZE] = run_image_test(
             "../../res/roms/test/blargg/dmg_sound/02-len ctr.gb",
@@ -84,7 +84,7 @@ mod tests {
             TestOptions::default(),
         );
         let image_result = compare_images(&result, "res/test/blargg/dmg_sound/02-len ctr.png");
-        assert_eq!(image_result, true);
+        assert!(image_result);
 
         let result: [u8; FRAME_BUFFER_SIZE] = run_image_test(
             "../../res/roms/test/blargg/dmg_sound/03-trigger.gb",
@@ -92,7 +92,7 @@ mod tests {
             TestOptions::default(),
         );
         let image_result = compare_images(&result, "res/test/blargg/dmg_sound/03-trigger.png");
-        assert_eq!(image_result, true);
+        assert!(image_result);
     }
 
     #[test]
@@ -103,7 +103,7 @@ mod tests {
             TestOptions::default(),
         );
         let image_result = compare_images(&result, "res/test/dmg_acid2.png");
-        assert_eq!(image_result, true);
+        assert!(image_result);
     }
 
     #[test]
@@ -117,7 +117,7 @@ mod tests {
             },
         );
         let image_result = compare_images(&result, "res/test/cgb_acid2.png");
-        assert_eq!(image_result, true);
+        assert!(image_result);
     }
 
     #[test]
@@ -128,6 +128,6 @@ mod tests {
             TestOptions::default(),
         );
         let image_result = compare_images(&result, "res/test/firstwhite.png");
-        assert_eq!(image_result, true);
+        assert!(image_result);
     }
 }

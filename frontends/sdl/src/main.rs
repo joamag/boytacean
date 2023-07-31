@@ -10,7 +10,7 @@ use boytacean::{
     devices::{printer::PrinterDevice, stdout::StdoutDevice},
     gb::{AudioProvider, GameBoy, GameBoyMode},
     pad::PadKey,
-    ppu::{PaletteInfo, PpuMode},
+    ppu::PaletteInfo,
     rom::Cartridge,
     serial::{NullDevice, SerialDevice},
     util::{replace_ext, write_file},
