@@ -784,12 +784,6 @@ fn main() {
     // parses the provided command line arguments and uses them to
     // obtain structured values
     let args = Args::parse();
-    let mode = if args.mode == "auto" {
-        GameBoyMode::Dmg
-    } else {
-        GameBoyMode::from_string(&args.mode)
-    };
-    let auto_mode = args.mode == "auto";
 
     // in case the default ROM path is provided and the file does not
     // exist then fails gracefully
@@ -798,6 +792,15 @@ fn main() {
         println!("No ROM file provided, please provide one using the --rom-path option");
         return;
     }
+
+    // tries to build the target mode from the mode argument
+    // parsing it if it does not contain the "auto" value
+    let mode = if args.mode == "auto" {
+        GameBoyMode::Dmg
+    } else {
+        GameBoyMode::from_string(&args.mode)
+    };
+    let auto_mode = args.mode == "auto";
 
     // creates a new Game Boy instance and loads both the boot ROM
     // and the initial game ROM to "start the engine"
