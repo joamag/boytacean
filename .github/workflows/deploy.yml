@@ -4,25 +4,8 @@ on:
     tags:
       - "*"
 jobs:
-  create-release:
-    name: Create Release
-    timeout-minutes: 10
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code from repository
-        uses: actions/checkout@v3
-      - name: Create release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref }}
-          release_name: ${{ github.ref }}
-          draft: false
-          prerelease: false
-  build-upload:
-    name: Build & Upload
-    needs: create-release
+  build-release:
+    name: Build Release
     timeout-minutes: 10
     strategy:
       matrix:
@@ -38,14 +21,14 @@ jobs:
           cargo build --release
       - name: Build SDL
         run: |
-          cargo install cargo-vcpkg && cargo vcpkg -v build
+          cd frontends/sdl && cargo install cargo-vcpkg && cargo vcpkg -v build
           cd frontends/sdl && cargo build
           cd frontends/sdl && cargo build --release
       - name: Build Libretro
         run: |
           cd frontends/libretro && cargo build
           cd frontends/libretro && cargo build --release
-      - name: Upload Base
+      - name: Create Release
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
