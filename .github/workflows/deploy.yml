@@ -21,14 +21,16 @@ jobs:
           cargo build --release
       - name: Build SDL
         run: |
+          cd frontends/sdl
           apt-get update && apt-get install -y -q zip
-          cd frontends/sdl && cargo install cargo-vcpkg && cargo vcpkg -v build
-          cd frontends/sdl && cargo build
-          cd frontends/sdl && cargo build --release
+          cargo install cargo-vcpkg && cargo vcpkg -v build
+          cargo build
+          cargo build --release
       - name: Build Libretro
         run: |
-          cd frontends/libretro && cargo build
-          cd frontends/libretro && cargo build --release
+          cd frontends/libretro
+          cargo build
+          cargo build --release
       - name: Create Release
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
