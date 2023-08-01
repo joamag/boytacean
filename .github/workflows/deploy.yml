@@ -113,9 +113,40 @@ jobs:
             target/release/libboytacean.dylib
             target/release/boytacean_libretro.dylib
           retention-days: 5
+  build-wasm:
+    name: Build WASM
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    container: rust:1.71.0
+    steps:
+      - name: Checkout code from repository
+        uses: actions/checkout@v3
+      - name: Build WASM
+        run: |
+          cargo install wasm-pack
+          wasm-pack build --release --target=web --out-dir=frontends/web/lib -- --features wasm
+      - name: Install Node.js 16
+        uses: actions/setup-node@v3
+        with:
+          node-version: 16
+      - name: Build Web code
+        run: |
+          cd frontends/web
+          npm install && npm run build
+      - name: Bundle files
+        run: |
+          apt-get update && apt-get install -y -q zip
+          cd frontends/web
+          zip -r boytacean-wasm.zip dist/*
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: boytacean-wasm
+          path: frontends/web/boytacean-wasm.zip
+          retention-days: 5
   release:
     name: Release
-    needs: [build-linux, build-windows, build-mac]
+    needs: [build-linux, build-windows, build-mac, build-wasm]
     timeout-minutes: 10
     runs-on: ubuntu-latest
     steps:
@@ -134,3 +165,4 @@ jobs:
             boytacean-mac/boytacean-sdl-mac-x64
             boytacean-mac/libboytacean.dylib
             boytacean-mac/boytacean_libretro.dylib
+            boytacean-wasm/boytacean-wasm.zip
