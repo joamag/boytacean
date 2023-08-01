@@ -116,7 +116,7 @@ jobs:
           retention-days: 5
   release:
     name: Release
-    needs: [build-linux, build-windows]
+    needs: [build-linux, build-windows, build-mac]
     timeout-minutes: 10
     runs-on: ubuntu-latest
     steps:
@@ -126,9 +126,12 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: |
+            boytacean-sdl-mac-x64
             boytacean-sdl-linux-x64
             boytacean-sdl-win32-x64.exe
+            libboytacean.dylib
             libboytacean.so
             boytacean.dll
+            boytacean_libretro.dylib
             boytacean_libretro.so
             boytacean_libretro.dll
