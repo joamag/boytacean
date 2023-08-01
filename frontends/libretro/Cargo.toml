@@ -11,5 +11,10 @@ readme = "README.md"
 [lib]
 crate-type = ["cdylib"]
 
+[features]
+debug = ["boytacean/debug"]
+pedantic = ["boytacean/pedantic"]
+cpulog = ["boytacean/cpulog"]
+
 [dependencies.boytacean]
 path = "../.."

@@ -405,6 +405,7 @@ impl GameBoy {
         self.serial().reset();
         self.mmu().reset();
         self.cpu.reset();
+        self.reset_cheats();
     }
 
     pub fn reload(&mut self) {
@@ -1027,6 +1028,14 @@ impl GameBoy {
 
     pub fn set_speed_callback(&mut self, callback: fn(speed: GameBoySpeed)) {
         self.mmu().set_speed_callback(callback);
+    }
+
+    pub fn reset_cheats(&mut self) {
+        self.reset_game_genie();
+    }
+
+    pub fn add_cheat_code(&mut self, code: &str) {
+        self.add_game_genie_code(code).unwrap();
     }
 
     pub fn reset_game_genie(&mut self) {

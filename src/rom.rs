@@ -908,7 +908,7 @@ pub static GAME_GENIE: Mbc = Mbc {
             // applies the patch, otherwise returns the original strategy is
             // going to be used
             if genie_code.is_valid((rom.mbc.read_rom)(rom, addr)) {
-                debugln!("Applying Game Genie code: {}", game_genie_code);
+                debugln!("Applying Game Genie code: {}", genie_code);
                 return genie_code.new_data();
             }
         }

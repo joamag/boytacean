@@ -4,6 +4,7 @@ pub mod consts;
 
 use std::{
     collections::HashMap,
+    ffi::CStr,
     fmt::{self, Display, Formatter},
     os::raw::{c_char, c_float, c_uint, c_void},
     slice::from_raw_parts,
@@ -359,11 +360,21 @@ pub extern "C" fn retro_unserialize() {
 #[no_mangle]
 pub extern "C" fn retro_cheat_reset() {
     debugln!("retro_cheat_reset()");
+    println!("retro_cheat_reset()");
+    let emulator = unsafe { EMULATOR.as_mut().unwrap() };
+    emulator.reset_cheats();
 }
 
 #[no_mangle]
-pub extern "C" fn retro_cheat_set() {
+pub extern "C" fn retro_cheat_set(_index: c_uint, enabled: bool, code: *const c_char) {
     debugln!("retro_cheat_set()");
+    if !enabled {
+        return;
+    }
+    let emulator = unsafe { EMULATOR.as_mut().unwrap() };
+    let code_c = unsafe { CStr::from_ptr(code) };
+    let code_s = code_c.to_string_lossy().into_owned();
+    emulator.add_cheat_code(&code_s)
 }
 
 #[no_mangle]
