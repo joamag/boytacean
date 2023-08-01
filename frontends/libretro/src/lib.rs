@@ -173,7 +173,7 @@ pub extern "C" fn retro_reset() {
 pub unsafe extern "C" fn retro_get_system_info(info: *mut RetroSystemInfo) {
     debugln!("retro_get_system_info()");
     (*info).library_name = "Boytacean\0".as_ptr() as *const c_char;
-    (*info).library_version = "v0.9.9\0".as_ptr() as *const c_char;
+    (*info).library_version = "v0.9.10\0".as_ptr() as *const c_char;
     (*info).valid_extensions = "gb|gbc\0".as_ptr() as *const c_char;
     (*info).need_fullpath = false;
     (*info).block_extract = false;
