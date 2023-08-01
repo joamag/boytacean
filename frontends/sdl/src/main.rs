@@ -235,6 +235,10 @@ impl Emulator {
         }
         self.rom_path = String::from(rom_path);
         self.ram_path = ram_path;
+
+        // @TODO: hardcoded adding of game genie codes
+        self.system.add_game_genie_code("00A-17B-C49").unwrap();
+        self.system.add_game_genie_code("008-60A-E6E").unwrap();
     }
 
     pub fn reset(&mut self) {

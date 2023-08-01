@@ -23,6 +23,10 @@ impl GameGenie {
         }
     }
 
+    pub fn reset(&mut self) {
+        self.codes.clear();
+    }
+
     pub fn contains_addr(&self, addr: u16) -> bool {
         self.codes.contains_key(&addr)
     }
@@ -88,8 +92,36 @@ impl GameGenieCode {
         self.old_data == value
     }
 
+    pub fn code(&self) -> &str {
+        &self.code
+    }
+
+    pub fn set_code(&mut self, code: String) {
+        self.code = code;
+    }
+
+    pub fn addr(&self) -> u16 {
+        self.addr
+    }
+
+    pub fn set_addr(&mut self, addr: u16) {
+        self.addr = addr;
+    }
+
     pub fn new_data(&self) -> u8 {
         self.new_data
+    }
+
+    pub fn set_new_data(&mut self, new_data: u8) {
+        self.new_data = new_data;
+    }
+
+    pub fn old_data(&self) -> u8 {
+        self.old_data
+    }
+
+    pub fn set_old_data(&mut self, old_data: u8) {
+        self.old_data = old_data;
     }
 
     pub fn short_description(&self) -> String {

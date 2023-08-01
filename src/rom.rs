@@ -208,33 +208,6 @@ impl Display for CgbMode {
     }
 }
 
-#[derive(Clone)]
-pub struct GameGenieCode {
-    code: String,
-    address: u16,
-    new_data: u8,
-    old_data: u8,
-}
-
-impl GameGenieCode {
-    pub fn short_description(&self) -> String {
-        self.code.to_string()
-    }
-
-    pub fn description(&self) -> String {
-        format!(
-            "Code: {}, Address: 0x{:04x}, New Data: 0x{:04x}, Old Data: 0x{:04x}",
-            self.code, self.address, self.new_data, self.old_data
-        )
-    }
-}
-
-impl Display for GameGenieCode {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.short_description())
-    }
-}
-
 /// Structure that defines the ROM and ROM contents
 /// of a Game Boy cartridge. Should correctly address
 /// the specifics of all the major MBCs (Memory Bank
@@ -464,6 +437,18 @@ impl Cartridge {
             offset += 1;
         }
         self.title_offset = 0x0134 + offset;
+    }
+
+    pub fn game_genie(&self) -> &Option<GameGenie> {
+        &self.game_genie
+    }
+
+    pub fn game_genie_mut(&mut self) -> &mut Option<GameGenie> {
+        &mut self.game_genie
+    }
+
+    pub fn set_game_genie(&mut self, game_genie: Option<GameGenie>) {
+        self.game_genie = game_genie;
     }
 
     fn allocate_ram(&mut self) {

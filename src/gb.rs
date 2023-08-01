@@ -12,7 +12,7 @@ use crate::{
     devices::{printer::PrinterDevice, stdout::StdoutDevice},
     dma::Dma,
     gen::{COMPILATION_DATE, COMPILATION_TIME, COMPILER, COMPILER_VERSION, VERSION},
-    genie::GameGenie,
+    genie::{GameGenie, GameGenieCode},
     mmu::Mmu,
     pad::{Pad, PadKey},
     ppu::{
@@ -999,15 +999,7 @@ impl GameBoy {
 
     pub fn load_cartridge(&mut self, rom: Cartridge) -> &mut Cartridge {
         self.mmu().set_rom(rom);
-        let rom = self.mmu().rom();
-
-        // TODO: Remove this section, attach Game Genie codes
-        let mut game_genie = GameGenie::default();
-        game_genie.add_code("00A-17B-C49").unwrap(); // SML
-        game_genie.add_code("008-60A-E6E").unwrap(); // SML
-        rom.attach_genie(game_genie);
-
-        rom
+        self.mmu().rom()
     }
 
     pub fn load_rom(&mut self, data: &[u8], ram_data: Option<&[u8]>) -> &mut Cartridge {
@@ -1035,6 +1027,23 @@ impl GameBoy {
 
     pub fn set_speed_callback(&mut self, callback: fn(speed: GameBoySpeed)) {
         self.mmu().set_speed_callback(callback);
+    }
+
+    pub fn reset_game_genie(&mut self) {
+        let rom = self.mmu().rom();
+        if rom.game_genie().is_some() {
+            rom.game_genie().clone().unwrap().reset();
+        }
+    }
+
+    pub fn add_game_genie_code(&mut self, code: &str) -> Result<&GameGenieCode, String> {
+        let rom = self.mmu().rom();
+        if rom.game_genie().is_none() {
+            let game_genie = GameGenie::default();
+            rom.attach_genie(game_genie);
+        }
+        let game_genie = rom.game_genie_mut().as_mut().unwrap();
+        game_genie.add_code(code)
     }
 }
 
