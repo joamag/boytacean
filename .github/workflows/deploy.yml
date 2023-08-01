@@ -8,11 +8,8 @@ jobs:
   build-linux:
     name: Build Release
     timeout-minutes: 30
-    strategy:
-      matrix:
-        rust-version: ["1.71.0"]
     runs-on: ubuntu-latest
-    container: rust:${{ matrix.rust-version }}
+    container: rust:1.71.0
     steps:
       - name: Checkout code from repository
         uses: actions/checkout@v3
