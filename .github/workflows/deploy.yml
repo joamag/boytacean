@@ -92,6 +92,7 @@ jobs:
           retention-days: 5
   release:
     name: Release
+    needs: [build-linux, build-windows]
     timeout-minutes: 10
     runs-on: ubuntu-latest
     steps:
