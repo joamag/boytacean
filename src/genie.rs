@@ -60,7 +60,7 @@ pub struct GameGenieCode {
     old_data: u8,
 
     /// A boolean value indicating whether the provided cheat code
-    /// was additive or not. If the code is additive, the new data
+    /// is additive or not. If the code is additive, the new data
     /// will be added to the old data, otherwise the new data will
     /// replace the old data.
     additive: bool,
