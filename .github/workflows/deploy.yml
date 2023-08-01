@@ -13,8 +13,7 @@ jobs:
       - name: Checkout code from repository
         uses: actions/checkout@v3
       - name: Build Base
-        run: |
-          cargo build --release
+        run: cargo build --release
       - name: Build SDL
         run: |
           cd frontends/sdl
@@ -52,8 +51,7 @@ jobs:
           rustup override set 1.71.0
           rustup default stable-msvc
       - name: Build Base
-        run: |
-          cargo build --release
+        run: cargo build --release
       - name: Build SDL
         run: |
           cd frontends/sdl
@@ -88,8 +86,7 @@ jobs:
           rustup install 1.71.0
           rustup override set 1.71.0
       - name: Build Base
-        run: |
-          cargo build --release
+        run: cargo build --release
       - name: Build SDL
         run: |
           cd frontends/sdl
@@ -121,10 +118,10 @@ jobs:
     steps:
       - name: Checkout code from repository
         uses: actions/checkout@v3
+      - name: Install wasm-pack
+        run: cargo install wasm-pack
       - name: Build WASM
-        run: |
-          cargo install wasm-pack
-          wasm-pack build --release --target=web --out-dir=frontends/web/lib -- --features wasm
+        run: wasm-pack build --release --target=web --out-dir=frontends/web/lib -- --features wasm
       - name: Install Node.js 16
         uses: actions/setup-node@v3
         with:
@@ -161,7 +158,7 @@ jobs:
             boytacean-linux/boytacean_libretro.so
             boytacean-win32/boytacean-sdl-win32-x64.exe
             boytacean-win32/boytacean.dll
-            boytacean-win32/boytacean_libretro.dll            
+            boytacean-win32/boytacean_libretro.dll
             boytacean-mac/boytacean-sdl-mac-x64
             boytacean-mac/libboytacean.dylib
             boytacean-mac/boytacean_libretro.dylib
