@@ -50,18 +50,14 @@ jobs:
   build-windows:
     name: Build Windows
     timeout-minutes: 30
-    strategy:
-      matrix:
-        rust-version: ["1.71.0"]
     runs-on: windows-latest
-    container: rust:${{ matrix.rust-version }}
     steps:
       - name: Checkout code from repository
         uses: actions/checkout@v3
       - name: Setup Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: stable
+          toolchain: 1.71.0
       - name: Build Base
         run: |
           cargo build
