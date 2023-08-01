@@ -43,6 +43,10 @@ const VOLUME: f32 = 64.0;
 /// backed RAM is going to be stored into the file system.
 const STORE_RATE: u8 = 5;
 
+/// The path to the default ROM file that is going to be
+/// loaded in case no other ROM path is provided.
+const DEFAULT_ROM_PATH: &str = "../../res/roms/demo/pocket.gb";
+
 pub struct Benchmark {
     count: usize,
     cpu_only: Option<bool>,
@@ -752,7 +756,7 @@ struct Args {
     )]
     cycles: u64,
 
-    #[arg(short, long, default_value_t = String::from("../../res/roms/demo/pocket.gb"), help = "Path to the ROM file to be loaded")]
+    #[arg(short, long, default_value_t = String::from(DEFAULT_ROM_PATH), help = "Path to the ROM file to be loaded")]
     rom_path: String,
 }
 
@@ -786,6 +790,14 @@ fn main() {
         GameBoyMode::from_string(&args.mode)
     };
     let auto_mode = args.mode == "auto";
+
+    // in case the default ROM path is provided and the file does not
+    // exist then fails gracefully
+    let path = Path::new(&args.rom_path);
+    if &args.rom_path == DEFAULT_ROM_PATH && !path.exists() {
+        println!("No ROM file provided, please provide one using the --rom-path option");
+        return;
+    }
 
     // creates a new Game Boy instance and loads both the boot ROM
     // and the initial game ROM to "start the engine"
