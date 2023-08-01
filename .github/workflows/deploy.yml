@@ -64,7 +64,7 @@ jobs:
         run: |
           cd frontends/libretro
           cargo build --release
-      - name: Transform Filenames
+      - name: Transform filenames
         run: |
           cd target/release
           mv boytacean-sdl.exe boytacean-sdl-win32-x64.exe
@@ -100,7 +100,7 @@ jobs:
         run: |
           cd frontends/libretro
           cargo build --release
-      - name: Transform Filenames
+      - name: Transform filenames
         run: |
           cd target/release
           mv boytacean-sdl boytacean-sdl-mac-x64
