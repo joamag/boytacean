@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-* Support for [Libretro](https://www.libretro.com/) core
+*
 
 ### Changed
 
@@ -18,6 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 *
+
+## [0.9.7] - 2023-06-20
+
+### Added
+
+* Support for [Libretro](https://www.libretro.com/) core - [#14](https://gitlab.stage.hive.pt/joamag/boytacean/-/issues/14)
 
 ## [0.9.6] - 2023-06-20
 
