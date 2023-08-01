@@ -55,6 +55,8 @@ jobs:
           rustup install 1.71.0
           rustup override set 1.71.0
           rustup default stable-msvc
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
       - name: Build Base
         run: |
           cargo build
