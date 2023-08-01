@@ -21,6 +21,7 @@ jobs:
           cargo build --release
       - name: Build SDL
         run: |
+          apt-get update && apt-get install -y -q zip
           cd frontends/sdl && cargo install cargo-vcpkg && cargo vcpkg -v build
           cd frontends/sdl && cargo build
           cd frontends/sdl && cargo build --release
