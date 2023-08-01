@@ -8,6 +8,8 @@ use std::{
 
 pub type SharedMut<T> = Rc<RefCell<T>>;
 
+/// Reads the contents of the file at the given path into
+/// a vector of bytes.
 pub fn read_file(path: &str) -> Vec<u8> {
     let mut file = match File::open(path) {
         Ok(file) => file,
@@ -18,6 +20,7 @@ pub fn read_file(path: &str) -> Vec<u8> {
     data
 }
 
+/// Writes the given data to the file at the given path.
 pub fn write_file(path: &str, data: &[u8]) {
     let mut file = match File::create(path) {
         Ok(file) => file,

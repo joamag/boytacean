@@ -33,7 +33,6 @@ import {
     default as _wasm,
     GameBoy,
     PadKey,
-    PpuMode,
     GameBoyMode,
     GameBoySpeed
 } from "../lib/boytacean";

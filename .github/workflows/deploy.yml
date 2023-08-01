@@ -1,0 +1,165 @@
+name: Deploy Workflow
+on:
+  push:
+    tags:
+      - "*"
+jobs:
+  build-linux:
+    name: Build Linux
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    container: rust:1.71.0
+    steps:
+      - name: Checkout code from repository
+        uses: actions/checkout@v3
+      - name: Build Base
+        run: cargo build --release
+      - name: Build SDL
+        run: |
+          cd frontends/sdl
+          apt-get update && apt-get install -y -q zip
+          cargo install cargo-vcpkg && cargo vcpkg -v build
+          cargo build --release
+      - name: Build Libretro
+        run: |
+          cd frontends/libretro
+          cargo build --release
+      - name: Transform filenames
+        run: |
+          cd target/release
+          mv boytacean-sdl boytacean-sdl-linux-x64
+          mv libboytacean_libretro.so boytacean_libretro.so
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: boytacean-linux
+          path: |
+            target/release/boytacean-sdl-linux-x64
+            target/release/libboytacean.so
+            target/release/boytacean_libretro.so
+          retention-days: 5
+  build-windows:
+    name: Build Windows
+    timeout-minutes: 30
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code from repository
+        uses: actions/checkout@v3
+      - name: Setup Rust
+        run: |
+          rustup install 1.71.0
+          rustup override set 1.71.0
+          rustup default stable-msvc
+      - name: Build Base
+        run: cargo build --release
+      - name: Build SDL
+        run: |
+          cd frontends/sdl
+          cargo install cargo-vcpkg && cargo vcpkg -v build
+          cargo build --release
+      - name: Build Libretro
+        run: |
+          cd frontends/libretro
+          cargo build --release
+      - name: Transform filenames
+        run: |
+          cd target/release
+          mv boytacean-sdl.exe boytacean-sdl-win32-x64.exe
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: boytacean-win32
+          path: |
+            target/release/boytacean-sdl-win32-x64.exe
+            target/release/boytacean.dll
+            target/release/boytacean_libretro.dll
+          retention-days: 5
+  build-mac:
+    name: Build Mac
+    timeout-minutes: 30
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code from repository
+        uses: actions/checkout@v3
+      - name: Setup Rust
+        run: |
+          rustup install 1.71.0
+          rustup override set 1.71.0
+      - name: Build Base
+        run: cargo build --release
+      - name: Build SDL
+        run: |
+          cd frontends/sdl
+          cargo install cargo-vcpkg && cargo vcpkg -v build
+          cargo build --release
+      - name: Build Libretro
+        run: |
+          cd frontends/libretro
+          cargo build --release
+      - name: Transform filenames
+        run: |
+          cd target/release
+          mv boytacean-sdl boytacean-sdl-mac-x64
+          mv libboytacean_libretro.dylib boytacean_libretro.dylib
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: boytacean-mac
+          path: |
+            target/release/boytacean-sdl-mac-x64
+            target/release/libboytacean.dylib
+            target/release/boytacean_libretro.dylib
+          retention-days: 5
+  build-wasm:
+    name: Build WASM
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    container: rust:1.71.0
+    steps:
+      - name: Checkout code from repository
+        uses: actions/checkout@v3
+      - name: Install wasm-pack
+        run: cargo install wasm-pack
+      - name: Build WASM
+        run: wasm-pack build --release --target=web --out-dir=frontends/web/lib -- --features wasm
+      - name: Install Node.js 16
+        uses: actions/setup-node@v3
+        with:
+          node-version: 16
+      - name: Build Web code
+        run: |
+          cd frontends/web
+          npm install && npm run build
+      - name: Bundle files
+        run: |
+          apt-get update && apt-get install -y -q zip
+          cd frontends/web
+          zip -r -j boytacean-wasm.zip dist/*
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: boytacean-wasm
+          path: frontends/web/boytacean-wasm.zip
+          retention-days: 5
+  release:
+    name: Release
+    needs: [build-linux, build-windows, build-mac, build-wasm]
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+      - name: Create release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            boytacean-linux/boytacean-sdl-linux-x64
+            boytacean-linux/libboytacean.so
+            boytacean-linux/boytacean_libretro.so
+            boytacean-win32/boytacean-sdl-win32-x64.exe
+            boytacean-win32/boytacean.dll
+            boytacean-win32/boytacean_libretro.dll
+            boytacean-mac/boytacean-sdl-mac-x64
+            boytacean-mac/libboytacean.dylib
+            boytacean-mac/boytacean_libretro.dylib
+            boytacean-wasm/boytacean-wasm.zip
