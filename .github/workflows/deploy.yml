@@ -54,6 +54,7 @@ jobs:
         run: |
           rustup install 1.71.0
           rustup override set 1.71.0
+          rustup default stable-msvc
       - name: Build Base
         run: |
           cargo build
