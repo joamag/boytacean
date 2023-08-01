@@ -12,6 +12,7 @@ use crate::{
     devices::{printer::PrinterDevice, stdout::StdoutDevice},
     dma::Dma,
     gen::{COMPILATION_DATE, COMPILATION_TIME, COMPILER, COMPILER_VERSION, VERSION},
+    genie::{GameGenie, GameGenieCode},
     mmu::Mmu,
     pad::{Pad, PadKey},
     ppu::{
@@ -404,6 +405,7 @@ impl GameBoy {
         self.serial().reset();
         self.mmu().reset();
         self.cpu.reset();
+        self.reset_cheats();
     }
 
     pub fn reload(&mut self) {
@@ -1026,6 +1028,34 @@ impl GameBoy {
 
     pub fn set_speed_callback(&mut self, callback: fn(speed: GameBoySpeed)) {
         self.mmu().set_speed_callback(callback);
+    }
+
+    pub fn reset_cheats(&mut self) {
+        self.reset_game_genie();
+    }
+
+    pub fn add_cheat_code(&mut self, code: &str) -> Result<bool, String> {
+        match self.add_game_genie_code(code) {
+            Ok(_) => Ok(true),
+            Err(message) => Err(message),
+        }
+    }
+
+    pub fn reset_game_genie(&mut self) {
+        let rom = self.mmu().rom();
+        if rom.game_genie().is_some() {
+            rom.game_genie().clone().unwrap().reset();
+        }
+    }
+
+    pub fn add_game_genie_code(&mut self, code: &str) -> Result<&GameGenieCode, String> {
+        let rom = self.mmu().rom();
+        if rom.game_genie().is_none() {
+            let game_genie = GameGenie::default();
+            rom.attach_genie(game_genie);
+        }
+        let game_genie = rom.game_genie_mut().as_mut().unwrap();
+        game_genie.add_code(code)
     }
 }
 
