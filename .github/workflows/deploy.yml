@@ -125,12 +125,12 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            boytacean-sdl-mac-x64
-            boytacean-sdl-linux-x64
-            boytacean-sdl-win32-x64.exe
-            libboytacean.dylib
-            libboytacean.so
-            boytacean.dll
-            boytacean_libretro.dylib
-            boytacean_libretro.so
-            boytacean_libretro.dll
+            boytacean-linux/boytacean-sdl-linux-x64
+            boytacean-linux/libboytacean.so
+            boytacean-linux/boytacean_libretro.so
+            boytacean-win32/boytacean-sdl-win32-x64.exe
+            boytacean-win32/boytacean.dll
+            boytacean-win32/boytacean_libretro.dll            
+            boytacean-mac/boytacean-sdl-mac-x64
+            boytacean-mac/libboytacean.dylib
+            boytacean-mac/boytacean_libretro.dylib
