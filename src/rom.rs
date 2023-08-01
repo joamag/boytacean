@@ -629,12 +629,20 @@ impl Cartridge {
         )
     }
 
+    pub fn rom_data_eager(&self) -> Vec<u8> {
+        self.rom_data.clone()
+    }
+
     pub fn ram_data_eager(&self) -> Vec<u8> {
         self.ram_data.clone()
     }
 
-    pub fn set_ram_data(&mut self, ram_data: Vec<u8>) {
-        self.ram_data = ram_data;
+    pub fn set_ram_data(&mut self, data: &[u8]) {
+        self.ram_data = data.to_vec();
+    }
+
+    pub fn clear_ram_data(&mut self) {
+        self.ram_data = vec![0u8; self.ram_data.len()];
     }
 
     pub fn attach_genie(&mut self, game_genie: GameGenie) {
@@ -666,6 +674,16 @@ impl Cartridge {
             cgb_l,
             self.cgb_flag()
         )
+    }
+}
+
+impl Cartridge {
+    pub fn rom_data(&self) -> &Vec<u8> {
+        &self.rom_data
+    }
+
+    pub fn ram_data(&self) -> &Vec<u8> {
+        &self.ram_data
     }
 }
 

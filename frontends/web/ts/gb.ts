@@ -275,7 +275,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         // of cycles coming from the previous tick
         let counterCycles = pending;
 
-        let lastFrame = -1;
+        let lastFrame = this.gameBoy.ppu_frame();
 
         while (true) {
             // limits the number of cycles to the provided
@@ -289,13 +289,9 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
             const tickCycles = this.gameBoy.clock();
             counterCycles += tickCycles;
 
-            // in case the current PPU mode is VBlank and the
-            // frame is different from the previously rendered
-            // one then it's time to update the canvas
-            if (
-                this.gameBoy.ppu_mode() === PpuMode.VBlank &&
-                this.gameBoy.ppu_frame() !== lastFrame
-            ) {
+            // in case the frame is different from the previously
+            // rendered one then it's time to update the canvas
+            if (this.gameBoy.ppu_frame() !== lastFrame) {
                 // updates the reference to the last frame index
                 // to be used for comparison in the next tick
                 lastFrame = this.gameBoy.ppu_frame();
@@ -611,8 +607,8 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
 
     get audioSpecs(): AudioSpecs {
         return {
-            samplingRate: 44100,
-            channels: 2
+            samplingRate: this.gameBoy?.audio_sampling_rate() ?? 44100,
+            channels: this.gameBoy?.audio_channels() ?? 2
         };
     }
 

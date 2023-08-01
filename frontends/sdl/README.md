@@ -58,6 +58,7 @@ To obtain more information about the issues.
 #### I'm facing issues with the vcpkg binaries
 
 If there're issues with the `cargo vcpkg build` build process you may need to remove the `~/.vcpkg-root` and re-run the process to re-build the whole set of packages.
+It's also important to completely delete the `target` directory.
 
 ### I'm having difficulties building SDL for arm64 in Mac OS
 
@@ -79,7 +80,7 @@ cargo vcpkg -v build
 It's possible to run the emulator in headless mode using the `--headless` parameter:
 
 ```bash
-cargo run  -- --rom-path ../../res/roms/test/blargg/cpu/cpu_instrs.gb --cycles 100000000  --headless --device stdout --unlimited
+cargo run -- --rom-path ../../res/roms/test/blargg/cpu/cpu_instrs.gb --cycles 100000000 --headless --device stdout --unlimited
 ```
 
 ## Features

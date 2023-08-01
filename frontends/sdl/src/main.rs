@@ -10,9 +10,10 @@ use boytacean::{
     devices::{printer::PrinterDevice, stdout::StdoutDevice},
     gb::{AudioProvider, GameBoy, GameBoyMode},
     pad::PadKey,
-    ppu::{PaletteInfo, PpuMode},
+    ppu::PaletteInfo,
     rom::Cartridge,
     serial::{NullDevice, SerialDevice},
+    util::{replace_ext, write_file},
 };
 use chrono::Utc;
 use clap::Parser;
@@ -37,6 +38,10 @@ const TITLE: &str = "Boytacean";
 /// Base audio volume to be used as the basis of the
 /// amplification level of the volume
 const VOLUME: f32 = 64.0;
+
+/// The rate (in seconds) at which the current battery
+/// backed RAM is going to be stored into the file system.
+const STORE_RATE: u8 = 5;
 
 pub struct Benchmark {
     count: usize,
@@ -69,6 +74,7 @@ pub struct Emulator {
     audio: Option<Audio>,
     title: &'static str,
     rom_path: String,
+    ram_path: String,
     logic_frequency: u32,
     visual_frequency: f32,
     next_tick_time: f32,
@@ -88,6 +94,7 @@ impl Emulator {
             audio: None,
             title: TITLE,
             rom_path: String::from("invalid"),
+            ram_path: String::from("invalid"),
             logic_frequency: GameBoy::CPU_FREQ,
             visual_frequency: GameBoy::VISUAL_FREQ,
             next_tick_time: 0.0,
@@ -198,12 +205,25 @@ impl Emulator {
     }
 
     pub fn start_audio(&mut self, sdl: &Sdl) {
-        self.audio = Some(Audio::new(sdl));
+        self.audio = Some(Audio::new(
+            sdl,
+            self.system.audio_sampling_rate() as i32,
+            self.system.audio_channels(),
+            None,
+        ));
     }
 
     pub fn load_rom(&mut self, path: Option<&str>) {
-        let path_res = path.unwrap_or(&self.rom_path);
-        let rom = self.system.load_rom_file(path_res);
+        let rom_path: &str = path.unwrap_or(&self.rom_path);
+        let ram_path = replace_ext(rom_path, "sav").unwrap_or_else(|| "invalid".to_string());
+        let rom = self.system.load_rom_file(
+            rom_path,
+            if Path::new(&ram_path).exists() {
+                Some(&ram_path)
+            } else {
+                None
+            },
+        );
         println!(
             "========= Cartridge =========\n{}\n=============================",
             rom
@@ -213,7 +233,8 @@ impl Emulator {
                 .set_title(format!("{} [{}]", self.title, rom.title()).as_str())
                 .unwrap();
         }
-        self.rom_path = String::from(path_res);
+        self.rom_path = String::from(rom_path);
+        self.ram_path = ram_path;
     }
 
     pub fn reset(&mut self) {
@@ -305,6 +326,10 @@ impl Emulator {
             .create_texture_streaming(PixelFormatEnum::RGB24, width as u32, height as u32)
             .unwrap();
 
+        // calculates the rate as visual cycles that will take from
+        // the current visual frequency to re-save the battery backed RAM
+        let store_count = (self.visual_frequency * STORE_RATE as f32).round() as u32;
+
         // starts the variable that will control the number of cycles that
         // are going to move (because of overflow) from one tick to another
         let mut pending_cycles = 0u32;
@@ -319,6 +344,14 @@ impl Emulator {
             // increments the counter that will keep track
             // on the number of visual ticks since beginning
             counter = counter.wrapping_add(1);
+
+            // in case the current counter is a multiple of the store rate
+            // then we've reached the time to re-save the battery backed RAM
+            // into a *.sav file in the file system
+            if counter % store_count == 0 && self.system.rom().has_battery() {
+                let ram_data = self.system.rom().ram_data();
+                write_file(&self.ram_path, ram_data);
+            }
 
             // obtains an event from the SDL sub-system to be
             // processed under the current emulation context
@@ -390,11 +423,12 @@ impl Emulator {
 
             if current_time >= self.next_tick_time_i {
                 // re-starts the counter cycles with the number of pending cycles
-                // from the previous tick and the last frame with a dummy value
-                // meant to be overridden in case there's at least one new frame
+                // from the previous tick and the last frame with the system PPU
+                // frame index to be overridden in case there's at least one new frame
                 // being drawn in the current tick
                 let mut counter_cycles = pending_cycles;
-                let mut last_frame = 0xffffu16;
+                let mut last_frame = self.system.ppu_frame();
+                let mut frame_dirty = false;
 
                 // calculates the number of cycles that are meant to be the target
                 // for the current "tick" operation this is basically the current
@@ -417,11 +451,9 @@ impl Emulator {
                     // and any other frequency based component of the system
                     counter_cycles += self.system.clock() as u32;
 
-                    // in case a V-Blank state has been reached a new frame is available
+                    // in case a new frame is available from the emulator
                     // then the frame must be pushed into SDL for display
-                    if self.system.ppu_mode() == PpuMode::VBlank
-                        && self.system.ppu_frame() != last_frame
-                    {
+                    if self.system.ppu_frame() != last_frame {
                         // obtains the frame buffer of the Game Boy PPU and uses it
                         // to update the stream texture, that will latter be copied
                         // to the canvas
@@ -431,6 +463,7 @@ impl Emulator {
                         // obtains the index of the current PPU frame, this value
                         // is going to be used to detect for new frame presence
                         last_frame = self.system.ppu_frame();
+                        frame_dirty = true;
                     }
 
                     // in case the audio subsystem is enabled, then the audio buffer
@@ -455,7 +488,7 @@ impl Emulator {
                 // this separation between texture creation and canvas flush prevents
                 // resources from being over-used in situations where multiple frames
                 // are generated during the same tick cycle
-                if last_frame != 0xffffu16 {
+                if frame_dirty {
                     // clears the graphics canvas, making sure that no garbage
                     // pixel data remaining in the pixel buffer, not doing this would
                     // create visual glitches in OSs like Mac OS X
@@ -662,6 +695,13 @@ struct Args {
     #[arg(short, long, default_value_t = String::from("printer"), help = "Serial device to be used")]
     device: String,
 
+    #[arg(
+        long,
+        default_value_t = false,
+        help = "If set no boot ROM will be loaded"
+    )]
+    no_boot: bool,
+
     #[arg(long, default_value_t = false, help = "If set no PPU will be used")]
     no_ppu: bool,
 
@@ -740,7 +780,7 @@ fn main() {
     // parses the provided command line arguments and uses them to
     // obtain structured values
     let args = Args::parse();
-    let mode: GameBoyMode = if args.mode == "auto" {
+    let mode = if args.mode == "auto" {
         GameBoyMode::Dmg
     } else {
         GameBoyMode::from_string(&args.mode)
@@ -760,7 +800,7 @@ fn main() {
     game_boy.set_dma_enabled(!args.no_dma);
     game_boy.set_timer_enabled(!args.no_timer);
     game_boy.attach_serial(device);
-    game_boy.load(true);
+    game_boy.load(!args.no_boot);
 
     // prints the current version of the emulator (informational message)
     println!("========= Boytacean =========\n{}", game_boy);
