@@ -36,9 +36,6 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
-            target/debug/libboytacean.so
-            target/release/libboytacean.so
-            target/debug/boytacean-sdl
             target/release/boytacean-sdl
-            target/debug/libboytacean-libretro.so
-            target/release/libboytacean-libretro.so
+            target/release/libboytacean.so
+            target/release/libboytacean_libretro.so

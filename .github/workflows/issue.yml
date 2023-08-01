@@ -2,7 +2,7 @@ name: Issue Assignment
 on:
   issues:
     types: [opened]
-jobs: 
+jobs:
   auto-assign:
     name: Auto Assign
     runs-on: ubuntu-latest
