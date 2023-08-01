@@ -1,4 +1,5 @@
 name: Deploy Workflow
+on: [push]
 #on:
 #  push:
 #    tags:
