@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * Improved command line parsing with positional ROM path value
 * Better CI/CD for releases
+* Hidden test panel in Web UI
 
 ### Fixed
 
