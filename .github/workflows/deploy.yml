@@ -6,7 +6,7 @@ on: [push]
 #      - "*"
 jobs:
   build-linux:
-    name: Build Release
+    name: Build Linux
     timeout-minutes: 30
     runs-on: ubuntu-latest
     container: rust:1.71.0
