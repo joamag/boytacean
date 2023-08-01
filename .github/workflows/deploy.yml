@@ -134,7 +134,7 @@ jobs:
         run: |
           apt-get update && apt-get install -y -q zip
           cd frontends/web
-          zip -r boytacean-wasm.zip dist/*
+          zip -r -j boytacean-wasm.zip dist/*
       - name: Upload artifacts
         uses: actions/upload-artifact@v3
         with:
