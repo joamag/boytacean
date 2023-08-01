@@ -36,7 +36,7 @@ impl GameGenie {
     }
 
     pub fn add_code(&mut self, code: &str) -> Result<&GameGenieCode, String> {
-        let genie_code = match GameGenieCode::from_code(code) {
+        let genie_code = match GameGenieCode::from_code(code, None) {
             Ok(genie_code) => genie_code,
             Err(e) => return Err(e),
         };
@@ -58,24 +58,53 @@ pub struct GameGenieCode {
     addr: u16,
     new_data: u8,
     old_data: u8,
+
+    /// A boolean value indicating whether the provided cheat code
+    /// was additive or not. If the code is additive, the new data
+    /// will be added to the old data, otherwise the new data will
+    /// replace the old data.
+    additive: bool,
+
+    /// A boolean value indicating whether the provided cheat code
+    /// was condensed (7 characters) or extended (11 characters).
+    condensed: bool,
 }
 
 impl GameGenieCode {
-    pub fn from_code(code: &str) -> Result<Self, String> {
-        if code.len() != 11 {
-            return Err(String::from("Invalid Game Genie code length"));
-        }
+    /// Creates a new Game Genie code structure from the provided string
+    /// in the ABC-DEF-GHI or ABC-DEF format.
+    /// Note that the additive mode (ex: ABC+DEF+GHI) can be optionally
+    /// handled or ignored using the `handle_additive` parameter.
+    pub fn from_code(code: &str, handle_additive: Option<bool>) -> Result<Self, String> {
+        let code_length = code.len();
 
+        if code_length != 11 && code_length != 7 {
+            return Err(format!(
+                "Invalid Game Genie code length: {} digits",
+                code_length
+            ));
+        }
         let code_u = code.to_uppercase();
+
+        let additive = if handle_additive.unwrap_or(false) {
+            code_u.chars().nth(3).unwrap() == '+'
+        } else {
+            false
+        };
+        let condensed = code_length == 7;
 
         let new_data_slice = &code_u[0..=1];
         let new_data = u8::from_str_radix(new_data_slice, 16).unwrap();
 
-        let old_data_slice = format!("{}{}", &code_u[8..=8], &code_u[10..=10]);
-        let old_data: u8 = u8::from_str_radix(old_data_slice.as_str(), 16)
-            .unwrap()
-            .rotate_right(2)
-            ^ 0xba;
+        let old_data = if code_length == 11 {
+            let old_data_slice: String = format!("{}{}", &code_u[8..=8], &code_u[10..=10]);
+            u8::from_str_radix(old_data_slice.as_str(), 16)
+                .unwrap()
+                .rotate_right(2)
+                ^ 0xba
+        } else {
+            0x00
+        };
 
         let addr_slice = format!("{}{}{}", &code_u[6..=6], &code_u[2..=2], &code_u[4..=5]);
         let addr = u16::from_str_radix(addr_slice.as_str(), 16).unwrap() ^ 0xf000;
@@ -85,11 +114,28 @@ impl GameGenieCode {
             addr,
             new_data,
             old_data,
+            additive,
+            condensed,
         })
     }
 
+    /// Tests whether the provided value is valid for the current
+    /// Game Genie code. A value is valid if it matches the old
+    /// data or if the code is condensed.
     pub fn is_valid(&self, value: u8) -> bool {
-        self.old_data == value
+        self.condensed || self.old_data == value
+    }
+
+    /// Patches the provided value with the new data according to
+    /// the Game Genie code. If the code is additive, the new data
+    /// is added to the current value otherwise the new data is
+    /// returned (simple and normal patching operation).
+    pub fn patch_data(&self, value: u8) -> u8 {
+        if self.additive() {
+            value.saturating_add(self.new_data())
+        } else {
+            self.new_data()
+        }
     }
 
     pub fn code(&self) -> &str {
@@ -124,6 +170,14 @@ impl GameGenieCode {
         self.old_data = old_data;
     }
 
+    pub fn additive(&self) -> bool {
+        self.additive
+    }
+
+    pub fn set_additive(&mut self, additive: bool) {
+        self.additive = additive;
+    }
+
     pub fn short_description(&self) -> String {
         self.code.to_string()
     }
@@ -148,12 +202,34 @@ mod tests {
 
     #[test]
     fn test_from_code() {
-        let code = "00A-17B-C49";
-        let game_genie_code = GameGenieCode::from_code(code).unwrap();
-
+        let mut game_genie_code = GameGenieCode::from_code("00A-17B-C49").unwrap();
         assert_eq!(game_genie_code.code, "00A-17B-C49");
         assert_eq!(game_genie_code.addr, 0x4a17);
         assert_eq!(game_genie_code.new_data, 0x00);
         assert_eq!(game_genie_code.old_data, 0xc8);
+        assert_eq!(game_genie_code.additive, false);
+        assert_eq!(game_genie_code.condensed, false);
+        assert_eq!(game_genie_code.is_valid(0xc8), true);
+        assert_eq!(game_genie_code.is_valid(0xc9), false);
+
+        game_genie_code = GameGenieCode::from_code("00A+17B+C49").unwrap();
+        assert_eq!(game_genie_code.code, "00A+17B+C49");
+        assert_eq!(game_genie_code.addr, 0x4a17);
+        assert_eq!(game_genie_code.new_data, 0x00);
+        assert_eq!(game_genie_code.old_data, 0xc8);
+        assert_eq!(game_genie_code.additive, true);
+        assert_eq!(game_genie_code.condensed, false);
+        assert_eq!(game_genie_code.is_valid(0xc8), true);
+        assert_eq!(game_genie_code.is_valid(0xc9), false);
+
+        game_genie_code = GameGenieCode::from_code("00A+17B").unwrap();
+        assert_eq!(game_genie_code.code, "00A+17B");
+        assert_eq!(game_genie_code.addr, 0x4a17);
+        assert_eq!(game_genie_code.new_data, 0x00);
+        assert_eq!(game_genie_code.old_data, 0x00);
+        assert_eq!(game_genie_code.additive, true);
+        assert_eq!(game_genie_code.condensed, true);
+        assert_eq!(game_genie_code.is_valid(0xc8), true);
+        assert_eq!(game_genie_code.is_valid(0xc9), true);
     }
 }

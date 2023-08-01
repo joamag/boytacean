@@ -903,13 +903,17 @@ pub static GAME_GENIE: Mbc = Mbc {
             // registered for the same memory address
             let genie_code = game_genie.get_addr(addr);
 
+            // obtains the current byte that is stored at the address using
+            // the MBC, this value will probably be patched
+            let data = (rom.mbc.read_rom)(rom, addr);
+
             // checks if the current data at the address is the same as the
             // one that is expected by the Game Genie code, if that's the case
             // applies the patch, otherwise returns the original strategy is
             // going to be used
-            if genie_code.is_valid((rom.mbc.read_rom)(rom, addr)) {
+            if genie_code.is_valid(data) {
                 debugln!("Applying Game Genie code: {}", genie_code);
-                return genie_code.new_data();
+                return genie_code.patch_data(data);
             }
         }
         (rom.mbc.read_rom)(rom, addr)

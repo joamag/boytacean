@@ -237,8 +237,9 @@ impl Emulator {
         self.ram_path = ram_path;
 
         // @TODO: hardcoded adding of game genie codes
-        self.system.add_game_genie_code("00A-17B-C49").unwrap();
-        self.system.add_game_genie_code("008-60A-E6E").unwrap();
+        self.system.add_cheat_code("00A-17B-C49");
+        self.system.add_cheat_code("008-60A-E6E");
+        self.system.add_cheat_code("99D-49C-E62");
     }
 
     pub fn reset(&mut self) {
