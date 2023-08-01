@@ -33,7 +33,6 @@ jobs:
         run: |
           cd target/release
           mv boytacean-sdl boytacean-sdl-linux-x64
-          mv libboytacean.so libboytacean.so
           mv libboytacean_libretro.so boytacean_libretro.so
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
