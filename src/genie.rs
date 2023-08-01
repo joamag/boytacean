@@ -38,7 +38,7 @@ impl GameGenie {
     pub fn add_code(&mut self, code: &str) -> Result<&GameGenieCode, String> {
         let genie_code = match GameGenieCode::from_code(code, None) {
             Ok(genie_code) => genie_code,
-            Err(e) => return Err(e),
+            Err(message) => return Err(message),
         };
         let addr = genie_code.addr;
         self.codes.insert(addr, genie_code);
@@ -202,7 +202,7 @@ mod tests {
 
     #[test]
     fn test_from_code() {
-        let mut game_genie_code = GameGenieCode::from_code("00A-17B-C49").unwrap();
+        let mut game_genie_code = GameGenieCode::from_code("00A-17B-C49", None).unwrap();
         assert_eq!(game_genie_code.code, "00A-17B-C49");
         assert_eq!(game_genie_code.addr, 0x4a17);
         assert_eq!(game_genie_code.new_data, 0x00);
@@ -211,8 +211,20 @@ mod tests {
         assert_eq!(game_genie_code.condensed, false);
         assert_eq!(game_genie_code.is_valid(0xc8), true);
         assert_eq!(game_genie_code.is_valid(0xc9), false);
+        assert_eq!(game_genie_code.patch_data(0x12), 0x00);
 
-        game_genie_code = GameGenieCode::from_code("00A+17B+C49").unwrap();
+        game_genie_code = GameGenieCode::from_code("00A+17B+C49", None).unwrap();
+        assert_eq!(game_genie_code.code, "00A+17B+C49");
+        assert_eq!(game_genie_code.addr, 0x4a17);
+        assert_eq!(game_genie_code.new_data, 0x00);
+        assert_eq!(game_genie_code.old_data, 0xc8);
+        assert_eq!(game_genie_code.additive, false);
+        assert_eq!(game_genie_code.condensed, false);
+        assert_eq!(game_genie_code.is_valid(0xc8), true);
+        assert_eq!(game_genie_code.is_valid(0xc9), false);
+        assert_eq!(game_genie_code.patch_data(0x12), 0x00);
+
+        game_genie_code = GameGenieCode::from_code("00A+17B+C49", Some(true)).unwrap();
         assert_eq!(game_genie_code.code, "00A+17B+C49");
         assert_eq!(game_genie_code.addr, 0x4a17);
         assert_eq!(game_genie_code.new_data, 0x00);
@@ -221,8 +233,20 @@ mod tests {
         assert_eq!(game_genie_code.condensed, false);
         assert_eq!(game_genie_code.is_valid(0xc8), true);
         assert_eq!(game_genie_code.is_valid(0xc9), false);
+        assert_eq!(game_genie_code.patch_data(0x12), 0x12);
 
-        game_genie_code = GameGenieCode::from_code("00A+17B").unwrap();
+        game_genie_code = GameGenieCode::from_code("00A+17B", None).unwrap();
+        assert_eq!(game_genie_code.code, "00A+17B");
+        assert_eq!(game_genie_code.addr, 0x4a17);
+        assert_eq!(game_genie_code.new_data, 0x00);
+        assert_eq!(game_genie_code.old_data, 0x00);
+        assert_eq!(game_genie_code.additive, false);
+        assert_eq!(game_genie_code.condensed, true);
+        assert_eq!(game_genie_code.is_valid(0xc8), true);
+        assert_eq!(game_genie_code.is_valid(0xc9), true);
+        assert_eq!(game_genie_code.patch_data(0x12), 0x00);
+
+        game_genie_code = GameGenieCode::from_code("00A+17B", Some(true)).unwrap();
         assert_eq!(game_genie_code.code, "00A+17B");
         assert_eq!(game_genie_code.addr, 0x4a17);
         assert_eq!(game_genie_code.new_data, 0x00);
@@ -231,5 +255,6 @@ mod tests {
         assert_eq!(game_genie_code.condensed, true);
         assert_eq!(game_genie_code.is_valid(0xc8), true);
         assert_eq!(game_genie_code.is_valid(0xc9), true);
+        assert_eq!(game_genie_code.patch_data(0x12), 0x012);
     }
 }

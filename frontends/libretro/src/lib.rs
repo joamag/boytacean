@@ -374,7 +374,7 @@ pub extern "C" fn retro_cheat_set(_index: c_uint, enabled: bool, code: *const c_
     let emulator = unsafe { EMULATOR.as_mut().unwrap() };
     let code_c = unsafe { CStr::from_ptr(code) };
     let code_s = code_c.to_string_lossy().into_owned();
-    emulator.add_cheat_code(&code_s)
+    emulator.add_cheat_code(&code_s).unwrap();
 }
 
 #[no_mangle]

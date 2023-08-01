@@ -1034,8 +1034,11 @@ impl GameBoy {
         self.reset_game_genie();
     }
 
-    pub fn add_cheat_code(&mut self, code: &str) {
-        self.add_game_genie_code(code).unwrap();
+    pub fn add_cheat_code(&mut self, code: &str) -> Result<bool, String> {
+        match self.add_game_genie_code(code) {
+            Ok(_) => Ok(true),
+            Err(message) => Err(message),
+        }
     }
 
     pub fn reset_game_genie(&mut self) {
