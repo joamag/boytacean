@@ -62,8 +62,7 @@ jobs:
       - name: Build SDL
         run: |
           cd frontends/sdl
-          apt-get update && apt-get install -y -q zip
-          cargo install cargo-vcpkg && cargo vcpkg -v build
+          cargo install cargo-vcpkg
           cargo build
           cargo build --release
       - name: Build Libretro
