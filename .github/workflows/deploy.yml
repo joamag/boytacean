@@ -1,12 +1,12 @@
 name: Deploy Workflow
-on:
-  push:
-    tags:
-      - "*"
+#on:
+#  push:
+#    tags:
+#      - "*"
 jobs:
-  build-release:
+  build-linux:
     name: Build Release
-    timeout-minutes: 10
+    timeout-minutes: 30
     strategy:
       matrix:
         rust-version: ["1.71.0"]
@@ -31,11 +31,79 @@ jobs:
           cd frontends/libretro
           cargo build
           cargo build --release
-      - name: Create Release
+      - name: Transform filenames
+        run: |
+          cd target/release
+          mv boytacean-sdl boytacean-sdl-linux-x64
+          mv libboytacean.so libboytacean.so
+          mv libboytacean_libretro.so boytacean_libretro.so
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: boytacean-win32
+          path: |
+            target/release/boytacean-sdl-linux-x64
+            target/release/libboytacean.so
+            target/release/boytacean_libretro.so
+          retention-days: 5
+  build-windows:
+    name: Build Windows
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        rust-version: ["1.71.0"]
+    runs-on: windows-latest
+    container: rust:${{ matrix.rust-version }}
+    steps:
+      - name: Checkout code from repository
+        uses: actions/checkout@v3
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - name: Build Base
+        run: |
+          cargo build
+          cargo build --release
+      - name: Build SDL
+        run: |
+          cd frontends/sdl
+          apt-get update && apt-get install -y -q zip
+          cargo install cargo-vcpkg && cargo vcpkg -v build
+          cargo build
+          cargo build --release
+      - name: Build Libretro
+        run: |
+          cd frontends/libretro
+          cargo build
+          cargo build --release
+      - name: Transform Filenames
+        run: |
+          cd target/release
+          mv boytacean-sdl.exe boytacean-sdl-win32-x64.exe
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: boytacean-win32
+          path: |
+            target/release/boytacean-sdl-win32-x64.exe
+            target/release/boytacean.dll
+            target/release/boytacean_libretro.dll
+          retention-days: 5
+  release:
+    name: Release
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+      - name: Create release
         uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
-            target/release/boytacean-sdl
-            target/release/libboytacean.so
-            target/release/libboytacean_libretro.so
+            boytacean-sdl-linux-x64
+            boytacean-sdl-win32-x64.exe
+            libboytacean.so
+            boytacean.dll
+            boytacean_libretro.so
+            boytacean_libretro.dll
