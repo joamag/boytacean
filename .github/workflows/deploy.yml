@@ -77,6 +77,43 @@ jobs:
             target/release/boytacean.dll
             target/release/boytacean_libretro.dll
           retention-days: 5
+  build-mac:
+    name: Build Mac
+    timeout-minutes: 30
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code from repository
+        uses: actions/checkout@v3
+      - name: Setup Rust
+        run: |
+          rustup install 1.71.0
+          rustup override set 1.71.0
+      - name: Build Base
+        run: |
+          cargo build --release
+      - name: Build SDL
+        run: |
+          cd frontends/sdl
+          cargo install cargo-vcpkg && cargo vcpkg -v build
+          cargo build --release
+      - name: Build Libretro
+        run: |
+          cd frontends/libretro
+          cargo build --release
+      - name: Transform Filenames
+        run: |
+          cd target/release
+          mv boytacean-sdl boytacean-sdl-mac-x64
+          mv libboytacean_libretro.dylib boytacean_libretro.dylib
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: boytacean-mac
+          path: |
+            target/release/boytacean-sdl-mac-x64
+            target/release/libboytacean.dylib
+            target/release/boytacean_libretro.dylib
+          retention-days: 5
   release:
     name: Release
     needs: [build-linux, build-windows]
