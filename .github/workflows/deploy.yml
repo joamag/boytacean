@@ -15,19 +15,16 @@ jobs:
         uses: actions/checkout@v3
       - name: Build Base
         run: |
-          cargo build
           cargo build --release
       - name: Build SDL
         run: |
           cd frontends/sdl
           apt-get update && apt-get install -y -q zip
           cargo install cargo-vcpkg && cargo vcpkg -v build
-          cargo build
           cargo build --release
       - name: Build Libretro
         run: |
           cd frontends/libretro
-          cargo build
           cargo build --release
       - name: Transform filenames
         run: |
@@ -57,18 +54,15 @@ jobs:
           rustup default stable-msvc
       - name: Build Base
         run: |
-          cargo build
           cargo build --release
       - name: Build SDL
         run: |
           cd frontends/sdl
           cargo install cargo-vcpkg && cargo vcpkg -v build
-          cargo build
           cargo build --release
       - name: Build Libretro
         run: |
           cd frontends/libretro
-          cargo build
           cargo build --release
       - name: Transform Filenames
         run: |
