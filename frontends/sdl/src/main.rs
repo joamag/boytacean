@@ -756,7 +756,7 @@ struct Args {
     )]
     cycles: u64,
 
-    #[arg(short, long, default_value_t = String::from(DEFAULT_ROM_PATH), help = "Path to the ROM file to be loaded")]
+    #[arg(default_value_t = String::from(DEFAULT_ROM_PATH), help = "Path to the ROM file to be loaded")]
     rom_path: String,
 }
 
