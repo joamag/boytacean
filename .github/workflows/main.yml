@@ -168,6 +168,8 @@ jobs:
         run: rustc --version
       - name: Verify Rust code format
         run: cd frontends/libretro && cargo fmt --all -- --check
+      - name: Verify Rust code linting
+        run: cd frontends/libretro && cargo clippy -- -D warnings -A unknown-lints
       - name: Run unit tests
         run: cd frontends/libretro && cargo test
       - name: Build development version
