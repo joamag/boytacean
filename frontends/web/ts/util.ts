@@ -4,7 +4,7 @@
  * @param buffer The array of bytes to encode.
  * @returns The resulting base64 string.
  */
-export const bufferToBase64 = (buffer: Uint8Array) => {
+export const bufferToBase64 = (buffer: Uint8Array): string => {
     const data = Array(buffer.length)
         .fill(null)
         .map((_, i) => String.fromCharCode(buffer[i]))
@@ -19,7 +19,7 @@ export const bufferToBase64 = (buffer: Uint8Array) => {
  * @param base64 The base64 string to decode.
  * @returns The resulting array of bytes.
  */
-export const base64ToBuffer = (base64: string) => {
+export const base64ToBuffer = (base64: string): Uint8Array => {
     const data = atob(base64);
     const array = Array(data.length)
         .fill(null)
@@ -36,7 +36,7 @@ export const base64ToBuffer = (base64: string) => {
  * @param width The width of the image in the buffer.
  * @returns The resulting image data object.
  */
-export const bufferToImageData = (buffer: Uint8Array, width: number) => {
+export const bufferToImageData = (buffer: Uint8Array, width: number): ImageData => {
     const clampedBuffer = new Uint8ClampedArray(buffer.length);
 
     for (let index = 0; index < clampedBuffer.length; index += 4) {
@@ -57,7 +57,7 @@ export const bufferToImageData = (buffer: Uint8Array, width: number) => {
  * @param width The width of the image in the buffer.
  * @returns The resulting data URL.
  */
-export const bufferToDataUrl = (buffer: Uint8Array, width: number) => {
+export const bufferToDataUrl = (buffer: Uint8Array, width: number): string => {
     const imageData = bufferToImageData(buffer, width);
 
     const canvas = document.createElement("canvas");
