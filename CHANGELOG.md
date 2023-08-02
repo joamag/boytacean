@@ -19,6 +19,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 *
 
+## [0.9.13] - 2023-08-01
+
+### Changed
+
+* Improved command line parsing with positional ROM path value
+* Better CI/CD for releases
+* Hidden test panel in Web UI
+
+### Fixed
+
+* Small issue with command line arguments
+
+## [0.9.12] - 2023-08-01
+
+### Added
+
+* New WASM build
+
+## [0.9.11] - 2023-08-01
+
+### Fixed
+
+* Build of a new release
+
+## [0.9.10] - 2023-08-01
+
+### Fixed
+
+* Issue with release life-cycle
+
+## [0.9.9] - 2023-08-01
+
+### Fixed
+
+* Issue with release life-cycle
+
+## [0.9.8] - 2023-08-01
+
+### Added
+
+* Better release life-cycle
+
+## [0.9.7] - 2023-08-01
+
+### Added
+
+* Support for [Libretro](https://www.libretro.com/) core - [#14](https://gitlab.stage.hive.pt/joamag/boytacean/-/issues/14)
+
 ## [0.9.6] - 2023-06-20
 
 ### Added

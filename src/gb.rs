@@ -12,9 +12,13 @@ use crate::{
     devices::{printer::PrinterDevice, stdout::StdoutDevice},
     dma::Dma,
     gen::{COMPILATION_DATE, COMPILATION_TIME, COMPILER, COMPILER_VERSION, VERSION},
+    genie::{GameGenie, GameGenieCode},
     mmu::Mmu,
     pad::{Pad, PadKey},
-    ppu::{Ppu, PpuMode, Tile, DISPLAY_HEIGHT, DISPLAY_WIDTH, FRAME_BUFFER_SIZE},
+    ppu::{
+        Ppu, PpuMode, Tile, DISPLAY_HEIGHT, DISPLAY_WIDTH, FRAME_BUFFER_RGB155_SIZE,
+        FRAME_BUFFER_SIZE,
+    },
     rom::{Cartridge, RamSize},
     serial::{NullDevice, Serial, SerialDevice},
     timer::Timer,
@@ -401,6 +405,14 @@ impl GameBoy {
         self.serial().reset();
         self.mmu().reset();
         self.cpu.reset();
+        self.reset_cheats();
+    }
+
+    pub fn reload(&mut self) {
+        let rom = self.rom().clone();
+        self.reset();
+        self.load(true);
+        self.load_cartridge(rom);
     }
 
     pub fn clock(&mut self) -> u16 {
@@ -535,6 +547,7 @@ impl GameBoy {
             BootRom::DmgBootix => self.load_boot(&DMG_BOOTIX),
             BootRom::MgbBootix => self.load_boot(&MGB_BOOTIX),
             BootRom::Cgb => self.load_boot(&CGB_BOOT),
+            BootRom::None => (),
         }
     }
 
@@ -600,36 +613,44 @@ impl GameBoy {
         self.apu_i().ch4_output()
     }
 
-    pub fn audio_ch1_enabled(&mut self) -> bool {
-        self.apu().ch2_enabled()
+    pub fn audio_ch1_enabled(&self) -> bool {
+        self.apu_i().ch2_out_enabled()
     }
 
     pub fn set_audio_ch1_enabled(&mut self, enabled: bool) {
-        self.apu().set_ch1_enabled(enabled)
+        self.apu().set_ch1_out_enabled(enabled)
     }
 
-    pub fn audio_ch2_enabled(&mut self) -> bool {
-        self.apu().ch2_enabled()
+    pub fn audio_ch2_enabled(&self) -> bool {
+        self.apu_i().ch2_out_enabled()
     }
 
     pub fn set_audio_ch2_enabled(&mut self, enabled: bool) {
-        self.apu().set_ch2_enabled(enabled)
+        self.apu().set_ch2_out_enabled(enabled)
     }
 
-    pub fn audio_ch3_enabled(&mut self) -> bool {
-        self.apu().ch3_enabled()
+    pub fn audio_ch3_enabled(&self) -> bool {
+        self.apu_i().ch3_out_enabled()
     }
 
     pub fn set_audio_ch3_enabled(&mut self, enabled: bool) {
-        self.apu().set_ch3_enabled(enabled)
+        self.apu().set_ch3_out_enabled(enabled)
     }
 
-    pub fn audio_ch4_enabled(&mut self) -> bool {
-        self.apu().ch4_enabled()
+    pub fn audio_ch4_enabled(&self) -> bool {
+        self.apu_i().ch4_out_enabled()
     }
 
     pub fn set_audio_ch4_enabled(&mut self, enabled: bool) {
-        self.apu().set_ch4_enabled(enabled)
+        self.apu().set_ch4_out_enabled(enabled)
+    }
+
+    pub fn audio_sampling_rate(&self) -> u16 {
+        self.apu_i().sampling_rate()
+    }
+
+    pub fn audio_channels(&self) -> u8 {
+        self.apu_i().channels()
     }
 
     pub fn cartridge_eager(&mut self) -> Cartridge {
@@ -641,7 +662,7 @@ impl GameBoy {
     }
 
     pub fn set_ram_data(&mut self, ram_data: Vec<u8>) {
-        self.mmu().rom().set_ram_data(ram_data)
+        self.mmu().rom().set_ram_data(&ram_data)
     }
 
     pub fn registers(&mut self) -> Registers {
@@ -941,6 +962,10 @@ impl GameBoy {
         &(self.ppu().frame_buffer)
     }
 
+    pub fn frame_buffer_rgb1555(&mut self) -> [u8; FRAME_BUFFER_RGB155_SIZE] {
+        self.ppu().frame_buffer_rgb1555()
+    }
+
     pub fn audio_buffer(&mut self) -> &VecDeque<u8> {
         self.apu().audio_buffer()
     }
@@ -957,6 +982,7 @@ impl GameBoy {
             BootRom::DmgBootix => self.load_boot_path("./res/boot/dmg_bootix.bin"),
             BootRom::MgbBootix => self.load_boot_path("./res/boot/mgb_bootix.bin"),
             BootRom::Cgb => self.load_boot_path("./res/boot/cgb_boot.bin"),
+            BootRom::None => (),
         }
     }
 
@@ -972,15 +998,28 @@ impl GameBoy {
         self.load_boot_file(BootRom::Cgb);
     }
 
-    pub fn load_rom(&mut self, data: &[u8]) -> &mut Cartridge {
-        let rom = Cartridge::from_data(data);
+    pub fn load_cartridge(&mut self, rom: Cartridge) -> &mut Cartridge {
         self.mmu().set_rom(rom);
         self.mmu().rom()
     }
 
-    pub fn load_rom_file(&mut self, path: &str) -> &mut Cartridge {
+    pub fn load_rom(&mut self, data: &[u8], ram_data: Option<&[u8]>) -> &mut Cartridge {
+        let mut rom = Cartridge::from_data(data);
+        if let Some(ram_data) = ram_data {
+            rom.set_ram_data(ram_data)
+        }
+        self.load_cartridge(rom)
+    }
+
+    pub fn load_rom_file(&mut self, path: &str, ram_path: Option<&str>) -> &mut Cartridge {
         let data = read_file(path);
-        self.load_rom(&data)
+        match ram_path {
+            Some(ram_path) => {
+                let ram_data = read_file(ram_path);
+                self.load_rom(&data, Some(&ram_data))
+            }
+            None => self.load_rom(&data, None),
+        }
     }
 
     pub fn attach_serial(&mut self, device: Box<dyn SerialDevice>) {
@@ -989,6 +1028,34 @@ impl GameBoy {
 
     pub fn set_speed_callback(&mut self, callback: fn(speed: GameBoySpeed)) {
         self.mmu().set_speed_callback(callback);
+    }
+
+    pub fn reset_cheats(&mut self) {
+        self.reset_game_genie();
+    }
+
+    pub fn add_cheat_code(&mut self, code: &str) -> Result<bool, String> {
+        match self.add_game_genie_code(code) {
+            Ok(_) => Ok(true),
+            Err(message) => Err(message),
+        }
+    }
+
+    pub fn reset_game_genie(&mut self) {
+        let rom = self.mmu().rom();
+        if rom.game_genie().is_some() {
+            rom.game_genie().clone().unwrap().reset();
+        }
+    }
+
+    pub fn add_game_genie_code(&mut self, code: &str) -> Result<&GameGenieCode, String> {
+        let rom = self.mmu().rom();
+        if rom.game_genie().is_none() {
+            let game_genie = GameGenie::default();
+            rom.attach_genie(game_genie);
+        }
+        let game_genie = rom.game_genie_mut().as_mut().unwrap();
+        game_genie.add_code(code)
     }
 }
 
@@ -1004,7 +1071,7 @@ impl GameBoy {
     }
 
     pub fn load_rom_ws(&mut self, data: &[u8]) -> Cartridge {
-        let rom = self.load_rom(data);
+        let rom = self.load_rom(data, None);
         rom.set_rumble_cb(|active| {
             rumble_callback(active);
         });

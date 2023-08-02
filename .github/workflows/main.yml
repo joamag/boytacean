@@ -20,6 +20,8 @@ jobs:
           "1.67.0",
           "1.68.0",
           "1.69.0",
+          "1.70.0",
+          "1.71.0",
           "latest"
         ]
     runs-on: ubuntu-latest
@@ -49,11 +51,11 @@ jobs:
     strategy:
       matrix:
         rust-version: [
-          "1.65.0",
-          "1.66.0",
           "1.67.0",
           "1.68.0",
           "1.69.0",
+          "1.70.0",
+          "1.71.0",
           "latest"
         ]
         node-version: ["16"]
@@ -96,6 +98,8 @@ jobs:
           "1.67.0",
           "1.68.0",
           "1.69.0",
+          "1.70.0",
+          "1.71.0",
           "latest"
         ]
     runs-on: ubuntu-latest
@@ -131,3 +135,40 @@ jobs:
         run: cd frontends/sdl && cargo run --release -- --benchmark
       - name: Run benchmark, only for CPU
         run: cd frontends/sdl && cargo run --release -- --benchmark --benchmark-cpu
+  build-libretro:
+    name: Build Libretro
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        rust-version: [
+          "1.64.0",
+          "1.65.0",
+          "1.66.0",
+          "1.71.0",
+          "latest"
+        ]
+    runs-on: ubuntu-latest
+    container: rust:${{ matrix.rust-version }}
+    steps:
+      - name: Checkout code from repository
+        uses: actions/checkout@v3
+      - name: Install Dependencies
+        run: |
+          apt-get update
+          apt-get install -y -q zip
+      - name: Install Rust components
+        run: |
+          rustup component add rustfmt
+          rustup component add clippy
+      - name: Print Rust information
+        run: rustc --version
+      - name: Verify Rust code format
+        run: cd frontends/libretro && cargo fmt --all -- --check
+      - name: Verify Rust code linting
+        run: cd frontends/libretro && cargo clippy -- -D warnings -A unknown-lints
+      - name: Run unit tests
+        run: cd frontends/libretro && cargo test
+      - name: Build development version
+        run: cd frontends/libretro && cargo build
+      - name: Build release version
+        run: cd frontends/libretro && cargo build --release

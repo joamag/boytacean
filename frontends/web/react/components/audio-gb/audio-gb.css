@@ -24,6 +24,11 @@
 
 .audio-gb > .section > .audio-wave.disabled {
     opacity: 0.6;
+    -o-opacity: 0.6;
+    -ms-opacity: 0.6;
+    -moz-opacity: 0.6;
+    -khtml-opacity: 0.6;
+    -webkit-opacity: 0.6;
 }
 
 .audio-gb > .section > .audio-wave > h4 {

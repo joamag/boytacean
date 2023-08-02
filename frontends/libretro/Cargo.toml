@@ -1,0 +1,20 @@
+[package]
+name = "boytacean-libretro"
+version = "0.9.13"
+authors = ["João Magalhães <joamag@gmail.com>"]
+description = "A Lib Retro frontend for Boytacen"
+license = "Apache-2.0"
+keywords = ["gameboy", "emulator", "rust", "libretro"]
+edition = "2018"
+readme = "README.md"
+
+[lib]
+crate-type = ["cdylib"]
+
+[features]
+debug = ["boytacean/debug"]
+pedantic = ["boytacean/pedantic"]
+cpulog = ["boytacean/cpulog"]
+
+[dependencies.boytacean]
+path = "../.."

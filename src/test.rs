@@ -30,7 +30,7 @@ pub fn run_test(rom_path: &str, max_cycles: Option<u64>, options: TestOptions) -
     let max_cycles = max_cycles.unwrap_or(u64::MAX);
 
     let mut game_boy = build_test(options);
-    game_boy.load_rom_file(rom_path);
+    game_boy.load_rom_file(rom_path, None);
 
     loop {
         cycles += game_boy.clock() as u64;
@@ -68,5 +68,15 @@ mod tests {
             TestOptions::default(),
         );
         assert_eq!(result, "cpu_instrs\n\n01:ok  02:ok  03:ok  04:ok  05:ok  06:ok  07:ok  08:ok  09:ok  10:ok  11:ok  \n\nPassed all tests\n");
+    }
+
+    #[test]
+    fn test_blargg_instr_timing() {
+        let result = run_serial_test(
+            "res/roms/test/blargg/instr_timing/instr_timing.gb",
+            Some(50000000),
+            TestOptions::default(),
+        );
+        assert_eq!(result, "instr_timing\n\n\nPassed\n");
     }
 }
