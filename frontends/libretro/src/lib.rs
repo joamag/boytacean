@@ -371,6 +371,8 @@ pub extern "C" fn retro_cheat_reset() {
 #[no_mangle]
 pub unsafe extern "C" fn retro_cheat_set(_index: c_uint, enabled: bool, code: *const c_char) {
     debugln!("retro_cheat_set()");
+    // we'll just ignore cheats that are not enabled, Boytacean
+    // does not support pre-loading cheats
     if !enabled {
         return;
     }
