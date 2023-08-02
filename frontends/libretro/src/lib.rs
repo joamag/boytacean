@@ -2,14 +2,6 @@
 
 pub mod consts;
 
-use std::{
-    collections::HashMap,
-    ffi::CStr,
-    fmt::{self, Display, Formatter},
-    os::raw::{c_char, c_float, c_uint, c_void},
-    slice::from_raw_parts,
-};
-
 use boytacean::{
     debugln,
     gb::{AudioProvider, GameBoy},
@@ -24,6 +16,13 @@ use consts::{
     RETRO_DEVICE_ID_JOYPAD_R3, RETRO_DEVICE_ID_JOYPAD_RIGHT, RETRO_DEVICE_ID_JOYPAD_SELECT,
     RETRO_DEVICE_ID_JOYPAD_START, RETRO_DEVICE_ID_JOYPAD_UP, RETRO_DEVICE_ID_JOYPAD_X,
     RETRO_DEVICE_ID_JOYPAD_Y, RETRO_DEVICE_JOYPAD,
+};
+use std::{
+    collections::HashMap,
+    ffi::CStr,
+    fmt::{self, Display, Formatter},
+    os::raw::{c_char, c_float, c_uint, c_void},
+    slice::from_raw_parts,
 };
 
 use crate::consts::{REGION_NTSC, RETRO_API_VERSION};

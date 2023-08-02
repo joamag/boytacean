@@ -119,7 +119,7 @@ impl Default for Dma {
 
 #[cfg(test)]
 mod tests {
-    use crate::dma::{Dma, DmaMode};
+    use super::{Dma, DmaMode};
 
     #[test]
     fn test_dma_default() {

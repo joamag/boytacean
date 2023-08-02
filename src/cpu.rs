@@ -588,7 +588,7 @@ impl Default for Cpu {
 
 #[cfg(test)]
 mod tests {
-    use crate::cpu::Cpu;
+    use super::Cpu;
 
     #[test]
     fn test_cpu_clock() {

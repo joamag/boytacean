@@ -1072,7 +1072,7 @@ impl Default for Apu {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::Apu;
 
     #[test]
     fn test_trigger_ch1() {

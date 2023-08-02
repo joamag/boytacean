@@ -46,7 +46,9 @@ pub fn replace_ext(path: &str, new_extension: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::path::Path;
+
+    use super::replace_ext;
 
     #[test]
     fn test_change_extension() {

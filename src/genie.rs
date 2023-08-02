@@ -198,7 +198,7 @@ impl Display for GameGenieCode {
 
 #[cfg(test)]
 mod tests {
-    use crate::genie::GameGenieCode;
+    use super::GameGenieCode;
 
     #[test]
     fn test_from_code() {
