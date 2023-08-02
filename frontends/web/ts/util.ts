@@ -36,7 +36,10 @@ export const base64ToBuffer = (base64: string): Uint8Array => {
  * @param width The width of the image in the buffer.
  * @returns The resulting image data object.
  */
-export const bufferToImageData = (buffer: Uint8Array, width: number): ImageData => {
+export const bufferToImageData = (
+    buffer: Uint8Array,
+    width: number
+): ImageData => {
     const clampedBuffer = new Uint8ClampedArray(buffer.length);
 
     for (let index = 0; index < clampedBuffer.length; index += 4) {
