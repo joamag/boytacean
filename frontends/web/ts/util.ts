@@ -1,7 +1,7 @@
 /**
- * Encodes a linear buffer into a base64 string.
+ * Encodes an array of bytes into a base64 string.
  *
- * @param buffer The linear buffer to encode.
+ * @param buffer The array of bytes to encode.
  * @returns The resulting base64 string.
  */
 export const bufferToBase64 = (buffer: Uint8Array) => {
@@ -14,10 +14,10 @@ export const bufferToBase64 = (buffer: Uint8Array) => {
 };
 
 /**
- * Converts a base64 string into a linear buffer.
+ * Converts a base64 string into an array of bytes.
  *
  * @param base64 The base64 string to decode.
- * @returns The resulting linear buffer.
+ * @returns The resulting array of bytes.
  */
 export const base64ToBuffer = (base64: string) => {
     const data = atob(base64);
@@ -29,10 +29,10 @@ export const base64ToBuffer = (base64: string) => {
 };
 
 /**
- * Converts a linear buffer into an image data object
+ * Converts an array of bytes into an image data object
  * ready to be used with a canvas context.
  *
- * @param buffer The linear buffer to convert.
+ * @param buffer The array of bytes to convert.
  * @param width The width of the image in the buffer.
  * @returns The resulting image data object.
  */
@@ -50,10 +50,10 @@ export const bufferToImageData = (buffer: Uint8Array, width: number) => {
 };
 
 /**
- * Converts the provided buffer containing an image data into
- * a data URL ready to be used in an <img> tag.
+ * Converts the provided array of bytes containing an image
+ * data into a data URL ready to be used in an <img> tag.
  *
- * @param buffer The buffer containing the image data.
+ * @param buffer The array of bytes containing the image data.
  * @param width The width of the image in the buffer.
  * @returns The resulting data URL.
  */
