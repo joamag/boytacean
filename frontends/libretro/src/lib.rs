@@ -29,7 +29,6 @@ use std::{
 static mut EMULATOR: Option<GameBoy> = None;
 static mut KEY_STATES: Option<HashMap<RetroJoypad, bool>> = None;
 static mut FRAME_BUFFER: [u8; FRAME_BUFFER_RGB565_SIZE] = [0x00; FRAME_BUFFER_RGB565_SIZE];
-static mut AUDIO_BUFFER: Option<Vec<i16>> = None;
 
 static mut PENDING_CYCLES: u32 = 0_u32;
 
@@ -152,10 +151,6 @@ pub extern "C" fn retro_init() {
     unsafe {
         EMULATOR = Some(GameBoy::new(None));
         KEY_STATES = Some(HashMap::new());
-        AUDIO_BUFFER = Some(vec![
-            0x00;
-            EMULATOR.as_ref().unwrap().apu_i().audio_buffer_max()
-        ]);
     }
 }
 
@@ -224,12 +219,10 @@ pub extern "C" fn retro_set_controller_port_device() {
 pub extern "C" fn retro_run() {
     let emulator = unsafe { EMULATOR.as_mut().unwrap() };
     let video_refresh_cb = unsafe { VIDEO_REFRESH_CALLBACK.as_ref().unwrap() };
-    let sample_batch_cb = unsafe { AUDIO_SAMPLE_BATCH_CALLBACK.as_ref().unwrap() };
+    let sample_cb = unsafe { AUDIO_SAMPLE_CALLBACK.as_ref().unwrap() };
     let input_poll_cb = unsafe { INPUT_POLL_CALLBACK.as_ref().unwrap() };
     let input_state_cb = unsafe { INPUT_STATE_CALLBACK.as_ref().unwrap() };
     let key_states = unsafe { KEY_STATES.as_mut().unwrap() };
-    let audio_buffer_ref = unsafe { AUDIO_BUFFER.as_mut().unwrap() };
-    let channels = emulator.audio_channels();
 
     let mut last_frame = emulator.ppu_frame();
 
@@ -282,11 +275,9 @@ pub extern "C" fn retro_run() {
                 .map(|v| *v as i16 * 256)
                 .collect::<Vec<i16>>();
 
-            audio_buffer_ref[0..audio_buffer.len()].copy_from_slice(&audio_buffer);
-            sample_batch_cb(
-                audio_buffer_ref.as_ptr(),
-                audio_buffer.len() / channels as usize,
-            );
+            for chunk in audio_buffer.chunks_exact(2) {
+                sample_cb(chunk[0], chunk[1]);
+            }
 
             emulator.clear_audio_buffer();
         }
