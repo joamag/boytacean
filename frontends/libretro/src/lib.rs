@@ -368,7 +368,6 @@ pub extern "C" fn retro_unserialize() {
 #[no_mangle]
 pub extern "C" fn retro_cheat_reset() {
     debugln!("retro_cheat_reset()");
-    println!("retro_cheat_reset()");
     let emulator = unsafe { EMULATOR.as_mut().unwrap() };
     emulator.reset_cheats();
 }
