@@ -789,7 +789,7 @@ fn main() {
     // exist then fails gracefully
     let path = Path::new(&args.rom_path);
     if args.rom_path == DEFAULT_ROM_PATH && !path.exists() {
-        println!("No ROM file provided, please provide one using the --rom-path option");
+        println!("No ROM file provided, please provide one using the [ROM_PATH] argument");
         return;
     }
 
