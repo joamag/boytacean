@@ -262,18 +262,19 @@ pub extern "C" fn retro_run() {
             // is going to be used to detect for new frame presence
             last_frame = emulator.ppu_frame();
         }
+    }
 
-        // in case there's new audio data available in the emulator
-        // we must handle it by sending it to the audio callback
-        if emulator.audio_buffer().len() >= 64 {
-            let audio_buffer = emulator
-                .audio_buffer()
-                .iter()
-                .map(|v| *v as i16 * 256)
-                .collect::<Vec<i16>>();
-            sample_batch_cb(audio_buffer.as_ptr(), audio_buffer.len() / 2_usize);
-            emulator.clear_audio_buffer();
-        }
+    // in case there's new audio data available in the emulator
+    // we must handle it by sending it to the audio callback and
+    // clearing the audio buffer
+    if !emulator.audio_buffer().is_empty() {
+        let audio_buffer = emulator
+            .audio_buffer()
+            .iter()
+            .map(|v| *v as i16 * 256)
+            .collect::<Vec<i16>>();
+        sample_batch_cb(audio_buffer.as_ptr(), audio_buffer.len() / 2_usize);
+        emulator.clear_audio_buffer();
     }
 
     input_poll_cb();
