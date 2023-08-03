@@ -749,6 +749,10 @@ impl Apu {
         self.audio_buffer.clear();
     }
 
+    pub fn audio_buffer_max(&self) -> usize {
+        self.audio_buffer_max
+    }
+
     pub fn clock_freq(&self) -> u32 {
         self.clock_freq
     }

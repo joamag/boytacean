@@ -30,6 +30,8 @@ use crate::consts::{REGION_NTSC, RETRO_API_VERSION};
 static mut EMULATOR: Option<GameBoy> = None;
 static mut KEY_STATES: Option<HashMap<RetroJoypad, bool>> = None;
 static mut FRAME_BUFFER: [u8; FRAME_BUFFER_RGB155_SIZE] = [0x00; FRAME_BUFFER_RGB155_SIZE];
+static mut AUDIO_BUFFER: Option<Vec<i16>> = None;
+
 static mut PENDING_CYCLES: u32 = 0_u32;
 
 static mut ENVIRONMENT_CALLBACK: Option<extern "C" fn(u32, *const c_void) -> bool> = None;
@@ -187,8 +189,8 @@ pub unsafe extern "C" fn retro_get_system_av_info(info: *mut RetroSystemAvInfo) 
     debugln!("retro_get_system_av_info()");
     (*info).geometry.base_width = DISPLAY_WIDTH as u32;
     (*info).geometry.base_height = DISPLAY_HEIGHT as u32;
-    (*info).geometry.max_width = DISPLAY_WIDTH as u32;
-    (*info).geometry.max_height = DISPLAY_HEIGHT as u32;
+    (*info).geometry.max_width = DISPLAY_WIDTH as u32 * 64;
+    (*info).geometry.max_height = DISPLAY_HEIGHT as u32 * 64;
     (*info).geometry.aspect_ratio = DISPLAY_WIDTH as f32 / DISPLAY_HEIGHT as f32;
     (*info).timing.fps = GameBoy::VISUAL_FREQ as f64;
     (*info).timing.sample_rate = EMULATOR.as_ref().unwrap().audio_sampling_rate() as f64;
@@ -258,20 +260,29 @@ pub extern "C" fn retro_run() {
             last_frame = emulator.ppu_frame();
         }
 
-        // obtains the audio buffer reference and queues it
-        // in a batch manner using the audio callback at the
-        // the end of the operation clears the buffer
-        let audio_buffer = emulator
-            .audio_buffer()
-            .iter()
-            .map(|v| *v as i16 * 256)
-            .collect::<Vec<i16>>();
+        // in case there's new audio data available in the emulator
+        // we must handle it by sending it to the audio callback
+        if !emulator.audio_buffer().is_empty() {
+            // obtains the audio buffer reference and queues it
+            // in a batch manner using the audio callback at the
+            // the end of the operation clears the buffer
+            let audio_buffer = emulator
+                .audio_buffer()
+                .iter()
+                .map(|v| *v as i16 * 256)
+                .collect::<Vec<i16>>();
 
-        sample_batch_cb(
-            audio_buffer.as_ptr(),
-            audio_buffer.len() / channels as usize,
-        );
-        emulator.clear_audio_buffer();
+            unsafe {
+                AUDIO_BUFFER = Some(audio_buffer.to_vec());
+                let audio_buffer_ref = AUDIO_BUFFER.as_ref().unwrap();
+                sample_batch_cb(
+                    audio_buffer_ref.as_ptr(),
+                    audio_buffer_ref.len() / channels as usize,
+                );
+            }
+
+            emulator.clear_audio_buffer();
+        }
     }
 
     input_poll_cb();
