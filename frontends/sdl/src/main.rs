@@ -81,6 +81,7 @@ pub struct Emulator {
     ram_path: String,
     logic_frequency: u32,
     visual_frequency: f32,
+    max_audio_buffer: u32,
     next_tick_time: f32,
     next_tick_time_i: u32,
     features: Vec<&'static str>,
@@ -101,6 +102,7 @@ impl Emulator {
             ram_path: String::from("invalid"),
             logic_frequency: GameBoy::CPU_FREQ,
             visual_frequency: GameBoy::VISUAL_FREQ,
+            max_audio_buffer: 64,
             next_tick_time: 0.0,
             next_tick_time_i: 0,
             features: options
@@ -470,6 +472,30 @@ impl Emulator {
                         frame_dirty = true;
                     }
 
+                    // in case there's new significant new audio data available in
+                    // the emulator we must handle it by sending it to the audio callback
+                    if self.system.audio_buffer().len() > self.max_audio_buffer as usize {
+                        // in case the audio subsystem is enabled, then the audio buffer
+                        // must be queued into the SDL audio subsystem
+                        if let Some(audio) = self.audio.as_mut() {
+                            let audio_buffer = self
+                                .system
+                                .audio_buffer()
+                                .iter()
+                                .map(|v| *v as f32 / VOLUME)
+                                .collect::<Vec<f32>>();
+                            audio.device.queue_audio(&audio_buffer).unwrap();
+                        }
+
+                        // clears the audio buffer to prevent it from
+                        // "exploding" in size, this is required GC operation
+                        self.system.clear_audio_buffer();
+                    }
+                }
+
+                // in case there's pending audio data available in the emulator
+                // we must handle it by sending it to the audio callback
+                if self.system.audio_buffer().is_empty() {
                     // in case the audio subsystem is enabled, then the audio buffer
                     // must be queued into the SDL audio subsystem
                     if let Some(audio) = self.audio.as_mut() {
