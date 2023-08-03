@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-*
+* Made audio flush for libretro and sdl frontends flush by the end of the frame
 
 ### Fixed
 
