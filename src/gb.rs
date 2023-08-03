@@ -17,7 +17,7 @@ use crate::{
     pad::{Pad, PadKey},
     ppu::{
         Ppu, PpuMode, Tile, DISPLAY_HEIGHT, DISPLAY_WIDTH, FRAME_BUFFER_RGB1555_SIZE,
-        FRAME_BUFFER_RGB565_SIZE, FRAME_BUFFER_SIZE,
+        FRAME_BUFFER_RGB565_SIZE, FRAME_BUFFER_SIZE, FRAME_BUFFER_XRGB8888_SIZE,
     },
     rom::{Cartridge, RamSize},
     serial::{NullDevice, Serial, SerialDevice},
@@ -960,6 +960,10 @@ impl GameBoy {
 
     pub fn frame_buffer(&mut self) -> &[u8; FRAME_BUFFER_SIZE] {
         &(self.ppu().frame_buffer)
+    }
+
+    pub fn frame_buffer_xrgb8888(&mut self) -> [u8; FRAME_BUFFER_XRGB8888_SIZE] {
+        self.ppu().frame_buffer_xrgb8888()
     }
 
     pub fn frame_buffer_rgb1555(&mut self) -> [u8; FRAME_BUFFER_RGB1555_SIZE] {

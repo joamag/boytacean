@@ -6,7 +6,7 @@ use boytacean::{
     debugln,
     gb::{AudioProvider, GameBoy},
     pad::PadKey,
-    ppu::{DISPLAY_HEIGHT, DISPLAY_WIDTH, FRAME_BUFFER_RGB565_SIZE, RGB565_SIZE},
+    ppu::{DISPLAY_HEIGHT, DISPLAY_WIDTH, FRAME_BUFFER_XRGB8888_SIZE, XRGB8888_SIZE},
     rom::Cartridge,
 };
 use consts::{
@@ -16,7 +16,7 @@ use consts::{
     RETRO_DEVICE_ID_JOYPAD_R2, RETRO_DEVICE_ID_JOYPAD_R3, RETRO_DEVICE_ID_JOYPAD_RIGHT,
     RETRO_DEVICE_ID_JOYPAD_SELECT, RETRO_DEVICE_ID_JOYPAD_START, RETRO_DEVICE_ID_JOYPAD_UP,
     RETRO_DEVICE_ID_JOYPAD_X, RETRO_DEVICE_ID_JOYPAD_Y, RETRO_DEVICE_JOYPAD,
-    RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, RETRO_PIXEL_FORMAT_RGB565,
+    RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, RETRO_PIXEL_FORMAT_XRGB8888,
 };
 use std::{
     collections::HashMap,
@@ -28,7 +28,7 @@ use std::{
 
 static mut EMULATOR: Option<GameBoy> = None;
 static mut KEY_STATES: Option<HashMap<RetroJoypad, bool>> = None;
-static mut FRAME_BUFFER: [u8; FRAME_BUFFER_RGB565_SIZE] = [0x00; FRAME_BUFFER_RGB565_SIZE];
+static mut FRAME_BUFFER: [u8; FRAME_BUFFER_XRGB8888_SIZE] = [0x00; FRAME_BUFFER_XRGB8888_SIZE];
 
 static mut PENDING_CYCLES: u32 = 0_u32;
 
@@ -198,7 +198,7 @@ pub unsafe extern "C" fn retro_get_system_av_info(info: *mut RetroSystemAvInfo) 
 
     environment_cb(
         RETRO_ENVIRONMENT_SET_PIXEL_FORMAT,
-        &RETRO_PIXEL_FORMAT_RGB565 as *const _ as *const c_void,
+        &RETRO_PIXEL_FORMAT_XRGB8888 as *const _ as *const c_void,
     );
 }
 
@@ -249,14 +249,14 @@ pub extern "C" fn retro_run() {
         // in case a new frame is available in the emulator
         // then the frame must be pushed into display
         if emulator.ppu_frame() != last_frame {
-            let frame_buffer = emulator.frame_buffer_rgb565();
+            let frame_buffer = emulator.frame_buffer_xrgb8888();
             unsafe {
                 FRAME_BUFFER.copy_from_slice(&frame_buffer);
                 video_refresh_cb(
                     FRAME_BUFFER.as_ptr(),
                     DISPLAY_WIDTH as u32,
                     DISPLAY_HEIGHT as u32,
-                    DISPLAY_WIDTH * RGB565_SIZE,
+                    DISPLAY_WIDTH * XRGB8888_SIZE,
                 );
             }
 

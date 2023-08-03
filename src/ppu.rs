@@ -23,6 +23,8 @@ pub const OAM_SIZE: usize = 260;
 pub const PALETTE_SIZE: usize = 4;
 pub const RGB_SIZE: usize = 3;
 pub const RGBA_SIZE: usize = 4;
+pub const RGB888_SIZE: usize = 3;
+pub const XRGB8888_SIZE: usize = 4;
 pub const RGB1555_SIZE: usize = 2;
 pub const RGB565_SIZE: usize = 2;
 pub const TILE_WIDTH: usize = 8;
@@ -58,6 +60,12 @@ pub const COLOR_BUFFER_SIZE: usize = DISPLAY_SIZE;
 
 /// The size of the RGB frame buffer in bytes.
 pub const FRAME_BUFFER_SIZE: usize = DISPLAY_SIZE * RGB_SIZE;
+
+/// The size of the RGB888 frame buffer in bytes.
+pub const FRAME_BUFFER_RGB888_SIZE: usize = DISPLAY_SIZE * RGB888_SIZE;
+
+/// The size of the XRGB8888 frame buffer in bytes.
+pub const FRAME_BUFFER_XRGB8888_SIZE: usize = DISPLAY_SIZE * XRGB8888_SIZE;
 
 /// The size of the RGB1555 frame buffer in bytes.
 pub const FRAME_BUFFER_RGB1555_SIZE: usize = DISPLAY_SIZE * RGB1555_SIZE;
@@ -915,17 +923,33 @@ impl Ppu {
         }
     }
 
+    pub fn frame_buffer_xrgb8888(&self) -> [u8; FRAME_BUFFER_XRGB8888_SIZE] {
+        let mut buffer = [0u8; FRAME_BUFFER_XRGB8888_SIZE];
+        for index in 0..DISPLAY_SIZE {
+            let (r, g, b) = (
+                self.frame_buffer[index * RGB_SIZE],
+                self.frame_buffer[index * RGB_SIZE + 1],
+                self.frame_buffer[index * RGB_SIZE + 2],
+            );
+            buffer[index * XRGB8888_SIZE] = b;
+            buffer[index * XRGB8888_SIZE + 1] = g;
+            buffer[index * XRGB8888_SIZE + 2] = r;
+            buffer[index * XRGB8888_SIZE + 3] = 0xff;
+        }
+        buffer
+    }
+
     pub fn frame_buffer_rgb1555(&self) -> [u8; FRAME_BUFFER_RGB1555_SIZE] {
         let mut buffer = [0u8; FRAME_BUFFER_RGB1555_SIZE];
         for index in 0..DISPLAY_SIZE {
             let (r, g, b) = (
-                self.frame_buffer[index * 3],
-                self.frame_buffer[index * 3 + 1],
-                self.frame_buffer[index * 3 + 2],
+                self.frame_buffer[index * RGB_SIZE],
+                self.frame_buffer[index * RGB_SIZE + 1],
+                self.frame_buffer[index * RGB_SIZE + 2],
             );
             let rgb1555 = Self::rgb888_to_rgb1555(r, g, b);
-            buffer[index * 2] = rgb1555[0];
-            buffer[index * 2 + 1] = rgb1555[1];
+            buffer[index * RGB1555_SIZE] = rgb1555[0];
+            buffer[index * RGB1555_SIZE + 1] = rgb1555[1];
         }
         buffer
     }
@@ -934,13 +958,13 @@ impl Ppu {
         let mut buffer = [0u8; FRAME_BUFFER_RGB565_SIZE];
         for index in 0..DISPLAY_SIZE {
             let (r, g, b) = (
-                self.frame_buffer[index * 3],
-                self.frame_buffer[index * 3 + 1],
-                self.frame_buffer[index * 3 + 2],
+                self.frame_buffer[index * RGB_SIZE],
+                self.frame_buffer[index * RGB_SIZE + 1],
+                self.frame_buffer[index * RGB_SIZE + 2],
             );
             let rgb565 = Self::rgb888_to_rgb565(r, g, b);
-            buffer[index * 2] = rgb565[0];
-            buffer[index * 2 + 1] = rgb565[1];
+            buffer[index * RGB565_SIZE] = rgb565[0];
+            buffer[index * RGB565_SIZE + 1] = rgb565[1];
         }
         buffer
     }

@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-*
+* XRGB8888 support for Libretro frontend, for better color fidelity and faster render
 
 ### Changed
 
