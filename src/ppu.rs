@@ -24,6 +24,7 @@ pub const PALETTE_SIZE: usize = 4;
 pub const RGB_SIZE: usize = 3;
 pub const RGBA_SIZE: usize = 4;
 pub const RGB1555_SIZE: usize = 2;
+pub const RGB565_SIZE: usize = 2;
 pub const TILE_WIDTH: usize = 8;
 pub const TILE_HEIGHT: usize = 8;
 pub const TILE_WIDTH_I: usize = 7;
@@ -59,7 +60,10 @@ pub const COLOR_BUFFER_SIZE: usize = DISPLAY_SIZE;
 pub const FRAME_BUFFER_SIZE: usize = DISPLAY_SIZE * RGB_SIZE;
 
 /// The size of the RGB1555 frame buffer in bytes.
-pub const FRAME_BUFFER_RGB155_SIZE: usize = DISPLAY_SIZE * RGB1555_SIZE;
+pub const FRAME_BUFFER_RGB1555_SIZE: usize = DISPLAY_SIZE * RGB1555_SIZE;
+
+/// The size of the RGB565 frame buffer in bytes.
+pub const FRAME_BUFFER_RGB565_SIZE: usize = DISPLAY_SIZE * RGB565_SIZE;
 
 /// The base colors to be used to populate the
 /// custom palettes of the Game Boy.
@@ -84,6 +88,10 @@ pub type PixelAlpha = [u8; RGBA_SIZE];
 /// Defines a pixel with 5 bits per channel plus a padding
 /// bit at the beginning.
 pub type PixelRgb1555 = [u8; RGB1555_SIZE];
+
+/// Defines a pixel with 5 bits per channel except for the
+/// green channel which uses 6 bits.
+pub type PixelRgb565 = [u8; RGB565_SIZE];
 
 /// Defines a type that represents a color palette
 /// within the Game Boy context.
@@ -907,8 +915,8 @@ impl Ppu {
         }
     }
 
-    pub fn frame_buffer_rgb1555(&self) -> [u8; FRAME_BUFFER_RGB155_SIZE] {
-        let mut buffer = [0u8; FRAME_BUFFER_RGB155_SIZE];
+    pub fn frame_buffer_rgb1555(&self) -> [u8; FRAME_BUFFER_RGB1555_SIZE] {
+        let mut buffer = [0u8; FRAME_BUFFER_RGB1555_SIZE];
         for index in 0..DISPLAY_SIZE {
             let (r, g, b) = (
                 self.frame_buffer[index * 3],
@@ -918,6 +926,21 @@ impl Ppu {
             let rgb1555 = Self::rgb888_to_rgb1555(r, g, b);
             buffer[index * 2] = rgb1555[0];
             buffer[index * 2 + 1] = rgb1555[1];
+        }
+        buffer
+    }
+
+    pub fn frame_buffer_rgb565(&self) -> [u8; FRAME_BUFFER_RGB565_SIZE] {
+        let mut buffer = [0u8; FRAME_BUFFER_RGB565_SIZE];
+        for index in 0..DISPLAY_SIZE {
+            let (r, g, b) = (
+                self.frame_buffer[index * 3],
+                self.frame_buffer[index * 3 + 1],
+                self.frame_buffer[index * 3 + 2],
+            );
+            let rgb565 = Self::rgb888_to_rgb565(r, g, b);
+            buffer[index * 2] = rgb565[0];
+            buffer[index * 2 + 1] = rgb565[1];
         }
         buffer
     }
@@ -1743,6 +1766,15 @@ impl Ppu {
         let a = 1;
 
         let pixel = (a << 15) | (r << 10) | (g << 5) | b;
+        [pixel as u8, (pixel >> 8) as u8]
+    }
+
+    fn rgb888_to_rgb565(first: u8, second: u8, third: u8) -> PixelRgb565 {
+        let r = (first as u16 >> 3) & 0x1f;
+        let g = (second as u16 >> 2) & 0x3f;
+        let b = (third as u16 >> 3) & 0x1f;
+
+        let pixel = (r << 11) | (g << 5) | b;
         [pixel as u8, (pixel >> 8) as u8]
     }
 }
