@@ -474,7 +474,7 @@ impl Emulator {
 
                     // in case there's new significant new audio data available in
                     // the emulator we must handle it, sending it to the audio callback
-                    if self.system.audio_buffer().len() > self.max_audio_buffer as usize {
+                    if self.system.audio_buffer().len() >= self.max_audio_buffer as usize {
                         if let Some(audio) = self.audio.as_mut() {
                             let audio_buffer = self
                                 .system
@@ -486,21 +486,6 @@ impl Emulator {
                         }
                         self.system.clear_audio_buffer();
                     }
-                }
-
-                // in case there's pending audio data available in the emulator
-                // we must handle it, sending it to the audio callback
-                if self.system.audio_buffer().is_empty() {
-                    if let Some(audio) = self.audio.as_mut() {
-                        let audio_buffer = self
-                            .system
-                            .audio_buffer()
-                            .iter()
-                            .map(|v| *v as f32 / VOLUME)
-                            .collect::<Vec<f32>>();
-                        audio.device.queue_audio(&audio_buffer).unwrap();
-                    }
-                    self.system.clear_audio_buffer();
                 }
 
                 // in case there's at least one new frame that was drawn during
