@@ -185,15 +185,17 @@ pub unsafe extern "C" fn retro_get_system_info(info: *mut RetroSystemInfo) {
 #[no_mangle]
 pub unsafe extern "C" fn retro_get_system_av_info(info: *mut RetroSystemAvInfo) {
     debugln!("retro_get_system_av_info()");
+    let emulator = EMULATOR.as_ref().unwrap();
+    let environment_cb = ENVIRONMENT_CALLBACK.as_ref().unwrap();
+
     (*info).geometry.base_width = DISPLAY_WIDTH as u32;
     (*info).geometry.base_height = DISPLAY_HEIGHT as u32;
     (*info).geometry.max_width = DISPLAY_WIDTH as u32;
     (*info).geometry.max_height = DISPLAY_HEIGHT as u32;
     (*info).geometry.aspect_ratio = DISPLAY_WIDTH as f32 / DISPLAY_HEIGHT as f32;
     (*info).timing.fps = GameBoy::VISUAL_FREQ as f64;
-    (*info).timing.sample_rate = EMULATOR.as_ref().unwrap().audio_sampling_rate() as f64;
+    (*info).timing.sample_rate = emulator.audio_sampling_rate() as f64;
 
-    let environment_cb = unsafe { ENVIRONMENT_CALLBACK.as_ref().unwrap() };
     environment_cb(
         RETRO_ENVIRONMENT_SET_PIXEL_FORMAT,
         &RETRO_PIXEL_FORMAT_RGB565 as *const _ as *const c_void,
