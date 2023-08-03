@@ -473,10 +473,8 @@ impl Emulator {
                     }
 
                     // in case there's new significant new audio data available in
-                    // the emulator we must handle it by sending it to the audio callback
+                    // the emulator we must handle it, sending it to the audio callback
                     if self.system.audio_buffer().len() > self.max_audio_buffer as usize {
-                        // in case the audio subsystem is enabled, then the audio buffer
-                        // must be queued into the SDL audio subsystem
                         if let Some(audio) = self.audio.as_mut() {
                             let audio_buffer = self
                                 .system
@@ -486,18 +484,13 @@ impl Emulator {
                                 .collect::<Vec<f32>>();
                             audio.device.queue_audio(&audio_buffer).unwrap();
                         }
-
-                        // clears the audio buffer to prevent it from
-                        // "exploding" in size, this is required GC operation
                         self.system.clear_audio_buffer();
                     }
                 }
 
                 // in case there's pending audio data available in the emulator
-                // we must handle it by sending it to the audio callback
+                // we must handle it, sending it to the audio callback
                 if self.system.audio_buffer().is_empty() {
-                    // in case the audio subsystem is enabled, then the audio buffer
-                    // must be queued into the SDL audio subsystem
                     if let Some(audio) = self.audio.as_mut() {
                         let audio_buffer = self
                             .system
@@ -507,9 +500,6 @@ impl Emulator {
                             .collect::<Vec<f32>>();
                         audio.device.queue_audio(&audio_buffer).unwrap();
                     }
-
-                    // clears the audio buffer to prevent it from
-                    // "exploding" in size, this is required GC operation
                     self.system.clear_audio_buffer();
                 }
 
