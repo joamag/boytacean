@@ -153,6 +153,10 @@ pub extern "C" fn retro_init() {
     unsafe {
         EMULATOR = Some(GameBoy::new(None));
         KEY_STATES = Some(HashMap::new());
+        AUDIO_BUFFER = Some(vec![
+            0x00;
+            EMULATOR.as_ref().unwrap().apu_i().audio_buffer_max()
+        ]);
     }
 }
 
@@ -219,6 +223,7 @@ pub extern "C" fn retro_run() {
     let input_poll_cb = unsafe { INPUT_POLL_CALLBACK.as_ref().unwrap() };
     let input_state_cb = unsafe { INPUT_STATE_CALLBACK.as_ref().unwrap() };
     let key_states = unsafe { KEY_STATES.as_mut().unwrap() };
+    let audio_buffer_ref = unsafe { AUDIO_BUFFER.as_mut().unwrap() };
     let channels = emulator.audio_channels();
 
     let mut last_frame = emulator.ppu_frame();
@@ -272,14 +277,11 @@ pub extern "C" fn retro_run() {
                 .map(|v| *v as i16 * 256)
                 .collect::<Vec<i16>>();
 
-            unsafe {
-                AUDIO_BUFFER = Some(audio_buffer.to_vec());
-                let audio_buffer_ref = AUDIO_BUFFER.as_ref().unwrap();
-                sample_batch_cb(
-                    audio_buffer_ref.as_ptr(),
-                    audio_buffer_ref.len() / channels as usize,
-                );
-            }
+            audio_buffer_ref[0..audio_buffer.len()].copy_from_slice(&audio_buffer);
+            sample_batch_cb(
+                audio_buffer_ref.as_ptr(),
+                audio_buffer.len() / channels as usize,
+            );
 
             emulator.clear_audio_buffer();
         }
