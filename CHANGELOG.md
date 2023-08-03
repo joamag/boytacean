@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-*
+* Breaking issue with Libretro frontend and Linux
 
 ## [0.9.13] - 2023-08-01
 
