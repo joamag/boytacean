@@ -941,13 +941,13 @@ impl Ppu {
 
     pub fn frame_buffer_xrgb8888_u32(&self) -> [u32; FRAME_BUFFER_SIZE] {
         let mut buffer = [0u32; FRAME_BUFFER_SIZE];
-        for index in 0..DISPLAY_SIZE {
+        for (index, pixel) in buffer.iter_mut().enumerate().take(DISPLAY_SIZE) {
             let (r, g, b) = (
                 self.frame_buffer[index * RGB_SIZE],
                 self.frame_buffer[index * RGB_SIZE + 1],
                 self.frame_buffer[index * RGB_SIZE + 2],
             );
-            buffer[index] = ((r as u32) << 16) | ((g as u32) << 8) | b as u32;
+            *pixel = ((r as u32) << 16) | ((g as u32) << 8) | b as u32;
         }
         buffer
     }
@@ -969,13 +969,13 @@ impl Ppu {
 
     pub fn frame_buffer_rgb1555_u16(&self) -> [u16; FRAME_BUFFER_SIZE] {
         let mut buffer = [0u16; FRAME_BUFFER_SIZE];
-        for index in 0..DISPLAY_SIZE {
+        for (index, pixel) in buffer.iter_mut().enumerate().take(DISPLAY_SIZE) {
             let (r, g, b) = (
                 self.frame_buffer[index * RGB_SIZE],
                 self.frame_buffer[index * RGB_SIZE + 1],
                 self.frame_buffer[index * RGB_SIZE + 2],
             );
-            buffer[index] = Self::rgb888_to_rgb1555_u16(r, g, b);
+            *pixel = Self::rgb888_to_rgb1555_u16(r, g, b);
         }
         buffer
     }
@@ -997,13 +997,13 @@ impl Ppu {
 
     pub fn frame_buffer_rgb565_u16(&self) -> [u16; FRAME_BUFFER_SIZE] {
         let mut buffer = [0u16; FRAME_BUFFER_SIZE];
-        for index in 0..DISPLAY_SIZE {
+        for (index, pixel) in buffer.iter_mut().enumerate().take(DISPLAY_SIZE) {
             let (r, g, b) = (
                 self.frame_buffer[index * RGB_SIZE],
                 self.frame_buffer[index * RGB_SIZE + 1],
                 self.frame_buffer[index * RGB_SIZE + 2],
             );
-            buffer[index] = Self::rgb888_to_rgb565_u16(r, g, b);
+            *pixel = Self::rgb888_to_rgb565_u16(r, g, b);
         }
         buffer
     }
