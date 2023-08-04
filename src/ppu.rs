@@ -939,6 +939,19 @@ impl Ppu {
         buffer
     }
 
+    pub fn frame_buffer_xrgb8888_u32(&self) -> [u32; FRAME_BUFFER_SIZE] {
+        let mut buffer = [0u32; FRAME_BUFFER_SIZE];
+        for index in 0..DISPLAY_SIZE {
+            let (r, g, b) = (
+                self.frame_buffer[index * RGB_SIZE],
+                self.frame_buffer[index * RGB_SIZE + 1],
+                self.frame_buffer[index * RGB_SIZE + 2],
+            );
+            buffer[index] = ((r as u32) << 16) | ((g as u32) << 8) | b as u32;
+        }
+        buffer
+    }
+
     pub fn frame_buffer_rgb1555(&self) -> [u8; FRAME_BUFFER_RGB1555_SIZE] {
         let mut buffer = [0u8; FRAME_BUFFER_RGB1555_SIZE];
         for index in 0..DISPLAY_SIZE {
@@ -954,6 +967,19 @@ impl Ppu {
         buffer
     }
 
+    pub fn frame_buffer_rgb1555_u16(&self) -> [u16; FRAME_BUFFER_SIZE] {
+        let mut buffer = [0u16; FRAME_BUFFER_SIZE];
+        for index in 0..DISPLAY_SIZE {
+            let (r, g, b) = (
+                self.frame_buffer[index * RGB_SIZE],
+                self.frame_buffer[index * RGB_SIZE + 1],
+                self.frame_buffer[index * RGB_SIZE + 2],
+            );
+            buffer[index] = Self::rgb888_to_rgb1555_u16(r, g, b);
+        }
+        buffer
+    }
+
     pub fn frame_buffer_rgb565(&self) -> [u8; FRAME_BUFFER_RGB565_SIZE] {
         let mut buffer = [0u8; FRAME_BUFFER_RGB565_SIZE];
         for index in 0..DISPLAY_SIZE {
@@ -965,6 +991,19 @@ impl Ppu {
             let rgb565 = Self::rgb888_to_rgb565(r, g, b);
             buffer[index * RGB565_SIZE] = rgb565[0];
             buffer[index * RGB565_SIZE + 1] = rgb565[1];
+        }
+        buffer
+    }
+
+    pub fn frame_buffer_rgb565_u16(&self) -> [u16; FRAME_BUFFER_SIZE] {
+        let mut buffer = [0u16; FRAME_BUFFER_SIZE];
+        for index in 0..DISPLAY_SIZE {
+            let (r, g, b) = (
+                self.frame_buffer[index * RGB_SIZE],
+                self.frame_buffer[index * RGB_SIZE + 1],
+                self.frame_buffer[index * RGB_SIZE + 2],
+            );
+            buffer[index] = Self::rgb888_to_rgb565_u16(r, g, b);
         }
         buffer
     }
@@ -1784,22 +1823,28 @@ impl Ppu {
     }
 
     fn rgb888_to_rgb1555(first: u8, second: u8, third: u8) -> PixelRgb1555 {
+        let pixel = Self::rgb888_to_rgb1555_u16(first, second, third);
+        [pixel as u8, (pixel >> 8) as u8]
+    }
+
+    fn rgb888_to_rgb1555_u16(first: u8, second: u8, third: u8) -> u16 {
         let r = (first as u16 >> 3) & 0x1f;
         let g = (second as u16 >> 3) & 0x1f;
         let b = (third as u16 >> 3) & 0x1f;
         let a = 1;
-
-        let pixel = (a << 15) | (r << 10) | (g << 5) | b;
-        [pixel as u8, (pixel >> 8) as u8]
+        (a << 15) | (r << 10) | (g << 5) | b
     }
 
     fn rgb888_to_rgb565(first: u8, second: u8, third: u8) -> PixelRgb565 {
+        let pixel = Self::rgb888_to_rgb565_u16(first, second, third);
+        [pixel as u8, (pixel >> 8) as u8]
+    }
+
+    fn rgb888_to_rgb565_u16(first: u8, second: u8, third: u8) -> u16 {
         let r = (first as u16 >> 3) & 0x1f;
         let g = (second as u16 >> 2) & 0x3f;
         let b = (third as u16 >> 3) & 0x1f;
-
-        let pixel = (r << 11) | (g << 5) | b;
-        [pixel as u8, (pixel >> 8) as u8]
+        (r << 11) | (g << 5) | b
     }
 }
 

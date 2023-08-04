@@ -6,7 +6,7 @@ use boytacean::{
     debugln,
     gb::{AudioProvider, GameBoy},
     pad::PadKey,
-    ppu::{DISPLAY_HEIGHT, DISPLAY_WIDTH, FRAME_BUFFER_XRGB8888_SIZE, XRGB8888_SIZE},
+    ppu::{DISPLAY_HEIGHT, DISPLAY_WIDTH, FRAME_BUFFER_SIZE, XRGB8888_SIZE},
     rom::Cartridge,
 };
 use consts::{
@@ -28,7 +28,7 @@ use std::{
 
 static mut EMULATOR: Option<GameBoy> = None;
 static mut KEY_STATES: Option<HashMap<RetroJoypad, bool>> = None;
-static mut FRAME_BUFFER: [u8; FRAME_BUFFER_XRGB8888_SIZE] = [0x00; FRAME_BUFFER_XRGB8888_SIZE];
+static mut FRAME_BUFFER: [u32; FRAME_BUFFER_SIZE] = [0x00; FRAME_BUFFER_SIZE];
 
 static mut PENDING_CYCLES: u32 = 0_u32;
 
@@ -249,11 +249,11 @@ pub extern "C" fn retro_run() {
         // in case a new frame is available in the emulator
         // then the frame must be pushed into display
         if emulator.ppu_frame() != last_frame {
-            let frame_buffer = emulator.frame_buffer_xrgb8888();
+            let frame_buffer = emulator.frame_buffer_xrgb8888_u32();
             unsafe {
                 FRAME_BUFFER.copy_from_slice(&frame_buffer);
                 video_refresh_cb(
-                    FRAME_BUFFER.as_ptr(),
+                    FRAME_BUFFER.as_ptr() as *const u8,
                     DISPLAY_WIDTH as u32,
                     DISPLAY_HEIGHT as u32,
                     DISPLAY_WIDTH * XRGB8888_SIZE,

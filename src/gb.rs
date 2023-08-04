@@ -966,12 +966,24 @@ impl GameBoy {
         self.ppu().frame_buffer_xrgb8888()
     }
 
+    pub fn frame_buffer_xrgb8888_u32(&mut self) -> [u32; FRAME_BUFFER_SIZE] {
+        self.ppu().frame_buffer_xrgb8888_u32()
+    }
+
     pub fn frame_buffer_rgb1555(&mut self) -> [u8; FRAME_BUFFER_RGB1555_SIZE] {
         self.ppu().frame_buffer_rgb1555()
     }
 
+    pub fn frame_buffer_rgb1555_u16(&mut self) -> [u16; FRAME_BUFFER_SIZE] {
+        self.ppu().frame_buffer_rgb1555_u16()
+    }
+
     pub fn frame_buffer_rgb565(&mut self) -> [u8; FRAME_BUFFER_RGB565_SIZE] {
         self.ppu().frame_buffer_rgb565()
+    }
+
+    pub fn frame_buffer_rgb565_u16(&mut self) -> [u16; FRAME_BUFFER_SIZE] {
+        self.ppu().frame_buffer_rgb565_u16()
     }
 
     pub fn audio_buffer(&mut self) -> &VecDeque<u8> {
