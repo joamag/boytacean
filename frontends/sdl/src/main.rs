@@ -13,6 +13,7 @@ use boytacean::{
     ppu::PaletteInfo,
     rom::Cartridge,
     serial::{NullDevice, SerialDevice},
+    state::save_state_file,
     util::{replace_ext, write_file},
 };
 use chrono::Utc;
@@ -815,6 +816,8 @@ fn main() {
     game_boy.set_timer_enabled(!args.no_timer);
     game_boy.attach_serial(device);
     game_boy.load(!args.no_boot);
+
+    save_state_file("tobias.sav", &game_boy);
 
     // prints the current version of the emulator (informational message)
     println!("========= Boytacean =========\n{}", game_boy);

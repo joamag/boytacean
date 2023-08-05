@@ -1,44 +1,110 @@
-use std::{convert::TryInto, io::Write};
+use std::{
+    convert::TryInto,
+    fs::File,
+    io::{Cursor, Read, Write},
+};
 
-#[repr(packed)]
+use crate::{gb::GameBoy, gen::VERSION};
+
+pub trait Serialize {
+    fn save(&self, buffer: &mut Vec<u8>);
+    fn load(&mut self, data: &mut Cursor<Vec<u8>>);
+}
+
 pub struct BeesState {
     pub name: BeesName,
     pub info: BeesInfo,
     pub core: BeesCore,
 }
 
-#[repr(packed)]
+impl Serialize for BeesState {
+    fn save(&self, buffer: &mut Vec<u8>) {
+        self.name.save(buffer);
+        self.info.save(buffer);
+        self.core.save(buffer);
+    }
+
+    fn load(&mut self, data: &mut Cursor<Vec<u8>>) {
+        todo!()
+    }
+}
+
 pub struct BeesBlockHeader {
-    pub magic: u32,
+    pub magic: String,
     pub size: u32,
 }
 
-#[repr(packed)]
+impl BeesBlockHeader {
+    pub fn new(magic: String, size: u32) -> Self {
+        Self { magic, size }
+    }
+}
+
+impl Serialize for BeesBlockHeader {
+    fn save(&self, buffer: &mut Vec<u8>) {
+        buffer.write_all(&self.magic.as_bytes()).unwrap();
+        buffer.write_all(&self.size.to_le_bytes()).unwrap();
+    }
+
+    fn load(&mut self, data: &mut Cursor<Vec<u8>>) {
+        let mut buffer = [0x00; 4];
+        data.read_exact(&mut buffer).unwrap();
+        self.magic = String::from_utf8(Vec::from(buffer)).unwrap();
+        data.read_exact(&mut buffer).unwrap();
+        self.size = u32::from_le_bytes(buffer.try_into().unwrap());
+    }
+}
+
 pub struct BeesBuffer {
     pub size: u32,
     pub offset: u32,
 }
 
-#[repr(packed)]
 pub struct BeesFooter {
     pub start_offset: u32,
     pub magic: u32,
 }
 
-#[repr(packed)]
 pub struct BeesName {
     pub header: BeesBlockHeader,
     pub name: String,
 }
 
-#[repr(packed)]
+impl BeesName {
+    pub fn new(name: String) -> Self {
+        Self {
+            header: BeesBlockHeader::new(String::from("NAME"), name.len() as u32),
+            name,
+        }
+    }
+}
+
+impl Serialize for BeesName {
+    fn save(&self, buffer: &mut Vec<u8>) {
+        self.header.save(buffer);
+        buffer.write_all(self.name.as_bytes()).unwrap();
+    }
+
+    fn load(&mut self, data: &mut Cursor<Vec<u8>>) {
+        let mut buffer = Vec::with_capacity(self.header.size as usize);
+        buffer.resize(self.header.size as usize, 0);
+        data.read_exact(&mut buffer).unwrap();
+        self.name = String::from_utf8(Vec::from(buffer)).unwrap();
+    }
+}
+
 pub struct BeesInfo {
     pub header: BeesBlockHeader,
     pub title: [u8; 16],
     pub checksum: [u8; 2],
 }
 
-#[repr(packed)]
+impl Serialize for BeesInfo {
+    fn save(&self, buffer: &mut Vec<u8>) {}
+
+    fn load(&mut self, data: &mut Cursor<Vec<u8>>) {}
+}
+
 pub struct BeesCore {
     pub header: BeesBlockHeader,
 
@@ -71,46 +137,24 @@ pub struct BeesCore {
     pub object_palettes: BeesBuffer,
 }
 
-trait Serialize {
-    fn store(&self, buffer: &mut Vec<u8>);
-    fn load(&mut self, data: &[u8]) -> u32;
+impl Serialize for BeesCore {
+    fn save(&self, buffer: &mut Vec<u8>) {}
+
+    fn load(&mut self, data: &mut Cursor<Vec<u8>>) {}
 }
 
-impl Serialize for BeesState {
-    fn store(&self, buffer: &mut Vec<u8>) {
-        self.info.store(buffer);
-    }
-
-    fn load(&mut self, data: &[u8]) -> u32 {
-        todo!()
-    }
+pub fn save_state_file(file_path: &str, gb: &GameBoy) {
+    let mut file = File::create(file_path).unwrap();
+    let data = save_state(gb);
+    file.write_all(&data).unwrap();
 }
 
-impl Serialize for BeesBlockHeader {
-    fn store(&self, buffer: &mut Vec<u8>) {
-        buffer.write(&self.magic.to_le_bytes()).unwrap();
-        buffer.write(&self.size.to_le_bytes()).unwrap();
-    }
+pub fn save_state(gb: &GameBoy) -> Vec<u8> {
+    let mut data: Vec<u8> = vec![];
 
-    fn load(&mut self, data: &[u8]) -> u32 {
-        self.magic = u32::from_le_bytes(data[0..4].try_into().unwrap());
-        self.size = u32::from_le_bytes(data[4..8].try_into().unwrap());
-        8
-    }
+    BeesName::new(format!("Boytacean v{}", VERSION)).save(&mut data);
+
+    data
 }
 
-impl Serialize for BeesName {
-    fn store(&self, buffer: &mut Vec<u8>) {}
-
-    fn load(&mut self, data: &[u8]) -> u32 {
-        0
-    }
-}
-
-impl Serialize for BeesInfo {
-    fn store(&self, buffer: &mut Vec<u8>) {}
-
-    fn load(&mut self, data: &[u8]) -> u32 {
-        0
-    }
-}
+pub fn load_state(state: Vec<u8>, gb: &GameBoy) {}
