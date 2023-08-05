@@ -73,7 +73,7 @@ pub struct BeesCore {
 
 trait Serialize {
     fn store(&self, buffer: &mut Vec<u8>);
-    fn load(&mut self, data: &[u8]);
+    fn load(&mut self, data: &[u8]) -> u32;
 }
 
 impl Serialize for BeesState {
@@ -81,7 +81,7 @@ impl Serialize for BeesState {
         self.info.store(buffer);
     }
 
-    fn load(&mut self, data: &[u8]) {
+    fn load(&mut self, data: &[u8]) -> u32 {
         todo!()
     }
 }
@@ -92,20 +92,25 @@ impl Serialize for BeesBlockHeader {
         buffer.write(&self.size.to_le_bytes()).unwrap();
     }
 
-    fn load(&mut self, data: &[u8]) {
+    fn load(&mut self, data: &[u8]) -> u32 {
         self.magic = u32::from_le_bytes(data[0..4].try_into().unwrap());
         self.size = u32::from_le_bytes(data[4..8].try_into().unwrap());
+        8
     }
 }
 
 impl Serialize for BeesName {
     fn store(&self, buffer: &mut Vec<u8>) {}
 
-    fn load(&mut self, data: &[u8]) {}
+    fn load(&mut self, data: &[u8]) -> u32 {
+        0
+    }
 }
 
 impl Serialize for BeesInfo {
     fn store(&self, buffer: &mut Vec<u8>) {}
 
-    fn load(&mut self, data: &[u8]) {}
+    fn load(&mut self, data: &[u8]) -> u32 {
+        0
+    }
 }
