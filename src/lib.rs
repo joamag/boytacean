@@ -15,6 +15,7 @@ pub mod pad;
 pub mod ppu;
 pub mod rom;
 pub mod serial;
+pub mod state;
 pub mod test;
 pub mod timer;
 pub mod util;
