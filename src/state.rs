@@ -1,5 +1,12 @@
 #[repr(packed)]
-pub struct BeesBlock {
+pub struct BeesState {
+    pub name: BeesName,
+    pub info: BeesInfo,
+    pub core: BeesCore,
+}
+
+#[repr(packed)]
+pub struct BeesBlockHeader {
     pub magic: u32,
     pub size: u32,
 }
@@ -17,8 +24,21 @@ pub struct BeesFooter {
 }
 
 #[repr(packed)]
+pub struct BeesName {
+    pub header: BeesBlockHeader,
+    pub name: String,
+}
+
+#[repr(packed)]
+pub struct BeesInfo {
+    pub header: BeesBlockHeader,
+    pub title: [u8; 16],
+    pub checksum: [u8; 2],
+}
+
+#[repr(packed)]
 pub struct BeesCore {
-    pub header: BeesBlock,
+    pub header: BeesBlockHeader,
 
     pub major: u16,
     pub minor: u16,
@@ -38,7 +58,7 @@ pub struct BeesCore {
     pub execution_mode: u8,
     _padding: u8,
 
-    pub io_registers: [u8; 0x80],
+    pub io_registers: [u8; 128],
 
     pub ram: BeesBuffer,
     pub vram: BeesBuffer,
@@ -47,4 +67,32 @@ pub struct BeesCore {
     pub hram: BeesBuffer,
     pub background_palettes: BeesBuffer,
     pub object_palettes: BeesBuffer,
+}
+
+trait Serialize {
+    fn store(&self, buffer: &mut Vec<u8>);
+    fn load(&self, data: &[u8]);
+}
+
+impl Serialize for BeesState {
+    fn store(&self, buffer: &mut Vec<u8>) {
+        self.info.store(buffer);
+    }
+
+    fn load(&self, data: &[u8]) {
+        todo!()
+    }
+}
+
+impl Serialize for BeesName {
+    fn store(&self, buffer: &mut Vec<u8>) {
+    }
+
+    fn load(&self, data: &[u8]) {}
+}
+
+impl Serialize for BeesInfo {
+    fn store(&self, buffer: &mut Vec<u8>) {}
+
+    fn load(&self, data: &[u8]) {}
 }
