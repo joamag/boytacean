@@ -1,3 +1,5 @@
+use std::{convert::TryInto, io::Write};
+
 #[repr(packed)]
 pub struct BeesState {
     pub name: BeesName,
@@ -71,7 +73,7 @@ pub struct BeesCore {
 
 trait Serialize {
     fn store(&self, buffer: &mut Vec<u8>);
-    fn load(&self, data: &[u8]);
+    fn load(&mut self, data: &[u8]);
 }
 
 impl Serialize for BeesState {
@@ -79,20 +81,31 @@ impl Serialize for BeesState {
         self.info.store(buffer);
     }
 
-    fn load(&self, data: &[u8]) {
+    fn load(&mut self, data: &[u8]) {
         todo!()
     }
 }
 
-impl Serialize for BeesName {
+impl Serialize for BeesBlockHeader {
     fn store(&self, buffer: &mut Vec<u8>) {
+        buffer.write(&self.magic.to_le_bytes()).unwrap();
+        buffer.write(&self.size.to_le_bytes()).unwrap();
     }
 
-    fn load(&self, data: &[u8]) {}
+    fn load(&mut self, data: &[u8]) {
+        self.magic = u32::from_le_bytes(data[0..4].try_into().unwrap());
+        self.size = u32::from_le_bytes(data[4..8].try_into().unwrap());
+    }
+}
+
+impl Serialize for BeesName {
+    fn store(&self, buffer: &mut Vec<u8>) {}
+
+    fn load(&mut self, data: &[u8]) {}
 }
 
 impl Serialize for BeesInfo {
     fn store(&self, buffer: &mut Vec<u8>) {}
 
-    fn load(&self, data: &[u8]) {}
+    fn load(&mut self, data: &[u8]) {}
 }
