@@ -260,8 +260,8 @@ impl Default for GameBoyConfig {
     }
 }
 
-/// Aggregation structure tha allows the bundling of
-/// all the components of a gameboy into a single a
+/// Aggregation structure allowing the bundling of
+/// all the components of a GameBoy into a single a
 /// single element for easy access.
 pub struct Components {
     pub ppu: Ppu,
