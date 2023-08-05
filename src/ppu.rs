@@ -1,3 +1,5 @@
+//! PPU (Picture Processing Unit) functions and structures.
+
 use core::fmt;
 use std::{
     borrow::BorrowMut,

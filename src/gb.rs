@@ -1,3 +1,5 @@
+//! Main GameBoy emulation entrypoint functions and structures.
+
 use std::{
     cell::RefCell,
     collections::VecDeque,
