@@ -1,3 +1,5 @@
+//! General information about the crate and the emulator.
+
 use crate::{
     gen::{NAME, VERSION},
     util::capitalize,
