@@ -1,3 +1,5 @@
+//! MMU (Memory Management Unit) functions and structures.
+
 use std::{cell::RefCell, rc::Rc};
 
 use crate::{

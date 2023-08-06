@@ -1,3 +1,5 @@
+//! Gamepad related functions and structures.
+
 use crate::warnln;
 
 #[cfg(feature = "wasm")]
