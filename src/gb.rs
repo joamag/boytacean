@@ -909,6 +909,10 @@ impl GameBoy {
         &mut self.cpu
     }
 
+    pub fn cpu_i(&self) -> &Cpu {
+        &self.cpu
+    }
+
     pub fn mmu(&mut self) -> &mut Mmu {
         self.cpu.mmu()
     }

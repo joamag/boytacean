@@ -14,7 +14,7 @@ use boytacean::{
     ppu::PaletteInfo,
     rom::Cartridge,
     serial::{NullDevice, SerialDevice},
-    state::save_state_file,
+    state::{load_state_file, save_state_file},
     util::{replace_ext, write_file},
 };
 use chrono::Utc;
@@ -400,8 +400,17 @@ impl Emulator {
                         match keycode {
                             Keycode::Num0 | Keycode::Num1 | Keycode::Num2 => {
                                 save_state_file(
-                                    format!("tobias{}.sav", keycode as u32 - Keycode::Num0 as u32)
-                                        .as_str(),
+                                    format!(
+                                        "{}.s{}",
+                                        self.rom_name(),
+                                        keycode as u32 - Keycode::Num0 as u32
+                                    )
+                                    .as_str(),
+                                    &self.system,
+                                );
+                                //load_state_file("tobias1.sav", &self.system);
+                                load_state_file(
+                                    "C:\\Users\\joamag\\Dropbox\\Roms\\gb\\kirby_2.s0",
                                     &self.system,
                                 );
                             }
