@@ -21,7 +21,12 @@ use chrono::Utc;
 use clap::Parser;
 use image::{ColorType, ImageBuffer, Rgb};
 use sdl::{surface_from_bytes, SdlSystem};
-use sdl2::{event::Event, keyboard::Keycode, pixels::PixelFormatEnum, Sdl};
+use sdl2::{
+    event::Event,
+    keyboard::{Keycode, Mod},
+    pixels::PixelFormatEnum,
+    Sdl,
+};
 use std::{
     cmp::max,
     path::Path,
@@ -32,7 +37,7 @@ use std::{
 /// The scale at which the screen is going to be drawn
 /// meaning the ratio between Game Boy resolution and
 /// the window size to be displayed.
-const SCREEN_SCALE: f32 = 2.5;
+const SCREEN_SCALE: f32 = 3.0;
 
 /// Base audio volume to be used as the basis of the
 /// amplification level of the volume
@@ -301,6 +306,19 @@ impl Emulator {
         self.palette_index = (self.palette_index + 1) % self.palettes.len();
     }
 
+    pub fn toggle_fullscreen(&mut self) {
+        let window = self.sdl.as_mut().unwrap().window_mut();
+        if window.fullscreen_state() == sdl2::video::FullscreenType::Off {
+            window
+                .set_fullscreen(sdl2::video::FullscreenType::Desktop)
+                .unwrap()
+        } else {
+            window
+                .set_fullscreen(sdl2::video::FullscreenType::Off)
+                .unwrap()
+        }
+    }
+
     pub fn limited(&self) -> bool {
         !self.unlimited
     }
@@ -386,6 +404,15 @@ impl Emulator {
                         ..
                     } => self.toggle_palette(),
                     Event::KeyDown {
+                        keycode: Some(Keycode::F),
+                        keymod,
+                        ..
+                    } => {
+                        if (keymod & (Mod::LCTRLMOD | Mod::RCTRLMOD)) != Mod::NOMOD {
+                            self.toggle_fullscreen()
+                        }
+                    }
+                    Event::KeyDown {
                         keycode: Some(Keycode::Plus),
                         ..
                     } => self.logic_frequency = self.logic_frequency.saturating_add(400000),
@@ -410,7 +437,7 @@ impl Emulator {
                                 );
                                 //load_state_file("tobias1.sav", &self.system);
                                 load_state_file(
-                                    "C:\\Users\\joamag\\Dropbox\\Roms\\gb\\kirby_2.s0",
+                                    "C:\\Users\\joamag\\Dropbox\\Roms\\gb\\tetris.s8",
                                     &mut self.system,
                                 );
                             }
