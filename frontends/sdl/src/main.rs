@@ -397,6 +397,16 @@ impl Emulator {
                         keycode: Some(keycode),
                         ..
                     } => {
+                        match keycode {
+                            Keycode::Num0 | Keycode::Num1 | Keycode::Num2 => {
+                                save_state_file(
+                                    format!("tobias{}.sav", keycode as u32 - Keycode::Num0 as u32)
+                                        .as_str(),
+                                    &self.system,
+                                );
+                            }
+                            _ => {}
+                        }
                         if let Some(key) = key_to_pad(keycode) {
                             self.system.key_press(key)
                         }
@@ -814,8 +824,6 @@ fn main() {
     game_boy.set_timer_enabled(!args.no_timer);
     game_boy.attach_serial(device);
     game_boy.load(!args.no_boot);
-
-    save_state_file("tobias.sav", &game_boy);
 
     // prints the current version of the emulator (informational message)
     println!("========= {} =========\n{}", capitalize(NAME), game_boy);

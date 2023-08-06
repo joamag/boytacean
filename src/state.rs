@@ -6,13 +6,17 @@ use std::{
 
 use crate::{
     gb::GameBoy,
-    gen::{NAME, VERSION},
+    info::{name, version},
     util::capitalize,
 };
 
 pub trait Serialize {
     fn save(&self, buffer: &mut Vec<u8>);
     fn load(&mut self, data: &mut Cursor<Vec<u8>>);
+}
+
+pub trait State {
+    fn from_gb(gb: &GameBoy) -> Self;
 }
 
 pub struct BeesState {
@@ -97,16 +101,50 @@ impl Serialize for BeesName {
     }
 }
 
+impl State for BeesName {
+    fn from_gb(_: &GameBoy) -> Self {
+        Self::new(format!("{} v{}", name(), version()))
+    }
+}
+
 pub struct BeesInfo {
     header: BeesBlockHeader,
     title: [u8; 16],
     checksum: [u8; 2],
 }
 
-impl Serialize for BeesInfo {
-    fn save(&self, buffer: &mut Vec<u8>) {}
+impl BeesInfo {
+    pub fn new(title: &[u8], checksum: &[u8]) -> Self {
+        Self {
+            header: BeesBlockHeader::new(
+                String::from("INFO"),
+                title.len() as u32 + checksum.len() as u32,
+            ),
+            title: title.try_into().unwrap(),
+            checksum: checksum.try_into().unwrap(),
+        }
+    }
+}
 
-    fn load(&mut self, data: &mut Cursor<Vec<u8>>) {}
+impl Serialize for BeesInfo {
+    fn save(&self, buffer: &mut Vec<u8>) {
+        self.header.save(buffer);
+        buffer.write_all(&self.title).unwrap();
+        buffer.write_all(&self.checksum).unwrap();
+    }
+
+    fn load(&mut self, data: &mut Cursor<Vec<u8>>) {
+        todo!()
+    }
+}
+
+impl State for BeesInfo {
+    fn from_gb(gb: &GameBoy) -> Self {
+        Self::new(
+            &gb.cartridge_i().rom_data()[0x134..=0x143],
+            &gb.cartridge_i().rom_data()[0x14e..=0x14f],
+        )
+    }
 }
 
 pub struct BeesCore {
@@ -156,7 +194,8 @@ pub fn save_state_file(file_path: &str, gb: &GameBoy) {
 pub fn save_state(gb: &GameBoy) -> Vec<u8> {
     let mut data: Vec<u8> = vec![];
 
-    BeesName::new(format!("{} v{}", capitalize(NAME), VERSION)).save(&mut data);
+    BeesName::from_gb(gb).save(&mut data);
+    BeesInfo::from_gb(gb).save(&mut data);
 
     data
 }

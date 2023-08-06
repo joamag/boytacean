@@ -656,6 +656,14 @@ impl GameBoy {
         self.apu_i().channels()
     }
 
+    pub fn cartridge(&mut self) -> &mut Cartridge {
+        self.mmu().rom()
+    }
+
+    pub fn cartridge_i(&self) -> &Cartridge {
+        self.mmu_i().rom_i()
+    }
+
     pub fn cartridge_eager(&mut self) -> Cartridge {
         self.mmu().rom().clone()
     }

@@ -511,6 +511,10 @@ impl Mmu {
         &mut self.rom
     }
 
+    pub fn rom_i(&self) -> &Cartridge {
+        &self.rom
+    }
+
     pub fn set_rom(&mut self, rom: Cartridge) {
         self.rom = rom;
     }
