@@ -50,12 +50,8 @@ impl BeesState {
     }
 
     pub fn verify(&self) -> Result<(), String> {
-        if let Err(result) = self.footer.verify() {
-            return Err(result);
-        }
-        if let Err(result) = self.core.verify() {
-            return Err(result);
-        }
+        self.footer.verify()?;
+        self.core.verify()?;
         Ok(())
     }
 }
