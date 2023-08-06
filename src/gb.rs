@@ -656,14 +656,6 @@ impl GameBoy {
         self.apu_i().channels()
     }
 
-    pub fn cartridge(&mut self) -> &mut Cartridge {
-        self.mmu().rom()
-    }
-
-    pub fn cartridge_i(&self) -> &Cartridge {
-        self.mmu_i().rom_i()
-    }
-
     pub fn cartridge_eager(&mut self) -> Cartridge {
         self.mmu().rom().clone()
     }
@@ -1003,6 +995,14 @@ impl GameBoy {
 
     pub fn audio_buffer(&mut self) -> &VecDeque<u8> {
         self.apu().audio_buffer()
+    }
+
+    pub fn cartridge(&mut self) -> &mut Cartridge {
+        self.mmu().rom()
+    }
+
+    pub fn cartridge_i(&self) -> &Cartridge {
+        self.mmu_i().rom_i()
     }
 
     pub fn load_boot_path(&mut self, path: &str) {
