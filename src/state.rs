@@ -21,6 +21,7 @@ pub trait State {
     fn to_gb(&self, gb: &mut GameBoy);
 }
 
+#[derive(Default)]
 pub struct BeesState {
     footer: BeesFooter,
     name: BeesName,
@@ -90,17 +91,6 @@ impl State for BeesState {
     }
 }
 
-impl Default for BeesState {
-    fn default() -> Self {
-        Self {
-            footer: BeesFooter::default(),
-            name: BeesName::default(),
-            info: BeesInfo::default(),
-            core: BeesCore::default(),
-        }
-    }
-}
-
 impl Display for BeesState {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.description(9))
@@ -120,7 +110,7 @@ impl BeesBlockHeader {
 
 impl Serialize for BeesBlockHeader {
     fn save(&self, buffer: &mut Vec<u8>) {
-        buffer.write_all(&self.magic.as_bytes()).unwrap();
+        buffer.write_all(self.magic.as_bytes()).unwrap();
         buffer.write_all(&self.size.to_le_bytes()).unwrap();
     }
 
@@ -130,7 +120,7 @@ impl Serialize for BeesBlockHeader {
         self.magic = String::from_utf8(Vec::from(buffer)).unwrap();
         let mut buffer = [0x00; 4];
         data.read_exact(&mut buffer).unwrap();
-        self.size = u32::from_le_bytes(buffer.try_into().unwrap());
+        self.size = u32::from_le_bytes(buffer);
     }
 }
 
@@ -148,10 +138,10 @@ impl Serialize for BeesBuffer {
     fn load(&mut self, data: &mut Cursor<Vec<u8>>) {
         let mut buffer = [0x00; 4];
         data.read_exact(&mut buffer).unwrap();
-        self.size = u32::from_le_bytes(buffer.try_into().unwrap());
+        self.size = u32::from_le_bytes(buffer);
         let mut buffer = [0x00; 4];
         data.read_exact(&mut buffer).unwrap();
-        self.offset = u32::from_le_bytes(buffer.try_into().unwrap());
+        self.offset = u32::from_le_bytes(buffer);
     }
 }
 
@@ -178,10 +168,10 @@ impl Serialize for BeesFooter {
     fn load(&mut self, data: &mut Cursor<Vec<u8>>) {
         let mut buffer = [0x00; 4];
         data.read_exact(&mut buffer).unwrap();
-        self.start_offset = u32::from_le_bytes(buffer.try_into().unwrap());
+        self.start_offset = u32::from_le_bytes(buffer);
         let mut buffer = [0x00; 4];
         data.read_exact(&mut buffer).unwrap();
-        self.magic = u32::from_le_bytes(buffer.try_into().unwrap());
+        self.magic = u32::from_le_bytes(buffer);
     }
 }
 
@@ -215,7 +205,7 @@ impl Serialize for BeesName {
         self.header.load(data);
         let mut buffer = vec![0x00; self.header.size as usize];
         data.read_exact(&mut buffer).unwrap();
-        self.name = String::from_utf8(Vec::from(buffer)).unwrap();
+        self.name = String::from_utf8(buffer).unwrap();
     }
 }
 
@@ -366,10 +356,10 @@ impl Serialize for BeesCore {
 
         let mut buffer = [0x00; 2];
         data.read_exact(&mut buffer).unwrap();
-        self.major = u16::from_le_bytes(buffer.try_into().unwrap());
+        self.major = u16::from_le_bytes(buffer);
         let mut buffer = [0x00; 2];
         data.read_exact(&mut buffer).unwrap();
-        self.minor = u16::from_le_bytes(buffer.try_into().unwrap());
+        self.minor = u16::from_le_bytes(buffer);
 
         let mut buffer = [0x00; 4];
         data.read_exact(&mut buffer).unwrap();
@@ -377,35 +367,35 @@ impl Serialize for BeesCore {
 
         let mut buffer = [0x00; 2];
         data.read_exact(&mut buffer).unwrap();
-        self.pc = u16::from_le_bytes(buffer.try_into().unwrap());
+        self.pc = u16::from_le_bytes(buffer);
         let mut buffer = [0x00; 2];
         data.read_exact(&mut buffer).unwrap();
-        self.af = u16::from_le_bytes(buffer.try_into().unwrap());
+        self.af = u16::from_le_bytes(buffer);
         let mut buffer = [0x00; 2];
         data.read_exact(&mut buffer).unwrap();
-        self.bc = u16::from_le_bytes(buffer.try_into().unwrap());
+        self.bc = u16::from_le_bytes(buffer);
         let mut buffer = [0x00; 2];
         data.read_exact(&mut buffer).unwrap();
-        self.de = u16::from_le_bytes(buffer.try_into().unwrap());
+        self.de = u16::from_le_bytes(buffer);
         let mut buffer = [0x00; 2];
         data.read_exact(&mut buffer).unwrap();
-        self.hl = u16::from_le_bytes(buffer.try_into().unwrap());
+        self.hl = u16::from_le_bytes(buffer);
         let mut buffer = [0x00; 2];
         data.read_exact(&mut buffer).unwrap();
-        self.sp = u16::from_le_bytes(buffer.try_into().unwrap());
+        self.sp = u16::from_le_bytes(buffer);
 
         let mut buffer = [0x00; 1];
         data.read_exact(&mut buffer).unwrap();
-        self.ime = u8::from_le_bytes(buffer.try_into().unwrap());
+        self.ime = u8::from_le_bytes(buffer);
         let mut buffer = [0x00; 1];
         data.read_exact(&mut buffer).unwrap();
-        self.ie = u8::from_le_bytes(buffer.try_into().unwrap());
+        self.ie = u8::from_le_bytes(buffer);
         let mut buffer = [0x00; 1];
         data.read_exact(&mut buffer).unwrap();
-        self.execution_mode = u8::from_le_bytes(buffer.try_into().unwrap());
+        self.execution_mode = u8::from_le_bytes(buffer);
         let mut buffer = [0x00; 1];
         data.read_exact(&mut buffer).unwrap();
-        self._padding = u8::from_le_bytes(buffer.try_into().unwrap());
+        self._padding = u8::from_le_bytes(buffer);
 
         data.read_exact(&mut self.io_registers).unwrap();
 
@@ -475,7 +465,7 @@ pub fn load_state_file(file_path: &str, gb: &mut GameBoy) {
     load_state(&data, gb);
 }
 
-pub fn load_state(data: &Vec<u8>, gb: &mut GameBoy) {
+pub fn load_state(data: &[u8], gb: &mut GameBoy) {
     let mut state = BeesState::default();
     state.load(&mut Cursor::new(data.to_vec()));
     print!("{}", state);
