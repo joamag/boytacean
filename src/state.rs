@@ -7,7 +7,6 @@ use std::{
 use crate::{
     gb::GameBoy,
     info::{name, version},
-    util::capitalize,
 };
 
 pub trait Serialize {

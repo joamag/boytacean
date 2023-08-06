@@ -5,11 +5,10 @@ pub mod consts;
 use boytacean::{
     debugln,
     gb::{AudioProvider, GameBoy},
-    gen::{NAME, VERSION},
+    info::{name, version},
     pad::PadKey,
     ppu::{DISPLAY_HEIGHT, DISPLAY_WIDTH, FRAME_BUFFER_SIZE, XRGB8888_SIZE},
     rom::Cartridge,
-    util::capitalize,
 };
 use consts::{
     REGION_NTSC, RETRO_API_VERSION, RETRO_DEVICE_ID_JOYPAD_A, RETRO_DEVICE_ID_JOYPAD_B,
@@ -174,8 +173,8 @@ pub extern "C" fn retro_reset() {
 #[no_mangle]
 pub unsafe extern "C" fn retro_get_system_info(info: *mut RetroSystemInfo) {
     debugln!("retro_get_system_info()");
-    (*info).library_name = format!("{}\0", capitalize(NAME)).as_ptr() as *const c_char;
-    (*info).library_version = format!("v{}\0", VERSION).as_ptr() as *const c_char;
+    (*info).library_name = format!("{}\0", name()).as_ptr() as *const c_char;
+    (*info).library_version = format!("v{}\0", version()).as_ptr() as *const c_char;
     (*info).valid_extensions = "gb|gbc\0".as_ptr() as *const c_char;
     (*info).need_fullpath = false;
     (*info).block_extract = false;

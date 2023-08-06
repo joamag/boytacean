@@ -9,13 +9,13 @@ use audio::Audio;
 use boytacean::{
     devices::{printer::PrinterDevice, stdout::StdoutDevice},
     gb::{AudioProvider, GameBoy, GameBoyMode},
-    gen::{NAME, VERSION},
+    info::{name, version},
     pad::PadKey,
     ppu::PaletteInfo,
     rom::Cartridge,
     serial::{NullDevice, SerialDevice},
     state::save_state_file,
-    util::{capitalize, replace_ext, write_file},
+    util::{replace_ext, write_file},
 };
 use chrono::Utc;
 use clap::Parser;
@@ -95,7 +95,7 @@ impl Emulator {
             unlimited: options.unlimited.unwrap_or(false),
             sdl: None,
             audio: None,
-            title: format!("{} v{}", capitalize(NAME), VERSION),
+            title: format!("{} v{}", name(), version()),
             rom_path: String::from("invalid"),
             ram_path: String::from("invalid"),
             logic_frequency: GameBoy::CPU_FREQ,
@@ -826,7 +826,7 @@ fn main() {
     game_boy.load(!args.no_boot);
 
     // prints the current version of the emulator (informational message)
-    println!("========= {} =========\n{}", capitalize(NAME), game_boy);
+    println!("========= {} =========\n{}", name(), game_boy);
 
     // creates a new generic emulator structure then starts
     // both the video and audio sub-systems, loads default
