@@ -488,12 +488,12 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     }
 
     get name(): string {
-        return name() || info.name;
+        return name() ?? info.name;
     }
 
     get device(): Entry {
         return {
-            text: system(),
+            text: system() ?? "Game Boy",
             url: "https://en.wikipedia.org/wiki/Game_Boy"
         };
     }
