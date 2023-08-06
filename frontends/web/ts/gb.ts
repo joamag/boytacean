@@ -31,10 +31,13 @@ import {
 import {
     Cartridge,
     default as _wasm,
+    name,
     GameBoy,
     PadKey,
     GameBoyMode,
-    GameBoySpeed
+    GameBoySpeed,
+    version,
+    system
 } from "../lib/boytacean";
 import info from "../package.json";
 
@@ -485,12 +488,12 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     }
 
     get name(): string {
-        return this.gameBoy?.name() || info.name;
+        return name() || info.name;
     }
 
     get device(): Entry {
         return {
-            text: "Game Boy",
+            text: system(),
             url: "https://en.wikipedia.org/wiki/Game_Boy"
         };
     }
@@ -501,7 +504,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
 
     get version(): Entry | undefined {
         return {
-            text: this.gameBoy?.version() ?? info.version,
+            text: version() ?? info.version,
             url: "https://github.com/joamag/boytacean/blob/master/CHANGELOG.md"
         };
     }

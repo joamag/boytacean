@@ -8,6 +8,7 @@ pub mod dma;
 pub mod gb;
 pub mod gen;
 pub mod genie;
+pub mod info;
 pub mod inst;
 pub mod macros;
 pub mod mmu;

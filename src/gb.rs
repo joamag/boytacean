@@ -11,8 +11,9 @@ use crate::{
     data::{BootRom, CGB_BOOT, DMG_BOOT, DMG_BOOTIX, MGB_BOOTIX, SGB_BOOT},
     devices::{printer::PrinterDevice, stdout::StdoutDevice},
     dma::Dma,
-    gen::{COMPILATION_DATE, COMPILATION_TIME, COMPILER, COMPILER_VERSION, NAME, VERSION},
+    gen::{COMPILATION_DATE, COMPILATION_TIME, COMPILER, COMPILER_VERSION},
     genie::{GameGenie, GameGenieCode},
+    info::version,
     mmu::Mmu,
     pad::{Pad, PadKey},
     ppu::{
@@ -22,7 +23,7 @@ use crate::{
     rom::{Cartridge, RamSize},
     serial::{NullDevice, Serial, SerialDevice},
     timer::Timer,
-    util::{capitalize, read_file},
+    util::read_file,
 };
 
 #[cfg(feature = "wasm")]
@@ -701,16 +702,6 @@ impl GameBoy {
         tile.palette_buffer(self.ppu().palette_bg())
     }
 
-    /// Obtains the name of the emulator.
-    pub fn name(&self) -> String {
-        capitalize(NAME)
-    }
-
-    /// Obtains the version of the emulator.
-    pub fn version(&self) -> String {
-        String::from(VERSION)
-    }
-
     /// Obtains the name of the compiler that has been
     /// used in the compilation of the base Boytacean
     /// library. Can be used for diagnostics.
@@ -874,7 +865,7 @@ impl GameBoy {
         format!(
             "{}  {}\n{}  {}\n{}  {}\n{}  {}\n{}  {}\n{}  {}",
             version_l,
-            VERSION,
+            version(),
             mode_l,
             self.mode(),
             clock_l,

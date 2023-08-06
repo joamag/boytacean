@@ -16,9 +16,9 @@ pub trait Serialize {
 }
 
 pub struct BeesState {
-    pub name: BeesName,
-    pub info: BeesInfo,
-    pub core: BeesCore,
+    name: BeesName,
+    info: BeesInfo,
+    core: BeesCore,
 }
 
 impl Serialize for BeesState {
@@ -34,8 +34,8 @@ impl Serialize for BeesState {
 }
 
 pub struct BeesBlockHeader {
-    pub magic: String,
-    pub size: u32,
+    magic: String,
+    size: u32,
 }
 
 impl BeesBlockHeader {
@@ -60,18 +60,18 @@ impl Serialize for BeesBlockHeader {
 }
 
 pub struct BeesBuffer {
-    pub size: u32,
-    pub offset: u32,
+    size: u32,
+    offset: u32,
 }
 
 pub struct BeesFooter {
-    pub start_offset: u32,
-    pub magic: u32,
+    start_offset: u32,
+    magic: u32,
 }
 
 pub struct BeesName {
-    pub header: BeesBlockHeader,
-    pub name: String,
+    header: BeesBlockHeader,
+    name: String,
 }
 
 impl BeesName {
@@ -98,9 +98,9 @@ impl Serialize for BeesName {
 }
 
 pub struct BeesInfo {
-    pub header: BeesBlockHeader,
-    pub title: [u8; 16],
-    pub checksum: [u8; 2],
+    header: BeesBlockHeader,
+    title: [u8; 16],
+    checksum: [u8; 2],
 }
 
 impl Serialize for BeesInfo {
@@ -110,35 +110,35 @@ impl Serialize for BeesInfo {
 }
 
 pub struct BeesCore {
-    pub header: BeesBlockHeader,
+    header: BeesBlockHeader,
 
-    pub major: u16,
-    pub minor: u16,
+    major: u16,
+    minor: u16,
 
-    pub model: u32,
+    model: u32,
 
-    pub pc: u16,
-    pub af: u16,
-    pub bc: u16,
-    pub de: u16,
-    pub hl: u16,
-    pub sp: u16,
+    pc: u16,
+    af: u16,
+    bc: u16,
+    de: u16,
+    hl: u16,
+    sp: u16,
 
-    pub ime: u8,
-    pub ie: u8,
+    ime: u8,
+    ie: u8,
     // 0 = running; 1 = halted; 2 = stopped
-    pub execution_mode: u8,
+    execution_mode: u8,
     _padding: u8,
 
-    pub io_registers: [u8; 128],
+    io_registers: [u8; 128],
 
-    pub ram: BeesBuffer,
-    pub vram: BeesBuffer,
-    pub mbc_ram: BeesBuffer,
-    pub oam: BeesBuffer,
-    pub hram: BeesBuffer,
-    pub background_palettes: BeesBuffer,
-    pub object_palettes: BeesBuffer,
+    ram: BeesBuffer,
+    vram: BeesBuffer,
+    mbc_ram: BeesBuffer,
+    oam: BeesBuffer,
+    hram: BeesBuffer,
+    background_palettes: BeesBuffer,
+    object_palettes: BeesBuffer,
 }
 
 impl Serialize for BeesCore {
