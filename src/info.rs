@@ -20,7 +20,7 @@ pub fn version() -> String {
     String::from(VERSION)
 }
 
-/// Obtains the system this emulator is emulating..
+/// Obtains the system this emulator is emulating.
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 pub fn system() -> String {
     String::from("Game Boy")
