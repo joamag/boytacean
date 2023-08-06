@@ -411,7 +411,7 @@ impl Emulator {
                                 //load_state_file("tobias1.sav", &self.system);
                                 load_state_file(
                                     "C:\\Users\\joamag\\Dropbox\\Roms\\gb\\kirby_2.s0",
-                                    &self.system,
+                                    &mut self.system,
                                 );
                             }
                             _ => {}

@@ -398,8 +398,18 @@ impl Cpu {
     }
 
     #[inline(always)]
+    pub fn set_pc(&mut self, value: u16) {
+        self.pc = value;
+    }
+
+    #[inline(always)]
     pub fn sp(&self) -> u16 {
         self.sp
+    }
+
+    #[inline(always)]
+    pub fn set_sp(&mut self, value: u16) {
+        self.sp = value;
     }
 
     #[inline(always)]

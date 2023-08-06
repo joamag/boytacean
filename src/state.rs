@@ -18,6 +18,7 @@ pub trait Serialize {
 
 pub trait State {
     fn from_gb(gb: &GameBoy) -> Self;
+    fn to_gb(&self, gb: &mut GameBoy);
 }
 
 pub struct BeesState {
@@ -31,12 +32,19 @@ impl BeesState {
     pub fn description(&self, column_length: usize) -> String {
         let emulator_l = format!("{:width$}", "Emulator", width = column_length);
         let title_l: String = format!("{:width$}", "Title", width = column_length);
+        let version_l: String = format!("{:width$}", "Version", width = column_length);
+        let model_l: String = format!("{:width$}", "Model", width = column_length);
         format!(
-            "{}  {}\n{}  {}\n",
+            "{}  {}\n{}  {}\n{}  {}.{}\n{}  {}\n",
             emulator_l,
             self.name.name,
             title_l,
             self.info.title(),
+            version_l,
+            self.core.major,
+            self.core.minor,
+            model_l,
+            self.core.model,
         )
     }
 }
@@ -73,6 +81,12 @@ impl State for BeesState {
             info: BeesInfo::from_gb(gb),
             core: BeesCore::from_gb(gb),
         }
+    }
+
+    fn to_gb(&self, gb: &mut GameBoy) {
+        self.name.to_gb(gb);
+        self.info.to_gb(gb);
+        self.core.to_gb(gb);
     }
 }
 
@@ -123,6 +137,22 @@ impl Serialize for BeesBlockHeader {
 pub struct BeesBuffer {
     size: u32,
     offset: u32,
+}
+
+impl Serialize for BeesBuffer {
+    fn save(&self, buffer: &mut Vec<u8>) {
+        buffer.write_all(&self.size.to_le_bytes()).unwrap();
+        buffer.write_all(&self.offset.to_le_bytes()).unwrap();
+    }
+
+    fn load(&mut self, data: &mut Cursor<Vec<u8>>) {
+        let mut buffer = [0x00; 4];
+        data.read_exact(&mut buffer).unwrap();
+        self.size = u32::from_le_bytes(buffer.try_into().unwrap());
+        let mut buffer = [0x00; 4];
+        data.read_exact(&mut buffer).unwrap();
+        self.offset = u32::from_le_bytes(buffer.try_into().unwrap());
+    }
 }
 
 pub struct BeesFooter {
@@ -190,9 +220,11 @@ impl Serialize for BeesName {
 }
 
 impl State for BeesName {
-    fn from_gb(_: &GameBoy) -> Self {
+    fn from_gb(_gb: &GameBoy) -> Self {
         Self::new(format!("{} v{}", name(), version()))
     }
+
+    fn to_gb(&self, _gb: &mut GameBoy) {}
 }
 
 impl Default for BeesName {
@@ -245,6 +277,8 @@ impl State for BeesInfo {
             &gb.cartridge_i().rom_data()[0x14e..=0x14f],
         )
     }
+
+    fn to_gb(&self, _gb: &mut GameBoy) {}
 }
 
 impl Default for BeesInfo {
@@ -259,7 +293,7 @@ pub struct BeesCore {
     major: u16,
     minor: u16,
 
-    model: u32,
+    model: String,
 
     pc: u16,
     af: u16,
@@ -286,7 +320,7 @@ pub struct BeesCore {
 }
 
 impl BeesCore {
-    pub fn new(model: u32, pc: u16, af: u16, bc: u16, de: u16, hl: u16, sp: u16) -> Self {
+    pub fn new(model: String, pc: u16, af: u16, bc: u16, de: u16, hl: u16, sp: u16) -> Self {
         Self {
             header: BeesBlockHeader::new(
                 String::from("CORE"),
@@ -323,15 +357,72 @@ impl BeesCore {
 }
 
 impl Serialize for BeesCore {
-    fn save(&self, buffer: &mut Vec<u8>) {}
+    fn save(&self, buffer: &mut Vec<u8>) {
+        self.header.save(buffer);
+    }
 
-    fn load(&mut self, data: &mut Cursor<Vec<u8>>) {}
+    fn load(&mut self, data: &mut Cursor<Vec<u8>>) {
+        self.header.load(data);
+
+        let mut buffer = [0x00; 2];
+        data.read_exact(&mut buffer).unwrap();
+        self.major = u16::from_le_bytes(buffer.try_into().unwrap());
+        let mut buffer = [0x00; 2];
+        data.read_exact(&mut buffer).unwrap();
+        self.minor = u16::from_le_bytes(buffer.try_into().unwrap());
+
+        let mut buffer = [0x00; 4];
+        data.read_exact(&mut buffer).unwrap();
+        self.model = String::from_utf8(Vec::from(buffer)).unwrap();
+
+        let mut buffer = [0x00; 2];
+        data.read_exact(&mut buffer).unwrap();
+        self.pc = u16::from_le_bytes(buffer.try_into().unwrap());
+        let mut buffer = [0x00; 2];
+        data.read_exact(&mut buffer).unwrap();
+        self.af = u16::from_le_bytes(buffer.try_into().unwrap());
+        let mut buffer = [0x00; 2];
+        data.read_exact(&mut buffer).unwrap();
+        self.bc = u16::from_le_bytes(buffer.try_into().unwrap());
+        let mut buffer = [0x00; 2];
+        data.read_exact(&mut buffer).unwrap();
+        self.de = u16::from_le_bytes(buffer.try_into().unwrap());
+        let mut buffer = [0x00; 2];
+        data.read_exact(&mut buffer).unwrap();
+        self.hl = u16::from_le_bytes(buffer.try_into().unwrap());
+        let mut buffer = [0x00; 2];
+        data.read_exact(&mut buffer).unwrap();
+        self.sp = u16::from_le_bytes(buffer.try_into().unwrap());
+
+        let mut buffer = [0x00; 1];
+        data.read_exact(&mut buffer).unwrap();
+        self.ime = u8::from_le_bytes(buffer.try_into().unwrap());
+        let mut buffer = [0x00; 1];
+        data.read_exact(&mut buffer).unwrap();
+        self.ie = u8::from_le_bytes(buffer.try_into().unwrap());
+        let mut buffer = [0x00; 1];
+        data.read_exact(&mut buffer).unwrap();
+        self.execution_mode = u8::from_le_bytes(buffer.try_into().unwrap());
+        let mut buffer = [0x00; 1];
+        data.read_exact(&mut buffer).unwrap();
+        self._padding = u8::from_le_bytes(buffer.try_into().unwrap());
+
+        data.read_exact(&mut self.io_registers).unwrap();
+
+        self.ram.load(data);
+        self.vram.load(data);
+        self.mbc_ram.load(data);
+        self.oam.load(data);
+        self.hram.load(data);
+        self.background_palettes.load(data);
+        self.object_palettes.load(data);
+    }
 }
 
 impl State for BeesCore {
     fn from_gb(gb: &GameBoy) -> Self {
         Self::new(
-            0x0002_u32, //GB_MODEL_DMG_B
+            String::from("GD  "),
             gb.cpu_i().pc(),
             gb.cpu_i().af(),
             gb.cpu_i().bc(),
@@ -340,13 +431,27 @@ impl State for BeesCore {
             gb.cpu_i().sp(),
         )
     }
+
+    fn to_gb(&self, gb: &mut GameBoy) {
+        gb.cpu().set_pc(self.pc);
+        gb.cpu().set_af(self.af);
+        gb.cpu().set_bc(self.bc);
+        gb.cpu().set_de(self.de);
+        gb.cpu().set_hl(self.hl);
+        gb.cpu().set_sp(self.sp);
+    }
 }
 
 impl Default for BeesCore {
     fn default() -> Self {
         Self::new(
-            0x0002_u32, //GB_MODEL_DMG_B
-            0x0000_u16, 0x0000_u16, 0x0000_u16, 0x0000_u16, 0x0000_u16, 0x0000_u16,
+            String::from("GD  "),
+            0x0000_u16,
+            0x0000_u16,
+            0x0000_u16,
+            0x0000_u16,
+            0x0000_u16,
+            0x0000_u16,
         )
     }
 }
@@ -363,15 +468,16 @@ pub fn save_state(gb: &GameBoy) -> Vec<u8> {
     data
 }
 
-pub fn load_state_file(file_path: &str, gb: &GameBoy) {
+pub fn load_state_file(file_path: &str, gb: &mut GameBoy) {
     let mut file = File::open(file_path).unwrap();
     let mut data = vec![];
     file.read_to_end(&mut data).unwrap();
     load_state(&data, gb);
 }
 
-pub fn load_state(data: &Vec<u8>, gb: &GameBoy) {
+pub fn load_state(data: &Vec<u8>, gb: &mut GameBoy) {
     let mut state = BeesState::default();
     state.load(&mut Cursor::new(data.to_vec()));
     print!("{}", state);
+    state.to_gb(gb);
 }
