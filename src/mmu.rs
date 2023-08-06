@@ -244,8 +244,14 @@ impl Mmu {
         }
 
         // @TODO: Implement DMA transfer in a better way
-        let data = self.read_many(self.dma.source(), self.dma.length());
-        self.write_many(self.dma.destination(), &data);
+
+        // only runs the DMA transfer if the system is in CGB mode
+        // this avoid issues when writing to DMG unmapped registers
+        // that would otherwise cause the system to crash
+        if self.mode == GameBoyMode::Cgb {
+            let data = self.read_many(self.dma.source(), self.dma.length());
+            self.write_many(self.dma.destination(), &data);
+        }
         self.dma.set_active(false);
     }
 
