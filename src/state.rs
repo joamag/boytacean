@@ -160,6 +160,9 @@ impl Serialize for BeesBuffer {
     fn save(&self, buffer: &mut Vec<u8>) {
         buffer.write_all(&self.size.to_le_bytes()).unwrap();
         buffer.write_all(&self.offset.to_le_bytes()).unwrap();
+
+        // @TODO need to seek the file to the beginning and write the
+        // associated buffer into that section
     }
 
     fn load(&mut self, data: &mut Cursor<Vec<u8>>) {
@@ -403,6 +406,36 @@ impl BeesCore {
 impl Serialize for BeesCore {
     fn save(&self, buffer: &mut Vec<u8>) {
         self.header.save(buffer);
+
+        buffer.write_all(&self.major.to_le_bytes()).unwrap();
+        buffer.write_all(&self.minor.to_le_bytes()).unwrap();
+
+        buffer.write_all(self.model.as_bytes()).unwrap();
+
+        buffer.write_all(&self.pc.to_le_bytes()).unwrap();
+        buffer.write_all(&self.af.to_le_bytes()).unwrap();
+        buffer.write_all(&self.bc.to_le_bytes()).unwrap();
+        buffer.write_all(&self.de.to_le_bytes()).unwrap();
+        buffer.write_all(&self.hl.to_le_bytes()).unwrap();
+        buffer.write_all(&self.sp.to_le_bytes()).unwrap();
+
+        buffer.write_all(&(self.ime as u8).to_le_bytes()).unwrap();
+        buffer.write_all(&self.ie.to_le_bytes()).unwrap();
+        buffer
+            .write_all(&self.execution_mode.to_le_bytes())
+            .unwrap();
+        buffer.write_all(&self._padding.to_le_bytes()).unwrap();
+
+        buffer.write_all(&self.io_registers).unwrap();
+
+        // @TODO requires support for writing of the underlying buffers
+        self.ram.save(buffer);
+        self.vram.save(buffer);
+        self.mbc_ram.save(buffer);
+        self.oam.save(buffer);
+        self.hram.save(buffer);
+        self.background_palettes.save(buffer);
+        self.object_palettes.save(buffer);
     }
 
     fn load(&mut self, data: &mut Cursor<Vec<u8>>) {
@@ -494,8 +527,8 @@ impl State for BeesCore {
         //@TODO the MBC is missing
         gb.mmu().write_many(0xfe00, &self.oam.buffer);
         gb.mmu().write_many(0xff80, &self.hram.buffer);
-        //@TODO the background palettes are missing
-        //@TODO the object palettes are missing
+        //@TODO the background palettes are missing - CGB only
+        //@TODO the object palettes are missing - CGB only
     }
 }
 
