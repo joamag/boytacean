@@ -507,6 +507,18 @@ impl Mmu {
         self.ram[addr as usize..addr as usize + buffer.len()].clone_from_slice(buffer);
     }
 
+    pub fn ram(&mut self) -> &mut Vec<u8> {
+        &mut self.ram
+    }
+
+    pub fn ram_i(&self) -> &Vec<u8> {
+        &self.ram
+    }
+
+    pub fn set_ram(&mut self, value: Vec<u8>) {
+        self.ram = value;
+    }
+
     pub fn rom(&mut self) -> &mut Cartridge {
         &mut self.rom
     }

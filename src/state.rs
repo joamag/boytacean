@@ -48,6 +48,16 @@ impl BeesState {
             self.core.model,
         )
     }
+
+    pub fn verify(&self) -> Result<(), String> {
+        if let Err(result) = self.footer.verify() {
+            return Err(result);
+        }
+        if let Err(result) = self.core.verify() {
+            return Err(result);
+        }
+        Ok(())
+    }
 }
 
 impl Serialize for BeesState {
@@ -85,6 +95,7 @@ impl State for BeesState {
     }
 
     fn to_gb(&self, gb: &mut GameBoy) {
+        self.verify().unwrap();
         self.name.to_gb(gb);
         self.info.to_gb(gb);
         self.core.to_gb(gb);
@@ -127,6 +138,26 @@ impl Serialize for BeesBlockHeader {
 pub struct BeesBuffer {
     size: u32,
     offset: u32,
+    buffer: Vec<u8>,
+}
+
+impl BeesBuffer {
+    pub fn new(size: u32, offset: u32, buffer: Vec<u8>) -> Self {
+        Self {
+            size,
+            offset,
+            buffer,
+        }
+    }
+
+    fn load_buffer(&self, data: &mut Cursor<Vec<u8>>) -> Vec<u8> {
+        let mut buffer = vec![0x00; self.size as usize];
+        let position = data.position();
+        data.seek(SeekFrom::Start(self.offset as u64)).unwrap();
+        data.read_exact(&mut buffer).unwrap();
+        data.set_position(position);
+        buffer
+    }
 }
 
 impl Serialize for BeesBuffer {
@@ -142,6 +173,13 @@ impl Serialize for BeesBuffer {
         let mut buffer = [0x00; 4];
         data.read_exact(&mut buffer).unwrap();
         self.offset = u32::from_le_bytes(buffer);
+        self.buffer = self.load_buffer(data);
+    }
+}
+
+impl Default for BeesBuffer {
+    fn default() -> Self {
+        Self::new(0, 0, vec![])
     }
 }
 
@@ -156,6 +194,13 @@ impl BeesFooter {
             start_offset,
             magic,
         }
+    }
+
+    pub fn verify(&self) -> Result<(), String> {
+        if self.magic != 0x53534542 {
+            return Err(String::from("Invalid magic"));
+        }
+        Ok(())
     }
 }
 
@@ -292,7 +337,7 @@ pub struct BeesCore {
     hl: u16,
     sp: u16,
 
-    ime: u8,
+    ime: bool,
     ie: u8,
     // 0 = running; 1 = halted; 2 = stopped
     execution_mode: u8,
@@ -330,19 +375,32 @@ impl BeesCore {
             de,
             hl,
             sp,
-            ime: 0,
+            ime: false,
             ie: 0,
             execution_mode: 0,
             _padding: 0,
             io_registers: [0x00; 128],
-            ram: BeesBuffer { size: 0, offset: 0 },
-            vram: BeesBuffer { size: 0, offset: 0 },
-            mbc_ram: BeesBuffer { size: 0, offset: 0 },
-            oam: BeesBuffer { size: 0, offset: 0 },
-            hram: BeesBuffer { size: 0, offset: 0 },
-            background_palettes: BeesBuffer { size: 0, offset: 0 },
-            object_palettes: BeesBuffer { size: 0, offset: 0 },
+            ram: BeesBuffer::default(),
+            vram: BeesBuffer::default(),
+            mbc_ram: BeesBuffer::default(),
+            oam: BeesBuffer::default(),
+            hram: BeesBuffer::default(),
+            background_palettes: BeesBuffer::default(),
+            object_palettes: BeesBuffer::default(),
         }
+    }
+
+    pub fn verify(&self) -> Result<(), String> {
+        if self.header.magic != "CORE" {
+            return Err(String::from("Invalid magic"));
+        }
+        if self.oam.size != 0xa0 {
+            return Err(String::from("Invalid OAM size"));
+        }
+        if self.hram.size != 0x7f {
+            return Err(String::from("Invalid HRAM size"));
+        }
+        Ok(())
     }
 }
 
@@ -386,7 +444,7 @@ impl Serialize for BeesCore {
 
         let mut buffer = [0x00; 1];
         data.read_exact(&mut buffer).unwrap();
-        self.ime = u8::from_le_bytes(buffer);
+        self.ime = buffer[0] != 0;
         let mut buffer = [0x00; 1];
         data.read_exact(&mut buffer).unwrap();
         self.ie = u8::from_le_bytes(buffer);
@@ -429,6 +487,19 @@ impl State for BeesCore {
         gb.cpu().set_de(self.de);
         gb.cpu().set_hl(self.hl);
         gb.cpu().set_sp(self.sp);
+
+        gb.cpu().set_ime(self.ime);
+        gb.mmu().ie = self.ie;
+
+        gb.mmu().write_many(0xff00, &self.io_registers);
+
+        gb.mmu().set_ram(self.ram.buffer.clone());
+        gb.mmu().write_many(0x8000, &self.vram.buffer);
+        //@TODO the MBC is missing
+        gb.mmu().write_many(0xfe00, &self.oam.buffer);
+        gb.mmu().write_many(0xff80, &self.hram.buffer);
+        //@TODO the background palettes are missing
+        //@TODO the object palettes are missing
     }
 }
 
@@ -468,6 +539,6 @@ pub fn load_state_file(file_path: &str, gb: &mut GameBoy) {
 pub fn load_state(data: &[u8], gb: &mut GameBoy) {
     let mut state = BeesState::default();
     state.load(&mut Cursor::new(data.to_vec()));
-    print!("{}", state);
     state.to_gb(gb);
+    print!("{}", state);
 }

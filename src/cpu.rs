@@ -483,6 +483,16 @@ impl Cpu {
     }
 
     #[inline(always)]
+    pub fn ime(&self) -> bool {
+        self.ime
+    }
+
+    #[inline(always)]
+    pub fn set_ime(&mut self, value: bool) {
+        self.ime = value;
+    }
+
+    #[inline(always)]
     pub fn read_u8(&mut self) -> u8 {
         let byte = self.mmu.read(self.pc);
         self.pc = self.pc.wrapping_add(1);
