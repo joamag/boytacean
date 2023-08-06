@@ -27,6 +27,7 @@ pub struct BeesState {
     name: BeesName,
     info: BeesInfo,
     core: BeesCore,
+    end: BeesBlockHeader,
 }
 
 impl BeesState {
@@ -61,6 +62,7 @@ impl Serialize for BeesState {
         self.name.save(buffer);
         self.info.save(buffer);
         self.core.save(buffer);
+        self.end.save(buffer);
         self.footer.save(buffer);
     }
 
@@ -74,9 +76,13 @@ impl Serialize for BeesState {
         data.seek(SeekFrom::Start(self.footer.start_offset as u64))
             .unwrap();
 
+        // @TODO we need to soft code this loading process to make it
+        // more flexible and able to handle a random sequence of blocks
+        // as we never know which blocks are we going to find
         self.name.load(data);
         self.info.load(data);
         self.core.load(data);
+        self.end.load(data);
     }
 }
 
@@ -87,6 +93,7 @@ impl State for BeesState {
             name: BeesName::from_gb(gb),
             info: BeesInfo::from_gb(gb),
             core: BeesCore::from_gb(gb),
+            end: BeesBlockHeader::new(String::from("END "), 0),
         }
     }
 
@@ -128,6 +135,12 @@ impl Serialize for BeesBlockHeader {
         let mut buffer = [0x00; 4];
         data.read_exact(&mut buffer).unwrap();
         self.size = u32::from_le_bytes(buffer);
+    }
+}
+
+impl Default for BeesBlockHeader {
+    fn default() -> Self {
+        Self::new(String::from("    "), 0)
     }
 }
 
