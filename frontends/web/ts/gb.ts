@@ -485,7 +485,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     }
 
     get name(): string {
-        return "Boytacean";
+        return this.gameBoy?.name() || info.name;
     }
 
     get device(): Entry {
@@ -501,7 +501,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
 
     get version(): Entry | undefined {
         return {
-            text: info.version,
+            text: this.gameBoy?.version() ?? info.version,
             url: "https://github.com/joamag/boytacean/blob/master/CHANGELOG.md"
         };
     }

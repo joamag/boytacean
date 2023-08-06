@@ -11,7 +11,7 @@ use crate::{
     data::{BootRom, CGB_BOOT, DMG_BOOT, DMG_BOOTIX, MGB_BOOTIX, SGB_BOOT},
     devices::{printer::PrinterDevice, stdout::StdoutDevice},
     dma::Dma,
-    gen::{COMPILATION_DATE, COMPILATION_TIME, COMPILER, COMPILER_VERSION, VERSION},
+    gen::{COMPILATION_DATE, COMPILATION_TIME, COMPILER, COMPILER_VERSION, NAME, VERSION},
     genie::{GameGenie, GameGenieCode},
     mmu::Mmu,
     pad::{Pad, PadKey},
@@ -22,7 +22,7 @@ use crate::{
     rom::{Cartridge, RamSize},
     serial::{NullDevice, Serial, SerialDevice},
     timer::Timer,
-    util::read_file,
+    util::{capitalize, read_file},
 };
 
 #[cfg(feature = "wasm")]
@@ -699,6 +699,16 @@ impl GameBoy {
     pub fn get_tile_buffer(&mut self, index: usize) -> Vec<u8> {
         let tile = self.get_tile(index);
         tile.palette_buffer(self.ppu().palette_bg())
+    }
+
+    /// Obtains the name of the emulator.
+    pub fn name(&self) -> String {
+        capitalize(NAME)
+    }
+
+    /// Obtains the version of the emulator.
+    pub fn version(&self) -> String {
+        String::from(VERSION)
     }
 
     /// Obtains the name of the compiler that has been

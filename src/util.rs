@@ -44,6 +44,15 @@ pub fn replace_ext(path: &str, new_extension: &str) -> Option<String> {
     Some(String::from(new_file_path.to_str()?))
 }
 
+/// Capitalizes the first character in the provided string.
+pub fn capitalize(string: &str) -> String {
+    let mut chars = string.chars();
+    match chars.next() {
+        None => String::new(),
+        Some(chr) => chr.to_uppercase().collect::<String>() + chars.as_str(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::path::Path;

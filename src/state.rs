@@ -4,7 +4,11 @@ use std::{
     io::{Cursor, Read, Write},
 };
 
-use crate::{gb::GameBoy, gen::VERSION};
+use crate::{
+    gb::GameBoy,
+    gen::{NAME, VERSION},
+    util::capitalize,
+};
 
 pub trait Serialize {
     fn save(&self, buffer: &mut Vec<u8>);
@@ -152,7 +156,7 @@ pub fn save_state_file(file_path: &str, gb: &GameBoy) {
 pub fn save_state(gb: &GameBoy) -> Vec<u8> {
     let mut data: Vec<u8> = vec![];
 
-    BeesName::new(format!("Boytacean v{}", VERSION)).save(&mut data);
+    BeesName::new(format!("{} v{}", capitalize(NAME), VERSION)).save(&mut data);
 
     data
 }

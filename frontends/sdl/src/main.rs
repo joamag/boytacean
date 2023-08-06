@@ -9,12 +9,13 @@ use audio::Audio;
 use boytacean::{
     devices::{printer::PrinterDevice, stdout::StdoutDevice},
     gb::{AudioProvider, GameBoy, GameBoyMode},
+    gen::{NAME, VERSION},
     pad::PadKey,
     ppu::PaletteInfo,
     rom::Cartridge,
     serial::{NullDevice, SerialDevice},
     state::save_state_file,
-    util::{replace_ext, write_file},
+    util::{capitalize, replace_ext, write_file},
 };
 use chrono::Utc;
 use clap::Parser;
@@ -31,10 +32,7 @@ use std::{
 /// The scale at which the screen is going to be drawn
 /// meaning the ratio between Game Boy resolution and
 /// the window size to be displayed.
-const SCREEN_SCALE: f32 = 2.0;
-
-/// The base title to be used in the window.
-const TITLE: &str = "Boytacean";
+const SCREEN_SCALE: f32 = 2.5;
 
 /// Base audio volume to be used as the basis of the
 /// amplification level of the volume
@@ -77,7 +75,7 @@ pub struct Emulator {
     unlimited: bool,
     sdl: Option<SdlSystem>,
     audio: Option<Audio>,
-    title: &'static str,
+    title: String,
     rom_path: String,
     ram_path: String,
     logic_frequency: u32,
@@ -97,7 +95,7 @@ impl Emulator {
             unlimited: options.unlimited.unwrap_or(false),
             sdl: None,
             audio: None,
-            title: TITLE,
+            title: format!("{} v{}", capitalize(NAME), VERSION),
             rom_path: String::from("invalid"),
             ram_path: String::from("invalid"),
             logic_frequency: GameBoy::CPU_FREQ,
@@ -200,7 +198,7 @@ impl Emulator {
     pub fn start_graphics(&mut self, sdl: &Sdl, screen_scale: f32) {
         self.sdl = Some(SdlSystem::new(
             sdl,
-            self.title,
+            &self.title,
             self.system.display_width() as u32,
             self.system.display_height() as u32,
             screen_scale,
@@ -820,7 +818,7 @@ fn main() {
     save_state_file("tobias.sav", &game_boy);
 
     // prints the current version of the emulator (informational message)
-    println!("========= Boytacean =========\n{}", game_boy);
+    println!("========= {} =========\n{}", capitalize(NAME), game_boy);
 
     // creates a new generic emulator structure then starts
     // both the video and audio sub-systems, loads default
