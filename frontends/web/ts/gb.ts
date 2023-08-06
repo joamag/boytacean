@@ -164,6 +164,15 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     }
 
     /**
+     * Initializes the global module structures.
+     */
+    async init() {
+        // initializes the WASM module, this is required
+        // so that the global symbols become available
+        await wasm();
+    }
+
+    /**
      * Runs the initialization and main loop execution for
      * the Game Boy emulator.
      * The main execution of this function should be an
@@ -173,10 +182,6 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
      * used in he Game Boy emulator initialization.
      */
     async main({ romUrl }: { romUrl?: string }) {
-        // initializes the WASM module, this is required
-        // so that the global symbols become available
-        await wasm();
-
         // boots the emulator subsystem with the initial
         // ROM retrieved from a remote data source
         await this.boot({ loadRom: true, romPath: romUrl ?? undefined });
