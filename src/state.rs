@@ -108,18 +108,16 @@ impl Serialize for BeesState {
             .unwrap();
 
         loop {
-            // reads the block information and then moves the cursor
-            // back to the original position to be able to re-read the
-            // block data
-            // @TODO: may read only the Block header that should suffice
-            // fo the verification we're doing and should save us some cycles
-            let block = BeesBlock::from_data(data);
-            let offset = -((block.header.size as usize + size_of::<u32>() * 2) as i64);
+            // reads the block header information and then moves the
+            // cursor back to the original position to be able to
+            // re-read the block data
+            let block = BeesBlockHeader::from_data(data);
+            let offset = -((size_of::<u32>() * 2) as i64);
             data.seek(SeekFrom::Current(offset)).unwrap();
 
-            println!("{}", block.magic().as_str());
+            println!("{}", block.magic);
 
-            match block.magic().as_str() {
+            match block.magic.as_str() {
                 "NAME" => self.name = BeesName::from_data(data),
                 "INFO" => self.info = BeesInfo::from_data(data),
                 "CORE" => self.core = BeesCore::from_data(data),
@@ -174,6 +172,16 @@ impl BeesBlockHeader {
     pub fn new(magic: String, size: u32) -> Self {
         Self { magic, size }
     }
+
+    pub fn from_data(data: &mut Cursor<Vec<u8>>) -> Self {
+        let mut instance = Self::default();
+        instance.load(data);
+        instance
+    }
+
+    pub fn is_end(&self) -> bool {
+        self.magic == "END "
+    }
 }
 
 impl Serialize for BeesBlockHeader {
@@ -226,7 +234,7 @@ impl BeesBlock {
     }
 
     pub fn is_end(&self) -> bool {
-        self.magic() == "END "
+        self.header.is_end()
     }
 }
 
