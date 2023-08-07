@@ -422,24 +422,37 @@ impl Emulator {
                     } => self.logic_frequency = self.logic_frequency.saturating_sub(400000),
                     Event::KeyDown {
                         keycode: Some(keycode),
+                        keymod,
                         ..
                     } => {
                         match keycode {
-                            Keycode::Num0 | Keycode::Num1 | Keycode::Num2 => {
-                                save_state_file(
-                                    format!(
-                                        "{}.s{}",
-                                        self.rom_name(),
-                                        keycode as u32 - Keycode::Num0 as u32
-                                    )
-                                    .as_str(),
-                                    &self.system,
+                            Keycode::Num0
+                            | Keycode::Num1
+                            | Keycode::Num2
+                            | Keycode::Num3
+                            | Keycode::Num4
+                            | Keycode::Num5
+                            | Keycode::Num6
+                            | Keycode::Num7
+                            | Keycode::Num8
+                            | Keycode::Num9 => {
+                                let file_path = format!(
+                                    "{}.s{}",
+                                    self.rom_name(),
+                                    keycode as u32 - Keycode::Num0 as u32
                                 );
-                                //load_state_file("tobias1.sav", &self.system);
-                                load_state_file(
-                                    "C:\\Users\\joamag\\Dropbox\\Roms\\gb\\tetris.s8",
-                                    &mut self.system,
-                                );
+                                if (keymod & (Mod::LCTRLMOD | Mod::RCTRLMOD)) != Mod::NOMOD {
+                                    save_state_file(&file_path, &mut self.system);
+                                    println!("Saved state into: {}", file_path)
+                                } else {
+                                    if let Err(message) =
+                                        load_state_file(&file_path, &mut self.system)
+                                    {
+                                        println!("Error loading state: {}", message)
+                                    } else {
+                                        println!("Loaded state from: {}", file_path)
+                                    }
+                                }
                             }
                             _ => {}
                         }

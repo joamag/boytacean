@@ -9,7 +9,7 @@ use std::{
 use crate::{gb::GameBoy, info::Info};
 
 pub trait Serialize {
-    fn save(&self, buffer: &mut Vec<u8>);
+    fn save(&mut self, buffer: &mut Vec<u8>);
     fn load(&mut self, data: &mut Cursor<Vec<u8>>);
 }
 
@@ -55,7 +55,41 @@ impl BeesState {
 }
 
 impl Serialize for BeesState {
-    fn save(&self, buffer: &mut Vec<u8>) {
+    fn save(&mut self, buffer: &mut Vec<u8>) {
+        let mut offset = 0x0000_u32;
+
+        self.core.ram.offset = offset;
+        buffer.write_all(&self.core.ram.buffer).unwrap();
+        offset += self.core.ram.size;
+
+        self.core.vram.offset = offset;
+        buffer.write_all(&self.core.vram.buffer).unwrap();
+        offset += self.core.vram.size;
+
+        self.core.mbc_ram.offset = offset;
+        buffer.write_all(&self.core.mbc_ram.buffer).unwrap();
+        offset += self.core.mbc_ram.size;
+
+        self.core.oam.offset = offset;
+        buffer.write_all(&self.core.oam.buffer).unwrap();
+        offset += self.core.oam.size;
+
+        self.core.hram.offset = offset;
+        buffer.write_all(&self.core.hram.buffer).unwrap();
+        offset += self.core.hram.size;
+
+        self.core.background_palettes.offset = offset;
+        buffer
+            .write_all(&self.core.background_palettes.buffer)
+            .unwrap();
+        offset += self.core.background_palettes.size;
+
+        self.core.object_palettes.offset = offset;
+        buffer.write_all(&self.core.object_palettes.buffer).unwrap();
+        offset += self.core.object_palettes.size;
+
+        self.footer.start_offset = offset;
+
         self.name.save(buffer);
         self.info.save(buffer);
         self.core.save(buffer);
@@ -121,7 +155,7 @@ impl BeesBlockHeader {
 }
 
 impl Serialize for BeesBlockHeader {
-    fn save(&self, buffer: &mut Vec<u8>) {
+    fn save(&mut self, buffer: &mut Vec<u8>) {
         buffer.write_all(self.magic.as_bytes()).unwrap();
         buffer.write_all(&self.size.to_le_bytes()).unwrap();
     }
@@ -157,6 +191,16 @@ impl BeesBuffer {
         }
     }
 
+    /// Fills the buffer with new data and optionally sets the offset
+    /// position of such data in the owner data.
+    fn fill_buffer(&mut self, data: &[u8], offset: Option<u32>) {
+        self.size = data.len() as u32;
+        self.offset = offset.unwrap_or(0);
+        self.buffer = data.to_vec();
+    }
+
+    /// Loads the internal buffer structure with the provided
+    /// data according to the size and offset defined.
     fn load_buffer(&self, data: &mut Cursor<Vec<u8>>) -> Vec<u8> {
         let mut buffer = vec![0x00; self.size as usize];
         let position = data.position();
@@ -168,12 +212,9 @@ impl BeesBuffer {
 }
 
 impl Serialize for BeesBuffer {
-    fn save(&self, buffer: &mut Vec<u8>) {
+    fn save(&mut self, buffer: &mut Vec<u8>) {
         buffer.write_all(&self.size.to_le_bytes()).unwrap();
         buffer.write_all(&self.offset.to_le_bytes()).unwrap();
-
-        // @TODO need to seek the file to the beginning and write the
-        // associated buffer into that section
     }
 
     fn load(&mut self, data: &mut Cursor<Vec<u8>>) {
@@ -215,7 +256,7 @@ impl BeesFooter {
 }
 
 impl Serialize for BeesFooter {
-    fn save(&self, buffer: &mut Vec<u8>) {
+    fn save(&mut self, buffer: &mut Vec<u8>) {
         buffer.write_all(&self.start_offset.to_le_bytes()).unwrap();
         buffer.write_all(&self.magic.to_le_bytes()).unwrap();
     }
@@ -251,7 +292,7 @@ impl BeesName {
 }
 
 impl Serialize for BeesName {
-    fn save(&self, buffer: &mut Vec<u8>) {
+    fn save(&mut self, buffer: &mut Vec<u8>) {
         self.header.save(buffer);
         buffer.write_all(self.name.as_bytes()).unwrap();
     }
@@ -309,7 +350,7 @@ impl BeesInfo {
 }
 
 impl Serialize for BeesInfo {
-    fn save(&self, buffer: &mut Vec<u8>) {
+    fn save(&mut self, buffer: &mut Vec<u8>) {
         self.header.save(buffer);
         buffer.write_all(&self.title).unwrap();
         buffer.write_all(&self.checksum).unwrap();
@@ -446,7 +487,7 @@ impl BeesCore {
 }
 
 impl Serialize for BeesCore {
-    fn save(&self, buffer: &mut Vec<u8>) {
+    fn save(&mut self, buffer: &mut Vec<u8>) {
         self.header.save(buffer);
 
         buffer.write_all(&self.major.to_le_bytes()).unwrap();
@@ -470,7 +511,6 @@ impl Serialize for BeesCore {
 
         buffer.write_all(&self.io_registers).unwrap();
 
-        // @TODO requires support for writing of the underlying buffers
         self.ram.save(buffer);
         self.vram.save(buffer);
         self.mbc_ram.save(buffer);
@@ -540,7 +580,7 @@ impl Serialize for BeesCore {
 
 impl State for BeesCore {
     fn from_gb(gb: &mut GameBoy) -> Self {
-        Self::new(
+        let mut core = Self::new(
             String::from("GD  "),
             gb.cpu_i().pc(),
             gb.cpu_i().af(),
@@ -552,7 +592,15 @@ impl State for BeesCore {
             gb.mmu_i().ie,
             0,
             gb.mmu().read_many(0xff00, 128).try_into().unwrap(),
-        )
+        );
+        core.ram.fill_buffer(gb.mmu().ram(), None);
+        core.vram
+            .fill_buffer(&gb.mmu().read_many(0x8000, 0x2000), None);
+        core.oam
+            .fill_buffer(&gb.mmu().read_many(0xfe00, 0x00a0), None);
+        core.hram
+            .fill_buffer(&gb.mmu().read_many(0xff80, 0x007f), None);
+        core
     }
 
     fn to_gb(&self, gb: &mut GameBoy) -> Result<(), String> {
