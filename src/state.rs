@@ -34,8 +34,10 @@ impl BeesState {
         let title_l: String = format!("{:width$}", "Title", width = column_length);
         let version_l: String = format!("{:width$}", "Version", width = column_length);
         let model_l: String = format!("{:width$}", "Model", width = column_length);
+        let ram_l: String = format!("{:width$}", "RAM", width = column_length);
+        let vram_l: String = format!("{:width$}", "VRAM", width = column_length);
         format!(
-            "{}  {}\n{}  {}\n{}  {}.{}\n{}  {}\n",
+            "{}  {}\n{}  {}\n{}  {}.{}\n{}  {}\n{}  {}\n{}  {}\n",
             emulator_l,
             self.name.name,
             title_l,
@@ -45,6 +47,10 @@ impl BeesState {
             self.core.minor,
             model_l,
             self.core.model,
+            ram_l,
+            self.core.ram.size,
+            vram_l,
+            self.core.vram.size,
         )
     }
 
