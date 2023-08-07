@@ -444,14 +444,12 @@ impl Emulator {
                                 if (keymod & (Mod::LCTRLMOD | Mod::RCTRLMOD)) != Mod::NOMOD {
                                     save_state_file(&file_path, &mut self.system);
                                     println!("Saved state into: {}", file_path)
+                                } else if let Err(message) =
+                                    load_state_file(&file_path, &mut self.system)
+                                {
+                                    println!("Error loading state: {}", message)
                                 } else {
-                                    if let Err(message) =
-                                        load_state_file(&file_path, &mut self.system)
-                                    {
-                                        println!("Error loading state: {}", message)
-                                    } else {
-                                        println!("Loaded state from: {}", file_path)
-                                    }
+                                    println!("Loaded state from: {}", file_path)
                                 }
                             }
                             _ => {}

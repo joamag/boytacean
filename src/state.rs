@@ -24,7 +24,7 @@ pub struct BeesState {
     name: BeesName,
     info: BeesInfo,
     core: BeesCore,
-    end: BeesBlockHeader,
+    end: BeesBlock,
 }
 
 impl BeesState {
@@ -99,13 +99,28 @@ impl Serialize for BeesState {
         data.seek(SeekFrom::Start(self.footer.start_offset as u64))
             .unwrap();
 
-        // @TODO: we need to soft code this loading process to make it
-        // more flexible and able to handle a random sequence of blocks
-        // as we never know which blocks are we going to find
-        self.name.load(data);
-        self.info.load(data);
-        self.core.load(data);
-        self.end.load(data);
+        loop {
+            // reads the block information and then moves the cursor
+            // back to the original position to be able to re-read the
+            // block data
+            // @TODO: may read only the Block header that should ufice
+            // fo the verification we're doing and should save us some cycles
+            let block = BeesBlock::from_data(data);
+            let offset = -((block.header.size as usize + size_of::<u32>() * 2) as i64);
+            data.seek(SeekFrom::Current(offset)).unwrap();
+
+            match block.magic().as_str() {
+                "NAME" => self.name = BeesName::from_data(data),
+                "INFO" => self.info = BeesInfo::from_data(data),
+                "CORE" => self.core = BeesCore::from_data(data),
+                "END " => self.end = BeesBlock::from_data(data),
+                _ => (),
+            }
+            println!("{}", block.magic().as_str());
+            if block.is_end() {
+                break;
+            }
+        }
     }
 }
 
@@ -116,7 +131,7 @@ impl State for BeesState {
             name: BeesName::from_gb(gb),
             info: BeesInfo::from_gb(gb),
             core: BeesCore::from_gb(gb),
-            end: BeesBlockHeader::new(String::from("END "), 0),
+            end: BeesBlock::from_magic(String::from("END ")),
         }
     }
 
@@ -165,6 +180,55 @@ impl Serialize for BeesBlockHeader {
 impl Default for BeesBlockHeader {
     fn default() -> Self {
         Self::new(String::from("    "), 0)
+    }
+}
+
+pub struct BeesBlock {
+    header: BeesBlockHeader,
+    buffer: Vec<u8>,
+}
+
+impl BeesBlock {
+    pub fn new(header: BeesBlockHeader, buffer: Vec<u8>) -> Self {
+        Self { header, buffer }
+    }
+
+    pub fn from_magic(magic: String) -> Self {
+        Self::new(BeesBlockHeader::new(magic, 0), vec![])
+    }
+
+    pub fn from_data(data: &mut Cursor<Vec<u8>>) -> Self {
+        let mut instance = Self::default();
+        instance.header.load(data);
+        let mut buffer = vec![0x00; instance.header.size as usize];
+        data.read_exact(&mut buffer).unwrap();
+        instance.buffer = buffer;
+        instance
+    }
+
+    pub fn magic(&self) -> &String {
+        &self.header.magic
+    }
+
+    pub fn is_end(&self) -> bool {
+        self.magic() == "END "
+    }
+}
+
+impl Serialize for BeesBlock {
+    fn save(&mut self, buffer: &mut Vec<u8>) {
+        self.header.save(buffer);
+        buffer.write_all(&self.buffer).unwrap();
+    }
+
+    fn load(&mut self, _data: &mut Cursor<Vec<u8>>) {
+        todo!()
+    }
+}
+
+impl Default for BeesBlock {
+    fn default() -> Self {
+        Self::new(BeesBlockHeader::default(), vec![])
     }
 }
 
@@ -280,6 +344,12 @@ impl BeesName {
             name,
         }
     }
+
+    pub fn from_data(data: &mut Cursor<Vec<u8>>) -> Self {
+        let mut instance = Self::default();
+        instance.load(data);
+        instance
+    }
 }
 
 impl Serialize for BeesName {
@@ -328,6 +398,12 @@ impl BeesInfo {
             title: title.try_into().unwrap(),
             checksum: checksum.try_into().unwrap(),
         }
+    }
+
+    pub fn from_data(data: &mut Cursor<Vec<u8>>) -> Self {
+        let mut instance = Self::default();
+        instance.load(data);
+        instance
     }
 
     pub fn title(&self) -> String {
@@ -463,6 +539,12 @@ impl BeesCore {
         }
     }
 
+    pub fn from_data(data: &mut Cursor<Vec<u8>>) -> Self {
+        let mut instance = Self::default();
+        instance.load(data);
+        instance
+    }
+
     pub fn verify(&self) -> Result<(), String> {
         if self.header.magic != "CORE" {
             return Err(String::from("Invalid magic"));
@@ -482,27 +564,27 @@ impl BeesCore {
         let mut buffer = [0x00_u8; 4];
 
         if gb.is_dmg() {
-            buffer[0] = 'G' as u8;
+            buffer[0] = b'G';
         } else if gb.is_cgb() {
-            buffer[0] = 'C' as u8;
-        } else if gb.is_sgb()  {
-            buffer[0] = 'S' as u8;
+            buffer[0] = b'C';
+        } else if gb.is_sgb() {
+            buffer[0] = b'S';
         } else {
-            buffer[0] = ' ' as u8;
+            buffer[0] = b' ';
         }
 
         if gb.is_dmg() {
-            buffer[1] = 'D' as u8;
+            buffer[1] = b'D';
         } else if gb.is_cgb() {
-            buffer[1] = 'C' as u8;
-        } else if gb.is_sgb()  {
-            buffer[1] = 'N' as u8;
+            buffer[1] = b'C';
+        } else if gb.is_sgb() {
+            buffer[1] = b'N';
         } else {
-            buffer[1] = ' ' as u8;
+            buffer[1] = b' ';
         }
 
-        buffer[2] = ' ' as u8;
-        buffer[3] = ' ' as u8;
+        buffer[2] = b' ';
+        buffer[3] = b' ';
 
         String::from_utf8(Vec::from(buffer)).unwrap()
     }

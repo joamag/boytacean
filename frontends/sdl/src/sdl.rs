@@ -21,7 +21,7 @@ impl SdlSystem {
     /// and sound.
     pub fn new(
         sdl: &Sdl,
-        title: &String,
+        title: &str,
         width: u32,
         height: u32,
         scale: f32,
