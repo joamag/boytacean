@@ -945,6 +945,10 @@ impl GameBoy {
         self.mmu().rom()
     }
 
+    pub fn rom_i(&self) -> &Cartridge {
+        self.mmu_i().rom_i()
+    }
+
     pub fn frame_buffer(&mut self) -> &[u8; FRAME_BUFFER_SIZE] {
         &(self.ppu().frame_buffer)
     }

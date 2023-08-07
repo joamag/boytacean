@@ -15,7 +15,7 @@ pub trait Serialize {
 
 pub trait State {
     fn from_gb(gb: &GameBoy) -> Self;
-    fn to_gb(&self, gb: &mut GameBoy);
+    fn to_gb(&self, gb: &mut GameBoy) -> Result<(), String>;
 }
 
 #[derive(Default)]
@@ -94,11 +94,12 @@ impl State for BeesState {
         }
     }
 
-    fn to_gb(&self, gb: &mut GameBoy) {
-        self.verify().unwrap();
-        self.name.to_gb(gb);
-        self.info.to_gb(gb);
-        self.core.to_gb(gb);
+    fn to_gb(&self, gb: &mut GameBoy) -> Result<(), String> {
+        self.verify()?;
+        self.name.to_gb(gb)?;
+        self.info.to_gb(gb)?;
+        self.core.to_gb(gb)?;
+        Ok(())
     }
 }
 
@@ -268,7 +269,9 @@ impl State for BeesName {
         Self::new(format!("{} v{}", Info::name(), Info::version()))
     }
 
-    fn to_gb(&self, _gb: &mut GameBoy) {}
+    fn to_gb(&self, _gb: &mut GameBoy) -> Result<(), String> {
+        Ok(())
+    }
 }
 
 impl Default for BeesName {
@@ -296,7 +299,12 @@ impl BeesInfo {
     }
 
     pub fn title(&self) -> String {
-        String::from_utf8(Vec::from(&self.title[..])).unwrap()
+        String::from(
+            String::from_utf8(Vec::from(&self.title[..]))
+                .unwrap()
+                .trim_matches(char::from(0))
+                .trim(),
+        )
     }
 }
 
@@ -322,7 +330,18 @@ impl State for BeesInfo {
         )
     }
 
-    fn to_gb(&self, _gb: &mut GameBoy) {}
+    fn to_gb(&self, gb: &mut GameBoy) -> Result<(), String> {
+        if self.title() != gb.rom_i().title() {
+            return Err(format!(
+                "Invalid ROM loaded, expected '{}' (len {}) got '{}' (len {})",
+                self.title(),
+                self.title().len(),
+                gb.rom_i().title(),
+                gb.rom_i().title().len(),
+            ));
+        }
+        Ok(())
+    }
 }
 
 impl Default for BeesInfo {
@@ -519,7 +538,7 @@ impl State for BeesCore {
         )
     }
 
-    fn to_gb(&self, gb: &mut GameBoy) {
+    fn to_gb(&self, gb: &mut GameBoy) -> Result<(), String> {
         gb.cpu().set_pc(self.pc);
         gb.cpu().set_af(self.af);
         gb.cpu().set_bc(self.bc);
@@ -539,6 +558,8 @@ impl State for BeesCore {
         gb.mmu().write_many(0xff80, &self.hram.buffer);
         //@TODO the background palettes are missing - CGB only
         //@TODO the object palettes are missing - CGB only
+
+        Ok(())
     }
 }
 
@@ -568,16 +589,18 @@ pub fn save_state(gb: &GameBoy) -> Vec<u8> {
     data
 }
 
-pub fn load_state_file(file_path: &str, gb: &mut GameBoy) {
+pub fn load_state_file(file_path: &str, gb: &mut GameBoy) -> Result<(), String> {
     let mut file = File::open(file_path).unwrap();
     let mut data = vec![];
     file.read_to_end(&mut data).unwrap();
-    load_state(&data, gb);
+    load_state(&data, gb)?;
+    Ok(())
 }
 
-pub fn load_state(data: &[u8], gb: &mut GameBoy) {
+pub fn load_state(data: &[u8], gb: &mut GameBoy) -> Result<(), String> {
     let mut state = BeesState::default();
     state.load(&mut Cursor::new(data.to_vec()));
-    state.to_gb(gb);
+    state.to_gb(gb)?;
     print!("{}", state);
+    Ok(())
 }
