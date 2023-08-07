@@ -112,7 +112,7 @@ impl Serialize for BeesState {
 impl State for BeesState {
     fn from_gb(gb: &mut GameBoy) -> Self {
         Self {
-            footer: BeesFooter::default(), // @TODO: check if this makes sense
+            footer: BeesFooter::default(),
             name: BeesName::from_gb(gb),
             info: BeesInfo::from_gb(gb),
             core: BeesCore::from_gb(gb),
@@ -475,6 +475,37 @@ impl BeesCore {
         }
         Ok(())
     }
+
+    /// Obtains the BEES (GAme Boy) model string using the
+    /// provided GameBoy instance.
+    fn bees_model(gb: &GameBoy) -> String {
+        let mut buffer = [0x00_u8; 4];
+
+        if gb.is_dmg() {
+            buffer[0] = 'G' as u8;
+        } else if gb.is_cgb() {
+            buffer[0] = 'C' as u8;
+        } else if gb.is_sgb()  {
+            buffer[0] = 'S' as u8;
+        } else {
+            buffer[0] = ' ' as u8;
+        }
+
+        if gb.is_dmg() {
+            buffer[1] = 'D' as u8;
+        } else if gb.is_cgb() {
+            buffer[1] = 'C' as u8;
+        } else if gb.is_sgb()  {
+            buffer[1] = 'N' as u8;
+        } else {
+            buffer[1] = ' ' as u8;
+        }
+
+        buffer[2] = ' ' as u8;
+        buffer[3] = ' ' as u8;
+
+        String::from_utf8(Vec::from(buffer)).unwrap()
+    }
 }
 
 impl Serialize for BeesCore {
@@ -572,7 +603,7 @@ impl Serialize for BeesCore {
 impl State for BeesCore {
     fn from_gb(gb: &mut GameBoy) -> Self {
         let mut core = Self::new(
-            String::from("GD  "), // @TODO: use the proper string
+            Self::bees_model(gb),
             gb.cpu_i().pc(),
             gb.cpu_i().af(),
             gb.cpu_i().bc(),
@@ -583,6 +614,7 @@ impl State for BeesCore {
             gb.mmu_i().ie,
             0,
             // @TODO: these registers cannot be totally retrieved
+            // because of that some audio noise exists
             gb.mmu().read_many(0xff00, 128).try_into().unwrap(),
         );
         core.ram.fill_buffer(gb.mmu().ram());
