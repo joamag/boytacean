@@ -383,6 +383,7 @@ pub struct BeesCore {
 }
 
 impl BeesCore {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         model: String,
         pc: u16,
@@ -417,7 +418,7 @@ impl BeesCore {
             sp,
             ime,
             ie,
-            execution_mode: execution_mode,
+            execution_mode,
             _padding: 0,
             io_registers,
             ram: BeesBuffer::default(),
