@@ -119,7 +119,7 @@ impl Serialize for BeesState {
                 "CORE" => self.core = BeesCore::from_data(data),
                 "MBC " => self.mbc = BeesMbc::from_data(data),
                 "END " => self.end = BeesBlock::from_data(data),
-                _ => (),
+                _ => { BeesBlock::from_data(data); }
             }
 
             if block.is_end() {
@@ -818,7 +818,7 @@ impl State for BeesMbc {
     fn from_gb(gb: &mut GameBoy) -> Self {
         let mut registers = vec![];
         match gb.cartridge().rom_type().mbc_type() {
-            crate::rom::MbcType::NoMbc => todo!(),
+            crate::rom::MbcType::NoMbc => (),
             crate::rom::MbcType::Mbc1 => {
                 registers.push(BeesMbrRegister::new(0x0000, if gb.rom().ram_enabled() { 0x0a_u8 } else { 0x00_u8 }));
                 registers.push(BeesMbrRegister::new(0x2000, gb.rom().rom_bank()));
@@ -828,12 +828,9 @@ impl State for BeesMbc {
             crate::rom::MbcType::Mbc2 => todo!(),
             crate::rom::MbcType::Mbc3 => todo!(),
             crate::rom::MbcType::Mbc5 => todo!(),
-            crate::rom::MbcType::Mbc6 => todo!(),
-            crate::rom::MbcType::Mbc7 => todo!(),
-            crate::rom::MbcType::Unknown => todo!(),
-        }
-        if gb.mmu().boot_active() {
-            registers.clear();
+            crate::rom::MbcType::Mbc6 => unimplemented!(),
+            crate::rom::MbcType::Mbc7 => unimplemented!(),
+            crate::rom::MbcType::Unknown => unimplemented!(),
         }
 
         Self::new(registers)
