@@ -136,8 +136,8 @@ impl State for BeesState {
             name: BeesName::from_gb(gb),
             info: BeesInfo::from_gb(gb),
             core: BeesCore::from_gb(gb),
-            end: BeesBlock::from_magic(String::from("END ")),
             mbc: BeesMbc::from_gb(gb),
+            end: BeesBlock::from_magic(String::from("END ")),
         }
     }
 
@@ -831,6 +831,9 @@ impl State for BeesMbc {
             crate::rom::MbcType::Mbc6 => todo!(),
             crate::rom::MbcType::Mbc7 => todo!(),
             crate::rom::MbcType::Unknown => todo!(),
+        }
+        if gb.mmu().boot_active() {
+            registers.clear();
         }
 
         Self::new(registers)
