@@ -14,7 +14,7 @@ pub trait Serialize {
 }
 
 pub trait State {
-    fn from_gb(gb: &GameBoy) -> Self;
+    fn from_gb(gb: &mut GameBoy) -> Self;
     fn to_gb(&self, gb: &mut GameBoy) -> Result<(), String>;
 }
 
@@ -84,7 +84,7 @@ impl Serialize for BeesState {
 }
 
 impl State for BeesState {
-    fn from_gb(gb: &GameBoy) -> Self {
+    fn from_gb(gb: &mut GameBoy) -> Self {
         Self {
             footer: BeesFooter::default(), // @TODO: check if this makes sense
             name: BeesName::from_gb(gb),
@@ -265,7 +265,7 @@ impl Serialize for BeesName {
 }
 
 impl State for BeesName {
-    fn from_gb(_gb: &GameBoy) -> Self {
+    fn from_gb(_gb: &mut GameBoy) -> Self {
         Self::new(format!("{} v{}", Info::name(), Info::version()))
     }
 
@@ -323,7 +323,7 @@ impl Serialize for BeesInfo {
 }
 
 impl State for BeesInfo {
-    fn from_gb(gb: &GameBoy) -> Self {
+    fn from_gb(gb: &mut GameBoy) -> Self {
         Self::new(
             &gb.cartridge_i().rom_data()[0x134..=0x143],
             &gb.cartridge_i().rom_data()[0x14e..=0x14f],
@@ -383,7 +383,19 @@ pub struct BeesCore {
 }
 
 impl BeesCore {
-    pub fn new(model: String, pc: u16, af: u16, bc: u16, de: u16, hl: u16, sp: u16) -> Self {
+    pub fn new(
+        model: String,
+        pc: u16,
+        af: u16,
+        bc: u16,
+        de: u16,
+        hl: u16,
+        sp: u16,
+        ime: bool,
+        ie: u8,
+        execution_mode: u8,
+        io_registers: [u8; 128],
+    ) -> Self {
         Self {
             header: BeesBlockHeader::new(
                 String::from("CORE"),
@@ -403,11 +415,11 @@ impl BeesCore {
             de,
             hl,
             sp,
-            ime: false,
-            ie: 0,
-            execution_mode: 0,
+            ime,
+            ie,
+            execution_mode: execution_mode,
             _padding: 0,
-            io_registers: [0x00; 128],
+            io_registers,
             ram: BeesBuffer::default(),
             vram: BeesBuffer::default(),
             mbc_ram: BeesBuffer::default(),
@@ -526,7 +538,7 @@ impl Serialize for BeesCore {
 }
 
 impl State for BeesCore {
-    fn from_gb(gb: &GameBoy) -> Self {
+    fn from_gb(gb: &mut GameBoy) -> Self {
         Self::new(
             String::from("GD  "),
             gb.cpu_i().pc(),
@@ -535,6 +547,10 @@ impl State for BeesCore {
             gb.cpu_i().de(),
             gb.cpu_i().hl(),
             gb.cpu_i().sp(),
+            gb.cpu_i().ime(),
+            gb.mmu_i().ie,
+            0,
+            gb.mmu().read_many(0xff00, 128).try_into().unwrap(),
         )
     }
 
@@ -573,17 +589,21 @@ impl Default for BeesCore {
             0x0000_u16,
             0x0000_u16,
             0x0000_u16,
+            false,
+            0x00,
+            0,
+            [0x00; 128],
         )
     }
 }
 
-pub fn save_state_file(file_path: &str, gb: &GameBoy) {
+pub fn save_state_file(file_path: &str, gb: &mut GameBoy) {
     let mut file = File::create(file_path).unwrap();
     let data = save_state(gb);
     file.write_all(&data).unwrap();
 }
 
-pub fn save_state(gb: &GameBoy) -> Vec<u8> {
+pub fn save_state(gb: &mut GameBoy) -> Vec<u8> {
     let mut data: Vec<u8> = vec![];
     BeesState::from_gb(gb).save(&mut data);
     data
