@@ -6,10 +6,7 @@ use std::{
     mem::size_of,
 };
 
-use crate::{
-    gb::GameBoy,
-    info::{name, version},
-};
+use crate::{gb::GameBoy, info::Info};
 
 pub trait Serialize {
     fn save(&self, buffer: &mut Vec<u8>);
@@ -268,7 +265,7 @@ impl Serialize for BeesName {
 
 impl State for BeesName {
     fn from_gb(_gb: &GameBoy) -> Self {
-        Self::new(format!("{} v{}", name(), version()))
+        Self::new(format!("{} v{}", Info::name(), Info::version()))
     }
 
     fn to_gb(&self, _gb: &mut GameBoy) {}

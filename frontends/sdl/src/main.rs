@@ -9,7 +9,7 @@ use audio::Audio;
 use boytacean::{
     devices::{printer::PrinterDevice, stdout::StdoutDevice},
     gb::{AudioProvider, GameBoy, GameBoyMode},
-    info::{name, version},
+    info::Info,
     pad::PadKey,
     ppu::PaletteInfo,
     rom::Cartridge,
@@ -100,7 +100,7 @@ impl Emulator {
             unlimited: options.unlimited.unwrap_or(false),
             sdl: None,
             audio: None,
-            title: format!("{} v{}", name(), version()),
+            title: format!("{} v{}", Info::name(), Info::version()),
             rom_path: String::from("invalid"),
             ram_path: String::from("invalid"),
             logic_frequency: GameBoy::CPU_FREQ,
@@ -862,7 +862,7 @@ fn main() {
     game_boy.load(!args.no_boot);
 
     // prints the current version of the emulator (informational message)
-    println!("========= {} =========\n{}", name(), game_boy);
+    println!("========= {} =========\n{}", Info::name(), game_boy);
 
     // creates a new generic emulator structure then starts
     // both the video and audio sub-systems, loads default

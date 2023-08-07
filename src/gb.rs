@@ -13,9 +13,8 @@ use crate::{
     data::{BootRom, CGB_BOOT, DMG_BOOT, DMG_BOOTIX, MGB_BOOTIX, SGB_BOOT},
     devices::{printer::PrinterDevice, stdout::StdoutDevice},
     dma::Dma,
-    gen::{COMPILATION_DATE, COMPILATION_TIME, COMPILER, COMPILER_VERSION},
     genie::{GameGenie, GameGenieCode},
-    info::version,
+    info::Info,
     mmu::Mmu,
     pad::{Pad, PadKey},
     ppu::{
@@ -704,25 +703,6 @@ impl GameBoy {
         tile.palette_buffer(self.ppu().palette_bg())
     }
 
-    /// Obtains the name of the compiler that has been
-    /// used in the compilation of the base Boytacean
-    /// library. Can be used for diagnostics.
-    pub fn compiler(&self) -> String {
-        String::from(COMPILER)
-    }
-
-    pub fn compiler_version(&self) -> String {
-        String::from(COMPILER_VERSION)
-    }
-
-    pub fn compilation_date(&self) -> String {
-        String::from(COMPILATION_DATE)
-    }
-
-    pub fn compilation_time(&self) -> String {
-        String::from(COMPILATION_TIME)
-    }
-
     pub fn is_dmg(&self) -> bool {
         self.mode == GameBoyMode::Dmg
     }
@@ -867,7 +847,7 @@ impl GameBoy {
         format!(
             "{}  {}\n{}  {}\n{}  {}\n{}  {}\n{}  {}\n{}  {}",
             version_l,
-            version(),
+            Info::version(),
             mode_l,
             self.mode(),
             clock_l,
