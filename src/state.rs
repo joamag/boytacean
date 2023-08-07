@@ -52,44 +52,36 @@ impl BeesState {
         self.core.verify()?;
         Ok(())
     }
+
+    /// Dumps the core data into the provided buffer and returns.
+    /// This will effectively populate the majority of the save
+    /// file with the core emulator contents.
+    fn dump_core(&mut self, buffer: &mut Vec<u8>) -> u32 {
+        let mut offset = 0x0000_u32;
+
+        let mut buffers = vec![
+            &mut self.core.ram,
+            &mut self.core.vram,
+            &mut self.core.mbc_ram,
+            &mut self.core.oam,
+            &mut self.core.hram,
+            &mut self.core.background_palettes,
+            &mut self.core.object_palettes,
+        ];
+
+        for item in buffers.iter_mut() {
+            (*item).offset = offset;
+            buffer.write_all(&(*item).buffer).unwrap();
+            offset += (*item).size;
+        }
+
+        offset
+    }
 }
 
 impl Serialize for BeesState {
     fn save(&mut self, buffer: &mut Vec<u8>) {
-        let mut offset = 0x0000_u32;
-
-        self.core.ram.offset = offset;
-        buffer.write_all(&self.core.ram.buffer).unwrap();
-        offset += self.core.ram.size;
-
-        self.core.vram.offset = offset;
-        buffer.write_all(&self.core.vram.buffer).unwrap();
-        offset += self.core.vram.size;
-
-        self.core.mbc_ram.offset = offset;
-        buffer.write_all(&self.core.mbc_ram.buffer).unwrap();
-        offset += self.core.mbc_ram.size;
-
-        self.core.oam.offset = offset;
-        buffer.write_all(&self.core.oam.buffer).unwrap();
-        offset += self.core.oam.size;
-
-        self.core.hram.offset = offset;
-        buffer.write_all(&self.core.hram.buffer).unwrap();
-        offset += self.core.hram.size;
-
-        self.core.background_palettes.offset = offset;
-        buffer
-            .write_all(&self.core.background_palettes.buffer)
-            .unwrap();
-        offset += self.core.background_palettes.size;
-
-        self.core.object_palettes.offset = offset;
-        buffer.write_all(&self.core.object_palettes.buffer).unwrap();
-        offset += self.core.object_palettes.size;
-
-        self.footer.start_offset = offset;
-
+        self.footer.start_offset = self.dump_core(buffer);
         self.name.save(buffer);
         self.info.save(buffer);
         self.core.save(buffer);
@@ -191,11 +183,10 @@ impl BeesBuffer {
         }
     }
 
-    /// Fills the buffer with new data and optionally sets the offset
-    /// position of such data in the owner data.
-    fn fill_buffer(&mut self, data: &[u8], offset: Option<u32>) {
+    /// Fills the buffer with new data and updating the size
+    /// value accordingly.
+    fn fill_buffer(&mut self, data: &[u8]) {
         self.size = data.len() as u32;
-        self.offset = offset.unwrap_or(0);
         self.buffer = data.to_vec();
     }
 
@@ -593,13 +584,10 @@ impl State for BeesCore {
             0,
             gb.mmu().read_many(0xff00, 128).try_into().unwrap(),
         );
-        core.ram.fill_buffer(gb.mmu().ram(), None);
-        core.vram
-            .fill_buffer(&gb.mmu().read_many(0x8000, 0x2000), None);
-        core.oam
-            .fill_buffer(&gb.mmu().read_many(0xfe00, 0x00a0), None);
-        core.hram
-            .fill_buffer(&gb.mmu().read_many(0xff80, 0x007f), None);
+        core.ram.fill_buffer(gb.mmu().ram());
+        core.vram.fill_buffer(&gb.mmu().read_many(0x8000, 0x2000));
+        core.oam.fill_buffer(&gb.mmu().read_many(0xfe00, 0x00a0));
+        core.hram.fill_buffer(&gb.mmu().read_many(0xff80, 0x007f));
         core
     }
 
