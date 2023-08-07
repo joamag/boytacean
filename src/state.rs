@@ -99,7 +99,7 @@ impl Serialize for BeesState {
         data.seek(SeekFrom::Start(self.footer.start_offset as u64))
             .unwrap();
 
-        // @TODO we need to soft code this loading process to make it
+        // @TODO: we need to soft code this loading process to make it
         // more flexible and able to handle a random sequence of blocks
         // as we never know which blocks are we going to find
         self.name.load(data);
@@ -572,7 +572,7 @@ impl Serialize for BeesCore {
 impl State for BeesCore {
     fn from_gb(gb: &mut GameBoy) -> Self {
         let mut core = Self::new(
-            String::from("GD  "),
+            String::from("GD  "), // @TODO: use the proper string
             gb.cpu_i().pc(),
             gb.cpu_i().af(),
             gb.cpu_i().bc(),
@@ -582,10 +582,12 @@ impl State for BeesCore {
             gb.cpu_i().ime(),
             gb.mmu_i().ie,
             0,
+            // @TODO: these registers cannot be totally retrieved
             gb.mmu().read_many(0xff00, 128).try_into().unwrap(),
         );
         core.ram.fill_buffer(gb.mmu().ram());
         core.vram.fill_buffer(&gb.mmu().read_many(0x8000, 0x2000));
+        core.mbc_ram.fill_buffer(gb.rom_i().ram_data());
         core.oam.fill_buffer(&gb.mmu().read_many(0xfe00, 0x00a0));
         core.hram.fill_buffer(&gb.mmu().read_many(0xff80, 0x007f));
         core
@@ -604,9 +606,9 @@ impl State for BeesCore {
 
         gb.mmu().write_many(0xff00, &self.io_registers);
 
-        gb.mmu().set_ram(self.ram.buffer.clone());
+        gb.mmu().set_ram(self.ram.buffer.to_vec());
         gb.mmu().write_many(0x8000, &self.vram.buffer);
-        //@TODO the MBC is missing
+        gb.rom().set_ram_data(&self.mbc_ram.buffer);
         gb.mmu().write_many(0xfe00, &self.oam.buffer);
         gb.mmu().write_many(0xff80, &self.hram.buffer);
         //@TODO the background palettes are missing - CGB only
