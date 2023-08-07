@@ -125,7 +125,9 @@ impl Serialize for BeesState {
                 "CORE" => self.core = BeesCore::from_data(data),
                 "MBC " => self.mbc = BeesMbc::from_data(data),
                 "END " => self.end = BeesBlock::from_data(data),
-                _ => { BeesBlock::from_data(data); }
+                _ => {
+                    BeesBlock::from_data(data);
+                }
             }
 
             if block.is_end() {
@@ -826,7 +828,14 @@ impl State for BeesMbc {
         match gb.cartridge().rom_type().mbc_type() {
             crate::rom::MbcType::NoMbc => (),
             crate::rom::MbcType::Mbc1 => {
-                registers.push(BeesMbrRegister::new(0x0000, if gb.rom().ram_enabled() { 0x0a_u8 } else { 0x00_u8 }));
+                registers.push(BeesMbrRegister::new(
+                    0x0000,
+                    if gb.rom().ram_enabled() {
+                        0x0a_u8
+                    } else {
+                        0x00_u8
+                    },
+                ));
                 registers.push(BeesMbrRegister::new(0x2000, gb.rom().rom_bank()));
                 registers.push(BeesMbrRegister::new(0x4000, gb.rom().ram_bank()));
                 registers.push(BeesMbrRegister::new(0x6000, 0x00_u8));
