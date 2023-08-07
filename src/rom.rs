@@ -13,6 +13,18 @@ pub const ROM_BANK_SIZE: usize = 16384;
 pub const RAM_BANK_SIZE: usize = 8192;
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
+pub enum MbcType {
+    NoMbc = 0x00,
+    Mbc1 = 0x01,
+    Mbc2 = 0x02,
+    Mbc3 = 0x03,
+    Mbc5 = 0x04,
+    Mbc6 = 0x05,
+    Mbc7 = 0x06,
+    Unknown = 0x07,
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
 pub enum RomType {
     RomOnly = 0x00,
     Mbc1 = 0x01,
@@ -77,6 +89,28 @@ impl RomType {
             RomType::HuC3 => "HuC3",
             RomType::HuC1RamBattery => "HuC1 + RAM + BATTERY",
             RomType::Unknown => "Unknown",
+        }
+    }
+
+    pub fn mbc_type(&self) -> MbcType {
+        match self {
+            RomType::RomOnly => MbcType::NoMbc,
+            RomType::Mbc1 | RomType::Mbc1Ram | RomType::Mbc1RamBattery => MbcType::Mbc1,
+            RomType::Mbc2 | RomType::Mbc2Battery => MbcType::Mbc2,
+            RomType::Mbc3
+            | RomType::Mbc3Ram
+            | RomType::Mbc3RamBattery
+            | RomType::Mbc3TimerBattery
+            | RomType::Mbc3TimerRamBattery => MbcType::Mbc3,
+            RomType::Mbc5
+            | RomType::Mbc5Ram
+            | RomType::Mbc5RamBattery
+            | RomType::Mbc5Rumble
+            | RomType::Mbc5RumbleRam
+            | RomType::Mbc5RumbleRamBattery => MbcType::Mbc5,
+            RomType::Mbc6 => MbcType::Mbc6,
+            RomType::Mbc7SensorRumbleRamBattery => MbcType::Mbc7,
+            _ => MbcType::Unknown,
         }
     }
 }
@@ -380,12 +414,28 @@ impl Cartridge {
         )
     }
 
-    pub fn set_rom_bank(&mut self, rom_bank: u8) {
-        self.rom_offset = rom_bank as usize * ROM_BANK_SIZE;
+    pub fn ram_enabled(&self) -> bool {
+        self.ram_enabled
+    }
+
+    pub fn set_ram_enabled(&mut self, ram_enabled: bool) {
+        self.ram_enabled = ram_enabled
+    }
+
+    pub fn ram_bank(&self) -> u8 {
+        (self.ram_offset / RAM_BANK_SIZE) as u8
     }
 
     pub fn set_ram_bank(&mut self, ram_bank: u8) {
         self.ram_offset = ram_bank as usize * RAM_BANK_SIZE;
+    }
+
+    pub fn rom_bank(&self) -> u8 {
+        (self.rom_offset / ROM_BANK_SIZE) as u8
+    }
+
+    pub fn set_rom_bank(&mut self, rom_bank: u8) {
+        self.rom_offset = rom_bank as usize * ROM_BANK_SIZE;
     }
 
     pub fn set_rumble_cb(&mut self, rumble_cb: fn(active: bool)) {

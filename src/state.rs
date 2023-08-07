@@ -24,6 +24,7 @@ pub struct BeesState {
     name: BeesName,
     info: BeesInfo,
     core: BeesCore,
+    mbc: BeesMbc,
     end: BeesBlock,
 }
 
@@ -85,6 +86,7 @@ impl Serialize for BeesState {
         self.name.save(buffer);
         self.info.save(buffer);
         self.core.save(buffer);
+        self.mbc.save(buffer);
         self.end.save(buffer);
         self.footer.save(buffer);
     }
@@ -103,20 +105,23 @@ impl Serialize for BeesState {
             // reads the block information and then moves the cursor
             // back to the original position to be able to re-read the
             // block data
-            // @TODO: may read only the Block header that should ufice
+            // @TODO: may read only the Block header that should suffice
             // fo the verification we're doing and should save us some cycles
             let block = BeesBlock::from_data(data);
             let offset = -((block.header.size as usize + size_of::<u32>() * 2) as i64);
             data.seek(SeekFrom::Current(offset)).unwrap();
 
+            println!("{}", block.magic().as_str());
+
             match block.magic().as_str() {
                 "NAME" => self.name = BeesName::from_data(data),
                 "INFO" => self.info = BeesInfo::from_data(data),
                 "CORE" => self.core = BeesCore::from_data(data),
+                "MBC " => self.mbc = BeesMbc::from_data(data),
                 "END " => self.end = BeesBlock::from_data(data),
                 _ => (),
             }
-            println!("{}", block.magic().as_str());
+
             if block.is_end() {
                 break;
             }
@@ -132,6 +137,7 @@ impl State for BeesState {
             info: BeesInfo::from_gb(gb),
             core: BeesCore::from_gb(gb),
             end: BeesBlock::from_magic(String::from("END ")),
+            mbc: BeesMbc::from_gb(gb),
         }
     }
 
@@ -140,6 +146,7 @@ impl State for BeesState {
         self.name.to_gb(gb)?;
         self.info.to_gb(gb)?;
         self.core.to_gb(gb)?;
+        self.mbc.to_gb(gb)?;
         Ok(())
     }
 }
@@ -747,6 +754,99 @@ impl Default for BeesCore {
             0,
             [0x00; 128],
         )
+    }
+}
+
+pub struct BeesMbrRegister {
+    address: u16,
+    value: u8,
+}
+
+impl BeesMbrRegister {
+    pub fn new(address: u16, value: u8) -> Self {
+        Self { address, value }
+    }
+}
+
+pub struct BeesMbc {
+    header: BeesBlockHeader,
+    registers: Vec<BeesMbrRegister>,
+}
+
+impl BeesMbc {
+    pub fn new(registers: Vec<BeesMbrRegister>) -> Self {
+        Self {
+            header: BeesBlockHeader::new(
+                String::from("MBC "),
+                ((size_of::<u8>() + size_of::<u16>()) * registers.len()) as u32,
+            ),
+            registers,
+        }
+    }
+
+    pub fn from_data(data: &mut Cursor<Vec<u8>>) -> Self {
+        let mut instance = Self::default();
+        instance.load(data);
+        instance
+    }
+}
+
+impl Serialize for BeesMbc {
+    fn save(&mut self, buffer: &mut Vec<u8>) {
+        self.header.save(buffer);
+        for register in self.registers.iter() {
+            buffer.write_all(&register.address.to_le_bytes()).unwrap();
+            buffer.write_all(&register.value.to_le_bytes()).unwrap();
+        }
+    }
+
+    fn load(&mut self, data: &mut Cursor<Vec<u8>>) {
+        self.header.load(data);
+        for _ in 0..(self.header.size / 3) {
+            let mut buffer = [0x00; 2];
+            data.read_exact(&mut buffer).unwrap();
+            let address = u16::from_le_bytes(buffer);
+            let mut buffer = [0x00; 1];
+            data.read_exact(&mut buffer).unwrap();
+            let value = u8::from_le_bytes(buffer);
+            self.registers.push(BeesMbrRegister::new(address, value));
+        }
+    }
+}
+
+impl State for BeesMbc {
+    fn from_gb(gb: &mut GameBoy) -> Self {
+        let mut registers = vec![];
+        match gb.cartridge().rom_type().mbc_type() {
+            crate::rom::MbcType::NoMbc => todo!(),
+            crate::rom::MbcType::Mbc1 => {
+                registers.push(BeesMbrRegister::new(0x0000, if gb.rom().ram_enabled() { 0x0a_u8 } else { 0x00_u8 }));
+                registers.push(BeesMbrRegister::new(0x2000, gb.rom().rom_bank()));
+                registers.push(BeesMbrRegister::new(0x4000, gb.rom().ram_bank()));
+                registers.push(BeesMbrRegister::new(0x6000, 0x00_u8));
+            }
+            crate::rom::MbcType::Mbc2 => todo!(),
+            crate::rom::MbcType::Mbc3 => todo!(),
+            crate::rom::MbcType::Mbc5 => todo!(),
+            crate::rom::MbcType::Mbc6 => todo!(),
+            crate::rom::MbcType::Mbc7 => todo!(),
+            crate::rom::MbcType::Unknown => todo!(),
+        }
+
+        Self::new(registers)
+    }
+
+    fn to_gb(&self, gb: &mut GameBoy) -> Result<(), String> {
+        for register in self.registers.iter() {
+            gb.mmu().write(register.address, register.value);
+        }
+        Ok(())
+    }
+}
+
+impl Default for BeesMbc {
+    fn default() -> Self {
+        Self::new(vec![])
     }
 }
 
