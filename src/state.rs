@@ -36,8 +36,10 @@ impl BeesState {
         let model_l: String = format!("{:width$}", "Model", width = column_length);
         let ram_l: String = format!("{:width$}", "RAM", width = column_length);
         let vram_l: String = format!("{:width$}", "VRAM", width = column_length);
+        let pc_l: String = format!("{:width$}", "PC", width = column_length);
+        let sp_l: String = format!("{:width$}", "SP", width = column_length);
         format!(
-            "{}  {}\n{}  {}\n{}  {}.{}\n{}  {}\n{}  {}\n{}  {}\n",
+            "{}  {}\n{}  {}\n{}  {}.{}\n{}  {}\n{}  {}\n{}  {}\n{}  0x{:04X}\n{}  0x{:04X}\n",
             emulator_l,
             self.name.name,
             title_l,
@@ -51,6 +53,10 @@ impl BeesState {
             self.core.ram.size,
             vram_l,
             self.core.vram.size,
+            pc_l,
+            self.core.pc,
+            sp_l,
+            self.core.sp
         )
     }
 
@@ -717,7 +723,7 @@ impl State for BeesCore {
             gb.cpu_i().sp(),
             gb.cpu_i().ime(),
             gb.mmu_i().ie,
-            0,
+            u8::from(gb.cpu().halted()),
             // @TODO: these registers cannot be totally retrieved
             // because of that some audio noise exists
             gb.mmu().read_many(0xff00, 128).try_into().unwrap(),
