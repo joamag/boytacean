@@ -70,9 +70,9 @@ impl BeesState {
         ];
 
         for item in buffers.iter_mut() {
-            (*item).offset = offset;
-            buffer.write_all(&(*item).buffer).unwrap();
-            offset += (*item).size;
+            item.offset = offset;
+            buffer.write_all(&item.buffer).unwrap();
+            offset += item.size;
         }
 
         offset
