@@ -906,7 +906,7 @@ pub static MBC5: Mbc = Mbc {
             }
             // ROM bank selection 9th bit
             0x3000 => {
-                let rom_bank = (rom.rom_bank() & 0x0ff) + (((value & 0x01) as u16) << 8);
+                let rom_bank = (rom.rom_bank() & 0x00ff) + (((value & 0x01) as u16) << 8);
                 rom.set_rom_bank(rom_bank);
             }
             // RAM bank selection
