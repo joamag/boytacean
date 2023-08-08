@@ -589,10 +589,14 @@ impl BeesCore {
         if self.hram.size != 0x7f {
             return Err(String::from("Invalid HRAM size"));
         }
-        if self.background_palettes.size != 0x40 && self.background_palettes.size != 0x00 {
+        if (self.is_cgb() && self.background_palettes.size != 0x40)
+            || (self.is_dmg() && self.background_palettes.size != 0x00)
+        {
             return Err(String::from("Invalid background palettes size"));
         }
-        if self.object_palettes.size != 0x40 && self.object_palettes.size != 0x00 {
+        if (self.is_cgb() && self.object_palettes.size != 0x40)
+            || (self.is_dmg() && self.object_palettes.size != 0x00)
+        {
             return Err(String::from("Invalid object palettes size"));
         }
         Ok(())
@@ -634,6 +638,20 @@ impl BeesCore {
         buffer[3] = b' ';
 
         String::from_utf8(Vec::from(buffer)).unwrap()
+    }
+
+    fn is_dmg(&self) -> bool {
+        if let Some(first_char) = self.model.chars().next() {
+            return first_char == 'G';
+        }
+        false
+    }
+
+    fn is_cgb(&self) -> bool {
+        if let Some(first_char) = self.model.chars().next() {
+            return first_char == 'C';
+        }
+        false
     }
 }
 
@@ -780,6 +798,8 @@ impl State for BeesCore {
         gb.mmu().write_many(0xff80, &self.hram.buffer);
 
         if gb.is_cgb() {
+            // updates the internal palettes for the CGB with the values
+            // stored in the BEES state
             gb.ppu().set_palettes_color([
                 self.background_palettes.buffer.to_vec().try_into().unwrap(),
                 self.object_palettes.buffer.to_vec().try_into().unwrap(),

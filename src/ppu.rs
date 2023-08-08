@@ -1856,7 +1856,8 @@ impl Ppu {
     }
 
     /// Computes an individual structured CGB color palette from 8 raw bytes
-    /// coming from the raw `palette_color` information.
+    /// coming from the raw `palette_color` information, this 8 bytes should
+    /// represent the 4 colors of the palette in the RGB555 format.
     fn compute_color_palette(palette: &mut Palette, palette_color: &[u8; 8]) {
         for color_index in 0..palette.len() {
             palette[color_index as usize] = Self::rgb555_to_rgb888(
