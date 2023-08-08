@@ -602,8 +602,8 @@ impl BeesCore {
         Ok(())
     }
 
-    /// Obtains the BEES (GAme Boy) model string using the
-    /// provided GameBoy instance.
+    /// Obtains the BEES (Game Boy) model string using the
+    /// provided `GameBoy` instance.
     fn bees_model(gb: &GameBoy) -> String {
         let mut buffer = [0x00_u8; 4];
 
