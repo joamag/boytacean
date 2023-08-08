@@ -1065,6 +1065,18 @@ impl Ppu {
         self.palette_obj_1
     }
 
+    pub fn palettes_color(&self) -> &[[u8; 64]; 2] {
+        &self.palettes_color
+    }
+
+    pub fn set_palettes_color(&mut self, palettes_color: [[u8; 64]; 2]) {
+        self.palettes_color = palettes_color;
+        Self::compute_palettes_color(
+            &mut [&mut self.palettes_color_bg, &mut self.palettes_color_obj],
+            &self.palettes_color,
+        );
+    }
+
     pub fn ly(&self) -> u8 {
         self.ly
     }
@@ -1790,19 +1802,6 @@ impl Ppu {
             || self.stat_oam && self.mode == PpuMode::OamRead
             || self.stat_vblank && self.mode == PpuMode::VBlank
             || self.stat_hblank && self.mode == PpuMode::HBlank
-    }
-
-    //@TOD check the best place to place this in the code
-    pub fn palettes_color(&self) -> &[[u8; 64]; 2] {
-        &self.palettes_color
-    }
-
-    pub fn set_palettes_color(&mut self, palettes_color: [[u8; 64]; 2]) {
-        self.palettes_color = palettes_color;
-        Self::compute_palettes_color(
-            &mut [&mut self.palettes_color_bg, &mut self.palettes_color_obj],
-            &self.palettes_color,
-        );
     }
 
     /// Computes the values for all of the palettes, this method
