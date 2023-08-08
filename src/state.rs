@@ -434,8 +434,15 @@ impl BeesInfo {
     }
 
     pub fn title(&self) -> String {
+        let mut final_index = 16;
+        for (i, byte) in self.title.iter().enumerate() {
+            if *byte == 0u8 {
+                final_index = i;
+                break;
+            }
+        }
         String::from(
-            String::from_utf8(Vec::from(&self.title[..]))
+            String::from_utf8(Vec::from(&self.title[..final_index]))
                 .unwrap()
                 .trim_matches(char::from(0))
                 .trim(),
@@ -582,6 +589,12 @@ impl BeesCore {
         if self.hram.size != 0x7f {
             return Err(String::from("Invalid HRAM size"));
         }
+        if self.background_palettes.size != 0x40 && self.background_palettes.size != 0x00 {
+            return Err(String::from("Invalid background palettes size"));
+        }
+        if self.object_palettes.size != 0x40 && self.object_palettes.size != 0x00 {
+            return Err(String::from("Invalid object palettes size"));
+        }
         Ok(())
     }
 
@@ -611,7 +624,9 @@ impl BeesCore {
         }
 
         if gb.is_dmg() {
-            buffer[2] = b'0';
+            buffer[2] = b'B';
+        } else if gb.is_cgb() {
+            buffer[2] = b'A';
         } else {
             buffer[2] = b' ';
         }
@@ -736,6 +751,12 @@ impl State for BeesCore {
         core.mbc_ram.fill_buffer(gb.rom_i().ram_data());
         core.oam.fill_buffer(&gb.mmu().read_many(0xfe00, 0x00a0));
         core.hram.fill_buffer(&gb.mmu().read_many(0xff80, 0x007f));
+        if gb.is_cgb() {
+            core.background_palettes
+                .fill_buffer(&gb.ppu_i().palettes_color()[0]);
+            core.object_palettes
+                .fill_buffer(&gb.ppu_i().palettes_color()[1]);
+        }
         core
     }
 
@@ -757,8 +778,17 @@ impl State for BeesCore {
         gb.rom().set_ram_data(&self.mbc_ram.buffer);
         gb.mmu().write_many(0xfe00, &self.oam.buffer);
         gb.mmu().write_many(0xff80, &self.hram.buffer);
-        //@TODO the background palettes are missing - CGB only
-        //@TODO the object palettes are missing - CGB only
+
+        if gb.is_cgb() {
+            gb.ppu().set_palettes_color([
+                self.background_palettes.buffer.to_vec().try_into().unwrap(),
+                self.object_palettes.buffer.to_vec().try_into().unwrap(),
+            ]);
+
+            // need to disable DMA transfer to avoid unwanted
+            // DMA transfers when loading the state
+            gb.dma().set_active(false);
+        }
 
         Ok(())
     }

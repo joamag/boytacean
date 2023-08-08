@@ -331,7 +331,7 @@ impl Mmu {
                         if self.boot_active {
                             0x00
                         } else {
-                            0xff
+                            0x01
                         }
                     }
 
