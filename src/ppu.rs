@@ -1015,8 +1015,33 @@ impl Ppu {
         &self.vram
     }
 
+    pub fn vram_dmg(&self) -> &[u8] {
+        &self.vram[0..VRAM_SIZE_DMG]
+    }
+
+    pub fn vram_cgb(&self) -> &[u8] {
+        &self.vram[0..VRAM_SIZE_CGB]
+    }
+
+    pub fn vram_device(&self) -> &[u8] {
+        match self.gb_mode {
+            GameBoyMode::Dmg => self.vram_dmg(),
+            GameBoyMode::Cgb => self.vram_cgb(),
+            GameBoyMode::Sgb => self.vram_dmg(),
+        }
+    }
+
+    pub fn set_vram(&mut self, value: &[u8]) {
+        self.vram[0..value.len()].copy_from_slice(value);
+        self.update_vram();
+    }
+
     pub fn hram(&self) -> &[u8; HRAM_SIZE] {
         &self.hram
+    }
+
+    pub fn set_hram(&mut self, value: [u8; HRAM_SIZE]) {
+        self.hram = value;
     }
 
     pub fn tiles(&self) -> &[Tile; TILE_COUNT] {
@@ -1132,6 +1157,28 @@ impl Ppu {
     /// useful for debugging purposes.
     pub fn print_tile_stdout(&self, tile_index: usize) {
         println!("{}", self.tiles[tile_index]);
+    }
+
+    /// Updates the internal PPU state (calculated values) according
+    /// to the VRAM values, this should be called whenever the VRAM
+    /// is replaced.
+    pub fn update_vram(&mut self) {
+        let vram_banks = if self.gb_mode == GameBoyMode::Cgb {
+            2u16
+        } else {
+            1u16
+        };
+        for vram_bank in 0..vram_banks {
+            let vram_offset = vram_bank * 0x2000;
+            for addr in 0x8000..=0x9fff {
+                let value = self.vram[(vram_offset + (addr & 0x1fff)) as usize];
+                if addr < 0x9800 {
+                    self.update_tile(addr, value);
+                } else if vram_bank == 0x1 {
+                    self.update_bg_map_attrs(addr, value);
+                }
+            }
+        }
     }
 
     /// Updates the tile structure with the value that has
@@ -1843,11 +1890,10 @@ impl Ppu {
         for index in 0..2 {
             let palette = &mut palettes[index];
             let palette_color = &palettes_color[index];
-
-            for palette_index in (0..palette.len()).step_by(8) {
+            for palette_index in 0..palette.len() {
                 Self::compute_color_palette(
-                    &mut palette[palette_index / 8],
-                    &palette_color[palette_index..palette_index + 8]
+                    &mut palette[palette_index],
+                    &palette_color[palette_index * 8..(palette_index + 1) * 8]
                         .try_into()
                         .unwrap(),
                 );
@@ -1860,7 +1906,7 @@ impl Ppu {
     /// represent the 4 colors of the palette in the RGB555 format.
     fn compute_color_palette(palette: &mut Palette, palette_color: &[u8; 8]) {
         for color_index in 0..palette.len() {
-            palette[color_index as usize] = Self::rgb555_to_rgb888(
+            palette[color_index] = Self::rgb555_to_rgb888(
                 palette_color[color_index * 2],
                 palette_color[color_index * 2 + 1],
             );

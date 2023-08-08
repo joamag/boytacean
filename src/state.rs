@@ -765,7 +765,7 @@ impl State for BeesCore {
             gb.mmu().read_many(0xff00, 128).try_into().unwrap(),
         );
         core.ram.fill_buffer(gb.mmu().ram());
-        core.vram.fill_buffer(&gb.mmu().read_many(0x8000, 0x2000));
+        core.vram.fill_buffer(gb.ppu().vram_device());
         core.mbc_ram.fill_buffer(gb.rom_i().ram_data());
         core.oam.fill_buffer(&gb.mmu().read_many(0xfe00, 0x00a0));
         core.hram.fill_buffer(&gb.mmu().read_many(0xff80, 0x007f));
@@ -792,7 +792,7 @@ impl State for BeesCore {
         gb.mmu().write_many(0xff00, &self.io_registers);
 
         gb.mmu().set_ram(self.ram.buffer.to_vec());
-        gb.mmu().write_many(0x8000, &self.vram.buffer);
+        gb.ppu().set_vram(&self.vram.buffer);
         gb.rom().set_ram_data(&self.mbc_ram.buffer);
         gb.mmu().write_many(0xfe00, &self.oam.buffer);
         gb.mmu().write_many(0xff80, &self.hram.buffer);

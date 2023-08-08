@@ -520,7 +520,7 @@ impl GameBoy {
         match self.mode() {
             GameBoyMode::Dmg => self.load_dmg(boot),
             GameBoyMode::Cgb => self.load_cgb(boot),
-            GameBoyMode::Sgb => todo!(),
+            GameBoyMode::Sgb => unimplemented!(),
         }
     }
 
