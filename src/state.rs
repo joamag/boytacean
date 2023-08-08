@@ -610,7 +610,12 @@ impl BeesCore {
             buffer[1] = b' ';
         }
 
-        buffer[2] = b' ';
+        if gb.is_dmg() {
+            buffer[2] = b'0';
+        } else {
+            buffer[2] = b' ';
+        }
+
         buffer[3] = b' ';
 
         String::from_utf8(Vec::from(buffer)).unwrap()
@@ -877,20 +882,27 @@ impl Default for BeesMbc {
     }
 }
 
-pub fn save_state_file(file_path: &str, gb: &mut GameBoy) {
-    let mut file = File::create(file_path).unwrap();
-    let data = save_state(gb);
+pub fn save_state_file(file_path: &str, gb: &mut GameBoy) -> Result<(), String> {
+    let mut file = match File::create(file_path) {
+        Ok(file) => file,
+        Err(_) => return Err(format!("Failed to open file: {}", file_path)),
+    };
+    let data = save_state(gb)?;
     file.write_all(&data).unwrap();
+    Ok(())
 }
 
-pub fn save_state(gb: &mut GameBoy) -> Vec<u8> {
+pub fn save_state(gb: &mut GameBoy) -> Result<Vec<u8>, String> {
     let mut data: Vec<u8> = vec![];
     BeesState::from_gb(gb).save(&mut data);
-    data
+    Ok(data)
 }
 
 pub fn load_state_file(file_path: &str, gb: &mut GameBoy) -> Result<(), String> {
-    let mut file = File::open(file_path).unwrap();
+    let mut file = match File::open(file_path) {
+        Ok(file) => file,
+        Err(_) => return Err(format!("Failed to open file: {}", file_path)),
+    };
     let mut data = vec![];
     file.read_to_end(&mut data).unwrap();
     load_state(&data, gb)?;
