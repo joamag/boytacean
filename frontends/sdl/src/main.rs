@@ -29,7 +29,7 @@ use sdl2::{
 };
 use std::{
     cmp::max,
-    path::Path,
+    path::{Path, PathBuf},
     thread,
     time::{Duration, Instant, SystemTime},
 };
@@ -83,6 +83,7 @@ pub struct Emulator {
     title: String,
     rom_path: String,
     ram_path: String,
+    dir_path: String,
     logic_frequency: u32,
     visual_frequency: f32,
     next_tick_time: f32,
@@ -103,6 +104,7 @@ impl Emulator {
             title: format!("{} v{}", Info::name(), Info::version()),
             rom_path: String::from("invalid"),
             ram_path: String::from("invalid"),
+            dir_path: String::from("invalid"),
             logic_frequency: GameBoy::CPU_FREQ,
             visual_frequency: GameBoy::VISUAL_FREQ,
             next_tick_time: 0.0,
@@ -243,6 +245,12 @@ impl Emulator {
         }
         self.rom_path = String::from(rom_path);
         self.ram_path = ram_path;
+        self.dir_path = Path::new(&self.rom_path)
+            .parent()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_string();
     }
 
     pub fn reset(&mut self) {
@@ -275,6 +283,22 @@ impl Emulator {
             "Took {:.2} seconds to run {} ticks ({} cycles) ({:.2} Mhz)!",
             delta, count, cycles, frequency_mhz
         );
+    }
+
+    fn save_state(&mut self, file_path: &str) {
+        if let Err(message) = save_state_file(file_path, &mut self.system) {
+            println!("Error saving state: {}", message)
+        } else {
+            println!("Saved state into: {}", file_path)
+        }
+    }
+
+    fn load_state(&mut self, file_path: &str) {
+        if let Err(message) = load_state_file(file_path, &mut self.system) {
+            println!("Error loading state: {}", message)
+        } else {
+            println!("Loaded state from: {}", file_path)
+        }
     }
 
     fn save_image(&mut self, file_path: &str) {
@@ -394,7 +418,7 @@ impl Emulator {
                     Event::KeyDown {
                         keycode: Some(Keycode::I),
                         ..
-                    } => self.save_image(&self.image_name(Some("png"))),
+                    } => self.save_image(&self.image_name(Some("png"), Some(&self.dir_path))),
                     Event::KeyDown {
                         keycode: Some(Keycode::T),
                         ..
@@ -436,20 +460,15 @@ impl Emulator {
                             | Keycode::Num7
                             | Keycode::Num8
                             | Keycode::Num9 => {
-                                let file_path = format!(
-                                    "{}.s{}",
+                                let file_path = self.save_name(
                                     self.rom_name(),
-                                    keycode as u32 - Keycode::Num0 as u32
+                                    keycode as u8 - Keycode::Num0 as u8,
+                                    &self.dir_path,
                                 );
                                 if (keymod & (Mod::LCTRLMOD | Mod::RCTRLMOD)) != Mod::NOMOD {
-                                    save_state_file(&file_path, &mut self.system);
-                                    println!("Saved state into: {}", file_path)
-                                } else if let Err(message) =
-                                    load_state_file(&file_path, &mut self.system)
-                                {
-                                    println!("Error loading state: {}", message)
+                                    self.save_state(&file_path);
                                 } else {
-                                    println!("Loaded state from: {}", file_path)
+                                    self.load_state(&file_path);
                                 }
                             }
                             _ => {}
@@ -727,21 +746,39 @@ impl Emulator {
             .unwrap()
     }
 
-    fn image_name(&self, ext: Option<&str>) -> String {
+    fn image_name(&self, ext: Option<&str>, dir_path: Option<&str>) -> String {
         let ext = ext.unwrap_or("png");
-        self.best_name(self.rom_name(), ext)
+        let dir_path = dir_path.unwrap_or(".");
+        self.best_name(self.rom_name(), ext, dir_path)
     }
 
-    fn best_name(&self, base: &str, ext: &str) -> String {
+    /// Obtains the best possible save file name (ex: `ROM_NAME.sv0`) taking
+    /// into consideration the current directory path and the index of the save.
+    fn save_name(&self, base: &str, index: u8, dir_path: &str) -> String {
+        let file_name = format!("{}.s{}", base, index);
+        let mut file_buf = PathBuf::from(dir_path);
+        file_buf.push(file_name);
+        file_buf.to_str().unwrap().to_string()
+    }
+
+    /// Tries to obtain the best possible file name for the provided base name
+    /// and extension avoiding name collisions with existing files in the
+    /// same directory.
+    fn best_name(&self, base: &str, ext: &str, dir_path: &str) -> String {
         let mut index = 0_usize;
         let mut name = format!("{}.{}", base, ext);
 
-        while Path::new(&name).exists() {
+        let mut path_buf = PathBuf::from(dir_path);
+        path_buf.push(&name);
+
+        while path_buf.exists() {
             index += 1;
             name = format!("{}-{}.{}", base, index, ext);
+            path_buf = PathBuf::from(dir_path);
+            path_buf.push(&name);
         }
 
-        name
+        path_buf.to_str().unwrap().to_string()
     }
 }
 
