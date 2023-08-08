@@ -430,11 +430,11 @@ impl Cartridge {
         self.ram_offset = ram_bank as usize * RAM_BANK_SIZE;
     }
 
-    pub fn rom_bank(&self) -> u8 {
-        (self.rom_offset / ROM_BANK_SIZE) as u8
+    pub fn rom_bank(&self) -> u16 {
+        (self.rom_offset / ROM_BANK_SIZE) as u16
     }
 
-    pub fn set_rom_bank(&mut self, rom_bank: u8) {
+    pub fn set_rom_bank(&mut self, rom_bank: u16) {
         self.rom_offset = rom_bank as usize * ROM_BANK_SIZE;
     }
 
@@ -783,8 +783,8 @@ pub static MBC1: Mbc = Mbc {
             }
             // ROM bank selection 5 lower bits
             0x2000 | 0x3000 => {
-                let mut rom_bank = value & 0x1f;
-                rom_bank &= (rom.rom_bank_count * 2 - 1) as u8;
+                let mut rom_bank = value as u16 & 0x1f;
+                rom_bank &= rom.rom_bank_count * 2 - 1;
                 if rom_bank == 0 {
                     rom_bank = 1;
                 }
@@ -845,8 +845,8 @@ pub static MBC3: Mbc = Mbc {
             }
             // ROM bank selection
             0x2000 | 0x3000 => {
-                let mut rom_bank = value & 0x7f;
-                rom_bank &= (rom.rom_bank_count * 2 - 1) as u8;
+                let mut rom_bank = value as u16 & 0x7f;
+                rom_bank &= rom.rom_bank_count * 2 - 1;
                 if rom_bank == 0 {
                     rom_bank = 1;
                 }
@@ -899,9 +899,14 @@ pub static MBC5: Mbc = Mbc {
             0x0000 | 0x1000 => {
                 rom.ram_enabled = (value & 0x0f) == 0x0a;
             }
-            // ROM bank selection
+            // ROM bank selection 8 lower bits
             0x2000 => {
-                let rom_bank = value;
+                let rom_bank = value as u16;
+                rom.set_rom_bank(rom_bank);
+            }
+            // ROM bank selection 9th bit
+            0x3000 => {
+                let rom_bank = (rom.rom_bank() & 0x0ff) + (((value & 0x01) as u16) << 8);
                 rom.set_rom_bank(rom_bank);
             }
             // RAM bank selection

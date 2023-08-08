@@ -6,15 +6,24 @@ use std::{
     mem::size_of,
 };
 
-use crate::{gb::GameBoy, info::Info};
+use crate::{gb::GameBoy, info::Info, rom::MbcType};
 
 pub trait Serialize {
-    fn save(&mut self, buffer: &mut Vec<u8>);
-    fn load(&mut self, data: &mut Cursor<Vec<u8>>);
+    /// Writes the data from the internal structure into the
+    /// provided buffer.
+    fn write(&mut self, buffer: &mut Vec<u8>);
+
+    /// Reads the data from the provided buffer and populates
+    /// the internal structure with it.
+    fn read(&mut self, data: &mut Cursor<Vec<u8>>);
 }
 
 pub trait State {
+    /// Obtains a new instance of the state from the provided
+    /// `GameBoy` instance and returns it.
     fn from_gb(gb: &mut GameBoy) -> Self;
+
+    /// Applies the state to the provided `GameBoy` instance.
     fn to_gb(&self, gb: &mut GameBoy) -> Result<(), String>;
 }
 
@@ -93,23 +102,23 @@ impl BeesState {
 }
 
 impl Serialize for BeesState {
-    fn save(&mut self, buffer: &mut Vec<u8>) {
+    fn write(&mut self, buffer: &mut Vec<u8>) {
         self.footer.start_offset = self.dump_core(buffer);
-        self.name.save(buffer);
-        self.info.save(buffer);
-        self.core.save(buffer);
-        self.mbc.save(buffer);
-        self.end.save(buffer);
-        self.footer.save(buffer);
+        self.name.write(buffer);
+        self.info.write(buffer);
+        self.core.write(buffer);
+        self.mbc.write(buffer);
+        self.end.write(buffer);
+        self.footer.write(buffer);
     }
 
-    fn load(&mut self, data: &mut Cursor<Vec<u8>>) {
+    fn read(&mut self, data: &mut Cursor<Vec<u8>>) {
         // moves the cursor to the end of the file
         // to read the footer, and then places the
         // the cursor in the start of the BEES data
         // according to the footer information
         data.seek(SeekFrom::End(-8)).unwrap();
-        self.footer.load(data);
+        self.footer.read(data);
         data.seek(SeekFrom::Start(self.footer.start_offset as u64))
             .unwrap();
 
@@ -179,7 +188,7 @@ impl BeesBlockHeader {
 
     pub fn from_data(data: &mut Cursor<Vec<u8>>) -> Self {
         let mut instance = Self::default();
-        instance.load(data);
+        instance.read(data);
         instance
     }
 
@@ -189,12 +198,12 @@ impl BeesBlockHeader {
 }
 
 impl Serialize for BeesBlockHeader {
-    fn save(&mut self, buffer: &mut Vec<u8>) {
+    fn write(&mut self, buffer: &mut Vec<u8>) {
         buffer.write_all(self.magic.as_bytes()).unwrap();
         buffer.write_all(&self.size.to_le_bytes()).unwrap();
     }
 
-    fn load(&mut self, data: &mut Cursor<Vec<u8>>) {
+    fn read(&mut self, data: &mut Cursor<Vec<u8>>) {
         let mut buffer = [0x00; 4];
         data.read_exact(&mut buffer).unwrap();
         self.magic = String::from_utf8(Vec::from(buffer)).unwrap();
@@ -226,10 +235,7 @@ impl BeesBlock {
 
     pub fn from_data(data: &mut Cursor<Vec<u8>>) -> Self {
         let mut instance = Self::default();
-        instance.header.load(data);
-        let mut buffer = vec![0x00; instance.header.size as usize];
-        data.read_exact(&mut buffer).unwrap();
-        instance.buffer = buffer;
+        instance.read(data);
         instance
     }
 
@@ -243,13 +249,15 @@ impl BeesBlock {
 }
 
 impl Serialize for BeesBlock {
-    fn save(&mut self, buffer: &mut Vec<u8>) {
-        self.header.save(buffer);
+    fn write(&mut self, buffer: &mut Vec<u8>) {
+        self.header.write(buffer);
         buffer.write_all(&self.buffer).unwrap();
     }
 
-    fn load(&mut self, _data: &mut Cursor<Vec<u8>>) {
-        todo!()
+    fn read(&mut self, data: &mut Cursor<Vec<u8>>) {
+        self.header.read(data);
+        self.buffer.reserve_exact(self.header.size as usize);
+        data.read_exact(&mut self.buffer).unwrap();
     }
 }
 
@@ -294,12 +302,12 @@ impl BeesBuffer {
 }
 
 impl Serialize for BeesBuffer {
-    fn save(&mut self, buffer: &mut Vec<u8>) {
+    fn write(&mut self, buffer: &mut Vec<u8>) {
         buffer.write_all(&self.size.to_le_bytes()).unwrap();
         buffer.write_all(&self.offset.to_le_bytes()).unwrap();
     }
 
-    fn load(&mut self, data: &mut Cursor<Vec<u8>>) {
+    fn read(&mut self, data: &mut Cursor<Vec<u8>>) {
         let mut buffer = [0x00; 4];
         data.read_exact(&mut buffer).unwrap();
         self.size = u32::from_le_bytes(buffer);
@@ -338,12 +346,12 @@ impl BeesFooter {
 }
 
 impl Serialize for BeesFooter {
-    fn save(&mut self, buffer: &mut Vec<u8>) {
+    fn write(&mut self, buffer: &mut Vec<u8>) {
         buffer.write_all(&self.start_offset.to_le_bytes()).unwrap();
         buffer.write_all(&self.magic.to_le_bytes()).unwrap();
     }
 
-    fn load(&mut self, data: &mut Cursor<Vec<u8>>) {
+    fn read(&mut self, data: &mut Cursor<Vec<u8>>) {
         let mut buffer = [0x00; 4];
         data.read_exact(&mut buffer).unwrap();
         self.start_offset = u32::from_le_bytes(buffer);
@@ -374,19 +382,19 @@ impl BeesName {
 
     pub fn from_data(data: &mut Cursor<Vec<u8>>) -> Self {
         let mut instance = Self::default();
-        instance.load(data);
+        instance.read(data);
         instance
     }
 }
 
 impl Serialize for BeesName {
-    fn save(&mut self, buffer: &mut Vec<u8>) {
-        self.header.save(buffer);
+    fn write(&mut self, buffer: &mut Vec<u8>) {
+        self.header.write(buffer);
         buffer.write_all(self.name.as_bytes()).unwrap();
     }
 
-    fn load(&mut self, data: &mut Cursor<Vec<u8>>) {
-        self.header.load(data);
+    fn read(&mut self, data: &mut Cursor<Vec<u8>>) {
+        self.header.read(data);
         let mut buffer = vec![0x00; self.header.size as usize];
         data.read_exact(&mut buffer).unwrap();
         self.name = String::from_utf8(buffer).unwrap();
@@ -429,7 +437,7 @@ impl BeesInfo {
 
     pub fn from_data(data: &mut Cursor<Vec<u8>>) -> Self {
         let mut instance = Self::default();
-        instance.load(data);
+        instance.read(data);
         instance
     }
 
@@ -451,14 +459,14 @@ impl BeesInfo {
 }
 
 impl Serialize for BeesInfo {
-    fn save(&mut self, buffer: &mut Vec<u8>) {
-        self.header.save(buffer);
+    fn write(&mut self, buffer: &mut Vec<u8>) {
+        self.header.write(buffer);
         buffer.write_all(&self.title).unwrap();
         buffer.write_all(&self.checksum).unwrap();
     }
 
-    fn load(&mut self, data: &mut Cursor<Vec<u8>>) {
-        self.header.load(data);
+    fn read(&mut self, data: &mut Cursor<Vec<u8>>) {
+        self.header.read(data);
         data.read_exact(&mut self.title).unwrap();
         data.read_exact(&mut self.checksum).unwrap();
     }
@@ -575,7 +583,7 @@ impl BeesCore {
 
     pub fn from_data(data: &mut Cursor<Vec<u8>>) -> Self {
         let mut instance = Self::default();
-        instance.load(data);
+        instance.read(data);
         instance
     }
 
@@ -656,8 +664,8 @@ impl BeesCore {
 }
 
 impl Serialize for BeesCore {
-    fn save(&mut self, buffer: &mut Vec<u8>) {
-        self.header.save(buffer);
+    fn write(&mut self, buffer: &mut Vec<u8>) {
+        self.header.write(buffer);
 
         buffer.write_all(&self.major.to_le_bytes()).unwrap();
         buffer.write_all(&self.minor.to_le_bytes()).unwrap();
@@ -680,17 +688,17 @@ impl Serialize for BeesCore {
 
         buffer.write_all(&self.io_registers).unwrap();
 
-        self.ram.save(buffer);
-        self.vram.save(buffer);
-        self.mbc_ram.save(buffer);
-        self.oam.save(buffer);
-        self.hram.save(buffer);
-        self.background_palettes.save(buffer);
-        self.object_palettes.save(buffer);
+        self.ram.write(buffer);
+        self.vram.write(buffer);
+        self.mbc_ram.write(buffer);
+        self.oam.write(buffer);
+        self.hram.write(buffer);
+        self.background_palettes.write(buffer);
+        self.object_palettes.write(buffer);
     }
 
-    fn load(&mut self, data: &mut Cursor<Vec<u8>>) {
-        self.header.load(data);
+    fn read(&mut self, data: &mut Cursor<Vec<u8>>) {
+        self.header.read(data);
 
         let mut buffer = [0x00; 2];
         data.read_exact(&mut buffer).unwrap();
@@ -737,13 +745,13 @@ impl Serialize for BeesCore {
 
         data.read_exact(&mut self.io_registers).unwrap();
 
-        self.ram.load(data);
-        self.vram.load(data);
-        self.mbc_ram.load(data);
-        self.oam.load(data);
-        self.hram.load(data);
-        self.background_palettes.load(data);
-        self.object_palettes.load(data);
+        self.ram.read(data);
+        self.vram.read(data);
+        self.mbc_ram.read(data);
+        self.oam.read(data);
+        self.hram.read(data);
+        self.background_palettes.read(data);
+        self.object_palettes.read(data);
     }
 }
 
@@ -861,22 +869,22 @@ impl BeesMbc {
 
     pub fn from_data(data: &mut Cursor<Vec<u8>>) -> Self {
         let mut instance = Self::default();
-        instance.load(data);
+        instance.read(data);
         instance
     }
 }
 
 impl Serialize for BeesMbc {
-    fn save(&mut self, buffer: &mut Vec<u8>) {
-        self.header.save(buffer);
+    fn write(&mut self, buffer: &mut Vec<u8>) {
+        self.header.write(buffer);
         for register in self.registers.iter() {
             buffer.write_all(&register.address.to_le_bytes()).unwrap();
             buffer.write_all(&register.value.to_le_bytes()).unwrap();
         }
     }
 
-    fn load(&mut self, data: &mut Cursor<Vec<u8>>) {
-        self.header.load(data);
+    fn read(&mut self, data: &mut Cursor<Vec<u8>>) {
+        self.header.read(data);
         for _ in 0..(self.header.size / 3) {
             let mut buffer = [0x00; 2];
             data.read_exact(&mut buffer).unwrap();
@@ -893,8 +901,8 @@ impl State for BeesMbc {
     fn from_gb(gb: &mut GameBoy) -> Self {
         let mut registers = vec![];
         match gb.cartridge().rom_type().mbc_type() {
-            crate::rom::MbcType::NoMbc => (),
-            crate::rom::MbcType::Mbc1 => {
+            MbcType::NoMbc => (),
+            MbcType::Mbc1 => {
                 registers.push(BeesMbrRegister::new(
                     0x0000,
                     if gb.rom().ram_enabled() {
@@ -903,16 +911,42 @@ impl State for BeesMbc {
                         0x00_u8
                     },
                 ));
-                registers.push(BeesMbrRegister::new(0x2000, gb.rom().rom_bank()));
+                registers.push(BeesMbrRegister::new(
+                    0x2000,
+                    gb.rom().rom_bank() as u8 & 0x1f,
+                ));
                 registers.push(BeesMbrRegister::new(0x4000, gb.rom().ram_bank()));
                 registers.push(BeesMbrRegister::new(0x6000, 0x00_u8));
             }
-            crate::rom::MbcType::Mbc2 => todo!(),
-            crate::rom::MbcType::Mbc3 => todo!(),
-            crate::rom::MbcType::Mbc5 => todo!(),
-            crate::rom::MbcType::Mbc6 => unimplemented!(),
-            crate::rom::MbcType::Mbc7 => unimplemented!(),
-            crate::rom::MbcType::Unknown => unimplemented!(),
+            MbcType::Mbc3 => {
+                registers.push(BeesMbrRegister::new(
+                    0x0000,
+                    if gb.rom().ram_enabled() {
+                        0x0a_u8
+                    } else {
+                        0x00_u8
+                    },
+                ));
+                registers.push(BeesMbrRegister::new(0x2000, gb.rom().rom_bank() as u8));
+                registers.push(BeesMbrRegister::new(0x4000, gb.rom().ram_bank()));
+            }
+            MbcType::Mbc5 => {
+                registers.push(BeesMbrRegister::new(
+                    0x0000,
+                    if gb.rom().ram_enabled() {
+                        0x0a_u8
+                    } else {
+                        0x00_u8
+                    },
+                ));
+                registers.push(BeesMbrRegister::new(0x2000, gb.rom().rom_bank() as u8));
+                registers.push(BeesMbrRegister::new(
+                    0x3000,
+                    (gb.rom().rom_bank() >> 8) as u8 & 0x01,
+                ));
+                registers.push(BeesMbrRegister::new(0x4000, gb.rom().ram_bank()));
+            }
+            _ => unimplemented!(),
         }
 
         Self::new(registers)
@@ -944,7 +978,7 @@ pub fn save_state_file(file_path: &str, gb: &mut GameBoy) -> Result<(), String> 
 
 pub fn save_state(gb: &mut GameBoy) -> Result<Vec<u8>, String> {
     let mut data: Vec<u8> = vec![];
-    BeesState::from_gb(gb).save(&mut data);
+    BeesState::from_gb(gb).write(&mut data);
     Ok(data)
 }
 
@@ -961,7 +995,7 @@ pub fn load_state_file(file_path: &str, gb: &mut GameBoy) -> Result<(), String> 
 
 pub fn load_state(data: &[u8], gb: &mut GameBoy) -> Result<(), String> {
     let mut state = BeesState::default();
-    state.load(&mut Cursor::new(data.to_vec()));
+    state.read(&mut Cursor::new(data.to_vec()));
     state.to_gb(gb)?;
     print!("{}", state);
     Ok(())
