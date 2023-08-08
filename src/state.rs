@@ -1,3 +1,5 @@
+//! System state (BEES format) functions and structures.
+
 use std::{
     convert::TryInto,
     fmt::{self, Display, Formatter},
@@ -966,6 +968,9 @@ impl Default for BeesMbc {
     }
 }
 
+/// Top level manager structure containing the
+/// entrypoint static methods for saving and loading
+/// BEES states for the Game Boy.
 pub struct StateManager;
 
 impl StateManager {
