@@ -966,37 +966,41 @@ impl Default for BeesMbc {
     }
 }
 
-pub fn save_state_file(file_path: &str, gb: &mut GameBoy) -> Result<(), String> {
-    let mut file = match File::create(file_path) {
-        Ok(file) => file,
-        Err(_) => return Err(format!("Failed to open file: {}", file_path)),
-    };
-    let data = save_state(gb)?;
-    file.write_all(&data).unwrap();
-    Ok(())
-}
+pub struct StateManager;
 
-pub fn save_state(gb: &mut GameBoy) -> Result<Vec<u8>, String> {
-    let mut data: Vec<u8> = vec![];
-    BeesState::from_gb(gb).write(&mut data);
-    Ok(data)
-}
+impl StateManager {
+    pub fn save_file(file_path: &str, gb: &mut GameBoy) -> Result<(), String> {
+        let mut file = match File::create(file_path) {
+            Ok(file) => file,
+            Err(_) => return Err(format!("Failed to open file: {}", file_path)),
+        };
+        let data = Self::save(gb)?;
+        file.write_all(&data).unwrap();
+        Ok(())
+    }
 
-pub fn load_state_file(file_path: &str, gb: &mut GameBoy) -> Result<(), String> {
-    let mut file = match File::open(file_path) {
-        Ok(file) => file,
-        Err(_) => return Err(format!("Failed to open file: {}", file_path)),
-    };
-    let mut data = vec![];
-    file.read_to_end(&mut data).unwrap();
-    load_state(&data, gb)?;
-    Ok(())
-}
+    pub fn save(gb: &mut GameBoy) -> Result<Vec<u8>, String> {
+        let mut data: Vec<u8> = vec![];
+        BeesState::from_gb(gb).write(&mut data);
+        Ok(data)
+    }
 
-pub fn load_state(data: &[u8], gb: &mut GameBoy) -> Result<(), String> {
-    let mut state = BeesState::default();
-    state.read(&mut Cursor::new(data.to_vec()));
-    state.to_gb(gb)?;
-    print!("{}", state);
-    Ok(())
+    pub fn load_file(file_path: &str, gb: &mut GameBoy) -> Result<(), String> {
+        let mut file = match File::open(file_path) {
+            Ok(file) => file,
+            Err(_) => return Err(format!("Failed to open file: {}", file_path)),
+        };
+        let mut data = vec![];
+        file.read_to_end(&mut data).unwrap();
+        Self::load(&data, gb)?;
+        Ok(())
+    }
+
+    pub fn load(data: &[u8], gb: &mut GameBoy) -> Result<(), String> {
+        let mut state = BeesState::default();
+        state.read(&mut Cursor::new(data.to_vec()));
+        state.to_gb(gb)?;
+        print!("{}", state);
+        Ok(())
+    }
 }

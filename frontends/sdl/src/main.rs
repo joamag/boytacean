@@ -14,7 +14,7 @@ use boytacean::{
     ppu::PaletteInfo,
     rom::Cartridge,
     serial::{NullDevice, SerialDevice},
-    state::{load_state_file, save_state_file},
+    state::StateManager,
     util::{replace_ext, write_file},
 };
 use chrono::Utc;
@@ -286,7 +286,7 @@ impl Emulator {
     }
 
     fn save_state(&mut self, file_path: &str) {
-        if let Err(message) = save_state_file(file_path, &mut self.system) {
+        if let Err(message) = StateManager::save_file(file_path, &mut self.system) {
             println!("Error saving state: {}", message)
         } else {
             println!("Saved state into: {}", file_path)
@@ -294,7 +294,7 @@ impl Emulator {
     }
 
     fn load_state(&mut self, file_path: &str) {
-        if let Err(message) = load_state_file(file_path, &mut self.system) {
+        if let Err(message) = StateManager::load_file(file_path, &mut self.system) {
             println!("Error loading state: {}", message)
         } else {
             println!("Loaded state from: {}", file_path)
