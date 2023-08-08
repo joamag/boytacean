@@ -121,8 +121,6 @@ impl Serialize for BeesState {
             let offset = -((size_of::<u32>() * 2) as i64);
             data.seek(SeekFrom::Current(offset)).unwrap();
 
-            println!("{}", block.magic);
-
             match block.magic.as_str() {
                 "NAME" => self.name = BeesName::from_data(data),
                 "INFO" => self.info = BeesInfo::from_data(data),
