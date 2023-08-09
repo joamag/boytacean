@@ -10,6 +10,7 @@ use boytacean::{
     ppu::{DISPLAY_HEIGHT, DISPLAY_WIDTH, FRAME_BUFFER_SIZE, XRGB8888_SIZE},
     rom::Cartridge,
     state::StateManager,
+    warnln,
 };
 use consts::{
     REGION_NTSC, RETRO_API_VERSION, RETRO_DEVICE_ID_JOYPAD_A, RETRO_DEVICE_ID_JOYPAD_B,
@@ -36,7 +37,7 @@ struct LibRetroInfo {
     name: &'static str,
     version: &'static str,
     name_s: String,
-    version_s: String
+    version_s: String,
 }
 
 static mut EMULATOR: Option<GameBoy> = None;
@@ -46,7 +47,7 @@ static mut INFO: LibRetroInfo = LibRetroInfo {
     name: "",
     version: "",
     name_s: String::new(),
-    version_s: String::new()
+    version_s: String::new(),
 };
 
 static mut PENDING_CYCLES: u32 = 0_u32;
@@ -379,21 +380,31 @@ pub extern "C" fn retro_serialize_size() -> usize {
 }
 
 #[no_mangle]
-pub extern "C" fn retro_serialize(data: *mut c_void, size: usize) {
+pub extern "C" fn retro_serialize(data: *mut c_void, size: usize) -> bool {
     debugln!("retro_serialize()");
     let instance = unsafe { EMULATOR.as_mut().unwrap() };
     let state = StateManager::save(instance).unwrap();
-    unsafe {
-        ptr::copy_nonoverlapping(state.as_ptr(), data as *mut u8, size);
+    if state.len() > size {
+        warnln!(
+            "Invalid state size needed {} bytes, got {} bytes",
+            state.len(),
+            size
+        );
+        return false;
     }
+    unsafe {
+        ptr::copy_nonoverlapping(state.as_ptr(), data as *mut u8, state.len());
+    }
+    true
 }
 
 #[no_mangle]
-pub extern "C" fn retro_unserialize(data: *const c_void, size: usize) {
+pub extern "C" fn retro_unserialize(data: *const c_void, size: usize) -> bool {
     debugln!("retro_unserialize()");
     let instance = unsafe { EMULATOR.as_mut().unwrap() };
     let state = unsafe { from_raw_parts(data as *const u8, size) };
     StateManager::load(state, instance).unwrap();
+    true
 }
 
 #[no_mangle]
