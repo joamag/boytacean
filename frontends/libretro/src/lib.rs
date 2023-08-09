@@ -29,9 +29,25 @@ use std::{
     slice::from_raw_parts,
 };
 
+/// Represents the information about the LibRetro extension
+/// to be used in a static context. Handles strings at the
+/// byte buffer level and also at the C string level.
+struct LibRetroInfo {
+    name: &'static str,
+    version: &'static str,
+    name_s: String,
+    version_s: String
+}
+
 static mut EMULATOR: Option<GameBoy> = None;
 static mut KEY_STATES: Option<HashMap<RetroJoypad, bool>> = None;
 static mut FRAME_BUFFER: [u32; FRAME_BUFFER_SIZE] = [0x00; FRAME_BUFFER_SIZE];
+static mut INFO: LibRetroInfo = LibRetroInfo {
+    name: "",
+    version: "",
+    name_s: String::new(),
+    version_s: String::new()
+};
 
 static mut PENDING_CYCLES: u32 = 0_u32;
 
@@ -154,6 +170,10 @@ pub extern "C" fn retro_init() {
     unsafe {
         EMULATOR = Some(GameBoy::new(None));
         KEY_STATES = Some(HashMap::new());
+        INFO.name_s = format!("{}\0", Info::name());
+        INFO.name = INFO.name_s.as_str();
+        INFO.version_s = format!("v{}\0", Info::version());
+        INFO.version = INFO.version_s.as_str();
     }
 }
 
@@ -175,8 +195,8 @@ pub extern "C" fn retro_reset() {
 #[no_mangle]
 pub unsafe extern "C" fn retro_get_system_info(info: *mut RetroSystemInfo) {
     debugln!("retro_get_system_info()");
-    (*info).library_name = format!("{}\0", Info::name()).as_ptr() as *const c_char;
-    (*info).library_version = format!("v{}\0", Info::version()).as_ptr() as *const c_char;
+    (*info).library_name = INFO.name.as_ptr() as *const c_char;
+    (*info).library_version = INFO.version.as_ptr() as *const c_char;
     (*info).valid_extensions = "gb|gbc\0".as_ptr() as *const c_char;
     (*info).need_fullpath = false;
     (*info).block_extract = false;
