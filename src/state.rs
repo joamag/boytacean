@@ -772,6 +772,9 @@ impl State for BeesCore {
             u8::from(gb.cpu().halted()),
             // @TODO: these registers cannot be totally retrieved
             // because of that some audio noise exists
+            // The loading of the registers should be done in a much
+            // more manual way like SameBoy does here
+            // https://github.com/LIJI32/SameBoy/blob/7e6f1f866e89430adaa6be839aecc4a2ccabd69c/Core/save_state.c#L673
             gb.mmu().read_many(0xff00, 128).try_into().unwrap(),
         );
         core.ram.fill_buffer(gb.mmu().ram());
@@ -802,6 +805,9 @@ impl State for BeesCore {
         // @TODO: we need to be careful about this writing and
         // should make this a bit more robust, to handle this
         // special case/situations
+        // The registers should be handled in a more manual manner
+        // to avoid unwanted side effects
+        // https://github.com/LIJI32/SameBoy/blob/7e6f1f866e89430adaa6be839aecc4a2ccabd69c/Core/save_state.c#L1003
         gb.mmu().write_many(0xff00, &self.io_registers);
 
         gb.mmu().set_ram(self.ram.buffer.to_vec());
