@@ -9,6 +9,7 @@ use boytacean::{
     pad::PadKey,
     ppu::{DISPLAY_HEIGHT, DISPLAY_WIDTH, FRAME_BUFFER_SIZE, XRGB8888_SIZE},
     rom::Cartridge,
+    state::StateManager,
 };
 use consts::{
     REGION_NTSC, RETRO_API_VERSION, RETRO_DEVICE_ID_JOYPAD_A, RETRO_DEVICE_ID_JOYPAD_B,
@@ -24,6 +25,7 @@ use std::{
     ffi::CStr,
     fmt::{self, Display, Formatter},
     os::raw::{c_char, c_float, c_uint, c_void},
+    ptr,
     slice::from_raw_parts,
 };
 
@@ -333,6 +335,8 @@ pub extern "C" fn retro_load_game_special(
 #[no_mangle]
 pub extern "C" fn retro_unload_game() {
     debugln!("retro_unload_game()");
+    let instance = unsafe { EMULATOR.as_mut().unwrap() };
+    instance.reset();
 }
 
 #[no_mangle]
@@ -348,18 +352,28 @@ pub extern "C" fn retro_get_memory_size(_memory_id: u32) -> usize {
 }
 
 #[no_mangle]
-pub extern "C" fn retro_serialize_size() {
+pub extern "C" fn retro_serialize_size() -> usize {
     debugln!("retro_serialize_size()");
+    let instance = unsafe { EMULATOR.as_mut().unwrap() };
+    StateManager::save(instance).unwrap().len()
 }
 
 #[no_mangle]
-pub extern "C" fn retro_serialize() {
+pub extern "C" fn retro_serialize(data: *mut c_void, size: usize) {
     debugln!("retro_serialize()");
+    let instance = unsafe { EMULATOR.as_mut().unwrap() };
+    let state = StateManager::save(instance).unwrap();
+    unsafe {
+        ptr::copy_nonoverlapping(state.as_ptr(), data as *mut u8, size);
+    }
 }
 
 #[no_mangle]
-pub extern "C" fn retro_unserialize() {
+pub extern "C" fn retro_unserialize(data: *const c_void, size: usize) {
     debugln!("retro_unserialize()");
+    let instance = unsafe { EMULATOR.as_mut().unwrap() };
+    let state = unsafe { from_raw_parts(data as *const u8, size) };
+    StateManager::load(state, instance).unwrap();
 }
 
 #[no_mangle]
