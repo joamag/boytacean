@@ -8,7 +8,11 @@ use std::{
     mem::size_of,
 };
 
-use crate::{gb::GameBoy, info::Info, rom::MbcType};
+use crate::{
+    gb::{GameBoy, GameBoySpeed},
+    info::Info,
+    rom::MbcType,
+};
 
 pub trait Serialize {
     /// Writes the data from the internal structure into the
@@ -823,6 +827,14 @@ impl State for BeesCore {
                 self.background_palettes.buffer.to_vec().try_into().unwrap(),
                 self.object_palettes.buffer.to_vec().try_into().unwrap(),
             ]);
+
+            // updates the speed of the CGB according to the KEY1 register
+            let is_double = self.io_registers[0x4d_usize] & 0x80 == 0x80;
+            gb.mmu().set_speed(if is_double {
+                GameBoySpeed::Double
+            } else {
+                GameBoySpeed::Normal
+            });
 
             // need to disable DMA transfer to avoid unwanted
             // DMA transfers when loading the state
