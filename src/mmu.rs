@@ -250,7 +250,7 @@ impl Mmu {
         // @TODO: Implement DMA transfer in a better way
 
         // only runs the DMA transfer if the system is in CGB mode
-        // this avoid issues when writing to DMG unmapped registers
+        // this avoids issues when writing to DMG unmapped registers
         // that would otherwise cause the system to crash
         if self.mode == GameBoyMode::Cgb {
             let data = self.read_many(self.dma.source(), self.dma.length());

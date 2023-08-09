@@ -1175,22 +1175,36 @@ impl Ppu {
     /// to the VRAM values, this should be called whenever the VRAM
     /// is replaced.
     pub fn update_vram(&mut self) {
+        // "saves" the old values of the VRAM bank and offset
+        // as they are going to be needed later, this is required
+        // as we're going to trick the PPU into switching banks
+        // over the update of the calculated values for the new VRAM,
+        // essentially required for the `update_tile()` method
+        let (vram_bank_old, vram_offset_old) = (self.vram_bank, self.vram_offset);
+
+        // determines the number of VRAM banks available according
+        // to the running Game Boy running mode (CGB vs DMG)
         let vram_banks = if self.gb_mode == GameBoyMode::Cgb {
-            2u16
+            2u8
         } else {
-            1u16
+            1u8
         };
+
         for vram_bank in 0..vram_banks {
-            let vram_offset = vram_bank * 0x2000;
+            self.vram_bank = vram_bank;
+            self.vram_offset = self.vram_bank as u16 * 0x2000;
             for addr in 0x8000..=0x9fff {
-                let value = self.vram[(vram_offset + (addr & 0x1fff)) as usize];
+                let value = self.vram[(self.vram_offset + (addr & 0x1fff)) as usize];
                 if addr < 0x9800 {
                     self.update_tile(addr, value);
-                } else if vram_bank == 0x1 {
+                } else if self.vram_bank == 0x1 {
                     self.update_bg_map_attrs(addr, value);
                 }
             }
         }
+
+        // restores the "old" values for VRAM bank and offset
+        (self.vram_bank, self.vram_offset) = (vram_bank_old, vram_offset_old);
     }
 
     /// Updates the tile structure with the value that has
