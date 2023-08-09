@@ -461,9 +461,9 @@ impl Emulator {
                             | Keycode::Num8
                             | Keycode::Num9 => {
                                 let file_path = self.save_name(
-                                    self.rom_name(),
                                     keycode as u8 - Keycode::Num0 as u8,
-                                    &self.dir_path,
+                                    None,
+                                    Some(&self.dir_path),
                                 );
                                 if (keymod & (Mod::LCTRLMOD | Mod::RCTRLMOD)) != Mod::NOMOD {
                                     self.save_state(&file_path);
@@ -738,6 +738,8 @@ impl Emulator {
         }
     }
 
+    /// Obtains the ROM name (file name without extension) so that
+    /// it can be used for derivate file names (eg: save files, screenshots).
     fn rom_name(&self) -> &str {
         Path::new(&self.rom_path)
             .file_stem()
@@ -749,13 +751,22 @@ impl Emulator {
     fn image_name(&self, ext: Option<&str>, dir_path: Option<&str>) -> String {
         let ext = ext.unwrap_or("png");
         let dir_path = dir_path.unwrap_or(".");
-        self.best_name(self.rom_name(), ext, dir_path)
+        Self::best_name(self.rom_name(), ext, dir_path)
     }
 
-    /// Obtains the best possible save file name (ex: `ROM_NAME.sv0`) taking
+    /// Obtains the best possible save file name (ex: `{ROM_NAME}.s0`) taking
     /// into consideration the current directory path and the index of the save.
-    fn save_name(&self, base: &str, index: u8, dir_path: &str) -> String {
-        let file_name = format!("{}.s{}", base, index);
+    fn save_name(&self, index: u8, suffix: Option<&str>, dir_path: Option<&str>) -> String {
+        let suffix = suffix.unwrap_or("s");
+        let dir_path = dir_path.unwrap_or(".");
+        Self::sequence_name(self.rom_name(), index, suffix, dir_path)
+    }
+
+    /// Generates a file name for the provided base name, index and suffix
+    /// taking into consideration the provided directory path.
+    /// The generated file name is `{base}.{suffix}{index}`.
+    fn sequence_name(base: &str, index: u8, suffix: &str, dir_path: &str) -> String {
+        let file_name = format!("{}.{}{}", base, suffix, index);
         let mut file_buf = PathBuf::from(dir_path);
         file_buf.push(file_name);
         file_buf.to_str().unwrap().to_string()
@@ -764,7 +775,7 @@ impl Emulator {
     /// Tries to obtain the best possible file name for the provided base name
     /// and extension avoiding name collisions with existing files in the
     /// same directory.
-    fn best_name(&self, base: &str, ext: &str, dir_path: &str) -> String {
+    fn best_name(base: &str, ext: &str, dir_path: &str) -> String {
         let mut index = 0_usize;
         let mut name = format!("{}.{}", base, ext);
 
