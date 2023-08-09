@@ -799,6 +799,9 @@ impl State for BeesCore {
         gb.cpu().set_ime(self.ime);
         gb.mmu().ie = self.ie;
 
+        // @TODO: we need to be careful about this writing and
+        // should make this a bit more robust, to handle this
+        // special case/situations
         gb.mmu().write_many(0xff00, &self.io_registers);
 
         gb.mmu().set_ram(self.ram.buffer.to_vec());

@@ -178,6 +178,10 @@ impl Mmu {
         self.speed
     }
 
+    pub fn set_speed(&mut self, value: GameBoySpeed) {
+        self.speed = value;
+    }
+
     pub fn set_speed_callback(&mut self, callback: fn(speed: GameBoySpeed)) {
         self.speed_callback = callback;
     }
