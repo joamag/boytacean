@@ -383,7 +383,13 @@ pub extern "C" fn retro_serialize_size() -> usize {
 pub extern "C" fn retro_serialize(data: *mut c_void, size: usize) -> bool {
     debugln!("retro_serialize()");
     let instance = unsafe { EMULATOR.as_mut().unwrap() };
-    let state = StateManager::save(instance).unwrap();
+    let state = match StateManager::save(instance) {
+        Ok(state) => state,
+        Err(err) => {
+            warnln!("Failed to save state: {}", err);
+            return false;
+        }
+    };
     if state.len() > size {
         warnln!(
             "Invalid state size needed {} bytes, got {} bytes",

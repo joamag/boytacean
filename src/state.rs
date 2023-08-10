@@ -27,7 +27,9 @@ pub trait Serialize {
 pub trait State {
     /// Obtains a new instance of the state from the provided
     /// `GameBoy` instance and returns it.
-    fn from_gb(gb: &mut GameBoy) -> Self;
+    fn from_gb(gb: &mut GameBoy) -> Result<Self, String>
+    where
+        Self: Sized;
 
     /// Applies the state to the provided `GameBoy` instance.
     fn to_gb(&self, gb: &mut GameBoy) -> Result<(), String>;
@@ -155,15 +157,15 @@ impl Serialize for BeesState {
 }
 
 impl State for BeesState {
-    fn from_gb(gb: &mut GameBoy) -> Self {
-        Self {
+    fn from_gb(gb: &mut GameBoy) -> Result<Self, String> {
+        Ok(Self {
             footer: BeesFooter::default(),
-            name: BeesName::from_gb(gb),
-            info: BeesInfo::from_gb(gb),
-            core: BeesCore::from_gb(gb),
-            mbc: BeesMbc::from_gb(gb),
+            name: BeesName::from_gb(gb)?,
+            info: BeesInfo::from_gb(gb)?,
+            core: BeesCore::from_gb(gb)?,
+            mbc: BeesMbc::from_gb(gb)?,
             end: BeesBlock::from_magic(String::from("END ")),
-        }
+        })
     }
 
     fn to_gb(&self, gb: &mut GameBoy) -> Result<(), String> {
@@ -408,8 +410,8 @@ impl Serialize for BeesName {
 }
 
 impl State for BeesName {
-    fn from_gb(_gb: &mut GameBoy) -> Self {
-        Self::new(format!("{} v{}", Info::name(), Info::version()))
+    fn from_gb(_gb: &mut GameBoy) -> Result<Self, String> {
+        Ok(Self::new(format!("{} v{}", Info::name(), Info::version())))
     }
 
     fn to_gb(&self, _gb: &mut GameBoy) -> Result<(), String> {
@@ -479,11 +481,11 @@ impl Serialize for BeesInfo {
 }
 
 impl State for BeesInfo {
-    fn from_gb(gb: &mut GameBoy) -> Self {
-        Self::new(
+    fn from_gb(gb: &mut GameBoy) -> Result<Self, String> {
+        Ok(Self::new(
             &gb.cartridge_i().rom_data()[0x134..=0x143],
             &gb.cartridge_i().rom_data()[0x14e..=0x14f],
-        )
+        ))
     }
 
     fn to_gb(&self, gb: &mut GameBoy) -> Result<(), String> {
@@ -762,7 +764,7 @@ impl Serialize for BeesCore {
 }
 
 impl State for BeesCore {
-    fn from_gb(gb: &mut GameBoy) -> Self {
+    fn from_gb(gb: &mut GameBoy) -> Result<Self, String> {
         let mut core = Self::new(
             Self::bees_model(gb),
             gb.cpu_i().pc(),
@@ -792,7 +794,7 @@ impl State for BeesCore {
             core.object_palettes
                 .fill_buffer(&gb.ppu_i().palettes_color()[1]);
         }
-        core
+        Ok(core)
     }
 
     fn to_gb(&self, gb: &mut GameBoy) -> Result<(), String> {
@@ -928,7 +930,7 @@ impl Serialize for BeesMbc {
 }
 
 impl State for BeesMbc {
-    fn from_gb(gb: &mut GameBoy) -> Self {
+    fn from_gb(gb: &mut GameBoy) -> Result<Self, String> {
         let mut registers = vec![];
         match gb.cartridge().rom_type().mbc_type() {
             MbcType::NoMbc => (),
@@ -979,7 +981,7 @@ impl State for BeesMbc {
             _ => unimplemented!(),
         }
 
-        Self::new(registers)
+        Ok(Self::new(registers))
     }
 
     fn to_gb(&self, gb: &mut GameBoy) -> Result<(), String> {
@@ -1014,7 +1016,8 @@ impl StateManager {
 
     pub fn save(gb: &mut GameBoy) -> Result<Vec<u8>, String> {
         let mut data: Vec<u8> = vec![];
-        BeesState::from_gb(gb).write(&mut data);
+        let mut state = BeesState::from_gb(gb)?;
+        state.write(&mut data);
         Ok(data)
     }
 
