@@ -11,7 +11,7 @@ use std::{
 use crate::{
     gb::{GameBoy, GameBoySpeed},
     info::Info,
-    rom::{MbcType, CgbMode},
+    rom::{CgbMode, MbcType},
 };
 
 pub trait Serialize {
