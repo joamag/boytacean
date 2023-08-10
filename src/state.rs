@@ -806,6 +806,13 @@ impl State for BeesCore {
         gb.cpu().set_ime(self.ime);
         gb.mmu().ie = self.ie;
 
+        match self.execution_mode {
+            0 => gb.cpu().set_halted(false),
+            1 => gb.cpu().set_halted(true),
+            2 => gb.cpu().stop(),
+            _ => unimplemented!(),
+        }
+
         // @TODO: we need to be careful about this writing and
         // should make this a bit more robust, to handle this
         // special case/situations

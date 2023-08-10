@@ -388,6 +388,11 @@ impl Cpu {
     }
 
     #[inline(always)]
+    pub fn set_halted(&mut self, value: bool) {
+        self.halted = value
+    }
+
+    #[inline(always)]
     pub fn cycles(&self) -> u8 {
         self.cycles
     }
