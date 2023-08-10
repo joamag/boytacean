@@ -1033,7 +1033,6 @@ impl StateManager {
         let mut state = BeesState::default();
         state.read(&mut Cursor::new(data.to_vec()));
         state.to_gb(gb)?;
-        print!("{}", state);
         Ok(())
     }
 }
