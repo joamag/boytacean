@@ -11,7 +11,7 @@ use std::{
 use crate::{
     gb::{GameBoy, GameBoySpeed},
     info::Info,
-    rom::MbcType,
+    rom::{MbcType, CgbMode},
 };
 
 pub trait Serialize {
@@ -451,9 +451,19 @@ impl BeesInfo {
 
     pub fn title(&self) -> String {
         let mut final_index = 16;
-        for (i, byte) in self.title.iter().enumerate() {
+        for (offset, byte) in self.title.iter().enumerate() {
             if *byte == 0u8 {
-                final_index = i;
+                final_index = offset;
+                break;
+            }
+
+            // in we're at the final byte of the title and the value
+            // is one that is reserved for CGB compatibility testing
+            // then we must ignore it for title processing purposes
+            if offset > 14
+                && (*byte == CgbMode::CgbCompatible as u8 || *byte == CgbMode::CgbOnly as u8)
+            {
+                final_index = offset;
                 break;
             }
         }
