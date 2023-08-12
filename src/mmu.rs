@@ -331,13 +331,7 @@ impl Mmu {
                     0x4d => (false as u8) | ((self.speed as u8) << 7),
 
                     // 0xFF50 - Boot active flag
-                    0x50 => {
-                        if self.boot_active {
-                            0x00
-                        } else {
-                            0x01
-                        }
-                    }
+                    0x50 => u8::from(!self.boot_active),
 
                     // 0xFF70 - SVBK: WRAM bank (CGB only)
                     0x70 => self.ram_bank & 0x07,
