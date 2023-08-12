@@ -502,6 +502,7 @@ impl Mmu {
     /// Game Boy verifications, allowing deep read of values.
     pub fn read_unsafe(&mut self, addr: u16) -> u8 {
         match addr {
+            0xff10..=0xff3f => self.apu.read_unsafe(addr),
             _ => self.read(addr),
         }
     }
@@ -512,6 +513,7 @@ impl Mmu {
     /// inaccessible.
     pub fn write_unsafe(&mut self, addr: u16, value: u8) {
         match addr {
+            0xff10..=0xff3f => self.apu.write_unsafe(addr, value),
             _ => self.write(addr, value),
         }
     }

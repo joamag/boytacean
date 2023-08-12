@@ -656,6 +656,14 @@ impl Apu {
         }
     }
 
+    pub fn read_unsafe(&mut self, addr: u16) -> u8 {
+        self.read(addr)
+    }
+
+    pub fn write_unsafe(&mut self, addr: u16, value: u8) {
+        self.write(addr, value);
+    }
+
     #[inline(always)]
     pub fn output(&self) -> u8 {
         self.ch1_output() + self.ch2_output() + self.ch3_output() + self.ch4_output()
