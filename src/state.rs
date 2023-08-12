@@ -1,4 +1,4 @@
-//! System state (BEES format) functions and structures.
+//! System state (BESS format) functions and structures.
 
 use std::{
     convert::TryInto,
@@ -36,16 +36,16 @@ pub trait State {
 }
 
 #[derive(Default)]
-pub struct BeesState {
-    footer: BeesFooter,
-    name: BeesName,
-    info: BeesInfo,
-    core: BeesCore,
-    mbc: BeesMbc,
-    end: BeesBlock,
+pub struct BessState {
+    footer: BessFooter,
+    name: BessName,
+    info: BessInfo,
+    core: BessCore,
+    mbc: BessMbc,
+    end: BessBlock,
 }
 
-impl BeesState {
+impl BessState {
     pub fn description(&self, column_length: usize) -> String {
         let emulator_l = format!("{:width$}", "Emulator", width = column_length);
         let title_l: String = format!("{:width$}", "Title", width = column_length);
@@ -109,7 +109,7 @@ impl BeesState {
     }
 }
 
-impl Serialize for BeesState {
+impl Serialize for BessState {
     fn write(&mut self, buffer: &mut Vec<u8>) {
         self.footer.start_offset = self.dump_core(buffer);
         self.name.write(buffer);
@@ -123,7 +123,7 @@ impl Serialize for BeesState {
     fn read(&mut self, data: &mut Cursor<Vec<u8>>) {
         // moves the cursor to the end of the file
         // to read the footer, and then places the
-        // the cursor in the start of the BEES data
+        // the cursor in the start of the BESS data
         // according to the footer information
         data.seek(SeekFrom::End(-8)).unwrap();
         self.footer.read(data);
@@ -134,18 +134,18 @@ impl Serialize for BeesState {
             // reads the block header information and then moves the
             // cursor back to the original position to be able to
             // re-read the block data
-            let block = BeesBlockHeader::from_data(data);
+            let block = BessBlockHeader::from_data(data);
             let offset = -((size_of::<u32>() * 2) as i64);
             data.seek(SeekFrom::Current(offset)).unwrap();
 
             match block.magic.as_str() {
-                "NAME" => self.name = BeesName::from_data(data),
-                "INFO" => self.info = BeesInfo::from_data(data),
-                "CORE" => self.core = BeesCore::from_data(data),
-                "MBC " => self.mbc = BeesMbc::from_data(data),
-                "END " => self.end = BeesBlock::from_data(data),
+                "NAME" => self.name = BessName::from_data(data),
+                "INFO" => self.info = BessInfo::from_data(data),
+                "CORE" => self.core = BessCore::from_data(data),
+                "MBC " => self.mbc = BessMbc::from_data(data),
+                "END " => self.end = BessBlock::from_data(data),
                 _ => {
-                    BeesBlock::from_data(data);
+                    BessBlock::from_data(data);
                 }
             }
 
@@ -156,15 +156,15 @@ impl Serialize for BeesState {
     }
 }
 
-impl State for BeesState {
+impl State for BessState {
     fn from_gb(gb: &mut GameBoy) -> Result<Self, String> {
         Ok(Self {
-            footer: BeesFooter::default(),
-            name: BeesName::from_gb(gb)?,
-            info: BeesInfo::from_gb(gb)?,
-            core: BeesCore::from_gb(gb)?,
-            mbc: BeesMbc::from_gb(gb)?,
-            end: BeesBlock::from_magic(String::from("END ")),
+            footer: BessFooter::default(),
+            name: BessName::from_gb(gb)?,
+            info: BessInfo::from_gb(gb)?,
+            core: BessCore::from_gb(gb)?,
+            mbc: BessMbc::from_gb(gb)?,
+            end: BessBlock::from_magic(String::from("END ")),
         })
     }
 
@@ -178,18 +178,18 @@ impl State for BeesState {
     }
 }
 
-impl Display for BeesState {
+impl Display for BessState {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.description(9))
     }
 }
 
-pub struct BeesBlockHeader {
+pub struct BessBlockHeader {
     magic: String,
     size: u32,
 }
 
-impl BeesBlockHeader {
+impl BessBlockHeader {
     pub fn new(magic: String, size: u32) -> Self {
         Self { magic, size }
     }
@@ -205,7 +205,7 @@ impl BeesBlockHeader {
     }
 }
 
-impl Serialize for BeesBlockHeader {
+impl Serialize for BessBlockHeader {
     fn write(&mut self, buffer: &mut Vec<u8>) {
         buffer.write_all(self.magic.as_bytes()).unwrap();
         buffer.write_all(&self.size.to_le_bytes()).unwrap();
@@ -221,24 +221,24 @@ impl Serialize for BeesBlockHeader {
     }
 }
 
-impl Default for BeesBlockHeader {
+impl Default for BessBlockHeader {
     fn default() -> Self {
         Self::new(String::from("    "), 0)
     }
 }
 
-pub struct BeesBlock {
-    header: BeesBlockHeader,
+pub struct BessBlock {
+    header: BessBlockHeader,
     buffer: Vec<u8>,
 }
 
-impl BeesBlock {
-    pub fn new(header: BeesBlockHeader, buffer: Vec<u8>) -> Self {
+impl BessBlock {
+    pub fn new(header: BessBlockHeader, buffer: Vec<u8>) -> Self {
         Self { header, buffer }
     }
 
     pub fn from_magic(magic: String) -> Self {
-        Self::new(BeesBlockHeader::new(magic, 0), vec![])
+        Self::new(BessBlockHeader::new(magic, 0), vec![])
     }
 
     pub fn from_data(data: &mut Cursor<Vec<u8>>) -> Self {
@@ -256,7 +256,7 @@ impl BeesBlock {
     }
 }
 
-impl Serialize for BeesBlock {
+impl Serialize for BessBlock {
     fn write(&mut self, buffer: &mut Vec<u8>) {
         self.header.write(buffer);
         buffer.write_all(&self.buffer).unwrap();
@@ -269,19 +269,19 @@ impl Serialize for BeesBlock {
     }
 }
 
-impl Default for BeesBlock {
+impl Default for BessBlock {
     fn default() -> Self {
-        Self::new(BeesBlockHeader::default(), vec![])
+        Self::new(BessBlockHeader::default(), vec![])
     }
 }
 
-pub struct BeesBuffer {
+pub struct BessBuffer {
     size: u32,
     offset: u32,
     buffer: Vec<u8>,
 }
 
-impl BeesBuffer {
+impl BessBuffer {
     pub fn new(size: u32, offset: u32, buffer: Vec<u8>) -> Self {
         Self {
             size,
@@ -309,7 +309,7 @@ impl BeesBuffer {
     }
 }
 
-impl Serialize for BeesBuffer {
+impl Serialize for BessBuffer {
     fn write(&mut self, buffer: &mut Vec<u8>) {
         buffer.write_all(&self.size.to_le_bytes()).unwrap();
         buffer.write_all(&self.offset.to_le_bytes()).unwrap();
@@ -326,18 +326,18 @@ impl Serialize for BeesBuffer {
     }
 }
 
-impl Default for BeesBuffer {
+impl Default for BessBuffer {
     fn default() -> Self {
         Self::new(0, 0, vec![])
     }
 }
 
-pub struct BeesFooter {
+pub struct BessFooter {
     start_offset: u32,
     magic: u32,
 }
 
-impl BeesFooter {
+impl BessFooter {
     pub fn new(start_offset: u32, magic: u32) -> Self {
         Self {
             start_offset,
@@ -353,7 +353,7 @@ impl BeesFooter {
     }
 }
 
-impl Serialize for BeesFooter {
+impl Serialize for BessFooter {
     fn write(&mut self, buffer: &mut Vec<u8>) {
         buffer.write_all(&self.start_offset.to_le_bytes()).unwrap();
         buffer.write_all(&self.magic.to_le_bytes()).unwrap();
@@ -369,21 +369,21 @@ impl Serialize for BeesFooter {
     }
 }
 
-impl Default for BeesFooter {
+impl Default for BessFooter {
     fn default() -> Self {
         Self::new(0x00, 0x53534542)
     }
 }
 
-pub struct BeesName {
-    header: BeesBlockHeader,
+pub struct BessName {
+    header: BessBlockHeader,
     name: String,
 }
 
-impl BeesName {
+impl BessName {
     pub fn new(name: String) -> Self {
         Self {
-            header: BeesBlockHeader::new(String::from("NAME"), name.len() as u32),
+            header: BessBlockHeader::new(String::from("NAME"), name.len() as u32),
             name,
         }
     }
@@ -395,7 +395,7 @@ impl BeesName {
     }
 }
 
-impl Serialize for BeesName {
+impl Serialize for BessName {
     fn write(&mut self, buffer: &mut Vec<u8>) {
         self.header.write(buffer);
         buffer.write_all(self.name.as_bytes()).unwrap();
@@ -409,7 +409,7 @@ impl Serialize for BeesName {
     }
 }
 
-impl State for BeesName {
+impl State for BessName {
     fn from_gb(_gb: &mut GameBoy) -> Result<Self, String> {
         Ok(Self::new(format!("{} v{}", Info::name(), Info::version())))
     }
@@ -419,22 +419,22 @@ impl State for BeesName {
     }
 }
 
-impl Default for BeesName {
+impl Default for BessName {
     fn default() -> Self {
         Self::new(String::from(""))
     }
 }
 
-pub struct BeesInfo {
-    header: BeesBlockHeader,
+pub struct BessInfo {
+    header: BessBlockHeader,
     title: [u8; 16],
     checksum: [u8; 2],
 }
 
-impl BeesInfo {
+impl BessInfo {
     pub fn new(title: &[u8], checksum: &[u8]) -> Self {
         Self {
-            header: BeesBlockHeader::new(
+            header: BessBlockHeader::new(
                 String::from("INFO"),
                 title.len() as u32 + checksum.len() as u32,
             ),
@@ -476,7 +476,7 @@ impl BeesInfo {
     }
 }
 
-impl Serialize for BeesInfo {
+impl Serialize for BessInfo {
     fn write(&mut self, buffer: &mut Vec<u8>) {
         self.header.write(buffer);
         buffer.write_all(&self.title).unwrap();
@@ -490,7 +490,7 @@ impl Serialize for BeesInfo {
     }
 }
 
-impl State for BeesInfo {
+impl State for BessInfo {
     fn from_gb(gb: &mut GameBoy) -> Result<Self, String> {
         Ok(Self::new(
             &gb.cartridge_i().rom_data()[0x134..=0x143],
@@ -512,14 +512,14 @@ impl State for BeesInfo {
     }
 }
 
-impl Default for BeesInfo {
+impl Default for BessInfo {
     fn default() -> Self {
         Self::new(&[0_u8; 16], &[0_u8; 2])
     }
 }
 
-pub struct BeesCore {
-    header: BeesBlockHeader,
+pub struct BessCore {
+    header: BessBlockHeader,
 
     major: u16,
     minor: u16,
@@ -541,16 +541,16 @@ pub struct BeesCore {
 
     io_registers: [u8; 128],
 
-    ram: BeesBuffer,
-    vram: BeesBuffer,
-    mbc_ram: BeesBuffer,
-    oam: BeesBuffer,
-    hram: BeesBuffer,
-    background_palettes: BeesBuffer,
-    object_palettes: BeesBuffer,
+    ram: BessBuffer,
+    vram: BessBuffer,
+    mbc_ram: BessBuffer,
+    oam: BessBuffer,
+    hram: BessBuffer,
+    background_palettes: BessBuffer,
+    object_palettes: BessBuffer,
 }
 
-impl BeesCore {
+impl BessCore {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         model: String,
@@ -566,7 +566,7 @@ impl BeesCore {
         io_registers: [u8; 128],
     ) -> Self {
         Self {
-            header: BeesBlockHeader::new(
+            header: BessBlockHeader::new(
                 String::from("CORE"),
                 ((size_of::<u16>() * 2)
                     + size_of::<u32>()
@@ -589,13 +589,13 @@ impl BeesCore {
             execution_mode,
             _padding: 0,
             io_registers,
-            ram: BeesBuffer::default(),
-            vram: BeesBuffer::default(),
-            mbc_ram: BeesBuffer::default(),
-            oam: BeesBuffer::default(),
-            hram: BeesBuffer::default(),
-            background_palettes: BeesBuffer::default(),
-            object_palettes: BeesBuffer::default(),
+            ram: BessBuffer::default(),
+            vram: BessBuffer::default(),
+            mbc_ram: BessBuffer::default(),
+            oam: BessBuffer::default(),
+            hram: BessBuffer::default(),
+            background_palettes: BessBuffer::default(),
+            object_palettes: BessBuffer::default(),
         }
     }
 
@@ -628,9 +628,9 @@ impl BeesCore {
         Ok(())
     }
 
-    /// Obtains the BEES (Game Boy) model string using the
+    /// Obtains the BESS (Game Boy) model string using the
     /// provided `GameBoy` instance.
-    fn bees_model(gb: &GameBoy) -> String {
+    fn bess_model(gb: &GameBoy) -> String {
         let mut buffer = [0x00_u8; 4];
 
         if gb.is_dmg() {
@@ -681,7 +681,7 @@ impl BeesCore {
     }
 }
 
-impl Serialize for BeesCore {
+impl Serialize for BessCore {
     fn write(&mut self, buffer: &mut Vec<u8>) {
         self.header.write(buffer);
 
@@ -773,10 +773,10 @@ impl Serialize for BeesCore {
     }
 }
 
-impl State for BeesCore {
+impl State for BessCore {
     fn from_gb(gb: &mut GameBoy) -> Result<Self, String> {
         let mut core = Self::new(
-            Self::bees_model(gb),
+            Self::bess_model(gb),
             gb.cpu_i().pc(),
             gb.cpu_i().af(),
             gb.cpu_i().bc(),
@@ -841,7 +841,7 @@ impl State for BeesCore {
 
         if gb.is_cgb() {
             // updates the internal palettes for the CGB with the values
-            // stored in the BEES state
+            // stored in the BESS state
             gb.ppu().set_palettes_color([
                 self.background_palettes.buffer.to_vec().try_into().unwrap(),
                 self.object_palettes.buffer.to_vec().try_into().unwrap(),
@@ -864,7 +864,7 @@ impl State for BeesCore {
     }
 }
 
-impl Default for BeesCore {
+impl Default for BessCore {
     fn default() -> Self {
         Self::new(
             String::from("GD  "),
@@ -882,26 +882,26 @@ impl Default for BeesCore {
     }
 }
 
-pub struct BeesMbrRegister {
+pub struct BessMbrRegister {
     address: u16,
     value: u8,
 }
 
-impl BeesMbrRegister {
+impl BessMbrRegister {
     pub fn new(address: u16, value: u8) -> Self {
         Self { address, value }
     }
 }
 
-pub struct BeesMbc {
-    header: BeesBlockHeader,
-    registers: Vec<BeesMbrRegister>,
+pub struct BessMbc {
+    header: BessBlockHeader,
+    registers: Vec<BessMbrRegister>,
 }
 
-impl BeesMbc {
-    pub fn new(registers: Vec<BeesMbrRegister>) -> Self {
+impl BessMbc {
+    pub fn new(registers: Vec<BessMbrRegister>) -> Self {
         Self {
-            header: BeesBlockHeader::new(
+            header: BessBlockHeader::new(
                 String::from("MBC "),
                 ((size_of::<u8>() + size_of::<u16>()) * registers.len()) as u32,
             ),
@@ -916,7 +916,7 @@ impl BeesMbc {
     }
 }
 
-impl Serialize for BeesMbc {
+impl Serialize for BessMbc {
     fn write(&mut self, buffer: &mut Vec<u8>) {
         self.header.write(buffer);
         for register in self.registers.iter() {
@@ -934,18 +934,18 @@ impl Serialize for BeesMbc {
             let mut buffer = [0x00; 1];
             data.read_exact(&mut buffer).unwrap();
             let value = u8::from_le_bytes(buffer);
-            self.registers.push(BeesMbrRegister::new(address, value));
+            self.registers.push(BessMbrRegister::new(address, value));
         }
     }
 }
 
-impl State for BeesMbc {
+impl State for BessMbc {
     fn from_gb(gb: &mut GameBoy) -> Result<Self, String> {
         let mut registers = vec![];
         match gb.cartridge().rom_type().mbc_type() {
             MbcType::NoMbc => (),
             MbcType::Mbc1 => {
-                registers.push(BeesMbrRegister::new(
+                registers.push(BessMbrRegister::new(
                     0x0000,
                     if gb.rom().ram_enabled() {
                         0x0a_u8
@@ -953,15 +953,15 @@ impl State for BeesMbc {
                         0x00_u8
                     },
                 ));
-                registers.push(BeesMbrRegister::new(
+                registers.push(BessMbrRegister::new(
                     0x2000,
                     gb.rom().rom_bank() as u8 & 0x1f,
                 ));
-                registers.push(BeesMbrRegister::new(0x4000, gb.rom().ram_bank()));
-                registers.push(BeesMbrRegister::new(0x6000, 0x00_u8));
+                registers.push(BessMbrRegister::new(0x4000, gb.rom().ram_bank()));
+                registers.push(BessMbrRegister::new(0x6000, 0x00_u8));
             }
             MbcType::Mbc3 => {
-                registers.push(BeesMbrRegister::new(
+                registers.push(BessMbrRegister::new(
                     0x0000,
                     if gb.rom().ram_enabled() {
                         0x0a_u8
@@ -969,11 +969,11 @@ impl State for BeesMbc {
                         0x00_u8
                     },
                 ));
-                registers.push(BeesMbrRegister::new(0x2000, gb.rom().rom_bank() as u8));
-                registers.push(BeesMbrRegister::new(0x4000, gb.rom().ram_bank()));
+                registers.push(BessMbrRegister::new(0x2000, gb.rom().rom_bank() as u8));
+                registers.push(BessMbrRegister::new(0x4000, gb.rom().ram_bank()));
             }
             MbcType::Mbc5 => {
-                registers.push(BeesMbrRegister::new(
+                registers.push(BessMbrRegister::new(
                     0x0000,
                     if gb.rom().ram_enabled() {
                         0x0a_u8
@@ -981,12 +981,12 @@ impl State for BeesMbc {
                         0x00_u8
                     },
                 ));
-                registers.push(BeesMbrRegister::new(0x2000, gb.rom().rom_bank() as u8));
-                registers.push(BeesMbrRegister::new(
+                registers.push(BessMbrRegister::new(0x2000, gb.rom().rom_bank() as u8));
+                registers.push(BessMbrRegister::new(
                     0x3000,
                     (gb.rom().rom_bank() >> 8) as u8 & 0x01,
                 ));
-                registers.push(BeesMbrRegister::new(0x4000, gb.rom().ram_bank()));
+                registers.push(BessMbrRegister::new(0x4000, gb.rom().ram_bank()));
             }
             _ => unimplemented!(),
         }
@@ -1002,7 +1002,7 @@ impl State for BeesMbc {
     }
 }
 
-impl Default for BeesMbc {
+impl Default for BessMbc {
     fn default() -> Self {
         Self::new(vec![])
     }
@@ -1010,7 +1010,7 @@ impl Default for BeesMbc {
 
 /// Top level manager structure containing the
 /// entrypoint static methods for saving and loading
-/// [BEES](https://github.com/LIJI32/SameBoy/blob/master/BESS.md) state
+/// [BESS](https://github.com/LIJI32/SameBoy/blob/master/BESS.md) state
 /// files and buffers for the Game Boy.
 pub struct StateManager;
 
@@ -1027,7 +1027,7 @@ impl StateManager {
 
     pub fn save(gb: &mut GameBoy) -> Result<Vec<u8>, String> {
         let mut data: Vec<u8> = vec![];
-        let mut state = BeesState::from_gb(gb)?;
+        let mut state = BessState::from_gb(gb)?;
         state.write(&mut data);
         Ok(data)
     }
@@ -1044,7 +1044,7 @@ impl StateManager {
     }
 
     pub fn load(data: &[u8], gb: &mut GameBoy) -> Result<(), String> {
-        let mut state = BeesState::default();
+        let mut state = BessState::default();
         state.read(&mut Cursor::new(data.to_vec()));
         state.to_gb(gb)?;
         Ok(())
