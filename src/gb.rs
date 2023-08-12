@@ -13,8 +13,8 @@ use crate::{
     data::{BootRom, CGB_BOOT, DMG_BOOT, DMG_BOOTIX, MGB_BOOTIX, SGB_BOOT},
     devices::{printer::PrinterDevice, stdout::StdoutDevice},
     dma::Dma,
-    gen::{COMPILATION_DATE, COMPILATION_TIME, COMPILER, COMPILER_VERSION, VERSION},
     genie::{GameGenie, GameGenieCode},
+    info::Info,
     mmu::Mmu,
     pad::{Pad, PadKey},
     ppu::{
@@ -520,7 +520,7 @@ impl GameBoy {
         match self.mode() {
             GameBoyMode::Dmg => self.load_dmg(boot),
             GameBoyMode::Cgb => self.load_cgb(boot),
-            GameBoyMode::Sgb => todo!(),
+            GameBoyMode::Sgb => unimplemented!(),
         }
     }
 
@@ -703,25 +703,6 @@ impl GameBoy {
         tile.palette_buffer(self.ppu().palette_bg())
     }
 
-    /// Obtains the name of the compiler that has been
-    /// used in the compilation of the base Boytacean
-    /// library. Can be used for diagnostics.
-    pub fn compiler(&self) -> String {
-        String::from(COMPILER)
-    }
-
-    pub fn compiler_version(&self) -> String {
-        String::from(COMPILER_VERSION)
-    }
-
-    pub fn compilation_date(&self) -> String {
-        String::from(COMPILATION_DATE)
-    }
-
-    pub fn compilation_time(&self) -> String {
-        String::from(COMPILATION_TIME)
-    }
-
     pub fn is_dmg(&self) -> bool {
         self.mode == GameBoyMode::Dmg
     }
@@ -866,7 +847,7 @@ impl GameBoy {
         format!(
             "{}  {}\n{}  {}\n{}  {}\n{}  {}\n{}  {}\n{}  {}",
             version_l,
-            VERSION,
+            Info::version(),
             mode_l,
             self.mode(),
             clock_l,
@@ -898,6 +879,10 @@ impl GameBoy {
 
     pub fn cpu(&mut self) -> &mut Cpu {
         &mut self.cpu
+    }
+
+    pub fn cpu_i(&self) -> &Cpu {
+        &self.cpu
     }
 
     pub fn mmu(&mut self) -> &mut Mmu {
@@ -960,6 +945,10 @@ impl GameBoy {
         self.mmu().rom()
     }
 
+    pub fn rom_i(&self) -> &Cartridge {
+        self.mmu_i().rom_i()
+    }
+
     pub fn frame_buffer(&mut self) -> &[u8; FRAME_BUFFER_SIZE] {
         &(self.ppu().frame_buffer)
     }
@@ -992,32 +981,45 @@ impl GameBoy {
         self.apu().audio_buffer()
     }
 
-    pub fn load_boot_path(&mut self, path: &str) {
-        let data = read_file(path);
-        self.load_boot(&data);
+    pub fn cartridge(&mut self) -> &mut Cartridge {
+        self.mmu().rom()
     }
 
-    pub fn load_boot_file(&mut self, boot_rom: BootRom) {
+    pub fn cartridge_i(&self) -> &Cartridge {
+        self.mmu_i().rom_i()
+    }
+
+    pub fn load_boot_path(&mut self, path: &str) -> Result<(), String> {
+        let data = read_file(path)?;
+        self.load_boot(&data);
+        Ok(())
+    }
+
+    pub fn load_boot_file(&mut self, boot_rom: BootRom) -> Result<(), String> {
         match boot_rom {
-            BootRom::Dmg => self.load_boot_path("./res/boot/dmg_boot.bin"),
-            BootRom::Sgb => self.load_boot_path("./res/boot/sgb_boot.bin"),
-            BootRom::DmgBootix => self.load_boot_path("./res/boot/dmg_bootix.bin"),
-            BootRom::MgbBootix => self.load_boot_path("./res/boot/mgb_bootix.bin"),
-            BootRom::Cgb => self.load_boot_path("./res/boot/cgb_boot.bin"),
+            BootRom::Dmg => self.load_boot_path("./res/boot/dmg_boot.bin")?,
+            BootRom::Sgb => self.load_boot_path("./res/boot/sgb_boot.bin")?,
+            BootRom::DmgBootix => self.load_boot_path("./res/boot/dmg_bootix.bin")?,
+            BootRom::MgbBootix => self.load_boot_path("./res/boot/mgb_bootix.bin")?,
+            BootRom::Cgb => self.load_boot_path("./res/boot/cgb_boot.bin")?,
             BootRom::None => (),
         }
+        Ok(())
     }
 
-    pub fn load_boot_default_f(&mut self) {
-        self.load_boot_dmg_f();
+    pub fn load_boot_default_f(&mut self) -> Result<(), String> {
+        self.load_boot_dmg_f()?;
+        Ok(())
     }
 
-    pub fn load_boot_dmg_f(&mut self) {
-        self.load_boot_file(BootRom::DmgBootix);
+    pub fn load_boot_dmg_f(&mut self) -> Result<(), String> {
+        self.load_boot_file(BootRom::DmgBootix)?;
+        Ok(())
     }
 
-    pub fn load_boot_cgb_f(&mut self) {
-        self.load_boot_file(BootRom::Cgb);
+    pub fn load_boot_cgb_f(&mut self) -> Result<(), String> {
+        self.load_boot_file(BootRom::Cgb)?;
+        Ok(())
     }
 
     pub fn load_cartridge(&mut self, rom: Cartridge) -> &mut Cartridge {
@@ -1034,10 +1036,10 @@ impl GameBoy {
     }
 
     pub fn load_rom_file(&mut self, path: &str, ram_path: Option<&str>) -> &mut Cartridge {
-        let data = read_file(path);
+        let data = read_file(path).unwrap();
         match ram_path {
             Some(ram_path) => {
-                let ram_data = read_file(ram_path);
+                let ram_data = read_file(ram_path).unwrap();
                 self.load_rom(&data, Some(&ram_data))
             }
             None => self.load_rom(&data, None),

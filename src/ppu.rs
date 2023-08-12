@@ -5,6 +5,7 @@ use std::{
     borrow::BorrowMut,
     cell::RefCell,
     cmp::max,
+    convert::TryInto,
     fmt::{Display, Formatter},
     rc::Rc,
 };
@@ -1014,8 +1015,33 @@ impl Ppu {
         &self.vram
     }
 
+    pub fn vram_dmg(&self) -> &[u8] {
+        &self.vram[0..VRAM_SIZE_DMG]
+    }
+
+    pub fn vram_cgb(&self) -> &[u8] {
+        &self.vram[0..VRAM_SIZE_CGB]
+    }
+
+    pub fn vram_device(&self) -> &[u8] {
+        match self.gb_mode {
+            GameBoyMode::Dmg => self.vram_dmg(),
+            GameBoyMode::Cgb => self.vram_cgb(),
+            GameBoyMode::Sgb => self.vram_dmg(),
+        }
+    }
+
+    pub fn set_vram(&mut self, value: &[u8]) {
+        self.vram[0..value.len()].copy_from_slice(value);
+        self.update_vram();
+    }
+
     pub fn hram(&self) -> &[u8; HRAM_SIZE] {
         &self.hram
+    }
+
+    pub fn set_hram(&mut self, value: [u8; HRAM_SIZE]) {
+        self.hram = value;
     }
 
     pub fn tiles(&self) -> &[Tile; TILE_COUNT] {
@@ -1037,6 +1063,18 @@ impl Ppu {
 
     pub fn palette_obj_1(&self) -> Palette {
         self.palette_obj_1
+    }
+
+    pub fn palettes_color(&self) -> &[[u8; 64]; 2] {
+        &self.palettes_color
+    }
+
+    pub fn set_palettes_color(&mut self, palettes_color: [[u8; 64]; 2]) {
+        self.palettes_color = palettes_color;
+        Self::compute_palettes_color(
+            &mut [&mut self.palettes_color_bg, &mut self.palettes_color_obj],
+            &self.palettes_color,
+        );
     }
 
     pub fn ly(&self) -> u8 {
@@ -1131,6 +1169,45 @@ impl Ppu {
     /// useful for debugging purposes.
     pub fn print_tile_stdout(&self, tile_index: usize) {
         println!("{}", self.tiles[tile_index]);
+    }
+
+    /// Updates the internal PPU state (calculated values) according
+    /// to the VRAM values, this should be called whenever the VRAM
+    /// is replaced.
+    pub fn update_vram(&mut self) {
+        // "saves" the old values of the VRAM bank and offset
+        // as they are going to be needed later, this is required
+        // as we're going to trick the PPU into switching banks
+        // over the update of the calculated values for the new VRAM,
+        // essentially required for the `update_tile()` method
+        let (vram_bank_old, vram_offset_old) = (self.vram_bank, self.vram_offset);
+
+        // determines the number of VRAM banks available according
+        // to the running Game Boy running mode (CGB vs DMG)
+        let vram_banks = if self.gb_mode == GameBoyMode::Cgb {
+            2u8
+        } else {
+            1u8
+        };
+
+        // goes over all the VRAM banks, and over all the VRAM addresses
+        // in those banks to update the internal tiles and background map
+        // attributes structures accordingly
+        for vram_bank in 0..vram_banks {
+            self.vram_bank = vram_bank;
+            self.vram_offset = self.vram_bank as u16 * 0x2000;
+            for addr in 0x8000..=0x9fff {
+                let value = self.vram[(self.vram_offset + (addr & 0x1fff)) as usize];
+                if addr < 0x9800 {
+                    self.update_tile(addr, value);
+                } else if self.vram_bank == 0x1 {
+                    self.update_bg_map_attrs(addr, value);
+                }
+            }
+        }
+
+        // restores the "old" values for VRAM bank and offset
+        (self.vram_bank, self.vram_offset) = (vram_bank_old, vram_offset_old);
     }
 
     /// Updates the tile structure with the value that has
@@ -1747,6 +1824,8 @@ impl Ppu {
     /// Computes the values for all of the palettes, this method
     /// is useful to "flush" color computation whenever the base
     /// palette colors are changed.
+    /// Notice that this is only applicable to the DMG running mode
+    /// either in the original DMG or in CGB with DMG compatibility.
     fn compute_palettes(&mut self) {
         if self.dmg_compat {
             Self::compute_palette(
@@ -1815,6 +1894,39 @@ impl Ppu {
             palette_color[palette_offset + color_offset],
             palette_color[palette_offset + color_offset + 1],
         );
+    }
+
+    /// Re-computes the complete set of CGB only color palettes using the
+    /// raw `palettes_color` information and computing the `Palette` structure
+    /// for both background and objects palettes.
+    fn compute_palettes_color(
+        palettes: &mut [&mut [Palette; 8]; 2],
+        palettes_color: &[[u8; 64]; 2],
+    ) {
+        for index in 0..2 {
+            let palette = &mut palettes[index];
+            let palette_color = &palettes_color[index];
+            for palette_index in 0..palette.len() {
+                Self::compute_color_palette(
+                    &mut palette[palette_index],
+                    &palette_color[palette_index * 8..(palette_index + 1) * 8]
+                        .try_into()
+                        .unwrap(),
+                );
+            }
+        }
+    }
+
+    /// Computes an individual structured CGB color palette from 8 raw bytes
+    /// coming from the raw `palette_color` information, this 8 bytes should
+    /// represent the 4 colors of the palette in the RGB555 format.
+    fn compute_color_palette(palette: &mut Palette, palette_color: &[u8; 8]) {
+        for color_index in 0..palette.len() {
+            palette[color_index] = Self::rgb555_to_rgb888(
+                palette_color[color_index * 2],
+                palette_color[color_index * 2 + 1],
+            );
+        }
     }
 
     fn rgb555_to_rgb888(first: u8, second: u8) -> Pixel {

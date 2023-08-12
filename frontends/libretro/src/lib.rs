@@ -5,9 +5,12 @@ pub mod consts;
 use boytacean::{
     debugln,
     gb::{AudioProvider, GameBoy},
+    info::Info,
     pad::PadKey,
     ppu::{DISPLAY_HEIGHT, DISPLAY_WIDTH, FRAME_BUFFER_SIZE, XRGB8888_SIZE},
     rom::Cartridge,
+    state::StateManager,
+    warnln,
 };
 use consts::{
     REGION_NTSC, RETRO_API_VERSION, RETRO_DEVICE_ID_JOYPAD_A, RETRO_DEVICE_ID_JOYPAD_B,
@@ -23,12 +26,29 @@ use std::{
     ffi::CStr,
     fmt::{self, Display, Formatter},
     os::raw::{c_char, c_float, c_uint, c_void},
+    ptr,
     slice::from_raw_parts,
 };
+
+/// Represents the information about the LibRetro extension
+/// to be used in a static context. Handles strings at the
+/// byte buffer level and also at the C string level.
+struct LibRetroInfo {
+    name: &'static str,
+    version: &'static str,
+    name_s: String,
+    version_s: String,
+}
 
 static mut EMULATOR: Option<GameBoy> = None;
 static mut KEY_STATES: Option<HashMap<RetroJoypad, bool>> = None;
 static mut FRAME_BUFFER: [u32; FRAME_BUFFER_SIZE] = [0x00; FRAME_BUFFER_SIZE];
+static mut INFO: LibRetroInfo = LibRetroInfo {
+    name: "",
+    version: "",
+    name_s: String::new(),
+    version_s: String::new(),
+};
 
 static mut PENDING_CYCLES: u32 = 0_u32;
 
@@ -151,6 +171,10 @@ pub extern "C" fn retro_init() {
     unsafe {
         EMULATOR = Some(GameBoy::new(None));
         KEY_STATES = Some(HashMap::new());
+        INFO.name_s = format!("{}\0", Info::name());
+        INFO.name = INFO.name_s.as_str();
+        INFO.version_s = format!("v{}\0", Info::version());
+        INFO.version = INFO.version_s.as_str();
     }
 }
 
@@ -172,8 +196,8 @@ pub extern "C" fn retro_reset() {
 #[no_mangle]
 pub unsafe extern "C" fn retro_get_system_info(info: *mut RetroSystemInfo) {
     debugln!("retro_get_system_info()");
-    (*info).library_name = "Boytacean\0".as_ptr() as *const c_char;
-    (*info).library_version = "v0.9.13\0".as_ptr() as *const c_char;
+    (*info).library_name = INFO.name.as_ptr() as *const c_char;
+    (*info).library_version = INFO.version.as_ptr() as *const c_char;
     (*info).valid_extensions = "gb|gbc\0".as_ptr() as *const c_char;
     (*info).need_fullpath = false;
     (*info).block_extract = false;
@@ -332,6 +356,8 @@ pub extern "C" fn retro_load_game_special(
 #[no_mangle]
 pub extern "C" fn retro_unload_game() {
     debugln!("retro_unload_game()");
+    let instance = unsafe { EMULATOR.as_mut().unwrap() };
+    instance.reset();
 }
 
 #[no_mangle]
@@ -347,18 +373,47 @@ pub extern "C" fn retro_get_memory_size(_memory_id: u32) -> usize {
 }
 
 #[no_mangle]
-pub extern "C" fn retro_serialize_size() {
+pub extern "C" fn retro_serialize_size() -> usize {
     debugln!("retro_serialize_size()");
+    let instance = unsafe { EMULATOR.as_mut().unwrap() };
+    StateManager::save(instance).unwrap().len()
 }
 
 #[no_mangle]
-pub extern "C" fn retro_serialize() {
+pub extern "C" fn retro_serialize(data: *mut c_void, size: usize) -> bool {
     debugln!("retro_serialize()");
+    let instance = unsafe { EMULATOR.as_mut().unwrap() };
+    let state = match StateManager::save(instance) {
+        Ok(state) => state,
+        Err(err) => {
+            warnln!("Failed to save state: {}", err);
+            return false;
+        }
+    };
+    if state.len() > size {
+        warnln!(
+            "Invalid state size needed {} bytes, got {} bytes",
+            state.len(),
+            size
+        );
+        return false;
+    }
+    unsafe {
+        ptr::copy_nonoverlapping(state.as_ptr(), data as *mut u8, state.len());
+    }
+    true
 }
 
 #[no_mangle]
-pub extern "C" fn retro_unserialize() {
+pub extern "C" fn retro_unserialize(data: *const c_void, size: usize) -> bool {
     debugln!("retro_unserialize()");
+    let instance = unsafe { EMULATOR.as_mut().unwrap() };
+    let state = unsafe { from_raw_parts(data as *const u8, size) };
+    if let Err(err) = StateManager::load(state, instance) {
+        warnln!("Failed to load state: {}", err);
+        return false;
+    }
+    true
 }
 
 #[no_mangle]

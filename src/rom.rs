@@ -13,6 +13,18 @@ pub const ROM_BANK_SIZE: usize = 16384;
 pub const RAM_BANK_SIZE: usize = 8192;
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
+pub enum MbcType {
+    NoMbc = 0x00,
+    Mbc1 = 0x01,
+    Mbc2 = 0x02,
+    Mbc3 = 0x03,
+    Mbc5 = 0x04,
+    Mbc6 = 0x05,
+    Mbc7 = 0x06,
+    Unknown = 0x07,
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
 pub enum RomType {
     RomOnly = 0x00,
     Mbc1 = 0x01,
@@ -77,6 +89,28 @@ impl RomType {
             RomType::HuC3 => "HuC3",
             RomType::HuC1RamBattery => "HuC1 + RAM + BATTERY",
             RomType::Unknown => "Unknown",
+        }
+    }
+
+    pub fn mbc_type(&self) -> MbcType {
+        match self {
+            RomType::RomOnly => MbcType::NoMbc,
+            RomType::Mbc1 | RomType::Mbc1Ram | RomType::Mbc1RamBattery => MbcType::Mbc1,
+            RomType::Mbc2 | RomType::Mbc2Battery => MbcType::Mbc2,
+            RomType::Mbc3
+            | RomType::Mbc3Ram
+            | RomType::Mbc3RamBattery
+            | RomType::Mbc3TimerBattery
+            | RomType::Mbc3TimerRamBattery => MbcType::Mbc3,
+            RomType::Mbc5
+            | RomType::Mbc5Ram
+            | RomType::Mbc5RamBattery
+            | RomType::Mbc5Rumble
+            | RomType::Mbc5RumbleRam
+            | RomType::Mbc5RumbleRamBattery => MbcType::Mbc5,
+            RomType::Mbc6 => MbcType::Mbc6,
+            RomType::Mbc7SensorRumbleRamBattery => MbcType::Mbc7,
+            _ => MbcType::Unknown,
         }
     }
 }
@@ -301,7 +335,7 @@ impl Cartridge {
     }
 
     pub fn from_file(path: &str) -> Self {
-        let data = read_file(path);
+        let data = read_file(path).unwrap();
         Self::from_data(&data)
     }
 
@@ -380,12 +414,28 @@ impl Cartridge {
         )
     }
 
-    pub fn set_rom_bank(&mut self, rom_bank: u8) {
-        self.rom_offset = rom_bank as usize * ROM_BANK_SIZE;
+    pub fn ram_enabled(&self) -> bool {
+        self.ram_enabled
+    }
+
+    pub fn set_ram_enabled(&mut self, ram_enabled: bool) {
+        self.ram_enabled = ram_enabled
+    }
+
+    pub fn ram_bank(&self) -> u8 {
+        (self.ram_offset / RAM_BANK_SIZE) as u8
     }
 
     pub fn set_ram_bank(&mut self, ram_bank: u8) {
         self.ram_offset = ram_bank as usize * RAM_BANK_SIZE;
+    }
+
+    pub fn rom_bank(&self) -> u16 {
+        (self.rom_offset / ROM_BANK_SIZE) as u16
+    }
+
+    pub fn set_rom_bank(&mut self, rom_bank: u16) {
+        self.rom_offset = rom_bank as usize * ROM_BANK_SIZE;
     }
 
     pub fn set_rumble_cb(&mut self, rumble_cb: fn(active: bool)) {
@@ -733,8 +783,8 @@ pub static MBC1: Mbc = Mbc {
             }
             // ROM bank selection 5 lower bits
             0x2000 | 0x3000 => {
-                let mut rom_bank = value & 0x1f;
-                rom_bank &= (rom.rom_bank_count * 2 - 1) as u8;
+                let mut rom_bank = value as u16 & 0x1f;
+                rom_bank &= rom.rom_bank_count * 2 - 1;
                 if rom_bank == 0 {
                     rom_bank = 1;
                 }
@@ -795,8 +845,8 @@ pub static MBC3: Mbc = Mbc {
             }
             // ROM bank selection
             0x2000 | 0x3000 => {
-                let mut rom_bank = value & 0x7f;
-                rom_bank &= (rom.rom_bank_count * 2 - 1) as u8;
+                let mut rom_bank = value as u16 & 0x7f;
+                rom_bank &= rom.rom_bank_count * 2 - 1;
                 if rom_bank == 0 {
                     rom_bank = 1;
                 }
@@ -849,9 +899,14 @@ pub static MBC5: Mbc = Mbc {
             0x0000 | 0x1000 => {
                 rom.ram_enabled = (value & 0x0f) == 0x0a;
             }
-            // ROM bank selection
+            // ROM bank selection 8 lower bits
             0x2000 => {
-                let rom_bank = value;
+                let rom_bank = value as u16;
+                rom.set_rom_bank(rom_bank);
+            }
+            // ROM bank selection 9th bit
+            0x3000 => {
+                let rom_bank = (rom.rom_bank() & 0x00ff) + (((value & 0x01) as u16) << 8);
                 rom.set_rom_bank(rom_bank);
             }
             // RAM bank selection

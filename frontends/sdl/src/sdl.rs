@@ -42,7 +42,11 @@ impl SdlSystem {
         // creates the system window that is going to be used to
         // show the emulator and sets it to the central are o screen
         let window = video_subsystem
-            .window(title, scale as u32 * width, scale as u32 * height)
+            .window(
+                title,
+                (scale * width as f32) as u32,
+                (scale * height as f32) as u32,
+            )
             .resizable()
             .position_centered()
             .opengl()

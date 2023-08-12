@@ -34,7 +34,8 @@ import {
     GameBoy,
     PadKey,
     GameBoyMode,
-    GameBoySpeed
+    GameBoySpeed,
+    Info
 } from "../lib/boytacean";
 import info from "../package.json";
 
@@ -161,6 +162,15 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     }
 
     /**
+     * Initializes the global module structures.
+     */
+    async init() {
+        // initializes the WASM module, this is required
+        // so that the global symbols become available
+        await wasm();
+    }
+
+    /**
      * Runs the initialization and main loop execution for
      * the Game Boy emulator.
      * The main execution of this function should be an
@@ -170,10 +180,6 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
      * used in he Game Boy emulator initialization.
      */
     async main({ romUrl }: { romUrl?: string }) {
-        // initializes the WASM module, this is required
-        // so that the global symbols become available
-        await wasm();
-
         // boots the emulator subsystem with the initial
         // ROM retrieved from a remote data source
         await this.boot({ loadRom: true, romPath: romUrl ?? undefined });
@@ -485,12 +491,12 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     }
 
     get name(): string {
-        return "Boytacean";
+        return Info.name() ?? info.name;
     }
 
     get device(): Entry {
         return {
-            text: "Game Boy",
+            text: Info.system(),
             url: "https://en.wikipedia.org/wiki/Game_Boy"
         };
     }
@@ -501,7 +507,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
 
     get version(): Entry | undefined {
         return {
-            text: info.version,
+            text: Info.version() ?? info.version,
             url: "https://github.com/joamag/boytacean/blob/master/CHANGELOG.md"
         };
     }
@@ -657,16 +663,16 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     get compiler(): Compiler | null {
         if (!this.gameBoy) return null;
         return {
-            name: this.gameBoy.compiler(),
-            version: this.gameBoy.compiler_version()
+            name: Info.compiler(),
+            version: Info.compiler_version()
         };
     }
 
     get compilation(): Compilation | null {
         if (!this.gameBoy) return null;
         return {
-            date: this.gameBoy.compilation_date(),
-            time: this.gameBoy.compilation_time()
+            date: Info.compilation_date(),
+            time: Info.compilation_time()
         };
     }
 

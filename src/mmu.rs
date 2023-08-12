@@ -178,6 +178,10 @@ impl Mmu {
         self.speed
     }
 
+    pub fn set_speed(&mut self, value: GameBoySpeed) {
+        self.speed = value;
+    }
+
     pub fn set_speed_callback(&mut self, callback: fn(speed: GameBoySpeed)) {
         self.speed_callback = callback;
     }
@@ -244,8 +248,14 @@ impl Mmu {
         }
 
         // @TODO: Implement DMA transfer in a better way
-        let data = self.read_many(self.dma.source(), self.dma.length());
-        self.write_many(self.dma.destination(), &data);
+
+        // only runs the DMA transfer if the system is in CGB mode
+        // this avoids issues when writing to DMG unmapped registers
+        // that would otherwise cause the system to crash
+        if self.mode == GameBoyMode::Cgb {
+            let data = self.read_many(self.dma.source(), self.dma.length());
+            self.write_many(self.dma.destination(), &data);
+        }
         self.dma.set_active(false);
     }
 
@@ -321,7 +331,13 @@ impl Mmu {
                     0x4d => (false as u8) | ((self.speed as u8) << 7),
 
                     // 0xFF50 - Boot active flag
-                    0x50 => u8::from(self.boot_active),
+                    0x50 => {
+                        if self.boot_active {
+                            0x00
+                        } else {
+                            0x01
+                        }
+                    }
 
                     // 0xFF70 - SVBK: WRAM bank (CGB only)
                     0x70 => self.ram_bank & 0x07,
@@ -424,7 +440,7 @@ impl Mmu {
                     }
 
                     // 0xFF50 - Boot active flag
-                    0x50 => self.boot_active = false,
+                    0x50 => self.boot_active = value == 0x00,
 
                     // 0xFF70 - SVBK: WRAM bank (CGB only)
                     0x70 => {
@@ -482,9 +498,23 @@ impl Mmu {
         }
     }
 
-    pub fn write_many(&mut self, addr: u16, data: &[u8]) {
-        for (index, byte) in data.iter().enumerate() {
-            self.write(addr + index as u16, *byte)
+    /// Reads a byte from a certain memory address, without the typical
+    /// Game Boy verifications, allowing deep read of values.
+    pub fn read_unsafe(&mut self, addr: u16) -> u8 {
+        match addr {
+            0xff10..=0xff3f => self.apu.read_unsafe(addr),
+            _ => self.read(addr),
+        }
+    }
+
+    /// Writes a byte to a certain memory address without the typical
+    /// Game Boy verification process. This allows for faster memory
+    /// access in registers and other memory areas that are typically
+    /// inaccessible.
+    pub fn write_unsafe(&mut self, addr: u16, value: u8) {
+        match addr {
+            0xff10..=0xff3f => self.apu.write_unsafe(addr, value),
+            _ => self.write(addr, value),
         }
     }
 
@@ -499,6 +529,29 @@ impl Mmu {
         data
     }
 
+    pub fn write_many(&mut self, addr: u16, data: &[u8]) {
+        for (index, byte) in data.iter().enumerate() {
+            self.write(addr + index as u16, *byte)
+        }
+    }
+
+    pub fn read_many_unsafe(&mut self, addr: u16, count: u16) -> Vec<u8> {
+        let mut data: Vec<u8> = vec![];
+
+        for index in 0..count {
+            let byte = self.read_unsafe(addr + index);
+            data.push(byte);
+        }
+
+        data
+    }
+
+    pub fn write_many_unsafe(&mut self, addr: u16, data: &[u8]) {
+        for (index, byte) in data.iter().enumerate() {
+            self.write_unsafe(addr + index as u16, *byte)
+        }
+    }
+
     pub fn write_boot(&mut self, addr: u16, buffer: &[u8]) {
         self.boot[addr as usize..addr as usize + buffer.len()].clone_from_slice(buffer);
     }
@@ -507,8 +560,24 @@ impl Mmu {
         self.ram[addr as usize..addr as usize + buffer.len()].clone_from_slice(buffer);
     }
 
+    pub fn ram(&mut self) -> &mut Vec<u8> {
+        &mut self.ram
+    }
+
+    pub fn ram_i(&self) -> &Vec<u8> {
+        &self.ram
+    }
+
+    pub fn set_ram(&mut self, value: Vec<u8>) {
+        self.ram = value;
+    }
+
     pub fn rom(&mut self) -> &mut Cartridge {
         &mut self.rom
+    }
+
+    pub fn rom_i(&self) -> &Cartridge {
+        &self.rom
     }
 
     pub fn set_rom(&mut self, rom: Cartridge) {

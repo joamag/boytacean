@@ -9,20 +9,27 @@ use audio::Audio;
 use boytacean::{
     devices::{printer::PrinterDevice, stdout::StdoutDevice},
     gb::{AudioProvider, GameBoy, GameBoyMode},
+    info::Info,
     pad::PadKey,
     ppu::PaletteInfo,
     rom::Cartridge,
     serial::{NullDevice, SerialDevice},
+    state::StateManager,
     util::{replace_ext, write_file},
 };
 use chrono::Utc;
 use clap::Parser;
 use image::{ColorType, ImageBuffer, Rgb};
 use sdl::{surface_from_bytes, SdlSystem};
-use sdl2::{event::Event, keyboard::Keycode, pixels::PixelFormatEnum, Sdl};
+use sdl2::{
+    event::Event,
+    keyboard::{Keycode, Mod},
+    pixels::PixelFormatEnum,
+    Sdl,
+};
 use std::{
     cmp::max,
-    path::Path,
+    path::{Path, PathBuf},
     thread,
     time::{Duration, Instant, SystemTime},
 };
@@ -30,10 +37,7 @@ use std::{
 /// The scale at which the screen is going to be drawn
 /// meaning the ratio between Game Boy resolution and
 /// the window size to be displayed.
-const SCREEN_SCALE: f32 = 2.0;
-
-/// The base title to be used in the window.
-const TITLE: &str = "Boytacean";
+const SCREEN_SCALE: f32 = 3.0;
 
 /// Base audio volume to be used as the basis of the
 /// amplification level of the volume
@@ -76,9 +80,10 @@ pub struct Emulator {
     unlimited: bool,
     sdl: Option<SdlSystem>,
     audio: Option<Audio>,
-    title: &'static str,
+    title: String,
     rom_path: String,
     ram_path: String,
+    dir_path: String,
     logic_frequency: u32,
     visual_frequency: f32,
     next_tick_time: f32,
@@ -96,9 +101,10 @@ impl Emulator {
             unlimited: options.unlimited.unwrap_or(false),
             sdl: None,
             audio: None,
-            title: TITLE,
+            title: format!("{} v{}", Info::name(), Info::version()),
             rom_path: String::from("invalid"),
             ram_path: String::from("invalid"),
+            dir_path: String::from("invalid"),
             logic_frequency: GameBoy::CPU_FREQ,
             visual_frequency: GameBoy::VISUAL_FREQ,
             next_tick_time: 0.0,
@@ -199,7 +205,7 @@ impl Emulator {
     pub fn start_graphics(&mut self, sdl: &Sdl, screen_scale: f32) {
         self.sdl = Some(SdlSystem::new(
             sdl,
-            self.title,
+            &self.title,
             self.system.display_width() as u32,
             self.system.display_height() as u32,
             screen_scale,
@@ -239,6 +245,12 @@ impl Emulator {
         }
         self.rom_path = String::from(rom_path);
         self.ram_path = ram_path;
+        self.dir_path = Path::new(&self.rom_path)
+            .parent()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_string();
     }
 
     pub fn reset(&mut self) {
@@ -273,6 +285,22 @@ impl Emulator {
         );
     }
 
+    fn save_state(&mut self, file_path: &str) {
+        if let Err(message) = StateManager::save_file(file_path, &mut self.system) {
+            println!("Error saving state: {}", message)
+        } else {
+            println!("Saved state into: {}", file_path)
+        }
+    }
+
+    fn load_state(&mut self, file_path: &str) {
+        if let Err(message) = StateManager::load_file(file_path, &mut self.system) {
+            println!("Error loading state: {}", message)
+        } else {
+            println!("Loaded state from: {}", file_path)
+        }
+    }
+
     fn save_image(&mut self, file_path: &str) {
         let width = self.system.display_width() as u32;
         let height = self.system.display_height() as u32;
@@ -300,6 +328,19 @@ impl Emulator {
             .ppu()
             .set_palette_colors(self.palettes[self.palette_index].colors());
         self.palette_index = (self.palette_index + 1) % self.palettes.len();
+    }
+
+    pub fn toggle_fullscreen(&mut self) {
+        let window = self.sdl.as_mut().unwrap().window_mut();
+        if window.fullscreen_state() == sdl2::video::FullscreenType::Off {
+            window
+                .set_fullscreen(sdl2::video::FullscreenType::Desktop)
+                .unwrap()
+        } else {
+            window
+                .set_fullscreen(sdl2::video::FullscreenType::Off)
+                .unwrap()
+        }
     }
 
     pub fn limited(&self) -> bool {
@@ -354,7 +395,7 @@ impl Emulator {
             // into a *.sav file in the file system
             if counter % store_count == 0 && self.system.rom().has_battery() {
                 let ram_data = self.system.rom().ram_data();
-                write_file(&self.ram_path, ram_data);
+                write_file(&self.ram_path, ram_data).unwrap();
             }
 
             // obtains an event from the SDL sub-system to be
@@ -377,7 +418,7 @@ impl Emulator {
                     Event::KeyDown {
                         keycode: Some(Keycode::I),
                         ..
-                    } => self.save_image(&self.image_name(Some("png"))),
+                    } => self.save_image(&self.image_name(Some("png"), Some(&self.dir_path))),
                     Event::KeyDown {
                         keycode: Some(Keycode::T),
                         ..
@@ -386,6 +427,15 @@ impl Emulator {
                         keycode: Some(Keycode::P),
                         ..
                     } => self.toggle_palette(),
+                    Event::KeyDown {
+                        keycode: Some(Keycode::F),
+                        keymod,
+                        ..
+                    } => {
+                        if (keymod & (Mod::LCTRLMOD | Mod::RCTRLMOD)) != Mod::NOMOD {
+                            self.toggle_fullscreen()
+                        }
+                    }
                     Event::KeyDown {
                         keycode: Some(Keycode::Plus),
                         ..
@@ -396,8 +446,33 @@ impl Emulator {
                     } => self.logic_frequency = self.logic_frequency.saturating_sub(400000),
                     Event::KeyDown {
                         keycode: Some(keycode),
+                        keymod,
                         ..
                     } => {
+                        match keycode {
+                            Keycode::Num0
+                            | Keycode::Num1
+                            | Keycode::Num2
+                            | Keycode::Num3
+                            | Keycode::Num4
+                            | Keycode::Num5
+                            | Keycode::Num6
+                            | Keycode::Num7
+                            | Keycode::Num8
+                            | Keycode::Num9 => {
+                                let file_path = self.save_name(
+                                    keycode as u8 - Keycode::Num0 as u8,
+                                    None,
+                                    Some(&self.dir_path),
+                                );
+                                if (keymod & (Mod::LCTRLMOD | Mod::RCTRLMOD)) != Mod::NOMOD {
+                                    self.save_state(&file_path);
+                                } else {
+                                    self.load_state(&file_path);
+                                }
+                            }
+                            _ => {}
+                        }
                         if let Some(key) = key_to_pad(keycode) {
                             self.system.key_press(key)
                         }
@@ -663,6 +738,8 @@ impl Emulator {
         }
     }
 
+    /// Obtains the ROM name (file name without extension) so that
+    /// it can be used for derivate file names (eg: save files, screenshots).
     fn rom_name(&self) -> &str {
         Path::new(&self.rom_path)
             .file_stem()
@@ -671,21 +748,48 @@ impl Emulator {
             .unwrap()
     }
 
-    fn image_name(&self, ext: Option<&str>) -> String {
+    fn image_name(&self, ext: Option<&str>, dir_path: Option<&str>) -> String {
         let ext = ext.unwrap_or("png");
-        self.best_name(self.rom_name(), ext)
+        let dir_path = dir_path.unwrap_or(".");
+        Self::best_name(self.rom_name(), ext, dir_path)
     }
 
-    fn best_name(&self, base: &str, ext: &str) -> String {
+    /// Obtains the best possible save file name (ex: `{ROM_NAME}.s0`) taking
+    /// into consideration the current directory path and the index of the save.
+    fn save_name(&self, index: u8, suffix: Option<&str>, dir_path: Option<&str>) -> String {
+        let suffix = suffix.unwrap_or("s");
+        let dir_path = dir_path.unwrap_or(".");
+        Self::sequence_name(self.rom_name(), index, suffix, dir_path)
+    }
+
+    /// Generates a file name for the provided base name, index and suffix
+    /// taking into consideration the provided directory path.
+    /// The generated file name is `{base}.{suffix}{index}`.
+    fn sequence_name(base: &str, index: u8, suffix: &str, dir_path: &str) -> String {
+        let file_name = format!("{}.{}{}", base, suffix, index);
+        let mut file_buf = PathBuf::from(dir_path);
+        file_buf.push(file_name);
+        file_buf.to_str().unwrap().to_string()
+    }
+
+    /// Tries to obtain the best possible file name for the provided base name
+    /// and extension avoiding name collisions with existing files in the
+    /// same directory.
+    fn best_name(base: &str, ext: &str, dir_path: &str) -> String {
         let mut index = 0_usize;
         let mut name = format!("{}.{}", base, ext);
 
-        while Path::new(&name).exists() {
+        let mut path_buf = PathBuf::from(dir_path);
+        path_buf.push(&name);
+
+        while path_buf.exists() {
             index += 1;
             name = format!("{}-{}.{}", base, index, ext);
+            path_buf = PathBuf::from(dir_path);
+            path_buf.push(&name);
         }
 
-        name
+        path_buf.to_str().unwrap().to_string()
     }
 }
 
@@ -817,7 +921,7 @@ fn main() {
     game_boy.load(!args.no_boot);
 
     // prints the current version of the emulator (informational message)
-    println!("========= Boytacean =========\n{}", game_boy);
+    println!("========= {} =========\n{}", Info::name(), game_boy);
 
     // creates a new generic emulator structure then starts
     // both the video and audio sub-systems, loads default

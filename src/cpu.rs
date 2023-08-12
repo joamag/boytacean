@@ -388,6 +388,11 @@ impl Cpu {
     }
 
     #[inline(always)]
+    pub fn set_halted(&mut self, value: bool) {
+        self.halted = value
+    }
+
+    #[inline(always)]
     pub fn cycles(&self) -> u8 {
         self.cycles
     }
@@ -398,8 +403,18 @@ impl Cpu {
     }
 
     #[inline(always)]
+    pub fn set_pc(&mut self, value: u16) {
+        self.pc = value;
+    }
+
+    #[inline(always)]
     pub fn sp(&self) -> u16 {
         self.sp
+    }
+
+    #[inline(always)]
+    pub fn set_sp(&mut self, value: u16) {
+        self.sp = value;
     }
 
     #[inline(always)]
@@ -470,6 +485,16 @@ impl Cpu {
     pub fn set_hl(&mut self, value: u16) {
         self.h = (value >> 8) as u8;
         self.l = value as u8;
+    }
+
+    #[inline(always)]
+    pub fn ime(&self) -> bool {
+        self.ime
+    }
+
+    #[inline(always)]
+    pub fn set_ime(&mut self, value: bool) {
+        self.ime = value;
     }
 
     #[inline(always)]
