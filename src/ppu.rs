@@ -1190,6 +1190,9 @@ impl Ppu {
             1u8
         };
 
+        // goes over all the VRAM banks, and over all the VRAM addresses
+        // in those banks to update the internal tiles and background map
+        // attributes structures accordingly
         for vram_bank in 0..vram_banks {
             self.vram_bank = vram_bank;
             self.vram_offset = self.vram_bank as u16 * 0x2000;
