@@ -10,23 +10,24 @@ pub type SharedMut<T> = Rc<RefCell<T>>;
 
 /// Reads the contents of the file at the given path into
 /// a vector of bytes.
-pub fn read_file(path: &str) -> Vec<u8> {
+pub fn read_file(path: &str) -> Result<Vec<u8>, String> {
     let mut file = match File::open(path) {
         Ok(file) => file,
-        Err(_) => panic!("Failed to open file: {}", path),
+        Err(_) => return Err(format!("Failed to open file: {}", path)),
     };
     let mut data = Vec::new();
     file.read_to_end(&mut data).unwrap();
-    data
+    Ok(data)
 }
 
 /// Writes the given data to the file at the given path.
-pub fn write_file(path: &str, data: &[u8]) {
+pub fn write_file(path: &str, data: &[u8]) -> Result<(), String> {
     let mut file = match File::create(path) {
         Ok(file) => file,
-        Err(_) => panic!("Failed to open file: {}", path),
+        Err(_) => return Err(format!("Failed to open file: {}", path)),
     };
-    file.write_all(data).unwrap()
+    file.write_all(data).unwrap();
+    Ok(())
 }
 
 /// Replaces the extension in the given path with the provided extension.

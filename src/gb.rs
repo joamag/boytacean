@@ -990,7 +990,7 @@ impl GameBoy {
     }
 
     pub fn load_boot_path(&mut self, path: &str) {
-        let data = read_file(path);
+        let data = read_file(path).unwrap();
         self.load_boot(&data);
     }
 
@@ -1031,10 +1031,10 @@ impl GameBoy {
     }
 
     pub fn load_rom_file(&mut self, path: &str, ram_path: Option<&str>) -> &mut Cartridge {
-        let data = read_file(path);
+        let data = read_file(path).unwrap();
         match ram_path {
             Some(ram_path) => {
-                let ram_data = read_file(ram_path);
+                let ram_data = read_file(ram_path).unwrap();
                 self.load_rom(&data, Some(&ram_data))
             }
             None => self.load_rom(&data, None),

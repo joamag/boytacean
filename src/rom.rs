@@ -335,7 +335,7 @@ impl Cartridge {
     }
 
     pub fn from_file(path: &str) -> Self {
-        let data = read_file(path);
+        let data = read_file(path).unwrap();
         Self::from_data(&data)
     }
 
