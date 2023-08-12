@@ -989,32 +989,37 @@ impl GameBoy {
         self.mmu_i().rom_i()
     }
 
-    pub fn load_boot_path(&mut self, path: &str) {
-        let data = read_file(path).unwrap();
+    pub fn load_boot_path(&mut self, path: &str) -> Result<(), String> {
+        let data = read_file(path)?;
         self.load_boot(&data);
+        Ok(())
     }
 
-    pub fn load_boot_file(&mut self, boot_rom: BootRom) {
+    pub fn load_boot_file(&mut self, boot_rom: BootRom) -> Result<(), String> {
         match boot_rom {
-            BootRom::Dmg => self.load_boot_path("./res/boot/dmg_boot.bin"),
-            BootRom::Sgb => self.load_boot_path("./res/boot/sgb_boot.bin"),
-            BootRom::DmgBootix => self.load_boot_path("./res/boot/dmg_bootix.bin"),
-            BootRom::MgbBootix => self.load_boot_path("./res/boot/mgb_bootix.bin"),
-            BootRom::Cgb => self.load_boot_path("./res/boot/cgb_boot.bin"),
+            BootRom::Dmg => self.load_boot_path("./res/boot/dmg_boot.bin")?,
+            BootRom::Sgb => self.load_boot_path("./res/boot/sgb_boot.bin")?,
+            BootRom::DmgBootix => self.load_boot_path("./res/boot/dmg_bootix.bin")?,
+            BootRom::MgbBootix => self.load_boot_path("./res/boot/mgb_bootix.bin")?,
+            BootRom::Cgb => self.load_boot_path("./res/boot/cgb_boot.bin")?,
             BootRom::None => (),
         }
+        Ok(())
     }
 
-    pub fn load_boot_default_f(&mut self) {
-        self.load_boot_dmg_f();
+    pub fn load_boot_default_f(&mut self) -> Result<(), String> {
+        self.load_boot_dmg_f()?;
+        Ok(())
     }
 
-    pub fn load_boot_dmg_f(&mut self) {
-        self.load_boot_file(BootRom::DmgBootix);
+    pub fn load_boot_dmg_f(&mut self) -> Result<(), String> {
+        self.load_boot_file(BootRom::DmgBootix)?;
+        Ok(())
     }
 
-    pub fn load_boot_cgb_f(&mut self) {
-        self.load_boot_file(BootRom::Cgb);
+    pub fn load_boot_cgb_f(&mut self) -> Result<(), String> {
+        self.load_boot_file(BootRom::Cgb)?;
+        Ok(())
     }
 
     pub fn load_cartridge(&mut self, rom: Cartridge) -> &mut Cartridge {
