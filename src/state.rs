@@ -1010,7 +1010,8 @@ impl Default for BeesMbc {
 
 /// Top level manager structure containing the
 /// entrypoint static methods for saving and loading
-/// BEES states for the Game Boy.
+/// [BEES](https://github.com/LIJI32/SameBoy/blob/master/BESS.md) state
+/// files and buffers for the Game Boy.
 pub struct StateManager;
 
 impl StateManager {
