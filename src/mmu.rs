@@ -498,9 +498,21 @@ impl Mmu {
         }
     }
 
-    pub fn write_many(&mut self, addr: u16, data: &[u8]) {
-        for (index, byte) in data.iter().enumerate() {
-            self.write(addr + index as u16, *byte)
+    /// Reads a byte from a certain memory address, without the typical
+    /// Game Boy verifications, allowing deep read of values.
+    pub fn read_unsafe(&mut self, addr: u16) -> u8 {
+        match addr {
+            _ => self.read(addr),
+        }
+    }
+
+    /// Writes a byte to a certain memory address without the typical
+    /// Game Boy verification process. This allows for faster memory
+    /// access in registers and other memory areas that are typically
+    /// inaccessible.
+    pub fn write_unsafe(&mut self, addr: u16, value: u8) {
+        match addr {
+            _ => self.write(addr, value),
         }
     }
 
@@ -513,6 +525,29 @@ impl Mmu {
         }
 
         data
+    }
+
+    pub fn write_many(&mut self, addr: u16, data: &[u8]) {
+        for (index, byte) in data.iter().enumerate() {
+            self.write(addr + index as u16, *byte)
+        }
+    }
+
+    pub fn read_many_unsafe(&mut self, addr: u16, count: u16) -> Vec<u8> {
+        let mut data: Vec<u8> = vec![];
+
+        for index in 0..count {
+            let byte = self.read_unsafe(addr + index);
+            data.push(byte);
+        }
+
+        data
+    }
+
+    pub fn write_many_unsafe(&mut self, addr: u16, data: &[u8]) {
+        for (index, byte) in data.iter().enumerate() {
+            self.write_unsafe(addr + index as u16, *byte)
+        }
     }
 
     pub fn write_boot(&mut self, addr: u16, buffer: &[u8]) {
