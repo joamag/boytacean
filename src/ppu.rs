@@ -820,6 +820,7 @@ impl Ppu {
                     self.ly = 0;
                     self.int_vblank = false;
                     self.int_stat = false;
+                    self.window_counter = 0;
                     self.first_frame = true;
                     self.clear_frame_buffer();
                 }
