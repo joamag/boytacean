@@ -11,11 +11,13 @@ use std::{
 use crate::{
     gb::{GameBoy, GameBoySpeed},
     info::Info,
+    ppu::{DISPLAY_HEIGHT, DISPLAY_WIDTH, FRAME_BUFFER_SIZE},
     rom::{CgbMode, MbcType},
+    util::save_bmp,
 };
 
 /// Magic string for the BOS (Boytacean Save State) format.
-pub const BOS_MAGIC: &'static str = "BOS\0";
+pub const BOS_MAGIC: &str = "BOS\0";
 
 /// Magic string ("BOS\0") in little endian unsigned 32 bit format.
 pub const BOS_MAGIC_UINT: u32 = 0x00534f42;
@@ -31,10 +33,23 @@ pub enum SaveStateFormat {
     Bess,
 }
 
+#[derive(Clone, Copy)]
 pub enum BosBlockKind {
     Name = 0x01,
     ImageBuffer = 0x02,
     SystemInfo = 0x03,
+    Unknown = 0xff,
+}
+
+impl BosBlockKind {
+    fn from_u8(value: u8) -> Self {
+        match value {
+            0x01 => Self::Name,
+            0x02 => Self::ImageBuffer,
+            0x03 => Self::SystemInfo,
+            _ => Self::Unknown,
+        }
+    }
 }
 
 pub trait Serialize {
@@ -62,7 +77,8 @@ pub trait State {
 pub struct BosState {
     magic: u32,
     version: u8,
-    blocks: Vec<BosBlock>,
+    block_count: u8,
+    image_buffer: Option<BosImageBuffer>,
     bess: BessState,
 }
 
@@ -85,12 +101,37 @@ impl BosState {
         self.bess.verify()?;
         Ok(())
     }
+
+    pub fn save_bmp(&self, file_path: &str) -> Result<(), String> {
+        if let Some(image_buffer) = &self.image_buffer {
+            image_buffer.save_bmp(file_path)?;
+            Ok(())
+        } else {
+            Err(String::from("No image buffer found"))
+        }
+    }
+
+    fn build_block_count(&self) -> u8 {
+        let mut count = 0_u8;
+        if self.image_buffer.is_some() {
+            count += 1;
+        }
+        count
+    }
 }
 
 impl Serialize for BosState {
     fn write(&mut self, buffer: &mut Cursor<Vec<u8>>) {
+        self.block_count = self.build_block_count();
+
         buffer.write_all(&self.magic.to_le_bytes()).unwrap();
         buffer.write_all(&self.version.to_le_bytes()).unwrap();
+        buffer.write_all(&self.block_count.to_le_bytes()).unwrap();
+
+        if let Some(image_buffer) = &mut self.image_buffer {
+            image_buffer.write(buffer);
+        }
+
         self.bess.write(buffer);
     }
 
@@ -101,6 +142,28 @@ impl Serialize for BosState {
         let mut buffer = [0x00; 1];
         data.read_exact(&mut buffer).unwrap();
         self.version = u8::from_le_bytes(buffer);
+        let mut buffer = [0x00; 1];
+        data.read_exact(&mut buffer).unwrap();
+        self.block_count = u8::from_le_bytes(buffer);
+
+        for _ in 0..self.block_count {
+            let block = BosBlock::from_data(data);
+            let offset = -((size_of::<u8>() + size_of::<u32>()) as i64);
+            data.seek(SeekFrom::Current(offset)).unwrap();
+
+            match block.kind {
+                BosBlockKind::ImageBuffer => {
+                    self.image_buffer = Some(BosImageBuffer::from_data(data));
+                }
+                _ => {
+                    data.seek(SeekFrom::Current(-offset)).unwrap();
+                    data.seek(SeekFrom::Current(block.size as i64)).unwrap();
+                }
+            }
+        }
+
+        self.block_count = self.build_block_count();
+
         self.bess.read(data);
     }
 }
@@ -110,7 +173,8 @@ impl State for BosState {
         Ok(Self {
             magic: BOS_MAGIC_UINT,
             version: BOS_VERSION,
-            blocks: vec![],
+            block_count: 1,
+            image_buffer: Some(BosImageBuffer::from_gb(gb)?),
             bess: BessState::from_gb(gb)?,
         })
     }
@@ -125,7 +189,101 @@ impl State for BosState {
 pub struct BosBlock {
     kind: BosBlockKind,
     size: u32,
-    buffer: Vec<u8>,
+}
+
+impl BosBlock {
+    pub fn new(kind: BosBlockKind, size: u32) -> Self {
+        Self { kind, size }
+    }
+
+    pub fn from_data(data: &mut Cursor<Vec<u8>>) -> Self {
+        let mut instance = Self::default();
+        instance.read(data);
+        instance
+    }
+}
+
+impl Serialize for BosBlock {
+    fn write(&mut self, buffer: &mut Cursor<Vec<u8>>) {
+        buffer.write_all(&(self.kind as u8).to_le_bytes()).unwrap();
+        buffer.write_all(&self.size.to_le_bytes()).unwrap();
+    }
+
+    fn read(&mut self, data: &mut Cursor<Vec<u8>>) {
+        let mut buffer = [0x00; 1];
+        data.read_exact(&mut buffer).unwrap();
+        self.kind = BosBlockKind::from_u8(u8::from_le_bytes(buffer));
+        let mut buffer = [0x00; 4];
+        data.read_exact(&mut buffer).unwrap();
+        self.size = u32::from_le_bytes(buffer);
+    }
+}
+
+impl Default for BosBlock {
+    fn default() -> Self {
+        Self::new(BosBlockKind::Name, 0)
+    }
+}
+
+pub struct BosImageBuffer {
+    header: BosBlock,
+    image: [u8; FRAME_BUFFER_SIZE],
+}
+
+impl BosImageBuffer {
+    pub fn new(image: [u8; FRAME_BUFFER_SIZE]) -> Self {
+        Self {
+            header: BosBlock::new(
+                BosBlockKind::ImageBuffer,
+                (size_of::<u8>() * FRAME_BUFFER_SIZE) as u32,
+            ),
+            image,
+        }
+    }
+
+    pub fn from_data(data: &mut Cursor<Vec<u8>>) -> Self {
+        let mut instance = Self::default();
+        instance.read(data);
+        instance
+    }
+
+    pub fn save_bmp(&self, file_path: &str) -> Result<(), String> {
+        save_bmp(
+            file_path,
+            &self.image,
+            DISPLAY_WIDTH as u32,
+            DISPLAY_HEIGHT as u32,
+        )?;
+        Ok(())
+    }
+}
+
+impl Serialize for BosImageBuffer {
+    fn write(&mut self, buffer: &mut Cursor<Vec<u8>>) {
+        self.header.write(buffer);
+        buffer.write_all(&self.image).unwrap();
+    }
+
+    fn read(&mut self, data: &mut Cursor<Vec<u8>>) {
+        self.header.read(data);
+        data.read_exact(&mut self.image).unwrap();
+    }
+}
+
+impl State for BosImageBuffer {
+    fn from_gb(gb: &mut GameBoy) -> Result<Self, String> {
+        Ok(Self::new(*gb.ppu_i().frame_buffer))
+    }
+
+    fn to_gb(&self, _gb: &mut GameBoy) -> Result<(), String> {
+        Ok(())
+    }
+}
+
+impl Default for BosImageBuffer {
+    fn default() -> Self {
+        Self::new([0x00; FRAME_BUFFER_SIZE])
+    }
 }
 
 #[derive(Default)]
