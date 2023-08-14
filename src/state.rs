@@ -16,13 +16,13 @@ use crate::{
     util::save_bmp,
 };
 
-/// Magic string for the BOS (Boytacean Save State) format.
+/// Magic string for the BOS (Boytacean Save) format.
 pub const BOS_MAGIC: &str = "BOS\0";
 
 /// Magic string ("BOS\0") in little endian unsigned 32 bit format.
 pub const BOS_MAGIC_UINT: u32 = 0x00534f42;
 
-/// Current version of the BOS (Boytacean Save State) format.
+/// Current version of the BOS (Boytacean Save) format.
 pub const BOS_VERSION: u8 = 1;
 
 /// Magic number for the BESS file format.
@@ -84,7 +84,7 @@ pub struct BosState {
 
 impl BosState {
     /// Checks if the data contained in the provided
-    /// buffer represents a valid BOS (Boytacean Save State)
+    /// buffer represents a valid BOS (Boytacean Save)
     /// file structure, thought magic string validation.
     pub fn is_bos(data: &mut Cursor<Vec<u8>>) -> bool {
         let mut buffer = [0x00; 4];
