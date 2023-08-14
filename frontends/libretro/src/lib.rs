@@ -9,7 +9,7 @@ use boytacean::{
     pad::PadKey,
     ppu::{DISPLAY_HEIGHT, DISPLAY_WIDTH, FRAME_BUFFER_SIZE, XRGB8888_SIZE},
     rom::Cartridge,
-    state::StateManager,
+    state::{SaveStateFormat, StateManager},
     warnln,
 };
 use consts::{
@@ -376,14 +376,16 @@ pub extern "C" fn retro_get_memory_size(_memory_id: u32) -> usize {
 pub extern "C" fn retro_serialize_size() -> usize {
     debugln!("retro_serialize_size()");
     let instance = unsafe { EMULATOR.as_mut().unwrap() };
-    StateManager::save(instance).unwrap().len()
+    StateManager::save(instance, Some(SaveStateFormat::Bess))
+        .unwrap()
+        .len()
 }
 
 #[no_mangle]
 pub extern "C" fn retro_serialize(data: *mut c_void, size: usize) -> bool {
     debugln!("retro_serialize()");
     let instance = unsafe { EMULATOR.as_mut().unwrap() };
-    let state = match StateManager::save(instance) {
+    let state = match StateManager::save(instance, Some(SaveStateFormat::Bess)) {
         Ok(state) => state,
         Err(err) => {
             warnln!("Failed to save state: {}", err);
