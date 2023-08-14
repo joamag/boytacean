@@ -1,4 +1,4 @@
-//! System state (BESS format) functions and structures.
+//! System save state (BOS and [BESS](https://github.com/LIJI32/SameBoy/blob/master/BESS.md) formats) functions and structures.
 
 use std::{
     convert::TryInto,
@@ -14,10 +14,33 @@ use crate::{
     rom::{CgbMode, MbcType},
 };
 
+/// Magic string for the BOS (Boytacean Save State) format.
+pub const BOS_MAGIC: &'static str = "BOS\0";
+
+/// Magic string ("BOS\0") in little endian unsigned 32 bit format.
+pub const BOS_MAGIC_UINT: u32 = 0x00534f42;
+
+/// Current version of the BOS (Boytacean Save State) format.
+pub const BOS_VERSION: u8 = 1;
+
+/// Magic number for the BESS file format.
+pub const BESS_MAGIC: u32 = 0x53534542;
+
+pub enum SaveStateFormat {
+    Bos,
+    Bess,
+}
+
+pub enum BosBlockKind {
+    Name = 0x01,
+    ImageBuffer = 0x02,
+    SystemInfo = 0x03,
+}
+
 pub trait Serialize {
     /// Writes the data from the internal structure into the
     /// provided buffer.
-    fn write(&mut self, buffer: &mut Vec<u8>);
+    fn write(&mut self, buffer: &mut Cursor<Vec<u8>>);
 
     /// Reads the data from the provided buffer and populates
     /// the internal structure with it.
@@ -36,6 +59,76 @@ pub trait State {
 }
 
 #[derive(Default)]
+pub struct BosState {
+    magic: u32,
+    version: u8,
+    blocks: Vec<BosBlock>,
+    bess: BessState,
+}
+
+impl BosState {
+    /// Checks if the data contained in the provided
+    /// buffer represents a valid BOS (Boytacean Save State)
+    /// file structure, thought magic string validation.
+    pub fn is_bos(data: &mut Cursor<Vec<u8>>) -> bool {
+        let mut buffer = [0x00; 4];
+        data.read_exact(&mut buffer).unwrap();
+        let magic = u32::from_le_bytes(buffer);
+        data.seek(SeekFrom::Start(0)).unwrap();
+        magic == BOS_MAGIC_UINT
+    }
+
+    pub fn verify(&self) -> Result<(), String> {
+        if self.magic != BOS_MAGIC_UINT {
+            return Err(String::from("Invalid magic"));
+        }
+        self.bess.verify()?;
+        Ok(())
+    }
+}
+
+impl Serialize for BosState {
+    fn write(&mut self, buffer: &mut Cursor<Vec<u8>>) {
+        buffer.write_all(&self.magic.to_le_bytes()).unwrap();
+        buffer.write_all(&self.version.to_le_bytes()).unwrap();
+        self.bess.write(buffer);
+    }
+
+    fn read(&mut self, data: &mut Cursor<Vec<u8>>) {
+        let mut buffer = [0x00; 4];
+        data.read_exact(&mut buffer).unwrap();
+        self.magic = u32::from_le_bytes(buffer);
+        let mut buffer = [0x00; 1];
+        data.read_exact(&mut buffer).unwrap();
+        self.version = u8::from_le_bytes(buffer);
+        self.bess.read(data);
+    }
+}
+
+impl State for BosState {
+    fn from_gb(gb: &mut GameBoy) -> Result<Self, String> {
+        Ok(Self {
+            magic: BOS_MAGIC_UINT,
+            version: BOS_VERSION,
+            blocks: vec![],
+            bess: BessState::from_gb(gb)?,
+        })
+    }
+
+    fn to_gb(&self, gb: &mut GameBoy) -> Result<(), String> {
+        self.verify()?;
+        self.bess.to_gb(gb)?;
+        Ok(())
+    }
+}
+
+pub struct BosBlock {
+    kind: BosBlockKind,
+    size: u32,
+    buffer: Vec<u8>,
+}
+
+#[derive(Default)]
 pub struct BessState {
     footer: BessFooter,
     name: BessName,
@@ -46,6 +139,18 @@ pub struct BessState {
 }
 
 impl BessState {
+    /// Checks if the data contained in the provided
+    /// buffer represents a valid BESS (Best Effort Save State)
+    /// file structure, thought magic string validation.
+    pub fn is_bess(data: &mut Cursor<Vec<u8>>) -> bool {
+        data.seek(SeekFrom::End(-8)).unwrap();
+        let mut buffer = [0x00; 4];
+        data.read_exact(&mut buffer).unwrap();
+        let magic = u32::from_le_bytes(buffer);
+        data.seek(SeekFrom::Start(0)).unwrap();
+        magic == BESS_MAGIC
+    }
+
     pub fn description(&self, column_length: usize) -> String {
         let emulator_l = format!("{:width$}", "Emulator", width = column_length);
         let title_l: String = format!("{:width$}", "Title", width = column_length);
@@ -86,9 +191,7 @@ impl BessState {
     /// Dumps the core data into the provided buffer and returns.
     /// This will effectively populate the majority of the save
     /// file with the core emulator contents.
-    fn dump_core(&mut self, buffer: &mut Vec<u8>) -> u32 {
-        let mut offset = 0x0000_u32;
-
+    fn dump_core(&mut self, buffer: &mut Cursor<Vec<u8>>) {
         let mut buffers = vec![
             &mut self.core.ram,
             &mut self.core.vram,
@@ -100,18 +203,16 @@ impl BessState {
         ];
 
         for item in buffers.iter_mut() {
-            item.offset = offset;
+            item.offset = buffer.position() as u32;
             buffer.write_all(&item.buffer).unwrap();
-            offset += item.size;
         }
-
-        offset
     }
 }
 
 impl Serialize for BessState {
-    fn write(&mut self, buffer: &mut Vec<u8>) {
-        self.footer.start_offset = self.dump_core(buffer);
+    fn write(&mut self, buffer: &mut Cursor<Vec<u8>>) {
+        self.dump_core(buffer);
+        self.footer.start_offset = buffer.position() as u32;
         self.name.write(buffer);
         self.info.write(buffer);
         self.core.write(buffer);
@@ -206,7 +307,7 @@ impl BessBlockHeader {
 }
 
 impl Serialize for BessBlockHeader {
-    fn write(&mut self, buffer: &mut Vec<u8>) {
+    fn write(&mut self, buffer: &mut Cursor<Vec<u8>>) {
         buffer.write_all(self.magic.as_bytes()).unwrap();
         buffer.write_all(&self.size.to_le_bytes()).unwrap();
     }
@@ -257,7 +358,7 @@ impl BessBlock {
 }
 
 impl Serialize for BessBlock {
-    fn write(&mut self, buffer: &mut Vec<u8>) {
+    fn write(&mut self, buffer: &mut Cursor<Vec<u8>>) {
         self.header.write(buffer);
         buffer.write_all(&self.buffer).unwrap();
     }
@@ -310,7 +411,7 @@ impl BessBuffer {
 }
 
 impl Serialize for BessBuffer {
-    fn write(&mut self, buffer: &mut Vec<u8>) {
+    fn write(&mut self, buffer: &mut Cursor<Vec<u8>>) {
         buffer.write_all(&self.size.to_le_bytes()).unwrap();
         buffer.write_all(&self.offset.to_le_bytes()).unwrap();
     }
@@ -346,7 +447,7 @@ impl BessFooter {
     }
 
     pub fn verify(&self) -> Result<(), String> {
-        if self.magic != 0x53534542 {
+        if self.magic != BESS_MAGIC {
             return Err(String::from("Invalid magic"));
         }
         Ok(())
@@ -354,7 +455,7 @@ impl BessFooter {
 }
 
 impl Serialize for BessFooter {
-    fn write(&mut self, buffer: &mut Vec<u8>) {
+    fn write(&mut self, buffer: &mut Cursor<Vec<u8>>) {
         buffer.write_all(&self.start_offset.to_le_bytes()).unwrap();
         buffer.write_all(&self.magic.to_le_bytes()).unwrap();
     }
@@ -371,7 +472,7 @@ impl Serialize for BessFooter {
 
 impl Default for BessFooter {
     fn default() -> Self {
-        Self::new(0x00, 0x53534542)
+        Self::new(0x00, BESS_MAGIC)
     }
 }
 
@@ -396,7 +497,7 @@ impl BessName {
 }
 
 impl Serialize for BessName {
-    fn write(&mut self, buffer: &mut Vec<u8>) {
+    fn write(&mut self, buffer: &mut Cursor<Vec<u8>>) {
         self.header.write(buffer);
         buffer.write_all(self.name.as_bytes()).unwrap();
     }
@@ -477,7 +578,7 @@ impl BessInfo {
 }
 
 impl Serialize for BessInfo {
-    fn write(&mut self, buffer: &mut Vec<u8>) {
+    fn write(&mut self, buffer: &mut Cursor<Vec<u8>>) {
         self.header.write(buffer);
         buffer.write_all(&self.title).unwrap();
         buffer.write_all(&self.checksum).unwrap();
@@ -682,7 +783,7 @@ impl BessCore {
 }
 
 impl Serialize for BessCore {
-    fn write(&mut self, buffer: &mut Vec<u8>) {
+    fn write(&mut self, buffer: &mut Cursor<Vec<u8>>) {
         self.header.write(buffer);
 
         buffer.write_all(&self.major.to_le_bytes()).unwrap();
@@ -917,7 +1018,7 @@ impl BessMbc {
 }
 
 impl Serialize for BessMbc {
-    fn write(&mut self, buffer: &mut Vec<u8>) {
+    fn write(&mut self, buffer: &mut Cursor<Vec<u8>>) {
         self.header.write(buffer);
         for register in self.registers.iter() {
             buffer.write_all(&register.address.to_le_bytes()).unwrap();
@@ -1015,21 +1116,33 @@ impl Default for BessMbc {
 pub struct StateManager;
 
 impl StateManager {
-    pub fn save_file(file_path: &str, gb: &mut GameBoy) -> Result<(), String> {
+    pub fn save_file(
+        file_path: &str,
+        gb: &mut GameBoy,
+        format: Option<SaveStateFormat>,
+    ) -> Result<(), String> {
         let mut file = match File::create(file_path) {
             Ok(file) => file,
             Err(_) => return Err(format!("Failed to open file: {}", file_path)),
         };
-        let data = Self::save(gb)?;
+        let data = Self::save(gb, format)?;
         file.write_all(&data).unwrap();
         Ok(())
     }
 
-    pub fn save(gb: &mut GameBoy) -> Result<Vec<u8>, String> {
-        let mut data: Vec<u8> = vec![];
-        let mut state = BessState::from_gb(gb)?;
-        state.write(&mut data);
-        Ok(data)
+    pub fn save(gb: &mut GameBoy, format: Option<SaveStateFormat>) -> Result<Vec<u8>, String> {
+        let mut data = Cursor::new(vec![]);
+        match format {
+            Some(SaveStateFormat::Bos) | None => {
+                let mut state = BosState::from_gb(gb)?;
+                state.write(&mut data);
+            }
+            Some(SaveStateFormat::Bess) => {
+                let mut state = BessState::from_gb(gb)?;
+                state.write(&mut data);
+            }
+        }
+        Ok(data.into_inner())
     }
 
     pub fn load_file(file_path: &str, gb: &mut GameBoy) -> Result<(), String> {
@@ -1044,9 +1157,18 @@ impl StateManager {
     }
 
     pub fn load(data: &[u8], gb: &mut GameBoy) -> Result<(), String> {
-        let mut state = BessState::default();
-        state.read(&mut Cursor::new(data.to_vec()));
-        state.to_gb(gb)?;
+        let data = &mut Cursor::new(data.to_vec());
+        if BosState::is_bos(data) {
+            let mut state = BosState::default();
+            state.read(data);
+            state.to_gb(gb)?;
+        } else if BessState::is_bess(data) {
+            let mut state = BessState::default();
+            state.read(data);
+            state.to_gb(gb)?;
+        } else {
+            return Err(String::from("Invalid state file"));
+        }
         Ok(())
     }
 }
