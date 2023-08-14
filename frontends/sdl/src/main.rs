@@ -88,6 +88,7 @@ pub struct Emulator {
     visual_frequency: f32,
     next_tick_time: f32,
     next_tick_time_i: u32,
+    fast: bool,
     features: Vec<&'static str>,
     palettes: [PaletteInfo; 7],
     palette_index: usize,
@@ -109,6 +110,7 @@ impl Emulator {
             visual_frequency: GameBoy::VISUAL_FREQ,
             next_tick_time: 0.0,
             next_tick_time_i: 0,
+            fast: false,
             features: options
                 .features
                 .unwrap_or_else(|| vec!["video", "audio", "no-vsync"]),
@@ -427,6 +429,34 @@ impl Emulator {
                         keycode: Some(Keycode::P),
                         ..
                     } => self.toggle_palette(),
+                    Event::KeyDown {
+                        keycode: Some(Keycode::E),
+                        keymod,
+                        ..
+                    } => {
+                        if !self.fast && (keymod & (Mod::LCTRLMOD | Mod::RCTRLMOD)) != Mod::NOMOD {
+                            self.fast = true;
+                            self.logic_frequency *= 8;
+                        }
+                    }
+                    Event::KeyUp {
+                        keycode: Some(Keycode::E),
+                        ..
+                    } => {
+                        if self.fast {
+                            self.fast = false;
+                            self.logic_frequency /= 8;
+                        }
+                    }
+                    Event::KeyUp {
+                        keycode: Some(Keycode::LCtrl) | Some(Keycode::RCtrl),
+                        ..
+                    } => {
+                        if self.fast {
+                            self.fast = false;
+                            self.logic_frequency /= 8;
+                        }
+                    }
                     Event::KeyDown {
                         keycode: Some(Keycode::F),
                         keymod,

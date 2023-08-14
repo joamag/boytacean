@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * XRGB8888 support for Libretro frontend, for better color fidelity and faster render
 * Support for save state - [#7](https://gitlab.stage.hive.pt/joamag/boytacean/-/issues/7)
 * LibRetro save state support - [#7](https://gitlab.stage.hive.pt/joamag/boytacean/-/issues/7)
+* Support for fast mode in SDL frontend
 
 ### Changed
 
