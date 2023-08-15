@@ -411,7 +411,7 @@ pub extern "C" fn retro_unserialize(data: *const c_void, size: usize) -> bool {
     debugln!("retro_unserialize()");
     let instance = unsafe { EMULATOR.as_mut().unwrap() };
     let state = unsafe { from_raw_parts(data as *const u8, size) };
-    if let Err(err) = StateManager::load(state, instance) {
+    if let Err(err) = StateManager::load(state, instance, None) {
         warnln!("Failed to load state: {}", err);
         return false;
     }

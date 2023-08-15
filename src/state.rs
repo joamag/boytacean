@@ -16,6 +16,9 @@ use crate::{
     util::save_bmp,
 };
 
+#[cfg(feature = "wasm")]
+use wasm_bindgen::prelude::*;
+
 /// Magic string for the BOS (Boytacean Save) format.
 pub const BOS_MAGIC: &str = "BOS\0";
 
@@ -28,6 +31,7 @@ pub const BOS_VERSION: u8 = 1;
 /// Magic number for the BESS file format.
 pub const BESS_MAGIC: u32 = 0x53534542;
 
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
 pub enum SaveStateFormat {
     Bos,
     Bess,
@@ -1271,6 +1275,7 @@ impl Default for BessMbc {
 /// entrypoint static methods for saving and loading
 /// [BESS](https://github.com/LIJI32/SameBoy/blob/master/BESS.md) state
 /// files and buffers for the Game Boy.
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
 pub struct StateManager;
 
 impl StateManager {
@@ -1288,6 +1293,24 @@ impl StateManager {
         Ok(())
     }
 
+    pub fn load_file(
+        file_path: &str,
+        gb: &mut GameBoy,
+        format: Option<SaveStateFormat>,
+    ) -> Result<(), String> {
+        let mut file = match File::open(file_path) {
+            Ok(file) => file,
+            Err(_) => return Err(format!("Failed to open file: {}", file_path)),
+        };
+        let mut data = vec![];
+        file.read_to_end(&mut data).unwrap();
+        Self::load(&data, gb, format)?;
+        Ok(())
+    }
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
+impl StateManager {
     pub fn save(gb: &mut GameBoy, format: Option<SaveStateFormat>) -> Result<Vec<u8>, String> {
         let mut data = Cursor::new(vec![]);
         match format {
@@ -1303,30 +1326,63 @@ impl StateManager {
         Ok(data.into_inner())
     }
 
-    pub fn load_file(file_path: &str, gb: &mut GameBoy) -> Result<(), String> {
-        let mut file = match File::open(file_path) {
-            Ok(file) => file,
-            Err(_) => return Err(format!("Failed to open file: {}", file_path)),
+    pub fn load(
+        data: &[u8],
+        gb: &mut GameBoy,
+        format: Option<SaveStateFormat>,
+    ) -> Result<(), String> {
+        let data = &mut Cursor::new(data.to_vec());
+        let format = match format {
+            Some(format) => format,
+            None => {
+                if BosState::is_bos(data) {
+                    SaveStateFormat::Bos
+                } else if BessState::is_bess(data) {
+                    SaveStateFormat::Bess
+                } else {
+                    return Err(String::from("Invalid state file"));
+                }
+            }
         };
-        let mut data = vec![];
-        file.read_to_end(&mut data).unwrap();
-        Self::load(&data, gb)?;
+        match format {
+            SaveStateFormat::Bos => {
+                let mut state = BosState::default();
+                state.read(data);
+                state.to_gb(gb)?;
+            }
+            SaveStateFormat::Bess => {
+                let mut state = BessState::default();
+                state.read(data);
+                state.to_gb(gb)?;
+            }
+        }
         Ok(())
     }
 
-    pub fn load(data: &[u8], gb: &mut GameBoy) -> Result<(), String> {
+    /// Obtains the thumbnail of the state file, this thumbnail is
+    /// stored in raw RGB format.
+    /// This operation is currently only supported for the BOS format.
+    pub fn thumbnail(data: &[u8], format: Option<SaveStateFormat>) -> Result<Vec<u8>, String> {
         let data = &mut Cursor::new(data.to_vec());
-        if BosState::is_bos(data) {
-            let mut state = BosState::default();
-            state.read(data);
-            state.to_gb(gb)?;
-        } else if BessState::is_bess(data) {
-            let mut state = BessState::default();
-            state.read(data);
-            state.to_gb(gb)?;
-        } else {
-            return Err(String::from("Invalid state file"));
+        let format = match format {
+            Some(format) => format,
+            None => {
+                if BosState::is_bos(data) {
+                    SaveStateFormat::Bos
+                } else if BessState::is_bess(data) {
+                    SaveStateFormat::Bess
+                } else {
+                    return Err(String::from("Invalid state file"));
+                }
+            }
+        };
+        match format {
+            SaveStateFormat::Bos => {
+                let mut state = BosState::default();
+                state.read(data);
+                Ok(state.image_buffer.unwrap().image.to_vec())
+            }
+            SaveStateFormat::Bess => Err(String::from("Format foes not support thumbnail")),
         }
-        Ok(())
     }
 }
