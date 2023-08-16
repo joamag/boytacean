@@ -13,6 +13,7 @@ import {
     HelpPanel,
     PixelFormat,
     RomInfo,
+    SaveState,
     SectionInfo,
     Size
 } from "emukit";
@@ -807,14 +808,21 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         localStorage.removeItem(`${title}-s${index}`);
     }
 
-    thumbnailState(index: number): Uint8Array {
+    getState(index: number): SaveState | null {
         if (!this.gameBoy || !this.cartridge || !window.localStorage)
-            return new Uint8Array();
+            return null;
         const title = this.cartridge.title();
         const dataB64 = localStorage.getItem(`${title}-s${index}`);
-        if (!dataB64) return new Uint8Array();
+        if (!dataB64) return null;
         const data = base64ToBuffer(dataB64);
-        return StateManager.thumbnail(data, SaveStateFormat.Bos);
+        const state = StateManager.read_bos(data);
+        return {
+            index: index,
+            timestamp: Number(state.timestamp()),
+            agent: state.agent(),
+            model: state.model(),
+            thumbnail: state.image_eager()
+        };
     }
 
     listStates(): number[] {

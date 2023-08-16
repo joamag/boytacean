@@ -13,7 +13,7 @@ use crate::{
     info::Info,
     ppu::{DISPLAY_HEIGHT, DISPLAY_WIDTH, FRAME_BUFFER_SIZE},
     rom::{CgbMode, MbcType},
-    util::save_bmp,
+    util::{get_timestamp, save_bmp},
 };
 
 #[cfg(feature = "wasm")]
@@ -39,18 +39,16 @@ pub enum SaveStateFormat {
 
 #[derive(Clone, Copy)]
 pub enum BosBlockKind {
-    Name = 0x01,
+    Info = 0x01,
     ImageBuffer = 0x02,
-    SystemInfo = 0x03,
     Unknown = 0xff,
 }
 
 impl BosBlockKind {
     fn from_u8(value: u8) -> Self {
         match value {
-            0x01 => Self::Name,
+            0x01 => Self::Info,
             0x02 => Self::ImageBuffer,
-            0x03 => Self::SystemInfo,
             _ => Self::Unknown,
         }
     }
@@ -77,11 +75,13 @@ pub trait State {
     fn to_gb(&self, gb: &mut GameBoy) -> Result<(), String>;
 }
 
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
 #[derive(Default)]
 pub struct BosState {
     magic: u32,
     version: u8,
     block_count: u8,
+    info: Option<BosInfo>,
     image_buffer: Option<BosImageBuffer>,
     bess: BessState,
 }
@@ -106,7 +106,7 @@ impl BosState {
         Ok(())
     }
 
-    pub fn save_bmp(&self, file_path: &str) -> Result<(), String> {
+    pub fn save_image_bmp(&self, file_path: &str) -> Result<(), String> {
         if let Some(image_buffer) = &self.image_buffer {
             image_buffer.save_bmp(file_path)?;
             Ok(())
@@ -117,10 +117,48 @@ impl BosState {
 
     fn build_block_count(&self) -> u8 {
         let mut count = 0_u8;
+        if self.info.is_some() {
+            count += 1;
+        }
         if self.image_buffer.is_some() {
             count += 1;
         }
         count
+    }
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
+impl BosState {
+    pub fn timestamp(&self) -> Result<u64, String> {
+        if let Some(info) = &self.info {
+            Ok(info.timestamp)
+        } else {
+            Err(String::from("No timestamp available"))
+        }
+    }
+
+    pub fn agent(&self) -> Result<String, String> {
+        if let Some(info) = &self.info {
+            Ok(format!("{}/{}", info.agent, info.agent_version))
+        } else {
+            Err(String::from("No agent available"))
+        }
+    }
+
+    pub fn model(&self) -> Result<String, String> {
+        if let Some(info) = &self.info {
+            Ok(info.model.clone())
+        } else {
+            Err(String::from("No model available"))
+        }
+    }
+
+    pub fn image_eager(&self) -> Result<Vec<u8>, String> {
+        if let Some(image_buffer) = &self.image_buffer {
+            Ok(image_buffer.image.to_vec())
+        } else {
+            Err(String::from("No image available"))
+        }
     }
 }
 
@@ -132,6 +170,9 @@ impl Serialize for BosState {
         buffer.write_all(&self.version.to_le_bytes()).unwrap();
         buffer.write_all(&self.block_count.to_le_bytes()).unwrap();
 
+        if let Some(info) = &mut self.info {
+            info.write(buffer);
+        }
         if let Some(image_buffer) = &mut self.image_buffer {
             image_buffer.write(buffer);
         }
@@ -156,6 +197,9 @@ impl Serialize for BosState {
             data.seek(SeekFrom::Current(offset)).unwrap();
 
             match block.kind {
+                BosBlockKind::Info => {
+                    self.info = Some(BosInfo::from_data(data));
+                }
                 BosBlockKind::ImageBuffer => {
                     self.image_buffer = Some(BosImageBuffer::from_data(data));
                 }
@@ -177,7 +221,8 @@ impl State for BosState {
         Ok(Self {
             magic: BOS_MAGIC_UINT,
             version: BOS_VERSION,
-            block_count: 1,
+            block_count: 2,
+            info: Some(BosInfo::from_gb(gb)?),
             image_buffer: Some(BosImageBuffer::from_gb(gb)?),
             bess: BessState::from_gb(gb)?,
         })
@@ -225,7 +270,116 @@ impl Serialize for BosBlock {
 
 impl Default for BosBlock {
     fn default() -> Self {
-        Self::new(BosBlockKind::Name, 0)
+        Self::new(BosBlockKind::Info, 0)
+    }
+}
+
+pub struct BosInfo {
+    header: BosBlock,
+    timestamp: u64,
+    agent: String,
+    agent_version: String,
+    model: String,
+}
+
+impl BosInfo {
+    pub fn new(model: String, timestamp: u64, agent: String, agent_version: String) -> Self {
+        Self {
+            header: BosBlock::new(
+                BosBlockKind::Info,
+                (size_of::<u64>()
+                    + size_of::<u8>() * agent.len()
+                    + size_of::<u8>() * agent_version.len()
+                    + size_of::<u8>() * model.len()
+                    + size_of::<u32>() * 4) as u32,
+            ),
+            model,
+            timestamp,
+            agent,
+            agent_version,
+        }
+    }
+
+    pub fn from_data(data: &mut Cursor<Vec<u8>>) -> Self {
+        let mut instance = Self::default();
+        instance.read(data);
+        instance
+    }
+}
+
+impl Serialize for BosInfo {
+    fn write(&mut self, buffer: &mut Cursor<Vec<u8>>) {
+        self.header.write(buffer);
+
+        buffer
+            .write_all(&(size_of::<u64>() as u32).to_le_bytes())
+            .unwrap();
+        buffer.write_all(&self.timestamp.to_le_bytes()).unwrap();
+
+        buffer
+            .write_all(&(self.agent.as_bytes().len() as u32).to_le_bytes())
+            .unwrap();
+        buffer.write_all(self.agent.as_bytes()).unwrap();
+
+        buffer
+            .write_all(&(self.agent_version.as_bytes().len() as u32).to_le_bytes())
+            .unwrap();
+        buffer.write_all(self.agent_version.as_bytes()).unwrap();
+
+        buffer
+            .write_all(&(self.model.as_bytes().len() as u32).to_le_bytes())
+            .unwrap();
+        buffer.write_all(self.model.as_bytes()).unwrap();
+    }
+
+    fn read(&mut self, data: &mut Cursor<Vec<u8>>) {
+        self.header.read(data);
+
+        let mut buffer = [0x00; size_of::<u32>()];
+        data.read_exact(&mut buffer).unwrap();
+        let mut buffer = vec![0x00; u32::from_le_bytes(buffer) as usize];
+        data.read_exact(&mut buffer).unwrap();
+        self.timestamp = u64::from_le_bytes(buffer.try_into().unwrap());
+
+        let mut buffer = [0x00; size_of::<u32>()];
+        data.read_exact(&mut buffer).unwrap();
+        let mut buffer = vec![0x00; u32::from_le_bytes(buffer) as usize];
+        data.read_exact(&mut buffer).unwrap();
+        self.agent = String::from_utf8(buffer).unwrap();
+
+        let mut buffer = [0x00; size_of::<u32>()];
+        data.read_exact(&mut buffer).unwrap();
+        let mut buffer = vec![0x00; u32::from_le_bytes(buffer) as usize];
+        data.read_exact(&mut buffer).unwrap();
+        self.agent_version = String::from_utf8(buffer).unwrap();
+
+        let mut buffer = [0x00; size_of::<u32>()];
+        data.read_exact(&mut buffer).unwrap();
+        let mut buffer = vec![0x00; u32::from_le_bytes(buffer) as usize];
+        data.read_exact(&mut buffer).unwrap();
+        self.model = String::from_utf8(buffer).unwrap();
+    }
+}
+
+impl State for BosInfo {
+    fn from_gb(gb: &mut GameBoy) -> Result<Self, String> {
+        let timestamp = get_timestamp();
+        Ok(Self::new(
+            gb.mode().to_string(Some(true)),
+            timestamp,
+            Info::name(),
+            Info::version(),
+        ))
+    }
+
+    fn to_gb(&self, _gb: &mut GameBoy) -> Result<(), String> {
+        Ok(())
+    }
+}
+
+impl Default for BosInfo {
+    fn default() -> Self {
+        Self::new(String::from(""), 0, String::from(""), String::from(""))
     }
 }
 
@@ -290,6 +444,7 @@ impl Default for BosImageBuffer {
     }
 }
 
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
 #[derive(Default)]
 pub struct BessState {
     footer: BessFooter,
@@ -1357,6 +1512,20 @@ impl StateManager {
             }
         }
         Ok(())
+    }
+
+    pub fn read_bos(data: &[u8]) -> Result<BosState, String> {
+        let data = &mut Cursor::new(data.to_vec());
+        let mut state = BosState::default();
+        state.read(data);
+        Ok(state)
+    }
+
+    pub fn read_bess(data: &[u8]) -> Result<BessState, String> {
+        let data = &mut Cursor::new(data.to_vec());
+        let mut state = BessState::default();
+        state.read(data);
+        Ok(state)
     }
 
     /// Obtains the thumbnail of the state file, this thumbnail is

@@ -15,7 +15,7 @@ readme = "README.md"
 crate-type = ["cdylib", "rlib"]
 
 [features]
-wasm = ["wasm-bindgen"]
+wasm = ["wasm-bindgen", "js-sys"]
 debug = []
 pedantic = []
 cpulog = []
@@ -23,6 +23,7 @@ gen-mock = []
 
 [dependencies]
 wasm-bindgen = { version = "0.2", optional = true }
+js-sys = { version = "0.3", optional = true }
 
 [build-dependencies]
 chrono = "0.4"

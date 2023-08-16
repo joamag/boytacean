@@ -6,6 +6,9 @@ use std::{
     rc::Rc,
 };
 
+#[cfg(feature = "wasm")]
+use wasm_bindgen::prelude::*;
+
 pub type SharedMut<T> = Rc<RefCell<T>>;
 
 /// Reads the contents of the file at the given path into
@@ -100,6 +103,22 @@ pub fn save_bmp(path: &str, pixels: &[u8], width: u32, height: u32) -> Result<()
     }
 
     Ok(())
+}
+
+#[cfg(not(feature = "wasm"))]
+pub fn get_timestamp() -> u64 {
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    let now = SystemTime::now();
+    now.duration_since(UNIX_EPOCH).unwrap().as_secs()
+}
+
+#[cfg(feature = "wasm")]
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
+pub fn get_timestamp() -> u64 {
+    use js_sys::Date;
+
+    (Date::now() / 1000.0) as u64
 }
 
 #[cfg(test)]
