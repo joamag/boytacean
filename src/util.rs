@@ -1,10 +1,13 @@
 use std::{
     cell::RefCell,
     fs::File,
-    io::{Read, Write},
+    io::{BufWriter, Read, Write},
     path::Path,
     rc::Rc,
 };
+
+#[cfg(feature = "wasm")]
+use wasm_bindgen::prelude::*;
 
 pub type SharedMut<T> = Rc<RefCell<T>>;
 
@@ -52,6 +55,70 @@ pub fn capitalize(string: &str) -> String {
         None => String::new(),
         Some(chr) => chr.to_uppercase().collect::<String>() + chars.as_str(),
     }
+}
+
+pub fn save_bmp(path: &str, pixels: &[u8], width: u32, height: u32) -> Result<(), String> {
+    let file = match File::create(path) {
+        Ok(file) => file,
+        Err(_) => return Err(format!("Failed to open file: {}", path)),
+    };
+    let mut writer = BufWriter::new(file);
+
+    // writes the BMP file header
+    let file_size = 54 + (width * height * 3);
+    writer.write_all(&[0x42, 0x4d]).unwrap(); // "BM" magic number
+    writer.write_all(&file_size.to_le_bytes()).unwrap(); // file size
+    writer.write_all(&[0x00, 0x00]).unwrap(); // reserved
+    writer.write_all(&[0x00, 0x00]).unwrap(); // reserved
+    writer.write_all(&[0x36, 0x00, 0x00, 0x00]).unwrap(); // offset to pixel data
+    writer.write_all(&[0x28, 0x00, 0x00, 0x00]).unwrap(); // DIB header size
+    writer.write_all(&(width as i32).to_le_bytes()).unwrap(); // image width
+    writer.write_all(&(height as i32).to_le_bytes()).unwrap(); // image height
+    writer.write_all(&[0x01, 0x00]).unwrap(); // color planes
+    writer.write_all(&[0x18, 0x00]).unwrap(); // bits per pixel
+    writer.write_all(&[0x00, 0x00, 0x00, 0x00]).unwrap(); // compression method
+    writer
+        .write_all(&[(width * height * 3) as u8, 0x00, 0x00, 0x00])
+        .unwrap(); // image size
+    writer.write_all(&[0x13, 0x0b, 0x00, 0x00]).unwrap(); // horizontal resolution (72 DPI)
+    writer.write_all(&[0x13, 0x0b, 0x00, 0x00]).unwrap(); // vertical resolution (72 DPI)
+    writer.write_all(&[0x00, 0x00, 0x00, 0x00]).unwrap(); // color palette
+    writer.write_all(&[0x00, 0x00, 0x00, 0x00]).unwrap(); // important colors
+
+    // iterates over the complete array of pixels in reverse order
+    // to account for the fact that BMP files are stored upside down
+    for y in (0..height).rev() {
+        for x in 0..width {
+            let [r, g, b] = [
+                pixels[((y * width + x) * 3) as usize],
+                pixels[((y * width + x) * 3 + 1) as usize],
+                pixels[((y * width + x) * 3 + 2) as usize],
+            ];
+            writer.write_all(&[b, g, r]).unwrap();
+        }
+        let padding = (4 - ((width * 3) % 4)) % 4;
+        for _ in 0..padding {
+            writer.write_all(&[0x00]).unwrap();
+        }
+    }
+
+    Ok(())
+}
+
+#[cfg(not(feature = "wasm"))]
+pub fn get_timestamp() -> u64 {
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    let now = SystemTime::now();
+    now.duration_since(UNIX_EPOCH).unwrap().as_secs()
+}
+
+#[cfg(feature = "wasm")]
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
+pub fn get_timestamp() -> u64 {
+    use js_sys::Date;
+
+    (Date::now() / 1000.0) as u64
 }
 
 #[cfg(test)]

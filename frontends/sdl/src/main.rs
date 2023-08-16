@@ -288,7 +288,7 @@ impl Emulator {
     }
 
     fn save_state(&mut self, file_path: &str) {
-        if let Err(message) = StateManager::save_file(file_path, &mut self.system) {
+        if let Err(message) = StateManager::save_file(file_path, &mut self.system, None) {
             println!("Error saving state: {}", message)
         } else {
             println!("Saved state into: {}", file_path)
@@ -296,7 +296,7 @@ impl Emulator {
     }
 
     fn load_state(&mut self, file_path: &str) {
-        if let Err(message) = StateManager::load_file(file_path, &mut self.system) {
+        if let Err(message) = StateManager::load_file(file_path, &mut self.system, None) {
             println!("Error loading state: {}", message)
         } else {
             println!("Loaded state from: {}", file_path)

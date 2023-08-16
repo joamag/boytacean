@@ -1,7 +1,8 @@
 import {
     AudioSpecs,
+    base64ToBuffer,
     BenchmarkResult,
-    SectionInfo,
+    bufferToBase64,
     Compilation,
     Compiler,
     DebugPanel,
@@ -14,14 +15,15 @@ import {
     HelpPanel,
     PixelFormat,
     RomInfo,
+    SaveState,
+    SectionInfo,
     Size
 } from "emukit";
 import { PALETTES, PALETTES_MAP } from "./palettes";
-import { base64ToBuffer, bufferToBase64 } from "./util";
 import {
     DebugAudio,
-    DebugSettings,
     DebugGeneral,
+    DebugSettings,
     HelpFaqs,
     HelpKeyboard,
     SerialSection,
@@ -32,10 +34,12 @@ import {
     Cartridge,
     default as _wasm,
     GameBoy,
-    PadKey,
     GameBoyMode,
     GameBoySpeed,
-    Info
+    Info,
+    PadKey,
+    SaveStateFormat,
+    StateManager
 } from "../lib/boytacean";
 import info from "../package.json";
 
@@ -140,7 +144,12 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     private frameStart: number = EmulatorBase.now();
     private frameCount = 0;
     private paletteIndex = 0;
-    private storeCycles: number = LOGIC_HZ * STORE_RATE;
+
+    /**
+     * The frequency at which the battery backed RAM is going
+     * to be flushed to the `localStorage`.
+     */
+    private flushCycles: number = LOGIC_HZ * STORE_RATE;
 
     private romName: string | null = null;
     private romData: Uint8Array | null = null;
@@ -310,10 +319,10 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
             // then we need to check if a RAM flush to local
             // storage operation is required
             if (this.cartridge && this.cartridge.has_battery()) {
-                this.storeCycles -= tickCycles;
-                if (this.storeCycles <= 0) {
-                    this.storeRam();
-                    this.storeCycles = this.logicFrequency * STORE_RATE;
+                this.flushCycles -= tickCycles;
+                if (this.flushCycles <= 0) {
+                    this.saveRam();
+                    this.flushCycles = this.logicFrequency * STORE_RATE;
                 }
             }
         }
@@ -528,7 +537,8 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
             Feature.Benchmark,
             Feature.Keyboard,
             Feature.KeyboardGB,
-            Feature.RomTypeInfo
+            Feature.RomTypeInfo,
+            Feature.SaveState
         ];
     }
 
@@ -776,6 +786,27 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         this.gameBoy?.key_lift(keyCode);
     }
 
+    serializeState(): Uint8Array {
+        if (!this.gameBoy) throw new Error("Unable to serialize state");
+        return StateManager.save(this.gameBoy, SaveStateFormat.Bos);
+    }
+
+    unserializeState(data: Uint8Array) {
+        if (!this.gameBoy) throw new Error("Unable to unserialize state");
+        StateManager.load(data, this.gameBoy, SaveStateFormat.Bos);
+    }
+
+    buildState(index: number, data: Uint8Array): SaveState {
+        const state = StateManager.read_bos(data);
+        return {
+            index: index,
+            timestamp: Number(state.timestamp()),
+            agent: state.agent(),
+            model: state.model(),
+            thumbnail: state.image_eager()
+        };
+    }
+
     pauseVideo() {
         this.gameBoy?.set_ppu_enabled(false);
     }
@@ -884,6 +915,19 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     }
 
     /**
+     * Tries for save/flush the current machine RAM into the
+     * `localStorage`, so that it can be latter restored.
+     */
+    private saveRam() {
+        if (!this.gameBoy || !this.cartridge || !window.localStorage) return;
+        if (!this.cartridge.has_battery()) return;
+        const title = this.cartridge.title();
+        const ramData = this.gameBoy.ram_data_eager();
+        const ramDataB64 = bufferToBase64(ramData);
+        localStorage.setItem(title, ramDataB64);
+    }
+
+    /**
      * Tries to load game RAM from the `localStorage` using the
      * current cartridge title as the name of the item and
      * decoding it using Base64.
@@ -894,18 +938,6 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         if (!ramDataB64) return;
         const ramData = base64ToBuffer(ramDataB64);
         this.gameBoy.set_ram_data(ramData);
-    }
-
-    /**
-     * Tries for store/flush the current machine RAM into the
-     * `localStorage`, so that it can be latter restored.
-     */
-    private storeRam() {
-        if (!this.gameBoy || !this.cartridge || !window.localStorage) return;
-        const title = this.cartridge.title();
-        const ramData = this.gameBoy.ram_data_eager();
-        const ramDataB64 = bufferToBase64(ramData);
-        localStorage.setItem(title, ramDataB64);
     }
 
     private storeSettings() {

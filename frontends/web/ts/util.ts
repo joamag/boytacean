@@ -1,34 +1,4 @@
 /**
- * Encodes an array of bytes into a base64 string.
- *
- * @param buffer The array of bytes to encode.
- * @returns The resulting base64 string.
- */
-export const bufferToBase64 = (buffer: Uint8Array): string => {
-    const data = Array(buffer.length)
-        .fill(null)
-        .map((_, i) => String.fromCharCode(buffer[i]))
-        .join("");
-    const base64 = btoa(data);
-    return base64;
-};
-
-/**
- * Converts a base64 string into an array of bytes.
- *
- * @param base64 The base64 string to decode.
- * @returns The resulting array of bytes.
- */
-export const base64ToBuffer = (base64: string): Uint8Array => {
-    const data = atob(base64);
-    const array = Array(data.length)
-        .fill(null)
-        .map((_, i) => data.charCodeAt(i));
-    const buffer = new Uint8Array(array);
-    return buffer;
-};
-
-/**
  * Converts an array of bytes into an image data object
  * ready to be used with a canvas context.
  *
@@ -58,9 +28,14 @@ export const bufferToImageData = (
  *
  * @param buffer The array of bytes containing the image data.
  * @param width The width of the image in the buffer.
+ * @param format The format of the image as a MIME string.
  * @returns The resulting data URL.
  */
-export const bufferToDataUrl = (buffer: Uint8Array, width: number): string => {
+export const bufferToDataUrl = (
+    buffer: Uint8Array,
+    width: number,
+    format = "image/png"
+): string => {
     const imageData = bufferToImageData(buffer, width);
 
     const canvas = document.createElement("canvas");
@@ -70,6 +45,6 @@ export const bufferToDataUrl = (buffer: Uint8Array, width: number): string => {
     const context = canvas.getContext("2d");
     context?.putImageData(imageData, 0, 0);
 
-    const dataUrl = canvas.toDataURL();
+    const dataUrl = canvas.toDataURL(format);
     return dataUrl;
 };
