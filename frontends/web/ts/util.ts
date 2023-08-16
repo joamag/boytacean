@@ -28,9 +28,14 @@ export const bufferToImageData = (
  *
  * @param buffer The array of bytes containing the image data.
  * @param width The width of the image in the buffer.
+ * @param format The format of the image as a MIME string.
  * @returns The resulting data URL.
  */
-export const bufferToDataUrl = (buffer: Uint8Array, width: number): string => {
+export const bufferToDataUrl = (
+    buffer: Uint8Array,
+    width: number,
+    format = "image/png"
+): string => {
     const imageData = bufferToImageData(buffer, width);
 
     const canvas = document.createElement("canvas");
@@ -40,6 +45,6 @@ export const bufferToDataUrl = (buffer: Uint8Array, width: number): string => {
     const context = canvas.getContext("2d");
     context?.putImageData(imageData, 0, 0);
 
-    const dataUrl = canvas.toDataURL();
+    const dataUrl = canvas.toDataURL(format);
     return dataUrl;
 };
