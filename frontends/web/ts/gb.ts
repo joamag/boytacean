@@ -1,6 +1,8 @@
 import {
     AudioSpecs,
+    base64ToBuffer,
     BenchmarkResult,
+    bufferToBase64,
     Compilation,
     Compiler,
     DebugPanel,
@@ -18,7 +20,6 @@ import {
     Size
 } from "emukit";
 import { PALETTES, PALETTES_MAP } from "./palettes";
-import { base64ToBuffer, bufferToBase64 } from "./util";
 import {
     DebugAudio,
     DebugGeneral,
@@ -37,8 +38,8 @@ import {
     GameBoySpeed,
     Info,
     PadKey,
-    StateManager,
-    SaveStateFormat
+    SaveStateFormat,
+    StateManager
 } from "../lib/boytacean";
 import info from "../package.json";
 
@@ -785,36 +786,17 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         this.gameBoy?.key_lift(keyCode);
     }
 
-    saveState(index: number) {
-        if (!this.gameBoy || !this.cartridge || !window.localStorage) return;
-        const title = this.cartridge.title();
-        const data = StateManager.save(this.gameBoy, SaveStateFormat.Bos);
-        const dataB64 = bufferToBase64(data);
-        localStorage.setItem(`${title}-s${index}`, dataB64);
+    serializeState(): Uint8Array {
+        if (!this.gameBoy) throw new Error("Unable to serialize state");
+        return StateManager.save(this.gameBoy, SaveStateFormat.Bos);
     }
 
-    loadState(index: number) {
-        if (!this.gameBoy || !this.cartridge || !window.localStorage) return;
-        const title = this.cartridge.title();
-        const dataB64 = localStorage.getItem(`${title}-s${index}`);
-        if (!dataB64) return;
-        const data = base64ToBuffer(dataB64);
+    unserializeState(data: Uint8Array) {
+        if (!this.gameBoy) throw new Error("Unable to unserialize state");
         StateManager.load(data, this.gameBoy, SaveStateFormat.Bos);
     }
 
-    deleteState(index: number) {
-        if (!this.gameBoy || !this.cartridge || !window.localStorage) return;
-        const title = this.cartridge.title();
-        localStorage.removeItem(`${title}-s${index}`);
-    }
-
-    getState(index: number): SaveState | null {
-        if (!this.gameBoy || !this.cartridge || !window.localStorage)
-            return null;
-        const title = this.cartridge.title();
-        const dataB64 = localStorage.getItem(`${title}-s${index}`);
-        if (!dataB64) return null;
-        const data = base64ToBuffer(dataB64);
+    buildState(index: number, data: Uint8Array): SaveState {
         const state = StateManager.read_bos(data);
         return {
             index: index,
@@ -823,17 +805,6 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
             model: state.model(),
             thumbnail: state.image_eager()
         };
-    }
-
-    listStates(): number[] {
-        if (!this.gameBoy || !this.cartridge || !window.localStorage) return [];
-        const states: number[] = [];
-        const title = this.cartridge.title();
-        for (let index = 0; index < 10; index++) {
-            const dataB64 = localStorage.getItem(`${title}-s${index}`);
-            if (dataB64 !== null) states.push(index);
-        }
-        return states;
     }
 
     pauseVideo() {

@@ -1,34 +1,4 @@
 /**
- * Encodes an array of bytes into a base64 string.
- *
- * @param buffer The array of bytes to encode.
- * @returns The resulting base64 string.
- */
-export const bufferToBase64 = (buffer: Uint8Array): string => {
-    const data = Array(buffer.length)
-        .fill(null)
-        .map((_, i) => String.fromCharCode(buffer[i]))
-        .join("");
-    const base64 = btoa(data);
-    return base64;
-};
-
-/**
- * Converts a base64 string into an array of bytes.
- *
- * @param base64 The base64 string to decode.
- * @returns The resulting array of bytes.
- */
-export const base64ToBuffer = (base64: string): Uint8Array => {
-    const data = atob(base64);
-    const array = Array(data.length)
-        .fill(null)
-        .map((_, i) => data.charCodeAt(i));
-    const buffer = new Uint8Array(array);
-    return buffer;
-};
-
-/**
  * Converts an array of bytes into an image data object
  * ready to be used with a canvas context.
  *
