@@ -75,10 +75,19 @@ impl GameBoyMode {
 
     pub fn from_string(value: &str) -> Self {
         match value {
-            "dmg" => GameBoyMode::Dmg,
-            "cgb" => GameBoyMode::Cgb,
-            "sgb" => GameBoyMode::Sgb,
+            "dmg" | "DMG" => GameBoyMode::Dmg,
+            "cgb" | "CGB" => GameBoyMode::Cgb,
+            "sgb" | "SGB" => GameBoyMode::Sgb,
             _ => panic!("Invalid mode value: {}", value),
+        }
+    }
+
+    pub fn to_string(&self, uppercase: Option<bool>) -> String {
+        let uppercase = uppercase.unwrap_or(false);
+        match self {
+            GameBoyMode::Dmg => (if uppercase { "DMG" } else { "dmg" }).to_string(),
+            GameBoyMode::Cgb => (if uppercase { "CGB" } else { "cgb" }).to_string(),
+            GameBoyMode::Sgb => (if uppercase { "SGB" } else { "sgb" }).to_string(),
         }
     }
 
