@@ -94,7 +94,7 @@ impl BosState {
         let mut buffer = [0x00; 4];
         data.read_exact(&mut buffer).unwrap();
         let magic = u32::from_le_bytes(buffer);
-        data.seek(SeekFrom::Start(0)).unwrap();
+        data.rewind().unwrap();
         magic == BOS_MAGIC_UINT
     }
 
@@ -464,7 +464,7 @@ impl BessState {
         let mut buffer = [0x00; 4];
         data.read_exact(&mut buffer).unwrap();
         let magic = u32::from_le_bytes(buffer);
-        data.seek(SeekFrom::Start(0)).unwrap();
+        data.rewind().unwrap();
         magic == BESS_MAGIC
     }
 
