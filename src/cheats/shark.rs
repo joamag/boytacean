@@ -9,7 +9,7 @@ use wasm_bindgen::prelude::*;
 #[derive(Clone)]
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 pub struct GameShark {
-    /// Hash map that contains the complete set of Game Shark
+    /// Hash map that contains the complete set of GameShark
     /// codes that have been registered for the current ROM.
     /// These codes are going to apply a series of patches to
     /// the RAM effectively allowing the user to cheat.
@@ -109,14 +109,14 @@ pub struct GameSharkCode {
 }
 
 impl GameSharkCode {
-    /// Creates a new Game Shark code structure from the provided string
+    /// Creates a new GameShark code structure from the provided string
     /// in the ABCDGHEF format.
     pub fn from_code(code: &str, _handle_additive: Option<bool>) -> Result<Self, String> {
         let code_length = code.len();
 
         if code_length != 8 {
             return Err(format!(
-                "Invalid Game Shark code length: {} digits",
+                "Invalid GameShark code length: {} digits",
                 code_length
             ));
         }
@@ -141,7 +141,7 @@ impl GameSharkCode {
     }
 
     /// Tests whether the provided value is valid for the current
-    /// Game Shark code
+    /// GameShark code
     pub fn is_valid(&self, _value: u8) -> bool {
         true
     }

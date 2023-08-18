@@ -16,7 +16,7 @@ A Game Boy emulator that is written in Rust 🦀.
 * Game Boy Printer emulation
 * Support for multiple MBCs: MBC1, MBC3, and MBC5
 * Save state support using the [BESS Specification](https://github.com/LIJI32/SameBoy/blob/master/BESS.md) for cross-compatibility with other emulators
-* Cheat support using [Game Genie](https://en.wikipedia.org/wiki/Game_Genie) codes
+* Cheat support using [Game Genie](https://en.wikipedia.org/wiki/Game_Genie) and [GameShark](https://pt.wikipedia.org/wiki/GameShark) codes
 * Variable CPU clock speed
 * Accurate PPU - passes [dmg-acid2](https://github.com/mattcurrie/dmg-acid2) and [cgb-acid2](https://github.com/mattcurrie/cgb-acid2) tests
 

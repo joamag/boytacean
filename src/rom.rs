@@ -315,7 +315,7 @@ pub struct Cartridge {
     /// current ROM's cartridge data.
     game_genie: Option<GameGenie>,
 
-    /// Optional reference to the Game Shark instance that
+    /// Optional reference to the GameShark instance that
     /// would be used for the "cheating" by patching the
     /// current ROM's cartridge data.
     game_shark: Option<GameShark>,

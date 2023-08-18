@@ -897,7 +897,7 @@ struct Args {
 
     #[arg(
         long,
-        help = "Cheat codes to be applied to the ROM, supports both Game Genie and Game Shark"
+        help = "Cheat codes to be applied to the ROM, supports both Game Genie and GameShark"
     )]
     cheats: Vec<String>,
 
