@@ -120,7 +120,7 @@ impl GameSharkCode {
         let addr =
             u16::from_str_radix(&addr_slice, 16).map_err(|e| format!("Invalid address: {}", e))?;
 
-        if addr < 0xa000 || addr > 0xdfff {
+        if !(0xa000..=0xdfff).contains(&addr) {
             return Err(format!("Invalid cheat address: 0x{:04x}", addr));
         }
 

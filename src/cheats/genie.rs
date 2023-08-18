@@ -105,12 +105,13 @@ impl GameGenieCode {
         let condensed = code_length == 7;
 
         let new_data_slice = &code_u[0..=1];
-        let new_data = u8::from_str_radix(new_data_slice, 16).unwrap();
+        let new_data = u8::from_str_radix(new_data_slice, 16)
+            .map_err(|e| format!("Invalid new data: {}", e))?;
 
         let old_data = if code_length == 11 {
             let old_data_slice: String = format!("{}{}", &code_u[8..=8], &code_u[10..=10]);
             u8::from_str_radix(old_data_slice.as_str(), 16)
-                .unwrap()
+                .map_err(|e| format!("Invalid old data: {}", e))?
                 .rotate_right(2)
                 ^ 0xba
         } else {
@@ -118,7 +119,13 @@ impl GameGenieCode {
         };
 
         let addr_slice = format!("{}{}{}", &code_u[6..=6], &code_u[2..=2], &code_u[4..=5]);
-        let addr = u16::from_str_radix(addr_slice.as_str(), 16).unwrap() ^ 0xf000;
+        let addr = u16::from_str_radix(addr_slice.as_str(), 16)
+            .map_err(|e| format!("Invalid address: {}", e))?
+            ^ 0xf000;
+
+        if addr > 0x7fff {
+            return Err(format!("Invalid cheat address: 0x{:04x}", addr));
+        }
 
         Ok(Self {
             code: code_u,
