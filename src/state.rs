@@ -6,7 +6,6 @@ use std::{
     fs::File,
     io::{Cursor, Read, Seek, SeekFrom, Write},
     mem::size_of,
-    vec,
 };
 
 use crate::{
