@@ -1495,7 +1495,7 @@ impl StateManager {
                 } else if BessState::is_bess(data) {
                     SaveStateFormat::Bess
                 } else {
-                    return Err(String::from("Invalid state file"));
+                    return Err(String::from("Unknown state file"));
                 }
             }
         };
@@ -1541,7 +1541,7 @@ impl StateManager {
                 } else if BessState::is_bess(data) {
                     SaveStateFormat::Bess
                 } else {
-                    return Err(String::from("Invalid state file"));
+                    return Err(String::from("Unknown state file"));
                 }
             }
         };
