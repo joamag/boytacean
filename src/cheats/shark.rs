@@ -76,7 +76,6 @@ impl GameShark {
             if code.addr >= 0xd000 && code.ram_bank != ram_bank {
                 continue;
             }
-            println!("Game Shark code: {}", code.description());
             writes.push((code.addr, code.new_data));
         }
         writes
