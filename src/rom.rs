@@ -2,9 +2,16 @@ use core::fmt;
 use std::{
     cmp::max,
     fmt::{Display, Formatter},
+    vec,
 };
 
-use crate::{debugln, gb::GameBoyMode, genie::GameGenie, util::read_file, warnln};
+use crate::{
+    cheats::{genie::GameGenie, shark::GameShark},
+    debugln,
+    gb::GameBoyMode,
+    util::read_file,
+    warnln,
+};
 
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
@@ -307,6 +314,11 @@ pub struct Cartridge {
     /// would be used for the "cheating" by patching the
     /// current ROM's cartridge data.
     game_genie: Option<GameGenie>,
+
+    /// Optional reference to the Game Shark instance that
+    /// would be used for the "cheating" by patching the
+    /// current ROM's cartridge data.
+    game_shark: Option<GameShark>,
 }
 
 impl Cartridge {
@@ -325,6 +337,7 @@ impl Cartridge {
             rumble_active: false,
             rumble_cb: |_| {},
             game_genie: None,
+            game_shark: None,
         }
     }
 
@@ -374,6 +387,13 @@ impl Cartridge {
         self.title_offset = 0x0143;
         self.rumble_active = false;
         self.rumble_cb = |_| {};
+    }
+
+    pub fn vblank(&mut self) -> Option<Vec<(u16, u8)>> {
+        if let Some(game_shark) = &mut self.game_shark {
+            return Some(game_shark.writes());
+        }
+        None
     }
 
     pub fn data(&self) -> &Vec<u8> {
@@ -499,6 +519,18 @@ impl Cartridge {
 
     pub fn set_game_genie(&mut self, game_genie: Option<GameGenie>) {
         self.game_genie = game_genie;
+    }
+
+    pub fn game_shark(&self) -> &Option<GameShark> {
+        &self.game_shark
+    }
+
+    pub fn game_shark_mut(&mut self) -> &mut Option<GameShark> {
+        &mut self.game_shark
+    }
+
+    pub fn set_game_shark(&mut self, game_shark: Option<GameShark>) {
+        self.game_shark = game_shark;
     }
 
     fn allocate_ram(&mut self) {
@@ -688,6 +720,14 @@ impl Cartridge {
     pub fn detach_genie(&mut self) {
         self.game_genie = None;
         self.handler = self.mbc;
+    }
+
+    pub fn attach_shark(&mut self, game_shark: GameShark) {
+        self.game_shark = Some(game_shark);
+    }
+
+    pub fn detach_shark(&mut self) {
+        self.game_shark = None;
     }
 
     pub fn description(&self, column_length: usize) -> String {

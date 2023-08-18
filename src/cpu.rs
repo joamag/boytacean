@@ -157,6 +157,10 @@ impl Cpu {
                 self.push_word(pc);
                 self.pc = 0x40;
 
+                // notifies the MMU about the V-Blank interrupt,
+                // this may trigger some additional operations
+                self.mmu.vblank();
+
                 // acknowledges that the V-Blank interrupt has been
                 // properly handled
                 self.mmu.ppu().ack_vblank();

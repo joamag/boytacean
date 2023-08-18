@@ -23,6 +23,16 @@ impl GameGenie {
         }
     }
 
+    pub fn is_code(code: &str) -> bool {
+        if code.len() != 11 && code.len() != 7 {
+            return false;
+        }
+        if !code.contains('-') && !code.contains('+') {
+            return false;
+        }
+        true
+    }
+
     pub fn reset(&mut self) {
         self.codes.clear();
     }
@@ -84,6 +94,7 @@ impl GameGenieCode {
                 code_length
             ));
         }
+
         let code_u = code.to_uppercase();
 
         let additive = if handle_additive.unwrap_or(false) {
@@ -184,7 +195,7 @@ impl GameGenieCode {
 
     pub fn description(&self) -> String {
         format!(
-            "Code: {}, Address: 0x{:04x}, New Data: 0x{:04x}, Old Data: 0x{:04x}",
+            "Code: {}, Address: 0x{:04x}, New Data: 0x{:02x}, Old Data: 0x{:02x}",
             self.code, self.addr, self.new_data, self.old_data
         )
     }

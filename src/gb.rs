@@ -9,11 +9,14 @@ use std::{
 
 use crate::{
     apu::Apu,
+    cheats::{
+        genie::{GameGenie, GameGenieCode},
+        shark::{GameShark, GameSharkCode},
+    },
     cpu::Cpu,
     data::{BootRom, CGB_BOOT, DMG_BOOT, DMG_BOOTIX, MGB_BOOTIX, SGB_BOOT},
     devices::{printer::PrinterDevice, stdout::StdoutDevice},
     dma::Dma,
-    genie::{GameGenie, GameGenieCode},
     info::Info,
     mmu::Mmu,
     pad::{Pad, PadKey},
@@ -1065,20 +1068,25 @@ impl GameBoy {
 
     pub fn reset_cheats(&mut self) {
         self.reset_game_genie();
+        self.reset_game_shark();
     }
 
     pub fn add_cheat_code(&mut self, code: &str) -> Result<bool, String> {
-        match self.add_game_genie_code(code) {
-            Ok(_) => Ok(true),
-            Err(message) => Err(message),
+        if GameGenie::is_code(code) {
+            return match self.add_game_genie_code(code) {
+                Ok(_) => Ok(true),
+                Err(message) => Err(message),
+            };
         }
-    }
 
-    pub fn reset_game_genie(&mut self) {
-        let rom = self.mmu().rom();
-        if rom.game_genie().is_some() {
-            rom.game_genie().clone().unwrap().reset();
+        if GameShark::is_code(code) {
+            return match self.add_game_shark_code(code) {
+                Ok(_) => Ok(true),
+                Err(message) => Err(message),
+            };
         }
+
+        Err(String::from("Not a valid cheat code"))
     }
 
     pub fn add_game_genie_code(&mut self, code: &str) -> Result<&GameGenieCode, String> {
@@ -1089,6 +1097,30 @@ impl GameBoy {
         }
         let game_genie = rom.game_genie_mut().as_mut().unwrap();
         game_genie.add_code(code)
+    }
+
+    pub fn add_game_shark_code(&mut self, code: &str) -> Result<&GameSharkCode, String> {
+        let rom = self.mmu().rom();
+        if rom.game_shark().is_none() {
+            let game_shark = GameShark::default();
+            rom.attach_shark(game_shark);
+        }
+        let game_shark = rom.game_shark_mut().as_mut().unwrap();
+        game_shark.add_code(code)
+    }
+
+    pub fn reset_game_genie(&mut self) {
+        let rom = self.mmu().rom();
+        if rom.game_genie().is_some() {
+            rom.game_genie_mut().as_mut().unwrap().reset();
+        }
+    }
+
+    pub fn reset_game_shark(&mut self) {
+        let rom = self.mmu().rom();
+        if rom.game_shark().is_some() {
+            rom.game_shark_mut().as_mut().unwrap().reset();
+        }
     }
 }
 

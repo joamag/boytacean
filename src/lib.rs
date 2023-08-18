@@ -1,13 +1,13 @@
 #![allow(clippy::uninlined_format_args)]
 
 pub mod apu;
+pub mod cheats;
 pub mod cpu;
 pub mod data;
 pub mod devices;
 pub mod dma;
 pub mod gb;
 pub mod gen;
-pub mod genie;
 pub mod info;
 pub mod inst;
 pub mod macros;
