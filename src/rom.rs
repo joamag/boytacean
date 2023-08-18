@@ -390,9 +390,8 @@ impl Cartridge {
     }
 
     pub fn vblank(&mut self) -> Option<Vec<(u16, u8)>> {
-        let ram_bank = self.ram_bank();
         if let Some(game_shark) = &mut self.game_shark {
-            return Some(game_shark.writes(ram_bank));
+            return Some(game_shark.writes());
         }
         None
     }

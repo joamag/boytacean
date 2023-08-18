@@ -173,7 +173,7 @@ impl Mmu {
         let writes = self.rom.vblank();
         if let Some(writes) = writes {
             for (addr, value) in writes {
-                self.write(addr, value);
+                self.ram[addr as usize] = value;
             }
         }
     }

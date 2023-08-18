@@ -70,13 +70,17 @@ impl GameShark {
         Ok(self.get_addr(addr))
     }
 
-    pub fn writes(&self, ram_bank: u8) -> Vec<(u16, u8)> {
+    pub fn writes(&self) -> Vec<(u16, u8)> {
         let mut writes = vec![];
-        for (_, code) in self.codes.iter() {
-            if code.addr >= 0xd000 && code.ram_bank != ram_bank {
-                continue;
-            }
-            writes.push((code.addr, code.new_data));
+        for code in self.codes.values() {
+            // calculates the real RAM address using both
+            // he base RAM address the RAM bank offset
+            let addr = if code.addr <= 0xd000 {
+                code.addr - 0xc000
+            } else {
+                code.addr - 0xc000 + (0x1000 * (code.ram_bank - 1) as u16)
+            };
+            writes.push((addr, code.new_data));
         }
         writes
     }
