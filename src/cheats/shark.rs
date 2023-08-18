@@ -37,8 +37,23 @@ impl GameShark {
         self.codes.clear();
     }
 
-    pub fn contains_addr(&self, addr: u16) -> bool {
-        self.codes.contains_key(&addr)
+    pub fn contains_addr(&self, addr: u16, ram_bank: u8) -> bool {
+        // runs the check to see if the code is registered
+        // for the provided (RAM) address
+        if !self.codes.contains_key(&addr) {
+            return false;
+        }
+
+        // in case the code is for internal RAM then we don't
+        // need to check the RAM bank
+        if addr <= 0xd000 {
+            return true;
+        }
+
+        // this access is for the external RAM so we need to check
+        // that the RAM bank matches
+        let code = self.get_addr(addr);
+        code.ram_bank == ram_bank
     }
 
     pub fn get_addr(&self, addr: u16) -> &GameSharkCode {
@@ -53,6 +68,18 @@ impl GameShark {
         let addr = genie_code.addr;
         self.codes.insert(addr, genie_code);
         Ok(self.get_addr(addr))
+    }
+
+    pub fn writes(&self, ram_bank: u8) -> Vec<(u16, u8)> {
+        let mut writes = vec![];
+        for (_, code) in self.codes.iter() {
+            if code.addr >= 0xd000 && code.ram_bank != ram_bank {
+                continue;
+            }
+            println!("Game Shark code: {}", code.description());
+            writes.push((code.addr, code.new_data));
+        }
+        writes
     }
 }
 
@@ -99,8 +126,8 @@ impl GameSharkCode {
         let new_data_slice = &code_u[2..=3];
         let new_data = u8::from_str_radix(new_data_slice, 16).unwrap();
 
-        let addr_slice = &code_u[4..=7];
-        let addr = u16::from_str_radix(addr_slice, 16).unwrap();
+        let addr_slice = format!("{}{}", &code_u[6..=7], &code_u[4..=5]);
+        let addr = u16::from_str_radix(&addr_slice, 16).unwrap();
 
         Ok(Self {
             code: code_u,
@@ -108,6 +135,16 @@ impl GameSharkCode {
             new_data,
             addr,
         })
+    }
+
+    /// Tests whether the provided value is valid for the current
+    /// Game Shark code
+    pub fn is_valid(&self, _value: u8) -> bool {
+        true
+    }
+
+    pub fn patch_data(&self, _value: u8) -> u8 {
+        self.new_data()
     }
 
     pub fn code(&self) -> &str {

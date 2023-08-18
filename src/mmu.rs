@@ -166,6 +166,18 @@ impl Mmu {
         self.ram = vec![0x00; RAM_SIZE_CGB];
     }
 
+    /// Notifies the system that a VBlank interrupt has been
+    /// triggered, would usually be the perfect time to update
+    /// some of the internal memory structures.
+    pub fn vblank(&mut self) {
+        let writes = self.rom.vblank();
+        if let Some(writes) = writes {
+            for (addr, value) in writes {
+                self.write(addr, value);
+            }
+        }
+    }
+
     /// Switches the current system's speed toggling between
     /// the normal and double speed modes.
     pub fn switch_speed(&mut self) {

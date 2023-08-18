@@ -2,6 +2,7 @@ use core::fmt;
 use std::{
     cmp::max,
     fmt::{Display, Formatter},
+    vec,
 };
 
 use crate::{
@@ -388,6 +389,14 @@ impl Cartridge {
         self.rumble_cb = |_| {};
     }
 
+    pub fn vblank(&mut self) -> Option<Vec<(u16, u8)>> {
+        let ram_bank = self.ram_bank();
+        if let Some(game_shark) = &mut self.game_shark {
+            return Some(game_shark.writes(ram_bank));
+        }
+        None
+    }
+
     pub fn data(&self) -> &Vec<u8> {
         &self.rom_data
     }
@@ -716,12 +725,10 @@ impl Cartridge {
 
     pub fn attach_shark(&mut self, game_shark: GameShark) {
         self.game_shark = Some(game_shark);
-        //@TODO: implement the attach
     }
 
     pub fn detach_shark(&mut self) {
         self.game_shark = None;
-        //@TODO: implement the detach
     }
 
     pub fn description(&self, column_length: usize) -> String {
