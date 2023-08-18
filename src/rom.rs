@@ -4,7 +4,9 @@ use std::{
     fmt::{Display, Formatter},
 };
 
-use crate::{debugln, gb::GameBoyMode, genie::GameGenie, util::read_file, warnln};
+use crate::{
+    debugln, gb::GameBoyMode, genie::GameGenie, shark::GameShark, util::read_file, warnln,
+};
 
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
@@ -307,6 +309,11 @@ pub struct Cartridge {
     /// would be used for the "cheating" by patching the
     /// current ROM's cartridge data.
     game_genie: Option<GameGenie>,
+
+    /// Optional reference to the Game Shark instance that
+    /// would be used for the "cheating" by patching the
+    /// current ROM's cartridge data.
+    game_shark: Option<GameShark>,
 }
 
 impl Cartridge {
@@ -325,6 +332,7 @@ impl Cartridge {
             rumble_active: false,
             rumble_cb: |_| {},
             game_genie: None,
+            game_shark: None,
         }
     }
 
@@ -499,6 +507,18 @@ impl Cartridge {
 
     pub fn set_game_genie(&mut self, game_genie: Option<GameGenie>) {
         self.game_genie = game_genie;
+    }
+
+    pub fn game_shark(&self) -> &Option<GameShark> {
+        &self.game_shark
+    }
+
+    pub fn game_shark_mut(&mut self) -> &mut Option<GameShark> {
+        &mut self.game_shark
+    }
+
+    pub fn set_game_shark(&mut self, game_shark: Option<GameShark>) {
+        self.game_shark = game_shark;
     }
 
     fn allocate_ram(&mut self) {
@@ -688,6 +708,16 @@ impl Cartridge {
     pub fn detach_genie(&mut self) {
         self.game_genie = None;
         self.handler = self.mbc;
+    }
+
+    pub fn attach_shark(&mut self, game_shark: GameShark) {
+        self.game_shark = Some(game_shark);
+        //@TODO: implement the attach
+    }
+
+    pub fn detach_shark(&mut self) {
+        self.game_shark = None;
+        //@TODO: implement the detach
     }
 
     pub fn description(&self, column_length: usize) -> String {

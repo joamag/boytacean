@@ -1,4 +1,7 @@
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    fmt::{self, Display, Formatter},
+};
 
 #[derive(Clone)]
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
@@ -8,6 +11,52 @@ pub struct GameShark {
     /// These codes are going to apply a series of patches to
     /// the RAM effectively allowing the user to cheat.
     codes: HashMap<u16, GameSharkCode>,
+}
+
+impl GameShark {
+    pub fn new() -> Self {
+        Self {
+            codes: HashMap::new(),
+        }
+    }
+
+    pub fn is_code(code: &str) -> bool {
+        if code.len() != 8 {
+            return false;
+        }
+        if code.contains('-') || code.contains('+') {
+            return false;
+        }
+        true
+    }
+
+    pub fn reset(&mut self) {
+        self.codes.clear();
+    }
+
+    pub fn contains_addr(&self, addr: u16) -> bool {
+        self.codes.contains_key(&addr)
+    }
+
+    pub fn get_addr(&self, addr: u16) -> &GameSharkCode {
+        self.codes.get(&addr).unwrap()
+    }
+
+    pub fn add_code(&mut self, code: &str) -> Result<&GameSharkCode, String> {
+        let genie_code = match GameSharkCode::from_code(code, None) {
+            Ok(genie_code) => genie_code,
+            Err(message) => return Err(message),
+        };
+        let addr = genie_code.addr;
+        self.codes.insert(addr, genie_code);
+        Ok(self.get_addr(addr))
+    }
+}
+
+impl Default for GameShark {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[derive(Clone)]
@@ -29,7 +78,7 @@ pub struct GameSharkCode {
 impl GameSharkCode {
     /// Creates a new Game Shark code structure from the provided string
     /// in the ABCDGHEF format.
-    pub fn from_code(code: &str, handle_additive: Option<bool>) -> Result<Self, String> {
+    pub fn from_code(code: &str, _handle_additive: Option<bool>) -> Result<Self, String> {
         let code_length = code.len();
 
         if code_length != 8 {
@@ -98,5 +147,11 @@ impl GameSharkCode {
             "Code: {}, RAM Bank: 0x{:02x}, New Data: 0x{:02x}, Address: 0x{:04x}",
             self.code, self.ram_bank, self.new_data, self.addr
         )
+    }
+}
+
+impl Display for GameSharkCode {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.short_description())
     }
 }

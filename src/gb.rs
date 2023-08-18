@@ -23,6 +23,7 @@ use crate::{
     },
     rom::{Cartridge, RamSize},
     serial::{NullDevice, Serial, SerialDevice},
+    shark::{GameShark, GameSharkCode},
     timer::Timer,
     util::read_file,
 };
@@ -1068,10 +1069,21 @@ impl GameBoy {
     }
 
     pub fn add_cheat_code(&mut self, code: &str) -> Result<bool, String> {
-        match self.add_game_genie_code(code) {
-            Ok(_) => Ok(true),
-            Err(message) => Err(message),
+        if GameGenie::is_code(code) {
+            return match self.add_game_genie_code(code) {
+                Ok(_) => Ok(true),
+                Err(message) => Err(message),
+            };
         }
+
+        if GameShark::is_code(code) {
+            return match self.add_game_shark_code(code) {
+                Ok(_) => Ok(true),
+                Err(message) => Err(message),
+            };
+        }
+
+        Err(String::from("Not a valid cheat code"))
     }
 
     pub fn reset_game_genie(&mut self) {
@@ -1089,6 +1101,16 @@ impl GameBoy {
         }
         let game_genie = rom.game_genie_mut().as_mut().unwrap();
         game_genie.add_code(code)
+    }
+
+    pub fn add_game_shark_code(&mut self, code: &str) -> Result<&GameSharkCode, String> {
+        let rom = self.mmu().rom();
+        if rom.game_shark().is_none() {
+            let game_shark = GameShark::default();
+            rom.attach_shark(game_shark);
+        }
+        let game_shark = rom.game_shark_mut().as_mut().unwrap();
+        game_shark.add_code(code)
     }
 }
 

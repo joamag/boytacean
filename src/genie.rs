@@ -23,6 +23,16 @@ impl GameGenie {
         }
     }
 
+    pub fn is_code(code: &str) -> bool {
+        if code.len() != 11 && code.len() != 7 {
+            return false;
+        }
+        if !code.contains('-') && !code.contains('+') {
+            return false;
+        }
+        true
+    }
+
     pub fn reset(&mut self) {
         self.codes.clear();
     }
