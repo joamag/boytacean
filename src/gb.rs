@@ -9,11 +9,14 @@ use std::{
 
 use crate::{
     apu::Apu,
+    cheats::{
+        genie::{GameGenie, GameGenieCode},
+        shark::{GameShark, GameSharkCode},
+    },
     cpu::Cpu,
     data::{BootRom, CGB_BOOT, DMG_BOOT, DMG_BOOTIX, MGB_BOOTIX, SGB_BOOT},
     devices::{printer::PrinterDevice, stdout::StdoutDevice},
     dma::Dma,
-    genie::{GameGenie, GameGenieCode},
     info::Info,
     mmu::Mmu,
     pad::{Pad, PadKey},
@@ -23,7 +26,6 @@ use crate::{
     },
     rom::{Cartridge, RamSize},
     serial::{NullDevice, Serial, SerialDevice},
-    shark::{GameShark, GameSharkCode},
     timer::Timer,
     util::read_file,
 };

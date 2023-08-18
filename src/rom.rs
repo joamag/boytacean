@@ -5,7 +5,11 @@ use std::{
 };
 
 use crate::{
-    debugln, gb::GameBoyMode, genie::GameGenie, shark::GameShark, util::read_file, warnln,
+    cheats::{genie::GameGenie, shark::GameShark},
+    debugln,
+    gb::GameBoyMode,
+    util::read_file,
+    warnln,
 };
 
 #[cfg(feature = "wasm")]
