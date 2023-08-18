@@ -261,6 +261,12 @@ impl Emulator {
         self.load_rom(None);
     }
 
+    pub fn apply_cheats(&mut self, cheats: &Vec<String>) {
+        for cheat in cheats {
+            self.system.add_cheat_code(cheat).unwrap();
+        }
+    }
+
     pub fn benchmark(&mut self, params: &Benchmark) {
         println!("Going to run benchmark...");
 
@@ -889,6 +895,12 @@ struct Args {
     )]
     cycles: u64,
 
+    #[arg(
+        long,
+        help = "Cheat codes to be applied to the ROM, supports both Game Genie and Game Shark"
+    )]
+    cheats: Vec<String>,
+
     #[arg(default_value_t = String::from(DEFAULT_ROM_PATH), help = "Path to the ROM file to be loaded")]
     rom_path: String,
 }
@@ -968,6 +980,7 @@ fn main() {
     let mut emulator = Emulator::new(game_boy, options);
     emulator.start(SCREEN_SCALE);
     emulator.load_rom(Some(&args.rom_path));
+    emulator.apply_cheats(&args.cheats);
     emulator.toggle_palette();
 
     run(args, &mut emulator);
