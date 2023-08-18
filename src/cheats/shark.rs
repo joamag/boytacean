@@ -37,31 +37,12 @@ impl GameShark {
         self.codes.clear();
     }
 
-    pub fn contains_addr(&self, addr: u16, ram_bank: u8) -> bool {
-        // runs the check to see if the code is registered
-        // for the provided (RAM) address
-        if !self.codes.contains_key(&addr) {
-            return false;
-        }
-
-        // in case the code is for internal RAM then we don't
-        // need to check the RAM bank
-        if addr <= 0xd000 {
-            return true;
-        }
-
-        // this access is for the external RAM so we need to check
-        // that the RAM bank matches
-        let code = self.get_addr(addr);
-        code.ram_bank == ram_bank
-    }
-
     pub fn get_addr(&self, addr: u16) -> &GameSharkCode {
         self.codes.get(&addr).unwrap()
     }
 
     pub fn add_code(&mut self, code: &str) -> Result<&GameSharkCode, String> {
-        let genie_code = match GameSharkCode::from_code(code, None) {
+        let genie_code = match GameSharkCode::from_code(code) {
             Ok(genie_code) => genie_code,
             Err(message) => return Err(message),
         };
@@ -70,17 +51,20 @@ impl GameShark {
         Ok(self.get_addr(addr))
     }
 
-    pub fn writes(&self) -> Vec<(u16, u8)> {
+    pub fn writes(&self) -> Vec<(u16, u16, u8)> {
         let mut writes = vec![];
         for code in self.codes.values() {
             // calculates the real RAM address using both
             // he base RAM address the RAM bank offset
-            let addr = if code.addr <= 0xd000 {
-                code.addr - 0xc000
+            let (base_addr, addr) = if code.addr <= 0xc000 {
+                (
+                    0xa000,
+                    code.addr - 0xa000 + (0x1000 * (code.ram_bank - 1) as u16),
+                )
             } else {
-                code.addr - 0xc000 + (0x1000 * (code.ram_bank - 1) as u16)
+                (0xc000, code.addr - 0xc000)
             };
-            writes.push((addr, code.new_data));
+            writes.push((base_addr, addr, code.new_data));
         }
         writes
     }
@@ -111,7 +95,7 @@ pub struct GameSharkCode {
 impl GameSharkCode {
     /// Creates a new GameShark code structure from the provided string
     /// in the ABCDGHEF format.
-    pub fn from_code(code: &str, _handle_additive: Option<bool>) -> Result<Self, String> {
+    pub fn from_code(code: &str) -> Result<Self, String> {
         let code_length = code.len();
 
         if code_length != 8 {
@@ -124,13 +108,21 @@ impl GameSharkCode {
         let code_u = code.to_uppercase();
 
         let ram_bank_slice = &code_u[0..=1];
-        let ram_bank = u8::from_str_radix(ram_bank_slice, 16).unwrap();
+        let ram_bank = u8::from_str_radix(ram_bank_slice, 16)
+            .map_err(|e| format!("Invalid RAM bank: {}", e))?
+            & 0x0f;
 
         let new_data_slice = &code_u[2..=3];
-        let new_data = u8::from_str_radix(new_data_slice, 16).unwrap();
+        let new_data = u8::from_str_radix(new_data_slice, 16)
+            .map_err(|e| format!("Invalid new data: {}", e))?;
 
         let addr_slice = format!("{}{}", &code_u[6..=7], &code_u[4..=5]);
-        let addr = u16::from_str_radix(&addr_slice, 16).unwrap();
+        let addr =
+            u16::from_str_radix(&addr_slice, 16).map_err(|e| format!("Invalid address: {}", e))?;
+
+        if addr < 0xa000 || addr > 0xdfff {
+            return Err(format!("Invalid cheat address: 0x{:04x}", addr));
+        }
 
         Ok(Self {
             code: code_u,

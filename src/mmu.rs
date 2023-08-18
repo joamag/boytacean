@@ -172,8 +172,12 @@ impl Mmu {
     pub fn vblank(&mut self) {
         let writes = self.rom.vblank();
         if let Some(writes) = writes {
-            for (addr, value) in writes {
-                self.ram[addr as usize] = value;
+            for (base_addr, addr, value) in writes {
+                match base_addr {
+                    0xa000 => self.rom.ram_data_mut()[addr as usize] = value,
+                    0xc000 => self.ram[addr as usize] = value,
+                    _ => panic!("Invalid base address for write: 0x{:04x}", base_addr),
+                }
             }
         }
     }

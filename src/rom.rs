@@ -389,7 +389,7 @@ impl Cartridge {
         self.rumble_cb = |_| {};
     }
 
-    pub fn vblank(&mut self) -> Option<Vec<(u16, u8)>> {
+    pub fn vblank(&mut self) -> Option<Vec<(u16, u16, u8)>> {
         if let Some(game_shark) = &mut self.game_shark {
             return Some(game_shark.writes());
         }
@@ -757,8 +757,16 @@ impl Cartridge {
         &self.rom_data
     }
 
+    pub fn rom_data_mut(&mut self) -> &mut Vec<u8> {
+        &mut self.rom_data
+    }
+
     pub fn ram_data(&self) -> &Vec<u8> {
         &self.ram_data
+    }
+
+    pub fn ram_data_mut(&mut self) -> &mut Vec<u8> {
+        &mut self.ram_data
     }
 }
 

@@ -439,7 +439,9 @@ pub unsafe extern "C" fn retro_cheat_set(_index: c_uint, enabled: bool, code: *c
     let emulator = EMULATOR.as_mut().unwrap();
     let code_c = CStr::from_ptr(code);
     let code_s = code_c.to_string_lossy().into_owned();
-    emulator.add_cheat_code(&code_s).unwrap();
+    if let Err(err) = emulator.add_cheat_code(&code_s) {
+        warnln!("Failed to add cheat code ({}): {}", code_s, err);
+    }
 }
 
 #[no_mangle]
