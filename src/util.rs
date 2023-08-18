@@ -125,7 +125,7 @@ pub fn get_timestamp() -> u64 {
 mod tests {
     use std::path::Path;
 
-    use super::replace_ext;
+    use super::{capitalize, replace_ext};
 
     #[test]
     fn test_change_extension() {
@@ -155,5 +155,23 @@ mod tests {
 
         let new_path = replace_ext("/path/to/directory/", "dat");
         assert_eq!(new_path, None);
+    }
+
+    #[test]
+    fn test_capitalize_empty_string() {
+        let result = capitalize("");
+        assert_eq!(result, "");
+    }
+
+    #[test]
+    fn test_capitalize_single_character() {
+        let result = capitalize("a");
+        assert_eq!(result, "A");
+    }
+
+    #[test]
+    fn test_capitalize_multiple_characters() {
+        let result = capitalize("hello, world!");
+        assert_eq!(result, "Hello, world!");
     }
 }

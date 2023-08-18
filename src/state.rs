@@ -6,6 +6,7 @@ use std::{
     fs::File,
     io::{Cursor, Read, Seek, SeekFrom, Write},
     mem::size_of,
+    vec,
 };
 
 use crate::{
@@ -460,7 +461,7 @@ impl BessState {
     /// buffer represents a valid BESS (Best Effort Save State)
     /// file structure, thought magic string validation.
     pub fn is_bess(data: &mut Cursor<Vec<u8>>) -> bool {
-        data.seek(SeekFrom::End(-8)).unwrap();
+        data.seek(SeekFrom::End(-4)).unwrap();
         let mut buffer = [0x00; 4];
         data.read_exact(&mut buffer).unwrap();
         let magic = u32::from_le_bytes(buffer);
@@ -911,8 +912,8 @@ impl Serialize for BessInfo {
 impl State for BessInfo {
     fn from_gb(gb: &mut GameBoy) -> Result<Self, String> {
         Ok(Self::new(
-            &gb.cartridge_i().rom_data()[0x134..=0x143],
-            &gb.cartridge_i().rom_data()[0x14e..=0x14f],
+            &gb.cartridge_i().rom_data()[0x0134..=0x0143],
+            &gb.cartridge_i().rom_data()[0x014e..=0x014f],
         ))
     }
 
@@ -1495,7 +1496,7 @@ impl StateManager {
                 } else if BessState::is_bess(data) {
                     SaveStateFormat::Bess
                 } else {
-                    return Err(String::from("Unknown state file"));
+                    return Err(String::from("Unknown save state file format"));
                 }
             }
         };
@@ -1528,7 +1529,7 @@ impl StateManager {
         Ok(state)
     }
 
-    /// Obtains the thumbnail of the state file, this thumbnail is
+    /// Obtains the thumbnail of the save state file, this thumbnail is
     /// stored in raw RGB format.
     /// This operation is currently only supported for the BOS format.
     pub fn thumbnail(data: &[u8], format: Option<SaveStateFormat>) -> Result<Vec<u8>, String> {
@@ -1541,7 +1542,7 @@ impl StateManager {
                 } else if BessState::is_bess(data) {
                     SaveStateFormat::Bess
                 } else {
-                    return Err(String::from("Unknown state file"));
+                    return Err(String::from("Unknown save state file format"));
                 }
             }
         };
@@ -1553,5 +1554,31 @@ impl StateManager {
             }
             SaveStateFormat::Bess => Err(String::from("Format foes not support thumbnail")),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::gb::GameBoy;
+
+    #[test]
+    fn test_load_bos() {
+        let mut gb = GameBoy::default();
+        gb.load(true);
+        gb.load_rom_file("res/roms/test/firstwhite.gb", None);
+        let data = StateManager::save(&mut gb, Some(SaveStateFormat::Bos)).unwrap();
+        StateManager::load(&data, &mut gb, Some(SaveStateFormat::Bos)).unwrap();
+        StateManager::load(&data, &mut gb, None).unwrap();
+    }
+
+    #[test]
+    fn test_load_bess() {
+        let mut gb = GameBoy::default();
+        gb.load(true);
+        gb.load_rom_file("res/roms/test/firstwhite.gb", None);
+        let data = StateManager::save(&mut gb, Some(SaveStateFormat::Bess)).unwrap();
+        StateManager::load(&data, &mut gb, Some(SaveStateFormat::Bess)).unwrap();
+        StateManager::load(&data, &mut gb, None).unwrap();
     }
 }
