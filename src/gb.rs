@@ -1068,6 +1068,7 @@ impl GameBoy {
 
     pub fn reset_cheats(&mut self) {
         self.reset_game_genie();
+        self.reset_game_shark();
     }
 
     pub fn add_cheat_code(&mut self, code: &str) -> Result<bool, String> {
@@ -1088,13 +1089,6 @@ impl GameBoy {
         Err(String::from("Not a valid cheat code"))
     }
 
-    pub fn reset_game_genie(&mut self) {
-        let rom = self.mmu().rom();
-        if rom.game_genie().is_some() {
-            rom.game_genie().clone().unwrap().reset();
-        }
-    }
-
     pub fn add_game_genie_code(&mut self, code: &str) -> Result<&GameGenieCode, String> {
         let rom = self.mmu().rom();
         if rom.game_genie().is_none() {
@@ -1113,6 +1107,20 @@ impl GameBoy {
         }
         let game_shark = rom.game_shark_mut().as_mut().unwrap();
         game_shark.add_code(code)
+    }
+
+    pub fn reset_game_genie(&mut self) {
+        let rom = self.mmu().rom();
+        if rom.game_genie().is_some() {
+            rom.game_genie_mut().as_mut().unwrap().reset();
+        }
+    }
+
+    pub fn reset_game_shark(&mut self) {
+        let rom = self.mmu().rom();
+        if rom.game_shark().is_some() {
+            rom.game_shark_mut().as_mut().unwrap().reset();
+        }
     }
 }
 
