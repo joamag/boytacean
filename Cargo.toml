@@ -36,6 +36,12 @@ lto = true
 opt-level = 3
 codegen-units = 1
 
+[profile.release-safe]
+inherits = "release"
+debug = false
+lto = true
+opt-level = 3
+
 [workspace]
 members = [".", "frontends/libretro", "frontends/sdl"]
 

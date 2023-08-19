@@ -20,6 +20,7 @@ pub const ROM_BANK_SIZE: usize = 16384;
 pub const RAM_BANK_SIZE: usize = 8192;
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum MbcType {
     NoMbc = 0x00,
     Mbc1 = 0x01,
@@ -31,7 +32,6 @@ pub enum MbcType {
     Unknown = 0x07,
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen)]
 impl MbcType {
     pub fn ram_bank_mask(&self) -> u8 {
         match self {
