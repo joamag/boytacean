@@ -32,6 +32,23 @@ pub enum MbcType {
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
+impl MbcType {
+    pub fn ram_bank_mask(&self) -> u8 {
+        match self {
+            MbcType::NoMbc => 0x00,
+            MbcType::Mbc1 => 0x03,
+            MbcType::Mbc2 => unimplemented!(),
+            MbcType::Mbc3 => 0x03,
+            MbcType::Mbc5 => 0x0f,
+            MbcType::Mbc6 => unimplemented!(),
+            MbcType::Mbc7 => unimplemented!(),
+            MbcType::Unknown => unimplemented!(),
+        }
+    }
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum RomType {
     RomOnly = 0x00,
     Mbc1 = 0x01,
@@ -723,7 +740,9 @@ impl Cartridge {
     }
 
     pub fn attach_shark(&mut self, game_shark: GameShark) {
+        let rom_type = self.rom_type();
         self.game_shark = Some(game_shark);
+        self.game_shark.as_mut().unwrap().set_rom_type(rom_type);
     }
 
     pub fn detach_shark(&mut self) {

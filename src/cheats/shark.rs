@@ -3,6 +3,8 @@ use std::{
     fmt::{self, Display, Formatter},
 };
 
+use crate::rom::RomType;
+
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
 
@@ -14,13 +16,22 @@ pub struct GameShark {
     /// These codes are going to apply a series of patches to
     /// the RAM effectively allowing the user to cheat.
     codes: HashMap<u16, GameSharkCode>,
+
+    /// The kind of ROM (Cartridge) that is going to be patched.
+    /// Relevant for some operations.
+    rom_type: RomType,
 }
 
 impl GameShark {
     pub fn new() -> Self {
         Self {
             codes: HashMap::new(),
+            rom_type: RomType::RomOnly,
         }
+    }
+
+    pub fn set_rom_type(&mut self, rom_type: RomType) {
+        self.rom_type = rom_type;
     }
 
     pub fn is_code(code: &str) -> bool {
@@ -42,7 +53,7 @@ impl GameShark {
     }
 
     pub fn add_code(&mut self, code: &str) -> Result<&GameSharkCode, String> {
-        let genie_code = match GameSharkCode::from_code(code) {
+        let genie_code = match GameSharkCode::from_code(code, &self.rom_type) {
             Ok(genie_code) => genie_code,
             Err(message) => return Err(message),
         };
@@ -95,7 +106,7 @@ pub struct GameSharkCode {
 impl GameSharkCode {
     /// Creates a new GameShark code structure from the provided string
     /// in the ABCDGHEF format.
-    pub fn from_code(code: &str) -> Result<Self, String> {
+    pub fn from_code(code: &str, rom_type: &RomType) -> Result<Self, String> {
         let code_length = code.len();
 
         if code_length != 8 {
@@ -108,9 +119,10 @@ impl GameSharkCode {
         let code_u = code.to_uppercase();
 
         let ram_bank_slice = &code_u[0..=1];
-        let ram_bank = u8::from_str_radix(ram_bank_slice, 16)
+        let mut ram_bank = u8::from_str_radix(ram_bank_slice, 16)
             .map_err(|e| format!("Invalid RAM bank: {}", e))?
-            & 0x0f;
+            & rom_type.mbc_type().ram_bank_mask();
+        ram_bank = if ram_bank == 0x00 { 0x01 } else { ram_bank };
 
         let new_data_slice = &code_u[2..=3];
         let new_data = u8::from_str_radix(new_data_slice, 16)

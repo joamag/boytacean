@@ -1100,7 +1100,7 @@ impl GameBoy {
     }
 
     pub fn add_game_shark_code(&mut self, code: &str) -> Result<&GameSharkCode, String> {
-        let rom = self.mmu().rom();
+        let rom = self.rom();
         if rom.game_shark().is_none() {
             let game_shark = GameShark::default();
             rom.attach_shark(game_shark);
@@ -1110,7 +1110,7 @@ impl GameBoy {
     }
 
     pub fn reset_game_genie(&mut self) {
-        let rom = self.mmu().rom();
+        let rom = self.rom();
         if rom.game_genie().is_some() {
             rom.game_genie_mut().as_mut().unwrap().reset();
         }
