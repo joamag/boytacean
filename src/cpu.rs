@@ -92,7 +92,7 @@ impl Cpu {
 
     /// Sets the CPU registers and some of the memory space to the
     /// state expected after the Game Boy boot ROM executes, using
-    /// these values its possible to skip the boot loading process.
+    /// these values it's possible to skip the boot loading process.
     pub fn boot(&mut self) {
         self.pc = 0x0100;
         self.sp = 0xfffe;
