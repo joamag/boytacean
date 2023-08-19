@@ -85,8 +85,8 @@ pub struct Mmu {
     /// Boy execution. The buffer effectively used is of 256 bytes
     /// for the "normal" Game Boy (MGB) and 2308 bytes for the
     /// Game Boy Color (CGB). Note that in the case of the CGB
-    /// the bios which is 2308 bytes long is in fact only 2048 bytes
-    /// as the 256 bytes in range 0x100-0x1FF are meant to be
+    /// the BIOS which is 2308 bytes long is in fact only 2048 bytes
+    /// as the 256 bytes in range 0x0100-0x01FF are meant to be
     /// overwritten byte the cartridge header.
     boot: Vec<u8>,
 
