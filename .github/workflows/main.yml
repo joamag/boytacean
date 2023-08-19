@@ -127,12 +127,8 @@ jobs:
         run: cd frontends/sdl && cargo test
       - name: Build development version
         run: cd frontends/sdl && cargo build
-      - name: Build release version (safe)
-        run: cd frontends/sdl && cargo build --profile release-safe
-        if: matrix.rust-version != '1.71.0'
       - name: Build release version
         run: cd frontends/sdl && cargo build --release
-        if: matrix.rust-version == '1.71.0'
       - name: Run release version
         run: cd frontends/sdl && cargo run --release -- --headless --cycles 10000000
       - name: Run benchmark
