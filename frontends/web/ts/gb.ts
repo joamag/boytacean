@@ -26,8 +26,7 @@ import {
     DebugSettings,
     HelpFaqs,
     HelpKeyboard,
-    SerialSection,
-    TestSection
+    SerialSection
 } from "../react";
 
 import {
@@ -398,8 +397,9 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         // in case a remote ROM loading operation has been
         // requested then loads it from the remote origin
         if (loadRom) {
-            ({ name: romName, data: romData } =
-                await GameboyEmulator.fetchRom(romPath));
+            ({ name: romName, data: romData } = await GameboyEmulator.fetchRom(
+                romPath
+            ));
         } else if (romName === null || romData === null) {
             [romName, romData] = [this.romName, this.romData];
         }
@@ -547,10 +547,6 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
                 name: "Serial",
                 icon: require("../res/serial.svg"),
                 node: SerialSection({ emulator: this })
-            },
-            {
-                name: "Test",
-                node: TestSection({})
             }
         ];
     }
