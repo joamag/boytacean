@@ -4,9 +4,11 @@ Cargo.lock
 
 /.idea
 
+/ndk
 /target
 /res/roms.prop
 /frontends/*/target
+/frontends/*/ndk
 
 /src/gen/build.rs
 /src/gen/_build.rs
