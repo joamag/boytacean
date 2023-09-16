@@ -170,3 +170,63 @@ jobs:
       - name: Build release version
         run: cd frontends/libretro && cargo build --release
         if: matrix.rust-version == '1.71.0'
+  build-libretro-android:
+    name: Build Libretro Android
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        rust-version: [
+          "1.71.0",
+          "latest"
+        ]
+    runs-on: ubuntu-latest
+    container: rust:${{ matrix.rust-version }}
+    steps:
+      - name: Checkout code from repository
+        uses: actions/checkout@v3
+      - name: Install Android NDK
+        uses: nttld/setup-ndk@v1
+        id: setup-ndk
+        with:
+          ndk-version: r25c
+      - name: Install Dependencies
+        run: |
+          apt-get update
+          apt-get install -y -q zip
+      - name: Install Rust components
+        run: |
+          rustup component add rustfmt
+          rustup component add clippy
+      - name: Print Rust information
+        run: rustc --version
+      - name: Setup local NDK
+        run: |
+          mkdir -p ndk
+          ${NDK_HOME}/build/tools/make_standalone_toolchain.py --api 26 --arch arm64 --install-dir ndk/arm64
+          ${NDK_HOME}/build/tools/make_standalone_toolchain.py --api 26 --arch arm --install-dir ndk/arm
+          ${NDK_HOME}/build/tools/make_standalone_toolchain.py --api 26 --arch x86 --install-dir ndk/x86
+        env:
+          NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+      - name: Add Rust Android targets
+        run: |
+          rustup target add aarch64-linux-android
+          rustup target add armv7-linux-androideabi
+          rustup target add i686-linux-android
+      - name: Verify Rust code format
+        run: cd frontends/libretro && cargo fmt --all -- --check
+      - name: Verify Rust code linting
+        run: cd frontends/libretro && cargo clippy -- -D warnings -A unknown-lints
+      - name: Run unit tests
+        run: cd frontends/libretro && cargo test
+      - name: Build development version
+        run: |
+          cd frontends/libretro
+          cargo build --target=aarch64-linux-android
+          cargo build --target=armv7-linux-androideabi
+          cargo build --target=i686-linux-android
+      - name: Build release version
+        run: |
+          cd frontends/libretro
+          cargo build --target=aarch64-linux-android --release
+          cargo build --target=armv7-linux-androideabi --release
+          cargo build --target=i686-linux-android --release
