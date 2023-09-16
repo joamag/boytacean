@@ -34,6 +34,7 @@ jobs:
         with:
           name: boytacean-linux
           path: |
+            frontends/libretro/res/boytacean_libretro.info
             target/release/boytacean-sdl-linux-x64
             target/release/libboytacean.so
             target/release/boytacean_libretro.so
@@ -153,6 +154,7 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: |
+            boytacean-linux//boytacean_libretro.info
             boytacean-linux/boytacean-sdl-linux-x64
             boytacean-linux/libboytacean.so
             boytacean-linux/boytacean_libretro.so
