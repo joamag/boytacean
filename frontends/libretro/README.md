@@ -8,7 +8,7 @@ cargo build
 
 ### Cross-compiling
 
-#### Arm64
+#### Arm64 Linux
 
 Download the linux toolchain from [https://developer.arm.com/downloads/-/gnu-a](https://developer.arm.com/downloads/-/gnu-a).
 
@@ -27,9 +27,13 @@ mklink /D aarch64-linux-gnu %ARM64_TOOLCHAIN%
 New-Item -ItemType SymbolicLink -Path aarch64-linux-gnu -Target $env:ARM64_TOOLCHAIN
 ```
 
+To install the Rust targets for Arm64 Linux using rustup run:
+
 ```bash
 rustup target add aarch64-unknown-linux-gnu
 ```
+
+Then you're ready to build Boytacean's libretro core:
 
 ```bash
 cargo build --target=aarch64-unknown-linux-gnu --release
