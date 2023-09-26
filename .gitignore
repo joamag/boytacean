@@ -6,6 +6,7 @@ Cargo.lock
 
 /ndk
 /target
+/aarch64-linux-gnu
 /res/roms.prop
 /frontends/*/target
 /frontends/*/ndk

@@ -6,7 +6,36 @@
 cargo build
 ```
 
-### Android
+### Cross-compiling
+
+#### Arm64
+
+Download the linux toolchain from [https://developer.arm.com/downloads/-/gnu-a](https://developer.arm.com/downloads/-/gnu-a).
+
+Set the env variable `ARM64_TOOLCHAIN` to the path of the toolchain directory.
+
+Create a toolchain synbolic link using the following command in Unix:
+
+```bash
+ln -s $ARM64_TOOLCHAIN aarch64-linux-gnu
+```
+
+... and the following command in Windows (cmd vs powershell):
+
+```bash
+mklink /D aarch64-linux-gnu %ARM64_TOOLCHAIN%
+New-Item -ItemType SymbolicLink -Path aarch64-linux-gnu -Target $env:ARM64_TOOLCHAIN
+```
+
+```bash
+rustup target add aarch64-unknown-linux-gnu
+```
+
+```bash
+cargo build --target=aarch64-unknown-linux-gnu --release
+```
+
+#### Android
 
 Configure `NDK_HOME` environment variable to point to your Android NDK directory and then create local toolchain replicas in the root project directory using:
 
