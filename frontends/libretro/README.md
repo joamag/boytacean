@@ -10,7 +10,7 @@ cargo build
 
 #### Arm64
 
-Download the linux toolchain from [https://developer.arm.com/downloads/-/gnu-a](https://developer.arm.com/downloads/-/gnu-a).
+Download the linux toolchain from [Arm GNU Toolchain Downloads](https://developer.arm.com/downloads/-/arm-gnu-toolchain-downloads).
 
 Set the env variable `ARM64_TOOLCHAIN` to the path of the toolchain directory.
 
