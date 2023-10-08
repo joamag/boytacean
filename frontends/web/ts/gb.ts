@@ -1,3 +1,4 @@
+import { loadAsync } from "jszip";
 import {
     AudioSpecs,
     base64ToBuffer,
@@ -594,7 +595,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     }
 
     get romExts(): string[] {
-        return ["gb", "gbc"];
+        return ["gb", "gbc", "zip"];
     }
 
     get pixelFormat(): PixelFormat {
@@ -783,6 +784,19 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         const keyCode = KEYS_NAME[key];
         if (keyCode === undefined) return;
         this.gameBoy?.key_lift(keyCode);
+    }
+
+    async buildRomData(file: File): Promise<Uint8Array> {
+        const arrayBuffer = await file.arrayBuffer();
+        let romData = new Uint8Array(arrayBuffer);
+
+        if (file.name.endsWith(".zip")) {
+            const zip = await loadAsync(romData);
+            const firstFile = Object.values(zip.files)[0];
+            romData = await firstFile.async("uint8array");
+        }
+
+        return romData;
     }
 
     serializeState(): Uint8Array {
