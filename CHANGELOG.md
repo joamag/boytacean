@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 * Support for Zip file in Web frontend
+* Support for raw frame buffer
+* Lazy evaluation of frame_buffer (on-demand) for DMG
 
 ### Changed
 

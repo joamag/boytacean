@@ -430,7 +430,7 @@ impl Serialize for BosImageBuffer {
 
 impl State for BosImageBuffer {
     fn from_gb(gb: &mut GameBoy) -> Result<Self, String> {
-        Ok(Self::new(*gb.ppu_i().frame_buffer))
+        Ok(Self::new(gb.ppu_i().frame_buffer_raw()))
     }
 
     fn to_gb(&self, _gb: &mut GameBoy) -> Result<(), String> {

@@ -589,6 +589,10 @@ impl GameBoy {
         self.frame_buffer().to_vec()
     }
 
+    pub fn frame_buffer_raw_eager(&mut self) -> Vec<u8> {
+        self.frame_buffer_raw().to_vec()
+    }
+
     pub fn audio_buffer_eager(&mut self, clear: bool) -> Vec<u8> {
         let buffer = Vec::from(self.audio_buffer().clone());
         if clear {
@@ -962,7 +966,7 @@ impl GameBoy {
     }
 
     pub fn frame_buffer(&mut self) -> &[u8; FRAME_BUFFER_SIZE] {
-        &(self.ppu().frame_buffer)
+        self.ppu().frame_buffer()
     }
 
     pub fn frame_buffer_xrgb8888(&mut self) -> [u8; FRAME_BUFFER_XRGB8888_SIZE] {
@@ -987,6 +991,10 @@ impl GameBoy {
 
     pub fn frame_buffer_rgb565_u16(&mut self) -> [u16; FRAME_BUFFER_SIZE] {
         self.ppu().frame_buffer_rgb565_u16()
+    }
+
+    pub fn frame_buffer_raw(&mut self) -> [u8; FRAME_BUFFER_SIZE] {
+        self.ppu().frame_buffer_raw()
     }
 
     pub fn audio_buffer(&mut self) -> &VecDeque<u8> {
