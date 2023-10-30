@@ -966,7 +966,7 @@ impl GameBoy {
     }
 
     pub fn frame_buffer(&mut self) -> &[u8; FRAME_BUFFER_SIZE] {
-        &(self.ppu().frame_buffer)
+        &(self.ppu().frame_buffer())
     }
 
     pub fn frame_buffer_xrgb8888(&mut self) -> [u8; FRAME_BUFFER_XRGB8888_SIZE] {

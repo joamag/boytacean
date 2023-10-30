@@ -331,9 +331,12 @@ pub struct Ppu {
     /// tone value (0 to 3) for all the pixels in the screen (DMG only).
     pub shade_buffer: Box<[u8; SHADE_BUFFER_SIZE]>,
 
-    /// The 8 bit based RGB frame buffer with the
-    /// processed set of pixels ready to be displayed on screen.
-    pub frame_buffer: Box<[u8; FRAME_BUFFER_SIZE]>,
+    /// The 8 bit based RGB frame buffer with the processed
+    /// set of pixels ready to be displayed on screen.
+    /// This value may be lazy computed in case the DMG mode
+    /// is in use, the lazy evaluation is controlled by
+    /// the `frame_buffer_index` value.
+    frame_buffer: Box<[u8; FRAME_BUFFER_SIZE]>,
 
     /// The buffer that will control the background to OAM
     /// priority, allowing the background to be drawn over
@@ -511,6 +514,11 @@ pub struct Ppu {
     /// the identifier wraps on the u16 edges.
     frame_index: u16,
 
+    // Index of the last frame that was rendered, this value is used
+    // to control the delayed rendering of the frame buffer and should
+    // avoid some resource usage
+    frame_buffer_index: u16,
+
     stat_hblank: bool,
     stat_vblank: bool,
     stat_oam: bool,
@@ -597,6 +605,7 @@ impl Ppu {
             palette_address_obj: 0x0,
             first_frame: false,
             frame_index: 0,
+            frame_buffer_index: std::u16::MAX,
             stat_hblank: false,
             stat_vblank: false,
             stat_oam: false,
@@ -651,6 +660,7 @@ impl Ppu {
         self.palette_address_obj = 0x0;
         self.first_frame = false;
         self.frame_index = 0;
+        self.frame_buffer_index = std::u16::MAX;
         self.stat_hblank = false;
         self.stat_vblank = false;
         self.stat_oam = false;
@@ -949,13 +959,37 @@ impl Ppu {
         }
     }
 
-    pub fn frame_buffer_xrgb8888(&self) -> [u8; FRAME_BUFFER_XRGB8888_SIZE] {
+    pub fn frame_buffer(&mut self) -> &[u8; FRAME_BUFFER_SIZE] {
+        if self.gb_mode != GameBoyMode::Dmg {
+            return &self.frame_buffer;
+        }
+
+        if self.frame_index == self.frame_buffer_index {
+            return &self.frame_buffer;
+        }
+
+        let mut frame_offset = 0;
+        for shade_index in self.shade_buffer.iter() {
+            let color: &[u8; 3] = &self.palette_colors[*shade_index as usize];
+            self.frame_buffer[frame_offset] = color[0];
+            self.frame_buffer[frame_offset + 1] = color[1];
+            self.frame_buffer[frame_offset + 2] = color[2];
+            frame_offset += RGB_SIZE;
+        }
+
+        self.frame_buffer_index = self.frame_index;
+
+        &self.frame_buffer
+    }
+
+    pub fn frame_buffer_xrgb8888(&mut self) -> [u8; FRAME_BUFFER_XRGB8888_SIZE] {
+        let frame_buffer = self.frame_buffer();
         let mut buffer = [0u8; FRAME_BUFFER_XRGB8888_SIZE];
         for index in 0..DISPLAY_SIZE {
             let (r, g, b) = (
-                self.frame_buffer[index * RGB_SIZE],
-                self.frame_buffer[index * RGB_SIZE + 1],
-                self.frame_buffer[index * RGB_SIZE + 2],
+                frame_buffer[index * RGB_SIZE],
+                frame_buffer[index * RGB_SIZE + 1],
+                frame_buffer[index * RGB_SIZE + 2],
             );
             buffer[index * XRGB8888_SIZE] = b;
             buffer[index * XRGB8888_SIZE + 1] = g;
@@ -965,26 +999,28 @@ impl Ppu {
         buffer
     }
 
-    pub fn frame_buffer_xrgb8888_u32(&self) -> [u32; FRAME_BUFFER_SIZE] {
+    pub fn frame_buffer_xrgb8888_u32(&mut self) -> [u32; FRAME_BUFFER_SIZE] {
+        let frame_buffer = self.frame_buffer();
         let mut buffer = [0u32; FRAME_BUFFER_SIZE];
         for (index, pixel) in buffer.iter_mut().enumerate().take(DISPLAY_SIZE) {
             let (r, g, b) = (
-                self.frame_buffer[index * RGB_SIZE],
-                self.frame_buffer[index * RGB_SIZE + 1],
-                self.frame_buffer[index * RGB_SIZE + 2],
+                frame_buffer[index * RGB_SIZE],
+                frame_buffer[index * RGB_SIZE + 1],
+                frame_buffer[index * RGB_SIZE + 2],
             );
             *pixel = ((r as u32) << 16) | ((g as u32) << 8) | b as u32;
         }
         buffer
     }
 
-    pub fn frame_buffer_rgb1555(&self) -> [u8; FRAME_BUFFER_RGB1555_SIZE] {
+    pub fn frame_buffer_rgb1555(&mut self) -> [u8; FRAME_BUFFER_RGB1555_SIZE] {
+        let frame_buffer = self.frame_buffer();
         let mut buffer = [0u8; FRAME_BUFFER_RGB1555_SIZE];
         for index in 0..DISPLAY_SIZE {
             let (r, g, b) = (
-                self.frame_buffer[index * RGB_SIZE],
-                self.frame_buffer[index * RGB_SIZE + 1],
-                self.frame_buffer[index * RGB_SIZE + 2],
+                frame_buffer[index * RGB_SIZE],
+                frame_buffer[index * RGB_SIZE + 1],
+                frame_buffer[index * RGB_SIZE + 2],
             );
             let rgb1555 = Self::rgb888_to_rgb1555(r, g, b);
             buffer[index * RGB1555_SIZE] = rgb1555[0];
@@ -993,26 +1029,28 @@ impl Ppu {
         buffer
     }
 
-    pub fn frame_buffer_rgb1555_u16(&self) -> [u16; FRAME_BUFFER_SIZE] {
+    pub fn frame_buffer_rgb1555_u16(&mut self) -> [u16; FRAME_BUFFER_SIZE] {
+        let frame_buffer = self.frame_buffer();
         let mut buffer = [0u16; FRAME_BUFFER_SIZE];
         for (index, pixel) in buffer.iter_mut().enumerate().take(DISPLAY_SIZE) {
             let (r, g, b) = (
-                self.frame_buffer[index * RGB_SIZE],
-                self.frame_buffer[index * RGB_SIZE + 1],
-                self.frame_buffer[index * RGB_SIZE + 2],
+                frame_buffer[index * RGB_SIZE],
+                frame_buffer[index * RGB_SIZE + 1],
+                frame_buffer[index * RGB_SIZE + 2],
             );
             *pixel = Self::rgb888_to_rgb1555_u16(r, g, b);
         }
         buffer
     }
 
-    pub fn frame_buffer_rgb565(&self) -> [u8; FRAME_BUFFER_RGB565_SIZE] {
+    pub fn frame_buffer_rgb565(&mut self) -> [u8; FRAME_BUFFER_RGB565_SIZE] {
+        let frame_buffer = self.frame_buffer();
         let mut buffer = [0u8; FRAME_BUFFER_RGB565_SIZE];
         for index in 0..DISPLAY_SIZE {
             let (r, g, b) = (
-                self.frame_buffer[index * RGB_SIZE],
-                self.frame_buffer[index * RGB_SIZE + 1],
-                self.frame_buffer[index * RGB_SIZE + 2],
+                frame_buffer[index * RGB_SIZE],
+                frame_buffer[index * RGB_SIZE + 1],
+                frame_buffer[index * RGB_SIZE + 2],
             );
             let rgb565 = Self::rgb888_to_rgb565(r, g, b);
             buffer[index * RGB565_SIZE] = rgb565[0];
@@ -1021,13 +1059,14 @@ impl Ppu {
         buffer
     }
 
-    pub fn frame_buffer_rgb565_u16(&self) -> [u16; FRAME_BUFFER_SIZE] {
+    pub fn frame_buffer_rgb565_u16(&mut self) -> [u16; FRAME_BUFFER_SIZE] {
+        let frame_buffer = self.frame_buffer();
         let mut buffer = [0u16; FRAME_BUFFER_SIZE];
         for (index, pixel) in buffer.iter_mut().enumerate().take(DISPLAY_SIZE) {
             let (r, g, b) = (
-                self.frame_buffer[index * RGB_SIZE],
-                self.frame_buffer[index * RGB_SIZE + 1],
-                self.frame_buffer[index * RGB_SIZE + 2],
+                frame_buffer[index * RGB_SIZE],
+                frame_buffer[index * RGB_SIZE + 1],
+                frame_buffer[index * RGB_SIZE + 2],
             );
             *pixel = Self::rgb888_to_rgb565_u16(r, g, b);
         }
@@ -1049,12 +1088,13 @@ impl Ppu {
     pub fn frame_buffer_palette(&self, palette_colors: &Palette) -> [u8; FRAME_BUFFER_SIZE] {
         if self.gb_mode == GameBoyMode::Dmg {
             let mut buffer = [0u8; FRAME_BUFFER_SIZE];
-            for (index, shade_index) in self.shade_buffer.iter().enumerate() {
+            let mut frame_offset = 0;
+            for shade_index in self.shade_buffer.iter() {
                 let color: &[u8; 3] = &palette_colors[*shade_index as usize];
-                let frame_offset = index * RGB_SIZE;
                 buffer[frame_offset] = color[0];
                 buffer[frame_offset + 1] = color[1];
                 buffer[frame_offset + 2] = color[2];
+                frame_offset += RGB_SIZE;
             }
             buffer
         } else {
@@ -1201,20 +1241,17 @@ impl Ppu {
     /// Fills the frame buffer with pixels of the provided color,
     /// this method should represent the fastest way of achieving
     /// the fill background with color operation.
-    pub fn fill_frame_buffer(&mut self, color: Pixel) {
-        self.color_buffer.fill(0);
-        self.shade_buffer.fill(0);
-        for index in (0..self.frame_buffer.len()).step_by(RGB_SIZE) {
-            self.frame_buffer[index] = color[0];
-            self.frame_buffer[index + 1] = color[1];
-            self.frame_buffer[index + 2] = color[2];
-        }
+    pub fn fill_frame_buffer(&mut self, shade_index: u8) {
+        self.color_buffer.fill(shade_index);
+        self.shade_buffer.fill(shade_index);
+        //@TODO: maybe act conditionally on DMG
+        self.frame_buffer_index = std::u16::MAX;
     }
 
     /// Clears the current frame buffer, setting the background color
     /// for all the pixels in the frame buffer.
     pub fn clear_frame_buffer(&mut self) {
-        self.fill_frame_buffer(self.palette_colors[0]);
+        self.fill_frame_buffer(0);
     }
 
     /// Prints the tile data information to the stdout, this is
@@ -1484,10 +1521,8 @@ impl Ppu {
         // to draw the background map, note that the initial index is used
         // to skip the drawing of the tiles that are not visible (WX)
         for _ in initial_index..DISPLAY_WIDTH {
-            // obtains the current pixel data from the tile and
-            // re-maps it according to the current palette
+            // obtains the current pixel data from the tile
             let pixel = tile.get_flipped(x, y, xflip, yflip);
-            let color = &palette[pixel as usize];
 
             // updates the pixel in the color buffer, which stores
             // the raw pixel color information (unmapped) and then
@@ -1495,7 +1530,9 @@ impl Ppu {
             self.color_buffer[color_offset] = pixel;
             self.shade_buffer[color_offset] = (palette_v >> (pixel * 2)) & 3;
 
-            // set the color pixel in the frame buffer
+            // re-maps the pixel according to the current palette
+            // and sets the color pixel in the frame buffer
+            let color = &palette[pixel as usize];
             self.frame_buffer[frame_offset] = color[0];
             self.frame_buffer[frame_offset + 1] = color[1];
             self.frame_buffer[frame_offset + 2] = color[2];
@@ -1593,10 +1630,6 @@ impl Ppu {
         // which stores Game Boy colors from 0 to 3
         let mut color_offset = self.ly as usize * DISPLAY_WIDTH;
 
-        // calculates the frame buffer offset position assuming the proper
-        // Game Boy screen width and RGB pixel (3 bytes) size
-        let mut frame_offset = self.ly as usize * DISPLAY_WIDTH * RGB_SIZE;
-
         // obtains the current integer value (raw) for the background palette
         // this is going to be used for shade index value computation (DMG only)
         let palette_v = self.palettes[0];
@@ -1610,27 +1643,19 @@ impl Ppu {
         // allows us to position the background map properly in the display
         let initial_index = max(wx as i16 - 7, 0) as usize;
         color_offset += initial_index;
-        frame_offset += initial_index * RGB_SIZE;
 
         // iterates over all the pixels in the current line of the display
         // to draw the background map, note that the initial index is used
         // to skip the drawing of the tiles that are not visible (WX)
         for _ in initial_index..DISPLAY_WIDTH {
-            // obtains the current pixel data from the tile and
-            // re-maps it according to the current palette
+            // obtains the current pixel data from the tile
             let pixel = tile.get(x, y);
-            let color = &self.palette_bg[pixel as usize];
 
             // updates the pixel in the color buffer, which stores
             // the raw pixel color information (unmapped) and then
             // updates the shade buffer with the shade index
             self.color_buffer[color_offset] = pixel;
             self.shade_buffer[color_offset] = (palette_v >> (pixel * 2)) & 3;
-
-            // set the color pixel in the frame buffer
-            self.frame_buffer[frame_offset] = color[0];
-            self.frame_buffer[frame_offset + 1] = color[1];
-            self.frame_buffer[frame_offset + 2] = color[2];
 
             // increments the current tile X position in drawing
             x += 1;
@@ -1660,10 +1685,6 @@ impl Ppu {
             // increments the color offset by one, representing
             // the drawing of one pixel
             color_offset += 1;
-
-            // increments the offset of the frame buffer by the
-            // size of an RGB pixel (which is 3 bytes)
-            frame_offset += RGB_SIZE;
         }
     }
 
@@ -1843,17 +1864,15 @@ impl Ppu {
                         // to be used in priority calculus
                         index_buffer[x as usize] = obj.x;
 
-                        // obtains the current pixel data from the tile row and
-                        // re-maps it according to the object palette
-                        let color = &palette[pixel as usize];
-
                         // updates the pixel in the color buffer, which stores
                         // the raw pixel color information (unmapped) and then
                         // updates the shade buffer with the shade index
                         self.color_buffer[color_offset as usize] = pixel;
                         self.shade_buffer[color_offset as usize] = (palette_v >> (pixel * 2)) & 3;
 
-                        // sets the color pixel in the frame buffer
+                        // re-maps the pixel according to the object palette
+                        // and then sets the color pixel in the frame buffer
+                        let color = &palette[pixel as usize];
                         self.frame_buffer[frame_offset as usize] = color[0];
                         self.frame_buffer[frame_offset as usize + 1] = color[1];
                         self.frame_buffer[frame_offset as usize + 2] = color[2];
