@@ -1040,20 +1040,33 @@ impl Ppu {
     /// extremely slow operation (in DMG devices) and because of
     /// that should be used carefully.
     pub fn frame_buffer_raw(&self) -> [u8; FRAME_BUFFER_SIZE] {
+        self.frame_buffer_palette(&BASIC_PALETTE)
+    }
+
+    /// Obtains the frame buffer with the colors mapped according
+    /// to the provided palette of colors.
+    /// This method is very slow and only useful for the DMG mode
+    /// which can have its simple colors mapped to palettes.
+    pub fn frame_buffer_palette(&self, palette_colors: &Palette) -> [u8; FRAME_BUFFER_SIZE] {
         if self.gb_mode == GameBoyMode::Dmg {
-            let mut palettes_color: [Palette; 3] = [
+            // creates space for the palettes in color and then computes the
+            // currently set background and object palettes according to provided
+            // parameter of colors
+            let mut palettes_computed: [Palette; 3] = [
                 [[0u8; RGB_SIZE]; PALETTE_SIZE],
                 [[0u8; RGB_SIZE]; PALETTE_SIZE],
                 [[0u8; RGB_SIZE]; PALETTE_SIZE],
             ];
-            for (index, palette_color) in palettes_color.iter_mut().enumerate() {
-                Self::compute_palette(palette_color, &BASIC_PALETTE, self.palettes[index]);
+            for (index, palette_computed) in palettes_computed.iter_mut().enumerate() {
+                Self::compute_palette(palette_computed, &palette_colors, self.palettes[index]);
             }
 
+            // populates the frame buffer with the pixel proper re-mapped to
+            // color values of the palette passed by parameter
             let mut buffer = [0u8; FRAME_BUFFER_SIZE];
             for (index, pixel) in self.color_buffer.iter().enumerate() {
                 let palette_index = self.palette_buffer[index];
-                let palette = palettes_color[palette_index as usize];
+                let palette = palettes_computed[palette_index as usize];
                 let color = palette[*pixel as usize];
 
                 let frame_offset = (index * 3) as usize;
@@ -1724,9 +1737,9 @@ impl Ppu {
             let (palette, palette_index) = if self.gb_mode == GameBoyMode::Cgb {
                 if self.dmg_compat {
                     if obj.palette == 0 {
-                        (&self.palette_obj_0, 1_u8)
+                        (&self.palette_obj_0, 255_u8)
                     } else if obj.palette == 1 {
-                        (&self.palette_obj_1, 2_u8)
+                        (&self.palette_obj_1, 255_u8)
                     } else {
                         panic!("Invalid object palette: {:02x}", obj.palette);
                     }
