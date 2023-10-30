@@ -968,17 +968,15 @@ impl Ppu {
             return &self.frame_buffer;
         }
 
-        let mut frame_offset = 0;
-        for shade_index in self.shade_buffer.iter() {
-            let color: &[u8; 3] = &self.palette_colors[*shade_index as usize];
-            self.frame_buffer[frame_offset] = color[0];
-            self.frame_buffer[frame_offset + 1] = color[1];
-            self.frame_buffer[frame_offset + 2] = color[2];
-            frame_offset += RGB_SIZE;
+        for (index, pixel) in self.frame_buffer.chunks_mut(RGB_SIZE).enumerate() {
+            let shade_index = self.shade_buffer[index];
+            let color = &self.palette_colors[shade_index as usize];
+            pixel[0] = color[0];
+            pixel[1] = color[1];
+            pixel[2] = color[2];
         }
 
         self.frame_buffer_index = self.frame_index;
-
         &self.frame_buffer
     }
 
@@ -1088,13 +1086,12 @@ impl Ppu {
     pub fn frame_buffer_palette(&self, palette_colors: &Palette) -> [u8; FRAME_BUFFER_SIZE] {
         if self.gb_mode == GameBoyMode::Dmg {
             let mut buffer = [0u8; FRAME_BUFFER_SIZE];
-            let mut frame_offset = 0;
-            for shade_index in self.shade_buffer.iter() {
-                let color: &[u8; 3] = &palette_colors[*shade_index as usize];
-                buffer[frame_offset] = color[0];
-                buffer[frame_offset + 1] = color[1];
-                buffer[frame_offset + 2] = color[2];
-                frame_offset += RGB_SIZE;
+            for (index, pixel) in buffer.chunks_mut(RGB_SIZE).enumerate() {
+                let shade_index = self.shade_buffer[index];
+                let color = &palette_colors[shade_index as usize];
+                pixel[0] = color[0];
+                pixel[1] = color[1];
+                pixel[2] = color[2];
             }
             buffer
         } else {
@@ -1241,17 +1238,21 @@ impl Ppu {
     /// Fills the frame buffer with pixels of the provided color,
     /// this method should represent the fastest way of achieving
     /// the fill background with color operation.
-    pub fn fill_frame_buffer(&mut self, shade_index: u8) {
+    pub fn fill_frame_buffer(&mut self, shade_index: u8, color: Pixel) {
         self.color_buffer.fill(shade_index);
         self.shade_buffer.fill(shade_index);
-        //@TODO: maybe act conditionally on DMG
         self.frame_buffer_index = std::u16::MAX;
+        for pixel in self.frame_buffer.chunks_mut(RGB_SIZE) {
+            pixel[0] = color[0];
+            pixel[1] = color[1];
+            pixel[2] = color[2];
+        }
     }
 
     /// Clears the current frame buffer, setting the background color
     /// for all the pixels in the frame buffer.
     pub fn clear_frame_buffer(&mut self) {
-        self.fill_frame_buffer(0);
+        self.fill_frame_buffer(0, self.palette_colors[0]);
     }
 
     /// Prints the tile data information to the stdout, this is
