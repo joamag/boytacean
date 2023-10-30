@@ -1238,7 +1238,8 @@ impl Ppu {
     /// Fills the frame buffer with pixels of the provided color,
     /// this method should represent the fastest way of achieving
     /// the fill background with color operation.
-    pub fn fill_frame_buffer(&mut self, shade_index: u8, color: Pixel) {
+    pub fn fill_frame_buffer(&mut self, shade_index: u8) {
+        let color = &self.palette_colors[shade_index as usize];
         self.color_buffer.fill(shade_index);
         self.shade_buffer.fill(shade_index);
         self.frame_buffer_index = std::u16::MAX;
@@ -1252,7 +1253,7 @@ impl Ppu {
     /// Clears the current frame buffer, setting the background color
     /// for all the pixels in the frame buffer.
     pub fn clear_frame_buffer(&mut self) {
-        self.fill_frame_buffer(0, self.palette_colors[0]);
+        self.fill_frame_buffer(0);
     }
 
     /// Prints the tile data information to the stdout, this is
