@@ -1066,10 +1066,10 @@ impl Ppu {
             let mut buffer = [0u8; FRAME_BUFFER_SIZE];
             for (index, pixel) in self.color_buffer.iter().enumerate() {
                 let palette_index = self.palette_buffer[index];
-                let palette = palettes_computed[palette_index as usize];
-                let color = palette[*pixel as usize];
+                let palette = &palettes_computed[palette_index as usize];
+                let color = &palette[*pixel as usize];
 
-                let frame_offset = (index * 3) as usize;
+                let frame_offset = index * RGB_SIZE;
                 buffer[frame_offset] = color[0];
                 buffer[frame_offset + 1] = color[1];
                 buffer[frame_offset + 2] = color[2];
@@ -1374,10 +1374,10 @@ impl Ppu {
             self.render_map_dmg(self.bg_map, self.scx, self.scy, 0, 0, self.ly);
         }
         if self.switch_bg && self.switch_window {
-            self.render_map_dmg(self.window_map, 0, 0, self.wx, self.wy, self.window_counter);
+            //self.render_map_dmg(self.window_map, 0, 0, self.wx, self.wy, self.window_counter);
         }
         if self.switch_obj {
-            self.render_objects();
+           // self.render_objects();
         }
     }
 
