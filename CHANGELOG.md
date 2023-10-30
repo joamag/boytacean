@@ -17,6 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+*
+
+## [0.9.16] - 2023-10-30
+
+### Fixed
+
 * Bumped emukit version to fix a bug with zip file handling
 
 ## [0.9.15] - 2023-10-30
