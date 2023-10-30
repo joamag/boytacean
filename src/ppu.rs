@@ -61,6 +61,12 @@ pub const DISPLAY_SIZE: usize = DISPLAY_WIDTH * DISPLAY_HEIGHT;
 /// range from 0 to 3.
 pub const COLOR_BUFFER_SIZE: usize = DISPLAY_SIZE;
 
+/// The size of the buffer that will hold the palette
+/// index for each of the pixel in the screen, so that
+/// (together with the color buffer) it is possible to
+/// rebuild the pixel buffer from scratch.
+pub const PALETTE_BUFFER_SIZE: usize = DISPLAY_SIZE;
+
 /// The size of the RGB frame buffer in bytes.
 pub const FRAME_BUFFER_SIZE: usize = DISPLAY_SIZE * RGB_SIZE;
 
@@ -80,6 +86,8 @@ pub const FRAME_BUFFER_RGB565_SIZE: usize = DISPLAY_SIZE * RGB565_SIZE;
 /// custom palettes of the Game Boy.
 pub const PALETTE_COLORS: Palette = [[255, 255, 255], [192, 192, 192], [96, 96, 96], [0, 0, 0]];
 
+/// Default tile data to be used in the DMG compatibility
+/// mode of tile processing (avoids algorithmic forking).
 pub const DEFAULT_TILE_ATTR: TileData = TileData {
     palette: 0,
     vram_bank: 0,
@@ -87,6 +95,15 @@ pub const DEFAULT_TILE_ATTR: TileData = TileData {
     yflip: false,
     priority: false,
 };
+
+/// A basic palette for DMG with the typical high contrast
+/// color characteristic of the Game Boy.
+pub const BASIC_PALETTE: Palette = [
+    [0xff, 0xff, 0xff],
+    [0xc0, 0xc0, 0xc0],
+    [0x60, 0x60, 0x60],
+    [0x00, 0x00, 0x00],
+];
 
 /// Defines the Game Boy pixel type as a buffer
 /// with the size of RGB (3 bytes).
@@ -311,6 +328,10 @@ pub struct Ppu {
     /// (from 0 to 3) for all the pixels in the screen.
     pub color_buffer: Box<[u8; COLOR_BUFFER_SIZE]>,
 
+    /// The palette buffer that is going to store the palette
+    /// index for all the pixels in the screen.
+    pub palette_buffer: Box<[u8; PALETTE_BUFFER_SIZE]>,
+
     /// The 8 bit based RGB frame buffer with the
     /// processed set of pixels ready to be displayed on screen.
     pub frame_buffer: Box<[u8; FRAME_BUFFER_SIZE]>,
@@ -533,6 +554,7 @@ impl Ppu {
     pub fn new(mode: GameBoyMode, gbc: Rc<RefCell<GameBoyConfig>>) -> Self {
         Self {
             color_buffer: Box::new([0u8; COLOR_BUFFER_SIZE]),
+            palette_buffer: Box::new([0u8; COLOR_BUFFER_SIZE]),
             frame_buffer: Box::new([0u8; FRAME_BUFFER_SIZE]),
             priority_buffer: Box::new([false; COLOR_BUFFER_SIZE]),
             vram: [0u8; VRAM_SIZE],
@@ -590,6 +612,7 @@ impl Ppu {
 
     pub fn reset(&mut self) {
         self.color_buffer = Box::new([0u8; COLOR_BUFFER_SIZE]);
+        self.palette_buffer = Box::new([0u8; PALETTE_BUFFER_SIZE]);
         self.frame_buffer = Box::new([0u8; FRAME_BUFFER_SIZE]);
         self.priority_buffer = Box::new([false; COLOR_BUFFER_SIZE]);
         self.vram = [0u8; VRAM_SIZE_CGB];
@@ -1012,6 +1035,38 @@ impl Ppu {
         buffer
     }
 
+    /// Obtains the "raw" version of the frame buffer any custom
+    /// color palette operation applied to it. This is can be an
+    /// extremely slow operation (in DMG devices) and because of
+    /// that should be used carefully.
+    pub fn frame_buffer_raw(&self) -> [u8; FRAME_BUFFER_SIZE] {
+        if self.gb_mode == GameBoyMode::Dmg {
+            let mut palettes_color: [Palette; 3] = [
+                [[0u8; RGB_SIZE]; PALETTE_SIZE],
+                [[0u8; RGB_SIZE]; PALETTE_SIZE],
+                [[0u8; RGB_SIZE]; PALETTE_SIZE],
+            ];
+            for (index, palette_color) in palettes_color.iter_mut().enumerate() {
+                Self::compute_palette(palette_color, &BASIC_PALETTE, self.palettes[index]);
+            }
+
+            let mut buffer = [0u8; FRAME_BUFFER_SIZE];
+            for (index, pixel) in self.color_buffer.iter().enumerate() {
+                let palette_index = self.palette_buffer[index];
+                let palette = palettes_color[palette_index as usize];
+                let color = palette[*pixel as usize];
+
+                let frame_offset = (index * 3) as usize;
+                buffer[frame_offset] = color[0];
+                buffer[frame_offset + 1] = color[1];
+                buffer[frame_offset + 2] = color[2];
+            }
+            buffer
+        } else {
+            *self.frame_buffer.clone()
+        }
+    }
+
     pub fn vram(&self) -> &[u8; VRAM_SIZE] {
         &self.vram
     }
@@ -1149,10 +1204,11 @@ impl Ppu {
     }
 
     /// Fills the frame buffer with pixels of the provided color,
-    /// this method must represent the fastest way of achieving
+    /// this method should represent the fastest way of achieving
     /// the fill background with color operation.
     pub fn fill_frame_buffer(&mut self, color: Pixel) {
         self.color_buffer.fill(0);
+        self.palette_buffer.fill(0);
         for index in (0..self.frame_buffer.len()).step_by(RGB_SIZE) {
             self.frame_buffer[index] = color[0];
             self.frame_buffer[index + 1] = color[1];
@@ -1435,8 +1491,10 @@ impl Ppu {
             let color = &palette[pixel as usize];
 
             // updates the pixel in the color buffer, which stores
-            // the raw pixel color information (unmapped)
+            // the raw pixel color information (unmapped) and then
+            // updates the palette buffer with the palette index
             self.color_buffer[color_offset] = pixel;
+            self.palette_buffer[color_offset] = 0;
 
             // set the color pixel in the frame buffer
             self.frame_buffer[frame_offset] = color[0];
@@ -1561,8 +1619,10 @@ impl Ppu {
             let color = &self.palette_bg[pixel as usize];
 
             // updates the pixel in the color buffer, which stores
-            // the raw pixel color information (unmapped)
+            // the raw pixel color information (unmapped) and then
+            // updates the palette buffer with the palette index
             self.color_buffer[color_offset] = pixel;
+            self.palette_buffer[color_offset] = 0;
 
             // set the color pixel in the frame buffer
             self.frame_buffer[frame_offset] = color[0];
@@ -1661,22 +1721,22 @@ impl Ppu {
                 continue;
             }
 
-            let palette = if self.gb_mode == GameBoyMode::Cgb {
+            let (palette, palette_index) = if self.gb_mode == GameBoyMode::Cgb {
                 if self.dmg_compat {
                     if obj.palette == 0 {
-                        &self.palette_obj_0
+                        (&self.palette_obj_0, 1_u8)
                     } else if obj.palette == 1 {
-                        &self.palette_obj_1
+                        (&self.palette_obj_1, 2_u8)
                     } else {
                         panic!("Invalid object palette: {:02x}", obj.palette);
                     }
                 } else {
-                    &self.palettes_color_obj[obj.palette_cgb as usize]
+                    (&self.palettes_color_obj[obj.palette_cgb as usize], 255_u8)
                 }
             } else if obj.palette == 0 {
-                &self.palette_obj_0
+                (&self.palette_obj_0, 1_u8)
             } else if obj.palette == 1 {
-                &self.palette_obj_1
+                (&self.palette_obj_1, 2_u8)
             } else {
                 panic!("Invalid object palette: {:02x}", obj.palette);
             };
@@ -1781,8 +1841,10 @@ impl Ppu {
                         let color = palette[pixel as usize];
 
                         // updates the pixel in the color buffer, which stores
-                        // the raw pixel color information (unmapped)
+                        // the raw pixel color information (unmapped) and then
+                        // updates the palette buffer with the palette index
                         self.color_buffer[color_offset as usize] = pixel;
+                        self.palette_buffer[color_offset as usize] = palette_index;
 
                         // sets the color pixel in the frame buffer
                         self.frame_buffer[frame_offset as usize] = color[0];
