@@ -9,9 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-* Support for Zip file in Web frontend
-* Support for raw frame buffer
-* Lazy evaluation of frame_buffer (on-demand) for DMG
+*
 
 ### Changed
 
@@ -20,6 +18,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 *
+
+## [0.9.15] - 2023-10-30
+
+### Added
+
+* Support for ROM in zip files (Web frontend)
+* Support for raw frame buffer
+* Lazy evaluation of frame_buffer (on-demand) for DMG
 
 ## [0.9.14] - 2023-08-24
 
