@@ -57,7 +57,7 @@ pub const DISPLAY_HEIGHT: usize = 144;
 pub const DISPLAY_SIZE: usize = DISPLAY_WIDTH * DISPLAY_HEIGHT;
 
 /// The size to be used by the buffer of color ids
-/// for the Game Boy screen the values there should
+/// for the Game Boy screen, the values there should
 /// range from 0 to 3.
 pub const COLOR_BUFFER_SIZE: usize = DISPLAY_SIZE;
 
