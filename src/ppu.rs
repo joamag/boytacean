@@ -1240,7 +1240,7 @@ impl Ppu {
     /// the fill background with color operation.
     pub fn fill_frame_buffer(&mut self, shade_index: u8) {
         let color = &self.palette_colors[shade_index as usize];
-        self.color_buffer.fill(shade_index);
+        self.color_buffer.fill(0);
         self.shade_buffer.fill(shade_index);
         self.frame_buffer_index = std::u16::MAX;
         for pixel in self.frame_buffer.chunks_mut(RGB_SIZE) {
