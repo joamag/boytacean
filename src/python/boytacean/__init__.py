@@ -4,10 +4,11 @@ from .boytacean import DISPLAY_WIDTH, DISPLAY_HEIGHT, GameBoy as GameBoyRust
 
 
 class GameBoy:
-    def __init__(self, apu_enabled=True):
+    def __init__(self, apu_enabled=True, serial_enabled=True):
         super().__init__()
         self._system = GameBoyRust()
         self._system.set_apu_enabled(apu_enabled)
+        self._system.set_serial_enabled(serial_enabled)
 
     def load(self):
         self._system.load()
@@ -43,3 +44,10 @@ class GameBoy:
 
     def set_apu_enabled(self, value: bool):
         self._system.set_apu_enabled(value)
+
+    @property
+    def serial_enabled(self) -> bool:
+        return self._system.serial_enabled()
+
+    def set_serial_enabled(self, value: bool):
+        self._system.set_serial_enabled(value)

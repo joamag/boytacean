@@ -59,6 +59,14 @@ impl GameBoy {
     pub fn set_apu_enabled(&mut self, value: bool) {
         self.system.set_apu_enabled(value);
     }
+
+    pub fn serial_enabled(&self) -> bool {
+        self.system.serial_enabled()
+    }
+
+    pub fn set_serial_enabled(&mut self, value: bool) {
+        self.system.set_serial_enabled(value);
+    }
 }
 
 #[pymodule]

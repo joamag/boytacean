@@ -3,7 +3,7 @@ from boytacean import GameBoy
 
 FRAME_COUNT = 12000
 
-gb = GameBoy(apu_enabled=False)
+gb = GameBoy(apu_enabled=False, serial_enabled=False)
 gb.load()
 gb.load_rom("../../res/roms/demo/pocket.gb")
 start = time()
