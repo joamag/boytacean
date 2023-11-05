@@ -36,6 +36,10 @@ impl GameBoy {
         self.system.clock_m(count)
     }
 
+    pub fn clocks(&mut self, count: usize) -> u64 {
+        self.system.clocks(count)
+    }
+
     pub fn frame_buffer(&mut self, py: Python) -> PyObject {
         let pybytes = PyBytes::new(py, self.system.frame_buffer());
         pybytes.into()

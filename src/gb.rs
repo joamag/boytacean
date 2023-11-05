@@ -479,6 +479,14 @@ impl GameBoy {
         cycles
     }
 
+    pub fn clocks(&mut self, count: usize) -> u64 {
+        let mut cycles = 0_u64;
+        for _ in 0..count {
+            cycles += self.clock() as u64;
+        }
+        cycles
+    }
+
     pub fn key_press(&mut self, key: PadKey) {
         self.pad().key_press(key);
     }

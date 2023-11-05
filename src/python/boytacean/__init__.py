@@ -20,6 +20,9 @@ class GameBoy:
     def clock_m(self, count: int) -> int:
         return self._system.clock_m(count)
 
+    def clocks(self, count: int) -> int:
+        return self._system.clocks(count)
+
     def frame_buffer(self):
         return self._system.frame_buffer()
 
