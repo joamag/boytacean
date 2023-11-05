@@ -1,6 +1,6 @@
 from PIL import Image
 
-from .boytacean import GameBoy as GameBoyRust
+from .boytacean import DISPLAY_WIDTH, DISPLAY_HEIGHT, GameBoy as GameBoyRust
 
 
 class GameBoy:
@@ -26,7 +26,9 @@ class GameBoy:
     def frame_buffer(self):
         return self._system.frame_buffer()
 
-    def save_image(self, filename: str):
+    def save_image(self, filename: str, format: str = "PNG"):
         frame_buffer = self._system.frame_buffer()
-        image = Image.frombytes("RGB", (160, 144), frame_buffer, "raw")
-        image.save(filename, "PNG")
+        image = Image.frombytes(
+            "RGB", (DISPLAY_WIDTH, DISPLAY_HEIGHT), frame_buffer, "raw"
+        )
+        image.save(filename, format=format)

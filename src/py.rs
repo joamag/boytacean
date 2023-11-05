@@ -1,6 +1,9 @@
 use pyo3::{prelude::*, types::PyBytes};
 
-use crate::{gb::GameBoy as GameBoyBase, ppu::FRAME_BUFFER_SIZE};
+use crate::{
+    gb::GameBoy as GameBoyBase,
+    ppu::{DISPLAY_HEIGHT, DISPLAY_WIDTH},
+};
 
 #[pyclass]
 struct GameBoy {
@@ -49,5 +52,7 @@ impl GameBoy {
 #[pymodule]
 fn boytacean(_py: Python, module: &PyModule) -> PyResult<()> {
     module.add_class::<GameBoy>()?;
+    module.add("DISPLAY_WIDTH", DISPLAY_WIDTH)?;
+    module.add("DISPLAY_HEIGHT", DISPLAY_HEIGHT)?;
     Ok(())
 }
