@@ -1,11 +1,15 @@
 from time import time
 from boytacean import GameBoy
 
-gb = GameBoy()
+FRAME_COUNT = 12000
+
+gb = GameBoy(apu_enabled=False)
 gb.load()
 gb.load_rom("../../res/roms/demo/pocket.gb")
 start = time()
-for _ in range(6000):
+for _ in range(FRAME_COUNT):
     gb.next_frame()
-print(f"Time taken: {(time() - start)}")
+total = time() - start
+print(f"Time taken: {total} seconds")
+print(f"Speedup: {FRAME_COUNT / total / 60}x")
 gb.save_image("pocket.png")

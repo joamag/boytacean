@@ -51,6 +51,14 @@ impl GameBoy {
         let pybytes = PyBytes::new(py, self.system.frame_buffer());
         pybytes.into()
     }
+
+    pub fn apu_enabled(&self) -> bool {
+        self.system.apu_enabled()
+    }
+
+    pub fn set_apu_enabled(&mut self, value: bool) {
+        self.system.set_apu_enabled(value);
+    }
 }
 
 #[pymodule]
