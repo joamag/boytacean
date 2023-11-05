@@ -487,6 +487,18 @@ impl GameBoy {
         cycles
     }
 
+    pub fn next_frame(&mut self) -> u32 {
+        let mut cycles = 0u32;
+        let current_frame = self.ppu_frame();
+        loop {
+            cycles += self.clock() as u32;
+            if self.ppu_frame() != current_frame {
+                break;
+            }
+        }
+        cycles
+    }
+
     pub fn key_press(&mut self, key: PadKey) {
         self.pad().key_press(key);
     }

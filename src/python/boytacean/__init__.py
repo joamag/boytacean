@@ -23,6 +23,9 @@ class GameBoy:
     def clocks(self, count: int) -> int:
         return self._system.clocks(count)
 
+    def next_frame(self) -> int:
+        return self._system.next_frame()
+
     def frame_buffer(self):
         return self._system.frame_buffer()
 
