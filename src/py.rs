@@ -1,25 +1,49 @@
-use pyo3::prelude::*;
+use pyo3::{prelude::*, types::PyBytes};
+
+use crate::{gb::GameBoy as GameBoyBase, ppu::FRAME_BUFFER_SIZE};
 
 #[pyclass]
-struct Boytacean {
-    #[pyo3(get, set)]
-    value: i32,
+struct GameBoy {
+    system: GameBoyBase,
 }
 
 #[pymethods]
-impl Boytacean {
+impl GameBoy {
     #[new]
-    fn new(value: i32) -> Self {
-        Self { value }
+    fn new() -> Self {
+        Self {
+            system: GameBoyBase::new(None),
+        }
     }
 
-    pub fn add(&mut self, other: i32) {
-        self.value += other;
+    pub fn reset(&mut self) {
+        self.system.reset();
+    }
+
+    pub fn load(&mut self) {
+        self.system.load(true);
+    }
+
+    pub fn load_rom(&mut self, path: &str) {
+        self.system.load_rom_file(path, None);
+    }
+
+    pub fn clock(&mut self) -> u16 {
+        self.system.clock()
+    }
+
+    pub fn clock_m(&mut self, count: usize) -> u16 {
+        self.system.clock_m(count)
+    }
+
+    pub fn frame_buffer(&mut self, py: Python) -> PyObject {
+        let pybytes = PyBytes::new(py, self.system.frame_buffer());
+        pybytes.into()
     }
 }
 
 #[pymodule]
 fn boytacean(_py: Python, module: &PyModule) -> PyResult<()> {
-    module.add_class::<Boytacean>()?;
+    module.add_class::<GameBoy>()?;
     Ok(())
 }

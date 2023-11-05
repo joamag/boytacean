@@ -3,11 +3,10 @@
 use core::fmt;
 use std::{
     borrow::BorrowMut,
-    cell::RefCell,
     cmp::max,
     convert::TryInto,
     fmt::{Display, Formatter},
-    rc::Rc,
+    sync::{Arc, Mutex},
 };
 
 use crate::{
@@ -545,7 +544,7 @@ pub struct Ppu {
     /// The pointer to the parent configuration of the running
     /// Game Boy emulator, that can be used to control the behaviour
     /// of Game Boy emulation.
-    gbc: Rc<RefCell<GameBoyConfig>>,
+    gbc: Arc<Mutex<GameBoyConfig>>,
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
@@ -558,7 +557,7 @@ pub enum PpuMode {
 }
 
 impl Ppu {
-    pub fn new(mode: GameBoyMode, gbc: Rc<RefCell<GameBoyConfig>>) -> Self {
+    pub fn new(mode: GameBoyMode, gbc: Arc<Mutex<GameBoyConfig>>) -> Self {
         Self {
             color_buffer: Box::new([0u8; COLOR_BUFFER_SIZE]),
             shade_buffer: Box::new([0u8; COLOR_BUFFER_SIZE]),
@@ -1231,7 +1230,7 @@ impl Ppu {
         self.gb_mode = value;
     }
 
-    pub fn set_gbc(&mut self, value: Rc<RefCell<GameBoyConfig>>) {
+    pub fn set_gbc(&mut self, value: Arc<Mutex<GameBoyConfig>>) {
         self.gbc = value;
     }
 
@@ -2057,7 +2056,7 @@ impl Default for Ppu {
     fn default() -> Self {
         Self::new(
             GameBoyMode::Dmg,
-            Rc::new(RefCell::new(GameBoyConfig::default())),
+            Arc::new(Mutex::new(GameBoyConfig::default())),
         )
     }
 }

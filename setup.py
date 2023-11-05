@@ -17,9 +17,7 @@ try:
 except ImportError:
     import subprocess
 
-    errno = subprocess.call(
-        [sys.executable, "-m", "pip", "install", "setuptools-rust"]
-    )
+    errno = subprocess.call([sys.executable, "-m", "pip", "install", "setuptools-rust"])
     if errno:
         print("Please install setuptools-rust package")
         raise SystemExit(errno)
@@ -36,9 +34,7 @@ setuptools.setup(
     keywords="gameboy emulator rust",
     url="https://boytacean.joao.me",
     packages=["boytacean"],
-    package_dir = {
-        "" : os.path.normpath("src/python")
-    },
+    package_dir={"": os.path.normpath("src/python")},
     rust_extensions=[
         setuptools_rust.RustExtension(
             "boytacean.boytacean",
