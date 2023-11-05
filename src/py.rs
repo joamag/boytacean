@@ -52,12 +52,36 @@ impl GameBoy {
         pybytes.into()
     }
 
+    pub fn ppu_enabled(&self) -> bool {
+        self.system.ppu_enabled()
+    }
+
+    pub fn set_ppu_enabled(&mut self, value: bool) {
+        self.system.set_ppu_enabled(value);
+    }
+
     pub fn apu_enabled(&self) -> bool {
         self.system.apu_enabled()
     }
 
     pub fn set_apu_enabled(&mut self, value: bool) {
         self.system.set_apu_enabled(value);
+    }
+
+    pub fn dma_enabled(&self) -> bool {
+        self.system.dma_enabled()
+    }
+
+    pub fn set_dma_enabled(&mut self, value: bool) {
+        self.system.set_dma_enabled(value);
+    }
+
+    pub fn timer_enabled(&self) -> bool {
+        self.system.timer_enabled()
+    }
+
+    pub fn set_timer_enabled(&mut self, value: bool) {
+        self.system.set_timer_enabled(value);
     }
 
     pub fn serial_enabled(&self) -> bool {
@@ -74,5 +98,6 @@ fn boytacean(_py: Python, module: &PyModule) -> PyResult<()> {
     module.add_class::<GameBoy>()?;
     module.add("DISPLAY_WIDTH", DISPLAY_WIDTH)?;
     module.add("DISPLAY_HEIGHT", DISPLAY_HEIGHT)?;
+    module.add("CPU_FREQ", GameBoyBase::CPU_FREQ)?;
     Ok(())
 }
