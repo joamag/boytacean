@@ -2,7 +2,8 @@ use pyo3::{prelude::*, types::PyBytes};
 
 use crate::{
     gb::{GameBoy as GameBoyBase, GameBoyMode},
-    ppu::{DISPLAY_HEIGHT, DISPLAY_WIDTH}, info::Info,
+    info::Info,
+    ppu::{DISPLAY_HEIGHT, DISPLAY_WIDTH},
 };
 
 #[pyclass]
