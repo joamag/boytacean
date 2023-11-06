@@ -2,7 +2,7 @@ use pyo3::{prelude::*, types::PyBytes};
 
 use crate::{
     gb::{GameBoy as GameBoyBase, GameBoyMode},
-    ppu::{DISPLAY_HEIGHT, DISPLAY_WIDTH},
+    ppu::{DISPLAY_HEIGHT, DISPLAY_WIDTH}, info::Info,
 };
 
 #[pyclass]
@@ -94,6 +94,14 @@ impl GameBoy {
 
     pub fn set_serial_enabled(&mut self, value: bool) {
         self.system.set_serial_enabled(value);
+    }
+
+    pub fn version(&self) -> String {
+        Info::version()
+    }
+
+    pub fn clock_freq_s(&self) -> String {
+        self.system.clock_freq_s()
     }
 }
 

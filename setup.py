@@ -43,7 +43,7 @@ setuptools.setup(
         )
     ],
     install_requires=[],
-    setup_requires=["setuptools-rust", "wheel"],
+    setup_requires=["setuptools-rust", "wheel", "pillow"],
     include_package_data=True,
     zip_safe=False,
     classifiers=[
