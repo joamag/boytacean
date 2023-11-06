@@ -4,7 +4,6 @@ from boytacean import GameBoy, CPU_FREQ
 CLOCK_COUNT = 100000000
 
 gb = GameBoy(apu_enabled=False, serial_enabled=False)
-gb.load()
 gb.load_rom("../../res/roms/demo/pocket.gb")
 start = time()
 cycles = gb.clocks(CLOCK_COUNT)

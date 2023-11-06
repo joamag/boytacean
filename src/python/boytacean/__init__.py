@@ -1,24 +1,35 @@
+from enum import Enum
 from PIL.Image import Image, frombytes
 
 from .boytacean import DISPLAY_WIDTH, DISPLAY_HEIGHT, CPU_FREQ, GameBoy as GameBoyRust
 
 
+class GameBoyMode(Enum):
+    DMG = 1
+    CGB = 2
+    SGB = 3
+
+
 class GameBoy:
     def __init__(
         self,
+        mode=GameBoyMode.DMG,
         ppu_enabled=True,
         apu_enabled=True,
         dma_enabled=True,
         timer_enabled=True,
         serial_enabled=True,
+        load=True,
     ):
         super().__init__()
-        self._system = GameBoyRust()
+        self._system = GameBoyRust(mode.value)
         self._system.set_ppu_enabled(ppu_enabled)
         self._system.set_apu_enabled(apu_enabled)
         self._system.set_dma_enabled(dma_enabled)
         self._system.set_timer_enabled(timer_enabled)
         self._system.set_serial_enabled(serial_enabled)
+        if load:
+            self.load()
 
     def load(self):
         self._system.load()

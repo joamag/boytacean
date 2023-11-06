@@ -1,7 +1,7 @@
 use pyo3::{prelude::*, types::PyBytes};
 
 use crate::{
-    gb::GameBoy as GameBoyBase,
+    gb::{GameBoy as GameBoyBase, GameBoyMode},
     ppu::{DISPLAY_HEIGHT, DISPLAY_WIDTH},
 };
 
@@ -13,9 +13,9 @@ struct GameBoy {
 #[pymethods]
 impl GameBoy {
     #[new]
-    fn new() -> Self {
+    fn new(mode: u8) -> Self {
         Self {
-            system: GameBoyBase::new(None),
+            system: GameBoyBase::new(Some(GameBoyMode::from_u8(mode))),
         }
     }
 
