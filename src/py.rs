@@ -27,7 +27,11 @@ impl GameBoy {
         self.system.load(true);
     }
 
-    pub fn load_rom(&mut self, path: &str) {
+    pub fn load_rom(&mut self, data: &[u8]) {
+        self.system.load_rom(data, None);
+    }
+
+    pub fn load_rom_file(&mut self, path: &str) {
         self.system.load_rom_file(path, None);
     }
 

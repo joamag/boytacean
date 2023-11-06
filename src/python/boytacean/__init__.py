@@ -24,7 +24,10 @@ class GameBoy:
         self._system.load()
 
     def load_rom(self, filename: str):
-        self._system.load_rom(filename)
+        self._system.load_rom_file(filename)
+
+    def load_rom_data(self, data: bytes):
+        self._system.load_rom(data)
 
     def clock(self) -> int:
         return self._system.clock()
