@@ -2,6 +2,8 @@ from enum import Enum
 
 from PIL.Image import Image, frombytes
 
+from .palettes import PALETTES
+
 from .boytacean import DISPLAY_WIDTH, DISPLAY_HEIGHT, CPU_FREQ, GameBoy as GameBoyRust
 
 
@@ -75,6 +77,15 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
     def save_image(self, filename: str, format: str = "PNG"):
         image = self.image()
         image.save(filename, format=format)
+
+    def set_palette(self, name: str):
+        if not name in PALETTES:
+            raise ValueError(f"Unknown palette: {name}")
+        palette = PALETTES[name]
+        self.set_palette_colors(palette)
+
+    def set_palette_colors(self, colors_hex: str):
+        self._system.set_palette_colors(colors_hex)
 
     @property
     def ppu_enabled(self) -> bool:

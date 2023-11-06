@@ -3,7 +3,7 @@ use pyo3::{prelude::*, types::PyBytes};
 use crate::{
     gb::{GameBoy as GameBoyBase, GameBoyMode},
     info::Info,
-    ppu::{DISPLAY_HEIGHT, DISPLAY_WIDTH},
+    ppu::{PaletteInfo, DISPLAY_HEIGHT, DISPLAY_WIDTH},
 };
 
 #[pyclass]
@@ -55,6 +55,11 @@ impl GameBoy {
     pub fn frame_buffer(&mut self, py: Python) -> PyObject {
         let pybytes = PyBytes::new(py, self.system.frame_buffer());
         pybytes.into()
+    }
+
+    pub fn set_palette_colors(&mut self, colors_hex: &str) {
+        let palette = PaletteInfo::from_colors_hex("default", colors_hex);
+        self.system.ppu().set_palette_colors(palette.colors());
     }
 
     pub fn ppu_enabled(&self) -> bool {
