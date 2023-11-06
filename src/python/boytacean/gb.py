@@ -69,7 +69,7 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
     def frame_buffer(self):
         return self._system.frame_buffer()
 
-    def image(self) -> "Image":
+    def image(self) -> Image:
         frame_buffer = self._system.frame_buffer()
         image = frombytes("RGB", (DISPLAY_WIDTH, DISPLAY_HEIGHT), frame_buffer, "raw")
         return image
