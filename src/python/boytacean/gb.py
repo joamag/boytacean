@@ -103,12 +103,12 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
         image = self.image()
         image.save(filename, format=format)
 
-    def video(self, encoder="avc1", display=True) -> Any:
+    def video(self, encoder="avc1", display=True, file_name="output.mp4") -> Any:
         from cv2 import VideoWriter, VideoWriter_fourcc, imread
         from IPython.display import Video, display as _display
 
-        image_paths = glob(f"{self._capture_temp_dir}/*.png")
-        video_path = f"{self._capture_temp_dir}/video.mp4"
+        image_paths = glob(f"{self._capture_temp_dir}/frame_*.png")
+        video_path = f"{self._capture_temp_dir}/{file_name}"
 
         encoder = VideoWriter(
             video_path,
