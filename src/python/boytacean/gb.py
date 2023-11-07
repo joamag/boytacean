@@ -1,4 +1,7 @@
 from enum import Enum
+from os import remove
+from glob import glob
+from contextlib import contextmanager
 
 from PIL.Image import Image, frombytes
 
@@ -14,6 +17,10 @@ class GameBoyMode(Enum):
 
 
 class GameBoy:
+    _frame_index: int = 0
+    _start_frame: int | None
+    _frame_gap: int
+
     def __init__(
         self,
         mode=GameBoyMode.DMG,
@@ -25,6 +32,9 @@ class GameBoy:
         load=True,
     ):
         super().__init__()
+        self._frame_index = 0
+        self._next_frame = None
+        self._frame_gap = 60
         self._system = GameBoyRust(mode.value)
         self._system.set_ppu_enabled(ppu_enabled)
         self._system.set_apu_enabled(apu_enabled)
@@ -64,7 +74,12 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
         return self._system.clocks(count)
 
     def next_frame(self) -> int:
-        return self._system.next_frame()
+        cycles = self._system.next_frame()
+        self._frame_index += 1
+        if self._next_frame != None and self._frame_index >= self._next_frame:
+            self._next_frame = self._next_frame + self._frame_gap
+            self.save_image(f"frame_{self._frame_index}.png")
+        return cycles
 
     def frame_buffer(self):
         return self._system.frame_buffer()
@@ -86,6 +101,37 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
 
     def set_palette_colors(self, colors_hex: str):
         self._system.set_palette_colors(colors_hex)
+
+    @contextmanager
+    def video_capture(self, fps=5):
+        self._start_capture(fps=fps)
+        try:
+            yield
+        finally:
+            self._stop_capture()
+
+    def video(self):
+        import cv2
+
+        images = glob("*.png")
+        fourcc = cv2.VideoWriter_fourcc(*"H264")
+
+        encoder = cv2.VideoWriter(
+            "output.mp4",
+            fourcc,
+            60.0 / self._frame_gap,
+            (DISPLAY_WIDTH, DISPLAY_HEIGHT),
+        )
+
+        for image_file in sorted(images):
+            img = cv2.imread(image_file)
+            encoder.write(img)
+
+        encoder.release()
+
+        from IPython.display import Video
+
+        return Video("output.mp4", embed=True, html_attributes="controls loop autoplay")
 
     @property
     def ppu_enabled(self) -> bool:
@@ -129,3 +175,12 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
     @property
     def clock_freq_s(self) -> str:
         return self._system.clock_freq_s()
+
+    def _start_capture(self, fps=5):
+        self._next_frame = self._frame_index + self._frame_gap
+        self._frame_gap = int(60.0 / fps)  # @TODO: This is not accurate!!!
+
+    def _stop_capture(self):
+        self._next_frame = None
+        for file in glob("*.png"):
+            remove(file)
