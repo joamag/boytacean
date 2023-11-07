@@ -4,7 +4,7 @@ from glob import glob
 from shutil import rmtree
 from tempfile import mkdtemp
 from contextlib import contextmanager
-from typing import Any
+from typing import Any, Union
 
 from PIL.Image import Image, frombytes
 
@@ -28,9 +28,9 @@ class GameBoyMode(Enum):
 
 class GameBoy:
     _frame_index: int = 0
-    _start_frame: int | None
+    _start_frame: Union[int, None]
     _frame_gap: int
-    _capture_temp_dir: str | None
+    _capture_temp_dir: Union[str, None]
 
     def __init__(
         self,
@@ -195,7 +195,7 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
     def _on_next_frame(self):
         if self._next_frame != None and self._frame_index >= self._next_frame:
             self._next_frame = self._next_frame + self._frame_gap
-            self.save_image(f"{self._capture_temp_dir}/frame_{self._frame_index}.png")
+            self.save_image(f"{self._capture_temp_dir}/frame_{self._frame_index:08d}.png")
 
     def _start_capture(self, fps=5):
         self._next_frame = self._frame_index + self._frame_gap
