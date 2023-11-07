@@ -117,5 +117,7 @@ fn boytacean(_py: Python, module: &PyModule) -> PyResult<()> {
     module.add("DISPLAY_WIDTH", DISPLAY_WIDTH)?;
     module.add("DISPLAY_HEIGHT", DISPLAY_HEIGHT)?;
     module.add("CPU_FREQ", GameBoyBase::CPU_FREQ)?;
+    module.add("VISUAL_FREQ", GameBoyBase::VISUAL_FREQ)?;
+    module.add("LCD_CYCLES", GameBoyBase::LCD_CYCLES)?;
     Ok(())
 }
