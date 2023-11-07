@@ -4,7 +4,7 @@ from math import ceil
 from shutil import rmtree
 from tempfile import mkdtemp
 from contextlib import contextmanager
-from typing import Any, Union
+from typing import Any, Iterable, Union
 
 from PIL.Image import Image, frombytes
 
@@ -174,6 +174,10 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
 
     def set_serial_enabled(self, value: bool):
         self._system.set_serial_enabled(value)
+
+    @property
+    def palettes(self) -> Iterable[str]:
+        return PALETTES.keys()
 
     @property
     def version(self) -> str:
