@@ -1,6 +1,6 @@
 from enum import Enum
-from os import remove
 from glob import glob
+from math import ceil
 from shutil import rmtree
 from tempfile import mkdtemp
 from contextlib import contextmanager
@@ -195,11 +195,13 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
     def _on_next_frame(self):
         if self._next_frame != None and self._frame_index >= self._next_frame:
             self._next_frame = self._next_frame + self._frame_gap
-            self.save_image(f"{self._capture_temp_dir}/frame_{self._frame_index:08d}.png")
+            self.save_image(
+                f"{self._capture_temp_dir}/frame_{self._frame_index:08d}.png"
+            )
 
     def _start_capture(self, fps=5):
         self._next_frame = self._frame_index + self._frame_gap
-        self._frame_gap = int(VISUAL_FREQ / fps)
+        self._frame_gap = ceil(VISUAL_FREQ / fps)
         self._capture_temp_dir = mkdtemp()
 
     def _stop_capture(self):
