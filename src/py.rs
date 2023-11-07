@@ -102,6 +102,10 @@ impl GameBoy {
         self.system.set_serial_enabled(value);
     }
 
+    pub fn rom_title(&self) -> String {
+        self.system.rom_i().title()
+    }
+
     pub fn version(&self) -> String {
         Info::version()
     }

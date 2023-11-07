@@ -176,8 +176,8 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
         self._system.set_serial_enabled(value)
 
     @property
-    def palettes(self) -> Iterable[str]:
-        return PALETTES.keys()
+    def rom_title(self) -> str:
+        return self._system.rom_title()
 
     @property
     def version(self) -> str:
@@ -186,6 +186,10 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
     @property
     def clock_freq_s(self) -> str:
         return self._system.clock_freq_s()
+
+    @property
+    def palettes(self) -> Iterable[str]:
+        return PALETTES.keys()
 
     @contextmanager
     def video_capture(self, fps=5):
