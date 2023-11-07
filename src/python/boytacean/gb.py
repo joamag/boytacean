@@ -119,8 +119,8 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
 
         try:
             for image_file in sorted(image_paths):
-                img = imread(image_file)
-                encoder.write(img)
+                image = imread(image_file)
+                encoder.write(image)
         finally:
             encoder.release()
 
