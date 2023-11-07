@@ -1,5 +1,5 @@
 from time import time
-from boytacean import GameBoy
+from boytacean import GameBoy, VISUAL_FREQ
 
 FRAME_COUNT = 12000
 
@@ -10,5 +10,5 @@ for _ in range(FRAME_COUNT):
     gb.next_frame()
 total = time() - start
 print(f"Time taken: {total:.2f} seconds")
-print(f"Speedup: {FRAME_COUNT / total / 60:.2f}x")
+print(f"Speedup: {FRAME_COUNT / total / VISUAL_FREQ:.2f}x")
 gb.save_image("pocket.png")

@@ -1,7 +1,10 @@
 from enum import Enum
 from os import remove
 from glob import glob
+from shutil import rmtree
+from tempfile import mkdtemp
 from contextlib import contextmanager
+from typing import Any
 
 from PIL.Image import Image, frombytes
 
@@ -27,6 +30,7 @@ class GameBoy:
     _frame_index: int = 0
     _start_frame: int | None
     _frame_gap: int
+    _capture_temp_dir: str | None
 
     def __init__(
         self,
@@ -42,6 +46,7 @@ class GameBoy:
         self._frame_index = 0
         self._next_frame = None
         self._frame_gap = VISUAL_FREQ
+        self._capture_temp_dir = None
         self._system = GameBoyRust(mode.value)
         self._system.set_ppu_enabled(ppu_enabled)
         self._system.set_apu_enabled(apu_enabled)
@@ -83,9 +88,7 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
     def next_frame(self) -> int:
         cycles = self._system.next_frame()
         self._frame_index += 1
-        if self._next_frame != None and self._frame_index >= self._next_frame:
-            self._next_frame = self._next_frame + self._frame_gap
-            self.save_image(f"frame_{self._frame_index}.png")
+        self._on_next_frame()
         return cycles
 
     def frame_buffer(self):
@@ -100,27 +103,33 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
         image = self.image()
         image.save(filename, format=format)
 
-    def video(self, encoder="H264"):
+    def video(self, encoder="avc1", display=True) -> Any:
         from cv2 import VideoWriter, VideoWriter_fourcc, imread
-        from IPython.display import Video
+        from IPython.display import Video, display as _display
 
-        images = glob("*.png")
+        image_paths = glob(f"{self._capture_temp_dir}/*.png")
+        video_path = f"{self._capture_temp_dir}/video.mp4"
 
         encoder = VideoWriter(
-            "output.mp4",
+            video_path,
             VideoWriter_fourcc(*encoder),
             VISUAL_FREQ / self._frame_gap,
             (DISPLAY_WIDTH, DISPLAY_HEIGHT),
         )
 
         try:
-            for image_file in sorted(images):
+            for image_file in sorted(image_paths):
                 img = imread(image_file)
                 encoder.write(img)
         finally:
             encoder.release()
 
-        return Video("output.mp4", embed=True, html_attributes="controls loop autoplay")
+        video = Video(video_path, embed=True, html_attributes="controls loop autoplay")
+
+        if display:
+            _display(video)
+
+        return video
 
     def set_palette(self, name: str):
         if not name in PALETTES:
@@ -180,13 +189,20 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
         try:
             yield
         finally:
+            self.video()
             self._stop_capture()
+
+    def _on_next_frame(self):
+        if self._next_frame != None and self._frame_index >= self._next_frame:
+            self._next_frame = self._next_frame + self._frame_gap
+            self.save_image(f"{self._capture_temp_dir}/frame_{self._frame_index}.png")
 
     def _start_capture(self, fps=5):
         self._next_frame = self._frame_index + self._frame_gap
         self._frame_gap = int(VISUAL_FREQ / fps)
+        self._capture_temp_dir = mkdtemp()
 
     def _stop_capture(self):
         self._next_frame = None
-        for file in glob("*.png"):
-            remove(file)
+        if self._capture_temp_dir:
+            rmtree(self._capture_temp_dir)

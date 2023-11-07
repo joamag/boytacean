@@ -1,5 +1,5 @@
 from time import time
-from pyboy import PyBoy
+from pyboy import PyBoy, VISUAL_FREQ
 
 FRAME_COUNT = 12000
 
@@ -11,5 +11,5 @@ with PyBoy("../../res/roms/demo/pocket.gb", disable_renderer=True) as pyboy:
         pyboy.tick()
     total = time() - start
     print(f"Time taken: {total:.2f} seconds")
-    print(f"Speedup: {FRAME_COUNT / total / 60:.2f}x")
+    print(f"Speedup: {FRAME_COUNT / total / VISUAL_FREQ:.2f}x")
     pyboy.screen_image().save("pocket_pyboy.png")
