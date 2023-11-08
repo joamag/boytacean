@@ -95,14 +95,15 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
 
     def video(
         self,
-        display=True,
+        save=True,
+        display=False,
     ) -> Any:
         from IPython.display import display as _display
 
         if self._video == None:
             raise RuntimeError("Not capturing a video")
 
-        video = self._video.build()
+        video = self._video.build(save=save)
         if display:
             _display(video)
         return video
@@ -175,6 +176,9 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
         video_name="output",
         fps=5,
         frame_format="png",
+        video=True,
+        save=False,
+        display=True,
     ):
         self._start_capture(
             video_format=video_format,
@@ -185,11 +189,10 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
         )
         try:
             yield
+            if video:
+                self.video(save=save, display=display)
         finally:
-            try:
-                self.video()
-            finally:
-                self._stop_capture()
+            self._stop_capture()
 
     def _on_next_frame(self):
         if self._video != None and self._video.should_capture(self._frame_index):

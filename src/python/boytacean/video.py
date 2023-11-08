@@ -1,8 +1,11 @@
+from os import remove
 from glob import glob
 from math import ceil
-from shutil import rmtree
+from shutil import move, rmtree
 from typing import Any, Sequence, Union
 from tempfile import mkdtemp
+
+from os.path import exists, join
 
 from PIL.Image import Image
 
@@ -13,9 +16,9 @@ from .boytacean import (
 )
 
 FORMATS = {
-    "mp4": ["avc1", "mp4", "h264", "hev1"],
+    "mp4": ["avc1", "hev1"],
     "webm": ["vp8", "vp9"],
-    "mkv": ["avc1", "mp4", "h264", "hev1"],
+    "mkv": ["avc1", "h264", "hev1"],
 }
 
 
@@ -69,9 +72,9 @@ class VideoCapture:
     def save_frame(self, frame: Image, frame_index: int):
         frame.save(self.frame_path(frame_index), format=self.frame_format)
 
-    def build(self) -> Any:
+    def build(self, save=False) -> Any:
         from cv2 import VideoWriter, VideoWriter_fourcc, imread
-        from IPython.display import Video
+        from IPython.display import Video, FileLink
 
         if not self._capture_temp_dir:
             raise RuntimeError("Not capturing a video")
@@ -92,6 +95,12 @@ class VideoCapture:
                 encoder.write(image)
         finally:
             encoder.release()
+
+        if save:
+            if exists(self.video_filename):
+                remove(self.video_filename)
+            move(video_path, ".")
+            video_path = join(".", self.video_filename)
 
         return Video(video_path, embed=True, html_attributes="controls loop autoplay")
 
