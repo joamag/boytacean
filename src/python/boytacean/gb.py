@@ -81,6 +81,12 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
         self._on_next_frame()
         return cycles
 
+    def skip_frames(self, count: int) -> int:
+        cycles = 0
+        for _ in range(count):
+            cycles += self.next_frame()
+        return cycles
+
     def frame_buffer(self):
         return self._system.frame_buffer()
 
