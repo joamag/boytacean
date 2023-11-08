@@ -4,6 +4,7 @@ from os.path import dirname, realpath, join
 
 CURRENT_DIR = dirname(realpath(__file__))
 ROM_PATH = join(CURRENT_DIR, "../../res/roms/demo/pocket.gb")
+IMAGE_NAME = "pocket.png"
 
 FRAME_COUNT = 12000
 
@@ -15,4 +16,4 @@ for _ in range(FRAME_COUNT):
 total = time() - start
 print(f"Time taken: {total:.2f} seconds")
 print(f"Speedup: {FRAME_COUNT / total / VISUAL_FREQ:.2f}x")
-gb.save_image("pocket.png")
+gb.save_image(IMAGE_NAME)
