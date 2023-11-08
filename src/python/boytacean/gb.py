@@ -1,21 +1,15 @@
 from enum import Enum
-from glob import glob
-from math import ceil
-from shutil import rmtree
-from tempfile import mkdtemp
 from contextlib import contextmanager
 from typing import Any, Iterable, Union
 
 from PIL.Image import Image, frombytes
 
 from .palettes import PALETTES
+from .video import VideoCapture
 
 from .boytacean import (
     DISPLAY_WIDTH,
     DISPLAY_HEIGHT,
-    CPU_FREQ,
-    VISUAL_FREQ,
-    LCD_CYCLES,
     GameBoy as GameBoyRust,
 )
 
@@ -28,9 +22,7 @@ class GameBoyMode(Enum):
 
 class GameBoy:
     _frame_index: int = 0
-    _start_frame: Union[int, None]
-    _frame_gap: int
-    _capture_temp_dir: Union[str, None]
+    _video: Union[VideoCapture, None] = None
 
     def __init__(
         self,
@@ -44,9 +36,7 @@ class GameBoy:
     ):
         super().__init__()
         self._frame_index = 0
-        self._next_frame = None
-        self._frame_gap = VISUAL_FREQ
-        self._capture_temp_dir = None
+        self._video = None
         self._system = GameBoyRust(mode.value)
         self._system.set_ppu_enabled(ppu_enabled)
         self._system.set_apu_enabled(apu_enabled)
@@ -99,42 +89,22 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
         image = frombytes("RGB", (DISPLAY_WIDTH, DISPLAY_HEIGHT), frame_buffer, "raw")
         return image
 
-    def save_image(self, filename: str, format: str = "PNG"):
+    def save_image(self, filename: str, format: str = "png"):
         image = self.image()
-        image.save(filename, format=format)
+        image.save(f"{filename}.{format.lower()}", format=format)
 
     def video(
         self,
-        encoder="avc1",
         display=True,
-        file_name="output.mp4",
-        frame_glob="frame_*.png",
     ) -> Any:
-        from cv2 import VideoWriter, VideoWriter_fourcc, imread
-        from IPython.display import Video, display as _display
+        from IPython.display import display as _display
 
-        image_paths = glob(f"{self._capture_temp_dir}/{frame_glob}")
-        video_path = f"{self._capture_temp_dir}/{file_name}"
+        if self._video == None:
+            raise RuntimeError("Not capturing a video")
 
-        encoder = VideoWriter(
-            video_path,
-            VideoWriter_fourcc(*encoder),
-            VISUAL_FREQ / self._frame_gap,
-            (DISPLAY_WIDTH, DISPLAY_HEIGHT),
-        )
-
-        try:
-            for image_file in sorted(image_paths):
-                image = imread(image_file)
-                encoder.write(image)
-        finally:
-            encoder.release()
-
-        video = Video(video_path, embed=True, html_attributes="controls loop autoplay")
-
+        video = self._video.build()
         if display:
             _display(video)
-
         return video
 
     def set_palette(self, name: str):
@@ -198,27 +168,54 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
         return PALETTES.keys()
 
     @contextmanager
-    def video_capture(self, fps=5):
-        self._start_capture(fps=fps)
+    def video_capture(
+        self,
+        video_format="avc1",
+        video_extension="mp4",
+        video_name="output",
+        fps=5,
+        frame_format="png",
+    ):
+        self._start_capture(
+            video_format=video_format,
+            video_extension=video_extension,
+            video_name=video_name,
+            fps=fps,
+            frame_format=frame_format,
+        )
         try:
             yield
         finally:
-            self.video()
-            self._stop_capture()
+            try:
+                self.video()
+            finally:
+                self._stop_capture()
 
     def _on_next_frame(self):
-        if self._next_frame != None and self._frame_index >= self._next_frame:
-            self._next_frame = self._next_frame + self._frame_gap
-            self.save_image(
-                f"{self._capture_temp_dir}/frame_{self._frame_index:08d}.png"
-            )
+        if self._video != None and self._video.should_capture(self._frame_index):
+            self._video.save_frame(self.image(), self._frame_index)
+            self._video.compute_next(self._frame_index)
 
-    def _start_capture(self, fps=5):
-        self._next_frame = self._frame_index + self._frame_gap
-        self._frame_gap = ceil(VISUAL_FREQ / fps)
-        self._capture_temp_dir = mkdtemp()
+    def _start_capture(
+        self,
+        video_format="avc1",
+        video_extension="mp4",
+        video_name="output",
+        fps=5,
+        frame_format="png",
+    ):
+        if self._video != None:
+            raise RuntimeError("Already capturing a video")
+        self._video = VideoCapture(
+            start_frame=self._frame_index,
+            video_format=video_format,
+            video_extension=video_extension,
+            video_name=video_name,
+            fps=fps,
+            frame_format=frame_format,
+        )
 
     def _stop_capture(self):
-        self._next_frame = None
-        if self._capture_temp_dir:
-            rmtree(self._capture_temp_dir)
+        if self._video:
+            self._video.cleanup()
+        self._video = None
