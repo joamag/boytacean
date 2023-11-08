@@ -166,10 +166,12 @@ impl PaletteInfo {
         &self.name
     }
 
+    /// Returns the colors in RGB format.
     pub fn colors(&self) -> &Palette {
         &self.colors
     }
 
+    /// Returns the colors in hex format, separated by comma.
     pub fn colors_hex(&self) -> String {
         let mut buffer = String::new();
         let mut is_first = true;
