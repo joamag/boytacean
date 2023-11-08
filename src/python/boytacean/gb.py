@@ -97,7 +97,7 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
 
     def save_image(self, filename: str, format: str = "png"):
         image = self.image()
-        image.save(f"{filename}.{format.lower()}", format=format)
+        image.save(filename, format=format)
 
     def video(
         self,

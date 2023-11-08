@@ -1,10 +1,14 @@
 from time import time
 from boytacean import GameBoy, VISUAL_FREQ
+from os.path import dirname, realpath, join
+
+CURRENT_DIR = dirname(realpath(__file__))
+ROM_PATH = join(CURRENT_DIR, "../../res/roms/demo/pocket.gb")
 
 FRAME_COUNT = 12000
 
 gb = GameBoy(apu_enabled=False, serial_enabled=False)
-gb.load_rom("../../res/roms/demo/pocket.gb")
+gb.load_rom(ROM_PATH)
 start = time()
 for _ in range(FRAME_COUNT):
     gb.next_frame()
