@@ -1,6 +1,6 @@
 from enum import Enum
 from contextlib import contextmanager
-from typing import Any, Iterable, Union
+from typing import Any, Iterable, Union, cast
 
 from PIL.Image import Image, frombytes
 
@@ -23,6 +23,7 @@ class GameBoyMode(Enum):
 class GameBoy:
     _frame_index: int = 0
     _video: Union[VideoCapture, None] = None
+    _display: Union[Any, None] = None
 
     def __init__(
         self,
@@ -32,19 +33,24 @@ class GameBoy:
         dma_enabled=True,
         timer_enabled=True,
         serial_enabled=True,
+        load_graphics=True,
         load=True,
+        boot=True,
     ):
         super().__init__()
         self._frame_index = 0
         self._video = None
+        self._display = None
         self._system = GameBoyRust(mode.value)
         self._system.set_ppu_enabled(ppu_enabled)
         self._system.set_apu_enabled(apu_enabled)
         self._system.set_dma_enabled(dma_enabled)
         self._system.set_timer_enabled(timer_enabled)
         self._system.set_serial_enabled(serial_enabled)
+        if load_graphics:
+            self.load_graphics()
         if load:
-            self.load()
+            self.load(boot=boot)
 
     def _repr_markdown_(self) -> str:
         return f"""
@@ -57,8 +63,11 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
 | Clock   | {self.clock_freq_s} |
 """
 
-    def load(self):
-        self._system.load()
+    def boot(self):
+        self._system.boot()
+
+    def load(self, boot=True):
+        self._system.load(boot)
 
     def load_rom(self, filename: str):
         self._system.load_rom_file(filename)
@@ -87,11 +96,11 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
             cycles += self.next_frame()
         return cycles
 
-    def frame_buffer(self):
+    def frame_buffer(self) -> bytes:
         return self._system.frame_buffer()
 
     def image(self) -> Image:
-        frame_buffer = self._system.frame_buffer()
+        frame_buffer = cast(bytes, self._system.frame_buffer())
         image = frombytes("RGB", (DISPLAY_WIDTH, DISPLAY_HEIGHT), frame_buffer, "raw")
         return image
 
@@ -122,6 +131,11 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
 
     def set_palette_colors(self, colors_hex: str):
         self._system.set_palette_colors(colors_hex)
+
+    def load_graphics(self):
+        from .graphics import Display
+
+        self._display = Display()
 
     @property
     def ppu_enabled(self) -> bool:
@@ -171,6 +185,10 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
         return self._system.clock_freq_s()
 
     @property
+    def frame_count(self) -> int:
+        return self._frame_index
+
+    @property
     def palettes(self) -> Iterable[str]:
         return PALETTES.keys()
 
@@ -204,6 +222,13 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
         if self._video != None and self._video.should_capture(self._frame_index):
             self._video.save_frame(self.image(), self._frame_index)
             self._video.compute_next(self._frame_index)
+
+        #@TODO: this should be sample, meaning that not every
+        # single frame is sent to the display (performance)
+        if self._display != None:
+            from .graphics import Display
+
+            cast(Display, self._display).render_frame(self.frame_buffer())
 
     def _start_capture(
         self,

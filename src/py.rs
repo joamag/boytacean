@@ -24,8 +24,12 @@ impl GameBoy {
         self.system.reset();
     }
 
-    pub fn load(&mut self) {
-        self.system.load(true);
+    pub fn boot(&mut self) {
+        self.system.boot();
+    }
+
+    pub fn load(&mut self, boot: bool) {
+        self.system.load(boot);
     }
 
     pub fn load_rom(&mut self, data: &[u8]) {
