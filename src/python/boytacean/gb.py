@@ -223,7 +223,7 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
             self._video.save_frame(self.image(), self._frame_index)
             self._video.compute_next(self._frame_index)
 
-        #@TODO: this should be sample, meaning that not every
+        # @TODO: this should be sample, meaning that not every
         # single frame is sent to the display (performance)
         if self._display != None:
             from .graphics import Display
