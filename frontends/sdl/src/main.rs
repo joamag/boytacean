@@ -967,8 +967,8 @@ fn main() {
     game_boy.set_dma_enabled(!args.no_dma);
     game_boy.set_timer_enabled(!args.no_timer);
     game_boy.attach_serial(device);
-    game_boy.load(!args.no_boot && args.boot_rom_path == "");
-    if args.boot_rom_path != "" {
+    game_boy.load(!args.no_boot && args.boot_rom_path.is_empty());
+    if !args.boot_rom_path.is_empty() {
         game_boy.load_boot_path(&args.boot_rom_path).unwrap();
     }
 
