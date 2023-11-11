@@ -9,7 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-*
+* Support for Python 3 API - [#36](https://gitlab.stage.hive.pt/joamag/boytacean/-/issues/36)
+* `next_frame()` method for frame by frame navigation
 
 ### Changed
 

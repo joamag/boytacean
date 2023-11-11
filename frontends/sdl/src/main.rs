@@ -845,6 +845,13 @@ struct Args {
     )]
     no_boot: bool,
 
+    #[arg(
+        long,
+        default_value_t = String::from(""),
+        help = "Path to Game Boy boot ROM file to be used in loading stage"
+    )]
+    boot_rom_path: String,
+
     #[arg(long, default_value_t = false, help = "If set no PPU will be used")]
     no_ppu: bool,
 
@@ -960,7 +967,10 @@ fn main() {
     game_boy.set_dma_enabled(!args.no_dma);
     game_boy.set_timer_enabled(!args.no_timer);
     game_boy.attach_serial(device);
-    game_boy.load(!args.no_boot);
+    game_boy.load(!args.no_boot && args.boot_rom_path == "");
+    if args.boot_rom_path != "" {
+        game_boy.load_boot_path(&args.boot_rom_path).unwrap();
+    }
 
     // prints the current version of the emulator (informational message)
     println!("========= {} =========\n{}", Info::name(), game_boy);

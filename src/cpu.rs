@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc};
+use std::sync::{Arc, Mutex};
 
 use crate::{
     apu::Apu,
@@ -44,11 +44,11 @@ pub struct Cpu {
     /// The pointer to the parent configuration of the running
     /// Game Boy emulator, that can be used to control the behaviour
     /// of Game Boy emulation.
-    gbc: Rc<RefCell<GameBoyConfig>>,
+    gbc: Arc<Mutex<GameBoyConfig>>,
 }
 
 impl Cpu {
-    pub fn new(mmu: Mmu, gbc: Rc<RefCell<GameBoyConfig>>) -> Self {
+    pub fn new(mmu: Mmu, gbc: Arc<Mutex<GameBoyConfig>>) -> Self {
         Self {
             pc: 0x0,
             sp: 0x0,
@@ -603,14 +603,14 @@ impl Cpu {
         self.ime = false;
     }
 
-    pub fn set_gbc(&mut self, value: Rc<RefCell<GameBoyConfig>>) {
+    pub fn set_gbc(&mut self, value: Arc<Mutex<GameBoyConfig>>) {
         self.gbc = value;
     }
 }
 
 impl Default for Cpu {
     fn default() -> Self {
-        let gbc: Rc<RefCell<GameBoyConfig>> = Rc::new(RefCell::new(GameBoyConfig::default()));
+        let gbc: Arc<Mutex<GameBoyConfig>> = Arc::new(Mutex::new(GameBoyConfig::default()));
         Cpu::new(Mmu::default(), gbc)
     }
 }

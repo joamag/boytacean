@@ -1,10 +1,15 @@
+*.pyc
+
 .DS_Store
 
 Cargo.lock
 
+/.vscode/settings.json
+
 /.idea
 
 /ndk
+/build
 /target
 /aarch64-linux-gnu
 /res/roms.prop
@@ -13,3 +18,5 @@ Cargo.lock
 
 /src/gen/build.rs
 /src/gen/_build.rs
+
+/src/python/boytacean.egg-info

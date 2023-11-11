@@ -1,10 +1,9 @@
 //! Main GameBoy emulation entrypoint functions and structures.
 
 use std::{
-    cell::RefCell,
     collections::VecDeque,
     fmt::{self, Display, Formatter},
-    rc::Rc,
+    sync::{Arc, Mutex},
 };
 
 use crate::{
@@ -370,7 +369,7 @@ pub struct GameBoy {
     /// configuration values on the current emulator.
     /// If performance is required (may value access)
     /// the values should be cloned and stored locally.
-    gbc: Rc<RefCell<GameBoyConfig>>,
+    gbc: Arc<Mutex<GameBoyConfig>>,
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
@@ -378,7 +377,7 @@ impl GameBoy {
     #[cfg_attr(feature = "wasm", wasm_bindgen(constructor))]
     pub fn new(mode: Option<GameBoyMode>) -> Self {
         let mode = mode.unwrap_or(GameBoyMode::Dmg);
-        let gbc = Rc::new(RefCell::new(GameBoyConfig {
+        let gbc = Arc::new(Mutex::new(GameBoyConfig {
             mode,
             ppu_enabled: true,
             apu_enabled: true,
@@ -476,6 +475,26 @@ impl GameBoy {
         }
         if self.serial_enabled {
             self.serial_clock(cycles);
+        }
+        cycles
+    }
+
+    pub fn clocks(&mut self, count: usize) -> u64 {
+        let mut cycles = 0_u64;
+        for _ in 0..count {
+            cycles += self.clock() as u64;
+        }
+        cycles
+    }
+
+    pub fn next_frame(&mut self) -> u32 {
+        let mut cycles = 0u32;
+        let current_frame = self.ppu_frame();
+        loop {
+            cycles += self.clock() as u32;
+            if self.ppu_frame() != current_frame {
+                break;
+            }
         }
         cycles
     }
@@ -745,7 +764,7 @@ impl GameBoy {
 
     pub fn set_mode(&mut self, value: GameBoyMode) {
         self.mode = value;
-        (*self.gbc).borrow_mut().set_mode(value);
+        (*self.gbc).lock().unwrap().set_mode(value);
         self.mmu().set_mode(value);
         self.ppu().set_gb_mode(value);
     }
@@ -756,7 +775,7 @@ impl GameBoy {
 
     pub fn set_ppu_enabled(&mut self, value: bool) {
         self.ppu_enabled = value;
-        (*self.gbc).borrow_mut().set_ppu_enabled(value);
+        (*self.gbc).lock().unwrap().set_ppu_enabled(value);
     }
 
     pub fn apu_enabled(&self) -> bool {
@@ -765,7 +784,7 @@ impl GameBoy {
 
     pub fn set_apu_enabled(&mut self, value: bool) {
         self.apu_enabled = value;
-        (*self.gbc).borrow_mut().set_apu_enabled(value);
+        (*self.gbc).lock().unwrap().set_apu_enabled(value);
     }
 
     pub fn dma_enabled(&self) -> bool {
@@ -774,7 +793,7 @@ impl GameBoy {
 
     pub fn set_dma_enabled(&mut self, value: bool) {
         self.dma_enabled = value;
-        (*self.gbc).borrow_mut().set_dma_enabled(value);
+        (*self.gbc).lock().unwrap().set_dma_enabled(value);
     }
 
     pub fn timer_enabled(&self) -> bool {
@@ -783,7 +802,7 @@ impl GameBoy {
 
     pub fn set_timer_enabled(&mut self, value: bool) {
         self.timer_enabled = value;
-        (*self.gbc).borrow_mut().set_timer_enabled(value);
+        (*self.gbc).lock().unwrap().set_timer_enabled(value);
     }
 
     pub fn serial_enabled(&self) -> bool {
@@ -792,7 +811,7 @@ impl GameBoy {
 
     pub fn set_serial_enabled(&mut self, value: bool) {
         self.serial_enabled = value;
-        (*self.gbc).borrow_mut().set_serial_enabled(value);
+        (*self.gbc).lock().unwrap().set_serial_enabled(value);
     }
 
     pub fn set_all_enabled(&mut self, value: bool) {
@@ -809,7 +828,7 @@ impl GameBoy {
 
     pub fn set_clock_freq(&mut self, value: u32) {
         self.clock_freq = value;
-        (*self.gbc).borrow_mut().set_clock_freq(value);
+        (*self.gbc).lock().unwrap().set_clock_freq(value);
         self.apu().set_clock_freq(value);
     }
 

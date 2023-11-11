@@ -1,6 +1,6 @@
 //! MMU (Memory Management Unit) functions and structures.
 
-use std::{cell::RefCell, rc::Rc};
+use std::sync::{Arc, Mutex};
 
 use crate::{
     apu::Apu,
@@ -111,11 +111,11 @@ pub struct Mmu {
     /// The pointer to the parent configuration of the running
     /// Game Boy emulator, that can be used to control the behaviour
     /// of Game Boy emulation.
-    gbc: Rc<RefCell<GameBoyConfig>>,
+    gbc: Arc<Mutex<GameBoyConfig>>,
 }
 
 impl Mmu {
-    pub fn new(components: Components, mode: GameBoyMode, gbc: Rc<RefCell<GameBoyConfig>>) -> Self {
+    pub fn new(components: Components, mode: GameBoyMode, gbc: Arc<Mutex<GameBoyConfig>>) -> Self {
         Self {
             ppu: components.ppu,
             apu: components.apu,
@@ -602,7 +602,7 @@ impl Mmu {
         self.mode = value;
     }
 
-    pub fn set_gbc(&mut self, value: Rc<RefCell<GameBoyConfig>>) {
+    pub fn set_gbc(&mut self, value: Arc<Mutex<GameBoyConfig>>) {
         self.gbc = value;
     }
 }
@@ -610,7 +610,7 @@ impl Mmu {
 impl Default for Mmu {
     fn default() -> Self {
         let mode = GameBoyMode::Dmg;
-        let gbc = Rc::new(RefCell::new(GameBoyConfig::default()));
+        let gbc = Arc::new(Mutex::new(GameBoyConfig::default()));
         let components = Components {
             ppu: Ppu::new(mode, gbc.clone()),
             apu: Apu::default(),

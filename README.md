@@ -53,6 +53,12 @@ What's still missing...
 cargo build
 ```
 
+### Python Library
+
+```bash
+pip install .
+```
+
 ### WASM for Node.js
 
 ```bash

@@ -16,6 +16,7 @@ crate-type = ["cdylib", "rlib"]
 
 [features]
 wasm = ["wasm-bindgen", "js-sys"]
+python = ["pyo3"]
 debug = []
 pedantic = []
 cpulog = []
@@ -24,6 +25,7 @@ gen-mock = []
 [dependencies]
 wasm-bindgen = { version = "0.2", optional = true }
 js-sys = { version = "0.3", optional = true }
+pyo3 = { version = "0.20", optional = true }
 
 [build-dependencies]
 chrono = "0.4"

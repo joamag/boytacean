@@ -208,6 +208,8 @@ impl Default for Serial {
     }
 }
 
+unsafe impl Send for Serial {}
+
 pub struct NullDevice {}
 
 impl NullDevice {
