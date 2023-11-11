@@ -7,8 +7,9 @@ ROM_PATH = join(CURRENT_DIR, "../../res/roms/demo/pocket.gb")
 IMAGE_NAME = "pocket.png"
 
 FRAME_COUNT = 12000
+LOAD_GRAPHICS = False
 
-gb = GameBoy(apu_enabled=False, serial_enabled=False, load_graphics=True)
+gb = GameBoy(apu_enabled=False, serial_enabled=False, load_graphics=LOAD_GRAPHICS)
 gb.load_rom(ROM_PATH)
 start = time()
 for _ in range(FRAME_COUNT):
