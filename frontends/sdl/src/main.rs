@@ -848,7 +848,7 @@ struct Args {
     #[arg(
         long,
         default_value_t = String::from(""),
-        help = "Path to Game Boy ROM file to be used in loading stage"
+        help = "Path to Game Boy boot ROM file to be used in loading stage"
     )]
     boot_rom_path: String,
 
