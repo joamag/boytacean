@@ -33,7 +33,7 @@ class GameBoy:
         dma_enabled=True,
         timer_enabled=True,
         serial_enabled=True,
-        load_graphics=True,
+        load_graphics=False,
         load=True,
         boot=True,
     ):
