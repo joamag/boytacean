@@ -35,7 +35,7 @@ impl GameBoy {
     pub fn load_boot_path(&mut self, path: &str) -> PyResult<()> {
         self.system
             .load_boot_path(path)
-            .map_err(|err| PyErr::new::<PyException, _>(err))
+            .map_err(PyErr::new::<PyException, _>)
     }
 
     pub fn load_rom(&mut self, data: &[u8]) {
