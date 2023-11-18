@@ -1,5 +1,5 @@
 from time import time
-from boytacean import GameBoy, VISUAL_FREQ
+from boytacean import PyBoy, VISUAL_FREQ
 from os.path import dirname, realpath, join, splitext, basename
 
 CURRENT_DIR = dirname(realpath(__file__))
@@ -11,15 +11,16 @@ IMAGE_NAME = f"{ROM_NAME}_pyboy_iface.png"
 FRAME_COUNT = 12000
 LOAD_GRAPHICS = True
 
-gb = GameBoy(
-    apu_enabled=False, serial_enabled=False, load_graphics=LOAD_GRAPHICS, boot=False
-)
-gb.load_boot_path(BOOT_ROM_PATH)
-gb.load_rom(ROM_PATH)
-start = time()
-for _ in range(FRAME_COUNT):
-    gb.next_frame()
-total = time() - start
-print(f"Time taken: {total:.2f} seconds")
-print(f"Speedup: {FRAME_COUNT / total / VISUAL_FREQ:.2f}x")
-gb.save_image(IMAGE_NAME)
+
+with PyBoy(ROM_PATH, bootrom_file=BOOT_ROM_PATH, disable_renderer=True) as pyboy:
+    pyboy.set_emulation_speed(0)
+    print(pyboy.cartridge_title())
+    start = time()
+    for _ in range(FRAME_COUNT):
+        pyboy.tick()
+    total = time() - start
+    print(f"Time taken: {total:.2f} seconds")
+    print(f"Speedup: {FRAME_COUNT / total / VISUAL_FREQ:.2f}x")
+    image = pyboy.screen_image()
+    if image:
+        image.save(IMAGE_NAME)
