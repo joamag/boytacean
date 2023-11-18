@@ -69,8 +69,11 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
     def load(self, boot=True):
         self._system.load(boot)
 
-    def load_rom(self, filename: str):
-        self._system.load_rom_file(filename)
+    def load_boot_path(self, path: str):
+        self._system.load_boot_path(path)
+
+    def load_rom(self, path: str):
+        self._system.load_rom_file(path)
 
     def load_rom_data(self, data: bytes):
         self._system.load_rom(data)
@@ -104,9 +107,9 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
         image = frombytes("RGB", (DISPLAY_WIDTH, DISPLAY_HEIGHT), frame_buffer, "raw")
         return image
 
-    def save_image(self, filename: str, format: str = "png"):
+    def save_image(self, path: str, format: str = "png"):
         image = self.image()
-        image.save(filename, format=format)
+        image.save(path, format=format)
 
     def video(
         self,

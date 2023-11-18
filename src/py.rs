@@ -1,4 +1,4 @@
-use pyo3::{prelude::*, types::PyBytes};
+use pyo3::{exceptions::PyException, prelude::*, types::PyBytes};
 
 use crate::{
     gb::{GameBoy as GameBoyBase, GameBoyMode},
@@ -30,6 +30,12 @@ impl GameBoy {
 
     pub fn load(&mut self, boot: bool) {
         self.system.load(boot);
+    }
+
+    pub fn load_boot_path(&mut self, path: &str) -> PyResult<()> {
+        self.system
+            .load_boot_path(path)
+            .map_err(|err| PyErr::new::<PyException, _>(err))
     }
 
     pub fn load_rom(&mut self, data: &[u8]) {
