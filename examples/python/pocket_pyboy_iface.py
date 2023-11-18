@@ -1,11 +1,12 @@
 from time import time
 from boytacean import GameBoy, VISUAL_FREQ
-from os.path import dirname, realpath, join
+from os.path import dirname, realpath, join, splitext, basename
 
 CURRENT_DIR = dirname(realpath(__file__))
 ROM_PATH = join(CURRENT_DIR, "../../res/roms/demo/pocket.gb")
 BOOT_ROM_PATH = join(CURRENT_DIR, "../../res/boot/dmg_pyboy.bin")
-IMAGE_NAME = "pocket.png"
+ROM_NAME = splitext(basename(ROM_PATH))[0]
+IMAGE_NAME = f"{ROM_NAME}_pyboy_iface.png"
 
 FRAME_COUNT = 12000
 LOAD_GRAPHICS = True
