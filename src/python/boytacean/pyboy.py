@@ -192,7 +192,7 @@ class PyBoy(GameBoy):
         print("Missing emulation speed control")
 
     def tick(self):
-        super().next_frame()
+        self.next_frame()
 
     def stop(self):
         pass

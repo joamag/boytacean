@@ -245,11 +245,11 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
             self._stop_capture()
 
     def _on_next_frame(self):
-        if self._video != None and self._video.should_capture(self._frame_index):
+        if self._video is not None and self._video.should_capture(self._frame_index):
             self._video.save_frame(self.image(), self._frame_index)
             self._video.compute_next(self._frame_index)
 
-        if self._display != None and self._display.should_render(self._frame_index):
+        if self._display is not None and self._display.should_render(self._frame_index):
             from .graphics import Display
 
             cast(Display, self._display).render_frame(self.frame_buffer())
@@ -262,7 +262,7 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
         fps=5,
         frame_format="png",
     ):
-        if self._video != None:
+        if self._video is not None:
             raise RuntimeError("Already capturing a video")
         self._video = VideoCapture(
             start_frame=self._frame_index,
