@@ -152,6 +152,7 @@ class PyBoy(GameBoy):
         sound_emulated=False,
         cgb=None,
         randomize=False,
+        plugin_manager=True,
         **kwargs,
     ):
         super().__init__(
@@ -179,7 +180,9 @@ class PyBoy(GameBoy):
         # runs the plugin manager initialization at the end of the __init__
         # so that we have a working and running emulator to work with
         self.plugin_manager = (
-            PluginManager(self, self.mb, kwargs) if PluginManager else None
+            PluginManager(self, self.mb, kwargs)
+            if plugin_manager and PluginManager
+            else None
         )
 
     def __enter__(self):

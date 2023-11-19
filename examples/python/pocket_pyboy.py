@@ -9,7 +9,7 @@ IMAGE_NAME = f"{ROM_NAME}_pyboy.png"
 
 FRAME_COUNT = 12000
 VISUAL_FREQ = 59.7275
-LOAD_GRAPHICS = True
+LOAD_GRAPHICS = False
 
 with PyBoy(
     ROM_PATH,

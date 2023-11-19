@@ -10,11 +10,13 @@ ROM_NAME = splitext(basename(ROM_PATH))[0]
 IMAGE_NAME = f"{ROM_NAME}_pyboy_iface.png"
 
 FRAME_COUNT = 12000
-LOAD_GRAPHICS = True
-
+LOAD_GRAPHICS = False
 
 with PyBoy(
-    ROM_PATH, bootrom_file=BOOT_ROM_PATH, disable_renderer=not LOAD_GRAPHICS
+    ROM_PATH,
+    bootrom_file=BOOT_ROM_PATH,
+    disable_renderer=not LOAD_GRAPHICS,
+    plugin_manager=False,
 ) as pyboy:
     pyboy.set_emulation_speed(0)
     print(pyboy.cartridge_title())
