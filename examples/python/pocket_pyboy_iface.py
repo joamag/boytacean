@@ -13,7 +13,9 @@ FRAME_COUNT = 12000
 LOAD_GRAPHICS = True
 
 
-with PyBoy(ROM_PATH, bootrom_file=BOOT_ROM_PATH, disable_renderer=True) as pyboy:
+with PyBoy(
+    ROM_PATH, bootrom_file=BOOT_ROM_PATH, disable_renderer=not LOAD_GRAPHICS
+) as pyboy:
     pyboy.set_emulation_speed(0)
     print(pyboy.cartridge_title())
     start = time()

@@ -77,8 +77,11 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
     def load(self, boot=True):
         self._system.load(boot)
 
-    def load_boot_path(self, path: str):
+    def load_boot(self, path: str):
         self._system.load_boot_path(path)
+
+    def load_boot_data(self, data: bytes):
+        self._system.load_boot(data)
 
     def load_rom(self, path: str):
         self._system.load_rom_file(path)

@@ -33,6 +33,10 @@ impl GameBoy {
         self.system.load(boot);
     }
 
+    pub fn load_boot(&mut self, data: &[u8]) {
+        self.system.load_boot(data)
+    }
+
     pub fn load_boot_path(&mut self, path: &str) -> PyResult<()> {
         self.system
             .load_boot_path(path)
