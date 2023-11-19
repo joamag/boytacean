@@ -1,12 +1,14 @@
 import os
 import sys
+from typing import cast
 
 # Makes us able to import PyBoy from the directory below
 file_path = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(0, file_path + "/../..")
 
-# from boytacean import PyBoy, WindowEvent # isort:skip
-from boytacean import PyBoy
+from boytacean.pyboy import PyBoy, WindowEvent
+
+from pyboy.plugins.game_wrapper_tetris import GameWrapperTetris
 
 # Check if the ROM is given through argv
 if len(sys.argv) > 1:
@@ -27,6 +29,12 @@ pyboy.set_emulation_speed(0)
 assert pyboy.cartridge_title() == "TETRIS"
 
 tetris = pyboy.game_wrapper()
+if tetris is None:
+    print("Game Wrapper not enabled")
+    exit(1)
+
+tetris = cast(GameWrapperTetris, tetris)
+
 tetris.start_game(timer_div=0x00)  # The timer_div works like a random seed in Tetris
 
 tetromino_at_0x00 = tetris.next_tetromino()

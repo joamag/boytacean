@@ -56,10 +56,10 @@ class Display:
         return frame_index >= self._next_frame
 
     def render_frame(self, frame_buffer: bytes):
-        if not self._window:
+        if self._window is None:
             raise RuntimeError("Window not initialized")
 
-        if not self._renderer:
+        if self._renderer is None:
             raise RuntimeError("Renderer not initialized")
 
         # we consider that every time there's a request for a new

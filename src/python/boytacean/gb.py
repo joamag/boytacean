@@ -45,6 +45,7 @@ class GameBoy:
         boot=True,
     ):
         super().__init__()
+        self._mode = mode
         self._frame_index = 0
         self._video = None
         self._display = None
@@ -137,7 +138,7 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
     ) -> Any:
         from IPython.display import display as _display
 
-        if self._video == None:
+        if self._video is None:
             raise RuntimeError("Not capturing a video")
 
         video = self._video.build(save=save)

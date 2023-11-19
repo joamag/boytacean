@@ -1,8 +1,34 @@
 from enum import Enum
+from sys import modules
+from typing import Any
 
 from PIL.Image import Image
 
 from .gb import GameBoy, GameBoyMode, PadKey
+
+PATCH_CYTHON = True
+""" If the cython module should be patched to avoiding importing it
+and compiling the pyboy modules to native code making them incompatible
+with the Boytacean stubs """
+
+
+class NonImportableModule:
+    def __getattr__(self, name):
+        raise ImportError("This module cannot be imported.")
+
+
+if PATCH_CYTHON:
+    modules["cython"] = NonImportableModule()  # type: ignore
+
+try:
+    from pyboy.plugins.manager import PluginManager
+except ImportError:
+    PluginManager = None
+
+try:
+    from pyboy.botsupport import BotSupportManager
+except ImportError:
+    BotSupportManager = None
 
 
 class WindowEvent(Enum):
@@ -81,6 +107,26 @@ class WindowEvent(Enum):
         )
 
 
+class LCD:
+    def __init__(self, system: "PyBoy"):
+        self.renderer = None  # @TODO: add something here
+        self._system = system
+
+
+class MotherBoard:
+    def __init__(self, system: "PyBoy", kwargs: dict[str, Any]):
+        self.lcd = LCD(system)
+        self._system = system
+        self._kwargs = kwargs
+
+    def getitem(self, addr: int) -> int:
+        return self._system.read_memory(addr)
+
+    @property
+    def cgb(self):
+        return self._system._mode == GameBoyMode.CGB
+
+
 class PyBoy(GameBoy):
     def __init__(
         self,
@@ -101,16 +147,29 @@ class PyBoy(GameBoy):
             load=True,
             boot=not bool(bootrom_file),
         )
+
+        # adds some default values to kwargs, to provide
+        # compatibility with pyboy
+        kwargs.update(scale=3)
+
+        self.mb = MotherBoard(self, kwargs)
+
         if bootrom_file:
             self.load_boot_path(bootrom_file)
         if gamerom_file:
             self.load_rom(gamerom_file)
 
+        # runs the plugin manager initialization at the end of the __init__
+        # so that we have a working and running emulator to work with
+        self.plugin_manager = (
+            PluginManager(self, self.mb, kwargs) if PluginManager else None
+        )
+
     def __enter__(self):
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
-        pass
+        self.stop()
 
     def set_emulation_speed(self, speed: float):
         print("Missing emulation speed control")
@@ -120,6 +179,16 @@ class PyBoy(GameBoy):
 
     def stop(self):
         pass
+
+    def game_wrapper(self):
+        if self.plugin_manager is None:
+            raise RuntimeError("Plugins not enabled")
+        return self.plugin_manager.gamewrapper()
+
+    def botsupport_manager(self):
+        if BotSupportManager is None:
+            raise RuntimeError("BotSupport not enabled")
+        return BotSupportManager(self, self.mb)
 
     def send_input(self, event: WindowEvent):
         if event.is_press():
@@ -139,6 +208,13 @@ class PyBoy(GameBoy):
 
     def set_memory_value(self, addr: int, value: int):
         self.write_memory(addr, value)
+
+    def _post_tick(self):
+        if self.plugin_manager:
+            self.plugin_manager.post_tick()
+
+    def _on_next_frame(self):
+        self._post_tick()
 
 
 PAD_KEY_MAP = {

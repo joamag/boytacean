@@ -1,5 +1,6 @@
 from time import time
-from boytacean import PyBoy, VISUAL_FREQ
+from boytacean import VISUAL_FREQ
+from boytacean.pyboy import PyBoy
 from os.path import dirname, realpath, join, splitext, basename
 
 CURRENT_DIR = dirname(realpath(__file__))

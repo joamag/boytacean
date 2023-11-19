@@ -1,7 +1,6 @@
 from .gb import GameBoyMode, GameBoy
 from .palettes import PALETTES
 from .video import VideoCapture
-from .pyboy import PyBoy, WindowEvent
 
 from .boytacean import (
     DISPLAY_WIDTH,

@@ -10,7 +10,7 @@ IMAGE_NAME = f"{ROM_NAME}_pyboy.png"
 FRAME_COUNT = 12000
 VISUAL_FREQ = 59.7275
 
-with PyBoy(ROM_PATH, disable_renderer=True) as pyboy:
+with PyBoy(ROM_PATH, disable_renderer=True, window_type="headless") as pyboy:
     pyboy.set_emulation_speed(0)
     print(pyboy.cartridge_title())
     start = time()
