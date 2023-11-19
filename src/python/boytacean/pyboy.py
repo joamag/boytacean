@@ -40,6 +40,9 @@ class PyBoy(GameBoy):
     def tick(self):
         super().next_frame()
 
+    def stop(self):
+        pass
+
     def cartridge_title(self) -> str:
         return self.rom_title
 
