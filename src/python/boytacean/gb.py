@@ -78,6 +78,12 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
     def load_rom_data(self, data: bytes):
         self._system.load_rom(data)
 
+    def read_memory(self, addr: int) -> int:
+        return self._system.read_memory(addr)
+
+    def write_memory(self, addr: int, value: int):
+        self._system.write_memory(addr, value)
+
     def clock(self) -> int:
         return self._system.clock()
 

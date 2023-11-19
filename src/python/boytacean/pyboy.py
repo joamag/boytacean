@@ -47,9 +47,7 @@ class PyBoy(GameBoy):
         return self.image()
 
     def get_memory_value(self, addr: int) -> int:
-        raise NotImplementedError("get_memory_value")
-        # return self.memory_value(addr)
+        return self.read_memory(addr)
 
     def set_memory_value(self, addr: int, value: int):
-        raise NotImplementedError("set_memory_value")
-        # self.set_memory_value(addr, value)
+        self.write_memory(addr, value)

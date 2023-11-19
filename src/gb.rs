@@ -1089,6 +1089,14 @@ impl GameBoy {
         self.serial().set_device(device);
     }
 
+    pub fn read_memory(&mut self, addr: u16) -> u8 {
+        self.mmu().read(addr)
+    }
+
+    pub fn write_memory(&mut self, addr: u16, value: u8) {
+        self.mmu().write(addr, value);
+    }
+
     pub fn set_speed_callback(&mut self, callback: fn(speed: GameBoySpeed)) {
         self.mmu().set_speed_callback(callback);
     }

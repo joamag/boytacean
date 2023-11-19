@@ -46,6 +46,14 @@ impl GameBoy {
         self.system.load_rom_file(path, None);
     }
 
+    pub fn read_memory(&mut self, addr: u16) -> u8 {
+        self.system.read_memory(addr)
+    }
+
+    pub fn write_memory(&mut self, addr: u16, value: u8) {
+        self.system.write_memory(addr, value);
+    }
+
     pub fn clock(&mut self) -> u16 {
         self.system.clock()
     }
