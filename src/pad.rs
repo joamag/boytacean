@@ -24,6 +24,22 @@ pub enum PadKey {
     B,
 }
 
+impl PadKey {
+    pub fn from_u8(value: u8) -> Self {
+        match value {
+            1 => PadKey::Up,
+            2 => PadKey::Down,
+            3 => PadKey::Left,
+            4 => PadKey::Right,
+            5 => PadKey::Start,
+            6 => PadKey::Select,
+            7 => PadKey::A,
+            8 => PadKey::B,
+            _ => panic!("Invalid pad key value: {}", value),
+        }
+    }
+}
+
 pub struct Pad {
     down: bool,
     up: bool,

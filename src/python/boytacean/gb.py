@@ -16,6 +16,17 @@ class GameBoyMode(Enum):
     SGB = 3
 
 
+class PadKey(Enum):
+    Up = 1
+    Down = 2
+    Left = 3
+    Right = 4
+    Start = 5
+    Select = 6
+    A = 7
+    B = 8
+
+
 class GameBoy:
     _frame_index: int = 0
     _video: Union[VideoCapture, None] = None
@@ -100,6 +111,12 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
         for _ in range(count):
             cycles += self.next_frame()
         return cycles
+
+    def key_press(self, key: PadKey):
+        self._system.key_press(key.value)
+
+    def key_lift(self, key: PadKey):
+        self._system.key_lift(key.value)
 
     def frame_buffer(self) -> bytes:
         return self._system.frame_buffer()

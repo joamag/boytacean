@@ -3,6 +3,7 @@ use pyo3::{exceptions::PyException, prelude::*, types::PyBytes};
 use crate::{
     gb::{GameBoy as GameBoyBase, GameBoyMode},
     info::Info,
+    pad::PadKey,
     ppu::{PaletteInfo, DISPLAY_HEIGHT, DISPLAY_WIDTH},
 };
 
@@ -68,6 +69,14 @@ impl GameBoy {
 
     pub fn next_frame(&mut self) -> u32 {
         self.system.next_frame()
+    }
+
+    pub fn key_press(&mut self, key: u8) {
+        self.system.key_press(PadKey::from_u8(key))
+    }
+
+    pub fn key_lift(&mut self, key: u8) {
+        self.system.key_lift(PadKey::from_u8(key))
     }
 
     pub fn frame_buffer(&mut self, py: Python) -> PyObject {
