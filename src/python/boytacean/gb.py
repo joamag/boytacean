@@ -7,11 +7,7 @@ from PIL.Image import Image, frombytes
 from .palettes import PALETTES
 from .video import VideoCapture
 
-from .boytacean import (
-    DISPLAY_WIDTH,
-    DISPLAY_HEIGHT,
-    GameBoy as GameBoyRust,
-)
+from .boytacean import DISPLAY_WIDTH, DISPLAY_HEIGHT, GameBoy as GameBoyRust
 
 
 class GameBoyMode(Enum):
