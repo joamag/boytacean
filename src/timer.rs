@@ -122,6 +122,16 @@ impl Timer {
     pub fn ack_tima(&mut self) {
         self.set_int_tima(false);
     }
+
+    #[inline(always)]
+    pub fn div(&self) -> u8 {
+        self.div
+    }
+
+    #[inline(always)]
+    pub fn set_div(&mut self, value: u8) {
+        self.div = value;
+    }
 }
 
 impl Default for Timer {

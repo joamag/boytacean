@@ -211,6 +211,14 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
         return self._system.clock_freq_s()
 
     @property
+    def timer_div(self) -> int:
+        return self._system.timer_div()
+
+    @timer_div.setter
+    def timer_div(self, value: int):
+        self._system.set_timer_div(value)
+
+    @property
     def frame_count(self) -> int:
         return self._frame_index
 

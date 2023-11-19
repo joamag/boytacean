@@ -127,9 +127,23 @@ class LCD:
         self._system = system
 
 
+class Timer:
+    def __init__(self, system: "PyBoy"):
+        self._system = system
+
+    @property
+    def DIV(self):
+        return self._system.timer_div
+
+    @DIV.setter
+    def DIV(self, value: int):
+        self._system.timer_div = value
+
+
 class MotherBoard:
     def __init__(self, system: "PyBoy", kwargs: dict[str, Any]):
         self.lcd = LCD(system)
+        self.timer = Timer(system)
         self._system = system
         self._kwargs = kwargs
 

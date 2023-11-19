@@ -144,6 +144,14 @@ impl GameBoy {
     pub fn clock_freq_s(&self) -> String {
         self.system.clock_freq_s()
     }
+
+    pub fn timer_div(&self) -> u8 {
+        self.system.timer_i().div()
+    }
+
+    pub fn set_timer_div(&mut self, value: u8) {
+        self.system.timer().set_div(value);
+    }
 }
 
 #[pymodule]
