@@ -110,6 +110,9 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
         self._on_next_frame()
         return cycles
 
+    def step_to(self, addr: int) -> int:
+        return self._system.step_to(addr)
+
     def skip_frames(self, count: int) -> int:
         cycles = 0
         for _ in range(count):

@@ -499,6 +499,17 @@ impl GameBoy {
         cycles
     }
 
+    pub fn step_to(&mut self, addr: u16) -> u32 {
+        let mut cycles = 0u32;
+        loop {
+            cycles += self.clock() as u32;
+            if self.cpu_i().pc() == addr {
+                break;
+            }
+        }
+        cycles
+    }
+
     pub fn key_press(&mut self, key: PadKey) {
         self.pad().key_press(key);
     }

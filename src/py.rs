@@ -76,6 +76,10 @@ impl GameBoy {
         self.system.next_frame()
     }
 
+    pub fn step_to(&mut self, addr: u16) -> u32 {
+        self.system.step_to(addr)
+    }
+
     pub fn key_press(&mut self, key: u8) {
         self.system.key_press(PadKey::from_u8(key))
     }
