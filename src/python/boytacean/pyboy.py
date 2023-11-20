@@ -1,6 +1,6 @@
 from enum import Enum
 from sys import modules
-from typing import Any
+from typing import IO, Any
 
 from PIL.Image import Image
 
@@ -245,6 +245,14 @@ class PyBoy(GameBoy):
 
     def set_memory_value(self, addr: int, value: int):
         self.write_memory(addr, value)
+
+    def save_state(self, file: IO):
+        data = super().save_state()
+        file.write(data)
+
+    def load_state(self, file: IO):
+        data = file.read()
+        super().load_state(data)
 
     def _post_tick(self):
         if self.plugin_manager:

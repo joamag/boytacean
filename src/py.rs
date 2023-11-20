@@ -5,6 +5,7 @@ use crate::{
     info::Info,
     pad::PadKey,
     ppu::{PaletteInfo, DISPLAY_HEIGHT, DISPLAY_WIDTH},
+    state::StateManager,
 };
 
 #[pyclass]
@@ -151,6 +152,17 @@ impl GameBoy {
 
     pub fn set_timer_div(&mut self, value: u8) {
         self.system.timer().set_div(value);
+    }
+
+    pub fn save_state(&mut self, py: Python) -> PyResult<PyObject> {
+        match StateManager::save(&mut self.system, None) {
+            Ok(data) => Ok(PyBytes::new(py, &data).into()),
+            Err(e) => Err(PyErr::new::<PyException, _>(e)),
+        }
+    }
+
+    pub fn load_state(&mut self, data: &[u8]) -> PyResult<()> {
+        StateManager::load(data, &mut self.system, None).map_err(PyErr::new::<PyException, _>)
     }
 }
 

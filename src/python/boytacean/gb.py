@@ -163,6 +163,12 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
 
         self._display = Display()
 
+    def save_state(self) -> bytes:
+        return self._system.save_state()
+
+    def load_state(self, data: bytes):
+        self._system.load_state(data)
+
     @property
     def ppu_enabled(self) -> bool:
         return self._system.ppu_enabled()
