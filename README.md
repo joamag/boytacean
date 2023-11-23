@@ -37,13 +37,13 @@ What's still missing...
 
 ## Deployments
 
-| Provider  | Stable  | URL                                                              |
-| --------- | ------- | ---------------------------------------------------------------- |
-| Cloudfare | `True`  | [boytacean.joao.me](https://boytacean.joao.me)                   |
-| Cloudfare | `True`  | [boytacean.pages.dev](https://boytacean.pages.dev)               |
-| Cloudfare | `True`  | [prod.boytacean.pages.dev](https://prod.boytacean.pages.dev)     |
-| Cloudfare | `True`  | [stable.boytacean.pages.dev](https://stable.boytacean.pages.dev) |
-| Cloudfare | `False` | [master.boytacean.pages.dev](https://master.boytacean.pages.dev) |
+| Provider   | Stable  | URL                                                              |
+| ---------- | ------- | ---------------------------------------------------------------- |
+| Cloudflare | `True`  | [boytacean.joao.me](https://boytacean.joao.me)                   |
+| Cloudflare | `True`  | [boytacean.pages.dev](https://boytacean.pages.dev)               |
+| Cloudflare | `True`  | [prod.boytacean.pages.dev](https://prod.boytacean.pages.dev)     |
+| Cloudflare | `True`  | [stable.boytacean.pages.dev](https://stable.boytacean.pages.dev) |
+| Cloudflare | `False` | [master.boytacean.pages.dev](https://master.boytacean.pages.dev) |
 
 ## Build
 

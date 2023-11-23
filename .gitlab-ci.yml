@@ -89,7 +89,7 @@ deploy-netlify-prod:
   only:
     - tags
 
-deploy-cloudfare-master:
+deploy-cloudflare-master:
   stage: deploy
   script:
     - cd frontends/web/dist
@@ -100,7 +100,7 @@ deploy-cloudfare-master:
   only:
     - master
 
-deploy-cloudfare-stable:
+deploy-cloudflare-stable:
   stage: deploy
   script:
     - cd frontends/web/dist
@@ -111,7 +111,7 @@ deploy-cloudfare-stable:
   only:
     - stable
 
-deploy-cloudfare-prod:
+deploy-cloudflare-prod:
   stage: deploy
   script:
     - cd frontends/web/dist
