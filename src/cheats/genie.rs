@@ -41,18 +41,18 @@ impl GameGenie {
         self.codes.contains_key(&addr)
     }
 
-    pub fn get_addr(&self, addr: u16) -> &GameGenieCode {
-        self.codes.get(&addr).unwrap()
+    pub fn get_addr(&self, addr: u16) -> Result<&GameGenieCode, String> {
+        match self.codes.get(&addr) {
+            Some(code) => Ok(code),
+            None => Err(format!("Invalid address: {}", addr)),
+        }
     }
 
     pub fn add_code(&mut self, code: &str) -> Result<&GameGenieCode, String> {
-        let genie_code = match GameGenieCode::from_code(code, None) {
-            Ok(genie_code) => genie_code,
-            Err(message) => return Err(message),
-        };
+        let genie_code = GameGenieCode::from_code(code, None)?;
         let addr = genie_code.addr;
         self.codes.insert(addr, genie_code);
-        Ok(self.get_addr(addr))
+        self.get_addr(addr)
     }
 }
 

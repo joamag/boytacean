@@ -48,18 +48,18 @@ impl GameShark {
         self.codes.clear();
     }
 
-    pub fn get_addr(&self, addr: u16) -> &GameSharkCode {
-        self.codes.get(&addr).unwrap()
+    pub fn get_addr(&self, addr: u16) -> Result<&GameSharkCode, String> {
+        match self.codes.get(&addr) {
+            Some(code) => Ok(code),
+            None => Err(format!("Invalid address: {}", addr)),
+        }
     }
 
     pub fn add_code(&mut self, code: &str) -> Result<&GameSharkCode, String> {
-        let genie_code = match GameSharkCode::from_code(code, &self.rom_type) {
-            Ok(genie_code) => genie_code,
-            Err(message) => return Err(message),
-        };
-        let addr = genie_code.addr;
-        self.codes.insert(addr, genie_code);
-        Ok(self.get_addr(addr))
+        let shark_code = GameSharkCode::from_code(code, &self.rom_type)?;
+        let addr = shark_code.addr;
+        self.codes.insert(addr, shark_code);
+        self.get_addr(addr)
     }
 
     pub fn writes(&self) -> Vec<(u16, u16, u8)> {
@@ -89,7 +89,7 @@ impl Default for GameShark {
 
 #[derive(Clone)]
 pub struct GameSharkCode {
-    /// The Game Genie code that is going to be applied to the ROM.
+    /// The GameShark code that is going to be applied to the ROM.
     code: String,
 
     /// The RAM bank that the cheat code is going to be applied to,
