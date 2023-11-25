@@ -4,12 +4,15 @@ use std::{
     io::{BufWriter, Read, Write},
     path::Path,
     rc::Rc,
+    sync::{Arc, Mutex},
 };
 
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
 
 pub type SharedMut<T> = Rc<RefCell<T>>;
+
+pub type SharedThread<T> = Arc<Mutex<T>>;
 
 /// Reads the contents of the file at the given path into
 /// a vector of bytes.

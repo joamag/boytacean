@@ -26,7 +26,7 @@ use crate::{
     rom::{Cartridge, RamSize},
     serial::{NullDevice, Serial, SerialDevice},
     timer::Timer,
-    util::read_file,
+    util::{read_file, SharedThread},
 };
 
 #[cfg(feature = "wasm")]
@@ -369,7 +369,7 @@ pub struct GameBoy {
     /// configuration values on the current emulator.
     /// If performance is required (may value access)
     /// the values should be cloned and stored locally.
-    gbc: Arc<Mutex<GameBoyConfig>>,
+    gbc: SharedThread<GameBoyConfig>,
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
