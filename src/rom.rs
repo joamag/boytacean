@@ -1023,7 +1023,7 @@ pub static GAME_GENIE: Mbc = Mbc {
             // retrieves the Game Genie code that matches the current address
             // keep in mind that this assumes that no more that one code is
             // registered for the same memory address
-            let genie_code = game_genie.get_addr(addr);
+            let genie_code = game_genie.get_addr(addr).unwrap();
 
             // obtains the current byte that is stored at the address using
             // the MBC, this value will probably be patched
