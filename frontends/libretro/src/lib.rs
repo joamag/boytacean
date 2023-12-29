@@ -1,6 +1,7 @@
 #![allow(clippy::uninlined_format_args)]
 
 pub mod consts;
+pub mod palettes;
 
 use boytacean::{
     debugln,
@@ -19,8 +20,11 @@ use consts::{
     RETRO_DEVICE_ID_JOYPAD_R2, RETRO_DEVICE_ID_JOYPAD_R3, RETRO_DEVICE_ID_JOYPAD_RIGHT,
     RETRO_DEVICE_ID_JOYPAD_SELECT, RETRO_DEVICE_ID_JOYPAD_START, RETRO_DEVICE_ID_JOYPAD_UP,
     RETRO_DEVICE_ID_JOYPAD_X, RETRO_DEVICE_ID_JOYPAD_Y, RETRO_DEVICE_JOYPAD,
-    RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, RETRO_PIXEL_FORMAT_XRGB8888,
+    RETRO_ENVIRONMENT_GET_VARIABLE, RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE,
+    RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, RETRO_ENVIRONMENT_SET_VARIABLES,
+    RETRO_PIXEL_FORMAT_XRGB8888,
 };
+use palettes::get_palette;
 use std::{
     collections::HashMap,
     ffi::CStr,
@@ -60,6 +64,11 @@ static mut INPUT_POLL_CALLBACK: Option<extern "C" fn()> = None;
 static mut INPUT_STATE_CALLBACK: Option<
     extern "C" fn(port: u32, device: u32, index: u32, id: u32) -> i16,
 > = None;
+static mut UPDATED: bool = false;
+static mut VARIABLE: RetroVariable = RetroVariable {
+    key: "palette\0".as_ptr() as *const c_char,
+    value: std::ptr::null(),
+};
 
 const KEYS: [RetroJoypad; 8] = [
     RetroJoypad::RetroDeviceIdJoypadUp,
@@ -70,6 +79,17 @@ const KEYS: [RetroJoypad; 8] = [
     RetroJoypad::RetroDeviceIdJoypadSelect,
     RetroJoypad::RetroDeviceIdJoypadA,
     RetroJoypad::RetroDeviceIdJoypadB,
+];
+const VARIABLES: [RetroVariable; 2] = [
+    RetroVariable {
+        key: "palette\0".as_ptr() as *const c_char,
+        value: "DMG color palette; basic|hogwards|christmas|goldsilver|pacman|mariobros|pokemon\0"
+            .as_ptr() as *const c_char,
+    },
+    RetroVariable {
+        key: std::ptr::null(),
+        value: std::ptr::null(),
+    },
 ];
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
@@ -159,6 +179,12 @@ pub struct RetroSystemTiming {
     sample_rate: f64,
 }
 
+#[repr(C)]
+pub struct RetroVariable {
+    key: *const c_char,
+    value: *const c_char,
+}
+
 #[no_mangle]
 pub extern "C" fn retro_api_version() -> c_uint {
     debugln!("retro_api_version()");
@@ -233,6 +259,11 @@ pub extern "C" fn retro_set_environment(
     debugln!("retro_set_environment()");
     unsafe {
         ENVIRONMENT_CALLBACK = callback;
+        let environment_cb = ENVIRONMENT_CALLBACK.as_ref().unwrap();
+        environment_cb(
+            RETRO_ENVIRONMENT_SET_VARIABLES,
+            &VARIABLES as *const _ as *const c_void,
+        );
     }
 }
 
@@ -244,6 +275,7 @@ pub extern "C" fn retro_set_controller_port_device() {
 #[no_mangle]
 pub extern "C" fn retro_run() {
     let emulator = unsafe { EMULATOR.as_mut().unwrap() };
+    let environment_cb = unsafe { ENVIRONMENT_CALLBACK.as_ref().unwrap() };
     let video_refresh_cb = unsafe { VIDEO_REFRESH_CALLBACK.as_ref().unwrap() };
     let sample_batch_cb = unsafe { AUDIO_SAMPLE_BATCH_CALLBACK.as_ref().unwrap() };
     let input_poll_cb = unsafe { INPUT_POLL_CALLBACK.as_ref().unwrap() };
@@ -256,6 +288,20 @@ pub extern "C" fn retro_run() {
     let cycle_limit = (GameBoy::CPU_FREQ as f32 * emulator.multiplier() as f32
         / GameBoy::VISUAL_FREQ)
         .round() as u32;
+
+    // determines if any of the variable has changed value
+    // if that's the case all of them must be polled for
+    // update, and if needed action is triggered
+    unsafe {
+        environment_cb(
+            RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE,
+            &UPDATED as *const _ as *const c_void,
+        );
+        if UPDATED {
+            update_vars();
+            UPDATED = false;
+        }
+    }
 
     loop {
         // limits the number of ticks to the typical number
@@ -340,6 +386,7 @@ pub unsafe extern "C" fn retro_load_game(game: *const RetroGameInfo) -> bool {
     instance.reset();
     instance.load(true);
     instance.load_cartridge(rom);
+    update_vars();
     true
 }
 
@@ -486,6 +533,25 @@ pub extern "C" fn retro_set_input_state(
     unsafe {
         INPUT_STATE_CALLBACK = callback;
     }
+}
+
+unsafe fn update_vars() {
+    update_palette();
+}
+
+unsafe fn update_palette() {
+    let emulator = EMULATOR.as_mut().unwrap();
+    let environment_cb = ENVIRONMENT_CALLBACK.as_ref().unwrap();
+    environment_cb(
+        RETRO_ENVIRONMENT_GET_VARIABLE,
+        &VARIABLE as *const _ as *const c_void,
+    );
+    if VARIABLE.value.is_null() {
+        return;
+    }
+    let palette_name = String::from(CStr::from_ptr(VARIABLE.value).to_str().unwrap());
+    let palette_info: boytacean::ppu::PaletteInfo = get_palette(palette_name);
+    emulator.ppu().set_palette_colors(palette_info.colors());
 }
 
 fn retro_key_to_pad(retro_key: RetroJoypad) -> Option<PadKey> {
