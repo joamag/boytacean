@@ -6,7 +6,7 @@ pub struct PaletteInfoStatic {
 }
 
 impl PaletteInfoStatic {
-    pub fn into_palette_info(&self) -> PaletteInfo {
+    pub fn to_palette_info(&self) -> PaletteInfo {
         PaletteInfo::new(self.name, self.colors)
     }
 }
@@ -84,8 +84,8 @@ pub fn get_palette_names() -> Vec<String> {
 pub fn get_palette(name: String) -> PaletteInfo {
     for palette in PALETTES.iter() {
         if palette.name == name {
-            return palette.into_palette_info();
+            return palette.to_palette_info();
         }
     }
-    PALETTES[0].into_palette_info()
+    PALETTES[0].to_palette_info()
 }
