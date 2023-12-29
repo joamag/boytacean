@@ -127,8 +127,8 @@ pub type Palette = [Pixel; PALETTE_SIZE];
 /// with alpha within the Game Boy context.
 pub type PaletteAlpha = [PixelAlpha; PALETTE_SIZE];
 
-/// Represents a palette with the metadata that is
-/// associated with it.
+/// Represents a palette together with the metadata
+/// that is associated with it.
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 #[derive(Clone, PartialEq, Eq)]
 pub struct PaletteInfo {
