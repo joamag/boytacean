@@ -130,7 +130,7 @@ jobs:
       - name: Build Web code
         run: |
           cd frontends/web
-          npm install && npm run build
+          npm install && NODE_ENV=production npm run build
       - name: Bundle files
         run: |
           apt-get update && apt-get install -y -q zip

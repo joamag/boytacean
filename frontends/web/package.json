@@ -8,7 +8,7 @@
     },
     "license": "Apache-2.0",
     "scripts": {
-        "build": "NODE_ENV=production parcel build index.html",
+        "build": "parcel build index.html",
         "dev": "parcel index.html",
         "lint": "eslint .",
         "nodemon": "nodemon --exec \"parcel --no-cache index.html\"",
@@ -19,11 +19,10 @@
     "source": "index.ts",
     "devDependencies": {
         "@parcel/transformer-typescript-tsc": "^2.10.3",
-        "@types/node": "^20.10.6",
         "@types/react": "^18.2.46",
         "@types/react-dom": "^18.2.18",
-        "@typescript-eslint/eslint-plugin": "^6.17.0",
-        "@typescript-eslint/parser": "^6.17.0",
+        "@typescript-eslint/eslint-plugin": "^6.16.0",
+        "@typescript-eslint/parser": "^6.16.0",
         "buffer": "^6.0.3",
         "emukit": "^0.9.4",
         "eslint": "^8.56.0",
