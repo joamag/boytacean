@@ -34,7 +34,7 @@ For the Web front-end...
 What's still missing...
 
 * Low-level cycle accurate system emulation
-* Game Boy Camera emulation
+* [Game Boy Camera](https://en.wikipedia.org/wiki/Game_Boy_Camera) emulation
 * NetPlay gaming support
 
 ## Deployments
