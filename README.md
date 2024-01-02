@@ -33,7 +33,9 @@ For the Web front-end...
 
 What's still missing...
 
-* Machine state saving and loading (.sav files)
+* Low-level cycle accurate system emulation
+* Game Boy Camera emulation
+* NetPlay gaming support
 
 ## Deployments
 
