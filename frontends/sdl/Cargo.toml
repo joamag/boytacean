@@ -1,6 +1,6 @@
 [package]
 name = "boytacean-sdl"
-version = "0.9.17"
+version = "0.9.18"
 authors = ["João Magalhães <joamag@gmail.com>"]
 description = "An SDL frontend for Boytacen"
 license = "Apache-2.0"
