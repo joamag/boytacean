@@ -28,7 +28,7 @@ version = "0.24"
 version = "0.4"
 
 [dependencies.sdl2]
-version = "0.35"
+version = "0.36"
 git = "https://github.com/Rust-SDL2/rust-sdl2"
 rev = "2ab81ae1d9e8b4455fea7f25640f26a21dea6ea2"
 features = ["ttf", "image", "gfx", "mixer", "static-link", "use-vcpkg"]
