@@ -27,7 +27,7 @@ except ImportError:
 
 setuptools.setup(
     name="boytacean",
-    version="0.9.16",
+    version="0.9.17",
     author="João Magalhães",
     author_email="joamag@gmail.com",
     description="A Game Boy emulator that is written in Rust",

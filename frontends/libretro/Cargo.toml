@@ -1,6 +1,6 @@
 [package]
 name = "boytacean-libretro"
-version = "0.9.16"
+version = "0.9.17"
 authors = ["João Magalhães <joamag@gmail.com>"]
 description = "A Lib Retro frontend for Boytacen"
 license = "Apache-2.0"

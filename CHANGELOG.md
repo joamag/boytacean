@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+*
+
+### Changed
+
+*
+
+### Fixed
+
+*
+
+## [0.9.17] - 2024-01-02
+
+### Added
+
 * Support for Python 3 API - [#36](https://gitlab.stage.hive.pt/joamag/boytacean/-/issues/36)
 * `next_frame()` method for frame by frame navigation
 * Support for palette switching option in Libretro - [#37](https://gitlab.stage.hive.pt/joamag/boytacean/-/issues/37)
@@ -16,10 +30,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 * Made part of the frontend code conditional on `NODE_ENV = "development"`
-
-### Fixed
-
-*
 
 ## [0.9.16] - 2023-10-30
 
