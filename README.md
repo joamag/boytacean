@@ -41,11 +41,11 @@ What's still missing...
 
 | Provider   | Stable  | URL                                                              |
 | ---------- | ------- | ---------------------------------------------------------------- |
-| cloudflare | `True`  | [boytacean.joao.me](https://boytacean.joao.me)                   |
-| cloudflare | `True`  | [boytacean.pages.dev](https://boytacean.pages.dev)               |
-| cloudflare | `True`  | [prod.boytacean.pages.dev](https://prod.boytacean.pages.dev)     |
-| cloudflare | `True`  | [stable.boytacean.pages.dev](https://stable.boytacean.pages.dev) |
-| cloudflare | `False` | [master.boytacean.pages.dev](https://master.boytacean.pages.dev) |
+| Cloudflare | `True`  | [boytacean.joao.me](https://boytacean.joao.me)                   |
+| Cloudflare | `True`  | [boytacean.pages.dev](https://boytacean.pages.dev)               |
+| Cloudflare | `True`  | [prod.boytacean.pages.dev](https://prod.boytacean.pages.dev)     |
+| Cloudflare | `True`  | [stable.boytacean.pages.dev](https://stable.boytacean.pages.dev) |
+| Cloudflare | `False` | [master.boytacean.pages.dev](https://master.boytacean.pages.dev) |
 
 ## Build
 
