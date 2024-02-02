@@ -39,8 +39,7 @@ export const bufferToDataUrl = (
     const imageData = bufferToImageData(buffer, width);
 
     const canvas = document.createElement("canvas");
-    canvas.width = imageData.width;
-    canvas.height = imageData.height;
+    [canvas.width, canvas.height] = [imageData.width, imageData.height];
 
     const context = canvas.getContext("2d");
     context?.putImageData(imageData, 0, 0);

@@ -543,17 +543,20 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     }
 
     get sections(): SectionInfo[] {
-        return [
+        const _sections: SectionInfo[] = [
             {
                 name: "Serial",
                 icon: require("../res/serial.svg"),
                 node: SerialSection({ emulator: this })
-            },
-            {
-                name: "Test",
-                node: TestSection({})
             }
         ];
+        if (process.env.NODE_ENV === "development") {
+            _sections.push({
+                name: "Test",
+                node: TestSection({})
+            });
+        }
+        return _sections;
     }
 
     get help(): HelpPanel[] {
