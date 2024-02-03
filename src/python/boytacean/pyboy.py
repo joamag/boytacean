@@ -215,6 +215,7 @@ class PyBoy(GameBoy):
         self.stop()
 
     def set_emulation_speed(self, speed: float):
+        # @TODO: implement emulation speed control
         print("Missing emulation speed control")
 
     def tick(self):
