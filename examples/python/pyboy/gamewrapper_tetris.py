@@ -2,6 +2,13 @@ import os
 import sys
 from typing import cast
 
+# @TODO: There are still some significant changes in the way
+# this file is structured compared to the original file, need
+# to reduce the changes and comments in the file so that the
+# original file can be used without significant modifications.
+# This should prove that the Boytacean PyBoy interface is a
+# drop-in replacement for the original PyBoy interface.
+
 # Makes us able to import PyBoy from the directory below
 # 
 file_path = os.path.dirname(os.path.realpath(__file__))
