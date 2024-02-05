@@ -9,8 +9,8 @@ from typing import cast
 # This should prove that the Boytacean PyBoy interface is a
 # drop-in replacement for the original PyBoy interface.
 
-# Makes us able to import PyBoy from the directory below
-# 
+# makes us able to import PyBoy from the directory below
+# the res directory structure (where it should be cloned)
 file_path = os.path.dirname(os.path.realpath(__file__))
 py_path = os.path.abspath(file_path + "/../../../res/extern/PyBoy")
 sys.path.insert(0, py_path)
