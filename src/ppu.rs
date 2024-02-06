@@ -11,6 +11,7 @@ use std::{
 
 use crate::{
     gb::{GameBoyConfig, GameBoyMode},
+    util::SharedThread,
     warnln,
 };
 
@@ -582,7 +583,7 @@ pub struct Ppu {
     /// The pointer to the parent configuration of the running
     /// Game Boy emulator, that can be used to control the behaviour
     /// of Game Boy emulation.
-    gbc: Arc<Mutex<GameBoyConfig>>,
+    gbc: SharedThread<GameBoyConfig>,
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
@@ -595,7 +596,7 @@ pub enum PpuMode {
 }
 
 impl Ppu {
-    pub fn new(mode: GameBoyMode, gbc: Arc<Mutex<GameBoyConfig>>) -> Self {
+    pub fn new(mode: GameBoyMode, gbc: SharedThread<GameBoyConfig>) -> Self {
         Self {
             color_buffer: Box::new([0u8; COLOR_BUFFER_SIZE]),
             shade_buffer: Box::new([0u8; COLOR_BUFFER_SIZE]),
@@ -1268,7 +1269,7 @@ impl Ppu {
         self.gb_mode = value;
     }
 
-    pub fn set_gbc(&mut self, value: Arc<Mutex<GameBoyConfig>>) {
+    pub fn set_gbc(&mut self, value: SharedThread<GameBoyConfig>) {
         self.gbc = value;
     }
 

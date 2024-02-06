@@ -57,7 +57,7 @@ class VideoCapture:
         return FORMATS.get(extension, [])
 
     def should_capture(self, frame_index) -> bool:
-        return self._start_frame == None or frame_index >= self._next_frame
+        return self._start_frame is None or frame_index >= self._next_frame
 
     def compute_next(self, frame_index):
         self._next_frame = frame_index + self._frame_gap
@@ -76,7 +76,7 @@ class VideoCapture:
         from cv2 import VideoWriter, VideoWriter_fourcc, imread
         from IPython.display import Video, FileLink
 
-        if not self._capture_temp_dir:
+        if self._capture_temp_dir is None:
             raise RuntimeError("Not capturing a video")
 
         image_paths = glob(f"{self.frames_glob}")

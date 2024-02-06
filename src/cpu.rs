@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 
 use crate::{
     apu::Apu,
@@ -11,6 +11,7 @@ use crate::{
     ppu::Ppu,
     serial::Serial,
     timer::Timer,
+    util::SharedThread,
 };
 
 pub const PREFIX: u8 = 0xcb;
@@ -44,11 +45,11 @@ pub struct Cpu {
     /// The pointer to the parent configuration of the running
     /// Game Boy emulator, that can be used to control the behaviour
     /// of Game Boy emulation.
-    gbc: Arc<Mutex<GameBoyConfig>>,
+    gbc: SharedThread<GameBoyConfig>,
 }
 
 impl Cpu {
-    pub fn new(mmu: Mmu, gbc: Arc<Mutex<GameBoyConfig>>) -> Self {
+    pub fn new(mmu: Mmu, gbc: SharedThread<GameBoyConfig>) -> Self {
         Self {
             pc: 0x0,
             sp: 0x0,
@@ -603,14 +604,14 @@ impl Cpu {
         self.ime = false;
     }
 
-    pub fn set_gbc(&mut self, value: Arc<Mutex<GameBoyConfig>>) {
+    pub fn set_gbc(&mut self, value: SharedThread<GameBoyConfig>) {
         self.gbc = value;
     }
 }
 
 impl Default for Cpu {
     fn default() -> Self {
-        let gbc: Arc<Mutex<GameBoyConfig>> = Arc::new(Mutex::new(GameBoyConfig::default()));
+        let gbc = SharedThread::new(Mutex::new(GameBoyConfig::default()));
         Cpu::new(Mmu::default(), gbc)
     }
 }

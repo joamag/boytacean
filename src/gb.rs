@@ -26,7 +26,7 @@ use crate::{
     rom::{Cartridge, RamSize},
     serial::{NullDevice, Serial, SerialDevice},
     timer::Timer,
-    util::read_file,
+    util::{read_file, SharedThread},
 };
 
 #[cfg(feature = "wasm")]
@@ -274,8 +274,8 @@ impl Default for GameBoyConfig {
 }
 
 /// Aggregation structure allowing the bundling of
-/// all the components of a GameBoy into a single a
-/// single element for easy access.
+/// all the components of a GameBoy into a single
+/// element for easy access.
 pub struct Components {
     pub ppu: Ppu,
     pub apu: Apu,
@@ -369,7 +369,7 @@ pub struct GameBoy {
     /// configuration values on the current emulator.
     /// If performance is required (may value access)
     /// the values should be cloned and stored locally.
-    gbc: Arc<Mutex<GameBoyConfig>>,
+    gbc: SharedThread<GameBoyConfig>,
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
@@ -493,6 +493,17 @@ impl GameBoy {
         loop {
             cycles += self.clock() as u32;
             if self.ppu_frame() != current_frame {
+                break;
+            }
+        }
+        cycles
+    }
+
+    pub fn step_to(&mut self, addr: u16) -> u32 {
+        let mut cycles = 0u32;
+        loop {
+            cycles += self.clock() as u32;
+            if self.cpu_i().pc() == addr {
                 break;
             }
         }
@@ -1087,6 +1098,14 @@ impl GameBoy {
 
     pub fn attach_serial(&mut self, device: Box<dyn SerialDevice>) {
         self.serial().set_device(device);
+    }
+
+    pub fn read_memory(&mut self, addr: u16) -> u8 {
+        self.mmu().read(addr)
+    }
+
+    pub fn write_memory(&mut self, addr: u16, value: u8) {
+        self.mmu().write(addr, value);
     }
 
     pub fn set_speed_callback(&mut self, callback: fn(speed: GameBoySpeed)) {

@@ -1,6 +1,6 @@
 //! MMU (Memory Management Unit) functions and structures.
 
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 
 use crate::{
     apu::Apu,
@@ -12,6 +12,7 @@ use crate::{
     rom::Cartridge,
     serial::Serial,
     timer::Timer,
+    util::SharedThread,
 };
 
 pub const BOOT_SIZE_DMG: usize = 256;
@@ -111,11 +112,15 @@ pub struct Mmu {
     /// The pointer to the parent configuration of the running
     /// Game Boy emulator, that can be used to control the behaviour
     /// of Game Boy emulation.
-    gbc: Arc<Mutex<GameBoyConfig>>,
+    gbc: SharedThread<GameBoyConfig>,
 }
 
 impl Mmu {
-    pub fn new(components: Components, mode: GameBoyMode, gbc: Arc<Mutex<GameBoyConfig>>) -> Self {
+    pub fn new(
+        components: Components,
+        mode: GameBoyMode,
+        gbc: SharedThread<GameBoyConfig>,
+    ) -> Self {
         Self {
             ppu: components.ppu,
             apu: components.apu,
@@ -602,7 +607,7 @@ impl Mmu {
         self.mode = value;
     }
 
-    pub fn set_gbc(&mut self, value: Arc<Mutex<GameBoyConfig>>) {
+    pub fn set_gbc(&mut self, value: SharedThread<GameBoyConfig>) {
         self.gbc = value;
     }
 }
@@ -610,7 +615,7 @@ impl Mmu {
 impl Default for Mmu {
     fn default() -> Self {
         let mode = GameBoyMode::Dmg;
-        let gbc = Arc::new(Mutex::new(GameBoyConfig::default()));
+        let gbc = SharedThread::new(Mutex::new(GameBoyConfig::default()));
         let components = Components {
             ppu: Ppu::new(mode, gbc.clone()),
             apu: Apu::default(),

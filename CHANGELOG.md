@@ -9,11 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-*
+* Initial support for the `PyBoy` compatibility layer - [#36](https://gitlab.stage.hive.pt/joamag/boytacean/-/issues/36)
+* Python interface file for base boytacean (`boytacean.pyi`)
+* Interface to custom boot ROM loading in Python
 
 ### Changed
 
-*
+* Better `boot_dump.py` script with support for other string output formats
 
 ### Fixed
 

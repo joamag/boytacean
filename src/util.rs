@@ -4,12 +4,19 @@ use std::{
     io::{BufWriter, Read, Write},
     path::Path,
     rc::Rc,
+    sync::{Arc, Mutex},
 };
 
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
 
+/// Shared mutable type able to be passed between types
+/// allowing for circular referencing and interior mutability.
 pub type SharedMut<T> = Rc<RefCell<T>>;
+
+/// Shared thread type able to be passed between threads.
+/// Significant performance overhead compared to `SharedMut`.
+pub type SharedThread<T> = Arc<Mutex<T>>;
 
 /// Reads the contents of the file at the given path into
 /// a vector of bytes.

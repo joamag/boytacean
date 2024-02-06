@@ -7,17 +7,24 @@ from PIL.Image import Image, frombytes
 from .palettes import PALETTES
 from .video import VideoCapture
 
-from .boytacean import (
-    DISPLAY_WIDTH,
-    DISPLAY_HEIGHT,
-    GameBoy as GameBoyRust,
-)
+from .boytacean import DISPLAY_WIDTH, DISPLAY_HEIGHT, GameBoy as GameBoyRust
 
 
 class GameBoyMode(Enum):
     DMG = 1
     CGB = 2
     SGB = 3
+
+
+class PadKey(Enum):
+    Up = 1
+    Down = 2
+    Left = 3
+    Right = 4
+    Start = 5
+    Select = 6
+    A = 7
+    B = 8
 
 
 class GameBoy:
@@ -33,11 +40,12 @@ class GameBoy:
         dma_enabled=True,
         timer_enabled=True,
         serial_enabled=True,
-        load_graphics=True,
+        load_graphics=False,
         load=True,
         boot=True,
     ):
         super().__init__()
+        self._mode = mode
         self._frame_index = 0
         self._video = None
         self._display = None
@@ -69,11 +77,23 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
     def load(self, boot=True):
         self._system.load(boot)
 
-    def load_rom(self, filename: str):
-        self._system.load_rom_file(filename)
+    def load_boot(self, path: str):
+        self._system.load_boot_path(path)
+
+    def load_boot_data(self, data: bytes):
+        self._system.load_boot(data)
+
+    def load_rom(self, path: str):
+        self._system.load_rom_file(path)
 
     def load_rom_data(self, data: bytes):
         self._system.load_rom(data)
+
+    def read_memory(self, addr: int) -> int:
+        return self._system.read_memory(addr)
+
+    def write_memory(self, addr: int, value: int):
+        self._system.write_memory(addr, value)
 
     def clock(self) -> int:
         return self._system.clock()
@@ -90,11 +110,20 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
         self._on_next_frame()
         return cycles
 
+    def step_to(self, addr: int) -> int:
+        return self._system.step_to(addr)
+
     def skip_frames(self, count: int) -> int:
         cycles = 0
         for _ in range(count):
             cycles += self.next_frame()
         return cycles
+
+    def key_press(self, key: PadKey):
+        self._system.key_press(key.value)
+
+    def key_lift(self, key: PadKey):
+        self._system.key_lift(key.value)
 
     def frame_buffer(self) -> bytes:
         return self._system.frame_buffer()
@@ -104,9 +133,9 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
         image = frombytes("RGB", (DISPLAY_WIDTH, DISPLAY_HEIGHT), frame_buffer, "raw")
         return image
 
-    def save_image(self, filename: str, format: str = "png"):
+    def save_image(self, path: str, format: str = "png"):
         image = self.image()
-        image.save(filename, format=format)
+        image.save(path, format=format)
 
     def video(
         self,
@@ -115,7 +144,7 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
     ) -> Any:
         from IPython.display import display as _display
 
-        if self._video == None:
+        if self._video is None:
             raise RuntimeError("Not capturing a video")
 
         video = self._video.build(save=save)
@@ -136,6 +165,12 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
         from .graphics import Display
 
         self._display = Display()
+
+    def save_state(self) -> bytes:
+        return self._system.save_state()
+
+    def load_state(self, data: bytes):
+        self._system.load_state(data)
 
     @property
     def ppu_enabled(self) -> bool:
@@ -185,6 +220,14 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
         return self._system.clock_freq_s()
 
     @property
+    def timer_div(self) -> int:
+        return self._system.timer_div()
+
+    @timer_div.setter
+    def timer_div(self, value: int):
+        self._system.set_timer_div(value)
+
+    @property
     def frame_count(self) -> int:
         return self._frame_index
 
@@ -219,11 +262,11 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
             self._stop_capture()
 
     def _on_next_frame(self):
-        if self._video != None and self._video.should_capture(self._frame_index):
+        if self._video is not None and self._video.should_capture(self._frame_index):
             self._video.save_frame(self.image(), self._frame_index)
             self._video.compute_next(self._frame_index)
 
-        if self._display != None and self._display.should_render(self._frame_index):
+        if self._display is not None and self._display.should_render(self._frame_index):
             from .graphics import Display
 
             cast(Display, self._display).render_frame(self.frame_buffer())
@@ -236,7 +279,7 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
         fps=5,
         frame_format="png",
     ):
-        if self._video != None:
+        if self._video is not None:
             raise RuntimeError("Already capturing a video")
         self._video = VideoCapture(
             start_frame=self._frame_index,

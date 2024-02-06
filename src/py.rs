@@ -1,9 +1,11 @@
-use pyo3::{prelude::*, types::PyBytes};
+use pyo3::{exceptions::PyException, prelude::*, types::PyBytes};
 
 use crate::{
     gb::{GameBoy as GameBoyBase, GameBoyMode},
     info::Info,
+    pad::PadKey,
     ppu::{PaletteInfo, DISPLAY_HEIGHT, DISPLAY_WIDTH},
+    state::StateManager,
 };
 
 #[pyclass]
@@ -32,12 +34,30 @@ impl GameBoy {
         self.system.load(boot);
     }
 
+    pub fn load_boot(&mut self, data: &[u8]) {
+        self.system.load_boot(data)
+    }
+
+    pub fn load_boot_path(&mut self, path: &str) -> PyResult<()> {
+        self.system
+            .load_boot_path(path)
+            .map_err(PyErr::new::<PyException, _>)
+    }
+
     pub fn load_rom(&mut self, data: &[u8]) {
         self.system.load_rom(data, None);
     }
 
     pub fn load_rom_file(&mut self, path: &str) {
         self.system.load_rom_file(path, None);
+    }
+
+    pub fn read_memory(&mut self, addr: u16) -> u8 {
+        self.system.read_memory(addr)
+    }
+
+    pub fn write_memory(&mut self, addr: u16, value: u8) {
+        self.system.write_memory(addr, value);
     }
 
     pub fn clock(&mut self) -> u16 {
@@ -54,6 +74,18 @@ impl GameBoy {
 
     pub fn next_frame(&mut self) -> u32 {
         self.system.next_frame()
+    }
+
+    pub fn step_to(&mut self, addr: u16) -> u32 {
+        self.system.step_to(addr)
+    }
+
+    pub fn key_press(&mut self, key: u8) {
+        self.system.key_press(PadKey::from_u8(key))
+    }
+
+    pub fn key_lift(&mut self, key: u8) {
+        self.system.key_lift(PadKey::from_u8(key))
     }
 
     pub fn frame_buffer(&mut self, py: Python) -> PyObject {
@@ -116,6 +148,25 @@ impl GameBoy {
 
     pub fn clock_freq_s(&self) -> String {
         self.system.clock_freq_s()
+    }
+
+    pub fn timer_div(&self) -> u8 {
+        self.system.timer_i().div()
+    }
+
+    pub fn set_timer_div(&mut self, value: u8) {
+        self.system.timer().set_div(value);
+    }
+
+    pub fn save_state(&mut self, py: Python) -> PyResult<PyObject> {
+        match StateManager::save(&mut self.system, None) {
+            Ok(data) => Ok(PyBytes::new(py, &data).into()),
+            Err(e) => Err(PyErr::new::<PyException, _>(e)),
+        }
+    }
+
+    pub fn load_state(&mut self, data: &[u8]) -> PyResult<()> {
+        StateManager::load(data, &mut self.system, None).map_err(PyErr::new::<PyException, _>)
     }
 }
 
