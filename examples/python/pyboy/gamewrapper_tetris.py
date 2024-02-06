@@ -17,7 +17,7 @@ sys.path.insert(0, py_path)
 
 from boytacean.pyboy import PyBoy, WindowEvent
 
-#from pyboy import PyBoy, WindowEvent
+# from pyboy import PyBoy, WindowEvent
 
 from pyboy.plugins.game_wrapper_tetris import GameWrapperTetris
 
@@ -95,8 +95,9 @@ assert any(filter(lambda x: x != blank_tile, game_area[-1, :]))
 tetris.reset_game(timer_div=0x00)
 assert tetris.next_tetromino() == tetromino_at_0x00, tetris.next_tetromino()
 
-tetris.reset_game(timer_div=0x00)  #RESET is not working
+tetris.reset_game(timer_div=0x00)  # RESET is not working
 import time
+
 time.sleep(10)
 assert tetris.next_tetromino() == tetromino_at_0x00, tetris.next_tetromino()
 # After reseting, we should have a clean game area

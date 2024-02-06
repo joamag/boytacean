@@ -20,6 +20,7 @@ class NonImportableModule:
     def __getattr__(self, name):
         raise ImportError("This module cannot be imported.")
 
+
 # in case the Cython patch hack is set then removes the Cython module
 # from the modules dictionary, effectivly preventing it from being imported
 # and as a result no Cython code will be compiled
