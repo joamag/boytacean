@@ -66,7 +66,7 @@ impl GameShark {
         let mut writes = vec![];
         for code in self.codes.values() {
             // calculates the real RAM address using both
-            // he base RAM address the RAM bank offset
+            // the base RAM address and the RAM bank offset
             let (base_addr, addr) = if code.addr <= 0xc000 {
                 (
                     0xa000,
