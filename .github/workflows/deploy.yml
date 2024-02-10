@@ -118,7 +118,7 @@ jobs:
     name: Build WASM
     timeout-minutes: 30
     runs-on: ubuntu-latest
-    container: rust:1.73.0
+    container: rust:1.74.0
     steps:
       - name: Checkout code from repository
         uses: actions/checkout@v4
