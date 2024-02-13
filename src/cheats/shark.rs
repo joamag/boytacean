@@ -8,6 +8,18 @@ use crate::rom::RomType;
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
 
+/// Implementation of the GameShark cheat code system
+/// that "patches" RAM entries, making use of the V-Blank
+/// time to do that.
+///
+/// The codes in the GameShark system are in an hexadecimal
+/// ASCII format in the form of "ABCDGHEF" where:
+/// AB = RAM bank
+/// CD = New data
+/// GH = Address LSB
+/// EF = Address MSB
+///
+/// [Wikipedia - GameShark](https://en.wikipedia.org/wiki/GameShark)
 #[derive(Clone)]
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 pub struct GameShark {
