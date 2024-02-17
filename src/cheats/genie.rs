@@ -3,6 +3,8 @@ use std::{
     fmt::{self, Display, Formatter},
 };
 
+use crate::error::Error;
+
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
 
@@ -41,14 +43,14 @@ impl GameGenie {
         self.codes.contains_key(&addr)
     }
 
-    pub fn get_addr(&self, addr: u16) -> Result<&GameGenieCode, String> {
+    pub fn get_addr(&self, addr: u16) -> Result<&GameGenieCode, Error> {
         match self.codes.get(&addr) {
             Some(code) => Ok(code),
-            None => Err(format!("Invalid address: {}", addr)),
+            None => Err(Error::CustomError(format!("Invalid address: {}", addr))),
         }
     }
 
-    pub fn add_code(&mut self, code: &str) -> Result<&GameGenieCode, String> {
+    pub fn add_code(&mut self, code: &str) -> Result<&GameGenieCode, Error> {
         let genie_code = GameGenieCode::from_code(code, None)?;
         let addr = genie_code.addr;
         self.codes.insert(addr, genie_code);
@@ -85,14 +87,14 @@ impl GameGenieCode {
     /// in the ABC-DEF-GHI or ABC-DEF format.
     /// Note that the additive mode (ex: ABC+DEF+GHI) can be optionally
     /// handled or ignored using the `handle_additive` parameter.
-    pub fn from_code(code: &str, handle_additive: Option<bool>) -> Result<Self, String> {
+    pub fn from_code(code: &str, handle_additive: Option<bool>) -> Result<Self, Error> {
         let code_length = code.len();
 
         if code_length != 11 && code_length != 7 {
-            return Err(format!(
+            return Err(Error::CustomError(format!(
                 "Invalid Game Genie code length: {} digits",
                 code_length
-            ));
+            )));
         }
 
         let code_u = code.to_uppercase();
@@ -106,12 +108,12 @@ impl GameGenieCode {
 
         let new_data_slice = &code_u[0..=1];
         let new_data = u8::from_str_radix(new_data_slice, 16)
-            .map_err(|e| format!("Invalid new data: {}", e))?;
+            .map_err(|e| Error::CustomError(format!("Invalid new data: {}", e)))?;
 
         let old_data = if code_length == 11 {
             let old_data_slice: String = format!("{}{}", &code_u[8..=8], &code_u[10..=10]);
             u8::from_str_radix(old_data_slice.as_str(), 16)
-                .map_err(|e| format!("Invalid old data: {}", e))?
+                .map_err(|e| Error::CustomError(format!("Invalid old data: {}", e)))?
                 .rotate_right(2)
                 ^ 0xba
         } else {
@@ -120,11 +122,14 @@ impl GameGenieCode {
 
         let addr_slice = format!("{}{}{}", &code_u[6..=6], &code_u[2..=2], &code_u[4..=5]);
         let addr = u16::from_str_radix(addr_slice.as_str(), 16)
-            .map_err(|e| format!("Invalid address: {}", e))?
+            .map_err(|e| Error::CustomError(format!("Invalid address: {}", e)))?
             ^ 0xf000;
 
         if addr > 0x7fff {
-            return Err(format!("Invalid cheat address: 0x{:04x}", addr));
+            return Err(Error::CustomError(format!(
+                "Invalid cheat address: 0x{:04x}",
+                addr
+            )));
         }
 
         Ok(Self {

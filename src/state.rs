@@ -1204,8 +1204,8 @@ impl State for BessCore {
             gb.cpu_i().ime(),
             gb.mmu_i().ie,
             u8::from(gb.cpu().halted()),
-            // @TODO: these registers cannot be totally retrieved
-            // because of that some audio noise exists
+            // @TODO: these registers cannot be completely retrieved
+            // and because of that some audio noise is played
             // The loading of the registers should be done in a much
             // more manual way like SameBoy does here
             // https://github.com/LIJI32/SameBoy/blob/7e6f1f866e89430adaa6be839aecc4a2ccabd69c/Core/save_state.c#L673

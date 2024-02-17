@@ -6,6 +6,7 @@ pub mod cpu;
 pub mod data;
 pub mod devices;
 pub mod dma;
+pub mod error;
 pub mod gb;
 pub mod gen;
 pub mod info;

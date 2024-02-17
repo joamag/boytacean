@@ -16,6 +16,7 @@ use crate::{
     data::{BootRom, CGB_BOOT, DMG_BOOT, DMG_BOOTIX, MGB_BOOTIX, SGB_BOOT},
     devices::{printer::PrinterDevice, stdout::StdoutDevice},
     dma::Dma,
+    error::Error,
     info::Info,
     mmu::Mmu,
     pad::{Pad, PadKey},
@@ -1117,25 +1118,19 @@ impl GameBoy {
         self.reset_game_shark();
     }
 
-    pub fn add_cheat_code(&mut self, code: &str) -> Result<bool, String> {
+    pub fn add_cheat_code(&mut self, code: &str) -> Result<bool, Error> {
         if GameGenie::is_code(code) {
-            return match self.add_game_genie_code(code) {
-                Ok(_) => Ok(true),
-                Err(message) => Err(message),
-            };
+            return self.add_game_genie_code(code).map(|_| true);
         }
 
         if GameShark::is_code(code) {
-            return match self.add_game_shark_code(code) {
-                Ok(_) => Ok(true),
-                Err(message) => Err(message),
-            };
+            return self.add_game_shark_code(code).map(|_| true);
         }
 
-        Err(String::from("Not a valid cheat code"))
+        Err(Error::CustomError(String::from("Not a valid cheat code")))
     }
 
-    pub fn add_game_genie_code(&mut self, code: &str) -> Result<&GameGenieCode, String> {
+    pub fn add_game_genie_code(&mut self, code: &str) -> Result<&GameGenieCode, Error> {
         let rom = self.mmu().rom();
         if rom.game_genie().is_none() {
             let game_genie = GameGenie::default();
@@ -1145,7 +1140,7 @@ impl GameBoy {
         game_genie.add_code(code)
     }
 
-    pub fn add_game_shark_code(&mut self, code: &str) -> Result<&GameSharkCode, String> {
+    pub fn add_game_shark_code(&mut self, code: &str) -> Result<&GameSharkCode, Error> {
         let rom = self.rom();
         if rom.game_shark().is_none() {
             let game_shark = GameShark::default();

@@ -3,7 +3,7 @@ use std::{
     fmt::{self, Display, Formatter},
 };
 
-use crate::rom::RomType;
+use crate::{error::Error, rom::RomType};
 
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
@@ -60,14 +60,14 @@ impl GameShark {
         self.codes.clear();
     }
 
-    pub fn get_addr(&self, addr: u16) -> Result<&GameSharkCode, String> {
+    pub fn get_addr(&self, addr: u16) -> Result<&GameSharkCode, Error> {
         match self.codes.get(&addr) {
             Some(code) => Ok(code),
-            None => Err(format!("Invalid address: {}", addr)),
+            None => Err(Error::CustomError(format!("Invalid address: {}", addr))),
         }
     }
 
-    pub fn add_code(&mut self, code: &str) -> Result<&GameSharkCode, String> {
+    pub fn add_code(&mut self, code: &str) -> Result<&GameSharkCode, Error> {
         let shark_code = GameSharkCode::from_code(code, &self.rom_type)?;
         let addr = shark_code.addr;
         self.codes.insert(addr, shark_code);
@@ -118,34 +118,37 @@ pub struct GameSharkCode {
 impl GameSharkCode {
     /// Creates a new GameShark code structure from the provided string
     /// in the ABCDGHEF format.
-    pub fn from_code(code: &str, rom_type: &RomType) -> Result<Self, String> {
+    pub fn from_code(code: &str, rom_type: &RomType) -> Result<Self, Error> {
         let code_length = code.len();
 
         if code_length != 8 {
-            return Err(format!(
+            return Err(Error::CustomError(format!(
                 "Invalid GameShark code length: {} digits",
                 code_length
-            ));
+            )));
         }
 
         let code_u = code.to_uppercase();
 
         let ram_bank_slice = &code_u[0..=1];
         let mut ram_bank = u8::from_str_radix(ram_bank_slice, 16)
-            .map_err(|e| format!("Invalid RAM bank: {}", e))?
+            .map_err(|e| Error::CustomError(format!("Invalid RAM bank: {}", e)))?
             & rom_type.mbc_type().ram_bank_mask();
         ram_bank = if ram_bank == 0x00 { 0x01 } else { ram_bank };
 
         let new_data_slice = &code_u[2..=3];
         let new_data = u8::from_str_radix(new_data_slice, 16)
-            .map_err(|e| format!("Invalid new data: {}", e))?;
+            .map_err(|e| Error::CustomError(format!("Invalid new data: {}", e)))?;
 
         let addr_slice = format!("{}{}", &code_u[6..=7], &code_u[4..=5]);
-        let addr =
-            u16::from_str_radix(&addr_slice, 16).map_err(|e| format!("Invalid address: {}", e))?;
+        let addr = u16::from_str_radix(&addr_slice, 16)
+            .map_err(|e| Error::CustomError(format!("Invalid address: {}", e)))?;
 
         if !(0xa000..=0xdfff).contains(&addr) {
-            return Err(format!("Invalid cheat address: 0x{:04x}", addr));
+            return Err(Error::CustomError(format!(
+                "Invalid cheat address: 0x{:04x}",
+                addr
+            )));
         }
 
         Ok(Self {

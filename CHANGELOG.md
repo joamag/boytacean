@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 * Better `boot_dump.py` script with support for other string output formats
+* Improved error handling using the `Error` enum
 
 ### Fixed
 
