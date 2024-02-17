@@ -1040,13 +1040,13 @@ impl GameBoy {
         self.mmu_i().rom_i()
     }
 
-    pub fn load_boot_path(&mut self, path: &str) -> Result<(), String> {
+    pub fn load_boot_path(&mut self, path: &str) -> Result<(), Error> {
         let data = read_file(path)?;
         self.load_boot(&data);
         Ok(())
     }
 
-    pub fn load_boot_file(&mut self, boot_rom: BootRom) -> Result<(), String> {
+    pub fn load_boot_file(&mut self, boot_rom: BootRom) -> Result<(), Error> {
         match boot_rom {
             BootRom::Dmg => self.load_boot_path("./res/boot/dmg_boot.bin")?,
             BootRom::Sgb => self.load_boot_path("./res/boot/sgb_boot.bin")?,
@@ -1058,17 +1058,17 @@ impl GameBoy {
         Ok(())
     }
 
-    pub fn load_boot_default_f(&mut self) -> Result<(), String> {
+    pub fn load_boot_default_f(&mut self) -> Result<(), Error> {
         self.load_boot_dmg_f()?;
         Ok(())
     }
 
-    pub fn load_boot_dmg_f(&mut self) -> Result<(), String> {
+    pub fn load_boot_dmg_f(&mut self) -> Result<(), Error> {
         self.load_boot_file(BootRom::DmgBootix)?;
         Ok(())
     }
 
-    pub fn load_boot_cgb_f(&mut self) -> Result<(), String> {
+    pub fn load_boot_cgb_f(&mut self) -> Result<(), Error> {
         self.load_boot_file(BootRom::Cgb)?;
         Ok(())
     }
