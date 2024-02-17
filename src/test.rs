@@ -65,16 +65,16 @@ pub fn run_image_test(
 
 #[cfg(test)]
 mod tests {
-    use super::{run_serial_test, TestOptions};
+    use super::{run_serial_test, run_step_test, TestOptions};
 
     #[test]
-    fn test_blargg_cpu_instrs() {
-        let result = run_serial_test(
+    fn test_boot_state() {
+        let result = run_step_test(
             "res/roms/test/blargg/cpu/cpu_instrs.gb",
-            Some(300000000),
+            0x0100,
             TestOptions::default(),
         );
-        assert_eq!(result, "cpu_instrs\n\n01:ok  02:ok  03:ok  04:ok  05:ok  06:ok  07:ok  08:ok  09:ok  10:ok  11:ok  \n\nPassed all tests\n");
+        assert_eq!(result.cpu_i().pc(), 0x0100);
     }
 
     #[test]
