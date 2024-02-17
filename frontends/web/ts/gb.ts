@@ -804,22 +804,22 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
 
     serializeState(): Uint8Array {
         if (!this.gameBoy) throw new Error("Unable to serialize state");
-        return StateManager.save(this.gameBoy, SaveStateFormat.Bos);
+        return StateManager.save_ws(this.gameBoy, SaveStateFormat.Bos);
     }
 
     unserializeState(data: Uint8Array) {
         if (!this.gameBoy) throw new Error("Unable to unserialize state");
-        StateManager.load(data, this.gameBoy, SaveStateFormat.Bos);
+        StateManager.load_ws(data, this.gameBoy, SaveStateFormat.Bos);
     }
 
     buildState(index: number, data: Uint8Array): SaveState {
-        const state = StateManager.read_bos(data);
+        const state = StateManager.read_bos_ws(data);
         return {
             index: index,
-            timestamp: Number(state.timestamp()),
-            agent: state.agent(),
-            model: state.model(),
-            thumbnail: state.image_eager()
+            timestamp: Number(state.timestamp_ws()),
+            agent: state.agent_ws(),
+            model: state.model_ws(),
+            thumbnail: state.image_eager_ws()
         };
     }
 

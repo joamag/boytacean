@@ -128,7 +128,6 @@ impl BosState {
     }
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen)]
 impl BosState {
     pub fn timestamp(&self) -> Result<u64, Error> {
         if let Some(info) = &self.info {
@@ -160,6 +159,26 @@ impl BosState {
         } else {
             Err(Error::CustomError(String::from("No image available")))
         }
+    }
+}
+
+#[cfg(feature = "wasm")]
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
+impl BosState {
+    pub fn timestamp_ws(&self) -> Result<u64, String> {
+        Self::timestamp(self).map_err(|e| e.to_string())
+    }
+
+    pub fn agent_ws(&self) -> Result<String, String> {
+        Self::agent(self).map_err(|e| e.to_string())
+    }
+
+    pub fn model_ws(&self) -> Result<String, String> {
+        Self::model(self).map_err(|e| e.to_string())
+    }
+
+    pub fn image_eager_ws(&self) -> Result<Vec<u8>, String> {
+        Self::image_eager(self).map_err(|e| e.to_string())
     }
 }
 
@@ -1465,7 +1484,6 @@ impl StateManager {
     }
 }
 
-#[cfg_attr(feature = "wasm", wasm_bindgen)]
 impl StateManager {
     pub fn save(gb: &mut GameBoy, format: Option<SaveStateFormat>) -> Result<Vec<u8>, Error> {
         let mut data = Cursor::new(vec![]);
@@ -1560,6 +1578,34 @@ impl StateManager {
                 "Format foes not support thumbnail",
             ))),
         }
+    }
+}
+
+#[cfg(feature = "wasm")]
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
+impl StateManager {
+    pub fn save_ws(gb: &mut GameBoy, format: Option<SaveStateFormat>) -> Result<Vec<u8>, String> {
+        Self::save(gb, format).map_err(|e| e.to_string())
+    }
+
+    pub fn load_ws(
+        data: &[u8],
+        gb: &mut GameBoy,
+        format: Option<SaveStateFormat>,
+    ) -> Result<(), String> {
+        Self::load(data, gb, format).map_err(|e| e.to_string())
+    }
+
+    pub fn read_bos_ws(data: &[u8]) -> Result<BosState, String> {
+        Self::read_bos(data).map_err(|e| e.to_string())
+    }
+
+    pub fn read_bess_ws(data: &[u8]) -> Result<BessState, String> {
+        Self::read_bess(data).map_err(|e| e.to_string())
+    }
+
+    pub fn thumbnail_ws(data: &[u8], format: Option<SaveStateFormat>) -> Result<Vec<u8>, String> {
+        Self::thumbnail(data, format).map_err(|e| e.to_string())
     }
 }
 
