@@ -42,6 +42,13 @@ pub fn run_test(rom_path: &str, max_cycles: Option<u64>, options: TestOptions) -
     game_boy
 }
 
+pub fn run_step_test(rom_path: &str, addr: u16, options: TestOptions) -> GameBoy {
+    let mut game_boy = build_test(options);
+    game_boy.load_rom_file(rom_path, None);
+    game_boy.step_to(addr);
+    game_boy
+}
+
 pub fn run_serial_test(rom_path: &str, max_cycles: Option<u64>, options: TestOptions) -> String {
     let mut game_boy = run_test(rom_path, max_cycles, options);
     game_boy.serial().device().state()
@@ -59,6 +66,16 @@ pub fn run_image_test(
 #[cfg(test)]
 mod tests {
     use super::{run_serial_test, TestOptions};
+
+    #[test]
+    fn test_blargg_cpu_instrs() {
+        let result = run_serial_test(
+            "res/roms/test/blargg/cpu/cpu_instrs.gb",
+            Some(300000000),
+            TestOptions::default(),
+        );
+        assert_eq!(result, "cpu_instrs\n\n01:ok  02:ok  03:ok  04:ok  05:ok  06:ok  07:ok  08:ok  09:ok  10:ok  11:ok  \n\nPassed all tests\n");
+    }
 
     #[test]
     fn test_blargg_cpu_instrs() {
