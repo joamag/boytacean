@@ -75,6 +75,12 @@ mod tests {
             TestOptions::default(),
         );
         assert_eq!(result.cpu_i().pc(), 0x0100);
+        assert_eq!(result.cpu_i().sp(), 0xfffe);
+        assert_eq!(result.cpu_i().af(), 0x01b0);
+        assert_eq!(result.cpu_i().bc(), 0x0013);
+        assert_eq!(result.cpu_i().de(), 0x00d8);
+        assert_eq!(result.cpu_i().hl(), 0x014d);
+        assert_eq!(result.cpu_i().ime(), false);
     }
 
     #[test]
