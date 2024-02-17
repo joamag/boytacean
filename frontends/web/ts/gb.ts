@@ -47,6 +47,9 @@ import info from "../package.json";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 declare const require: any;
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+declare const process: any;
+
 /**
  * The frequency at which the Game Boy emulator should
  * run "normally".
