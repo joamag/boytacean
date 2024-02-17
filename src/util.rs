@@ -33,7 +33,7 @@ pub fn read_file(path: &str) -> Result<Vec<u8>, Error> {
 /// Writes the given data to the file at the given path.
 pub fn write_file(path: &str, data: &[u8]) -> Result<(), Error> {
     let mut file = File::create(path)
-        .map_err(|_| Error::CustomError(format!("Failed to open file: {}", path)))?;
+        .map_err(|_| Error::CustomError(format!("Failed to create file: {}", path)))?;
     file.write_all(data).unwrap();
     Ok(())
 }
@@ -62,11 +62,9 @@ pub fn capitalize(string: &str) -> String {
     }
 }
 
-pub fn save_bmp(path: &str, pixels: &[u8], width: u32, height: u32) -> Result<(), String> {
-    let file = match File::create(path) {
-        Ok(file) => file,
-        Err(_) => return Err(format!("Failed to open file: {}", path)),
-    };
+pub fn save_bmp(path: &str, pixels: &[u8], width: u32, height: u32) -> Result<(), Error> {
+    let file = File::create(path)
+        .map_err(|_| Error::CustomError(format!("Failed to create file: {}", path)))?;
     let mut writer = BufWriter::new(file);
 
     // writes the BMP file header
