@@ -1168,7 +1168,7 @@ impl GameBoy {
 #[cfg(feature = "wasm")]
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 impl GameBoy {
-    pub fn set_panic_hook_ws() {
+    pub fn set_panic_hook_wa() {
         let prev = take_hook();
         set_hook(Box::new(move |info| {
             hook_impl(info);
@@ -1176,7 +1176,7 @@ impl GameBoy {
         }));
     }
 
-    pub fn load_rom_ws(&mut self, data: &[u8]) -> Cartridge {
+    pub fn load_rom_wa(&mut self, data: &[u8]) -> Cartridge {
         let rom = self.load_rom(data, None);
         rom.set_rumble_cb(|active| {
             rumble_callback(active);
@@ -1184,18 +1184,18 @@ impl GameBoy {
         rom.clone()
     }
 
-    pub fn load_callbacks_ws(&mut self) {
+    pub fn load_callbacks_wa(&mut self) {
         self.set_speed_callback(|speed| {
             speed_callback(speed);
         });
     }
 
-    pub fn load_null_ws(&mut self) {
+    pub fn load_null_wa(&mut self) {
         let null = Box::<NullDevice>::default();
         self.attach_serial(null);
     }
 
-    pub fn load_logger_ws(&mut self) {
+    pub fn load_logger_wa(&mut self) {
         let mut logger = Box::<StdoutDevice>::default();
         logger.set_callback(|data| {
             logger_callback(data.to_vec());
@@ -1203,7 +1203,7 @@ impl GameBoy {
         self.attach_serial(logger);
     }
 
-    pub fn load_printer_ws(&mut self) {
+    pub fn load_printer_wa(&mut self) {
         let mut printer = Box::<PrinterDevice>::default();
         printer.set_callback(|image_buffer| {
             printer_callback(image_buffer.to_vec());
@@ -1213,12 +1213,12 @@ impl GameBoy {
 
     /// Updates the emulation mode using the cartridge
     /// of the provided data to obtain the CGB flag value.
-    pub fn infer_mode_ws(&mut self, data: &[u8]) {
+    pub fn infer_mode_wa(&mut self, data: &[u8]) {
         let mode = Cartridge::from_data(data).gb_mode();
         self.set_mode(mode);
     }
 
-    pub fn set_palette_colors_ws(&mut self, value: Vec<JsValue>) {
+    pub fn set_palette_colors_wa(&mut self, value: Vec<JsValue>) {
         let palette: Palette = value
             .into_iter()
             .map(|v| Self::js_to_pixel(&v))
@@ -1228,7 +1228,7 @@ impl GameBoy {
         self.ppu().set_palette_colors(&palette);
     }
 
-    pub fn wasm_engine_ws(&self) -> Option<String> {
+    pub fn wasm_engine_wa(&self) -> Option<String> {
         let dependencies = dependencies_map();
         if !dependencies.contains_key("wasm-bindgen") {
             return None;

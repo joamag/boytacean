@@ -165,19 +165,19 @@ impl BosState {
 #[cfg(feature = "wasm")]
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 impl BosState {
-    pub fn timestamp_ws(&self) -> Result<u64, String> {
+    pub fn timestamp_wa(&self) -> Result<u64, String> {
         Self::timestamp(self).map_err(|e| e.to_string())
     }
 
-    pub fn agent_ws(&self) -> Result<String, String> {
+    pub fn agent_wa(&self) -> Result<String, String> {
         Self::agent(self).map_err(|e| e.to_string())
     }
 
-    pub fn model_ws(&self) -> Result<String, String> {
+    pub fn model_wa(&self) -> Result<String, String> {
         Self::model(self).map_err(|e| e.to_string())
     }
 
-    pub fn image_eager_ws(&self) -> Result<Vec<u8>, String> {
+    pub fn image_eager_wa(&self) -> Result<Vec<u8>, String> {
         Self::image_eager(self).map_err(|e| e.to_string())
     }
 }
@@ -1584,11 +1584,11 @@ impl StateManager {
 #[cfg(feature = "wasm")]
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 impl StateManager {
-    pub fn save_ws(gb: &mut GameBoy, format: Option<SaveStateFormat>) -> Result<Vec<u8>, String> {
+    pub fn save_wa(gb: &mut GameBoy, format: Option<SaveStateFormat>) -> Result<Vec<u8>, String> {
         Self::save(gb, format).map_err(|e| e.to_string())
     }
 
-    pub fn load_ws(
+    pub fn load_wa(
         data: &[u8],
         gb: &mut GameBoy,
         format: Option<SaveStateFormat>,
@@ -1596,15 +1596,15 @@ impl StateManager {
         Self::load(data, gb, format).map_err(|e| e.to_string())
     }
 
-    pub fn read_bos_ws(data: &[u8]) -> Result<BosState, String> {
+    pub fn read_bos_wa(data: &[u8]) -> Result<BosState, String> {
         Self::read_bos(data).map_err(|e| e.to_string())
     }
 
-    pub fn read_bess_ws(data: &[u8]) -> Result<BessState, String> {
+    pub fn read_bess_wa(data: &[u8]) -> Result<BessState, String> {
         Self::read_bess(data).map_err(|e| e.to_string())
     }
 
-    pub fn thumbnail_ws(data: &[u8], format: Option<SaveStateFormat>) -> Result<Vec<u8>, String> {
+    pub fn thumbnail_wa(data: &[u8], format: Option<SaveStateFormat>) -> Result<Vec<u8>, String> {
         Self::thumbnail(data, format).map_err(|e| e.to_string())
     }
 }
