@@ -1,6 +1,3 @@
-#!/usr/bin/python
-# -*- coding: utf-8 -*-
-
 __version__: str
 COMPILATION_DATE: str
 COMPILATION_TIME: str

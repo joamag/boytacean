@@ -1,6 +1,3 @@
-#!/usr/bin/python
-# -*- coding: utf-8 -*-
-
 from math import ceil
 from typing import Union
 from sdl2 import (

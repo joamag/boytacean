@@ -1,6 +1,3 @@
-#!/usr/bin/python
-# -*- coding: utf-8 -*-
-
 from time import time
 from boytacean import GameBoy, VISUAL_FREQ
 from os.path import dirname, realpath, join, splitext, basename

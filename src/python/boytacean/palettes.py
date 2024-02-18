@@ -1,6 +1,3 @@
-#!/usr/bin/python
-# -*- coding: utf-8 -*-
-
 BASIC_PALETTE = "ffffff,c0c0c0,606060,000000"
 HOGWARDS_PALETTE = "b6a571,8b7e56,554d35,201d13"
 CHRISTMAS_PALETTE = "e8e7df,8bab95,9e5c5e,534d57"

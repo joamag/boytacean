@@ -1,6 +1,3 @@
-#!/usr/bin/python
-# -*- coding: utf-8 -*-
-
 from enum import Enum
 from contextlib import contextmanager
 from typing import Any, Iterable, Union, cast

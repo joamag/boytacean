@@ -1,6 +1,3 @@
-#!/usr/bin/python
-# -*- coding: utf-8 -*-
-
 from time import time
 from pyboy import PyBoy
 from os.path import dirname, realpath, join, splitext, basename
