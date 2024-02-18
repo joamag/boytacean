@@ -1,3 +1,6 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
 from time import time
 from boytacean import VISUAL_FREQ
 from boytacean.pyboy import PyBoy

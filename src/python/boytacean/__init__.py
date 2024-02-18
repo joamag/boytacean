@@ -1,3 +1,6 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
 from .gb import GameBoyMode, GameBoy
 from .palettes import PALETTES
 from .video import VideoCapture

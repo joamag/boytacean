@@ -1,3 +1,6 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
 from time import time
 from boytacean import GameBoy, CPU_FREQ
 from os.path import dirname, realpath, join

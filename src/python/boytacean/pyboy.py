@@ -1,3 +1,6 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
 from enum import Enum
 from sys import modules
 from typing import IO, Any
