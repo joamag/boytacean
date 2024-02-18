@@ -1,6 +1,7 @@
-use pyo3::{exceptions::PyException, prelude::*, types::PyBytes};
+use pyo3::{conversion::IntoPy, exceptions::PyException, prelude::*, types::PyBytes};
 
 use crate::{
+    error::Error,
     gb::{GameBoy as GameBoyBase, GameBoyMode},
     info::Info,
     pad::PadKey,
@@ -179,4 +180,10 @@ fn boytacean(_py: Python, module: &PyModule) -> PyResult<()> {
     module.add("VISUAL_FREQ", GameBoyBase::VISUAL_FREQ)?;
     module.add("LCD_CYCLES", GameBoyBase::LCD_CYCLES)?;
     Ok(())
+}
+
+impl IntoPy<PyObject> for Error {
+    fn into_py(self, py: Python<'_>) -> PyObject {
+        self.to_string().into_py(py)
+    }
 }
