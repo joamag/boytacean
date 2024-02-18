@@ -442,7 +442,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         // inference logic to try to infer the best mode from the
         // GBC header in the cartridge data
         if (this.autoMode) {
-            this.gameBoy.infer_mode_ws(romData);
+            this.gameBoy.infer_mode_wa(romData);
         }
 
         // resets the Game Boy engine to restore it into
@@ -452,12 +452,12 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
 
         // loads the ROM file into the system and retrieves
         // the cartridge instance associated with it
-        const cartridge = this.gameBoy.load_rom_ws(romData);
+        const cartridge = this.gameBoy.load_rom_wa(romData);
 
         // loads the callbacks so that the Typescript code
         // gets notified about the various events triggered
         // in the WASM side
-        this.gameBoy.load_callbacks_ws();
+        this.gameBoy.load_callbacks_wa();
 
         // in case there's a serial device involved tries to load
         // it and initialize for the current Game Boy machine
@@ -691,7 +691,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
 
     get wasmEngine(): string | null {
         if (!this.gameBoy) return null;
-        return this.gameBoy.wasm_engine_ws() ?? null;
+        return this.gameBoy.wasm_engine_wa() ?? null;
     }
 
     get framerate(): number {
@@ -804,22 +804,22 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
 
     serializeState(): Uint8Array {
         if (!this.gameBoy) throw new Error("Unable to serialize state");
-        return StateManager.save_ws(this.gameBoy, SaveStateFormat.Bos);
+        return StateManager.save_wa(this.gameBoy, SaveStateFormat.Bos);
     }
 
     unserializeState(data: Uint8Array) {
         if (!this.gameBoy) throw new Error("Unable to unserialize state");
-        StateManager.load_ws(data, this.gameBoy, SaveStateFormat.Bos);
+        StateManager.load_wa(data, this.gameBoy, SaveStateFormat.Bos);
     }
 
     buildState(index: number, data: Uint8Array): SaveState {
-        const state = StateManager.read_bos_ws(data);
+        const state = StateManager.read_bos_wa(data);
         return {
             index: index,
-            timestamp: Number(state.timestamp_ws()),
-            agent: state.agent_ws(),
-            model: state.model_ws(),
-            thumbnail: state.image_eager_ws()
+            timestamp: Number(state.timestamp_wa()),
+            agent: state.agent_wa(),
+            model: state.model_wa(),
+            thumbnail: state.image_eager_wa()
         };
     }
 
@@ -904,17 +904,17 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     }
 
     loadNullDevice(set = true) {
-        this.gameBoy?.load_null_ws();
+        this.gameBoy?.load_null_wa();
         if (set) this.serialDevice = SerialDevice.Null;
     }
 
     loadLoggerDevice(set = true) {
-        this.gameBoy?.load_logger_ws();
+        this.gameBoy?.load_logger_wa();
         if (set) this.serialDevice = SerialDevice.Logger;
     }
 
     loadPrinterDevice(set = true) {
-        this.gameBoy?.load_printer_ws();
+        this.gameBoy?.load_printer_wa();
         if (set) this.serialDevice = SerialDevice.Printer;
     }
 
@@ -967,7 +967,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
 
     private updatePalette() {
         const palette = PALETTES[this.paletteIndex];
-        this.gameBoy?.set_palette_colors_ws(palette.colors);
+        this.gameBoy?.set_palette_colors_wa(palette.colors);
         this.storeSettings();
     }
 
@@ -1066,7 +1066,7 @@ const wasm = async (setHook = true) => {
     // wrap the call around try/catch
     if (setHook) {
         try {
-            GameBoy.set_panic_hook_ws();
+            GameBoy.set_panic_hook_wa();
         } catch (err) {
             console.error(err);
         }
