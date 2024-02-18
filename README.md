@@ -61,6 +61,12 @@ cargo build
 pip install .
 ```
 
+or
+
+```bash
+python setup.py install
+```
+
 ### WASM for Node.js
 
 ```bash

@@ -79,6 +79,17 @@ test-rust:
     - rustc --version
     - cargo test
 
+test-pyo3:
+  stage: test
+  parallel:
+    matrix:
+      - RUST_VERSION: ["1.74.0"]
+  script:
+    - rustup toolchain install $RUST_VERSION
+    - rustup override set $RUST_VERSION
+    - rustc --version
+    - python setup.py test
+
 deploy-netlify-preview:
   stage: deploy
   script:

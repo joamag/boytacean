@@ -426,9 +426,20 @@ impl GameBoy {
         let rom = self.rom().clone();
         self.reset();
         self.load(true);
-        self.load_cartridge(rom);
+        self.load_cartridge(rom).unwrap();
     }
 
+    /// Advance the clock of the system by one tick, this will
+    /// usually imply executing one CPU instruction and advancing
+    /// all the other components of the system by the required
+    /// amount of cycles.
+    ///
+    /// This method takes into account the current speed of the
+    /// system (single or double) and will execute the required
+    /// amount of cycles in the other components of the system
+    /// accordingly.
+    ///
+    /// The amount of cycles executed by the CPU is returned.
     pub fn clock(&mut self) -> u16 {
         let cycles = self.cpu_clock() as u16;
         let cycles_n = cycles / self.multiplier() as u16;
@@ -1081,12 +1092,16 @@ impl GameBoy {
         Ok(())
     }
 
-    pub fn load_cartridge(&mut self, rom: Cartridge) -> &mut Cartridge {
+    pub fn load_cartridge(&mut self, rom: Cartridge) -> Result<&mut Cartridge, Error> {
         self.mmu().set_rom(rom);
-        self.mmu().rom()
+        Ok(self.mmu().rom())
     }
 
-    pub fn load_rom(&mut self, data: &[u8], ram_data: Option<&[u8]>) -> &mut Cartridge {
+    pub fn load_rom(
+        &mut self,
+        data: &[u8],
+        ram_data: Option<&[u8]>,
+    ) -> Result<&mut Cartridge, Error> {
         let mut rom = Cartridge::from_data(data);
         if let Some(ram_data) = ram_data {
             rom.set_ram_data(ram_data)
@@ -1094,11 +1109,15 @@ impl GameBoy {
         self.load_cartridge(rom)
     }
 
-    pub fn load_rom_file(&mut self, path: &str, ram_path: Option<&str>) -> &mut Cartridge {
-        let data = read_file(path).unwrap();
+    pub fn load_rom_file(
+        &mut self,
+        path: &str,
+        ram_path: Option<&str>,
+    ) -> Result<&mut Cartridge, Error> {
+        let data = read_file(path)?;
         match ram_path {
             Some(ram_path) => {
-                let ram_data = read_file(ram_path).unwrap();
+                let ram_data = read_file(ram_path)?;
                 self.load_rom(&data, Some(&ram_data))
             }
             None => self.load_rom(&data, None),
@@ -1184,12 +1203,12 @@ impl GameBoy {
         }));
     }
 
-    pub fn load_rom_wa(&mut self, data: &[u8]) -> Cartridge {
-        let rom = self.load_rom(data, None);
+    pub fn load_rom_wa(&mut self, data: &[u8]) -> Result<Cartridge, String> {
+        let rom = self.load_rom(data, None).map_err(|e| e.to_string())?;
         rom.set_rumble_cb(|active| {
             rumble_callback(active);
         });
-        rom.clone()
+        Ok(rom.clone())
     }
 
     pub fn load_callbacks_wa(&mut self) {

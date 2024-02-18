@@ -2,7 +2,11 @@ from enum import Enum
 from contextlib import contextmanager
 from typing import Any, Iterable, Union, cast
 
-from PIL.Image import Image, frombytes
+try:
+    from PIL.Image import Image, frombytes
+except ImportError:
+    Image = Any
+    frombytes = Any
 
 from .palettes import PALETTES
 from .video import VideoCapture

@@ -46,12 +46,18 @@ impl GameBoy {
             .map_err(PyErr::new::<PyException, _>)
     }
 
-    pub fn load_rom(&mut self, data: &[u8]) {
-        self.system.load_rom(data, None);
+    pub fn load_rom(&mut self, data: &[u8]) -> PyResult<()> {
+        self.system
+            .load_rom(data, None)
+            .map(|_| ())
+            .map_err(PyErr::new::<PyException, _>)
     }
 
-    pub fn load_rom_file(&mut self, path: &str) {
-        self.system.load_rom_file(path, None);
+    pub fn load_rom_file(&mut self, path: &str) -> PyResult<()> {
+        self.system
+            .load_rom_file(path, None)
+            .map(|_| ())
+            .map_err(PyErr::new::<PyException, _>)
     }
 
     pub fn read_memory(&mut self, addr: u16) -> u8 {
