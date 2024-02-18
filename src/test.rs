@@ -65,11 +65,13 @@ pub fn run_image_test(
 
 #[cfg(test)]
 mod tests {
+    use crate::consts::{DIV_ADDR, TAC_ADDR, TIMA_ADDR, TMA_ADDR};
+
     use super::{run_serial_test, run_step_test, TestOptions};
 
     #[test]
     fn test_boot_state() {
-        let result = run_step_test(
+        let mut result = run_step_test(
             "res/roms/test/blargg/cpu/cpu_instrs.gb",
             0x0100,
             TestOptions::default(),
@@ -81,6 +83,11 @@ mod tests {
         assert_eq!(result.cpu_i().de(), 0x00d8);
         assert_eq!(result.cpu_i().hl(), 0x014d);
         assert_eq!(result.cpu_i().ime(), false);
+
+        assert_eq!(result.mmu().read(DIV_ADDR), 0xab);
+        assert_eq!(result.mmu().read(TIMA_ADDR), 0x00);
+        assert_eq!(result.mmu().read(TMA_ADDR), 0x00);
+        assert_eq!(result.mmu().read(TAC_ADDR), 0xf8);
     }
 
     #[test]

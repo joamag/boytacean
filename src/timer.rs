@@ -1,4 +1,7 @@
-use crate::warnln;
+use crate::{
+    consts::{DIV_ADDR, TAC_ADDR, TIMA_ADDR, TMA_ADDR},
+    warnln,
+};
 
 pub struct Timer {
     div: u8,
@@ -70,13 +73,13 @@ impl Timer {
     pub fn read(&mut self, addr: u16) -> u8 {
         match addr {
             // 0xFF04 — DIV: Divider register
-            0xff04 => self.div,
+            DIV_ADDR => self.div,
             // 0xFF05 — TIMA: Timer counter
-            0xff05 => self.tima,
+            TIMA_ADDR => self.tima,
             // 0xFF06 — TMA: Timer modulo
-            0xff06 => self.tma,
+            TMA_ADDR => self.tma,
             // 0xFF07 — TAC: Timer control
-            0xff07 => self.tac,
+            TAC_ADDR => self.tac | 0xf8,
             _ => {
                 warnln!("Reding from unknown Timer location 0x{:04x}", addr);
                 0xff
@@ -87,13 +90,13 @@ impl Timer {
     pub fn write(&mut self, addr: u16, value: u8) {
         match addr {
             // 0xFF04 — DIV: Divider register
-            0xff04 => self.div = 0,
+            DIV_ADDR => self.div = 0,
             // 0xFF05 — TIMA: Timer counter
-            0xff05 => self.tima = value,
+            TIMA_ADDR => self.tima = value,
             // 0xFF06 — TMA: Timer modulo
-            0xff06 => self.tma = value,
+            TMA_ADDR => self.tma = value,
             // 0xFF07 — TAC: Timer control
-            0xff07 => {
+            TAC_ADDR => {
                 self.tac = value;
                 match value & 0x03 {
                     0x00 => self.tima_ratio = 1024,
