@@ -98,8 +98,11 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
     def clock(self) -> int:
         return self._system.clock()
 
-    def clock_m(self, count: int) -> int:
-        return self._system.clock_m(count)
+    def clock_many(self, count: int) -> int:
+        return self._system.clock_many(count)
+
+    def clock_step(self, addr: int) -> int:
+        return self._system.clock_step(addr)
 
     def clocks(self, count: int) -> int:
         return self._system.clocks(count)

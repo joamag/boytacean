@@ -135,6 +135,16 @@ impl Timer {
     pub fn set_div(&mut self, value: u8) {
         self.div = value;
     }
+
+    #[inline(always)]
+    pub fn div_clock(&self) -> u16 {
+        self.div_clock
+    }
+
+    #[inline(always)]
+    pub fn set_div_clock(&mut self, value: u16) {
+        self.div_clock = value;
+    }
 }
 
 impl Default for Timer {

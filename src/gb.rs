@@ -432,51 +432,40 @@ impl GameBoy {
     pub fn clock(&mut self) -> u16 {
         let cycles = self.cpu_clock() as u16;
         let cycles_n = cycles / self.multiplier() as u16;
-        if self.ppu_enabled {
-            self.ppu_clock(cycles_n);
-        }
-        if self.apu_enabled {
-            self.apu_clock(cycles_n);
-        }
-        if self.dma_enabled {
-            self.dma_clock(cycles);
-        }
-        if self.timer_enabled {
-            self.timer_clock(cycles);
-        }
-        if self.serial_enabled {
-            self.serial_clock(cycles);
-        }
+        self.clock_devices(cycles, cycles_n);
         cycles
     }
 
     /// Risky function that will clock the CPU multiple times
     /// allowing an undefined number of cycles to be executed
     /// in the other Game Boy components.
+    ///
     /// This can cause unwanted behaviour in components like
     /// the PPU where only one mode switch operation is expected
     /// per each clock call.
-    pub fn clock_m(&mut self, count: usize) -> u16 {
+    ///
+    /// At the end of this execution major synchronization issues
+    /// may arise, so use with caution.
+    pub fn clock_many(&mut self, count: usize) -> u16 {
         let mut cycles = 0u16;
         for _ in 0..count {
             cycles += self.cpu_clock() as u16;
         }
         let cycles_n = cycles / self.multiplier() as u16;
-        if self.ppu_enabled {
-            self.ppu_clock(cycles_n);
+        self.clock_devices(cycles, cycles_n);
+        cycles
+    }
+
+    /// Function equivalent to `clock()` but that allows pre-emptive
+    /// breaking of the clock cycle loop if the PC (Program Counter)
+    /// reaches the provided address.
+    pub fn clock_step(&mut self, addr: u16) -> u16 {
+        let cycles = self.cpu_clock() as u16;
+        if self.cpu_i().pc() == addr {
+            return cycles;
         }
-        if self.apu_enabled {
-            self.apu_clock(cycles_n);
-        }
-        if self.dma_enabled {
-            self.dma_clock(cycles);
-        }
-        if self.timer_enabled {
-            self.timer_clock(cycles);
-        }
-        if self.serial_enabled {
-            self.serial_clock(cycles);
-        }
+        let cycles_n = cycles / self.multiplier() as u16;
+        self.clock_devices(cycles, cycles_n);
         cycles
     }
 
@@ -503,12 +492,31 @@ impl GameBoy {
     pub fn step_to(&mut self, addr: u16) -> u32 {
         let mut cycles = 0u32;
         loop {
-            cycles += self.clock() as u32;
+            cycles += self.clock_step(addr) as u32;
             if self.cpu_i().pc() == addr {
                 break;
             }
         }
         cycles
+    }
+
+    #[inline(always)]
+    fn clock_devices(&mut self, cycles: u16, cycles_n: u16) {
+        if self.ppu_enabled {
+            self.ppu_clock(cycles_n);
+        }
+        if self.apu_enabled {
+            self.apu_clock(cycles_n);
+        }
+        if self.dma_enabled {
+            self.dma_clock(cycles);
+        }
+        if self.timer_enabled {
+            self.timer_clock(cycles);
+        }
+        if self.serial_enabled {
+            self.serial_clock(cycles);
+        }
     }
 
     pub fn key_press(&mut self, key: PadKey) {

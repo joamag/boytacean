@@ -66,8 +66,12 @@ impl GameBoy {
         self.system.clock()
     }
 
-    pub fn clock_m(&mut self, count: usize) -> u16 {
-        self.system.clock_m(count)
+    pub fn clock_many(&mut self, count: usize) -> u16 {
+        self.system.clock_many(count)
+    }
+
+    pub fn clock_step(&mut self, addr: u16) -> u16 {
+        self.system.clock_step(addr)
     }
 
     pub fn clocks(&mut self, count: usize) -> u64 {
