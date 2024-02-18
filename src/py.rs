@@ -3,6 +3,7 @@ use pyo3::{conversion::IntoPy, exceptions::PyException, prelude::*, types::PyByt
 use crate::{
     error::Error,
     gb::{GameBoy as GameBoyBase, GameBoyMode},
+    gen::{COMPILATION_DATE, COMPILATION_TIME, COMPILER, COMPILER_VERSION, NAME, VERSION},
     info::Info,
     pad::PadKey,
     ppu::{PaletteInfo, DISPLAY_HEIGHT, DISPLAY_WIDTH},
@@ -174,6 +175,13 @@ impl GameBoy {
 #[pymodule]
 fn boytacean(_py: Python, module: &PyModule) -> PyResult<()> {
     module.add_class::<GameBoy>()?;
+    module.add("__version__", VERSION)?;
+    module.add("COMPILATION_DATE", COMPILATION_DATE)?;
+    module.add("COMPILATION_TIME", COMPILATION_TIME)?;
+    module.add("COMPILER", COMPILER)?;
+    module.add("COMPILER_VERSION", COMPILER_VERSION)?;
+    module.add("NAME", NAME)?;
+    module.add("VERSION", VERSION)?;
     module.add("DISPLAY_WIDTH", DISPLAY_WIDTH)?;
     module.add("DISPLAY_HEIGHT", DISPLAY_HEIGHT)?;
     module.add("CPU_FREQ", GameBoyBase::CPU_FREQ)?;
