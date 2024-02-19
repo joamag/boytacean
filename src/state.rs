@@ -1,4 +1,10 @@
 //! System save state (BOS and [BESS](https://github.com/LIJI32/SameBoy/blob/master/BESS.md) formats) functions and structures.
+//!
+//! The BOS (Boytacean Save) format is a custom save state format that contains the emulator state and the frame buffer.
+//! Its serialization includes header, info, image buffer and then a BESS (Best Effort Save State) footer with the state itself.
+//!
+//! The [BESS](https://github.com/LIJI32/SameBoy/blob/master/BESS.md) format is a format developed by the [SameBoy](https://sameboy.github.io/) emulator and is used to store the emulator state
+//! in agnostic and compatible way.
 
 use std::{
     convert::TryInto,

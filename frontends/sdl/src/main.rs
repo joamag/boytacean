@@ -8,6 +8,7 @@ pub mod test;
 use audio::Audio;
 use boytacean::{
     devices::{printer::PrinterDevice, stdout::StdoutDevice},
+    error::Error,
     gb::{AudioProvider, GameBoy, GameBoyMode},
     info::Info,
     pad::PadKey,
@@ -225,7 +226,7 @@ impl Emulator {
         ));
     }
 
-    pub fn load_rom(&mut self, path: Option<&str>) {
+    pub fn load_rom(&mut self, path: Option<&str>) -> Result<(), Error> {
         let rom_path: &str = path.unwrap_or(&self.rom_path);
         let ram_path = replace_ext(rom_path, "sav").unwrap_or_else(|| "invalid".to_string());
         let rom = self.system.load_rom_file(
@@ -235,7 +236,7 @@ impl Emulator {
             } else {
                 None
             },
-        );
+        )?;
         println!(
             "========= Cartridge =========\n{}\n=============================",
             rom
@@ -253,12 +254,14 @@ impl Emulator {
             .to_str()
             .unwrap()
             .to_string();
+        Ok(())
     }
 
-    pub fn reset(&mut self) {
+    pub fn reset(&mut self) -> Result<(), Error> {
         self.system.reset();
         self.system.load(true);
-        self.load_rom(None);
+        self.load_rom(None)?;
+        Ok(())
     }
 
     pub fn apply_cheats(&mut self, cheats: &Vec<String>) {
@@ -418,7 +421,7 @@ impl Emulator {
                     Event::KeyDown {
                         keycode: Some(Keycode::R),
                         ..
-                    } => self.reset(),
+                    } => self.reset().unwrap(),
                     Event::KeyDown {
                         keycode: Some(Keycode::B),
                         ..
@@ -528,7 +531,7 @@ impl Emulator {
                         }
                         self.system.reset();
                         self.system.load(true);
-                        self.load_rom(Some(&filename));
+                        self.load_rom(Some(&filename)).unwrap();
                     }
                     _ => (),
                 }
@@ -989,7 +992,7 @@ fn main() {
     };
     let mut emulator = Emulator::new(game_boy, options);
     emulator.start(SCREEN_SCALE);
-    emulator.load_rom(Some(&args.rom_path));
+    emulator.load_rom(Some(&args.rom_path)).unwrap();
     emulator.apply_cheats(&args.cheats);
     emulator.toggle_palette();
 

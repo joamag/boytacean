@@ -426,57 +426,57 @@ impl GameBoy {
         let rom = self.rom().clone();
         self.reset();
         self.load(true);
-        self.load_cartridge(rom);
+        self.load_cartridge(rom).unwrap();
     }
 
+    /// Advance the clock of the system by one tick, this will
+    /// usually imply executing one CPU instruction and advancing
+    /// all the other components of the system by the required
+    /// amount of cycles.
+    ///
+    /// This method takes into account the current speed of the
+    /// system (single or double) and will execute the required
+    /// amount of cycles in the other components of the system
+    /// accordingly.
+    ///
+    /// The amount of cycles executed by the CPU is returned.
     pub fn clock(&mut self) -> u16 {
         let cycles = self.cpu_clock() as u16;
         let cycles_n = cycles / self.multiplier() as u16;
-        if self.ppu_enabled {
-            self.ppu_clock(cycles_n);
-        }
-        if self.apu_enabled {
-            self.apu_clock(cycles_n);
-        }
-        if self.dma_enabled {
-            self.dma_clock(cycles);
-        }
-        if self.timer_enabled {
-            self.timer_clock(cycles);
-        }
-        if self.serial_enabled {
-            self.serial_clock(cycles);
-        }
+        self.clock_devices(cycles, cycles_n);
         cycles
     }
 
     /// Risky function that will clock the CPU multiple times
     /// allowing an undefined number of cycles to be executed
     /// in the other Game Boy components.
+    ///
     /// This can cause unwanted behaviour in components like
     /// the PPU where only one mode switch operation is expected
     /// per each clock call.
-    pub fn clock_m(&mut self, count: usize) -> u16 {
+    ///
+    /// At the end of this execution major synchronization issues
+    /// may arise, so use with caution.
+    pub fn clock_many(&mut self, count: usize) -> u16 {
         let mut cycles = 0u16;
         for _ in 0..count {
             cycles += self.cpu_clock() as u16;
         }
         let cycles_n = cycles / self.multiplier() as u16;
-        if self.ppu_enabled {
-            self.ppu_clock(cycles_n);
+        self.clock_devices(cycles, cycles_n);
+        cycles
+    }
+
+    /// Function equivalent to `clock()` but that allows pre-emptive
+    /// breaking of the clock cycle loop if the PC (Program Counter)
+    /// reaches the provided address.
+    pub fn clock_step(&mut self, addr: u16) -> u16 {
+        let cycles = self.cpu_clock() as u16;
+        if self.cpu_i().pc() == addr {
+            return cycles;
         }
-        if self.apu_enabled {
-            self.apu_clock(cycles_n);
-        }
-        if self.dma_enabled {
-            self.dma_clock(cycles);
-        }
-        if self.timer_enabled {
-            self.timer_clock(cycles);
-        }
-        if self.serial_enabled {
-            self.serial_clock(cycles);
-        }
+        let cycles_n = cycles / self.multiplier() as u16;
+        self.clock_devices(cycles, cycles_n);
         cycles
     }
 
@@ -503,12 +503,31 @@ impl GameBoy {
     pub fn step_to(&mut self, addr: u16) -> u32 {
         let mut cycles = 0u32;
         loop {
-            cycles += self.clock() as u32;
+            cycles += self.clock_step(addr) as u32;
             if self.cpu_i().pc() == addr {
                 break;
             }
         }
         cycles
+    }
+
+    #[inline(always)]
+    fn clock_devices(&mut self, cycles: u16, cycles_n: u16) {
+        if self.ppu_enabled {
+            self.ppu_clock(cycles_n);
+        }
+        if self.apu_enabled {
+            self.apu_clock(cycles_n);
+        }
+        if self.dma_enabled {
+            self.dma_clock(cycles);
+        }
+        if self.timer_enabled {
+            self.timer_clock(cycles);
+        }
+        if self.serial_enabled {
+            self.serial_clock(cycles);
+        }
     }
 
     pub fn key_press(&mut self, key: PadKey) {
@@ -1073,12 +1092,16 @@ impl GameBoy {
         Ok(())
     }
 
-    pub fn load_cartridge(&mut self, rom: Cartridge) -> &mut Cartridge {
+    pub fn load_cartridge(&mut self, rom: Cartridge) -> Result<&mut Cartridge, Error> {
         self.mmu().set_rom(rom);
-        self.mmu().rom()
+        Ok(self.mmu().rom())
     }
 
-    pub fn load_rom(&mut self, data: &[u8], ram_data: Option<&[u8]>) -> &mut Cartridge {
+    pub fn load_rom(
+        &mut self,
+        data: &[u8],
+        ram_data: Option<&[u8]>,
+    ) -> Result<&mut Cartridge, Error> {
         let mut rom = Cartridge::from_data(data);
         if let Some(ram_data) = ram_data {
             rom.set_ram_data(ram_data)
@@ -1086,11 +1109,15 @@ impl GameBoy {
         self.load_cartridge(rom)
     }
 
-    pub fn load_rom_file(&mut self, path: &str, ram_path: Option<&str>) -> &mut Cartridge {
-        let data = read_file(path).unwrap();
+    pub fn load_rom_file(
+        &mut self,
+        path: &str,
+        ram_path: Option<&str>,
+    ) -> Result<&mut Cartridge, Error> {
+        let data = read_file(path)?;
         match ram_path {
             Some(ram_path) => {
-                let ram_data = read_file(ram_path).unwrap();
+                let ram_data = read_file(ram_path)?;
                 self.load_rom(&data, Some(&ram_data))
             }
             None => self.load_rom(&data, None),
@@ -1176,12 +1203,12 @@ impl GameBoy {
         }));
     }
 
-    pub fn load_rom_wa(&mut self, data: &[u8]) -> Cartridge {
-        let rom = self.load_rom(data, None);
+    pub fn load_rom_wa(&mut self, data: &[u8]) -> Result<Cartridge, String> {
+        let rom = self.load_rom(data, None).map_err(|e| e.to_string())?;
         rom.set_rumble_cb(|active| {
             rumble_callback(active);
         });
-        rom.clone()
+        Ok(rom.clone())
     }
 
     pub fn load_callbacks_wa(&mut self) {

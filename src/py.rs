@@ -46,12 +46,18 @@ impl GameBoy {
             .map_err(PyErr::new::<PyException, _>)
     }
 
-    pub fn load_rom(&mut self, data: &[u8]) {
-        self.system.load_rom(data, None);
+    pub fn load_rom(&mut self, data: &[u8]) -> PyResult<()> {
+        self.system
+            .load_rom(data, None)
+            .map(|_| ())
+            .map_err(PyErr::new::<PyException, _>)
     }
 
-    pub fn load_rom_file(&mut self, path: &str) {
-        self.system.load_rom_file(path, None);
+    pub fn load_rom_file(&mut self, path: &str) -> PyResult<()> {
+        self.system
+            .load_rom_file(path, None)
+            .map(|_| ())
+            .map_err(PyErr::new::<PyException, _>)
     }
 
     pub fn read_memory(&mut self, addr: u16) -> u8 {
@@ -66,8 +72,12 @@ impl GameBoy {
         self.system.clock()
     }
 
-    pub fn clock_m(&mut self, count: usize) -> u16 {
-        self.system.clock_m(count)
+    pub fn clock_many(&mut self, count: usize) -> u16 {
+        self.system.clock_many(count)
+    }
+
+    pub fn clock_step(&mut self, addr: u16) -> u16 {
+        self.system.clock_step(addr)
     }
 
     pub fn clocks(&mut self, count: usize) -> u64 {

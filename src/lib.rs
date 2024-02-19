@@ -2,6 +2,7 @@
 
 pub mod apu;
 pub mod cheats;
+pub mod consts;
 pub mod cpu;
 pub mod data;
 pub mod devices;

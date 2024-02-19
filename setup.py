@@ -35,6 +35,7 @@ setuptools.setup(
     keywords="gameboy emulator rust",
     url="https://boytacean.joao.me",
     packages=["boytacean"],
+    test_suite="boytacean.test",
     package_dir={"": os.path.normpath("src/python")},
     rust_extensions=[
         setuptools_rust.RustExtension(

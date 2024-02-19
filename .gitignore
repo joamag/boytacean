@@ -1,4 +1,5 @@
 *.pyc
+*.pyd
 
 .DS_Store
 
@@ -6,6 +7,8 @@ Cargo.lock
 
 /.vscode/settings.json
 
+/.eggs
+/.venv
 /.idea
 
 /ndk
