@@ -459,7 +459,7 @@ impl Cartridge {
         Ok(())
     }
 
-    pub fn get_mbc(&self) -> Result<&'static Mbc, Error> {
+    pub fn mbc(&self) -> Result<&'static Mbc, Error> {
         Ok(match self.rom_type() {
             RomType::RomOnly => &NO_MBC,
             RomType::Mbc1 => &MBC1,
@@ -525,9 +525,7 @@ impl Cartridge {
     }
 
     fn set_data(&mut self, data: &[u8]) -> Result<(), Error> {
-        if data.len() < 0x7fff {
-            return Err(Error::RomSize);
-        }
+        self.ensure_data(data)?;
         self.rom_data = data.to_vec();
         self.rom_offset = 0x4000;
         self.ram_offset = 0x0000;
@@ -541,7 +539,7 @@ impl Cartridge {
     }
 
     fn set_mbc(&mut self) -> Result<(), Error> {
-        self.mbc = self.get_mbc()?;
+        self.mbc = self.mbc()?;
         self.handler = self.mbc;
         Ok(())
     }
@@ -602,6 +600,18 @@ impl Cartridge {
     fn allocate_ram(&mut self) {
         let ram_banks = max(self.ram_size().ram_banks(), 1);
         self.ram_data = vec![0u8; ram_banks as usize * RAM_BANK_SIZE];
+    }
+
+    /// Ensures that the data provided is of a valid Game Boy ROM
+    /// and that it's size is within the expected range.
+    fn ensure_data(&self, data: &[u8]) -> Result<(), Error> {
+        if data.len() < 0x7fff {
+            return Err(Error::RomSize);
+        }
+        if data.len() % (16 * 1024) != 0 {
+            return Err(Error::RomSize);
+        }
+        Ok(())
     }
 }
 
