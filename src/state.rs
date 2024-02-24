@@ -1624,7 +1624,8 @@ mod tests {
     fn test_load_bos() {
         let mut gb = GameBoy::default();
         gb.load(true);
-        gb.load_rom_file("res/roms/test/firstwhite.gb", None);
+        gb.load_rom_file("res/roms/test/firstwhite.gb", None)
+            .unwrap();
         let data = StateManager::save(&mut gb, Some(SaveStateFormat::Bos)).unwrap();
         StateManager::load(&data, &mut gb, Some(SaveStateFormat::Bos)).unwrap();
         StateManager::load(&data, &mut gb, None).unwrap();
@@ -1634,7 +1635,8 @@ mod tests {
     fn test_load_bess() {
         let mut gb = GameBoy::default();
         gb.load(true);
-        gb.load_rom_file("res/roms/test/firstwhite.gb", None);
+        gb.load_rom_file("res/roms/test/firstwhite.gb", None)
+            .unwrap();
         let data = StateManager::save(&mut gb, Some(SaveStateFormat::Bess)).unwrap();
         StateManager::load(&data, &mut gb, Some(SaveStateFormat::Bess)).unwrap();
         StateManager::load(&data, &mut gb, None).unwrap();

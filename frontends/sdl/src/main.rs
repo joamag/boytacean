@@ -526,7 +526,7 @@ impl Emulator {
                     }
                     Event::DropFile { filename, .. } => {
                         if self.auto_mode {
-                            let mode = Cartridge::from_file(&filename).gb_mode();
+                            let mode = Cartridge::from_file(&filename).unwrap().gb_mode();
                             self.system.set_mode(mode);
                         }
                         self.system.reset();
@@ -961,7 +961,7 @@ fn main() {
     // and the initial game ROM to "start the engine"
     let mut game_boy = GameBoy::new(Some(mode));
     if auto_mode {
-        let mode = Cartridge::from_file(&args.rom_path).gb_mode();
+        let mode = Cartridge::from_file(&args.rom_path).unwrap().gb_mode();
         game_boy.set_mode(mode);
     }
     let device: Box<dyn SerialDevice> = build_device(&args.device);

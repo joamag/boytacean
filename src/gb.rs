@@ -412,6 +412,10 @@ impl GameBoy {
         }
     }
 
+    pub fn verify_rom(data: &[u8]) -> bool {
+        Cartridge::from_data(data).is_ok()
+    }
+
     pub fn reset(&mut self) {
         self.ppu().reset();
         self.apu().reset();
@@ -1102,7 +1106,7 @@ impl GameBoy {
         data: &[u8],
         ram_data: Option<&[u8]>,
     ) -> Result<&mut Cartridge, Error> {
-        let mut rom = Cartridge::from_data(data);
+        let mut rom = Cartridge::from_data(data)?;
         if let Some(ram_data) = ram_data {
             rom.set_ram_data(ram_data)
         }
@@ -1240,9 +1244,12 @@ impl GameBoy {
 
     /// Updates the emulation mode using the cartridge
     /// of the provided data to obtain the CGB flag value.
-    pub fn infer_mode_wa(&mut self, data: &[u8]) {
-        let mode = Cartridge::from_data(data).gb_mode();
+    pub fn infer_mode_wa(&mut self, data: &[u8]) -> Result<(), String> {
+        let mode = Cartridge::from_data(data)
+            .map_err(|e| e.to_string())?
+            .gb_mode();
         self.set_mode(mode);
+        Ok(())
     }
 
     pub fn set_palette_colors_wa(&mut self, value: Vec<JsValue>) {

@@ -5,18 +5,14 @@ use std::fmt::{self, Display, Formatter};
 /// to provide a more detailed error message.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Error {
-    NotFound,
-    BadRequest,
-    InternalServerError,
+    RomSize,
     CustomError(String),
 }
 
 impl Error {
     pub fn description(&self) -> &str {
         match self {
-            Error::NotFound => "Not Found",
-            Error::BadRequest => "Bad Request",
-            Error::InternalServerError => "Internal Server Error",
+            Error::RomSize => "Invalid ROM size",
             Error::CustomError(message) => message,
         }
     }

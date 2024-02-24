@@ -380,7 +380,7 @@ pub unsafe extern "C" fn retro_load_game(game: *const RetroGameInfo) -> bool {
     debugln!("retro_load_game()");
     let instance = EMULATOR.as_mut().unwrap();
     let data_buffer = from_raw_parts((*game).data as *const u8, (*game).size);
-    let rom = Cartridge::from_data(data_buffer);
+    let rom = Cartridge::from_data(data_buffer).unwrap();
     let mode = rom.gb_mode();
     instance.set_mode(mode);
     instance.reset();

@@ -759,25 +759,25 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         this._serialDevice = value;
     }
 
-    toggleRunning() {
+    async toggleRunning() {
         if (this.paused) {
-            this.resume();
+            await this.resume();
         } else {
-            this.pause();
+            await this.pause();
         }
     }
 
-    pause() {
+    async pause() {
         this.paused = true;
     }
 
-    resume() {
+    async resume() {
         this.paused = false;
         this.nextTickTime = EmulatorBase.now();
     }
 
-    reset() {
-        this.boot({ engine: null });
+    async reset() {
+        await this.boot({ engine: null });
     }
 
     keyPress(key: string) {
