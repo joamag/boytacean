@@ -1242,8 +1242,13 @@ impl GameBoy {
         self.attach_serial(printer);
     }
 
-    /// Updates the emulation mode using the cartridge
-    /// of the provided data to obtain the CGB flag value.
+    /// Updates the emulation mode using the cartridge info
+    /// for the provided data to obtain the CGB flag value
+    /// and set the mode accordingly.
+    ///
+    /// This can be an expensive operation as it will require
+    /// cartridge data parsing to obtain the CGB flag.
+    /// It will also have to clone the data buffer.
     pub fn infer_mode_wa(&mut self, data: &[u8]) -> Result<(), String> {
         let mode = Cartridge::from_data(data)
             .map_err(|e| e.to_string())?
