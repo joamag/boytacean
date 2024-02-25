@@ -285,9 +285,10 @@ impl Mmu {
         // this avoids issues when writing to DMG unmapped registers
         // that would otherwise cause the system to crash
         if self.mode == GameBoyMode::Cgb {
-            let data = self.read_many(self.dma.source(), self.dma.length());
+            let data = self.read_many(self.dma.source(), self.dma.pending());
             self.write_many(self.dma.destination(), &data);
         }
+        self.dma.set_pending(0);
         self.dma.set_active(false);
     }
 

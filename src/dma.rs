@@ -13,6 +13,7 @@ pub struct Dma {
     source: u16,
     destination: u16,
     length: u16,
+    pending: u16,
     mode: DmaMode,
     active: bool,
 }
@@ -23,6 +24,7 @@ impl Dma {
             source: 0x0,
             destination: 0x0,
             length: 0x0,
+            pending: 0x0,
             mode: DmaMode::General,
             active: false,
         }
@@ -32,6 +34,7 @@ impl Dma {
         self.source = 0x0;
         self.destination = 0x0;
         self.length = 0x0;
+        self.pending = 0x0;
         self.mode = DmaMode::General;
         self.active = false;
     }
@@ -41,7 +44,7 @@ impl Dma {
     pub fn read(&mut self, addr: u16) -> u8 {
         match addr {
             // 0xFF55 — HDMA5: VRAM DMA length/mode/start (CGB only)
-            HDMA5_ADDR => ((self.length >> 4) - 1) as u8 | ((self.active as u8) << 7),
+            HDMA5_ADDR => ((self.pending >> 4) as u8).wrapping_sub(1) | ((!self.active as u8) << 7),
             _ => {
                 warnln!("Reading from unknown DMA location 0x{:04x}", addr);
                 0xff
@@ -67,6 +70,7 @@ impl Dma {
                     1 => DmaMode::HBlank,
                     _ => DmaMode::General,
                 };
+                self.pending = self.length;
                 self.active = true;
             }
             _ => warnln!("Writing to unknown DMA location 0x{:04x}", addr),
@@ -95,6 +99,14 @@ impl Dma {
 
     pub fn set_length(&mut self, value: u16) {
         self.length = value;
+    }
+
+    pub fn pending(&self) -> u16 {
+        self.pending
+    }
+
+    pub fn set_pending(&mut self, value: u16) {
+        self.pending = value;
     }
 
     pub fn mode(&self) -> DmaMode {
@@ -136,6 +148,7 @@ mod tests {
         dma.source = 0x1234;
         dma.destination = 0x5678;
         dma.length = 0x9abc;
+        dma.pending = 0x9abc;
         dma.mode = DmaMode::HBlank;
         dma.active = true;
 
@@ -144,6 +157,7 @@ mod tests {
         assert_eq!(dma.source, 0x0);
         assert_eq!(dma.destination, 0x0);
         assert_eq!(dma.length, 0x0);
+        assert_eq!(dma.pending, 0x0);
         assert_eq!(dma.mode, DmaMode::General);
         assert!(!dma.active);
     }
