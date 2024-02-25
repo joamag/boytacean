@@ -31,12 +31,4 @@ Thanks for your interest in contributing to Boytacean! We're excited to have you
 * Write meaningful commit messages.
 * Include comments in your code where necessary.
 
-## Getting Support
-
-* Join our Discord or mailing list (links in README).
-
-## Code of Conduct
-
-Respect the code of conduct detailed in `CODE_OF_CONDUCT.md`.
-
 Thank you for contributing to Boytacean!
