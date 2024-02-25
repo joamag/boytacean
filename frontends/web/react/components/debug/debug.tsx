@@ -100,6 +100,10 @@ const DebugSettingsContent: FC<EmulatorProps> = ({ emulator }) => {
         emulator.instance?.set_apu_enabled(option === "on");
     };
 
+    const onDmaChange = (option: string) => {
+        emulator.instance?.set_dma_enabled(option === "on");
+    };
+
     const onTimerChange = (option: string) => {
         emulator.instance?.set_timer_enabled(option === "on");
     };
@@ -133,6 +137,19 @@ const DebugSettingsContent: FC<EmulatorProps> = ({ emulator }) => {
                         size={"large"}
                         style={["simple"]}
                         onChange={onApuChange}
+                    />
+                }
+            />
+            <Pair
+                name={"DMA"}
+                valueNode={
+                    <ButtonSwitch
+                        options={["on", "off"]}
+                        value={emulator.instance?.dma_enabled() ? "on" : "off"}
+                        uppercase={true}
+                        size={"large"}
+                        style={["simple"]}
+                        onChange={onDmaChange}
                     />
                 }
             />
