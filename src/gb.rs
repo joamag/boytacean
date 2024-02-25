@@ -578,8 +578,11 @@ impl GameBoy {
         self.ppu().frame_index()
     }
 
+    /// Direct boot method that immediately jumps the machine
+    /// to the post boot state, this will effectively skip the
+    /// boot sequence and jump to the cartridge execution.
     pub fn boot(&mut self) {
-        self.cpu.boot();
+        self.load_boot_state();
     }
 
     pub fn load(&mut self, boot: bool) {
@@ -629,6 +632,15 @@ impl GameBoy {
 
     pub fn load_boot_cgb(&mut self) {
         self.load_boot_static(BootRom::Cgb);
+    }
+
+    /// Loads the boot machine state and sets the Program Counter
+    /// (PC) to the post boot address.
+    ///
+    /// Should allow the machine to jump to the cartridge execution
+    /// skipping the boot sequence.
+    pub fn load_boot_state(&mut self) {
+        self.cpu.boot();
     }
 
     pub fn vram_eager(&mut self) -> Vec<u8> {

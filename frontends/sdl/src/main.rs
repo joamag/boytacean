@@ -971,6 +971,9 @@ fn main() {
     game_boy.set_timer_enabled(!args.no_timer);
     game_boy.attach_serial(device);
     game_boy.load(!args.no_boot && args.boot_rom_path.is_empty());
+    if args.no_boot {
+        game_boy.load_boot_state();
+    }
     if !args.boot_rom_path.is_empty() {
         game_boy.load_boot_path(&args.boot_rom_path).unwrap();
     }
