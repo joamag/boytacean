@@ -1,4 +1,7 @@
-use crate::warnln;
+use crate::{
+    consts::{HDMA1_ADDR, HDMA2_ADDR, HDMA3_ADDR, HDMA4_ADDR, HDMA5_ADDR},
+    warnln,
+};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum DmaMode {
@@ -38,7 +41,7 @@ impl Dma {
     pub fn read(&mut self, addr: u16) -> u8 {
         match addr {
             // 0xFF55 — HDMA5: VRAM DMA length/mode/start (CGB only)
-            0xff45 => ((self.length >> 4) - 1) as u8 | ((self.active as u8) << 7),
+            HDMA5_ADDR => ((self.length >> 4) - 1) as u8 | ((self.active as u8) << 7),
             _ => {
                 warnln!("Reading from unknown DMA location 0x{:04x}", addr);
                 0xff
@@ -49,15 +52,15 @@ impl Dma {
     pub fn write(&mut self, addr: u16, value: u8) {
         match addr {
             // 0xFF51 — HDMA1: VRAM DMA source high (CGB only)
-            0xff51 => self.source = (self.source & 0x00ff) | ((value as u16) << 8),
+            HDMA1_ADDR => self.source = (self.source & 0x00ff) | ((value as u16) << 8),
             // 0xFF52 — HDMA2: VRAM DMA source low (CGB only)
-            0xff52 => self.source = (self.source & 0xff00) | ((value & 0xf0) as u16),
+            HDMA2_ADDR => self.source = (self.source & 0xff00) | ((value & 0xf0) as u16),
             // 0xFF53 — HDMA3: VRAM DMA destination high (CGB only)
-            0xff53 => self.destination = (self.destination & 0x00ff) | ((value as u16) << 8),
+            HDMA3_ADDR => self.destination = (self.destination & 0x00ff) | ((value as u16) << 8),
             // 0xFF54 — HDMA4: VRAM DMA destination low (CGB only)
-            0xff54 => self.destination = (self.destination & 0xff00) | ((value & 0xf0) as u16),
+            HDMA4_ADDR => self.destination = (self.destination & 0xff00) | ((value & 0xf0) as u16),
             // 0xFF55 — HDMA5: VRAM DMA length/mode/start (CGB only)
-            0xff55 => {
+            HDMA5_ADDR => {
                 self.length = (((value & 0x7f) + 0x1) as u16) << 4;
                 self.mode = match (value & 80) >> 7 {
                     0 => DmaMode::General,

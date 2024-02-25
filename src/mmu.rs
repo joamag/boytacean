@@ -4,6 +4,7 @@ use std::sync::Mutex;
 
 use crate::{
     apu::Apu,
+    consts::DMA_ADDR,
     debugln,
     dma::Dma,
     gb::{Components, GameBoyConfig, GameBoyMode, GameBoySpeed},
@@ -268,7 +269,16 @@ impl Mmu {
             return;
         }
 
-        // @TODO: Implement DMA transfer in a better way
+        // @TODO: Implement DMA transfer in a better way, meaning that
+        // the DMA transfer should respect the timings
+
+        // In both Normal Speed and Double Speed Mode it takes about 8 μs
+        // to transfer a block of $10 bytes. That is, 8 M-cycles in Normal
+        // Speed Mode [1], and 16 “fast” M-cycles in Double Speed Mode [2].
+        // Older MBC controllers (like MBC1-3) and slower ROMs are not guaranteed
+        // to support General Purpose or HBlank DMA, that’s because there are
+        // always 2 bytes transferred per microsecond (even if the itself
+        // program runs it Normal Speed Mode).
 
         // only runs the DMA transfer if the system is in CGB mode
         // this avoids issues when writing to DMG unmapped registers
@@ -485,9 +495,9 @@ impl Mmu {
                             0x40 | 0x60 | 0x70 => {
                                 match addr & 0x00ff {
                                     // 0xFF46 — DMA: OAM DMA source address & start
-                                    0x0046 => {
-                                        // @TODO must increment the cycle count by 160
-                                        // and make this a separated dma.rs file
+                                    DMA_ADDR => {
+                                        // @TODO must update the data section only after 160 m cycles,
+                                        // making this an immediate operation creates issues
                                         debugln!("Going to start DMA transfer to 0x{:x}00", value);
                                         let data = self.read_many((value as u16) << 8, 160);
                                         self.write_many(0xfe00, &data);
