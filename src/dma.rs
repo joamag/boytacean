@@ -184,7 +184,9 @@ mod tests {
     #[test]
     fn test_dma_default() {
         let dma = Dma::default();
-        assert!(!dma.active);
+        assert!(!dma.active_dma);
+        assert!(!dma.active_hdma);
+        assert!(!dma.active());
     }
 
     #[test]
@@ -195,7 +197,10 @@ mod tests {
         dma.length = 0x9abc;
         dma.pending = 0x9abc;
         dma.mode = DmaMode::HBlank;
-        dma.active = true;
+        dma.cycles_dma = 0x0012;
+        dma.value_dma = 0xff;
+        dma.active_dma = true;
+        dma.active_hdma = true;
 
         dma.reset();
 
@@ -204,13 +209,17 @@ mod tests {
         assert_eq!(dma.length, 0x0);
         assert_eq!(dma.pending, 0x0);
         assert_eq!(dma.mode, DmaMode::General);
-        assert!(!dma.active);
+        assert_eq!(dma.cycles_dma, 0x0);
+        assert_eq!(dma.value_dma, 0x0);
+        assert!(!dma.active_dma);
+        assert!(!dma.active_hdma);
     }
 
     #[test]
     fn test_dma_set_active() {
         let mut dma = Dma::new();
-        dma.set_active(true);
-        assert!(dma.active);
+        dma.set_active_dma(true);
+        assert!(dma.active_dma);
+        assert!(dma.active());
     }
 }
