@@ -261,7 +261,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
                 // system and the machine state (to be able to recover)
                 if (isPanic) {
                     await wasm(true);
-                    await this.boot({ restore: false });
+                    await this.boot({ restore: false, reuse: false });
 
                     this.trigger("error");
                 }
@@ -387,6 +387,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     async boot({
         engine = "auto",
         restore = true,
+        reuse = true,
         loadRom = false,
         romPath = ROM_PATH,
         romName = null,
@@ -394,6 +395,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     }: {
         engine?: string | null;
         restore?: boolean;
+        reuse?: boolean;
         loadRom?: boolean;
         romPath?: string;
         romName?: string | null;
@@ -414,19 +416,32 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
             throw new Error("Unable to load initial ROM");
         }
 
+        // checks if the current operation is a create operation
+        // meaning that a new emulator instance is being created
+        const isCreate = !(this.gameBoy && reuse);
+
         // selects the proper engine for execution
         // and builds a new instance of it
         switch (engine) {
             case "auto":
-                this.gameBoy = new GameBoy(GameBoyMode.Dmg);
+                this.gameBoy = isCreate
+                    ? new GameBoy(GameBoyMode.Dmg)
+                    : (this.gameBoy as GameBoy);
+                this.gameBoy.set_mode(GameBoyMode.Dmg);
                 this.autoMode = true;
                 break;
             case "cgb":
-                this.gameBoy = new GameBoy(GameBoyMode.Cgb);
+                this.gameBoy = isCreate
+                    ? new GameBoy(GameBoyMode.Cgb)
+                    : (this.gameBoy as GameBoy);
+                this.gameBoy.set_mode(GameBoyMode.Cgb);
                 this.autoMode = false;
                 break;
             case "dmg":
-                this.gameBoy = new GameBoy(GameBoyMode.Dmg);
+                this.gameBoy = isCreate
+                    ? new GameBoy(GameBoyMode.Dmg)
+                    : (this.gameBoy as GameBoy);
+                this.gameBoy.set_mode(GameBoyMode.Dmg);
                 this.autoMode = false;
                 break;
             default:
@@ -448,6 +463,19 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
             this.gameBoy.infer_mode_wa(romData);
         }
 
+        // prints some debug information about the emulator that
+        // has just been booted, this should provide some insights
+        if (isCreate) {
+            this.logger.info(
+                `Creating Boytacean emulator (${engine ?? "current"})...`
+            );
+            this.logger.info(`${this.gameBoy.description(9)}`);
+        } else {
+            this.logger.info(
+                `Resetting Boytacean emulator (${engine ?? "current"})...`
+            );
+        }
+
         // resets the Game Boy engine to restore it into
         // a valid state ready to be used
         this.gameBoy.reset();
@@ -456,6 +484,10 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         // loads the ROM file into the system and retrieves
         // the cartridge instance associated with it
         const cartridge = this.gameBoy.load_rom_wa(romData);
+
+        // prints some debug information about the cartridge that
+        // has just been loaded, this should provide some insights
+        this.logger.info(`${cartridge.description(9)}`);
 
         // loads the callbacks so that the Typescript code
         // gets notified about the various events triggered
