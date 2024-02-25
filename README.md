@@ -111,6 +111,14 @@ The palettes offered in the web version were provided by [TheWolfBunny64](https:
 
 To get some information about the resources that inspired me through the emulation creation journey check [Inspiration](doc/inspiration.md).
 
+## Contributing
+
+Love Gameboy emulation? Want to contribute to Boytacean? That's awesome! Your contributions are what make the open-source community such an amazing place to learn, inspire, and create.
+
+To get started, please take a look at our [Contributing Guidelines](CONTRIBUTING.md). Whether you're fixing bugs, adding new features, or helping with documentation, every contribution is valuable and greatly appreciated!
+
+Don't hesitate to reach out if you have any questions. Join us in making Boytacean the best Gameboy emulator out there!
+
 ## License
 
 Boytacean is currently licensed under the [Apache License, Version 2.0](http://www.apache.org/licenses/).
