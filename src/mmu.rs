@@ -4,7 +4,6 @@ use std::sync::Mutex;
 
 use crate::{
     apu::Apu,
-    consts::DMA_ADDR,
     debugln,
     dma::Dma,
     gb::{Components, GameBoyConfig, GameBoyMode, GameBoySpeed},
@@ -497,7 +496,7 @@ impl Mmu {
                             0x40 | 0x60 | 0x70 => {
                                 match addr & 0x00ff {
                                     // 0xFF46 — DMA: OAM DMA source address & start
-                                    DMA_ADDR => {
+                                    0x0046 => {
                                         // @TODO must update the data section only after 160 m cycles,
                                         // making this an immediate operation creates issues
                                         debugln!("Going to start DMA transfer to 0x{:x}00", value);
