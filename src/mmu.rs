@@ -271,7 +271,7 @@ impl Mmu {
 
         // @TODO: Implement DMA transfer in a better way, meaning that
         // the DMA transfer should respect the timings
-
+        //
         // In both Normal Speed and Double Speed Mode it takes about 8 μs
         // to transfer a block of $10 bytes. That is, 8 M-cycles in Normal
         // Speed Mode [1], and 16 “fast” M-cycles in Double Speed Mode [2].
@@ -279,6 +279,8 @@ impl Mmu {
         // to support General Purpose or HBlank DMA, that’s because there are
         // always 2 bytes transferred per microsecond (even if the itself
         // program runs it Normal Speed Mode).
+        //
+        // we should also respect General-Purpose DMA vs HBlank DMA
 
         // only runs the DMA transfer if the system is in CGB mode
         // this avoids issues when writing to DMG unmapped registers
