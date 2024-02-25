@@ -172,7 +172,7 @@ impl Cpu {
                     self.halted = false;
                 }
 
-                return 24;
+                return 20;
             } else if (self.mmu.ie & 0x02 == 0x02) && self.mmu.ppu().int_stat() {
                 debugln!("Going to run LCD STAT interrupt handler (0x48)");
 
@@ -190,7 +190,7 @@ impl Cpu {
                     self.halted = false;
                 }
 
-                return 24;
+                return 20;
             } else if (self.mmu.ie & 0x04 == 0x04) && self.mmu.timer().int_tima() {
                 debugln!("Going to run Timer interrupt handler (0x50)");
 
@@ -208,7 +208,7 @@ impl Cpu {
                     self.halted = false;
                 }
 
-                return 24;
+                return 20;
             } else if (self.mmu.ie & 0x08 == 0x08) && self.mmu.serial().int_serial() {
                 debugln!("Going to run Serial interrupt handler (0x58)");
 
@@ -226,7 +226,7 @@ impl Cpu {
                     self.halted = false;
                 }
 
-                return 24;
+                return 20;
             } else if (self.mmu.ie & 0x10 == 0x10) && self.mmu.pad().int_pad() {
                 debugln!("Going to run JoyPad interrupt handler (0x60)");
 
@@ -244,7 +244,7 @@ impl Cpu {
                     self.halted = false;
                 }
 
-                return 24;
+                return 20;
             }
         }
 

@@ -71,6 +71,22 @@ mod tests {
     }
 
     #[test]
+    fn test_blargg_interrupt_time() {
+        let result: [u8; FRAME_BUFFER_SIZE] = run_image_test(
+            "../../res/roms/test/blargg/interrupt_time/interrupt_time.gb",
+            Some(20000000),
+            TestOptions {
+                mode: Some(GameBoyMode::Cgb),
+                ..TestOptions::default()
+            },
+        )
+        .unwrap();
+        let image_result =
+            compare_images(&result, "res/test/blargg/interrupt_time/interrupt_time.png");
+        assert!(image_result);
+    }
+
+    #[test]
     fn test_blargg_dmg_sound() {
         let result: [u8; FRAME_BUFFER_SIZE] = run_image_test(
             "../../res/roms/test/blargg/dmg_sound/01-registers.gb",
