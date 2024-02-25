@@ -263,9 +263,19 @@ impl Mmu {
         self.boot_active = value;
     }
 
-    pub fn clock_dma(&mut self, _cycles: u16) {
+    pub fn clock_dma(&mut self, cycles: u16) {
         if !self.dma.active() {
             return;
+        }
+
+        if self.dma.active_dma() {
+            let cycles_dma = self.dma.cycles_dma().saturating_sub(cycles);
+            if cycles_dma == 0x0 {
+                let data = self.read_many((self.dma.value_dma() as u16) << 8, 160);
+                self.write_many(0xfe00, &data);
+                self.dma.set_active_dma(false);
+            }
+            self.dma.set_cycles_dma(cycles_dma);
         }
 
         // @TODO: Implement DMA transfer in a better way, meaning that
@@ -280,16 +290,17 @@ impl Mmu {
         // program runs it Normal Speed Mode).
         //
         // we should also respect General-Purpose DMA vs HBlank DMA
-
-        // only runs the DMA transfer if the system is in CGB mode
-        // this avoids issues when writing to DMG unmapped registers
-        // that would otherwise cause the system to crash
-        if self.mode == GameBoyMode::Cgb {
-            let data = self.read_many(self.dma.source(), self.dma.pending());
-            self.write_many(self.dma.destination(), &data);
+        if self.dma.active_hdma() {
+            // only runs the DMA transfer if the system is in CGB mode
+            // this avoids issues when writing to DMG unmapped registers
+            // that would otherwise cause the system to crash
+            if self.mode == GameBoyMode::Cgb {
+                let data = self.read_many(self.dma.source(), self.dma.pending());
+                self.write_many(self.dma.destination(), &data);
+            }
+            self.dma.set_pending(0);
+            self.dma.set_active_hdma(false);
         }
-        self.dma.set_pending(0);
-        self.dma.set_active(false);
     }
 
     pub fn read(&mut self, addr: u16) -> u8 {
@@ -497,13 +508,7 @@ impl Mmu {
                             0x40 | 0x60 | 0x70 => {
                                 match addr & 0x00ff {
                                     // 0xFF46 — DMA: OAM DMA source address & start
-                                    0x0046 => {
-                                        // @TODO must update the data section only after 160 m cycles,
-                                        // making this an immediate operation creates issues
-                                        debugln!("Going to start DMA transfer to 0x{:x}00", value);
-                                        let data = self.read_many((value as u16) << 8, 160);
-                                        self.write_many(0xfe00, &data);
-                                    }
+                                    0x0046 => self.dma.write(addr, value),
 
                                     // VRAM related write
                                     _ => self.ppu.write(addr, value),

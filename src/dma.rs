@@ -1,5 +1,5 @@
 use crate::{
-    consts::{HDMA1_ADDR, HDMA2_ADDR, HDMA3_ADDR, HDMA4_ADDR, HDMA5_ADDR},
+    consts::{DMA_ADDR, HDMA1_ADDR, HDMA2_ADDR, HDMA3_ADDR, HDMA4_ADDR, HDMA5_ADDR},
     warnln,
 };
 
@@ -15,7 +15,10 @@ pub struct Dma {
     length: u16,
     pending: u16,
     mode: DmaMode,
-    active: bool,
+    cycles_dma: u16,
+    value_dma: u8,
+    active_dma: bool,
+    active_hdma: bool,
 }
 
 impl Dma {
@@ -26,7 +29,10 @@ impl Dma {
             length: 0x0,
             pending: 0x0,
             mode: DmaMode::General,
-            active: false,
+            cycles_dma: 0x0,
+            value_dma: 0x0,
+            active_dma: false,
+            active_hdma: false,
         }
     }
 
@@ -36,7 +42,10 @@ impl Dma {
         self.length = 0x0;
         self.pending = 0x0;
         self.mode = DmaMode::General;
-        self.active = false;
+        self.cycles_dma = 0x0;
+        self.value_dma = 0x0;
+        self.active_dma = false;
+        self.active_hdma = false;
     }
 
     pub fn clock(&mut self, _cycles: u16) {}
@@ -44,7 +53,9 @@ impl Dma {
     pub fn read(&mut self, addr: u16) -> u8 {
         match addr {
             // 0xFF55 — HDMA5: VRAM DMA length/mode/start (CGB only)
-            HDMA5_ADDR => ((self.pending >> 4) as u8).wrapping_sub(1) | ((!self.active as u8) << 7),
+            HDMA5_ADDR => {
+                ((self.pending >> 4) as u8).wrapping_sub(1) | ((!self.active_hdma as u8) << 7)
+            }
             _ => {
                 warnln!("Reading from unknown DMA location 0x{:04x}", addr);
                 0xff
@@ -54,6 +65,12 @@ impl Dma {
 
     pub fn write(&mut self, addr: u16, value: u8) {
         match addr {
+            // 0xFF46 — DMA: OAM DMA source address & start
+            DMA_ADDR => {
+                self.cycles_dma = 640;
+                self.value_dma = value;
+                self.active_dma = true;
+            }
             // 0xFF51 — HDMA1: VRAM DMA source high (CGB only)
             HDMA1_ADDR => self.source = (self.source & 0x00ff) | ((value as u16) << 8),
             // 0xFF52 — HDMA2: VRAM DMA source low (CGB only)
@@ -71,7 +88,7 @@ impl Dma {
                     _ => DmaMode::General,
                 };
                 self.pending = self.length;
-                self.active = true;
+                self.active_hdma = true;
             }
             _ => warnln!("Writing to unknown DMA location 0x{:04x}", addr),
         }
@@ -117,12 +134,40 @@ impl Dma {
         self.mode = value;
     }
 
-    pub fn active(&self) -> bool {
-        self.active
+    pub fn cycles_dma(&self) -> u16 {
+        self.cycles_dma
     }
 
-    pub fn set_active(&mut self, value: bool) {
-        self.active = value;
+    pub fn set_cycles_dma(&mut self, value: u16) {
+        self.cycles_dma = value;
+    }
+
+    pub fn value_dma(&self) -> u8 {
+        self.value_dma
+    }
+
+    pub fn set_value_dma(&mut self, value: u8) {
+        self.value_dma = value;
+    }
+
+    pub fn active_dma(&self) -> bool {
+        self.active_dma
+    }
+
+    pub fn set_active_dma(&mut self, value: bool) {
+        self.active_dma = value;
+    }
+
+    pub fn active_hdma(&self) -> bool {
+        self.active_hdma
+    }
+
+    pub fn set_active_hdma(&mut self, value: bool) {
+        self.active_hdma = value;
+    }
+
+    pub fn active(&self) -> bool {
+        self.active_dma || self.active_hdma
     }
 }
 

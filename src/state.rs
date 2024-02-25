@@ -1305,7 +1305,7 @@ impl State for BessCore {
 
             // need to disable DMA transfer to avoid unwanted
             // DMA transfers when loading the state
-            gb.dma().set_active(false);
+            gb.dma().set_active_hdma(false);
         }
 
         Ok(())
