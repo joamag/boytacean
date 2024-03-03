@@ -21,6 +21,21 @@ pub const BOOT_SIZE_CGB: usize = 2304;
 pub const RAM_SIZE_DMG: usize = 8192;
 pub const RAM_SIZE_CGB: usize = 32768;
 
+pub trait BusComponent {
+    fn read(&mut self, addr: u16) -> u8;
+    fn write(&mut self, addr: u16, value: u8);
+    fn read_many(&mut self, addr: u16, count: usize) -> Vec<u8> {
+        (0..count)
+            .map(|offset| self.read(addr + offset as u16))
+            .collect()
+    }
+    fn write_many(&mut self, addr: u16, values: &[u8]) {
+        for (offset, &value) in values.iter().enumerate() {
+            self.write(addr + offset as u16, value);
+        }
+    }
+}
+
 pub struct Mmu {
     /// Register that controls the interrupts that are considered
     /// to be enabled and should be triggered.

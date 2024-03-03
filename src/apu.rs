@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use crate::{gb::GameBoy, warnln};
+use crate::{gb::GameBoy, mmu::BusComponent, warnln};
 
 const DUTY_TABLE: [[u8; 8]; 4] = [
     [0, 0, 0, 0, 0, 0, 0, 1],
@@ -1073,6 +1073,16 @@ impl Apu {
                 self.tick_length(Channel::Ch4);
             }
         }
+    }
+}
+
+impl BusComponent for Apu {
+    fn read(&mut self, addr: u16) -> u8 {
+        self.read(addr)
+    }
+
+    fn write(&mut self, addr: u16, value: u8) {
+        self.write(addr, value);
     }
 }
 

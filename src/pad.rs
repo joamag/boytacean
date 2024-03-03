@@ -1,6 +1,6 @@
 //! Gamepad related functions and structures.
 
-use crate::warnln;
+use crate::{mmu::BusComponent, warnln};
 
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
@@ -164,6 +164,16 @@ impl Pad {
     #[inline(always)]
     pub fn ack_pad(&mut self) {
         self.set_int_pad(false);
+    }
+}
+
+impl BusComponent for Pad {
+    fn read(&mut self, addr: u16) -> u8 {
+        self.read(addr)
+    }
+
+    fn write(&mut self, addr: u16, value: u8) {
+        self.write(addr, value);
     }
 }
 

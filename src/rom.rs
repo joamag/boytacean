@@ -10,6 +10,7 @@ use crate::{
     debugln,
     error::Error,
     gb::GameBoyMode,
+    mmu::BusComponent,
     util::read_file,
     warnln,
 };
@@ -370,7 +371,7 @@ impl Cartridge {
         Self::from_data(&data)
     }
 
-    pub fn read(&self, addr: u16) -> u8 {
+    pub fn read(&mut self, addr: u16) -> u8 {
         match addr & 0xf000 {
             0x0000 | 0x1000 | 0x2000 | 0x3000 | 0x4000 | 0x5000 | 0x6000 | 0x7000 => {
                 (self.handler.read_rom)(self, addr)
@@ -820,6 +821,16 @@ impl Cartridge {
 
     pub fn ram_data_mut(&mut self) -> &mut Vec<u8> {
         &mut self.ram_data
+    }
+}
+
+impl BusComponent for Cartridge {
+    fn read(&mut self, addr: u16) -> u8 {
+        self.read(addr)
+    }
+
+    fn write(&mut self, addr: u16, value: u8) {
+        self.write(addr, value);
     }
 }
 

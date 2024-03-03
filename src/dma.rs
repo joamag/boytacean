@@ -1,5 +1,6 @@
 use crate::{
     consts::{DMA_ADDR, HDMA1_ADDR, HDMA2_ADDR, HDMA3_ADDR, HDMA4_ADDR, HDMA5_ADDR},
+    mmu::BusComponent,
     warnln,
 };
 
@@ -170,6 +171,16 @@ impl Dma {
 
     pub fn active(&self) -> bool {
         self.active_dma || self.active_hdma
+    }
+}
+
+impl BusComponent for Dma {
+    fn read(&mut self, addr: u16) -> u8 {
+        self.read(addr)
+    }
+
+    fn write(&mut self, addr: u16, value: u8) {
+        self.write(addr, value);
     }
 }
 

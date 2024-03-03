@@ -1,5 +1,6 @@
 use crate::{
     consts::{DIV_ADDR, TAC_ADDR, TIMA_ADDR, TMA_ADDR},
+    mmu::BusComponent,
     warnln,
 };
 
@@ -144,6 +145,16 @@ impl Timer {
     #[inline(always)]
     pub fn set_div_clock(&mut self, value: u16) {
         self.div_clock = value;
+    }
+}
+
+impl BusComponent for Timer {
+    fn read(&mut self, addr: u16) -> u8 {
+        self.read(addr)
+    }
+
+    fn write(&mut self, addr: u16, value: u8) {
+        self.write(addr, value);
     }
 }
 

@@ -11,6 +11,7 @@ use std::{
 
 use crate::{
     gb::{GameBoyConfig, GameBoyMode},
+    mmu::BusComponent,
     util::SharedThread,
     warnln,
 };
@@ -2088,6 +2089,16 @@ impl Ppu {
         let g = (second as u16 >> 2) & 0x3f;
         let b = (third as u16 >> 3) & 0x1f;
         (r << 11) | (g << 5) | b
+    }
+}
+
+impl BusComponent for Ppu {
+    fn read(&mut self, addr: u16) -> u8 {
+        self.read(addr)
+    }
+
+    fn write(&mut self, addr: u16, value: u8) {
+        self.write(addr, value);
     }
 }
 
