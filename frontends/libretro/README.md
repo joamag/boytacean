@@ -6,7 +6,7 @@
 cargo build
 ```
 
-### Cross-compiling
+### Cross Compilation
 
 #### Arm64 Linux
 
@@ -14,7 +14,7 @@ Download the linux toolchain from [Arm GNU Toolchain Downloads](https://develope
 
 Set the env variable `ARM64_TOOLCHAIN` to the path of the toolchain directory.
 
-Create a toolchain synbolic link using the following command in Unix:
+Create a toolchain symbolic link using the following command in Unix:
 
 ```bash
 ln -s $ARM64_TOOLCHAIN aarch64-linux-gnu
@@ -65,3 +65,15 @@ cargo build --target=aarch64-linux-android --release
 cargo build --target=armv7-linux-androideabi --release
 cargo build --target=i686-linux-android --release
 ```
+
+## Run
+
+### Mac OS
+
+```bash
+cargo build --release
+cp -p ../../target/release/libboytacean_libretro.dylib ~/Library/Application\ Support/RetroArch/cores/boytacean_libretro.dylib
+cp -p res/boytacean_libretro.info ~/Library/Application\ Support/RetroArch/info/boytacean_libretro.info
+```
+
+Then you should be able to see the Core available in RetroArch.
