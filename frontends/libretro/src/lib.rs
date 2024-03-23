@@ -413,6 +413,9 @@ pub unsafe extern "C" fn retro_load_game(game: *const RetroGameInfo) -> bool {
         RETRO_ENVIRONMENT_GET_GAME_INFO_EXT,
         addr_of!(GAME_INFO_EXT) as *const _ as *const c_void,
     );
+    if !ext_result {
+        warnln!("Failed to get extended game info");
+    }
     infoln!(
         "Loading ROM file in Boytacean from '{}' ({} bytes)...",
         String::from(CStr::from_ptr((*game).path).to_str().unwrap()),

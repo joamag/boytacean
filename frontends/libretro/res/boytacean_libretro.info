@@ -24,4 +24,5 @@ memory_descriptors = "false"
 libretro_saves = "true"
 core_options = "true"
 
+# General Description
 description = "A Game Boy emulator that is written in Rust."
