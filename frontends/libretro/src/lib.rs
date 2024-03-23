@@ -30,7 +30,7 @@ use std::{
     ffi::CStr,
     fmt::{self, Display, Formatter},
     os::raw::{c_char, c_float, c_uint, c_void},
-    ptr,
+    ptr::{self, addr_of},
     slice::from_raw_parts,
 };
 
@@ -295,7 +295,7 @@ pub extern "C" fn retro_run() {
     unsafe {
         environment_cb(
             RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE,
-            &UPDATED as *const _ as *const c_void,
+            addr_of!(UPDATED) as *const _ as *const c_void,
         );
         if UPDATED {
             update_vars();
@@ -544,7 +544,7 @@ unsafe fn update_palette() {
     let environment_cb = ENVIRONMENT_CALLBACK.as_ref().unwrap();
     environment_cb(
         RETRO_ENVIRONMENT_GET_VARIABLE,
-        &VARIABLE as *const _ as *const c_void,
+        addr_of!(VARIABLE) as *const _ as *const c_void,
     );
     if VARIABLE.value.is_null() {
         return;
