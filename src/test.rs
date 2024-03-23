@@ -93,7 +93,7 @@ mod tests {
         assert_eq!(result.cpu_i().bc(), 0x0013);
         assert_eq!(result.cpu_i().de(), 0x00d8);
         assert_eq!(result.cpu_i().hl(), 0x014d);
-        assert_eq!(result.cpu_i().ime(), false);
+        assert!(!result.cpu_i().ime());
 
         assert_eq!(result.mmu().read(DIV_ADDR), 0xab);
         assert_eq!(result.mmu().read(TIMA_ADDR), 0x00);

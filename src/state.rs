@@ -535,7 +535,7 @@ impl BessState {
     /// This will effectively populate the majority of the save
     /// file with the core emulator contents.
     fn dump_core(&mut self, buffer: &mut Cursor<Vec<u8>>) {
-        let mut buffers = vec![
+        let mut buffers = [
             &mut self.core.ram,
             &mut self.core.vram,
             &mut self.core.mbc_ram,
