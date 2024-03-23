@@ -7,6 +7,7 @@ use boytacean::{
     debugln,
     gb::{AudioProvider, GameBoy},
     info::Info,
+    infoln,
     pad::PadKey,
     ppu::{DISPLAY_HEIGHT, DISPLAY_WIDTH, FRAME_BUFFER_SIZE, XRGB8888_SIZE},
     rom::Cartridge,
@@ -20,14 +21,14 @@ use consts::{
     RETRO_DEVICE_ID_JOYPAD_R2, RETRO_DEVICE_ID_JOYPAD_R3, RETRO_DEVICE_ID_JOYPAD_RIGHT,
     RETRO_DEVICE_ID_JOYPAD_SELECT, RETRO_DEVICE_ID_JOYPAD_START, RETRO_DEVICE_ID_JOYPAD_UP,
     RETRO_DEVICE_ID_JOYPAD_X, RETRO_DEVICE_ID_JOYPAD_Y, RETRO_DEVICE_JOYPAD,
-    RETRO_ENVIRONMENT_GET_VARIABLE, RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE,
-    RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, RETRO_ENVIRONMENT_SET_VARIABLES,
-    RETRO_PIXEL_FORMAT_XRGB8888,
+    RETRO_ENVIRONMENT_GET_GAME_INFO_EXT, RETRO_ENVIRONMENT_GET_VARIABLE,
+    RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, RETRO_ENVIRONMENT_SET_PIXEL_FORMAT,
+    RETRO_ENVIRONMENT_SET_VARIABLES, RETRO_PIXEL_FORMAT_XRGB8888,
 };
 use palettes::get_palette;
 use std::{
     collections::HashMap,
-    ffi::CStr,
+    ffi::{c_uchar, CStr},
     fmt::{self, Display, Formatter},
     os::raw::{c_char, c_float, c_uint, c_void},
     ptr::{self, addr_of},
@@ -52,6 +53,20 @@ static mut INFO: LibRetroInfo = LibRetroInfo {
     version: "",
     name_s: String::new(),
     version_s: String::new(),
+};
+
+static mut GAME_INFO_EXT: RetroGameInfoExt = RetroGameInfoExt {
+    full_path: std::ptr::null(),
+    archive_path: std::ptr::null(),
+    archive_file: std::ptr::null(),
+    dir: std::ptr::null(),
+    name: std::ptr::null(),
+    ext: std::ptr::null(),
+    meta: std::ptr::null(),
+    data: std::ptr::null(),
+    size: 0,
+    file_in_archive: 0,
+    persistent_data: 0,
 };
 
 static mut PENDING_CYCLES: u32 = 0_u32;
@@ -150,12 +165,27 @@ pub struct RetroGameInfo {
 }
 
 #[repr(C)]
+pub struct RetroGameInfoExt {
+    pub full_path: *const c_char,
+    pub archive_path: *const c_char,
+    pub archive_file: *const c_char,
+    pub dir: *const c_char,
+    pub name: *const c_char,
+    pub ext: *const c_char,
+    pub meta: *const c_char,
+    pub data: *const c_void,
+    pub size: usize,
+    pub file_in_archive: c_uchar,
+    pub persistent_data: c_uchar,
+}
+
+#[repr(C)]
 pub struct RetroSystemInfo {
     pub library_name: *const c_char,
     pub library_version: *const c_char,
     pub valid_extensions: *const c_char,
-    pub need_fullpath: bool,
-    pub block_extract: bool,
+    pub need_fullpath: c_uchar,
+    pub block_extract: c_uchar,
 }
 
 #[repr(C)]
@@ -225,8 +255,8 @@ pub unsafe extern "C" fn retro_get_system_info(info: *mut RetroSystemInfo) {
     (*info).library_name = INFO.name.as_ptr() as *const c_char;
     (*info).library_version = INFO.version.as_ptr() as *const c_char;
     (*info).valid_extensions = "gb|gbc\0".as_ptr() as *const c_char;
-    (*info).need_fullpath = false;
-    (*info).block_extract = false;
+    (*info).need_fullpath = u8::from(false);
+    (*info).block_extract = u8::from(false);
 }
 
 /// # Safety
@@ -378,6 +408,20 @@ pub extern "C" fn retro_get_region() -> u32 {
 #[no_mangle]
 pub unsafe extern "C" fn retro_load_game(game: *const RetroGameInfo) -> bool {
     debugln!("retro_load_game()");
+    let environment_cb = ENVIRONMENT_CALLBACK.as_ref().unwrap();
+    let ext_result = environment_cb(
+        RETRO_ENVIRONMENT_GET_GAME_INFO_EXT,
+        addr_of!(GAME_INFO_EXT) as *const _ as *const c_void,
+    );
+    infoln!(
+        "Loading ROM file in Boytacean from '{}' ({} bytes)...",
+        String::from(CStr::from_ptr((*game).path).to_str().unwrap()),
+        if ext_result {
+            GAME_INFO_EXT.size
+        } else {
+            (*game).size
+        },
+    );
     let instance = EMULATOR.as_mut().unwrap();
     let data_buffer = from_raw_parts((*game).data as *const u8, (*game).size);
     let rom = Cartridge::from_data(data_buffer).unwrap();
