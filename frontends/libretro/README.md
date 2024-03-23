@@ -77,3 +77,11 @@ cp -p res/boytacean_libretro.info ~/Library/Application\ Support/RetroArch/info/
 ```
 
 Then you should be able to see the Core available in RetroArch.
+
+If there's a new for debugging information to be display in RetroArch console then use:
+
+```bash
+export RUST_BACKTRACE=1
+cargo build --features debug
+cp -p ../../target/debug/libboytacean_libretro.dylib ~/Library/Application\ Support/RetroArch/cores/boytacean_libretro.dylib
+```
