@@ -1,6 +1,7 @@
 use std::fmt::{self, Display, Formatter};
 
-/// Top level enum for error handling.
+/// Top level enum for error handling within Boytacean.
+///
 /// Most of the time, you will want to use the `CustomError` variant
 /// to provide a more detailed error message.
 #[derive(Debug, Clone, PartialEq, Eq)]
