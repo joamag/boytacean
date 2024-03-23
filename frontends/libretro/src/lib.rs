@@ -22,8 +22,9 @@ use consts::{
     RETRO_DEVICE_ID_JOYPAD_SELECT, RETRO_DEVICE_ID_JOYPAD_START, RETRO_DEVICE_ID_JOYPAD_UP,
     RETRO_DEVICE_ID_JOYPAD_X, RETRO_DEVICE_ID_JOYPAD_Y, RETRO_DEVICE_JOYPAD,
     RETRO_ENVIRONMENT_GET_GAME_INFO_EXT, RETRO_ENVIRONMENT_GET_VARIABLE,
-    RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, RETRO_ENVIRONMENT_SET_PIXEL_FORMAT,
-    RETRO_ENVIRONMENT_SET_VARIABLES, RETRO_PIXEL_FORMAT_XRGB8888,
+    RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, RETRO_ENVIRONMENT_SET_CONTENT_INFO_OVERRIDE,
+    RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, RETRO_ENVIRONMENT_SET_VARIABLES,
+    RETRO_PIXEL_FORMAT_XRGB8888,
 };
 use palettes::get_palette;
 use std::{
@@ -54,7 +55,6 @@ static mut INFO: LibRetroInfo = LibRetroInfo {
     name_s: String::new(),
     version_s: String::new(),
 };
-
 static mut GAME_INFO_EXT: RetroGameInfoExt = RetroGameInfoExt {
     full_path: std::ptr::null(),
     archive_path: std::ptr::null(),
@@ -68,6 +68,18 @@ static mut GAME_INFO_EXT: RetroGameInfoExt = RetroGameInfoExt {
     file_in_archive: 0,
     persistent_data: 0,
 };
+static mut INFO_OVERRIDE: [RetroSystemContentInfoOverride; 2] = [
+    RetroSystemContentInfoOverride {
+        extensions: "gb|gbc\0".as_ptr() as *const c_char,
+        need_fullpath: 0,
+        persistent_data: 1,
+    },
+    RetroSystemContentInfoOverride {
+        extensions: std::ptr::null(),
+        need_fullpath: 0,
+        persistent_data: 0,
+    },
+];
 
 static mut PENDING_CYCLES: u32 = 0_u32;
 
@@ -215,6 +227,13 @@ pub struct RetroVariable {
     value: *const c_char,
 }
 
+#[repr(C)]
+struct RetroSystemContentInfoOverride {
+    extensions: *const c_char,
+    need_fullpath: c_uchar,
+    persistent_data: c_uchar,
+}
+
 #[no_mangle]
 pub extern "C" fn retro_api_version() -> c_uint {
     debugln!("retro_api_version()");
@@ -276,10 +295,19 @@ pub unsafe extern "C" fn retro_get_system_av_info(info: *mut RetroSystemAvInfo) 
     (*info).timing.fps = GameBoy::VISUAL_FREQ as f64;
     (*info).timing.sample_rate = emulator.audio_sampling_rate() as f64;
 
-    environment_cb(
+    if !environment_cb(
         RETRO_ENVIRONMENT_SET_PIXEL_FORMAT,
         &RETRO_PIXEL_FORMAT_XRGB8888 as *const _ as *const c_void,
-    );
+    ) {
+        warnln!("Failed to set pixel format");
+    }
+
+    if !environment_cb(
+        RETRO_ENVIRONMENT_SET_CONTENT_INFO_OVERRIDE,
+        addr_of!(INFO_OVERRIDE) as *const _ as *const c_void,
+    ) {
+        warnln!("Failed to set content info override");
+    }
 }
 
 #[no_mangle]
@@ -290,10 +318,12 @@ pub extern "C" fn retro_set_environment(
     unsafe {
         ENVIRONMENT_CALLBACK = callback;
         let environment_cb = ENVIRONMENT_CALLBACK.as_ref().unwrap();
-        environment_cb(
+        if !environment_cb(
             RETRO_ENVIRONMENT_SET_VARIABLES,
             &VARIABLES as *const _ as *const c_void,
-        );
+        ) {
+            warnln!("Failed to set variables");
+        }
     }
 }
 
@@ -323,10 +353,12 @@ pub extern "C" fn retro_run() {
     // if that's the case all of them must be polled for
     // update, and if needed action is triggered
     unsafe {
-        environment_cb(
+        if !environment_cb(
             RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE,
             addr_of!(UPDATED) as *const _ as *const c_void,
-        );
+        ) {
+            warnln!("Failed to get variable update");
+        }
         if UPDATED {
             update_vars();
             UPDATED = false;
@@ -589,10 +621,12 @@ unsafe fn update_vars() {
 unsafe fn update_palette() {
     let emulator = EMULATOR.as_mut().unwrap();
     let environment_cb = ENVIRONMENT_CALLBACK.as_ref().unwrap();
-    environment_cb(
+    if !environment_cb(
         RETRO_ENVIRONMENT_GET_VARIABLE,
         addr_of!(VARIABLE) as *const _ as *const c_void,
-    );
+    ) {
+        warnln!("Failed to get variable");
+    }
     if VARIABLE.value.is_null() {
         return;
     }
