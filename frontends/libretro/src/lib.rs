@@ -72,7 +72,7 @@ static mut INFO_OVERRIDE: [RetroSystemContentInfoOverride; 2] = [
     RetroSystemContentInfoOverride {
         extensions: "gb|gbc\0".as_ptr() as *const c_char,
         need_fullpath: 0,
-        persistent_data: 1,
+        persistent_data: 0,
     },
     RetroSystemContentInfoOverride {
         extensions: std::ptr::null(),
