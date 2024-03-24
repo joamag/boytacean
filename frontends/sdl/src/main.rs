@@ -289,10 +289,15 @@ impl Emulator {
 
         let delta = initial.elapsed().unwrap().as_millis() as f64 / 1000.0;
         let frequency_mhz = cycles as f64 / delta / 1000.0 / 1000.0;
+        let speedup = cycles as f64
+            / GameBoy::CPU_FREQ as f64
+            / delta
+            / self.system.speed().multiplier() as f64;
+        let framerate = speedup * GameBoy::VISUAL_FREQ as f64;
 
         println!(
-            "Took {:.2} seconds to run {} ticks ({} cycles) ({:.2} Mhz)!",
-            delta, count, cycles, frequency_mhz
+            "Took {:.2} seconds to run {} ticks ({} cycles) ({:.2} Mhz, {:.2} speedup, {:.2} FPS)!",
+            delta, count, cycles, frequency_mhz, speedup, framerate
         );
     }
 
