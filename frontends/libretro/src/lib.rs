@@ -2,6 +2,7 @@
 
 pub mod consts;
 pub mod palettes;
+pub mod structs;
 
 use boytacean::{
     debugln,
@@ -29,11 +30,15 @@ use consts::{
 use palettes::get_palette;
 use std::{
     collections::HashMap,
-    ffi::{c_uchar, CStr},
+    ffi::CStr,
     fmt::{self, Display, Formatter},
-    os::raw::{c_char, c_float, c_uint, c_void},
+    os::raw::{c_char, c_uint, c_void},
     ptr::{self, addr_of},
     slice::from_raw_parts,
+};
+use structs::{
+    RetroGameInfo, RetroGameInfoExt, RetroSystemAvInfo, RetroSystemContentInfoOverride,
+    RetroSystemInfo, RetroVariable,
 };
 
 /// Represents the information about the LibRetro extension
@@ -68,18 +73,6 @@ static mut GAME_INFO_EXT: RetroGameInfoExt = RetroGameInfoExt {
     file_in_archive: 0,
     persistent_data: 0,
 };
-static mut INFO_OVERRIDE: [RetroSystemContentInfoOverride; 2] = [
-    RetroSystemContentInfoOverride {
-        extensions: "gb|gbc\0".as_ptr() as *const c_char,
-        need_fullpath: 0,
-        persistent_data: 0,
-    },
-    RetroSystemContentInfoOverride {
-        extensions: std::ptr::null(),
-        need_fullpath: 0,
-        persistent_data: 0,
-    },
-];
 
 static mut PENDING_CYCLES: u32 = 0_u32;
 
@@ -97,16 +90,6 @@ static mut VARIABLE: RetroVariable = RetroVariable {
     value: std::ptr::null(),
 };
 
-const KEYS: [RetroJoypad; 8] = [
-    RetroJoypad::RetroDeviceIdJoypadUp,
-    RetroJoypad::RetroDeviceIdJoypadDown,
-    RetroJoypad::RetroDeviceIdJoypadLeft,
-    RetroJoypad::RetroDeviceIdJoypadRight,
-    RetroJoypad::RetroDeviceIdJoypadStart,
-    RetroJoypad::RetroDeviceIdJoypadSelect,
-    RetroJoypad::RetroDeviceIdJoypadA,
-    RetroJoypad::RetroDeviceIdJoypadB,
-];
 const VARIABLES: [RetroVariable; 2] = [
     RetroVariable {
         key: "palette\0".as_ptr() as *const c_char,
@@ -117,6 +100,29 @@ const VARIABLES: [RetroVariable; 2] = [
         key: std::ptr::null(),
         value: std::ptr::null(),
     },
+];
+const INFO_OVERRIDE: [RetroSystemContentInfoOverride; 2] = [
+    RetroSystemContentInfoOverride {
+        extensions: "gb|gbc\0".as_ptr() as *const c_char,
+        need_fullpath: 0,
+        persistent_data: 0,
+    },
+    RetroSystemContentInfoOverride {
+        extensions: std::ptr::null(),
+        need_fullpath: 0,
+        persistent_data: 0,
+    },
+];
+
+const KEYS: [RetroJoypad; 8] = [
+    RetroJoypad::RetroDeviceIdJoypadUp,
+    RetroJoypad::RetroDeviceIdJoypadDown,
+    RetroJoypad::RetroDeviceIdJoypadLeft,
+    RetroJoypad::RetroDeviceIdJoypadRight,
+    RetroJoypad::RetroDeviceIdJoypadStart,
+    RetroJoypad::RetroDeviceIdJoypadSelect,
+    RetroJoypad::RetroDeviceIdJoypadA,
+    RetroJoypad::RetroDeviceIdJoypadB,
 ];
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
@@ -166,72 +172,6 @@ impl Display for RetroJoypad {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.description())
     }
-}
-
-#[repr(C)]
-pub struct RetroGameInfo {
-    pub path: *const c_char,
-    pub data: *const c_void,
-    pub size: usize,
-    pub meta: *const c_char,
-}
-
-#[repr(C)]
-pub struct RetroGameInfoExt {
-    pub full_path: *const c_char,
-    pub archive_path: *const c_char,
-    pub archive_file: *const c_char,
-    pub dir: *const c_char,
-    pub name: *const c_char,
-    pub ext: *const c_char,
-    pub meta: *const c_char,
-    pub data: *const c_void,
-    pub size: usize,
-    pub file_in_archive: c_uchar,
-    pub persistent_data: c_uchar,
-}
-
-#[repr(C)]
-pub struct RetroSystemInfo {
-    pub library_name: *const c_char,
-    pub library_version: *const c_char,
-    pub valid_extensions: *const c_char,
-    pub need_fullpath: c_uchar,
-    pub block_extract: c_uchar,
-}
-
-#[repr(C)]
-pub struct RetroGameGeometry {
-    pub base_width: c_uint,
-    pub base_height: c_uint,
-    pub max_width: c_uint,
-    pub max_height: c_uint,
-    pub aspect_ratio: c_float,
-}
-
-#[repr(C)]
-pub struct RetroSystemAvInfo {
-    geometry: RetroGameGeometry,
-    timing: RetroSystemTiming,
-}
-
-#[repr(C)]
-pub struct RetroSystemTiming {
-    fps: f64,
-    sample_rate: f64,
-}
-
-#[repr(C)]
-pub struct RetroVariable {
-    key: *const c_char,
-    value: *const c_char,
-}
-
-#[repr(C)]
-struct RetroSystemContentInfoOverride {
-    extensions: *const c_char,
-    need_fullpath: c_uchar,
-    persistent_data: c_uchar,
 }
 
 #[no_mangle]
@@ -320,7 +260,7 @@ pub extern "C" fn retro_set_environment(
         );
         environment_cb(
             RETRO_ENVIRONMENT_SET_CONTENT_INFO_OVERRIDE,
-            addr_of!(INFO_OVERRIDE) as *const _ as *const c_void,
+            &INFO_OVERRIDE as *const _ as *const c_void,
         );
     }
 }
@@ -439,17 +379,16 @@ pub extern "C" fn retro_get_region() -> u32 {
 pub unsafe extern "C" fn retro_load_game(game: *const RetroGameInfo) -> bool {
     debugln!("retro_load_game()");
     let environment_cb = ENVIRONMENT_CALLBACK.as_ref().unwrap();
-    let ext_result = environment_cb(
+    if !environment_cb(
         RETRO_ENVIRONMENT_GET_GAME_INFO_EXT,
         addr_of!(GAME_INFO_EXT) as *const _ as *const c_void,
-    );
-    if !ext_result {
+    ) {
         warnln!("Failed to get extended game info");
     }
     infoln!(
         "Loading ROM file in Boytacean from '{}' ({} bytes)...",
         String::from(CStr::from_ptr((*game).path).to_str().unwrap()),
-        if ext_result {
+        if GAME_INFO_EXT.size > 0 {
             GAME_INFO_EXT.size
         } else {
             (*game).size
