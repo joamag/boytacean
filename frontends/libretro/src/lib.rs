@@ -4,7 +4,6 @@ pub mod consts;
 pub mod palettes;
 
 use boytacean::{
-    debugln,
     gb::{AudioProvider, GameBoy},
     info::Info,
     infoln,
@@ -236,41 +235,43 @@ struct RetroSystemContentInfoOverride {
 
 #[no_mangle]
 pub extern "C" fn retro_api_version() -> c_uint {
-    debugln!("retro_api_version()");
+    infoln!("retro_api_version()");
     RETRO_API_VERSION
 }
 
 #[no_mangle]
 pub extern "C" fn retro_init() {
-    debugln!("retro_init()");
+    infoln!("retro_init()");
     unsafe {
         EMULATOR = Some(GameBoy::new(None));
         KEY_STATES = Some(HashMap::new());
-        INFO.name_s = format!("{}\0", Info::name());
-        INFO.name = INFO.name_s.as_str();
-        INFO.version_s = format!("v{}\0", Info::version());
-        INFO.version = INFO.version_s.as_str();
     }
 }
 
 #[no_mangle]
 pub extern "C" fn retro_deinit() {
-    debugln!("retro_deinit()");
+    infoln!("retro_deinit()");
 }
 
 #[no_mangle]
 pub extern "C" fn retro_reset() {
-    debugln!("retro_reset()");
+    infoln!("retro_reset()");
     let emulator = unsafe { EMULATOR.as_mut().unwrap() };
     emulator.reload();
 }
 
 /// # Safety
 ///
-/// This function should not be called only within Lib Retro context.
+/// This function should be called only within Libretro context.
 #[no_mangle]
 pub unsafe extern "C" fn retro_get_system_info(info: *mut RetroSystemInfo) {
-    debugln!("retro_get_system_info()");
+    infoln!("retro_get_system_info()");
+
+    INFO.name_s = format!("{}\0", Info::name());
+    INFO.name = INFO.name_s.as_str();
+    INFO.version_s = format!("v{}\0", Info::version());
+    INFO.version = INFO.version_s.as_str();
+
     (*info).library_name = INFO.name.as_ptr() as *const c_char;
     (*info).library_version = INFO.version.as_ptr() as *const c_char;
     (*info).valid_extensions = "gb|gbc\0".as_ptr() as *const c_char;
@@ -280,10 +281,11 @@ pub unsafe extern "C" fn retro_get_system_info(info: *mut RetroSystemInfo) {
 
 /// # Safety
 ///
-/// This function should not be called only within Lib Retro context.
+/// This function should be called only within Libretro context.
 #[no_mangle]
 pub unsafe extern "C" fn retro_get_system_av_info(info: *mut RetroSystemAvInfo) {
-    debugln!("retro_get_system_av_info()");
+    infoln!("retro_get_system_av_info()");
+
     let emulator = EMULATOR.as_ref().unwrap();
     let environment_cb = ENVIRONMENT_CALLBACK.as_ref().unwrap();
 
@@ -301,35 +303,30 @@ pub unsafe extern "C" fn retro_get_system_av_info(info: *mut RetroSystemAvInfo) 
     ) {
         warnln!("Failed to set pixel format");
     }
-
-    if !environment_cb(
-        RETRO_ENVIRONMENT_SET_CONTENT_INFO_OVERRIDE,
-        addr_of!(INFO_OVERRIDE) as *const _ as *const c_void,
-    ) {
-        warnln!("Failed to set content info override");
-    }
 }
 
 #[no_mangle]
 pub extern "C" fn retro_set_environment(
     callback: Option<extern "C" fn(u32, *const c_void) -> bool>,
 ) {
-    debugln!("retro_set_environment()");
+    infoln!("retro_set_environment()");
     unsafe {
         ENVIRONMENT_CALLBACK = callback;
         let environment_cb = ENVIRONMENT_CALLBACK.as_ref().unwrap();
-        if !environment_cb(
+        environment_cb(
             RETRO_ENVIRONMENT_SET_VARIABLES,
             &VARIABLES as *const _ as *const c_void,
-        ) {
-            warnln!("Failed to set variables");
-        }
+        );
+        environment_cb(
+            RETRO_ENVIRONMENT_SET_CONTENT_INFO_OVERRIDE,
+            addr_of!(INFO_OVERRIDE) as *const _ as *const c_void,
+        );
     }
 }
 
 #[no_mangle]
 pub extern "C" fn retro_set_controller_port_device() {
-    debugln!("retro_set_controller_port_device()");
+    infoln!("retro_set_controller_port_device()");
 }
 
 #[no_mangle]
@@ -430,16 +427,16 @@ pub extern "C" fn retro_run() {
 
 #[no_mangle]
 pub extern "C" fn retro_get_region() -> u32 {
-    debugln!("retro_get_region()");
+    infoln!("retro_get_region()");
     REGION_NTSC
 }
 
 /// # Safety
 ///
-/// This function should not be called only within Lib Retro context.
+/// This function should be called only within Libretro context.
 #[no_mangle]
 pub unsafe extern "C" fn retro_load_game(game: *const RetroGameInfo) -> bool {
-    debugln!("retro_load_game()");
+    infoln!("retro_load_game()");
     let environment_cb = ENVIRONMENT_CALLBACK.as_ref().unwrap();
     let ext_result = environment_cb(
         RETRO_ENVIRONMENT_GET_GAME_INFO_EXT,
@@ -475,32 +472,32 @@ pub extern "C" fn retro_load_game_special(
     _info: *const RetroGameInfo,
     _num_info: usize,
 ) -> bool {
-    debugln!("retro_load_game_special()");
+    infoln!("retro_load_game_special()");
     false
 }
 
 #[no_mangle]
 pub extern "C" fn retro_unload_game() {
-    debugln!("retro_unload_game()");
+    infoln!("retro_unload_game()");
     let instance = unsafe { EMULATOR.as_mut().unwrap() };
     instance.reset();
 }
 
 #[no_mangle]
-pub extern "C" fn retro_get_memory_data(_memory_id: u32) -> *mut c_void {
-    debugln!("retro_get_memory_data()");
-    std::ptr::null_mut()
-}
-
-#[no_mangle]
 pub extern "C" fn retro_get_memory_size(_memory_id: u32) -> usize {
-    debugln!("retro_get_memory_size()");
+    infoln!("retro_get_memory_size()");
     0
 }
 
 #[no_mangle]
+pub extern "C" fn retro_get_memory_data(_memory_id: u32) -> *mut c_void {
+    infoln!("retro_get_memory_data()");
+    std::ptr::null_mut()
+}
+
+#[no_mangle]
 pub extern "C" fn retro_serialize_size() -> usize {
-    debugln!("retro_serialize_size()");
+    infoln!("retro_serialize_size()");
     let instance = unsafe { EMULATOR.as_mut().unwrap() };
     StateManager::save(instance, Some(SaveStateFormat::Bess))
         .unwrap()
@@ -509,7 +506,7 @@ pub extern "C" fn retro_serialize_size() -> usize {
 
 #[no_mangle]
 pub extern "C" fn retro_serialize(data: *mut c_void, size: usize) -> bool {
-    debugln!("retro_serialize()");
+    infoln!("retro_serialize()");
     let instance = unsafe { EMULATOR.as_mut().unwrap() };
     let state = match StateManager::save(instance, Some(SaveStateFormat::Bess)) {
         Ok(state) => state,
@@ -534,7 +531,7 @@ pub extern "C" fn retro_serialize(data: *mut c_void, size: usize) -> bool {
 
 #[no_mangle]
 pub extern "C" fn retro_unserialize(data: *const c_void, size: usize) -> bool {
-    debugln!("retro_unserialize()");
+    infoln!("retro_unserialize()");
     let instance = unsafe { EMULATOR.as_mut().unwrap() };
     let state = unsafe { from_raw_parts(data as *const u8, size) };
     if let Err(err) = StateManager::load(state, instance, None) {
@@ -546,17 +543,17 @@ pub extern "C" fn retro_unserialize(data: *const c_void, size: usize) -> bool {
 
 #[no_mangle]
 pub extern "C" fn retro_cheat_reset() {
-    debugln!("retro_cheat_reset()");
+    infoln!("retro_cheat_reset()");
     let emulator = unsafe { EMULATOR.as_mut().unwrap() };
     emulator.reset_cheats();
 }
 
 /// # Safety
 ///
-/// This function should not be called only within Lib Retro context.
+/// This function should be called only within Libretro context.
 #[no_mangle]
 pub unsafe extern "C" fn retro_cheat_set(_index: c_uint, enabled: bool, code: *const c_char) {
-    debugln!("retro_cheat_set()");
+    infoln!("retro_cheat_set()");
     // we'll just ignore cheats that are not enabled, Boytacean
     // does not support pre-loading cheats
     if !enabled {
@@ -574,7 +571,7 @@ pub unsafe extern "C" fn retro_cheat_set(_index: c_uint, enabled: bool, code: *c
 pub extern "C" fn retro_set_video_refresh(
     callback: Option<extern "C" fn(*const u8, c_uint, c_uint, usize)>,
 ) {
-    debugln!("retro_set_video_refresh()");
+    infoln!("retro_set_video_refresh()");
     unsafe {
         VIDEO_REFRESH_CALLBACK = callback;
     }
@@ -582,7 +579,7 @@ pub extern "C" fn retro_set_video_refresh(
 
 #[no_mangle]
 pub extern "C" fn retro_set_audio_sample(callback: Option<extern "C" fn(i16, i16)>) {
-    debugln!("retro_set_audio_sample()");
+    infoln!("retro_set_audio_sample()");
     unsafe {
         AUDIO_SAMPLE_CALLBACK = callback;
     }
@@ -590,7 +587,7 @@ pub extern "C" fn retro_set_audio_sample(callback: Option<extern "C" fn(i16, i16
 
 #[no_mangle]
 pub extern "C" fn retro_set_audio_sample_batch(callback: Option<extern "C" fn(*const i16, usize)>) {
-    debugln!("retro_set_audio_sample_batch()");
+    infoln!("retro_set_audio_sample_batch()");
     unsafe {
         AUDIO_SAMPLE_BATCH_CALLBACK = callback;
     }
@@ -598,7 +595,7 @@ pub extern "C" fn retro_set_audio_sample_batch(callback: Option<extern "C" fn(*c
 
 #[no_mangle]
 pub extern "C" fn retro_set_input_poll(callback: Option<extern "C" fn()>) {
-    debugln!("retro_set_input_poll()");
+    infoln!("retro_set_input_poll()");
     unsafe {
         INPUT_POLL_CALLBACK = callback;
     }
@@ -608,7 +605,7 @@ pub extern "C" fn retro_set_input_poll(callback: Option<extern "C" fn()>) {
 pub extern "C" fn retro_set_input_state(
     callback: Option<extern "C" fn(port: u32, device: u32, index: u32, id: u32) -> i16>,
 ) {
-    debugln!("retro_set_input_state()");
+    infoln!("retro_set_input_state()");
     unsafe {
         INPUT_STATE_CALLBACK = callback;
     }

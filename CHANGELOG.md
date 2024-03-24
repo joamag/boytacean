@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 * Issue related to interrupt timing, reduce interrupt to 20 cycles instead of 24
+* Libretro issue with the loading of the base emulator info `retro_get_system_info()`
 
 ## [0.9.18] - 2024-01-02
 
