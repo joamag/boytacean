@@ -484,6 +484,8 @@ impl GameBoy {
         cycles
     }
 
+    /// Equivalent to `clock()` but allows the execution of multiple
+    /// clock operations in a single call.
     pub fn clocks(&mut self, count: usize) -> u64 {
         let mut cycles = 0_u64;
         for _ in 0..count {
