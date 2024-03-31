@@ -83,6 +83,12 @@ rm -rf ~/.cache/vcpkg
 cargo vcpkg -v build
 ```
 
+If you're still facing issues try to remove the `installed` directory in the `vcpkg` directory:
+
+```bash
+rm -rf ~/vcpkg/installed
+```
+
 ## Execution
 
 ### Headless
