@@ -35,8 +35,8 @@ impl SdlSystem {
         let audio_subsystem = sdl.audio().unwrap();
         let event_pump = sdl.event_pump().unwrap();
 
-        // initialized the fonts context to be used
-        // in the loading of fonts
+        // initializes the fonts context to be used
+        // in the loading of fonts (supports TTF fonts)
         let ttf_context = sdl2::ttf::init().unwrap();
 
         // creates the system window that is going to be used to
