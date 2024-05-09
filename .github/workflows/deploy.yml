@@ -154,7 +154,7 @@ jobs:
       - name: Download artifacts
         uses: actions/download-artifact@v3
       - name: Create release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           files: |
             boytacean-linux/boytacean_libretro.info
