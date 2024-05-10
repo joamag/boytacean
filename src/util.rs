@@ -32,13 +32,15 @@ pub fn read_file(path: &str) -> Result<Vec<u8>, Error> {
 }
 
 /// Writes the given data to the file at the given path.
-pub fn write_file(path: &str, data: &[u8]) -> Result<(), Error> {
+pub fn write_file(path: &str, data: &[u8], flush: Option<bool>) -> Result<(), Error> {
     let mut file = File::create(path)
         .map_err(|_| Error::CustomError(format!("Failed to create file: {}", path)))?;
     file.write_all(data)
         .map_err(|_| Error::CustomError(format!("Failed to write to file: {}", path)))?;
-    file.flush()
-        .map_err(|_| Error::CustomError(format!("Failed to flush file: {}", path)))?;
+    if flush.unwrap_or(true) {
+        file.flush()
+            .map_err(|_| Error::CustomError(format!("Failed to flush file: {}", path)))?;
+    }
     Ok(())
 }
 
