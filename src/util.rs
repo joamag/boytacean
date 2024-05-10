@@ -26,7 +26,8 @@ pub fn read_file(path: &str) -> Result<Vec<u8>, Error> {
     let mut file = File::open(path)
         .map_err(|_| Error::CustomError(format!("Failed to open file: {}", path)))?;
     let mut data = Vec::new();
-    file.read_to_end(&mut data).unwrap();
+    file.read_to_end(&mut data)
+        .map_err(|_| Error::CustomError(format!("Failed to read from file: {}", path)))?;
     Ok(data)
 }
 
@@ -34,7 +35,10 @@ pub fn read_file(path: &str) -> Result<Vec<u8>, Error> {
 pub fn write_file(path: &str, data: &[u8]) -> Result<(), Error> {
     let mut file = File::create(path)
         .map_err(|_| Error::CustomError(format!("Failed to create file: {}", path)))?;
-    file.write_all(data).unwrap();
+    file.write_all(data)
+        .map_err(|_| Error::CustomError(format!("Failed to write to file: {}", path)))?;
+    file.flush()
+        .map_err(|_| Error::CustomError(format!("Failed to flush file: {}", path)))?;
     Ok(())
 }
 
