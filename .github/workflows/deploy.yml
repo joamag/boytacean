@@ -33,7 +33,7 @@ jobs:
           mv boytacean-sdl boytacean-sdl-linux-x64
           mv libboytacean_libretro.so boytacean_libretro.so
       - name: Upload artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: boytacean-linux
           path: |
@@ -70,7 +70,7 @@ jobs:
           cd target/release
           mv boytacean-sdl.exe boytacean-sdl-win32-x64.exe
       - name: Upload artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: boytacean-win32
           path: |
@@ -106,7 +106,7 @@ jobs:
           mv boytacean-sdl boytacean-sdl-mac-x64
           mv libboytacean_libretro.dylib boytacean_libretro.dylib
       - name: Upload artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: boytacean-mac
           path: |
@@ -140,7 +140,7 @@ jobs:
           cd frontends/web
           zip -r -j boytacean-wasm.zip dist/*
       - name: Upload artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: boytacean-wasm
           path: frontends/web/boytacean-wasm.zip
