@@ -1,0 +1,3 @@
+include build.rs Cargo.toml LICENSE
+recursive-include src *.rs
+recursive-include frontends Cargo.toml *.rs
