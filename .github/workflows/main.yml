@@ -76,7 +76,7 @@ jobs:
       - name: Build WASM Web binary
         run: wasm-pack build --release --target=web --out-dir=frontends/web/lib -- --features wasm
       - name: Install Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
       - name: Build and lint Web code
