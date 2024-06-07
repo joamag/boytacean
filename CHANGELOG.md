@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+*
+
+### Changed
+
+*
+
+### Fixed
+
+*
+
+## [0.10.0] - 2024-06-07
+
+### Added
+
 * Initial support for the `PyBoy` compatibility layer - [#36](https://gitlab.stage.hive.pt/joamag/boytacean/-/issues/36)
 * Support for PyPi registry for the PyO3 package - [#43](https://gitlab.stage.hive.pt/joamag/boytacean/-/issues/43)
 * Python interface file for base boytacean (`boytacean.pyi`)
