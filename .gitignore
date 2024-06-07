@@ -12,6 +12,7 @@ Cargo.lock
 /.idea
 
 /ndk
+/dist
 /build
 /target
 /aarch64-linux-gnu

@@ -166,3 +166,14 @@ deploy-npm:
     - build-wasm
   only:
     - tags
+
+deploy-pypi:
+  stage: deploy
+  script:
+    - pip install twine wheel
+    - python setup.py sdist bdist_wheel
+    - python -m twine upload -u ${PYPI_USERNAME} -p ${PYPI_PASSWORD} dist/*
+  dependencies:
+    - build-pyo3
+  only:
+    - tags
