@@ -171,7 +171,7 @@ deploy-pypi:
   stage: deploy
   script:
     - pip3 install twine wheel
-    - python3 setup.py sdist bdist_wheel
+    - python3 setup.py sdist
     - python3 -m twine upload -u ${PYPI_USERNAME} -p ${PYPI_PASSWORD} dist/*
   dependencies:
     - build-pyo3
