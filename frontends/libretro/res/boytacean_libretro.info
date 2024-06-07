@@ -6,7 +6,7 @@ corename = "Boytacean"
 categories = "Emulator"
 license = "Apache-2."
 permissions = ""
-display_version = "0.10.1"
+display_version = "0.10.2"
 
 # Hardware Information
 manufacturer = "Nintendo"
