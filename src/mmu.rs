@@ -1,4 +1,6 @@
-use std::{cell::RefCell, rc::Rc};
+//! MMU (Memory Management Unit) functions and structures.
+
+use std::sync::Mutex;
 
 use crate::{
     apu::Apu,
@@ -10,6 +12,7 @@ use crate::{
     rom::Cartridge,
     serial::Serial,
     timer::Timer,
+    util::SharedThread,
 };
 
 pub const BOOT_SIZE_DMG: usize = 256;
@@ -17,6 +20,21 @@ pub const BOOT_SIZE_CGB: usize = 2304;
 
 pub const RAM_SIZE_DMG: usize = 8192;
 pub const RAM_SIZE_CGB: usize = 32768;
+
+pub trait BusComponent {
+    fn read(&mut self, addr: u16) -> u8;
+    fn write(&mut self, addr: u16, value: u8);
+    fn read_many(&mut self, addr: u16, count: usize) -> Vec<u8> {
+        (0..count)
+            .map(|offset| self.read(addr + offset as u16))
+            .collect()
+    }
+    fn write_many(&mut self, addr: u16, values: &[u8]) {
+        for (offset, &value) in values.iter().enumerate() {
+            self.write(addr + offset as u16, value);
+        }
+    }
+}
 
 pub struct Mmu {
     /// Register that controls the interrupts that are considered
@@ -83,8 +101,8 @@ pub struct Mmu {
     /// Boy execution. The buffer effectively used is of 256 bytes
     /// for the "normal" Game Boy (MGB) and 2308 bytes for the
     /// Game Boy Color (CGB). Note that in the case of the CGB
-    /// the bios which is 2308 bytes long is in fact only 2048 bytes
-    /// as the 256 bytes in range 0x100-0x1FF are meant to be
+    /// the BIOS which is 2308 bytes long is in fact only 2048 bytes
+    /// as the 256 bytes in range 0x0100-0x01FF are meant to be
     /// overwritten byte the cartridge header.
     boot: Vec<u8>,
 
@@ -109,11 +127,15 @@ pub struct Mmu {
     /// The pointer to the parent configuration of the running
     /// Game Boy emulator, that can be used to control the behaviour
     /// of Game Boy emulation.
-    gbc: Rc<RefCell<GameBoyConfig>>,
+    gbc: SharedThread<GameBoyConfig>,
 }
 
 impl Mmu {
-    pub fn new(components: Components, mode: GameBoyMode, gbc: Rc<RefCell<GameBoyConfig>>) -> Self {
+    pub fn new(
+        components: Components,
+        mode: GameBoyMode,
+        gbc: SharedThread<GameBoyConfig>,
+    ) -> Self {
         Self {
             ppu: components.ppu,
             apu: components.apu,
@@ -164,6 +186,22 @@ impl Mmu {
         self.ram = vec![0x00; RAM_SIZE_CGB];
     }
 
+    /// Notifies the system that a VBlank interrupt has been
+    /// triggered, would usually be the perfect time to update
+    /// some of the internal memory structures.
+    pub fn vblank(&mut self) {
+        let writes = self.rom.vblank();
+        if let Some(writes) = writes {
+            for (base_addr, addr, value) in writes {
+                match base_addr {
+                    0xa000 => self.rom.ram_data_mut()[addr as usize] = value,
+                    0xc000 => self.ram[addr as usize] = value,
+                    _ => panic!("Invalid base address for write: 0x{:04x}", base_addr),
+                }
+            }
+        }
+    }
+
     /// Switches the current system's speed toggling between
     /// the normal and double speed modes.
     pub fn switch_speed(&mut self) {
@@ -174,6 +212,10 @@ impl Mmu {
 
     pub fn speed(&self) -> GameBoySpeed {
         self.speed
+    }
+
+    pub fn set_speed(&mut self, value: GameBoySpeed) {
+        self.speed = value;
     }
 
     pub fn set_speed_callback(&mut self, callback: fn(speed: GameBoySpeed)) {
@@ -236,15 +278,44 @@ impl Mmu {
         self.boot_active = value;
     }
 
-    pub fn clock_dma(&mut self, _cycles: u16) {
+    pub fn clock_dma(&mut self, cycles: u16) {
         if !self.dma.active() {
             return;
         }
 
-        // @TODO: Implement DMA transfer in a better way
-        let data = self.read_many(self.dma.source(), self.dma.length());
-        self.write_many(self.dma.destination(), &data);
-        self.dma.set_active(false);
+        if self.dma.active_dma() {
+            let cycles_dma = self.dma.cycles_dma().saturating_sub(cycles);
+            if cycles_dma == 0x0 {
+                let data = self.read_many((self.dma.value_dma() as u16) << 8, 160);
+                self.write_many(0xfe00, &data);
+                self.dma.set_active_dma(false);
+            }
+            self.dma.set_cycles_dma(cycles_dma);
+        }
+
+        // @TODO: Implement DMA transfer in a better way, meaning that
+        // the DMA transfer should respect the timings
+        //
+        // In both Normal Speed and Double Speed Mode it takes about 8 μs
+        // to transfer a block of $10 bytes. That is, 8 M-cycles in Normal
+        // Speed Mode [1], and 16 “fast” M-cycles in Double Speed Mode [2].
+        // Older MBC controllers (like MBC1-3) and slower ROMs are not guaranteed
+        // to support General Purpose or HBlank DMA, that’s because there are
+        // always 2 bytes transferred per microsecond (even if the itself
+        // program runs it Normal Speed Mode).
+        //
+        // we should also respect General-Purpose DMA vs HBlank DMA
+        if self.dma.active_hdma() {
+            // only runs the DMA transfer if the system is in CGB mode
+            // this avoids issues when writing to DMG unmapped registers
+            // that would otherwise cause the system to crash
+            if self.mode == GameBoyMode::Cgb {
+                let data = self.read_many(self.dma.source(), self.dma.pending());
+                self.write_many(self.dma.destination(), &data);
+            }
+            self.dma.set_pending(0);
+            self.dma.set_active_hdma(false);
+        }
     }
 
     pub fn read(&mut self, addr: u16) -> u8 {
@@ -319,7 +390,7 @@ impl Mmu {
                     0x4d => (false as u8) | ((self.speed as u8) << 7),
 
                     // 0xFF50 - Boot active flag
-                    0x50 => u8::from(self.boot_active),
+                    0x50 => u8::from(!self.boot_active),
 
                     // 0xFF70 - SVBK: WRAM bank (CGB only)
                     0x70 => self.ram_bank & 0x07,
@@ -341,7 +412,13 @@ impl Mmu {
                             }
                         },
                         0x10 | 0x20 | 0x30 => self.apu.read(addr),
-                        0x40 | 0x60 | 0x70 => self.ppu.read(addr),
+                        0x40 | 0x60 | 0x70 => match addr & 0x00ff {
+                            // 0xFF46 — DMA: OAM DMA source address & start
+                            0x0046 => self.dma.read(addr),
+
+                            // VRAM related read
+                            _ => self.ppu.read(addr),
+                        },
                         0x50 => match addr & 0x00ff {
                             0x51..=0x55 => self.dma.read(addr),
                             _ => {
@@ -422,7 +499,7 @@ impl Mmu {
                     }
 
                     // 0xFF50 - Boot active flag
-                    0x50 => self.boot_active = false,
+                    0x50 => self.boot_active = value == 0x00,
 
                     // 0xFF70 - SVBK: WRAM bank (CGB only)
                     0x70 => {
@@ -441,37 +518,27 @@ impl Mmu {
                     0xff => self.ie = value,
 
                     // Other registers
-                    _ => {
-                        match addr & 0x00f0 {
-                            0x00 => match addr & 0x00ff {
-                                0x00 => self.pad.write(addr, value),
-                                0x04..=0x07 => self.timer.write(addr, value),
-                                _ => debugln!("Writing to unknown IO control 0x{:04x}", addr),
-                            },
-                            0x10 | 0x20 | 0x30 => self.apu.write(addr, value),
-                            0x40 | 0x60 | 0x70 => {
-                                match addr & 0x00ff {
-                                    // 0xFF46 — DMA: OAM DMA source address & start
-                                    0x0046 => {
-                                        // @TODO must increment the cycle count by 160
-                                        // and make this a separated dma.rs file
-                                        debugln!("Going to start DMA transfer to 0x{:x}00", value);
-                                        let data = self.read_many((value as u16) << 8, 160);
-                                        self.write_many(0xfe00, &data);
-                                    }
-
-                                    // VRAM related write
-                                    _ => self.ppu.write(addr, value),
-                                }
-                            }
-                            #[allow(clippy::single_match)]
-                            0x50 => match addr & 0x00ff {
-                                0x51..=0x55 => self.dma.write(addr, value),
-                                _ => debugln!("Writing to unknown IO control 0x{:04x}", addr),
-                            },
+                    _ => match addr & 0x00f0 {
+                        0x00 => match addr & 0x00ff {
+                            0x00 => self.pad.write(addr, value),
+                            0x04..=0x07 => self.timer.write(addr, value),
                             _ => debugln!("Writing to unknown IO control 0x{:04x}", addr),
-                        }
-                    }
+                        },
+                        0x10 | 0x20 | 0x30 => self.apu.write(addr, value),
+                        0x40 | 0x60 | 0x70 => match addr & 0x00ff {
+                            // 0xFF46 — DMA: OAM DMA source address & start
+                            0x0046 => self.dma.write(addr, value),
+
+                            // VRAM related write
+                            _ => self.ppu.write(addr, value),
+                        },
+                        #[allow(clippy::single_match)]
+                        0x50 => match addr & 0x00ff {
+                            0x51..=0x55 => self.dma.write(addr, value),
+                            _ => debugln!("Writing to unknown IO control 0x{:04x}", addr),
+                        },
+                        _ => debugln!("Writing to unknown IO control 0x{:04x}", addr),
+                    },
                 },
                 addr => panic!("Writing to unknown location 0x{:04x}", addr),
             },
@@ -480,9 +547,23 @@ impl Mmu {
         }
     }
 
-    pub fn write_many(&mut self, addr: u16, data: &[u8]) {
-        for (index, byte) in data.iter().enumerate() {
-            self.write(addr + index as u16, *byte)
+    /// Reads a byte from a certain memory address, without the typical
+    /// Game Boy verifications, allowing deep read of values.
+    pub fn read_unsafe(&mut self, addr: u16) -> u8 {
+        match addr {
+            0xff10..=0xff3f => self.apu.read_unsafe(addr),
+            _ => self.read(addr),
+        }
+    }
+
+    /// Writes a byte to a certain memory address without the typical
+    /// Game Boy verification process. This allows for faster memory
+    /// access in registers and other memory areas that are typically
+    /// inaccessible.
+    pub fn write_unsafe(&mut self, addr: u16, value: u8) {
+        match addr {
+            0xff10..=0xff3f => self.apu.write_unsafe(addr, value),
+            _ => self.write(addr, value),
         }
     }
 
@@ -497,6 +578,29 @@ impl Mmu {
         data
     }
 
+    pub fn write_many(&mut self, addr: u16, data: &[u8]) {
+        for (index, byte) in data.iter().enumerate() {
+            self.write(addr + index as u16, *byte)
+        }
+    }
+
+    pub fn read_many_unsafe(&mut self, addr: u16, count: u16) -> Vec<u8> {
+        let mut data: Vec<u8> = vec![];
+
+        for index in 0..count {
+            let byte = self.read_unsafe(addr + index);
+            data.push(byte);
+        }
+
+        data
+    }
+
+    pub fn write_many_unsafe(&mut self, addr: u16, data: &[u8]) {
+        for (index, byte) in data.iter().enumerate() {
+            self.write_unsafe(addr + index as u16, *byte)
+        }
+    }
+
     pub fn write_boot(&mut self, addr: u16, buffer: &[u8]) {
         self.boot[addr as usize..addr as usize + buffer.len()].clone_from_slice(buffer);
     }
@@ -505,8 +609,24 @@ impl Mmu {
         self.ram[addr as usize..addr as usize + buffer.len()].clone_from_slice(buffer);
     }
 
+    pub fn ram(&mut self) -> &mut Vec<u8> {
+        &mut self.ram
+    }
+
+    pub fn ram_i(&self) -> &Vec<u8> {
+        &self.ram
+    }
+
+    pub fn set_ram(&mut self, value: Vec<u8>) {
+        self.ram = value;
+    }
+
     pub fn rom(&mut self) -> &mut Cartridge {
         &mut self.rom
+    }
+
+    pub fn rom_i(&self) -> &Cartridge {
+        &self.rom
     }
 
     pub fn set_rom(&mut self, rom: Cartridge) {
@@ -521,7 +641,7 @@ impl Mmu {
         self.mode = value;
     }
 
-    pub fn set_gbc(&mut self, value: Rc<RefCell<GameBoyConfig>>) {
+    pub fn set_gbc(&mut self, value: SharedThread<GameBoyConfig>) {
         self.gbc = value;
     }
 }
@@ -529,7 +649,7 @@ impl Mmu {
 impl Default for Mmu {
     fn default() -> Self {
         let mode = GameBoyMode::Dmg;
-        let gbc = Rc::new(RefCell::new(GameBoyConfig::default()));
+        let gbc = SharedThread::new(Mutex::new(GameBoyConfig::default()));
         let components = Components {
             ppu: Ppu::new(mode, gbc.clone()),
             apu: Apu::default(),

@@ -1,7 +1,9 @@
+import { loadAsync } from "jszip";
 import {
     AudioSpecs,
+    base64ToBuffer,
     BenchmarkResult,
-    SectionInfo,
+    bufferToBase64,
     Compilation,
     Compiler,
     DebugPanel,
@@ -14,14 +16,15 @@ import {
     HelpPanel,
     PixelFormat,
     RomInfo,
+    SaveState,
+    SectionInfo,
     Size
 } from "emukit";
 import { PALETTES, PALETTES_MAP } from "./palettes";
-import { base64ToBuffer, bufferToBase64 } from "./util";
 import {
     DebugAudio,
-    DebugSettings,
     DebugGeneral,
+    DebugSettings,
     HelpFaqs,
     HelpKeyboard,
     SerialSection,
@@ -32,14 +35,20 @@ import {
     Cartridge,
     default as _wasm,
     GameBoy,
-    PadKey,
     GameBoyMode,
-    GameBoySpeed
+    GameBoySpeed,
+    Info,
+    PadKey,
+    SaveStateFormat,
+    StateManager
 } from "../lib/boytacean";
 import info from "../package.json";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 declare const require: any;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+declare const process: any;
 
 /**
  * The frequency at which the Game Boy emulator should
@@ -139,7 +148,12 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     private frameStart: number = EmulatorBase.now();
     private frameCount = 0;
     private paletteIndex = 0;
-    private storeCycles: number = LOGIC_HZ * STORE_RATE;
+
+    /**
+     * The frequency at which the battery backed RAM is going
+     * to be flushed to the `localStorage`.
+     */
+    private flushCycles: number = LOGIC_HZ * STORE_RATE;
 
     private romName: string | null = null;
     private romData: Uint8Array | null = null;
@@ -161,6 +175,15 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     }
 
     /**
+     * Initializes the global module structures.
+     */
+    async init() {
+        // initializes the WASM module, this is required
+        // so that the global symbols become available
+        await wasm();
+    }
+
+    /**
      * Runs the initialization and main loop execution for
      * the Game Boy emulator.
      * The main execution of this function should be an
@@ -170,10 +193,6 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
      * used in he Game Boy emulator initialization.
      */
     async main({ romUrl }: { romUrl?: string }) {
-        // initializes the WASM module, this is required
-        // so that the global symbols become available
-        await wasm();
-
         // boots the emulator subsystem with the initial
         // ROM retrieved from a remote data source
         await this.boot({ loadRom: true, romPath: romUrl ?? undefined });
@@ -242,7 +261,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
                 // system and the machine state (to be able to recover)
                 if (isPanic) {
                     await wasm(true);
-                    await this.boot({ restore: false });
+                    await this.boot({ restore: false, reuse: false });
 
                     this.trigger("error");
                 }
@@ -304,10 +323,10 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
             // then we need to check if a RAM flush to local
             // storage operation is required
             if (this.cartridge && this.cartridge.has_battery()) {
-                this.storeCycles -= tickCycles;
-                if (this.storeCycles <= 0) {
-                    this.storeRam();
-                    this.storeCycles = this.logicFrequency * STORE_RATE;
+                this.flushCycles -= tickCycles;
+                if (this.flushCycles <= 0) {
+                    this.saveRam();
+                    this.flushCycles = this.logicFrequency * STORE_RATE;
                 }
             }
         }
@@ -368,6 +387,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     async boot({
         engine = "auto",
         restore = true,
+        reuse = true,
         loadRom = false,
         romPath = ROM_PATH,
         romName = null,
@@ -375,6 +395,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     }: {
         engine?: string | null;
         restore?: boolean;
+        reuse?: boolean;
         loadRom?: boolean;
         romPath?: string;
         romName?: string | null;
@@ -383,9 +404,8 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         // in case a remote ROM loading operation has been
         // requested then loads it from the remote origin
         if (loadRom) {
-            ({ name: romName, data: romData } = await GameboyEmulator.fetchRom(
-                romPath
-            ));
+            ({ name: romName, data: romData } =
+                await GameboyEmulator.fetchRom(romPath));
         } else if (romName === null || romData === null) {
             [romName, romData] = [this.romName, this.romData];
         }
@@ -396,19 +416,32 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
             throw new Error("Unable to load initial ROM");
         }
 
+        // checks if the current operation is a create operation
+        // meaning that a new emulator instance is being created
+        const isCreate = !(this.gameBoy && reuse);
+
         // selects the proper engine for execution
         // and builds a new instance of it
         switch (engine) {
             case "auto":
-                this.gameBoy = new GameBoy(GameBoyMode.Dmg);
+                this.gameBoy = isCreate
+                    ? new GameBoy(GameBoyMode.Dmg)
+                    : (this.gameBoy as GameBoy);
+                this.gameBoy.set_mode(GameBoyMode.Dmg);
                 this.autoMode = true;
                 break;
             case "cgb":
-                this.gameBoy = new GameBoy(GameBoyMode.Cgb);
+                this.gameBoy = isCreate
+                    ? new GameBoy(GameBoyMode.Cgb)
+                    : (this.gameBoy as GameBoy);
+                this.gameBoy.set_mode(GameBoyMode.Cgb);
                 this.autoMode = false;
                 break;
             case "dmg":
-                this.gameBoy = new GameBoy(GameBoyMode.Dmg);
+                this.gameBoy = isCreate
+                    ? new GameBoy(GameBoyMode.Dmg)
+                    : (this.gameBoy as GameBoy);
+                this.gameBoy.set_mode(GameBoyMode.Dmg);
                 this.autoMode = false;
                 break;
             default:
@@ -427,7 +460,20 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         // inference logic to try to infer the best mode from the
         // GBC header in the cartridge data
         if (this.autoMode) {
-            this.gameBoy.infer_mode_ws(romData);
+            this.gameBoy.infer_mode_wa(romData);
+        }
+
+        // prints some debug information about the emulator that
+        // has just been booted, this should provide some insights
+        if (isCreate) {
+            this.logger.info(
+                `Creating Boytacean emulator (${engine ?? "current"})...`
+            );
+            this.logger.info(`${this.gameBoy.description(9)}`);
+        } else {
+            this.logger.info(
+                `Resetting Boytacean emulator (${engine ?? "current"})...`
+            );
         }
 
         // resets the Game Boy engine to restore it into
@@ -437,12 +483,16 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
 
         // loads the ROM file into the system and retrieves
         // the cartridge instance associated with it
-        const cartridge = this.gameBoy.load_rom_ws(romData);
+        const cartridge = this.gameBoy.load_rom_wa(romData);
+
+        // prints some debug information about the cartridge that
+        // has just been loaded, this should provide some insights
+        this.logger.info(`${cartridge.description(9)}`);
 
         // loads the callbacks so that the Typescript code
         // gets notified about the various events triggered
         // in the WASM side
-        this.gameBoy.load_callbacks_ws();
+        this.gameBoy.load_callbacks_wa();
 
         // in case there's a serial device involved tries to load
         // it and initialize for the current Game Boy machine
@@ -485,12 +535,12 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     }
 
     get name(): string {
-        return "Boytacean";
+        return Info.name() ?? info.name;
     }
 
     get device(): Entry {
         return {
-            text: "Game Boy",
+            text: Info.system(),
             url: "https://en.wikipedia.org/wiki/Game_Boy"
         };
     }
@@ -501,7 +551,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
 
     get version(): Entry | undefined {
         return {
-            text: info.version,
+            text: Info.version() ?? info.version,
             url: "https://github.com/joamag/boytacean/blob/master/CHANGELOG.md"
         };
     }
@@ -522,22 +572,26 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
             Feature.Benchmark,
             Feature.Keyboard,
             Feature.KeyboardGB,
-            Feature.RomTypeInfo
+            Feature.RomTypeInfo,
+            Feature.SaveState
         ];
     }
 
     get sections(): SectionInfo[] {
-        return [
+        const _sections: SectionInfo[] = [
             {
                 name: "Serial",
                 icon: require("../res/serial.svg"),
                 node: SerialSection({ emulator: this })
-            },
-            {
-                name: "Test",
-                node: TestSection({})
             }
         ];
+        if (process.env.NODE_ENV === "development") {
+            _sections.push({
+                name: "Test",
+                node: TestSection({})
+            });
+        }
+        return _sections;
     }
 
     get help(): HelpPanel[] {
@@ -579,7 +633,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     }
 
     get romExts(): string[] {
-        return ["gb", "gbc"];
+        return ["gb", "gbc", "zip"];
     }
 
     get pixelFormat(): PixelFormat {
@@ -657,22 +711,22 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     get compiler(): Compiler | null {
         if (!this.gameBoy) return null;
         return {
-            name: this.gameBoy.compiler(),
-            version: this.gameBoy.compiler_version()
+            name: Info.compiler(),
+            version: Info.compiler_version()
         };
     }
 
     get compilation(): Compilation | null {
         if (!this.gameBoy) return null;
         return {
-            date: this.gameBoy.compilation_date(),
-            time: this.gameBoy.compilation_time()
+            date: Info.compilation_date(),
+            time: Info.compilation_time()
         };
     }
 
     get wasmEngine(): string | null {
         if (!this.gameBoy) return null;
-        return this.gameBoy.wasm_engine_ws() ?? null;
+        return this.gameBoy.wasm_engine_wa() ?? null;
     }
 
     get framerate(): number {
@@ -737,25 +791,25 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         this._serialDevice = value;
     }
 
-    toggleRunning() {
+    async toggleRunning() {
         if (this.paused) {
-            this.resume();
+            await this.resume();
         } else {
-            this.pause();
+            await this.pause();
         }
     }
 
-    pause() {
+    async pause() {
         this.paused = true;
     }
 
-    resume() {
+    async resume() {
         this.paused = false;
         this.nextTickTime = EmulatorBase.now();
     }
 
-    reset() {
-        this.boot({ engine: null });
+    async reset() {
+        await this.boot({ engine: null });
     }
 
     keyPress(key: string) {
@@ -768,6 +822,40 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         const keyCode = KEYS_NAME[key];
         if (keyCode === undefined) return;
         this.gameBoy?.key_lift(keyCode);
+    }
+
+    async buildRomData(file: File): Promise<Uint8Array> {
+        const arrayBuffer = await file.arrayBuffer();
+        let romData = new Uint8Array(arrayBuffer);
+
+        if (file.name.endsWith(".zip")) {
+            const zip = await loadAsync(romData);
+            const firstFile = Object.values(zip.files)[0];
+            romData = await firstFile.async("uint8array");
+        }
+
+        return romData;
+    }
+
+    serializeState(): Uint8Array {
+        if (!this.gameBoy) throw new Error("Unable to serialize state");
+        return StateManager.save_wa(this.gameBoy, SaveStateFormat.Bos);
+    }
+
+    unserializeState(data: Uint8Array) {
+        if (!this.gameBoy) throw new Error("Unable to unserialize state");
+        StateManager.load_wa(data, this.gameBoy, SaveStateFormat.Bos);
+    }
+
+    buildState(index: number, data: Uint8Array): SaveState {
+        const state = StateManager.read_bos_wa(data);
+        return {
+            index: index,
+            timestamp: Number(state.timestamp_wa()),
+            agent: state.agent_wa(),
+            model: state.model_wa(),
+            thumbnail: state.image_eager_wa()
+        };
     }
 
     pauseVideo() {
@@ -851,17 +939,17 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     }
 
     loadNullDevice(set = true) {
-        this.gameBoy?.load_null_ws();
+        this.gameBoy?.load_null_wa();
         if (set) this.serialDevice = SerialDevice.Null;
     }
 
     loadLoggerDevice(set = true) {
-        this.gameBoy?.load_logger_ws();
+        this.gameBoy?.load_logger_wa();
         if (set) this.serialDevice = SerialDevice.Logger;
     }
 
     loadPrinterDevice(set = true) {
-        this.gameBoy?.load_printer_ws();
+        this.gameBoy?.load_printer_wa();
         if (set) this.serialDevice = SerialDevice.Printer;
     }
 
@@ -878,6 +966,19 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     }
 
     /**
+     * Tries for save/flush the current machine RAM into the
+     * `localStorage`, so that it can be latter restored.
+     */
+    private saveRam() {
+        if (!this.gameBoy || !this.cartridge || !window.localStorage) return;
+        if (!this.cartridge.has_battery()) return;
+        const title = this.cartridge.title();
+        const ramData = this.gameBoy.ram_data_eager();
+        const ramDataB64 = bufferToBase64(ramData);
+        localStorage.setItem(title, ramDataB64);
+    }
+
+    /**
      * Tries to load game RAM from the `localStorage` using the
      * current cartridge title as the name of the item and
      * decoding it using Base64.
@@ -888,18 +989,6 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         if (!ramDataB64) return;
         const ramData = base64ToBuffer(ramDataB64);
         this.gameBoy.set_ram_data(ramData);
-    }
-
-    /**
-     * Tries for store/flush the current machine RAM into the
-     * `localStorage`, so that it can be latter restored.
-     */
-    private storeRam() {
-        if (!this.gameBoy || !this.cartridge || !window.localStorage) return;
-        const title = this.cartridge.title();
-        const ramData = this.gameBoy.ram_data_eager();
-        const ramDataB64 = bufferToBase64(ramData);
-        localStorage.setItem(title, ramDataB64);
     }
 
     private storeSettings() {
@@ -913,7 +1002,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
 
     private updatePalette() {
         const palette = PALETTES[this.paletteIndex];
-        this.gameBoy?.set_palette_colors_ws(palette.colors);
+        this.gameBoy?.set_palette_colors_wa(palette.colors);
         this.storeSettings();
     }
 
@@ -1012,7 +1101,7 @@ const wasm = async (setHook = true) => {
     // wrap the call around try/catch
     if (setHook) {
         try {
-            GameBoy.set_panic_hook_ws();
+            GameBoy.set_panic_hook_wa();
         } catch (err) {
             console.error(err);
         }

@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use crate::{gb::GameBoy, warnln};
+use crate::{gb::GameBoy, mmu::BusComponent, warnln};
 
 const DUTY_TABLE: [[u8; 8]; 4] = [
     [0, 0, 0, 0, 0, 0, 0, 1],
@@ -656,6 +656,14 @@ impl Apu {
         }
     }
 
+    pub fn read_unsafe(&mut self, addr: u16) -> u8 {
+        self.read(addr)
+    }
+
+    pub fn write_unsafe(&mut self, addr: u16, value: u8) {
+        self.write(addr, value);
+    }
+
     #[inline(always)]
     pub fn output(&self) -> u8 {
         self.ch1_output() + self.ch2_output() + self.ch3_output() + self.ch4_output()
@@ -747,6 +755,10 @@ impl Apu {
 
     pub fn clear_audio_buffer(&mut self) {
         self.audio_buffer.clear();
+    }
+
+    pub fn audio_buffer_max(&self) -> usize {
+        self.audio_buffer_max
     }
 
     pub fn clock_freq(&self) -> u32 {
@@ -1064,6 +1076,16 @@ impl Apu {
     }
 }
 
+impl BusComponent for Apu {
+    fn read(&mut self, addr: u16) -> u8 {
+        self.read(addr)
+    }
+
+    fn write(&mut self, addr: u16, value: u8) {
+        self.write(addr, value);
+    }
+}
+
 impl Default for Apu {
     fn default() -> Self {
         Self::new(44100, 2, 1.0, GameBoy::CPU_FREQ)
@@ -1072,7 +1094,7 @@ impl Default for Apu {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::Apu;
 
     #[test]
     fn test_trigger_ch1() {

@@ -14,8 +14,9 @@ A Game Boy emulator that is written in Rust 🦀.
 * Audio, with a pretty accurate APU
 * Serial Data Transfer ([Link Cable](https://en.wikipedia.org/wiki/Game_Link_Cable)) support
 * Game Boy Printer emulation
-* Support for multiple MBCs: MBC1, MBC2, MBC3, and MBC5
-* Cheat support using [Game Genie](https://en.wikipedia.org/wiki/Game_Genie) codes
+* Support for multiple MBCs: MBC1, MBC3, and MBC5
+* Save state support using the [BESS Specification](https://github.com/LIJI32/SameBoy/blob/master/BESS.md) for cross-compatibility with other emulators
+* Cheat support using [Game Genie](https://en.wikipedia.org/wiki/Game_Genie) and [GameShark](https://pt.wikipedia.org/wiki/GameShark) codes
 * Variable CPU clock speed
 * Accurate PPU - passes [dmg-acid2](https://github.com/mattcurrie/dmg-acid2) and [cgb-acid2](https://github.com/mattcurrie/cgb-acid2) tests
 
@@ -32,17 +33,19 @@ For the Web front-end...
 
 What's still missing...
 
-* Machine state saving and loading (.sav files)
+* Low-level cycle accurate system emulation
+* [Game Boy Camera](https://en.wikipedia.org/wiki/Game_Boy_Camera) emulation
+* NetPlay gaming support
 
 ## Deployments
 
-| Provider  | Stable  | URL                                                              |
-| --------- | ------- | ---------------------------------------------------------------- |
-| Cloudfare | `True`  | [boytacean.joao.me](https://boytacean.joao.me)                   |
-| Cloudfare | `True`  | [boytacean.pages.dev](https://boytacean.pages.dev)               |
-| Cloudfare | `True`  | [prod.boytacean.pages.dev](https://prod.boytacean.pages.dev)     |
-| Cloudfare | `True`  | [stable.boytacean.pages.dev](https://stable.boytacean.pages.dev) |
-| Cloudfare | `False` | [master.boytacean.pages.dev](https://master.boytacean.pages.dev) |
+| Provider   | Stable  | URL                                                              |
+| ---------- | ------- | ---------------------------------------------------------------- |
+| Cloudflare | `True`  | [boytacean.joao.me](https://boytacean.joao.me)                   |
+| Cloudflare | `True`  | [boytacean.pages.dev](https://boytacean.pages.dev)               |
+| Cloudflare | `True`  | [prod.boytacean.pages.dev](https://prod.boytacean.pages.dev)     |
+| Cloudflare | `True`  | [stable.boytacean.pages.dev](https://stable.boytacean.pages.dev) |
+| Cloudflare | `False` | [master.boytacean.pages.dev](https://master.boytacean.pages.dev) |
 
 ## Build
 
@@ -50,6 +53,18 @@ What's still missing...
 
 ```bash
 cargo build
+```
+
+### Python Library
+
+```bash
+pip install .
+```
+
+or
+
+```bash
+python setup.py install
 ```
 
 ### WASM for Node.js
@@ -95,6 +110,14 @@ The palettes offered in the web version were provided by [TheWolfBunny64](https:
 ## Inspiration
 
 To get some information about the resources that inspired me through the emulation creation journey check [Inspiration](doc/inspiration.md).
+
+## Contributing
+
+Love Gameboy emulation? Want to contribute to Boytacean? That's awesome! Your contributions are what make the open-source community such an amazing place to learn, inspire, and create.
+
+To get started, please take a look at our [Contributing Guidelines](CONTRIBUTING.md). Whether you're fixing bugs, adding new features, or helping with documentation, every contribution is valuable and greatly appreciated!
+
+Don't hesitate to reach out if you have any questions. Join us in making Boytacean the best Gameboy emulator out there!
 
 ## License
 

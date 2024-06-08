@@ -17,6 +17,16 @@ macro_rules! debugln {
     };
 }
 
+#[macro_export]
+macro_rules! infoln {
+    ($($rest:tt)*) => {
+        {
+            std::print!("[INFO] ");
+            std::println!($($rest)*);
+        }
+    }
+}
+
 #[cfg(feature = "pedantic")]
 #[macro_export]
 macro_rules! warnln {

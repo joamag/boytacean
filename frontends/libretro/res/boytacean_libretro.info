@@ -6,7 +6,7 @@ corename = "Boytacean"
 categories = "Emulator"
 license = "Apache-2."
 permissions = ""
-display_version = "0.9.13"
+display_version = "0.10.2"
 
 # Hardware Information
 manufacturer = "Nintendo"
@@ -15,13 +15,14 @@ systemid = "game_boy"
 
 # Libretro Features
 supports_no_game = "false"
-database = "Nintendo - Game Boy|Nintendo - Game Boy Color"
-savestate = "false"
-savestate_features = "null"
+savestate = "true"
+savestate_features = "deterministic"
 cheats = "true"
 input_descriptors = "true"
 memory_descriptors = "false"
-libretro_saves = "false"
+libretro_saves = "true"
 core_options = "true"
 
+# General Description
+database = "Nintendo - Game Boy|Nintendo - Game Boy Color"
 description = "A Game Boy emulator that is written in Rust."

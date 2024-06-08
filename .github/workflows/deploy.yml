@@ -8,10 +8,10 @@ jobs:
     name: Build Linux
     timeout-minutes: 30
     runs-on: ubuntu-latest
-    container: rust:1.71.0
+    container: rust:1.74.0
     steps:
       - name: Checkout code from repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Build Base
         run: cargo build --release
       - name: Build SDL
@@ -24,16 +24,20 @@ jobs:
         run: |
           cd frontends/libretro
           cargo build --release
+      - name: Bundle files
+        run: |
+          cp -p frontends/libretro/res/boytacean_libretro.info target/release/boytacean_libretro.info
       - name: Transform filenames
         run: |
           cd target/release
           mv boytacean-sdl boytacean-sdl-linux-x64
           mv libboytacean_libretro.so boytacean_libretro.so
       - name: Upload artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: boytacean-linux
           path: |
+            target/release/boytacean_libretro.info
             target/release/boytacean-sdl-linux-x64
             target/release/libboytacean.so
             target/release/boytacean_libretro.so
@@ -44,11 +48,11 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Checkout code from repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Setup Rust
         run: |
-          rustup install 1.71.0
-          rustup override set 1.71.0
+          rustup install 1.74.0
+          rustup override set 1.74.0
           rustup default stable-msvc
       - name: Build Base
         run: cargo build --release
@@ -66,7 +70,7 @@ jobs:
           cd target/release
           mv boytacean-sdl.exe boytacean-sdl-win32-x64.exe
       - name: Upload artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: boytacean-win32
           path: |
@@ -80,11 +84,11 @@ jobs:
     runs-on: macos-latest
     steps:
       - name: Checkout code from repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Setup Rust
         run: |
-          rustup install 1.71.0
-          rustup override set 1.71.0
+          rustup install 1.74.0
+          rustup override set 1.74.0
       - name: Build Base
         run: cargo build --release
       - name: Build SDL
@@ -102,7 +106,7 @@ jobs:
           mv boytacean-sdl boytacean-sdl-mac-x64
           mv libboytacean_libretro.dylib boytacean_libretro.dylib
       - name: Upload artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: boytacean-mac
           path: |
@@ -114,29 +118,29 @@ jobs:
     name: Build WASM
     timeout-minutes: 30
     runs-on: ubuntu-latest
-    container: rust:1.71.0
+    container: rust:1.74.0
     steps:
       - name: Checkout code from repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Install wasm-pack
         run: cargo install wasm-pack
       - name: Build WASM
         run: wasm-pack build --release --target=web --out-dir=frontends/web/lib -- --features wasm
       - name: Install Node.js 16
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 16
       - name: Build Web code
         run: |
           cd frontends/web
-          npm install && npm run build
+          npm install && NODE_ENV=production npm run build
       - name: Bundle files
         run: |
           apt-get update && apt-get install -y -q zip
           cd frontends/web
           zip -r -j boytacean-wasm.zip dist/*
       - name: Upload artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: boytacean-wasm
           path: frontends/web/boytacean-wasm.zip
@@ -148,11 +152,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
       - name: Create release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           files: |
+            boytacean-linux/boytacean_libretro.info
             boytacean-linux/boytacean-sdl-linux-x64
             boytacean-linux/libboytacean.so
             boytacean-linux/boytacean_libretro.so

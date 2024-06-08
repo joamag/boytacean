@@ -1,0 +1,51 @@
+name: Extra Workflow
+on:
+  push:
+  schedule:
+    - cron: "0 0 * * 0"
+jobs:
+  build-windows:
+    name: Build Windows
+    timeout-minutes: 30
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code from repository
+        uses: actions/checkout@v4
+      - name: Setup Rust
+        run: |
+          rustup install 1.74.0
+          rustup override set 1.74.0
+          rustup default stable-msvc
+      - name: Build Base
+        run: cargo build --release
+      - name: Build SDL
+        run: |
+          cd frontends/sdl
+          cargo install cargo-vcpkg && cargo vcpkg -v build
+          cargo build --release
+      - name: Build Libretro
+        run: |
+          cd frontends/libretro
+          cargo build --release
+  build-mac:
+    name: Build Mac
+    timeout-minutes: 30
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code from repository
+        uses: actions/checkout@v4
+      - name: Setup Rust
+        run: |
+          rustup install 1.74.0
+          rustup override set 1.74.0
+      - name: Build Base
+        run: cargo build --release
+      - name: Build SDL
+        run: |
+          cd frontends/sdl
+          cargo install cargo-vcpkg && cargo vcpkg -v build
+          cargo build --release
+      - name: Build Libretro
+        run: |
+          cd frontends/libretro
+          cargo build --release

@@ -1,0 +1,15 @@
+[target.aarch64-unknown-linux-gnu]
+ar = "./aarch64-linux-gnu/bin/aarch64-none-linux-gnu-ar"
+linker = "./aarch64-linux-gnu/bin/aarch64-none-linux-gnu-gcc"
+
+[target.aarch64-linux-android]
+ar = "./ndk/arm64/bin/aarch64-linux-android-ar"
+linker = "./ndk/arm64/bin/aarch64-linux-android-clang"
+
+[target.armv7-linux-androideabi]
+ar = "./ndk/arm/bin/arm-linux-androideabi-ar"
+linker = "./ndk/arm/bin/arm-linux-androideabi-clang"
+
+[target.i686-linux-android]
+ar = "./ndk/x86/bin/i686-linux-android-ar"
+linker = "./ndk/x86/bin/i686-linux-android-clang"

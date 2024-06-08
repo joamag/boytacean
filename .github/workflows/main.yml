@@ -10,11 +10,6 @@ jobs:
     strategy:
       matrix:
         rust-version: [
-          "1.60.0",
-          "1.61.0",
-          "1.62.0",
-          "1.63.0",
-          "1.64.0",
           "1.65.0",
           "1.66.0",
           "1.67.0",
@@ -22,13 +17,15 @@ jobs:
           "1.69.0",
           "1.70.0",
           "1.71.0",
+          "1.72.0",
+          "1.73.0",
           "latest"
         ]
     runs-on: ubuntu-latest
     container: rust:${{ matrix.rust-version }}
     steps:
       - name: Checkout code from repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Install Rust components
         run: |
           rustup component add rustfmt
@@ -51,11 +48,9 @@ jobs:
     strategy:
       matrix:
         rust-version: [
-          "1.67.0",
-          "1.68.0",
-          "1.69.0",
-          "1.70.0",
-          "1.71.0",
+          "1.74.0",
+          "1.75.0",
+          "1.76.0",
           "latest"
         ]
         node-version: ["16"]
@@ -63,7 +58,7 @@ jobs:
     container: rust:${{ matrix.rust-version }}
     steps:
       - name: Checkout code from repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Install Rust components
         run: |
           rustup component add rustfmt
@@ -81,7 +76,7 @@ jobs:
       - name: Build WASM Web binary
         run: wasm-pack build --release --target=web --out-dir=frontends/web/lib -- --features wasm
       - name: Install Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
       - name: Build and lint Web code
@@ -92,21 +87,16 @@ jobs:
     strategy:
       matrix:
         rust-version: [
-          "1.64.0",
-          "1.65.0",
-          "1.66.0",
-          "1.67.0",
-          "1.68.0",
-          "1.69.0",
-          "1.70.0",
-          "1.71.0",
+          "1.74.0",
+          "1.75.0",
+          "1.76.0",
           "latest"
         ]
     runs-on: ubuntu-latest
     container: rust:${{ matrix.rust-version }}
     steps:
       - name: Checkout code from repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Install Dependencies
         run: |
           apt-get update
@@ -141,17 +131,17 @@ jobs:
     strategy:
       matrix:
         rust-version: [
-          "1.64.0",
-          "1.65.0",
-          "1.66.0",
+          "1.70.0",
           "1.71.0",
+          "1.72.0",
+          "1.73.0",
           "latest"
         ]
     runs-on: ubuntu-latest
     container: rust:${{ matrix.rust-version }}
     steps:
       - name: Checkout code from repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Install Dependencies
         run: |
           apt-get update
@@ -172,3 +162,65 @@ jobs:
         run: cd frontends/libretro && cargo build
       - name: Build release version
         run: cd frontends/libretro && cargo build --release
+  build-libretro-android:
+    name: Build Libretro Android
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        rust-version: [
+          "1.71.0",
+          "1.72.0",
+          "1.73.0",
+          "latest"
+        ]
+    runs-on: ubuntu-latest
+    container: rust:${{ matrix.rust-version }}
+    steps:
+      - name: Checkout code from repository
+        uses: actions/checkout@v4
+      - name: Install Android NDK
+        uses: nttld/setup-ndk@v1
+        id: setup-ndk
+        with:
+          ndk-version: r25c
+      - name: Install Dependencies
+        run: |
+          apt-get update
+          apt-get install -y -q zip
+      - name: Install Rust components
+        run: |
+          rustup component add rustfmt
+          rustup component add clippy
+      - name: Print Rust information
+        run: rustc --version
+      - name: Setup local NDK
+        run: |
+          mkdir -p ndk
+          ${NDK_HOME}/build/tools/make_standalone_toolchain.py --api 26 --arch arm64 --install-dir ndk/arm64
+          ${NDK_HOME}/build/tools/make_standalone_toolchain.py --api 26 --arch arm --install-dir ndk/arm
+          ${NDK_HOME}/build/tools/make_standalone_toolchain.py --api 26 --arch x86 --install-dir ndk/x86
+        env:
+          NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+      - name: Add Rust Android targets
+        run: |
+          rustup target add aarch64-linux-android
+          rustup target add armv7-linux-androideabi
+          rustup target add i686-linux-android
+      - name: Verify Rust code format
+        run: cd frontends/libretro && cargo fmt --all -- --check
+      - name: Verify Rust code linting
+        run: cd frontends/libretro && cargo clippy -- -D warnings -A unknown-lints
+      - name: Run unit tests
+        run: cd frontends/libretro && cargo test
+      - name: Build development version
+        run: |
+          cd frontends/libretro
+          cargo build --target=aarch64-linux-android
+          cargo build --target=armv7-linux-androideabi
+          cargo build --target=i686-linux-android
+      - name: Build release version
+        run: |
+          cd frontends/libretro
+          cargo build --target=aarch64-linux-android --release
+          cargo build --target=armv7-linux-androideabi --release
+          cargo build --target=i686-linux-android --release

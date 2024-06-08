@@ -20,13 +20,13 @@ before_script:
   - export NVM_DIR="$HOME/.nvm"
   - \[ -s "$NVM_DIR/nvm.sh" \] && \. "$NVM_DIR/nvm.sh"
   - \[ -s "$NVM_DIR/bash_completion" \] && \. "$NVM_DIR/bash_completion"
-  - nvm install --lts
+  - nvm install 18
 
 build-rust:
   stage: build
   parallel:
     matrix:
-      - RUST_VERSION: ["1.60.0", "1.64.0", "stable", "nightly"]
+      - RUST_VERSION: ["1.65.0", "1.66.0", "stable", "nightly"]
   script:
     - rustup toolchain install $RUST_VERSION
     - rustup override set $RUST_VERSION
@@ -42,30 +42,53 @@ build-wasm:
   stage: build
   parallel:
     matrix:
-      - RUST_VERSION: ["1.67.0"]
+      - RUST_VERSION: ["1.74.0"]
   script:
     - rustup toolchain install $RUST_VERSION
     - rustup override set $RUST_VERSION
     - rustc --version
     - cargo install wasm-pack
     - wasm-pack build --release --target=web --out-dir=frontends/web/lib -- --features wasm
-    - cd frontends/web && npm install && npm run build && npm run lint
+    - cd frontends/web && npm install && NODE_ENV=production npm run build && npm run lint
   artifacts:
     paths:
       - frontends/web/dist
       - frontends/web/lib
     expire_in: 1 day
 
+build-pyo3:
+  stage: build
+  parallel:
+    matrix:
+      - RUST_VERSION: ["1.74.0"]
+  script:
+    - rustup toolchain install $RUST_VERSION
+    - rustup override set $RUST_VERSION
+    - rustc --version
+    - cargo build --features python
+    - cargo build --release --features python
+
 test-rust:
   stage: test
   parallel:
     matrix:
-      - RUST_VERSION: ["1.60.0", "1.64.0", "stable", "nightly"]
+      - RUST_VERSION: ["1.65.0", "1.66.0", "stable", "nightly"]
   script:
     - rustup toolchain install $RUST_VERSION
     - rustup override set $RUST_VERSION
     - rustc --version
     - cargo test
+
+test-pyo3:
+  stage: test
+  parallel:
+    matrix:
+      - RUST_VERSION: ["1.74.0"]
+  script:
+    - rustup toolchain install $RUST_VERSION
+    - rustup override set $RUST_VERSION
+    - rustc --version
+    - python3 setup.py test
 
 deploy-netlify-preview:
   stage: deploy
@@ -89,7 +112,7 @@ deploy-netlify-prod:
   only:
     - tags
 
-deploy-cloudfare-master:
+deploy-cloudflare-master:
   stage: deploy
   script:
     - cd frontends/web/dist
@@ -100,7 +123,7 @@ deploy-cloudfare-master:
   only:
     - master
 
-deploy-cloudfare-stable:
+deploy-cloudflare-stable:
   stage: deploy
   script:
     - cd frontends/web/dist
@@ -111,7 +134,7 @@ deploy-cloudfare-stable:
   only:
     - stable
 
-deploy-cloudfare-prod:
+deploy-cloudflare-prod:
   stage: deploy
   script:
     - cd frontends/web/dist
@@ -141,5 +164,16 @@ deploy-npm:
     - cd frontends/web/lib && npm publish
   dependencies:
     - build-wasm
+  only:
+    - tags
+
+deploy-pypi:
+  stage: deploy
+  script:
+    - pip3 install twine wheel
+    - python3 setup.py sdist
+    - python3 -m twine upload -u ${PYPI_USERNAME} -p ${PYPI_PASSWORD} dist/*
+  dependencies:
+    - build-pyo3
   only:
     - tags

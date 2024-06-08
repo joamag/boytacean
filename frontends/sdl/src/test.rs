@@ -52,7 +52,8 @@ mod tests {
             "../../res/roms/test/blargg/cpu/cpu_instrs.gb",
             Some(300000000),
             TestOptions::default(),
-        );
+        )
+        .unwrap();
         let image_result = compare_images(&result, "res/test/blargg/cpu/cpu_instrs.png");
         assert!(image_result);
     }
@@ -63,8 +64,25 @@ mod tests {
             "../../res/roms/test/blargg/instr_timing/instr_timing.gb",
             Some(50000000),
             TestOptions::default(),
-        );
+        )
+        .unwrap();
         let image_result = compare_images(&result, "res/test/blargg/instr_timing/instr_timing.png");
+        assert!(image_result);
+    }
+
+    #[test]
+    fn test_blargg_interrupt_time() {
+        let result: [u8; FRAME_BUFFER_SIZE] = run_image_test(
+            "../../res/roms/test/blargg/interrupt_time/interrupt_time.gb",
+            Some(20000000),
+            TestOptions {
+                mode: Some(GameBoyMode::Cgb),
+                ..TestOptions::default()
+            },
+        )
+        .unwrap();
+        let image_result =
+            compare_images(&result, "res/test/blargg/interrupt_time/interrupt_time.png");
         assert!(image_result);
     }
 
@@ -74,7 +92,8 @@ mod tests {
             "../../res/roms/test/blargg/dmg_sound/01-registers.gb",
             Some(50000000),
             TestOptions::default(),
-        );
+        )
+        .unwrap();
         let image_result = compare_images(&result, "res/test/blargg/dmg_sound/01-registers.png");
         assert!(image_result);
 
@@ -82,7 +101,8 @@ mod tests {
             "../../res/roms/test/blargg/dmg_sound/02-len ctr.gb",
             Some(50000000),
             TestOptions::default(),
-        );
+        )
+        .unwrap();
         let image_result = compare_images(&result, "res/test/blargg/dmg_sound/02-len ctr.png");
         assert!(image_result);
 
@@ -90,7 +110,8 @@ mod tests {
             "../../res/roms/test/blargg/dmg_sound/03-trigger.gb",
             Some(100000000),
             TestOptions::default(),
-        );
+        )
+        .unwrap();
         let image_result = compare_images(&result, "res/test/blargg/dmg_sound/03-trigger.png");
         assert!(image_result);
     }
@@ -101,7 +122,8 @@ mod tests {
             "../../res/roms/test/dmg_acid2.gb",
             Some(50000000),
             TestOptions::default(),
-        );
+        )
+        .unwrap();
         let image_result = compare_images(&result, "res/test/dmg_acid2.png");
         assert!(image_result);
     }
@@ -115,7 +137,8 @@ mod tests {
                 mode: Some(GameBoyMode::Cgb),
                 ..Default::default()
             },
-        );
+        )
+        .unwrap();
         let image_result = compare_images(&result, "res/test/cgb_acid2.png");
         assert!(image_result);
     }
@@ -126,7 +149,8 @@ mod tests {
             "../../res/roms/test/firstwhite.gb",
             Some(50000000),
             TestOptions::default(),
-        );
+        )
+        .unwrap();
         let image_result = compare_images(&result, "res/test/firstwhite.png");
         assert!(image_result);
     }

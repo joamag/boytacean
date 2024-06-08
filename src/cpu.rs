@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc};
+use std::sync::Mutex;
 
 use crate::{
     apu::Apu,
@@ -11,6 +11,7 @@ use crate::{
     ppu::Ppu,
     serial::Serial,
     timer::Timer,
+    util::SharedThread,
 };
 
 pub const PREFIX: u8 = 0xcb;
@@ -44,11 +45,11 @@ pub struct Cpu {
     /// The pointer to the parent configuration of the running
     /// Game Boy emulator, that can be used to control the behaviour
     /// of Game Boy emulation.
-    gbc: Rc<RefCell<GameBoyConfig>>,
+    gbc: SharedThread<GameBoyConfig>,
 }
 
 impl Cpu {
-    pub fn new(mmu: Mmu, gbc: Rc<RefCell<GameBoyConfig>>) -> Self {
+    pub fn new(mmu: Mmu, gbc: SharedThread<GameBoyConfig>) -> Self {
         Self {
             pc: 0x0,
             sp: 0x0,
@@ -92,7 +93,7 @@ impl Cpu {
 
     /// Sets the CPU registers and some of the memory space to the
     /// state expected after the Game Boy boot ROM executes, using
-    /// these values its possible to skip the boot loading process.
+    /// these values it's possible to skip the boot loading process.
     pub fn boot(&mut self) {
         self.pc = 0x0100;
         self.sp = 0xfffe;
@@ -157,6 +158,10 @@ impl Cpu {
                 self.push_word(pc);
                 self.pc = 0x40;
 
+                // notifies the MMU about the V-Blank interrupt,
+                // this may trigger some additional operations
+                self.mmu.vblank();
+
                 // acknowledges that the V-Blank interrupt has been
                 // properly handled
                 self.mmu.ppu().ack_vblank();
@@ -167,7 +172,7 @@ impl Cpu {
                     self.halted = false;
                 }
 
-                return 24;
+                return 20;
             } else if (self.mmu.ie & 0x02 == 0x02) && self.mmu.ppu().int_stat() {
                 debugln!("Going to run LCD STAT interrupt handler (0x48)");
 
@@ -185,7 +190,7 @@ impl Cpu {
                     self.halted = false;
                 }
 
-                return 24;
+                return 20;
             } else if (self.mmu.ie & 0x04 == 0x04) && self.mmu.timer().int_tima() {
                 debugln!("Going to run Timer interrupt handler (0x50)");
 
@@ -203,7 +208,7 @@ impl Cpu {
                     self.halted = false;
                 }
 
-                return 24;
+                return 20;
             } else if (self.mmu.ie & 0x08 == 0x08) && self.mmu.serial().int_serial() {
                 debugln!("Going to run Serial interrupt handler (0x58)");
 
@@ -221,7 +226,7 @@ impl Cpu {
                     self.halted = false;
                 }
 
-                return 24;
+                return 20;
             } else if (self.mmu.ie & 0x10 == 0x10) && self.mmu.pad().int_pad() {
                 debugln!("Going to run JoyPad interrupt handler (0x60)");
 
@@ -239,7 +244,7 @@ impl Cpu {
                     self.halted = false;
                 }
 
-                return 24;
+                return 20;
             }
         }
 
@@ -388,6 +393,11 @@ impl Cpu {
     }
 
     #[inline(always)]
+    pub fn set_halted(&mut self, value: bool) {
+        self.halted = value
+    }
+
+    #[inline(always)]
     pub fn cycles(&self) -> u8 {
         self.cycles
     }
@@ -398,8 +408,18 @@ impl Cpu {
     }
 
     #[inline(always)]
+    pub fn set_pc(&mut self, value: u16) {
+        self.pc = value;
+    }
+
+    #[inline(always)]
     pub fn sp(&self) -> u16 {
         self.sp
+    }
+
+    #[inline(always)]
+    pub fn set_sp(&mut self, value: u16) {
+        self.sp = value;
     }
 
     #[inline(always)]
@@ -470,6 +490,16 @@ impl Cpu {
     pub fn set_hl(&mut self, value: u16) {
         self.h = (value >> 8) as u8;
         self.l = value as u8;
+    }
+
+    #[inline(always)]
+    pub fn ime(&self) -> bool {
+        self.ime
+    }
+
+    #[inline(always)]
+    pub fn set_ime(&mut self, value: bool) {
+        self.ime = value;
     }
 
     #[inline(always)]
@@ -574,21 +604,21 @@ impl Cpu {
         self.ime = false;
     }
 
-    pub fn set_gbc(&mut self, value: Rc<RefCell<GameBoyConfig>>) {
+    pub fn set_gbc(&mut self, value: SharedThread<GameBoyConfig>) {
         self.gbc = value;
     }
 }
 
 impl Default for Cpu {
     fn default() -> Self {
-        let gbc: Rc<RefCell<GameBoyConfig>> = Rc::new(RefCell::new(GameBoyConfig::default()));
+        let gbc = SharedThread::new(Mutex::new(GameBoyConfig::default()));
         Cpu::new(Mmu::default(), gbc)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::cpu::Cpu;
+    use super::Cpu;
 
     #[test]
     fn test_cpu_clock() {

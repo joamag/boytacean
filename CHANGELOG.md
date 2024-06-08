@@ -19,6 +19,97 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 *
 
+## [0.10.2] - 2024-06-07
+
+### Fixed
+
+* Removed binary distribution from PyPi
+
+## [0.10.1] - 2024-06-07
+
+### Fixed
+
+* Bumped base rust version to fix issue with GitHub Action Deploy workflow
+
+## [0.10.0] - 2024-06-07
+
+### Added
+
+* Initial support for the `PyBoy` compatibility layer - [#36](https://gitlab.stage.hive.pt/joamag/boytacean/-/issues/36)
+* Support for PyPi registry for the PyO3 package - [#43](https://gitlab.stage.hive.pt/joamag/boytacean/-/issues/43)
+* Python interface file for base boytacean (`boytacean.pyi`)
+* Interface to custom boot ROM loading in Python
+
+### Changed
+
+* Better `boot_dump.py` script with support for other string output formats
+* Improved error handling using the `Error` enum
+
+### Fixed
+
+* Issue related to interrupt timing, reduce interrupt to 20 cycles instead of 24
+* Libretro issue with the loading of the base emulator info `retro_get_system_info()`
+
+## [0.9.18] - 2024-01-02
+
+### Added
+
+* Support for Python 3 API - [#36](https://gitlab.stage.hive.pt/joamag/boytacean/-/issues/36)
+* `next_frame()` method for frame by frame navigation
+* Support for palette switching option in Libretro - [#37](https://gitlab.stage.hive.pt/joamag/boytacean/-/issues/37)
+
+### Changed
+
+* Made part of the frontend code conditional on `NODE_ENV = "development"`
+* Re-release of version `0.9.17`
+
+## [0.9.17] - 2024-01-02
+
+### Added
+
+* Support for Python 3 API - [#36](https://gitlab.stage.hive.pt/joamag/boytacean/-/issues/36)
+* `next_frame()` method for frame by frame navigation
+* Support for palette switching option in Libretro - [#37](https://gitlab.stage.hive.pt/joamag/boytacean/-/issues/37)
+
+### Changed
+
+* Made part of the frontend code conditional on `NODE_ENV = "development"`
+
+## [0.9.16] - 2023-10-30
+
+### Fixed
+
+* Bumped emukit version to fix a bug with zip file handling
+
+## [0.9.15] - 2023-10-30
+
+### Added
+
+* Support for ROM in zip files (Web frontend)
+* Support for raw frame buffer
+* Lazy evaluation of frame_buffer (on-demand) for DMG
+
+## [0.9.14] - 2023-08-24
+
+### Added
+
+* XRGB8888 support for Libretro frontend, for better color fidelity and faster render
+* Support for save state - [#7](https://gitlab.stage.hive.pt/joamag/boytacean/-/issues/7)
+* LibRetro save state support - [#7](https://gitlab.stage.hive.pt/joamag/boytacean/-/issues/7)
+* Support for fast mode in SDL frontend
+* Support for GameShark cheat codes - [#33](https://gitlab.stage.hive.pt/joamag/boytacean/-/issues/33)
+
+### Changed
+
+* Made audio flush for libretro and sdl frontends flush by the end of the frame
+* Improved MBC5 to support 9 bit ROM bank addresses
+
+### Fixed
+
+* Breaking issue with Libretro frontend and Linux
+* Fix `window_counter` issue in PPU
+* Issue with BESS header testing
+
 ## [0.9.13] - 2023-08-01
 
 ### Changed

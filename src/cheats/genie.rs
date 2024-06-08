@@ -3,6 +3,8 @@ use std::{
     fmt::{self, Display, Formatter},
 };
 
+use crate::error::Error;
+
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
 
@@ -23,6 +25,16 @@ impl GameGenie {
         }
     }
 
+    pub fn is_code(code: &str) -> bool {
+        if code.len() != 11 && code.len() != 7 {
+            return false;
+        }
+        if !code.contains('-') && !code.contains('+') {
+            return false;
+        }
+        true
+    }
+
     pub fn reset(&mut self) {
         self.codes.clear();
     }
@@ -31,18 +43,18 @@ impl GameGenie {
         self.codes.contains_key(&addr)
     }
 
-    pub fn get_addr(&self, addr: u16) -> &GameGenieCode {
-        self.codes.get(&addr).unwrap()
+    pub fn get_addr(&self, addr: u16) -> Result<&GameGenieCode, Error> {
+        match self.codes.get(&addr) {
+            Some(code) => Ok(code),
+            None => Err(Error::CustomError(format!("Invalid address: {}", addr))),
+        }
     }
 
-    pub fn add_code(&mut self, code: &str) -> Result<&GameGenieCode, String> {
-        let genie_code = match GameGenieCode::from_code(code, None) {
-            Ok(genie_code) => genie_code,
-            Err(message) => return Err(message),
-        };
+    pub fn add_code(&mut self, code: &str) -> Result<&GameGenieCode, Error> {
+        let genie_code = GameGenieCode::from_code(code, None)?;
         let addr = genie_code.addr;
         self.codes.insert(addr, genie_code);
-        Ok(self.get_addr(addr))
+        self.get_addr(addr)
     }
 }
 
@@ -75,15 +87,16 @@ impl GameGenieCode {
     /// in the ABC-DEF-GHI or ABC-DEF format.
     /// Note that the additive mode (ex: ABC+DEF+GHI) can be optionally
     /// handled or ignored using the `handle_additive` parameter.
-    pub fn from_code(code: &str, handle_additive: Option<bool>) -> Result<Self, String> {
+    pub fn from_code(code: &str, handle_additive: Option<bool>) -> Result<Self, Error> {
         let code_length = code.len();
 
         if code_length != 11 && code_length != 7 {
-            return Err(format!(
+            return Err(Error::CustomError(format!(
                 "Invalid Game Genie code length: {} digits",
                 code_length
-            ));
+            )));
         }
+
         let code_u = code.to_uppercase();
 
         let additive = if handle_additive.unwrap_or(false) {
@@ -94,12 +107,13 @@ impl GameGenieCode {
         let condensed = code_length == 7;
 
         let new_data_slice = &code_u[0..=1];
-        let new_data = u8::from_str_radix(new_data_slice, 16).unwrap();
+        let new_data = u8::from_str_radix(new_data_slice, 16)
+            .map_err(|e| Error::CustomError(format!("Invalid new data: {}", e)))?;
 
         let old_data = if code_length == 11 {
             let old_data_slice: String = format!("{}{}", &code_u[8..=8], &code_u[10..=10]);
             u8::from_str_radix(old_data_slice.as_str(), 16)
-                .unwrap()
+                .map_err(|e| Error::CustomError(format!("Invalid old data: {}", e)))?
                 .rotate_right(2)
                 ^ 0xba
         } else {
@@ -107,7 +121,16 @@ impl GameGenieCode {
         };
 
         let addr_slice = format!("{}{}{}", &code_u[6..=6], &code_u[2..=2], &code_u[4..=5]);
-        let addr = u16::from_str_radix(addr_slice.as_str(), 16).unwrap() ^ 0xf000;
+        let addr = u16::from_str_radix(addr_slice.as_str(), 16)
+            .map_err(|e| Error::CustomError(format!("Invalid address: {}", e)))?
+            ^ 0xf000;
+
+        if addr > 0x7fff {
+            return Err(Error::CustomError(format!(
+                "Invalid cheat address: 0x{:04x}",
+                addr
+            )));
+        }
 
         Ok(Self {
             code: code_u,
@@ -184,7 +207,7 @@ impl GameGenieCode {
 
     pub fn description(&self) -> String {
         format!(
-            "Code: {}, Address: 0x{:04x}, New Data: 0x{:04x}, Old Data: 0x{:04x}",
+            "Code: {}, Address: 0x{:04x}, New Data: 0x{:02x}, Old Data: 0x{:02x}",
             self.code, self.addr, self.new_data, self.old_data
         )
     }
@@ -198,7 +221,7 @@ impl Display for GameGenieCode {
 
 #[cfg(test)]
 mod tests {
-    use crate::genie::GameGenieCode;
+    use super::GameGenieCode;
 
     #[test]
     fn test_from_code() {
@@ -207,10 +230,10 @@ mod tests {
         assert_eq!(game_genie_code.addr, 0x4a17);
         assert_eq!(game_genie_code.new_data, 0x00);
         assert_eq!(game_genie_code.old_data, 0xc8);
-        assert_eq!(game_genie_code.additive, false);
-        assert_eq!(game_genie_code.condensed, false);
-        assert_eq!(game_genie_code.is_valid(0xc8), true);
-        assert_eq!(game_genie_code.is_valid(0xc9), false);
+        assert!(!game_genie_code.additive);
+        assert!(!game_genie_code.condensed);
+        assert!(game_genie_code.is_valid(0xc8));
+        assert!(!game_genie_code.is_valid(0xc9));
         assert_eq!(game_genie_code.patch_data(0x12), 0x00);
 
         game_genie_code = GameGenieCode::from_code("00A+17B+C49", None).unwrap();
@@ -218,10 +241,10 @@ mod tests {
         assert_eq!(game_genie_code.addr, 0x4a17);
         assert_eq!(game_genie_code.new_data, 0x00);
         assert_eq!(game_genie_code.old_data, 0xc8);
-        assert_eq!(game_genie_code.additive, false);
-        assert_eq!(game_genie_code.condensed, false);
-        assert_eq!(game_genie_code.is_valid(0xc8), true);
-        assert_eq!(game_genie_code.is_valid(0xc9), false);
+        assert!(!game_genie_code.additive);
+        assert!(!game_genie_code.condensed);
+        assert!(game_genie_code.is_valid(0xc8));
+        assert!(!game_genie_code.is_valid(0xc9));
         assert_eq!(game_genie_code.patch_data(0x12), 0x00);
 
         game_genie_code = GameGenieCode::from_code("00A+17B+C49", Some(true)).unwrap();
@@ -229,10 +252,10 @@ mod tests {
         assert_eq!(game_genie_code.addr, 0x4a17);
         assert_eq!(game_genie_code.new_data, 0x00);
         assert_eq!(game_genie_code.old_data, 0xc8);
-        assert_eq!(game_genie_code.additive, true);
-        assert_eq!(game_genie_code.condensed, false);
-        assert_eq!(game_genie_code.is_valid(0xc8), true);
-        assert_eq!(game_genie_code.is_valid(0xc9), false);
+        assert!(game_genie_code.additive);
+        assert!(!game_genie_code.condensed);
+        assert!(game_genie_code.is_valid(0xc8));
+        assert!(!game_genie_code.is_valid(0xc9));
         assert_eq!(game_genie_code.patch_data(0x12), 0x12);
 
         game_genie_code = GameGenieCode::from_code("00A+17B", None).unwrap();
@@ -240,10 +263,10 @@ mod tests {
         assert_eq!(game_genie_code.addr, 0x4a17);
         assert_eq!(game_genie_code.new_data, 0x00);
         assert_eq!(game_genie_code.old_data, 0x00);
-        assert_eq!(game_genie_code.additive, false);
-        assert_eq!(game_genie_code.condensed, true);
-        assert_eq!(game_genie_code.is_valid(0xc8), true);
-        assert_eq!(game_genie_code.is_valid(0xc9), true);
+        assert!(!game_genie_code.additive);
+        assert!(game_genie_code.condensed);
+        assert!(game_genie_code.is_valid(0xc8));
+        assert!(game_genie_code.is_valid(0xc9));
         assert_eq!(game_genie_code.patch_data(0x12), 0x00);
 
         game_genie_code = GameGenieCode::from_code("00A+17B", Some(true)).unwrap();
@@ -251,10 +274,10 @@ mod tests {
         assert_eq!(game_genie_code.addr, 0x4a17);
         assert_eq!(game_genie_code.new_data, 0x00);
         assert_eq!(game_genie_code.old_data, 0x00);
-        assert_eq!(game_genie_code.additive, true);
-        assert_eq!(game_genie_code.condensed, true);
-        assert_eq!(game_genie_code.is_valid(0xc8), true);
-        assert_eq!(game_genie_code.is_valid(0xc9), true);
+        assert!(game_genie_code.additive);
+        assert!(game_genie_code.condensed);
+        assert!(game_genie_code.is_valid(0xc8));
+        assert!(game_genie_code.is_valid(0xc9));
         assert_eq!(game_genie_code.patch_data(0x12), 0x012);
     }
 }

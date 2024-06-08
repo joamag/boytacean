@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import sys
+import binascii
 
 
 def print_buffer(filename, mode="buffer"):
@@ -22,6 +23,16 @@ def print_buffer(filename, mode="buffer"):
         for byte in data:
             print("[0x%04x] 0x%02x" % (counter, ord(byte)))
             counter += 1
+
+    elif mode == "hexbytes":
+        hex_data = binascii.hexlify(data).decode()
+        escaped_data = "".join(
+            "\\x" + hex_data[i : i + 2] for i in range(0, len(hex_data), 2)
+        )
+        print("b'%s'" % escaped_data)
+
+    elif mode == "bytes":
+        print(repr(data))
 
 
 if __name__ == "__main__":

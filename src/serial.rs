@@ -1,4 +1,4 @@
-use crate::warnln;
+use crate::{mmu::BusComponent, warnln};
 
 pub trait SerialDevice {
     /// Sends a byte (u8) to the attached serial connection.
@@ -202,11 +202,23 @@ impl Serial {
     }
 }
 
+impl BusComponent for Serial {
+    fn read(&mut self, addr: u16) -> u8 {
+        self.read(addr)
+    }
+
+    fn write(&mut self, addr: u16, value: u8) {
+        self.write(addr, value);
+    }
+}
+
 impl Default for Serial {
     fn default() -> Self {
         Self::new()
     }
 }
+
+unsafe impl Send for Serial {}
 
 pub struct NullDevice {}
 

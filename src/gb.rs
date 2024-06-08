@@ -1,28 +1,33 @@
+//! Main GameBoy emulation entrypoint functions and structures.
+
 use std::{
-    cell::RefCell,
     collections::VecDeque,
     fmt::{self, Display, Formatter},
-    rc::Rc,
+    sync::{Arc, Mutex},
 };
 
 use crate::{
     apu::Apu,
+    cheats::{
+        genie::{GameGenie, GameGenieCode},
+        shark::{GameShark, GameSharkCode},
+    },
     cpu::Cpu,
     data::{BootRom, CGB_BOOT, DMG_BOOT, DMG_BOOTIX, MGB_BOOTIX, SGB_BOOT},
     devices::{printer::PrinterDevice, stdout::StdoutDevice},
     dma::Dma,
-    gen::{COMPILATION_DATE, COMPILATION_TIME, COMPILER, COMPILER_VERSION, VERSION},
-    genie::{GameGenie, GameGenieCode},
+    error::Error,
+    info::Info,
     mmu::Mmu,
     pad::{Pad, PadKey},
     ppu::{
-        Ppu, PpuMode, Tile, DISPLAY_HEIGHT, DISPLAY_WIDTH, FRAME_BUFFER_RGB155_SIZE,
-        FRAME_BUFFER_SIZE,
+        Ppu, PpuMode, Tile, DISPLAY_HEIGHT, DISPLAY_WIDTH, FRAME_BUFFER_RGB1555_SIZE,
+        FRAME_BUFFER_RGB565_SIZE, FRAME_BUFFER_SIZE, FRAME_BUFFER_XRGB8888_SIZE,
     },
     rom::{Cartridge, RamSize},
     serial::{NullDevice, Serial, SerialDevice},
     timer::Timer,
-    util::read_file,
+    util::{read_file, SharedThread},
 };
 
 #[cfg(feature = "wasm")]
@@ -73,10 +78,19 @@ impl GameBoyMode {
 
     pub fn from_string(value: &str) -> Self {
         match value {
-            "dmg" => GameBoyMode::Dmg,
-            "cgb" => GameBoyMode::Cgb,
-            "sgb" => GameBoyMode::Sgb,
+            "dmg" | "DMG" => GameBoyMode::Dmg,
+            "cgb" | "CGB" => GameBoyMode::Cgb,
+            "sgb" | "SGB" => GameBoyMode::Sgb,
             _ => panic!("Invalid mode value: {}", value),
+        }
+    }
+
+    pub fn to_string(&self, uppercase: Option<bool>) -> String {
+        let uppercase = uppercase.unwrap_or(false);
+        match self {
+            GameBoyMode::Dmg => (if uppercase { "DMG" } else { "dmg" }).to_string(),
+            GameBoyMode::Cgb => (if uppercase { "CGB" } else { "cgb" }).to_string(),
+            GameBoyMode::Sgb => (if uppercase { "SGB" } else { "sgb" }).to_string(),
         }
     }
 
@@ -260,9 +274,9 @@ impl Default for GameBoyConfig {
     }
 }
 
-/// Aggregation structure tha allows the bundling of
-/// all the components of a gameboy into a single a
-/// single element for easy access.
+/// Aggregation structure allowing the bundling of
+/// all the components of a GameBoy into a single
+/// element for easy access.
 pub struct Components {
     pub ppu: Ppu,
     pub apu: Apu,
@@ -356,7 +370,7 @@ pub struct GameBoy {
     /// configuration values on the current emulator.
     /// If performance is required (may value access)
     /// the values should be cloned and stored locally.
-    gbc: Rc<RefCell<GameBoyConfig>>,
+    gbc: SharedThread<GameBoyConfig>,
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
@@ -364,7 +378,7 @@ impl GameBoy {
     #[cfg_attr(feature = "wasm", wasm_bindgen(constructor))]
     pub fn new(mode: Option<GameBoyMode>) -> Self {
         let mode = mode.unwrap_or(GameBoyMode::Dmg);
-        let gbc = Rc::new(RefCell::new(GameBoyConfig {
+        let gbc = Arc::new(Mutex::new(GameBoyConfig {
             mode,
             ppu_enabled: true,
             apu_enabled: true,
@@ -398,6 +412,10 @@ impl GameBoy {
         }
     }
 
+    pub fn verify_rom(data: &[u8]) -> bool {
+        Cartridge::from_data(data).is_ok()
+    }
+
     pub fn reset(&mut self) {
         self.ppu().reset();
         self.apu().reset();
@@ -412,42 +430,95 @@ impl GameBoy {
         let rom = self.rom().clone();
         self.reset();
         self.load(true);
-        self.load_cartridge(rom);
+        self.load_cartridge(rom).unwrap();
     }
 
+    /// Advance the clock of the system by one tick, this will
+    /// usually imply executing one CPU instruction and advancing
+    /// all the other components of the system by the required
+    /// amount of cycles.
+    ///
+    /// This method takes into account the current speed of the
+    /// system (single or double) and will execute the required
+    /// amount of cycles in the other components of the system
+    /// accordingly.
+    ///
+    /// The amount of cycles executed by the CPU is returned.
     pub fn clock(&mut self) -> u16 {
         let cycles = self.cpu_clock() as u16;
         let cycles_n = cycles / self.multiplier() as u16;
-        if self.ppu_enabled {
-            self.ppu_clock(cycles_n);
-        }
-        if self.apu_enabled {
-            self.apu_clock(cycles_n);
-        }
-        if self.dma_enabled {
-            self.dma_clock(cycles);
-        }
-        if self.timer_enabled {
-            self.timer_clock(cycles);
-        }
-        if self.serial_enabled {
-            self.serial_clock(cycles);
-        }
+        self.clock_devices(cycles, cycles_n);
         cycles
     }
 
     /// Risky function that will clock the CPU multiple times
     /// allowing an undefined number of cycles to be executed
     /// in the other Game Boy components.
+    ///
     /// This can cause unwanted behaviour in components like
     /// the PPU where only one mode switch operation is expected
     /// per each clock call.
-    pub fn clock_m(&mut self, count: usize) -> u16 {
+    ///
+    /// At the end of this execution major synchronization issues
+    /// may arise, so use with caution.
+    pub fn clock_many(&mut self, count: usize) -> u16 {
         let mut cycles = 0u16;
         for _ in 0..count {
             cycles += self.cpu_clock() as u16;
         }
         let cycles_n = cycles / self.multiplier() as u16;
+        self.clock_devices(cycles, cycles_n);
+        cycles
+    }
+
+    /// Function equivalent to `clock()` but that allows pre-emptive
+    /// breaking of the clock cycle loop if the PC (Program Counter)
+    /// reaches the provided address.
+    pub fn clock_step(&mut self, addr: u16) -> u16 {
+        let cycles = self.cpu_clock() as u16;
+        if self.cpu_i().pc() == addr {
+            return cycles;
+        }
+        let cycles_n = cycles / self.multiplier() as u16;
+        self.clock_devices(cycles, cycles_n);
+        cycles
+    }
+
+    /// Equivalent to `clock()` but allows the execution of multiple
+    /// clock operations in a single call.
+    pub fn clocks(&mut self, count: usize) -> u64 {
+        let mut cycles = 0_u64;
+        for _ in 0..count {
+            cycles += self.clock() as u64;
+        }
+        cycles
+    }
+
+    pub fn next_frame(&mut self) -> u32 {
+        let mut cycles = 0u32;
+        let current_frame = self.ppu_frame();
+        loop {
+            cycles += self.clock() as u32;
+            if self.ppu_frame() != current_frame {
+                break;
+            }
+        }
+        cycles
+    }
+
+    pub fn step_to(&mut self, addr: u16) -> u32 {
+        let mut cycles = 0u32;
+        loop {
+            cycles += self.clock_step(addr) as u32;
+            if self.cpu_i().pc() == addr {
+                break;
+            }
+        }
+        cycles
+    }
+
+    #[inline(always)]
+    fn clock_devices(&mut self, cycles: u16, cycles_n: u16) {
         if self.ppu_enabled {
             self.ppu_clock(cycles_n);
         }
@@ -463,7 +534,6 @@ impl GameBoy {
         if self.serial_enabled {
             self.serial_clock(cycles);
         }
-        cycles
     }
 
     pub fn key_press(&mut self, key: PadKey) {
@@ -510,15 +580,18 @@ impl GameBoy {
         self.ppu().frame_index()
     }
 
+    /// Direct boot method that immediately jumps the machine
+    /// to the post boot state, this will effectively skip the
+    /// boot sequence and jump to the cartridge execution.
     pub fn boot(&mut self) {
-        self.cpu.boot();
+        self.load_boot_state();
     }
 
     pub fn load(&mut self, boot: bool) {
         match self.mode() {
             GameBoyMode::Dmg => self.load_dmg(boot),
             GameBoyMode::Cgb => self.load_cgb(boot),
-            GameBoyMode::Sgb => todo!(),
+            GameBoyMode::Sgb => unimplemented!(),
         }
     }
 
@@ -563,6 +636,15 @@ impl GameBoy {
         self.load_boot_static(BootRom::Cgb);
     }
 
+    /// Loads the boot machine state and sets the Program Counter
+    /// (PC) to the post boot address.
+    ///
+    /// Should allow the machine to jump to the cartridge execution
+    /// skipping the boot sequence.
+    pub fn load_boot_state(&mut self) {
+        self.cpu.boot();
+    }
+
     pub fn vram_eager(&mut self) -> Vec<u8> {
         self.ppu().vram().to_vec()
     }
@@ -573,6 +655,10 @@ impl GameBoy {
 
     pub fn frame_buffer_eager(&mut self) -> Vec<u8> {
         self.frame_buffer().to_vec()
+    }
+
+    pub fn frame_buffer_raw_eager(&mut self) -> Vec<u8> {
+        self.frame_buffer_raw().to_vec()
     }
 
     pub fn audio_buffer_eager(&mut self, clear: bool) -> Vec<u8> {
@@ -701,25 +787,6 @@ impl GameBoy {
         tile.palette_buffer(self.ppu().palette_bg())
     }
 
-    /// Obtains the name of the compiler that has been
-    /// used in the compilation of the base Boytacean
-    /// library. Can be used for diagnostics.
-    pub fn compiler(&self) -> String {
-        String::from(COMPILER)
-    }
-
-    pub fn compiler_version(&self) -> String {
-        String::from(COMPILER_VERSION)
-    }
-
-    pub fn compilation_date(&self) -> String {
-        String::from(COMPILATION_DATE)
-    }
-
-    pub fn compilation_time(&self) -> String {
-        String::from(COMPILATION_TIME)
-    }
-
     pub fn is_dmg(&self) -> bool {
         self.mode == GameBoyMode::Dmg
     }
@@ -746,7 +813,7 @@ impl GameBoy {
 
     pub fn set_mode(&mut self, value: GameBoyMode) {
         self.mode = value;
-        (*self.gbc).borrow_mut().set_mode(value);
+        (*self.gbc).lock().unwrap().set_mode(value);
         self.mmu().set_mode(value);
         self.ppu().set_gb_mode(value);
     }
@@ -757,7 +824,7 @@ impl GameBoy {
 
     pub fn set_ppu_enabled(&mut self, value: bool) {
         self.ppu_enabled = value;
-        (*self.gbc).borrow_mut().set_ppu_enabled(value);
+        (*self.gbc).lock().unwrap().set_ppu_enabled(value);
     }
 
     pub fn apu_enabled(&self) -> bool {
@@ -766,7 +833,7 @@ impl GameBoy {
 
     pub fn set_apu_enabled(&mut self, value: bool) {
         self.apu_enabled = value;
-        (*self.gbc).borrow_mut().set_apu_enabled(value);
+        (*self.gbc).lock().unwrap().set_apu_enabled(value);
     }
 
     pub fn dma_enabled(&self) -> bool {
@@ -775,7 +842,7 @@ impl GameBoy {
 
     pub fn set_dma_enabled(&mut self, value: bool) {
         self.dma_enabled = value;
-        (*self.gbc).borrow_mut().set_dma_enabled(value);
+        (*self.gbc).lock().unwrap().set_dma_enabled(value);
     }
 
     pub fn timer_enabled(&self) -> bool {
@@ -784,7 +851,7 @@ impl GameBoy {
 
     pub fn set_timer_enabled(&mut self, value: bool) {
         self.timer_enabled = value;
-        (*self.gbc).borrow_mut().set_timer_enabled(value);
+        (*self.gbc).lock().unwrap().set_timer_enabled(value);
     }
 
     pub fn serial_enabled(&self) -> bool {
@@ -793,7 +860,7 @@ impl GameBoy {
 
     pub fn set_serial_enabled(&mut self, value: bool) {
         self.serial_enabled = value;
-        (*self.gbc).borrow_mut().set_serial_enabled(value);
+        (*self.gbc).lock().unwrap().set_serial_enabled(value);
     }
 
     pub fn set_all_enabled(&mut self, value: bool) {
@@ -810,7 +877,7 @@ impl GameBoy {
 
     pub fn set_clock_freq(&mut self, value: u32) {
         self.clock_freq = value;
-        (*self.gbc).borrow_mut().set_clock_freq(value);
+        (*self.gbc).lock().unwrap().set_clock_freq(value);
         self.apu().set_clock_freq(value);
     }
 
@@ -864,7 +931,7 @@ impl GameBoy {
         format!(
             "{}  {}\n{}  {}\n{}  {}\n{}  {}\n{}  {}\n{}  {}",
             version_l,
-            VERSION,
+            Info::version(),
             mode_l,
             self.mode(),
             clock_l,
@@ -896,6 +963,10 @@ impl GameBoy {
 
     pub fn cpu(&mut self) -> &mut Cpu {
         &mut self.cpu
+    }
+
+    pub fn cpu_i(&self) -> &Cpu {
+        &self.cpu
     }
 
     pub fn mmu(&mut self) -> &mut Mmu {
@@ -958,64 +1029,113 @@ impl GameBoy {
         self.mmu().rom()
     }
 
-    pub fn frame_buffer(&mut self) -> &[u8; FRAME_BUFFER_SIZE] {
-        &(self.ppu().frame_buffer)
+    pub fn rom_i(&self) -> &Cartridge {
+        self.mmu_i().rom_i()
     }
 
-    pub fn frame_buffer_rgb1555(&mut self) -> [u8; FRAME_BUFFER_RGB155_SIZE] {
+    pub fn frame_buffer(&mut self) -> &[u8; FRAME_BUFFER_SIZE] {
+        self.ppu().frame_buffer()
+    }
+
+    pub fn frame_buffer_xrgb8888(&mut self) -> [u8; FRAME_BUFFER_XRGB8888_SIZE] {
+        self.ppu().frame_buffer_xrgb8888()
+    }
+
+    pub fn frame_buffer_xrgb8888_u32(&mut self) -> [u32; FRAME_BUFFER_SIZE] {
+        self.ppu().frame_buffer_xrgb8888_u32()
+    }
+
+    pub fn frame_buffer_rgb1555(&mut self) -> [u8; FRAME_BUFFER_RGB1555_SIZE] {
         self.ppu().frame_buffer_rgb1555()
+    }
+
+    pub fn frame_buffer_rgb1555_u16(&mut self) -> [u16; FRAME_BUFFER_SIZE] {
+        self.ppu().frame_buffer_rgb1555_u16()
+    }
+
+    pub fn frame_buffer_rgb565(&mut self) -> [u8; FRAME_BUFFER_RGB565_SIZE] {
+        self.ppu().frame_buffer_rgb565()
+    }
+
+    pub fn frame_buffer_rgb565_u16(&mut self) -> [u16; FRAME_BUFFER_SIZE] {
+        self.ppu().frame_buffer_rgb565_u16()
+    }
+
+    pub fn frame_buffer_raw(&mut self) -> [u8; FRAME_BUFFER_SIZE] {
+        self.ppu().frame_buffer_raw()
     }
 
     pub fn audio_buffer(&mut self) -> &VecDeque<u8> {
         self.apu().audio_buffer()
     }
 
-    pub fn load_boot_path(&mut self, path: &str) {
-        let data = read_file(path);
-        self.load_boot(&data);
-    }
-
-    pub fn load_boot_file(&mut self, boot_rom: BootRom) {
-        match boot_rom {
-            BootRom::Dmg => self.load_boot_path("./res/boot/dmg_boot.bin"),
-            BootRom::Sgb => self.load_boot_path("./res/boot/sgb_boot.bin"),
-            BootRom::DmgBootix => self.load_boot_path("./res/boot/dmg_bootix.bin"),
-            BootRom::MgbBootix => self.load_boot_path("./res/boot/mgb_bootix.bin"),
-            BootRom::Cgb => self.load_boot_path("./res/boot/cgb_boot.bin"),
-            BootRom::None => (),
-        }
-    }
-
-    pub fn load_boot_default_f(&mut self) {
-        self.load_boot_dmg_f();
-    }
-
-    pub fn load_boot_dmg_f(&mut self) {
-        self.load_boot_file(BootRom::DmgBootix);
-    }
-
-    pub fn load_boot_cgb_f(&mut self) {
-        self.load_boot_file(BootRom::Cgb);
-    }
-
-    pub fn load_cartridge(&mut self, rom: Cartridge) -> &mut Cartridge {
-        self.mmu().set_rom(rom);
+    pub fn cartridge(&mut self) -> &mut Cartridge {
         self.mmu().rom()
     }
 
-    pub fn load_rom(&mut self, data: &[u8], ram_data: Option<&[u8]>) -> &mut Cartridge {
-        let mut rom = Cartridge::from_data(data);
+    pub fn cartridge_i(&self) -> &Cartridge {
+        self.mmu_i().rom_i()
+    }
+
+    pub fn load_boot_path(&mut self, path: &str) -> Result<(), Error> {
+        let data = read_file(path)?;
+        self.load_boot(&data);
+        Ok(())
+    }
+
+    pub fn load_boot_file(&mut self, boot_rom: BootRom) -> Result<(), Error> {
+        match boot_rom {
+            BootRom::Dmg => self.load_boot_path("./res/boot/dmg_boot.bin")?,
+            BootRom::Sgb => self.load_boot_path("./res/boot/sgb_boot.bin")?,
+            BootRom::DmgBootix => self.load_boot_path("./res/boot/dmg_bootix.bin")?,
+            BootRom::MgbBootix => self.load_boot_path("./res/boot/mgb_bootix.bin")?,
+            BootRom::Cgb => self.load_boot_path("./res/boot/cgb_boot.bin")?,
+            BootRom::None => (),
+        }
+        Ok(())
+    }
+
+    pub fn load_boot_default_f(&mut self) -> Result<(), Error> {
+        self.load_boot_dmg_f()?;
+        Ok(())
+    }
+
+    pub fn load_boot_dmg_f(&mut self) -> Result<(), Error> {
+        self.load_boot_file(BootRom::DmgBootix)?;
+        Ok(())
+    }
+
+    pub fn load_boot_cgb_f(&mut self) -> Result<(), Error> {
+        self.load_boot_file(BootRom::Cgb)?;
+        Ok(())
+    }
+
+    pub fn load_cartridge(&mut self, rom: Cartridge) -> Result<&mut Cartridge, Error> {
+        self.mmu().set_rom(rom);
+        Ok(self.mmu().rom())
+    }
+
+    pub fn load_rom(
+        &mut self,
+        data: &[u8],
+        ram_data: Option<&[u8]>,
+    ) -> Result<&mut Cartridge, Error> {
+        let mut rom = Cartridge::from_data(data)?;
         if let Some(ram_data) = ram_data {
             rom.set_ram_data(ram_data)
         }
         self.load_cartridge(rom)
     }
 
-    pub fn load_rom_file(&mut self, path: &str, ram_path: Option<&str>) -> &mut Cartridge {
-        let data = read_file(path);
+    pub fn load_rom_file(
+        &mut self,
+        path: &str,
+        ram_path: Option<&str>,
+    ) -> Result<&mut Cartridge, Error> {
+        let data = read_file(path)?;
         match ram_path {
             Some(ram_path) => {
-                let ram_data = read_file(ram_path);
+                let ram_data = read_file(ram_path)?;
                 self.load_rom(&data, Some(&ram_data))
             }
             None => self.load_rom(&data, None),
@@ -1026,29 +1146,36 @@ impl GameBoy {
         self.serial().set_device(device);
     }
 
+    pub fn read_memory(&mut self, addr: u16) -> u8 {
+        self.mmu().read(addr)
+    }
+
+    pub fn write_memory(&mut self, addr: u16, value: u8) {
+        self.mmu().write(addr, value);
+    }
+
     pub fn set_speed_callback(&mut self, callback: fn(speed: GameBoySpeed)) {
         self.mmu().set_speed_callback(callback);
     }
 
     pub fn reset_cheats(&mut self) {
         self.reset_game_genie();
+        self.reset_game_shark();
     }
 
-    pub fn add_cheat_code(&mut self, code: &str) -> Result<bool, String> {
-        match self.add_game_genie_code(code) {
-            Ok(_) => Ok(true),
-            Err(message) => Err(message),
+    pub fn add_cheat_code(&mut self, code: &str) -> Result<bool, Error> {
+        if GameGenie::is_code(code) {
+            return self.add_game_genie_code(code).map(|_| true);
         }
-    }
 
-    pub fn reset_game_genie(&mut self) {
-        let rom = self.mmu().rom();
-        if rom.game_genie().is_some() {
-            rom.game_genie().clone().unwrap().reset();
+        if GameShark::is_code(code) {
+            return self.add_game_shark_code(code).map(|_| true);
         }
+
+        Err(Error::CustomError(String::from("Not a valid cheat code")))
     }
 
-    pub fn add_game_genie_code(&mut self, code: &str) -> Result<&GameGenieCode, String> {
+    pub fn add_game_genie_code(&mut self, code: &str) -> Result<&GameGenieCode, Error> {
         let rom = self.mmu().rom();
         if rom.game_genie().is_none() {
             let game_genie = GameGenie::default();
@@ -1057,12 +1184,36 @@ impl GameBoy {
         let game_genie = rom.game_genie_mut().as_mut().unwrap();
         game_genie.add_code(code)
     }
+
+    pub fn add_game_shark_code(&mut self, code: &str) -> Result<&GameSharkCode, Error> {
+        let rom = self.rom();
+        if rom.game_shark().is_none() {
+            let game_shark = GameShark::default();
+            rom.attach_shark(game_shark);
+        }
+        let game_shark = rom.game_shark_mut().as_mut().unwrap();
+        game_shark.add_code(code)
+    }
+
+    pub fn reset_game_genie(&mut self) {
+        let rom = self.rom();
+        if rom.game_genie().is_some() {
+            rom.game_genie_mut().as_mut().unwrap().reset();
+        }
+    }
+
+    pub fn reset_game_shark(&mut self) {
+        let rom = self.mmu().rom();
+        if rom.game_shark().is_some() {
+            rom.game_shark_mut().as_mut().unwrap().reset();
+        }
+    }
 }
 
 #[cfg(feature = "wasm")]
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 impl GameBoy {
-    pub fn set_panic_hook_ws() {
+    pub fn set_panic_hook_wa() {
         let prev = take_hook();
         set_hook(Box::new(move |info| {
             hook_impl(info);
@@ -1070,26 +1221,26 @@ impl GameBoy {
         }));
     }
 
-    pub fn load_rom_ws(&mut self, data: &[u8]) -> Cartridge {
-        let rom = self.load_rom(data, None);
+    pub fn load_rom_wa(&mut self, data: &[u8]) -> Result<Cartridge, String> {
+        let rom = self.load_rom(data, None).map_err(|e| e.to_string())?;
         rom.set_rumble_cb(|active| {
             rumble_callback(active);
         });
-        rom.clone()
+        Ok(rom.clone())
     }
 
-    pub fn load_callbacks_ws(&mut self) {
+    pub fn load_callbacks_wa(&mut self) {
         self.set_speed_callback(|speed| {
             speed_callback(speed);
         });
     }
 
-    pub fn load_null_ws(&mut self) {
+    pub fn load_null_wa(&mut self) {
         let null = Box::<NullDevice>::default();
         self.attach_serial(null);
     }
 
-    pub fn load_logger_ws(&mut self) {
+    pub fn load_logger_wa(&mut self) {
         let mut logger = Box::<StdoutDevice>::default();
         logger.set_callback(|data| {
             logger_callback(data.to_vec());
@@ -1097,7 +1248,7 @@ impl GameBoy {
         self.attach_serial(logger);
     }
 
-    pub fn load_printer_ws(&mut self) {
+    pub fn load_printer_wa(&mut self) {
         let mut printer = Box::<PrinterDevice>::default();
         printer.set_callback(|image_buffer| {
             printer_callback(image_buffer.to_vec());
@@ -1105,14 +1256,22 @@ impl GameBoy {
         self.attach_serial(printer);
     }
 
-    /// Updates the emulation mode using the cartridge
-    /// of the provided data to obtain the CGB flag value.
-    pub fn infer_mode_ws(&mut self, data: &[u8]) {
-        let mode = Cartridge::from_data(data).gb_mode();
+    /// Updates the emulation mode using the cartridge info
+    /// for the provided data to obtain the CGB flag value
+    /// and set the mode accordingly.
+    ///
+    /// This can be an expensive operation as it will require
+    /// cartridge data parsing to obtain the CGB flag.
+    /// It will also have to clone the data buffer.
+    pub fn infer_mode_wa(&mut self, data: &[u8]) -> Result<(), String> {
+        let mode = Cartridge::from_data(data)
+            .map_err(|e| e.to_string())?
+            .gb_mode();
         self.set_mode(mode);
+        Ok(())
     }
 
-    pub fn set_palette_colors_ws(&mut self, value: Vec<JsValue>) {
+    pub fn set_palette_colors_wa(&mut self, value: Vec<JsValue>) {
         let palette: Palette = value
             .into_iter()
             .map(|v| Self::js_to_pixel(&v))
@@ -1122,7 +1281,7 @@ impl GameBoy {
         self.ppu().set_palette_colors(&palette);
     }
 
-    pub fn wasm_engine_ws(&self) -> Option<String> {
+    pub fn wasm_engine_wa(&self) -> Option<String> {
         let dependencies = dependencies_map();
         if !dependencies.contains_key("wasm-bindgen") {
             return None;

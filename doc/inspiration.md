@@ -46,3 +46,5 @@
 * [GitHub - fcambus/jsemu (Emulators written in JavaScript)](https://github.com/fcambus/jsemu)
 * [Gameboy Doctor: debug and fix your gameboy emulator](https://robertheaton.com/gameboy-doctor)
 * [Game Boy Boot ROMs](https://gbdev.gg8.se/files/roms/bootroms)
+* [GBEmulatorShootout: Test ROMs results](https://daid.github.io/GBEmulatorShootout)
+* [GameRoy: JIT compilation in High-Accuracy Game Boy Emulation](https://rodrigodd.github.io/2023/09/02/gameroy-jit.html)

@@ -8,21 +8,29 @@ pub mod test;
 use audio::Audio;
 use boytacean::{
     devices::{printer::PrinterDevice, stdout::StdoutDevice},
+    error::Error,
     gb::{AudioProvider, GameBoy, GameBoyMode},
+    info::Info,
     pad::PadKey,
     ppu::PaletteInfo,
     rom::Cartridge,
     serial::{NullDevice, SerialDevice},
+    state::StateManager,
     util::{replace_ext, write_file},
 };
 use chrono::Utc;
 use clap::Parser;
 use image::{ColorType, ImageBuffer, Rgb};
 use sdl::{surface_from_bytes, SdlSystem};
-use sdl2::{event::Event, keyboard::Keycode, pixels::PixelFormatEnum, Sdl};
+use sdl2::{
+    event::Event,
+    keyboard::{Keycode, Mod},
+    pixels::PixelFormatEnum,
+    Sdl,
+};
 use std::{
     cmp::max,
-    path::Path,
+    path::{Path, PathBuf},
     thread,
     time::{Duration, Instant, SystemTime},
 };
@@ -30,10 +38,7 @@ use std::{
 /// The scale at which the screen is going to be drawn
 /// meaning the ratio between Game Boy resolution and
 /// the window size to be displayed.
-const SCREEN_SCALE: f32 = 2.0;
-
-/// The base title to be used in the window.
-const TITLE: &str = "Boytacean";
+const SCREEN_SCALE: f32 = 3.0;
 
 /// Base audio volume to be used as the basis of the
 /// amplification level of the volume
@@ -76,13 +81,15 @@ pub struct Emulator {
     unlimited: bool,
     sdl: Option<SdlSystem>,
     audio: Option<Audio>,
-    title: &'static str,
+    title: String,
     rom_path: String,
     ram_path: String,
+    dir_path: String,
     logic_frequency: u32,
     visual_frequency: f32,
     next_tick_time: f32,
     next_tick_time_i: u32,
+    fast: bool,
     features: Vec<&'static str>,
     palettes: [PaletteInfo; 7],
     palette_index: usize,
@@ -96,13 +103,15 @@ impl Emulator {
             unlimited: options.unlimited.unwrap_or(false),
             sdl: None,
             audio: None,
-            title: TITLE,
+            title: format!("{} v{}", Info::name(), Info::version()),
             rom_path: String::from("invalid"),
             ram_path: String::from("invalid"),
+            dir_path: String::from("invalid"),
             logic_frequency: GameBoy::CPU_FREQ,
             visual_frequency: GameBoy::VISUAL_FREQ,
             next_tick_time: 0.0,
             next_tick_time_i: 0,
+            fast: false,
             features: options
                 .features
                 .unwrap_or_else(|| vec!["video", "audio", "no-vsync"]),
@@ -199,7 +208,7 @@ impl Emulator {
     pub fn start_graphics(&mut self, sdl: &Sdl, screen_scale: f32) {
         self.sdl = Some(SdlSystem::new(
             sdl,
-            self.title,
+            &self.title,
             self.system.display_width() as u32,
             self.system.display_height() as u32,
             screen_scale,
@@ -217,7 +226,7 @@ impl Emulator {
         ));
     }
 
-    pub fn load_rom(&mut self, path: Option<&str>) {
+    pub fn load_rom(&mut self, path: Option<&str>) -> Result<(), Error> {
         let rom_path: &str = path.unwrap_or(&self.rom_path);
         let ram_path = replace_ext(rom_path, "sav").unwrap_or_else(|| "invalid".to_string());
         let rom = self.system.load_rom_file(
@@ -227,7 +236,7 @@ impl Emulator {
             } else {
                 None
             },
-        );
+        )?;
         println!(
             "========= Cartridge =========\n{}\n=============================",
             rom
@@ -239,12 +248,26 @@ impl Emulator {
         }
         self.rom_path = String::from(rom_path);
         self.ram_path = ram_path;
+        self.dir_path = Path::new(&self.rom_path)
+            .parent()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_string();
+        Ok(())
     }
 
-    pub fn reset(&mut self) {
+    pub fn reset(&mut self) -> Result<(), Error> {
         self.system.reset();
         self.system.load(true);
-        self.load_rom(None);
+        self.load_rom(None)?;
+        Ok(())
+    }
+
+    pub fn apply_cheats(&mut self, cheats: &Vec<String>) {
+        for cheat in cheats {
+            self.system.add_cheat_code(cheat).unwrap();
+        }
     }
 
     pub fn benchmark(&mut self, params: &Benchmark) {
@@ -266,17 +289,38 @@ impl Emulator {
 
         let delta = initial.elapsed().unwrap().as_millis() as f64 / 1000.0;
         let frequency_mhz = cycles as f64 / delta / 1000.0 / 1000.0;
+        let speedup = cycles as f64
+            / GameBoy::CPU_FREQ as f64
+            / delta
+            / self.system.speed().multiplier() as f64;
+        let framerate = speedup * GameBoy::VISUAL_FREQ as f64;
 
         println!(
-            "Took {:.2} seconds to run {} ticks ({} cycles) ({:.2} Mhz)!",
-            delta, count, cycles, frequency_mhz
+            "Took {:.2} seconds to run {} ticks ({} cycles) ({:.2} Mhz, {:.2} speedup, {:.2} FPS)!",
+            delta, count, cycles, frequency_mhz, speedup, framerate
         );
+    }
+
+    fn save_state(&mut self, file_path: &str) {
+        if let Err(message) = StateManager::save_file(file_path, &mut self.system, None) {
+            println!("Error saving state: {}", message)
+        } else {
+            println!("Saved state into: {}", file_path)
+        }
+    }
+
+    fn load_state(&mut self, file_path: &str) {
+        if let Err(message) = StateManager::load_file(file_path, &mut self.system, None) {
+            println!("Error loading state: {}", message)
+        } else {
+            println!("Loaded state from: {}", file_path)
+        }
     }
 
     fn save_image(&mut self, file_path: &str) {
         let width = self.system.display_width() as u32;
         let height = self.system.display_height() as u32;
-        let pixels = self.system.frame_buffer();
+        let pixels = self.system.frame_buffer_raw();
 
         let mut image_buffer: ImageBuffer<Rgb<u8>, Vec<u8>> = ImageBuffer::new(width, height);
 
@@ -300,6 +344,19 @@ impl Emulator {
             .ppu()
             .set_palette_colors(self.palettes[self.palette_index].colors());
         self.palette_index = (self.palette_index + 1) % self.palettes.len();
+    }
+
+    pub fn toggle_fullscreen(&mut self) {
+        let window = self.sdl.as_mut().unwrap().window_mut();
+        if window.fullscreen_state() == sdl2::video::FullscreenType::Off {
+            window
+                .set_fullscreen(sdl2::video::FullscreenType::Desktop)
+                .unwrap()
+        } else {
+            window
+                .set_fullscreen(sdl2::video::FullscreenType::Off)
+                .unwrap()
+        }
     }
 
     pub fn limited(&self) -> bool {
@@ -354,7 +411,7 @@ impl Emulator {
             // into a *.sav file in the file system
             if counter % store_count == 0 && self.system.rom().has_battery() {
                 let ram_data = self.system.rom().ram_data();
-                write_file(&self.ram_path, ram_data);
+                write_file(&self.ram_path, ram_data, None).unwrap();
             }
 
             // obtains an event from the SDL sub-system to be
@@ -369,7 +426,7 @@ impl Emulator {
                     Event::KeyDown {
                         keycode: Some(Keycode::R),
                         ..
-                    } => self.reset(),
+                    } => self.reset().unwrap(),
                     Event::KeyDown {
                         keycode: Some(Keycode::B),
                         ..
@@ -377,7 +434,7 @@ impl Emulator {
                     Event::KeyDown {
                         keycode: Some(Keycode::I),
                         ..
-                    } => self.save_image(&self.image_name(Some("png"))),
+                    } => self.save_image(&self.image_name(Some("png"), Some(&self.dir_path))),
                     Event::KeyDown {
                         keycode: Some(Keycode::T),
                         ..
@@ -386,6 +443,43 @@ impl Emulator {
                         keycode: Some(Keycode::P),
                         ..
                     } => self.toggle_palette(),
+                    Event::KeyDown {
+                        keycode: Some(Keycode::E),
+                        keymod,
+                        ..
+                    } => {
+                        if !self.fast && (keymod & (Mod::LCTRLMOD | Mod::RCTRLMOD)) != Mod::NOMOD {
+                            self.fast = true;
+                            self.logic_frequency *= 8;
+                        }
+                    }
+                    Event::KeyUp {
+                        keycode: Some(Keycode::E),
+                        ..
+                    } => {
+                        if self.fast {
+                            self.fast = false;
+                            self.logic_frequency /= 8;
+                        }
+                    }
+                    Event::KeyUp {
+                        keycode: Some(Keycode::LCtrl) | Some(Keycode::RCtrl),
+                        ..
+                    } => {
+                        if self.fast {
+                            self.fast = false;
+                            self.logic_frequency /= 8;
+                        }
+                    }
+                    Event::KeyDown {
+                        keycode: Some(Keycode::F),
+                        keymod,
+                        ..
+                    } => {
+                        if (keymod & (Mod::LCTRLMOD | Mod::RCTRLMOD)) != Mod::NOMOD {
+                            self.toggle_fullscreen()
+                        }
+                    }
                     Event::KeyDown {
                         keycode: Some(Keycode::Plus),
                         ..
@@ -396,8 +490,33 @@ impl Emulator {
                     } => self.logic_frequency = self.logic_frequency.saturating_sub(400000),
                     Event::KeyDown {
                         keycode: Some(keycode),
+                        keymod,
                         ..
                     } => {
+                        match keycode {
+                            Keycode::Num0
+                            | Keycode::Num1
+                            | Keycode::Num2
+                            | Keycode::Num3
+                            | Keycode::Num4
+                            | Keycode::Num5
+                            | Keycode::Num6
+                            | Keycode::Num7
+                            | Keycode::Num8
+                            | Keycode::Num9 => {
+                                let file_path = self.save_name(
+                                    keycode as u8 - Keycode::Num0 as u8,
+                                    None,
+                                    Some(&self.dir_path),
+                                );
+                                if (keymod & (Mod::LCTRLMOD | Mod::RCTRLMOD)) != Mod::NOMOD {
+                                    self.save_state(&file_path);
+                                } else {
+                                    self.load_state(&file_path);
+                                }
+                            }
+                            _ => {}
+                        }
                         if let Some(key) = key_to_pad(keycode) {
                             self.system.key_press(key)
                         }
@@ -412,12 +531,12 @@ impl Emulator {
                     }
                     Event::DropFile { filename, .. } => {
                         if self.auto_mode {
-                            let mode = Cartridge::from_file(&filename).gb_mode();
+                            let mode = Cartridge::from_file(&filename).unwrap().gb_mode();
                             self.system.set_mode(mode);
                         }
                         self.system.reset();
                         self.system.load(true);
-                        self.load_rom(Some(&filename));
+                        self.load_rom(Some(&filename)).unwrap();
                     }
                     _ => (),
                 }
@@ -469,9 +588,11 @@ impl Emulator {
                         last_frame = self.system.ppu_frame();
                         frame_dirty = true;
                     }
+                }
 
-                    // in case the audio subsystem is enabled, then the audio buffer
-                    // must be queued into the SDL audio subsystem
+                // in case there's new audio data available in the emulator we must
+                // handle it, sending it to the audio queue nad clearing the buffer
+                if !self.system.audio_buffer().is_empty() {
                     if let Some(audio) = self.audio.as_mut() {
                         let audio_buffer = self
                             .system
@@ -481,9 +602,6 @@ impl Emulator {
                             .collect::<Vec<f32>>();
                         audio.device.queue_audio(&audio_buffer).unwrap();
                     }
-
-                    // clears the audio buffer to prevent it from
-                    // "exploding" in size, this is required GC operation
                     self.system.clear_audio_buffer();
                 }
 
@@ -664,6 +782,8 @@ impl Emulator {
         }
     }
 
+    /// Obtains the ROM name (file name without extension) so that
+    /// it can be used for derivate file names (eg: save files, screenshots).
     fn rom_name(&self) -> &str {
         Path::new(&self.rom_path)
             .file_stem()
@@ -672,21 +792,48 @@ impl Emulator {
             .unwrap()
     }
 
-    fn image_name(&self, ext: Option<&str>) -> String {
+    fn image_name(&self, ext: Option<&str>, dir_path: Option<&str>) -> String {
         let ext = ext.unwrap_or("png");
-        self.best_name(self.rom_name(), ext)
+        let dir_path = dir_path.unwrap_or(".");
+        Self::best_name(self.rom_name(), ext, dir_path)
     }
 
-    fn best_name(&self, base: &str, ext: &str) -> String {
+    /// Obtains the best possible save file name (ex: `{ROM_NAME}.s0`) taking
+    /// into consideration the current directory path and the index of the save.
+    fn save_name(&self, index: u8, suffix: Option<&str>, dir_path: Option<&str>) -> String {
+        let suffix = suffix.unwrap_or("s");
+        let dir_path = dir_path.unwrap_or(".");
+        Self::sequence_name(self.rom_name(), index, suffix, dir_path)
+    }
+
+    /// Generates a file name for the provided base name, index and suffix
+    /// taking into consideration the provided directory path.
+    /// The generated file name is `{base}.{suffix}{index}`.
+    fn sequence_name(base: &str, index: u8, suffix: &str, dir_path: &str) -> String {
+        let file_name = format!("{}.{}{}", base, suffix, index);
+        let mut file_buf = PathBuf::from(dir_path);
+        file_buf.push(file_name);
+        file_buf.to_str().unwrap().to_string()
+    }
+
+    /// Tries to obtain the best possible file name for the provided base name
+    /// and extension avoiding name collisions with existing files in the
+    /// same directory.
+    fn best_name(base: &str, ext: &str, dir_path: &str) -> String {
         let mut index = 0_usize;
         let mut name = format!("{}.{}", base, ext);
 
-        while Path::new(&name).exists() {
+        let mut path_buf = PathBuf::from(dir_path);
+        path_buf.push(&name);
+
+        while path_buf.exists() {
             index += 1;
             name = format!("{}-{}.{}", base, index, ext);
+            path_buf = PathBuf::from(dir_path);
+            path_buf.push(&name);
         }
 
-        name
+        path_buf.to_str().unwrap().to_string()
     }
 }
 
@@ -705,6 +852,13 @@ struct Args {
         help = "If set no boot ROM will be loaded"
     )]
     no_boot: bool,
+
+    #[arg(
+        long,
+        default_value_t = String::from(""),
+        help = "Path to Game Boy boot ROM file to be used in loading stage"
+    )]
+    boot_rom_path: String,
 
     #[arg(long, default_value_t = false, help = "If set no PPU will be used")]
     no_ppu: bool,
@@ -756,6 +910,12 @@ struct Args {
     )]
     cycles: u64,
 
+    #[arg(
+        long,
+        help = "Cheat codes to be applied to the ROM, supports both Game Genie and GameShark"
+    )]
+    cheats: Vec<String>,
+
     #[arg(default_value_t = String::from(DEFAULT_ROM_PATH), help = "Path to the ROM file to be loaded")]
     rom_path: String,
 }
@@ -789,7 +949,7 @@ fn main() {
     // exist then fails gracefully
     let path = Path::new(&args.rom_path);
     if args.rom_path == DEFAULT_ROM_PATH && !path.exists() {
-        println!("No ROM file provided, please provide one using the --rom-path option");
+        println!("No ROM file provided, please provide one using the [ROM_PATH] argument");
         return;
     }
 
@@ -806,7 +966,7 @@ fn main() {
     // and the initial game ROM to "start the engine"
     let mut game_boy = GameBoy::new(Some(mode));
     if auto_mode {
-        let mode = Cartridge::from_file(&args.rom_path).gb_mode();
+        let mode = Cartridge::from_file(&args.rom_path).unwrap().gb_mode();
         game_boy.set_mode(mode);
     }
     let device: Box<dyn SerialDevice> = build_device(&args.device);
@@ -815,10 +975,16 @@ fn main() {
     game_boy.set_dma_enabled(!args.no_dma);
     game_boy.set_timer_enabled(!args.no_timer);
     game_boy.attach_serial(device);
-    game_boy.load(!args.no_boot);
+    game_boy.load(!args.no_boot && args.boot_rom_path.is_empty());
+    if args.no_boot {
+        game_boy.load_boot_state();
+    }
+    if !args.boot_rom_path.is_empty() {
+        game_boy.load_boot_path(&args.boot_rom_path).unwrap();
+    }
 
     // prints the current version of the emulator (informational message)
-    println!("========= Boytacean =========\n{}", game_boy);
+    println!("========= {} =========\n{}", Info::name(), game_boy);
 
     // creates a new generic emulator structure then starts
     // both the video and audio sub-systems, loads default
@@ -834,7 +1000,8 @@ fn main() {
     };
     let mut emulator = Emulator::new(game_boy, options);
     emulator.start(SCREEN_SCALE);
-    emulator.load_rom(Some(&args.rom_path));
+    emulator.load_rom(Some(&args.rom_path)).unwrap();
+    emulator.apply_cheats(&args.cheats);
     emulator.toggle_palette();
 
     run(args, &mut emulator);

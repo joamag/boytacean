@@ -1,4 +1,6 @@
-use crate::warnln;
+//! Gamepad related functions and structures.
+
+use crate::{mmu::BusComponent, warnln};
 
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
@@ -20,6 +22,22 @@ pub enum PadKey {
     Select,
     A,
     B,
+}
+
+impl PadKey {
+    pub fn from_u8(value: u8) -> Self {
+        match value {
+            1 => PadKey::Up,
+            2 => PadKey::Down,
+            3 => PadKey::Left,
+            4 => PadKey::Right,
+            5 => PadKey::Start,
+            6 => PadKey::Select,
+            7 => PadKey::A,
+            8 => PadKey::B,
+            _ => panic!("Invalid pad key value: {}", value),
+        }
+    }
 }
 
 pub struct Pad {
@@ -146,6 +164,16 @@ impl Pad {
     #[inline(always)]
     pub fn ack_pad(&mut self) {
         self.set_int_pad(false);
+    }
+}
+
+impl BusComponent for Pad {
+    fn read(&mut self, addr: u16) -> u8 {
+        self.read(addr)
+    }
+
+    fn write(&mut self, addr: u16, value: u8) {
+        self.write(addr, value);
     }
 }
 
