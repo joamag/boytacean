@@ -10,6 +10,11 @@ use std::{
 };
 
 use crate::{
+    color::{
+        rgb555_to_rgb888, rgb888_to_rgb1555_array, rgb888_to_rgb1555_u16, rgb888_to_rgb565,
+        rgb888_to_rgb565_u16, Pixel, PixelAlpha, RGB1555_SIZE, RGB565_SIZE, RGB888_SIZE, RGB_SIZE,
+        XRGB8888_SIZE,
+    },
     gb::{GameBoyConfig, GameBoyMode},
     mmu::BusComponent,
     util::SharedThread,
@@ -25,12 +30,6 @@ pub const VRAM_SIZE: usize = VRAM_SIZE_CGB;
 pub const HRAM_SIZE: usize = 128;
 pub const OAM_SIZE: usize = 260;
 pub const PALETTE_SIZE: usize = 4;
-pub const RGB_SIZE: usize = 3;
-pub const RGBA_SIZE: usize = 4;
-pub const RGB888_SIZE: usize = 3;
-pub const XRGB8888_SIZE: usize = 4;
-pub const RGB1555_SIZE: usize = 2;
-pub const RGB565_SIZE: usize = 2;
 pub const TILE_WIDTH: usize = 8;
 pub const TILE_HEIGHT: usize = 8;
 pub const TILE_WIDTH_I: usize = 7;
@@ -104,22 +103,6 @@ pub const BASIC_PALETTE: Palette = [
     [0x60, 0x60, 0x60],
     [0x00, 0x00, 0x00],
 ];
-
-/// Defines the Game Boy pixel type as a buffer
-/// with the size of RGB (3 bytes).
-pub type Pixel = [u8; RGB_SIZE];
-
-/// Defines a transparent Game Boy pixel type as a buffer
-/// with the size of RGBA (4 bytes).
-pub type PixelAlpha = [u8; RGBA_SIZE];
-
-/// Defines a pixel with 5 bits per channel plus a padding
-/// bit at the beginning.
-pub type PixelRgb1555 = [u8; RGB1555_SIZE];
-
-/// Defines a pixel with 5 bits per channel except for the
-/// green channel which uses 6 bits.
-pub type PixelRgb565 = [u8; RGB565_SIZE];
 
 /// Defines a type that represents a color palette
 /// within the Game Boy context.
@@ -644,7 +627,7 @@ impl Ppu {
             palette_address_obj: 0x0,
             first_frame: false,
             frame_index: 0,
-            frame_buffer_index: std::u16::MAX,
+            frame_buffer_index: u16::MAX,
             stat_hblank: false,
             stat_vblank: false,
             stat_oam: false,
@@ -699,7 +682,7 @@ impl Ppu {
         self.palette_address_obj = 0x0;
         self.first_frame = false;
         self.frame_index = 0;
-        self.frame_buffer_index = std::u16::MAX;
+        self.frame_buffer_index = u16::MAX;
         self.stat_hblank = false;
         self.stat_vblank = false;
         self.stat_oam = false;
@@ -1053,16 +1036,7 @@ impl Ppu {
     pub fn frame_buffer_rgb1555(&mut self) -> [u8; FRAME_BUFFER_RGB1555_SIZE] {
         let frame_buffer = self.frame_buffer();
         let mut buffer = [0u8; FRAME_BUFFER_RGB1555_SIZE];
-        for index in 0..DISPLAY_SIZE {
-            let (r, g, b) = (
-                frame_buffer[index * RGB_SIZE],
-                frame_buffer[index * RGB_SIZE + 1],
-                frame_buffer[index * RGB_SIZE + 2],
-            );
-            let rgb1555 = Self::rgb888_to_rgb1555(r, g, b);
-            buffer[index * RGB1555_SIZE] = rgb1555[0];
-            buffer[index * RGB1555_SIZE + 1] = rgb1555[1];
-        }
+        rgb888_to_rgb1555_array(frame_buffer, &mut buffer);
         buffer
     }
 
@@ -1075,7 +1049,7 @@ impl Ppu {
                 frame_buffer[index * RGB_SIZE + 1],
                 frame_buffer[index * RGB_SIZE + 2],
             );
-            *pixel = Self::rgb888_to_rgb1555_u16(r, g, b);
+            *pixel = rgb888_to_rgb1555_u16(r, g, b);
         }
         buffer
     }
@@ -1089,7 +1063,7 @@ impl Ppu {
                 frame_buffer[index * RGB_SIZE + 1],
                 frame_buffer[index * RGB_SIZE + 2],
             );
-            let rgb565 = Self::rgb888_to_rgb565(r, g, b);
+            let rgb565 = rgb888_to_rgb565(r, g, b);
             buffer[index * RGB565_SIZE] = rgb565[0];
             buffer[index * RGB565_SIZE + 1] = rgb565[1];
         }
@@ -1105,7 +1079,7 @@ impl Ppu {
                 frame_buffer[index * RGB_SIZE + 1],
                 frame_buffer[index * RGB_SIZE + 2],
             );
-            *pixel = Self::rgb888_to_rgb565_u16(r, g, b);
+            *pixel = rgb888_to_rgb565_u16(r, g, b);
         }
         buffer
     }
@@ -1281,7 +1255,7 @@ impl Ppu {
         let color = &self.palette_colors[shade_index as usize];
         self.color_buffer.fill(0);
         self.shade_buffer.fill(shade_index);
-        self.frame_buffer_index = std::u16::MAX;
+        self.frame_buffer_index = u16::MAX;
         for pixel in self.frame_buffer.chunks_mut(RGB_SIZE) {
             pixel[0] = color[0];
             pixel[1] = color[1];
@@ -2020,7 +1994,7 @@ impl Ppu {
     ) {
         let palette_offset = (palette_index * 4 * 2) as usize;
         let color_offset = (color_index * 2) as usize;
-        palette[color_index as usize] = Self::rgb555_to_rgb888(
+        palette[color_index as usize] = rgb555_to_rgb888(
             palette_color[palette_offset + color_offset],
             palette_color[palette_offset + color_offset + 1],
         );
@@ -2052,43 +2026,11 @@ impl Ppu {
     /// represent the 4 colors of the palette in the RGB555 format.
     fn compute_color_palette(palette: &mut Palette, palette_color: &[u8; 8]) {
         for color_index in 0..palette.len() {
-            palette[color_index] = Self::rgb555_to_rgb888(
+            palette[color_index] = rgb555_to_rgb888(
                 palette_color[color_index * 2],
                 palette_color[color_index * 2 + 1],
             );
         }
-    }
-
-    fn rgb555_to_rgb888(first: u8, second: u8) -> Pixel {
-        let r = (first & 0x1f) << 3;
-        let g = (((first & 0xe0) >> 5) | ((second & 0x03) << 3)) << 3;
-        let b = ((second & 0x7c) >> 2) << 3;
-        [r, g, b]
-    }
-
-    fn rgb888_to_rgb1555(first: u8, second: u8, third: u8) -> PixelRgb1555 {
-        let pixel = Self::rgb888_to_rgb1555_u16(first, second, third);
-        [pixel as u8, (pixel >> 8) as u8]
-    }
-
-    fn rgb888_to_rgb1555_u16(first: u8, second: u8, third: u8) -> u16 {
-        let r = (first as u16 >> 3) & 0x1f;
-        let g = (second as u16 >> 3) & 0x1f;
-        let b = (third as u16 >> 3) & 0x1f;
-        let a = 1;
-        (a << 15) | (r << 10) | (g << 5) | b
-    }
-
-    fn rgb888_to_rgb565(first: u8, second: u8, third: u8) -> PixelRgb565 {
-        let pixel = Self::rgb888_to_rgb565_u16(first, second, third);
-        [pixel as u8, (pixel >> 8) as u8]
-    }
-
-    fn rgb888_to_rgb565_u16(first: u8, second: u8, third: u8) -> u16 {
-        let r = (first as u16 >> 3) & 0x1f;
-        let g = (second as u16 >> 2) & 0x3f;
-        let b = (third as u16 >> 3) & 0x1f;
-        (r << 11) | (g << 5) | b
     }
 }
 

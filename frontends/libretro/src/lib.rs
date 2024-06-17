@@ -5,12 +5,13 @@ pub mod palettes;
 pub mod structs;
 
 use boytacean::{
+    color::XRGB8888_SIZE,
     debugln,
     gb::{AudioProvider, GameBoy},
     info::Info,
     infoln,
     pad::PadKey,
-    ppu::{DISPLAY_HEIGHT, DISPLAY_WIDTH, FRAME_BUFFER_SIZE, XRGB8888_SIZE},
+    ppu::{DISPLAY_HEIGHT, DISPLAY_WIDTH, FRAME_BUFFER_SIZE},
     rom::Cartridge,
     state::{SaveStateFormat, StateManager},
     warnln,

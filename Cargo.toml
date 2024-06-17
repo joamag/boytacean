@@ -15,8 +15,10 @@ readme = "README.md"
 crate-type = ["cdylib", "rlib"]
 
 [features]
+default = []
 wasm = ["wasm-bindgen", "js-sys"]
 python = ["pyo3"]
+simd = []
 debug = []
 pedantic = []
 cpulog = []
@@ -26,6 +28,9 @@ gen-mock = []
 wasm-bindgen = { version = "0.2", optional = true }
 js-sys = { version = "0.3", optional = true }
 pyo3 = { version = "0.20", optional = true }
+
+[dev-dependencies]
+criterion = "0.5"
 
 [build-dependencies]
 chrono = "0.4"
@@ -44,8 +49,18 @@ debug = false
 lto = true
 opt-level = 3
 
+[profile.bench]
+debug = false
+lto = true
+opt-level = 3
+codegen-units = 1
+
 [workspace]
 members = [".", "frontends/libretro", "frontends/sdl"]
 
 [package.metadata.docs.rs]
 features = ["wasm", "gen-mock"]
+
+[[bench]]
+name = "color"
+harness = false

@@ -114,6 +114,43 @@ pub fn save_bmp(path: &str, pixels: &[u8], width: u32, height: u32) -> Result<()
     Ok(())
 }
 
+/// Copies the contents of the source slice into the destination slice.
+///
+/// This function is optimized for performance and uses pointer-based
+/// operations to copy the data as fast as possible.
+pub fn copy_fast(src: &[u8], dst: &mut [u8], count: usize) {
+    unsafe {
+        let src_ptr = src.as_ptr();
+        let dst_ptr = dst.as_mut_ptr();
+        std::ptr::copy_nonoverlapping(src_ptr, dst_ptr, count);
+    }
+}
+
+// Interleaves two arrays of bytes into a single array using
+// a pointer-based approach for performance reasons.
+pub fn interleave_arrays(a: &[u8], b: &[u8], output: &mut [u8]) {
+    assert_eq!(a.len(), b.len());
+    assert_eq!(output.len(), a.len() + b.len());
+
+    let len = a.len();
+
+    unsafe {
+        let mut out_ptr = output.as_mut_ptr();
+        let mut a_ptr = a.as_ptr();
+        let mut b_ptr = b.as_ptr();
+
+        for _ in 0..len {
+            std::ptr::write(out_ptr, *a_ptr);
+            out_ptr = out_ptr.add(1);
+            a_ptr = a_ptr.add(1);
+
+            std::ptr::write(out_ptr, *b_ptr);
+            out_ptr = out_ptr.add(1);
+            b_ptr = b_ptr.add(1);
+        }
+    }
+}
+
 #[cfg(not(feature = "wasm"))]
 pub fn get_timestamp() -> u64 {
     use std::time::{SystemTime, UNIX_EPOCH};
