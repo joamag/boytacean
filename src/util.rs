@@ -118,12 +118,13 @@ pub fn save_bmp(path: &str, pixels: &[u8], width: u32, height: u32) -> Result<()
 ///
 /// This function is optimized for performance and uses pointer-based
 /// operations to copy the data as fast as possible.
-pub fn copy_fast(src: &[u8], dst: &mut [u8], count: usize) {
-    unsafe {
-        let src_ptr = src.as_ptr();
-        let dst_ptr = dst.as_mut_ptr();
-        std::ptr::copy_nonoverlapping(src_ptr, dst_ptr, count);
-    }
+pub unsafe fn copy_fast(src: &[u8], dst: &mut [u8], count: usize) {
+    debug_assert!(src.len() >= count);
+    debug_assert!(dst.len() >= count);
+
+    let src_ptr = src.as_ptr();
+    let dst_ptr = dst.as_mut_ptr();
+    std::ptr::copy_nonoverlapping(src_ptr, dst_ptr, count);
 }
 
 // Interleaves two arrays of bytes into a single array using
