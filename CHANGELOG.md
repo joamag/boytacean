@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-*
+* Support for SIMD based color space conversion - [#45](https://gitlab.stage.hive.pt/joamag/boytacean/-/issues/45)
 
 ### Changed
 

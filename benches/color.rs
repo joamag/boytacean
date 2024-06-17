@@ -1,0 +1,43 @@
+use boytacean::color::rgb888_to_rgb1555_scalar;
+
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
+
+fn multiply_array_size<T: Clone>(arr: &[T], multiplier: usize) -> Vec<T> {
+    let mut new_arr = Vec::with_capacity(arr.len() * multiplier);
+    for _ in 0..multiplier {
+        new_arr.extend_from_slice(arr);
+    }
+    new_arr
+}
+
+fn benchmark_rgb_conversion(c: &mut Criterion) {
+    let rgb888_pixels: Vec<u8> = vec![255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 0];
+    let rgb888_pixels_sized = multiply_array_size(&rgb888_pixels, 16 * 1024);
+
+    let mut rgb1555_pixels: Vec<u8> = vec![0; rgb888_pixels_sized.len() / 3 * 2];
+
+    c.bench_function("rgb888_to_rgb1555_scalar", |b| {
+        b.iter(|| {
+            rgb888_to_rgb1555_scalar(
+                black_box(&rgb888_pixels_sized),
+                black_box(&mut rgb1555_pixels),
+            )
+        })
+    });
+
+    #[cfg(feature = "simd")]
+    {
+        use boytacean::color::rgb888_to_rgb1555_simd;
+        c.bench_function("rgb888_to_rgb1555_simd", |b| {
+            b.iter(|| {
+                rgb888_to_rgb1555_simd(
+                    black_box(&rgb888_pixels_sized),
+                    black_box(&mut rgb1555_pixels),
+                )
+            })
+        });
+    }
+}
+
+criterion_group!(benches, benchmark_rgb_conversion);
+criterion_main!(benches);

@@ -34,10 +34,7 @@ use crate::{
 use wasm_bindgen::prelude::*;
 
 #[cfg(feature = "wasm")]
-use crate::{
-    gen::dependencies_map,
-    ppu::{Palette, Pixel},
-};
+use crate::{color::Pixel, gen::dependencies_map, ppu::Palette};
 
 #[cfg(feature = "wasm")]
 use std::{

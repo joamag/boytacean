@@ -1,7 +1,9 @@
 #![allow(clippy::uninlined_format_args)]
+#![cfg_attr(feature = "simd", feature(portable_simd))]
 
 pub mod apu;
 pub mod cheats;
+pub mod color;
 pub mod consts;
 pub mod cpu;
 pub mod data;
