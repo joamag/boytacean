@@ -226,6 +226,8 @@ pub fn rgb888_to_rgb1555_simd(rgb888_pixels: &[u8], rgb1555_pixels: &mut [u8]) {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::zero_prefixed_literal)]
+
     use super::{rgb888_to_rgb1555, rgb888_to_rgb1555_scalar};
 
     #[test]
