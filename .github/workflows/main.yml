@@ -32,6 +32,8 @@ jobs:
         run: cargo clippy -- -D warnings -A unknown-lints
       - name: Run unit tests
         run: cargo test
+      - name: Run benchmarks
+        run: cargo bench
       - name: Build development version
         run: cargo build
       - name: Build release version
