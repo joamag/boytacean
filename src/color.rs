@@ -94,8 +94,8 @@ pub fn rgb888_to_rgb1555_scalar(rgb888_pixels: &[u8], rgb1555_pixels: &mut [u8])
         unsafe {
             copy_fast(
                 &rgb1555,
-                &mut rgb1555_pixels[index * RGB1555_SIZE..index * RGB1555_SIZE + RGB565_SIZE],
-                RGB565_SIZE,
+                &mut rgb1555_pixels[index * RGB1555_SIZE..index * RGB1555_SIZE + RGB1555_SIZE],
+                RGB1555_SIZE,
             )
         }
     }
@@ -196,11 +196,11 @@ pub fn rgb888_to_rgb1555_simd(rgb888_pixels: &[u8], rgb1555_pixels: &mut [u8]) {
         let high_byte = u8x16::splat(0x80) | r_shifted_high | g_shifted_high;
         let low_byte = g_shifted_low | b_shifted;
 
-        let output_offset = index * SIMD_WIDTH * RGB565_SIZE;
+        let output_offset = index * SIMD_WIDTH * RGB1555_SIZE;
         interleave_arrays(
             low_byte.as_array(),
             high_byte.as_array(),
-            &mut rgb1555_pixels[output_offset..output_offset + SIMD_WIDTH * RGB565_SIZE],
+            &mut rgb1555_pixels[output_offset..output_offset + SIMD_WIDTH * RGB1555_SIZE],
         );
     }
 
@@ -216,12 +216,12 @@ pub fn rgb888_to_rgb1555_simd(rgb888_pixels: &[u8], rgb1555_pixels: &mut [u8]) {
             rgb888_pixels[current_offset + 2],
         );
         let rgb1555 = rgb888_to_rgb1555(r, g, b);
-        let output_offset = offset_rgb1555 + index * RGB565_SIZE;
+        let output_offset = offset_rgb1555 + index * RGB1555_SIZE;
         unsafe {
             copy_fast(
                 &rgb1555,
-                &mut rgb1555_pixels[output_offset..output_offset + RGB565_SIZE],
-                RGB565_SIZE,
+                &mut rgb1555_pixels[output_offset..output_offset + RGB1555_SIZE],
+                RGB1555_SIZE,
             );
         }
     }
