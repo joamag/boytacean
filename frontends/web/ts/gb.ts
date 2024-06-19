@@ -663,27 +663,6 @@ export class GameboyEmulator extends EmulatorLogic implements Emulator {
         this._serialDevice = value;
     }
 
-    async toggleRunning() {
-        if (this.paused) {
-            await this.resume();
-        } else {
-            await this.pause();
-        }
-    }
-
-    async pause() {
-        this.paused = true;
-    }
-
-    async resume() {
-        this.paused = false;
-        this.nextTickTime = EmulatorLogic.now();
-    }
-
-    async reset() {
-        await this.boot({ engine: null });
-    }
-
     keyPress(key: string) {
         const keyCode = KEYS_NAME[key];
         if (keyCode === undefined) return;
