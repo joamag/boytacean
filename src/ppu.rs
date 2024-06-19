@@ -536,9 +536,9 @@ pub struct Ppu {
     /// the identifier wraps on the u16 edges.
     frame_index: u16,
 
-    // Index of the last frame that was rendered, this value is used
-    // to control the delayed rendering of the frame buffer and should
-    // avoid some resource usage
+    /// Index of the last frame that was rendered, this value is used
+    /// to control the deferred rendering of the frame buffer and should
+    /// prevent unnecessary resource usage.
     frame_buffer_index: u16,
 
     stat_hblank: bool,

@@ -510,11 +510,8 @@ impl GameBoy {
     /// clocked.
     pub fn clocks_cycles(&mut self, limit: usize) -> u64 {
         let mut cycles = 0_u64;
-        loop {
+        while cycles < limit as u64 {
             cycles += self.clock() as u64;
-            if cycles >= limit as u64 {
-                break;
-            }
         }
         cycles
     }
@@ -535,15 +532,12 @@ impl GameBoy {
         let mut frames = 0_u16;
         let mut frame_buffer: Option<Vec<u8>> = None;
         let mut last_frame = self.ppu_frame();
-        loop {
+        while cycles < limit as u64 {
             cycles += self.clock() as u64;
             if self.ppu_frame() != last_frame {
                 frame_buffer = Some(self.frame_buffer().to_vec());
                 last_frame = self.ppu_frame();
                 frames += 1;
-            }
-            if cycles >= limit as u64 {
-                break;
             }
         }
         ClockFrame {
@@ -556,22 +550,16 @@ impl GameBoy {
     pub fn next_frame(&mut self) -> u32 {
         let mut cycles = 0u32;
         let current_frame = self.ppu_frame();
-        loop {
+        while self.ppu_frame() == current_frame {
             cycles += self.clock() as u32;
-            if self.ppu_frame() != current_frame {
-                break;
-            }
         }
         cycles
     }
 
     pub fn step_to(&mut self, addr: u16) -> u32 {
         let mut cycles = 0u32;
-        loop {
+        while self.cpu_i().pc() != addr {
             cycles += self.clock_step(addr) as u32;
-            if self.cpu_i().pc() == addr {
-                break;
-            }
         }
         cycles
     }
