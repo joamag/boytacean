@@ -8,7 +8,7 @@ import {
     Compiler,
     DebugPanel,
     Emulator,
-    EmulatorBase,
+    EmulatorLogic,
     Entry,
     Feature,
     Frequency,
@@ -40,7 +40,8 @@ import {
     Info,
     PadKey,
     SaveStateFormat,
-    StateManager
+    StateManager,
+    ClockFrame
 } from "../lib/boytacean";
 import info from "../package.json";
 
@@ -63,13 +64,6 @@ const LOGIC_HZ = 4194304;
  */
 const VISUAL_HZ = 59.7275;
 
-/**
- * The frequency of the pause polling update operation,
- * increasing this value will make resume from emulation
- * paused state fasted.
- */
-const IDLE_HZ = 10;
-
 const DISPLAY_WIDTH = 160;
 const DISPLAY_HEIGHT = 144;
 const DISPLAY_SCALE = 2;
@@ -80,13 +74,6 @@ const DISPLAY_SCALE = 2;
  * number of seconds in between flush operations (eg: 5 seconds).
  */
 const STORE_RATE = 5;
-
-/**
- * The sample rate that is going to be used for FPS calculus,
- * meaning that every N seconds we will calculate the number
- * of frames rendered divided by the N seconds.
- */
-const FPS_SAMPLE_RATE = 3;
 
 const KEYS_NAME: Record<string, number> = {
     ArrowUp: PadKey.Up,
@@ -116,7 +103,7 @@ export enum SerialDevice {
  * and "joins" all the elements together to bring input/output
  * of the associated machine.
  */
-export class GameboyEmulator extends EmulatorBase implements Emulator {
+export class GameboyEmulator extends EmulatorLogic implements Emulator {
     /**
      * The Game Boy engine (probably coming from WASM) that
      * is going to be used for the emulation.
@@ -138,16 +125,16 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
      */
     private autoMode = false;
 
-    private logicFrequency = LOGIC_HZ;
-    private visualFrequency = VISUAL_HZ;
-    private idleFrequency = IDLE_HZ;
+    protected logicFrequency = LOGIC_HZ;
+    protected visualFrequency = VISUAL_HZ;
 
-    private paused = false;
-    private nextTickTime = 0;
-    private fps = 0;
-    private frameStart: number = EmulatorBase.now();
-    private frameCount = 0;
     private paletteIndex = 0;
+
+    /**
+     * Number of pending CPU cycles from the previous tick.
+     * This is used to keep track of the overflow cycles.
+     */
+    private pending = 0;
 
     /**
      * The frequency at which the battery backed RAM is going
@@ -169,6 +156,12 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
      */
     private extraSettings: Record<string, string> = {};
 
+    /**
+     * Current frame structure used in the clocking operations
+     * of the emulator, allowing deferred frame buffer retrieval.
+     */
+    private clockFrame: ClockFrame | null = null;
+
     constructor(extraSettings = {}) {
         super();
         this.extraSettings = extraSettings;
@@ -184,151 +177,47 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     }
 
     /**
-     * Runs the initialization and main loop execution for
-     * the Game Boy emulator.
-     * The main execution of this function should be an
-     * infinite loop running machine `tick` operations.
+     * Runs a tick operation in the current emulator, this operation should
+     * be triggered at a regular interval to ensure that the emulator is
+     * properly updated.
      *
-     * @param options The set of options that are going to be
-     * used in he Game Boy emulator initialization.
+     * Not necessarily executed once per frame, but rather once per logic
+     * emulator unit.
+     *
+     * The tick operation is responsible for the following operations:
+     * - Clocks the system by the target number of cycles.
+     * - Triggers the frame event in case there's a frame to be processed.
+     * - Triggers the audio event, allowing the deferred retrieval of the audio buffer.
+     * - Flushes the RAM to the local storage in case the cartridge is battery backed.
      */
-    async main({ romUrl }: { romUrl?: string }) {
-        // boots the emulator subsystem with the initial
-        // ROM retrieved from a remote data source
-        await this.boot({ loadRom: true, romPath: romUrl ?? undefined });
-
-        // the counter that controls the overflowing cycles
-        // from tick to tick operation
-        let pending = 0;
-
-        // runs the sequence as an infinite loop, running
-        // the associated CPU cycles accordingly
-        while (true) {
-            // in case the machine is paused we must delay the execution
-            // a little bit until the paused state is recovered
-            if (this.paused) {
-                await new Promise((resolve) => {
-                    setTimeout(resolve, 1000 / this.idleFrequency);
-                });
-                continue;
-            }
-
-            // obtains the current time, this value is going
-            // to be used to compute the need for tick computation
-            let currentTime = EmulatorBase.now();
-
-            try {
-                pending = this.tick(
-                    currentTime,
-                    pending,
-                    Math.round(
-                        (this.logicFrequency *
-                            (this.gameBoy?.multiplier() ?? 1)) /
-                            this.visualFrequency
-                    )
-                );
-            } catch (err) {
-                // sets the default error message to be displayed
-                // to the user, this value may be overridden in case
-                // a better and more explicit message can be determined
-                let message = String(err);
-
-                // verifies if the current issue is a panic one
-                // and updates the message value if that's the case
-                const messageNormalized = (err as Error).message.toLowerCase();
-                const isPanic =
-                    messageNormalized.startsWith("unreachable") ||
-                    messageNormalized.startsWith("recursive use of an object");
-                if (isPanic) {
-                    message = "Unrecoverable error, restarting Game Boy";
-                }
-
-                // displays the error information to both the end-user
-                // and the developer (for diagnostics)
-                this.trigger("message", {
-                    text: message,
-                    error: true,
-                    timeout: 5000
-                });
-                console.error(err);
-
-                // pauses the machine, allowing the end-user to act
-                // on the error in a proper fashion
-                this.pause();
-
-                // if we're talking about a panic, proper action must be taken
-                // which in this case means restarting both the WASM sub
-                // system and the machine state (to be able to recover)
-                if (isPanic) {
-                    await wasm(true);
-                    await this.boot({ restore: false, reuse: false });
-
-                    this.trigger("error");
-                }
-            }
-
-            // calculates the amount of time until the next draw operation
-            // this is the amount of time that is going to be pending
-            currentTime = EmulatorBase.now();
-            const pendingTime = Math.max(this.nextTickTime - currentTime, 0);
-
-            // waits a little bit for the next frame to be draw,
-            // this should control the flow of render
-            await new Promise((resolve) => {
-                setTimeout(resolve, pendingTime);
-            });
-        }
-    }
-
-    tick(currentTime: number, pending: number, cycles = 70224) {
+    tick() {
         // in case the reference to the system is not set then
         // returns the control flow immediately (not possible to tick)
-        if (!this.gameBoy) return pending;
+        if (!this.gameBoy) return;
 
-        // in case the time to draw the next frame has not been
-        // reached the flush of the "tick" logic is skipped
-        if (currentTime < this.nextTickTime) return pending;
+        // calculates the number of cycles that are going to be
+        // processed in the current tick operation, this value is
+        // calculated using the logic and visual frequencies and
+        // the current Game Boy multiplier (DMG vs CGB)
+        const cycles = Math.round(
+            (this.logicFrequency * (this.gameBoy?.multiplier() ?? 1)) /
+                this.visualFrequency
+        );
 
         // initializes the counter of cycles with the pending number
         // of cycles coming from the previous tick
-        let counterCycles = pending;
+        let counterCycles = this.pending;
 
-        let lastFrame = this.gameBoy.ppu_frame();
-
-        while (true) {
-            // limits the number of cycles to the provided
-            // cycle value passed as a parameter
-            if (counterCycles >= cycles) {
-                break;
-            }
-
-            // runs the Game Boy clock, this operations should
-            // include the advance of both the CPU and the PPU
-            const tickCycles = this.gameBoy.clock();
-            counterCycles += tickCycles;
-
-            // in case the frame is different from the previously
-            // rendered one then it's time to update the canvas
-            if (this.gameBoy.ppu_frame() !== lastFrame) {
-                // updates the reference to the last frame index
-                // to be used for comparison in the next tick
-                lastFrame = this.gameBoy.ppu_frame();
-
-                // triggers the frame event indicating that
-                // a new frame is now available for drawing
-                this.trigger("frame");
-            }
-
-            // in case the current cartridge is battery backed
-            // then we need to check if a RAM flush to local
-            // storage operation is required
-            if (this.cartridge && this.cartridge.has_battery()) {
-                this.flushCycles -= tickCycles;
-                if (this.flushCycles <= 0) {
-                    this.saveRam();
-                    this.flushCycles = this.logicFrequency * STORE_RATE;
-                }
-            }
+        // clocks the system by the target number of cycles (deducted
+        // by the carryover cycles) and then in case there's at least
+        // a frame to be processed triggers the frame event, allowing
+        // the deferred retrieval of the frame buffer
+        this.clockFrame = this.gameBoy.clocks_frame_buffer(
+            cycles - counterCycles
+        );
+        counterCycles += Number(this.clockFrame.cycles);
+        if (this.clockFrame.frames > 0) {
+            this.trigger("frame");
         }
 
         // triggers the audio event, meaning that the audio should be
@@ -336,42 +225,25 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         // the audio buffer that is pending processing
         this.trigger("audio");
 
-        // increments the number of frames rendered in the current
-        // section, this value is going to be used to calculate FPS
-        this.frameCount += 1;
-
-        // in case the target number of frames for FPS control
-        // has been reached calculates the number of FPS and
-        // flushes the value to the screen
-        if (this.frameCount >= this.visualFrequency * FPS_SAMPLE_RATE) {
-            const currentTime = EmulatorBase.now();
-            const deltaTime = (currentTime - this.frameStart) / 1000;
-            const fps = Math.round(this.frameCount / deltaTime);
-            this.fps = fps;
-            this.frameCount = 0;
-            this.frameStart = currentTime;
+        // in case the current cartridge is battery backed
+        // then we need to check if a RAM flush to local
+        // storage operation is required
+        if (this.cartridge && this.cartridge.has_battery()) {
+            this.flushCycles -= counterCycles - this.pending;
+            if (this.flushCycles <= 0) {
+                this.saveRam();
+                this.flushCycles = this.logicFrequency * STORE_RATE;
+            }
         }
-
-        // calculates the number of ticks that have elapsed since the
-        // last draw operation, this is critical to be able to properly
-        // operate the clock of the CPU in frame drop situations, meaning
-        // a situation where the system resources are no able to emulate
-        // the system on time and frames must be skipped (ticks > 1)
-        if (this.nextTickTime === 0) this.nextTickTime = currentTime;
-        let ticks = Math.ceil(
-            (currentTime - this.nextTickTime) /
-                ((1 / this.visualFrequency) * 1000)
-        );
-        ticks = Math.max(ticks, 1);
-
-        // updates the next update time according to the number of ticks
-        // that have elapsed since the last operation, this way this value
-        // can better be used to control the game loop
-        this.nextTickTime += (1000 / this.visualFrequency) * ticks;
 
         // calculates the new number of pending (overflow) cycles
         // that are going to be added to the next iteration
-        return counterCycles - cycles;
+        this.pending = counterCycles - cycles;
+    }
+
+    async hardReset() {
+        await wasm(true);
+        await this.boot({ restore: false });
     }
 
     /**
@@ -655,7 +527,11 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
      * @returns The current pixel data for the emulator display.
      */
     get imageBuffer(): Uint8Array {
-        return this.gameBoy?.frame_buffer_eager() ?? new Uint8Array();
+        return (
+            this.clockFrame?.frame_buffer_eager() ??
+            this.gameBoy?.frame_buffer_eager() ??
+            new Uint8Array()
+        );
     }
 
     get audioSpecs(): AudioSpecs {
@@ -727,10 +603,6 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
     get wasmEngine(): string | null {
         if (!this.gameBoy) return null;
         return this.gameBoy.wasm_engine_wa() ?? null;
-    }
-
-    get framerate(): number {
-        return this.fps;
     }
 
     get registers(): Record<string, string | number> {
@@ -805,7 +677,7 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
 
     async resume() {
         this.paused = false;
-        this.nextTickTime = EmulatorBase.now();
+        this.nextTickTime = EmulatorLogic.now();
     }
 
     async reset() {
@@ -899,11 +771,11 @@ export class GameboyEmulator extends EmulatorBase implements Emulator {
         let cycles = 0;
         this.pause();
         try {
-            const initial = EmulatorBase.now();
+            const initial = EmulatorLogic.now();
             for (let i = 0; i < count; i++) {
                 cycles += this.gameBoy?.clock() ?? 0;
             }
-            const delta = (EmulatorBase.now() - initial) / 1000;
+            const delta = (EmulatorLogic.now() - initial) / 1000;
             const frequency_mhz = cycles / delta / 1000 / 1000;
             return {
                 delta: delta,
@@ -1092,6 +964,8 @@ console.image = (url: string, size = 80) => {
 };
 
 const wasm = async (setHook = true) => {
+    // waits for the WASM module to be (hard) re-loaded
+    // this should be an expensive operation
     await _wasm();
 
     // in case the set hook flag is set, then tries to

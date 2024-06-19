@@ -58,5 +58,5 @@ const BACKGROUNDS = [
 
     // starts the emulator with the provided ROM URL, this is
     // going to run the main emulator (infinite) loop
-    await emulator.main({ romUrl: romUrl });
+    await emulator.start({ romUrl: romUrl });
 })();
