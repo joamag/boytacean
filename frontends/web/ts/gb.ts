@@ -190,7 +190,7 @@ export class GameboyEmulator extends EmulatorLogic implements Emulator {
      * - Triggers the audio event, allowing the deferred retrieval of the audio buffer.
      * - Flushes the RAM to the local storage in case the cartridge is battery backed.
      */
-    tick() {
+    async tick() {
         // in case the reference to the system is not set then
         // returns the control flow immediately (not possible to tick)
         if (!this.gameBoy) return;
