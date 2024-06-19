@@ -308,6 +308,20 @@ pub trait AudioProvider {
     fn clear_audio_buffer(&mut self);
 }
 
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
+pub struct ClockFrame {
+    pub cycles: u64,
+    pub frames: u16,
+    frame_buffer: Option<Vec<u8>>,
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
+impl ClockFrame {
+    pub fn frame_buffer_eager(&mut self) -> Option<Vec<u8>> {
+        self.frame_buffer.take()
+    }
+}
+
 /// Top level structure that abstracts the usage of the
 /// Game Boy system under the Boytacean emulator.
 /// Should serve as the main entry-point API.
@@ -489,6 +503,54 @@ impl GameBoy {
             cycles += self.clock() as u64;
         }
         cycles
+    }
+
+    /// Clocks the emulator until the limit of cycles that has been
+    /// provided and returns the amount of cycles that have been
+    /// clocked.
+    pub fn clocks_cycles(&mut self, limit: usize) -> u64 {
+        let mut cycles = 0_u64;
+        loop {
+            cycles += self.clock() as u64;
+            if cycles >= limit as u64 {
+                break;
+            }
+        }
+        cycles
+    }
+
+    /// Clocks the emulator until the limit of cycles that has been
+    /// provided and returns the amount of cycles that have been
+    /// clocked together with the frame buffer of the PPU.
+    ///
+    /// Allows a caller to clock the emulator and at the same time
+    /// retrieve the frame buffer of the PPU at the proper timing
+    /// (on V-Blank).
+    ///
+    /// This method allows for complex foreign call optimizations
+    /// by preventing the need to call the emulator clock multiple
+    /// times to obtain the right frame buffer retrieval timing.
+    pub fn clocks_frame_buffer(&mut self, limit: usize) -> ClockFrame {
+        let mut cycles = 0_u64;
+        let mut frames = 0_u16;
+        let mut frame_buffer: Option<Vec<u8>> = None;
+        let mut last_frame = self.ppu_frame();
+        loop {
+            cycles += self.clock() as u64;
+            if self.ppu_frame() != last_frame {
+                frame_buffer = Some(self.frame_buffer().to_vec());
+                last_frame = self.ppu_frame();
+                frames += 1;
+            }
+            if cycles >= limit as u64 {
+                break;
+            }
+        }
+        ClockFrame {
+            cycles,
+            frames,
+            frame_buffer,
+        }
     }
 
     pub fn next_frame(&mut self) -> u32 {
