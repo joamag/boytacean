@@ -1,3 +1,5 @@
+//! Error related data structures.
+
 use std::fmt::{self, Display, Formatter};
 
 /// Top level enum for error handling within Boytacean.

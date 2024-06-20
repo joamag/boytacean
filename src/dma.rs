@@ -1,3 +1,5 @@
+//! DMA (Direct Memory Access) functions and structures.
+
 use crate::{
     consts::{DMA_ADDR, HDMA1_ADDR, HDMA2_ADDR, HDMA3_ADDR, HDMA4_ADDR, HDMA5_ADDR},
     mmu::BusComponent,

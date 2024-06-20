@@ -1,3 +1,5 @@
+//! APU (Audio Processing Unit) functions and structures.
+
 use std::collections::VecDeque;
 
 use crate::{gb::GameBoy, mmu::BusComponent, warnln};

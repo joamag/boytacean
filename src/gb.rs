@@ -1,4 +1,4 @@
-//! Main GameBoy emulation entrypoint functions and structures.
+//! Main Game Boy emulation entrypoint functions and structures.
 
 use std::{
     collections::VecDeque,
