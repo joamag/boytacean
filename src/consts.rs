@@ -1,3 +1,5 @@
+//! Game Boy specific hardware constants.
+
 // Timer registers
 pub const DIV_ADDR: u16 = 0xff04;
 pub const TIMA_ADDR: u16 = 0xff05;
