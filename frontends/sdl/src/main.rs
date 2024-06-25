@@ -118,6 +118,9 @@ pub struct Emulator {
 
     /// Path to the directory where storage of files is located, this
     /// value is going to be used to save files.
+    ///
+    /// Example usage of this directory includes screenshots, save states
+    /// and other files that are going to be saved to the file system.
     dir_path: String,
 
     /// The frequency at which the logic of the emulator is going to
