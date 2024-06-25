@@ -324,37 +324,44 @@ impl ClockFrame {
 
 /// Top level structure that abstracts the usage of the
 /// Game Boy system under the Boytacean emulator.
+///
 /// Should serve as the main entry-point API.
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 pub struct GameBoy {
     /// The current running mode of the emulator, this
     /// may affect many aspects of the emulation, like
     /// CPU frequency, PPU frequency, Boot rome size, etc.
+    ///
     /// This is a clone of the configuration value
     /// kept for performance reasons.
     mode: GameBoyMode,
 
     /// If the PPU is enabled, it will be clocked.
+    ///
     /// This is a clone of the configuration value
     /// kept for performance reasons.
     ppu_enabled: bool,
 
     /// If the APU is enabled, it will be clocked.
+    ///
     /// This is a clone of the configuration value
     /// kept for performance reasons.
     apu_enabled: bool,
 
     /// If the DMA is enabled, it will be clocked.
+    ///
     /// This is a clone of the configuration value
     /// kept for performance reasons.
     dma_enabled: bool,
 
     /// If the timer is enabled, it will be clocked.
+    ///
     /// This is a clone of the configuration value
     /// kept for performance reasons.
     timer_enabled: bool,
 
     /// If the serial is enabled, it will be clocked.
+    ///
     /// This is a clone of the configuration value
     /// kept for performance reasons.
     serial_enabled: bool,
@@ -365,6 +372,7 @@ pub struct GameBoy {
     /// logic to match the current frequency. For example
     /// the APU will adjust its internal clock to match
     /// this hint.
+    ///
     /// This is a clone of the configuration value
     /// kept for performance reasons.
     clock_freq: u32,
@@ -379,6 +387,7 @@ pub struct GameBoy {
     /// Game Boy configuration structure that can be
     /// used by the GB components to access global
     /// configuration values on the current emulator.
+    ///
     /// If performance is required (may value access)
     /// the values should be cloned and stored locally.
     gbc: SharedThread<GameBoyConfig>,

@@ -75,23 +75,81 @@ pub struct EmulatorOptions {
     features: Option<Vec<&'static str>>,
 }
 
+/// Main structure used to control the logic execution of
+/// an emulator in an SDL context.
+///
+/// The way the structure is defined should be as agnostic
+/// as possible to the underlying system, meaning that it
+/// should be able to run in different systems without any
+/// major changes.
 pub struct Emulator {
+    /// Reference to the system that is going to be used to
+    /// run the emulation.
     system: GameBoy,
+
+    /// Flag that controls if the emulator should run in
+    /// auto mode, meaning that the mode should be inferred
+    /// from the ROM file.
     auto_mode: bool,
+
+    /// Flag that controls if the emulator should run in an
+    /// unlimited mode, meaning that no speed limit is imposed.
     unlimited: bool,
+
+    /// Reference to the SDL system that is going to be used
+    /// to render the graphics and handle the input.
     sdl: Option<SdlSystem>,
+
+    /// Reference to the audio provider that is going to be used
+    /// to handle the audio output.
     audio: Option<Audio>,
+
+    /// The title of the emulator that is going to be displayed
+    /// in the window title.
     title: String,
+
+    /// The path to the ROM file that is going to be loaded into
+    /// the emulator.
     rom_path: String,
+
+    /// The path to the RAM file (save state) that is going to be
+    /// to load state from.
     ram_path: String,
+
+    /// Path to the directory where storage of files is located, this
+    /// value is going to be used to save files.
     dir_path: String,
+
+    /// The frequency at which the logic of the emulator is going to
+    /// be executed, this value is going to be used to control the
+    /// speed of the emulation.
     logic_frequency: u32,
+
+    /// The frequency at which the visual part of the emulator is going
+    /// to be executed, this value is going to be used to control the
+    /// speed of the visual part of the emulation (eg: 60 FPS).
     visual_frequency: f32,
+
+    /// The time at which the next tick is going to be executed, this
+    /// value is expressed in milliseconds.
     next_tick_time: f32,
+
+    /// Integer representation of the `next_tick_time` value.
     next_tick_time_i: u32,
+
+    /// Flag that controls if the emulator is running above its reference
+    /// speed.
     fast: bool,
+
+    /// Set of features that are going to be enabled in the emulator, this
+    /// value is going to be used to control the behavior of the emulator.
     features: Vec<&'static str>,
+
+    /// Set of palettes that are going to be used to control the color
+    /// of the emulator frame buffer.
     palettes: [PaletteInfo; 7],
+
+    /// Index of the current palette controlling the palette being used.
     palette_index: usize,
 }
 
