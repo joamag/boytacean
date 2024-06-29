@@ -15,6 +15,7 @@ use crate::{
         rgb888_to_rgb565_u16, Pixel, PixelAlpha, RGB1555_SIZE, RGB565_SIZE, RGB888_SIZE, RGB_SIZE,
         XRGB8888_SIZE,
     },
+    consts::{LCDC_ADDR, LY_ADDR, SCX_ADDR, SCY_ADDR, STAT_ADDR},
     gb::{GameBoyConfig, GameBoyMode},
     mmu::BusComponent,
     util::SharedThread,
@@ -782,7 +783,7 @@ impl Ppu {
             // Not Usable
             0xfea0..=0xfeff => 0xff,
             0xff80..=0xfffe => self.hram[(addr & 0x007f) as usize],
-            0xff40 =>
+            LCDC_ADDR =>
             {
                 #[allow(clippy::bool_to_int_with_if)]
                 (if self.switch_bg { 0x01 } else { 0x00 }
@@ -794,17 +795,18 @@ impl Ppu {
                     | if self.window_map { 0x40 } else { 0x00 }
                     | if self.switch_lcd { 0x80 } else { 0x00 })
             }
-            0xff41 => {
+            STAT_ADDR => {
                 (if self.stat_hblank { 0x08 } else { 0x00 }
                     | if self.stat_vblank { 0x10 } else { 0x00 }
                     | if self.stat_oam { 0x20 } else { 0x00 }
                     | if self.stat_lyc { 0x40 } else { 0x00 }
                     | if self.lyc == self.ly { 0x04 } else { 0x00 }
-                    | (self.mode as u8 & 0x03))
+                    | (self.mode as u8 & 0x03)
+                    | 0x80)
             }
-            0xff42 => self.scy,
-            0xff43 => self.scx,
-            0xff44 => self.ly,
+            SCY_ADDR => self.scy,
+            SCX_ADDR => self.scx,
+            LY_ADDR => self.ly,
             0xff45 => self.lyc,
             0xff47 => self.palettes[0],
             0xff48 => self.palettes[1],
@@ -855,7 +857,7 @@ impl Ppu {
             // Not Usable
             0xfea0..=0xfeff => (),
             0xff80..=0xfffe => self.hram[(addr & 0x007f) as usize] = value,
-            0xff40 => {
+            LCDC_ADDR => {
                 self.switch_bg = value & 0x01 == 0x01;
                 self.switch_obj = value & 0x02 == 0x02;
                 self.obj_size = value & 0x04 == 0x04;
@@ -879,14 +881,14 @@ impl Ppu {
                     self.clear_frame_buffer();
                 }
             }
-            0xff41 => {
+            STAT_ADDR => {
                 self.stat_hblank = value & 0x08 == 0x08;
                 self.stat_vblank = value & 0x10 == 0x10;
                 self.stat_oam = value & 0x20 == 0x20;
                 self.stat_lyc = value & 0x40 == 0x40;
             }
-            0xff42 => self.scy = value,
-            0xff43 => self.scx = value,
+            SCY_ADDR => self.scy = value,
+            SCX_ADDR => self.scx = value,
             0xff45 => self.lyc = value,
             0xff47 => {
                 if value == self.palettes[0] {

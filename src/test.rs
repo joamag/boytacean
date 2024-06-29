@@ -74,7 +74,10 @@ pub fn run_image_test(
 
 #[cfg(test)]
 mod tests {
-    use crate::consts::{DIV_ADDR, IF_ADDR, TAC_ADDR, TIMA_ADDR, TMA_ADDR};
+    use crate::consts::{
+        DIV_ADDR, IF_ADDR, LCDC_ADDR, LY_ADDR, SCX_ADDR, SCY_ADDR, STAT_ADDR, TAC_ADDR, TIMA_ADDR,
+        TMA_ADDR,
+    };
 
     use super::{run_serial_test, run_step_test, TestOptions};
 
@@ -100,6 +103,12 @@ mod tests {
         assert_eq!(result.mmu().read(TMA_ADDR), 0x00);
         assert_eq!(result.mmu().read(TAC_ADDR), 0xf8);
         assert_eq!(result.mmu().read(IF_ADDR), 0xe1);
+
+        assert_eq!(result.ppu().read(LCDC_ADDR), 0x91);
+        assert_eq!(result.ppu().read(STAT_ADDR), 0x81);
+        assert_eq!(result.ppu().read(SCY_ADDR), 0x00);
+        assert_eq!(result.ppu().read(SCX_ADDR), 0x00);
+        assert_eq!(result.ppu().read(LY_ADDR), 0x91);
     }
 
     #[test]
