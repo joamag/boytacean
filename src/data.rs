@@ -199,28 +199,18 @@ impl BootRom {
     }
 
     pub fn is_dmg(&self) -> bool {
-        match self {
-            BootRom::Dmg | BootRom::DmgBootix => true,
-            _ => false,
-        }
+        matches!(self, BootRom::Dmg | BootRom::DmgBootix)
     }
 
     pub fn is_cgb(&self) -> bool {
-        match self {
-            BootRom::Cgb => true,
-            _ => false,
-        }
+        matches!(self, BootRom::Cgb)
     }
 
     pub fn is_dmg_compat(&self) -> bool {
-        match self {
-            BootRom::Dmg
-            | BootRom::Sgb
-            | BootRom::DmgBootix
-            | BootRom::MgbBootix
-            | BootRom::Cgb => true,
-            _ => false,
-        }
+        matches!(
+            self,
+            BootRom::Dmg | BootRom::Sgb | BootRom::DmgBootix | BootRom::MgbBootix | BootRom::Cgb
+        )
     }
 }
 
