@@ -5,6 +5,7 @@ pub const DIV_ADDR: u16 = 0xff04;
 pub const TIMA_ADDR: u16 = 0xff05;
 pub const TMA_ADDR: u16 = 0xff06;
 pub const TAC_ADDR: u16 = 0xff07;
+pub const IF_ADDR: u16 = 0xff0f;
 
 // DMA registers
 pub const DMA_ADDR: u16 = 0xff46;

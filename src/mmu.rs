@@ -380,7 +380,8 @@ impl Mmu {
                             | if self.ppu.int_stat() { 0x02 } else { 0x00 }
                             | if self.timer.int_tima() { 0x04 } else { 0x00 }
                             | if self.serial.int_serial() { 0x08 } else { 0x00 }
-                            | if self.pad.int_pad() { 0x10 } else { 0x00 })
+                            | if self.pad.int_pad() { 0x10 } else { 0x00 }
+                            | 0xe0)
                     }
 
                     // 0xFF4C - KEY0: Compatibility flag (CGB only)
