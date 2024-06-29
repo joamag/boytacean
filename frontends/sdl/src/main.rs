@@ -320,7 +320,7 @@ impl Emulator {
 
     pub fn reset(&mut self) -> Result<(), Error> {
         self.system.reset();
-        self.system.load(true);
+        self.system.load(true)?;
         self.load_rom(None)?;
         Ok(())
     }
@@ -596,7 +596,7 @@ impl Emulator {
                             self.system.set_mode(mode);
                         }
                         self.system.reset();
-                        self.system.load(true);
+                        self.system.load(true).unwrap();
                         self.load_rom(Some(&filename)).unwrap();
                     }
                     _ => (),
@@ -1036,7 +1036,9 @@ fn main() {
     game_boy.set_dma_enabled(!args.no_dma);
     game_boy.set_timer_enabled(!args.no_timer);
     game_boy.attach_serial(device);
-    game_boy.load(!args.no_boot && args.boot_rom_path.is_empty());
+    game_boy
+        .load(!args.no_boot && args.boot_rom_path.is_empty())
+        .unwrap();
     if args.no_boot {
         game_boy.load_boot_state();
     }

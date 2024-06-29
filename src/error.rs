@@ -9,6 +9,7 @@ use std::fmt::{self, Display, Formatter};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Error {
     RomSize,
+    IncompatibleBootRom,
     CustomError(String),
 }
 
@@ -16,6 +17,7 @@ impl Error {
     pub fn description(&self) -> &str {
         match self {
             Error::RomSize => "Invalid ROM size",
+            Error::IncompatibleBootRom => "Incompatible Boot ROM",
             Error::CustomError(message) => message,
         }
     }

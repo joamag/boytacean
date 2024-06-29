@@ -401,7 +401,7 @@ pub unsafe extern "C" fn retro_load_game(game: *const RetroGameInfo) -> bool {
     let mode = rom.gb_mode();
     instance.set_mode(mode);
     instance.reset();
-    instance.load(true);
+    instance.load(true).unwrap();
     instance.load_cartridge(rom).unwrap();
     update_vars();
     true

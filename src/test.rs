@@ -1,4 +1,5 @@
 use crate::{
+    data::BootRom,
     devices::buffer::BufferDevice,
     error::Error,
     gb::{GameBoy, GameBoyMode},
@@ -12,6 +13,7 @@ pub struct TestOptions {
     pub apu_enabled: Option<bool>,
     pub dma_enabled: Option<bool>,
     pub timer_enabled: Option<bool>,
+    pub boot_rom: Option<BootRom>,
 }
 
 pub fn build_test(options: TestOptions) -> GameBoy {
@@ -22,7 +24,8 @@ pub fn build_test(options: TestOptions) -> GameBoy {
     game_boy.set_dma_enabled(options.dma_enabled.unwrap_or(true));
     game_boy.set_timer_enabled(options.timer_enabled.unwrap_or(true));
     game_boy.attach_serial(device);
-    game_boy.load(true);
+    game_boy.load(false).unwrap();
+    game_boy.load_boot_smart(options.boot_rom).unwrap();
     game_boy
 }
 
@@ -74,9 +77,12 @@ pub fn run_image_test(
 
 #[cfg(test)]
 mod tests {
-    use crate::consts::{
-        DIV_ADDR, IF_ADDR, LCDC_ADDR, LY_ADDR, SCX_ADDR, SCY_ADDR, STAT_ADDR, TAC_ADDR, TIMA_ADDR,
-        TMA_ADDR,
+    use crate::{
+        consts::{
+            DIV_ADDR, IF_ADDR, LCDC_ADDR, LY_ADDR, SCX_ADDR, SCY_ADDR, STAT_ADDR, TAC_ADDR,
+            TIMA_ADDR, TMA_ADDR,
+        },
+        data::BootRom,
     };
 
     use super::{run_serial_test, run_step_test, TestOptions};
@@ -86,7 +92,10 @@ mod tests {
         let mut result = run_step_test(
             "res/roms/test/blargg/cpu/cpu_instrs.gb",
             0x0100,
-            TestOptions::default(),
+            TestOptions {
+                boot_rom: Some(BootRom::Dmg),
+                ..TestOptions::default()
+            },
         )
         .unwrap();
 
@@ -98,7 +107,7 @@ mod tests {
         assert_eq!(result.cpu_i().hl(), 0x014d);
         assert!(!result.cpu_i().ime());
 
-        assert_eq!(result.mmu().read(DIV_ADDR), 0xab);
+        assert_eq!(result.mmu().read(DIV_ADDR), 0xcf);
         assert_eq!(result.mmu().read(TIMA_ADDR), 0x00);
         assert_eq!(result.mmu().read(TMA_ADDR), 0x00);
         assert_eq!(result.mmu().read(TAC_ADDR), 0xf8);
@@ -108,7 +117,7 @@ mod tests {
         assert_eq!(result.ppu().read(STAT_ADDR), 0x81);
         assert_eq!(result.ppu().read(SCY_ADDR), 0x00);
         assert_eq!(result.ppu().read(SCX_ADDR), 0x00);
-        assert_eq!(result.ppu().read(LY_ADDR), 0x91);
+        assert_eq!(result.ppu().read(LY_ADDR), 0x99);
     }
 
     #[test]

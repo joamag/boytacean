@@ -1,15 +1,7 @@
+use std::fmt::{self, Display, Formatter};
+
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
-
-#[cfg_attr(feature = "wasm", wasm_bindgen)]
-pub enum BootRom {
-    Dmg,
-    Sgb,
-    DmgBootix,
-    MgbBootix,
-    Cgb,
-    None,
-}
 
 pub const DMG_BOOT: [u8; 256] = [
     49, 254, 255, 175, 33, 255, 159, 50, 203, 124, 32, 251, 33, 38, 255, 14, 17, 62, 128, 50, 226,
@@ -173,3 +165,67 @@ pub const CGB_BOOT: [u8; 2304] = [
     31, 0, 255, 3, 64, 65, 66, 32, 33, 34, 128, 129, 130, 16, 17, 18, 18, 176, 121, 184, 173, 22,
     23, 7, 186, 5, 124, 19, 0, 0, 0, 0,
 ];
+
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum BootRom {
+    Dmg,
+    Sgb,
+    DmgBootix,
+    MgbBootix,
+    Cgb,
+    Other,
+    None,
+}
+
+impl BootRom {
+    pub fn description(&self) -> &'static str {
+        match self {
+            BootRom::Dmg => "DMG",
+            BootRom::Sgb => "SGB",
+            BootRom::DmgBootix => "DMG Bootix",
+            BootRom::MgbBootix => "MGB Bootix",
+            BootRom::Cgb => "CGB",
+            BootRom::Other => "Other",
+            BootRom::None => "None",
+        }
+    }
+
+    pub fn normalize(&self) -> Option<BootRom> {
+        match self {
+            BootRom::None => None,
+            _ => Some(*self),
+        }
+    }
+
+    pub fn is_dmg(&self) -> bool {
+        match self {
+            BootRom::Dmg | BootRom::DmgBootix => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_cgb(&self) -> bool {
+        match self {
+            BootRom::Cgb => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_dmg_compat(&self) -> bool {
+        match self {
+            BootRom::Dmg
+            | BootRom::Sgb
+            | BootRom::DmgBootix
+            | BootRom::MgbBootix
+            | BootRom::Cgb => true,
+            _ => false,
+        }
+    }
+}
+
+impl Display for BootRom {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.description())
+    }
+}

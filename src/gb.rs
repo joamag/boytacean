@@ -377,6 +377,16 @@ pub struct GameBoy {
     /// kept for performance reasons.
     clock_freq: u32,
 
+    /// The boot ROM that will (or was) used to boot the
+    /// current Game Boy system.
+    ///
+    /// This should be explicitly set by the developed when
+    /// set the boot ROM in the system's memory.
+    ///
+    /// The loading process used to load the boot ROM is not
+    /// taken in consideration for this value.
+    boot_rom: BootRom,
+
     /// Reference to the Game Boy CPU component to be
     /// used as the main element of the system, when
     /// clocked, the amount of ticks from it will be
@@ -421,6 +431,7 @@ impl GameBoy {
 
         Self {
             mode,
+            boot_rom: BootRom::None,
             ppu_enabled: true,
             apu_enabled: true,
             dma_enabled: true,
@@ -449,7 +460,7 @@ impl GameBoy {
     pub fn reload(&mut self) {
         let rom = self.rom().clone();
         self.reset();
-        self.load(true);
+        self.load(true).unwrap();
         self.load_cartridge(rom).unwrap();
     }
 
@@ -643,26 +654,30 @@ impl GameBoy {
         self.load_boot_state();
     }
 
-    pub fn load(&mut self, boot: bool) {
+    pub fn load(&mut self, boot: bool) -> Result<(), Error> {
+        let boot_rom = self.boot_rom().normalize();
         match self.mode() {
-            GameBoyMode::Dmg => self.load_dmg(boot),
-            GameBoyMode::Cgb => self.load_cgb(boot),
+            GameBoyMode::Dmg => self.load_dmg(boot, boot_rom)?,
+            GameBoyMode::Cgb => self.load_cgb(boot, boot_rom)?,
             GameBoyMode::Sgb => unimplemented!(),
         }
+        Ok(())
     }
 
-    pub fn load_dmg(&mut self, boot: bool) {
+    pub fn load_dmg(&mut self, boot: bool, boot_rom: Option<BootRom>) -> Result<(), Error> {
         self.mmu().allocate_dmg();
         if boot {
-            self.load_boot_dmg();
+            self.load_boot_dmg(boot_rom)?;
         }
+        Ok(())
     }
 
-    pub fn load_cgb(&mut self, boot: bool) {
+    pub fn load_cgb(&mut self, boot: bool, boot_rom: Option<BootRom>) -> Result<(), Error> {
         self.mmu().allocate_cgb();
         if boot {
-            self.load_boot_cgb();
+            self.load_boot_cgb(boot_rom)?;
         }
+        Ok(())
     }
 
     pub fn load_boot(&mut self, data: &[u8]) {
@@ -676,20 +691,42 @@ impl GameBoy {
             BootRom::DmgBootix => self.load_boot(&DMG_BOOTIX),
             BootRom::MgbBootix => self.load_boot(&MGB_BOOTIX),
             BootRom::Cgb => self.load_boot(&CGB_BOOT),
-            BootRom::None => (),
+            BootRom::Other | BootRom::None => (),
         }
+        self.boot_rom = boot_rom;
     }
 
-    pub fn load_boot_default(&mut self) {
-        self.load_boot_dmg();
+    pub fn load_boot_default(&mut self, boot_rom: Option<BootRom>) -> Result<(), Error> {
+        self.load_boot_dmg(boot_rom)
     }
 
-    pub fn load_boot_dmg(&mut self) {
-        self.load_boot_static(BootRom::DmgBootix);
+    pub fn load_boot_smart(&mut self, boot_rom: Option<BootRom>) -> Result<(), Error> {
+        match self.mode() {
+            GameBoyMode::Dmg => self.load_boot_dmg(boot_rom)?,
+            GameBoyMode::Cgb => self.load_boot_cgb(boot_rom)?,
+            GameBoyMode::Sgb => unimplemented!(),
+        }
+        Ok(())
     }
 
-    pub fn load_boot_cgb(&mut self) {
-        self.load_boot_static(BootRom::Cgb);
+    pub fn load_boot_dmg(&mut self, boot_rom: Option<BootRom>) -> Result<(), Error> {
+        if let Some(boot_rom) = boot_rom {
+            if !boot_rom.is_dmg_compat() {
+                return Err(Error::IncompatibleBootRom);
+            }
+        }
+        self.load_boot_static(boot_rom.unwrap_or(BootRom::DmgBootix));
+        Ok(())
+    }
+
+    pub fn load_boot_cgb(&mut self, boot_rom: Option<BootRom>) -> Result<(), Error> {
+        if let Some(boot_rom) = boot_rom {
+            if !boot_rom.is_cgb() {
+                return Err(Error::IncompatibleBootRom);
+            }
+        }
+        self.load_boot_static(boot_rom.unwrap_or(BootRom::Cgb));
+        Ok(())
     }
 
     /// Loads the boot machine state and sets the Program Counter
@@ -941,6 +978,10 @@ impl GameBoy {
         format!("{:.02} Mhz", self.clock_freq() as f32 / 1000.0 / 1000.0)
     }
 
+    pub fn boot_rom(&self) -> BootRom {
+        self.boot_rom
+    }
+
     pub fn attach_null_serial(&mut self) {
         self.attach_serial(Box::<NullDevice>::default());
     }
@@ -980,16 +1021,19 @@ impl GameBoy {
     pub fn description(&self, column_length: usize) -> String {
         let version_l = format!("{:width$}", "Version", width = column_length);
         let mode_l = format!("{:width$}", "Mode", width = column_length);
+        let boot_rom_l = format!("{:width$}", "Boot ROM", width = column_length);
         let clock_l = format!("{:width$}", "Clock", width = column_length);
         let ram_size_l = format!("{:width$}", "RAM Size", width = column_length);
         let vram_size_l = format!("{:width$}", "VRAM Size", width = column_length);
         let serial_l = format!("{:width$}", "Serial", width = column_length);
         format!(
-            "{}  {}\n{}  {}\n{}  {}\n{}  {}\n{}  {}\n{}  {}",
+            "{}  {}\n{}  {}\n{}  {}\n{}  {}\n{}  {}\n{}  {}\n{}  {}",
             version_l,
             Info::version(),
             mode_l,
             self.mode(),
+            boot_rom_l,
+            self.boot_rom(),
             clock_l,
             self.clock_freq_s(),
             ram_size_l,
@@ -1146,8 +1190,9 @@ impl GameBoy {
             BootRom::DmgBootix => self.load_boot_path("./res/boot/dmg_bootix.bin")?,
             BootRom::MgbBootix => self.load_boot_path("./res/boot/mgb_bootix.bin")?,
             BootRom::Cgb => self.load_boot_path("./res/boot/cgb_boot.bin")?,
-            BootRom::None => (),
+            BootRom::Other | BootRom::None => (),
         }
+        self.boot_rom = boot_rom;
         Ok(())
     }
 
