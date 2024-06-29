@@ -913,6 +913,10 @@ impl GameBoy {
         self.boot_rom
     }
 
+    pub fn set_boot_rom(&mut self, value: BootRom) {
+        self.boot_rom = value;
+    }
+
     pub fn attach_null_serial(&mut self) {
         self.attach_serial(Box::<NullDevice>::default());
     }
