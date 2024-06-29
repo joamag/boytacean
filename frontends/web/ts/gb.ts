@@ -351,7 +351,7 @@ export class GameboyEmulator extends EmulatorLogic implements Emulator {
         // resets the Game Boy engine to restore it into
         // a valid state ready to be used
         this.gameBoy.reset();
-        this.gameBoy.load(true);
+        this.gameBoy.load_unsafe(true);
 
         // loads the ROM file into the system and retrieves
         // the cartridge instance associated with it

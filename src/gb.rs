@@ -654,79 +654,10 @@ impl GameBoy {
         self.load_boot_state();
     }
 
-    pub fn load(&mut self, boot: bool) -> Result<(), Error> {
-        let boot_rom = self.boot_rom().normalize();
-        match self.mode() {
-            GameBoyMode::Dmg => self.load_dmg(boot, boot_rom)?,
-            GameBoyMode::Cgb => self.load_cgb(boot, boot_rom)?,
-            GameBoyMode::Sgb => unimplemented!(),
-        }
-        Ok(())
-    }
-
-    pub fn load_dmg(&mut self, boot: bool, boot_rom: Option<BootRom>) -> Result<(), Error> {
-        self.mmu().allocate_dmg();
-        if boot {
-            self.load_boot_dmg(boot_rom)?;
-        }
-        Ok(())
-    }
-
-    pub fn load_cgb(&mut self, boot: bool, boot_rom: Option<BootRom>) -> Result<(), Error> {
-        self.mmu().allocate_cgb();
-        if boot {
-            self.load_boot_cgb(boot_rom)?;
-        }
-        Ok(())
-    }
-
-    pub fn load_boot(&mut self, data: &[u8]) {
-        self.cpu.mmu().write_boot(0x0000, data);
-    }
-
-    pub fn load_boot_static(&mut self, boot_rom: BootRom) {
-        match boot_rom {
-            BootRom::Dmg => self.load_boot(&DMG_BOOT),
-            BootRom::Sgb => self.load_boot(&SGB_BOOT),
-            BootRom::DmgBootix => self.load_boot(&DMG_BOOTIX),
-            BootRom::MgbBootix => self.load_boot(&MGB_BOOTIX),
-            BootRom::Cgb => self.load_boot(&CGB_BOOT),
-            BootRom::Other | BootRom::None => (),
-        }
-        self.boot_rom = boot_rom;
-    }
-
-    pub fn load_boot_default(&mut self, boot_rom: Option<BootRom>) -> Result<(), Error> {
-        self.load_boot_dmg(boot_rom)
-    }
-
-    pub fn load_boot_smart(&mut self, boot_rom: Option<BootRom>) -> Result<(), Error> {
-        match self.mode() {
-            GameBoyMode::Dmg => self.load_boot_dmg(boot_rom)?,
-            GameBoyMode::Cgb => self.load_boot_cgb(boot_rom)?,
-            GameBoyMode::Sgb => unimplemented!(),
-        }
-        Ok(())
-    }
-
-    pub fn load_boot_dmg(&mut self, boot_rom: Option<BootRom>) -> Result<(), Error> {
-        if let Some(boot_rom) = boot_rom {
-            if !boot_rom.is_dmg_compat() {
-                return Err(Error::IncompatibleBootRom);
-            }
-        }
-        self.load_boot_static(boot_rom.unwrap_or(BootRom::DmgBootix));
-        Ok(())
-    }
-
-    pub fn load_boot_cgb(&mut self, boot_rom: Option<BootRom>) -> Result<(), Error> {
-        if let Some(boot_rom) = boot_rom {
-            if !boot_rom.is_cgb() {
-                return Err(Error::IncompatibleBootRom);
-            }
-        }
-        self.load_boot_static(boot_rom.unwrap_or(BootRom::Cgb));
-        Ok(())
+    /// Unsafe load strategy that will panic the current system
+    /// in case there are boot ROM loading issues.
+    pub fn load_unsafe(&mut self, boot: bool) {
+        self.load(boot).unwrap();
     }
 
     /// Loads the boot machine state and sets the Program Counter
@@ -1177,10 +1108,52 @@ impl GameBoy {
         self.mmu_i().rom_i()
     }
 
+    pub fn load(&mut self, boot: bool) -> Result<(), Error> {
+        let boot_rom = self.boot_rom().normalize();
+        match self.mode() {
+            GameBoyMode::Dmg => self.load_dmg(boot, boot_rom)?,
+            GameBoyMode::Cgb => self.load_cgb(boot, boot_rom)?,
+            GameBoyMode::Sgb => unimplemented!(),
+        }
+        Ok(())
+    }
+
+    pub fn load_dmg(&mut self, boot: bool, boot_rom: Option<BootRom>) -> Result<(), Error> {
+        self.mmu().allocate_dmg();
+        if boot {
+            self.load_boot_dmg(boot_rom)?;
+        }
+        Ok(())
+    }
+
+    pub fn load_cgb(&mut self, boot: bool, boot_rom: Option<BootRom>) -> Result<(), Error> {
+        self.mmu().allocate_cgb();
+        if boot {
+            self.load_boot_cgb(boot_rom)?;
+        }
+        Ok(())
+    }
+
+    pub fn load_boot(&mut self, data: &[u8]) {
+        self.cpu.mmu().write_boot(0x0000, data);
+    }
+
     pub fn load_boot_path(&mut self, path: &str) -> Result<(), Error> {
         let data = read_file(path)?;
         self.load_boot(&data);
         Ok(())
+    }
+
+    pub fn load_boot_static(&mut self, boot_rom: BootRom) {
+        match boot_rom {
+            BootRom::Dmg => self.load_boot(&DMG_BOOT),
+            BootRom::Sgb => self.load_boot(&SGB_BOOT),
+            BootRom::DmgBootix => self.load_boot(&DMG_BOOTIX),
+            BootRom::MgbBootix => self.load_boot(&MGB_BOOTIX),
+            BootRom::Cgb => self.load_boot(&CGB_BOOT),
+            BootRom::Other | BootRom::None => (),
+        }
+        self.boot_rom = boot_rom;
     }
 
     pub fn load_boot_file(&mut self, boot_rom: BootRom) -> Result<(), Error> {
@@ -1196,18 +1169,66 @@ impl GameBoy {
         Ok(())
     }
 
-    pub fn load_boot_default_f(&mut self) -> Result<(), Error> {
-        self.load_boot_dmg_f()?;
+    pub fn load_boot_default(&mut self, boot_rom: Option<BootRom>) -> Result<(), Error> {
+        self.load_boot_dmg(boot_rom)
+    }
+
+    pub fn load_boot_smart(&mut self, boot_rom: Option<BootRom>) -> Result<(), Error> {
+        match self.mode() {
+            GameBoyMode::Dmg => self.load_boot_dmg(boot_rom)?,
+            GameBoyMode::Cgb => self.load_boot_cgb(boot_rom)?,
+            GameBoyMode::Sgb => unimplemented!(),
+        }
         Ok(())
     }
 
-    pub fn load_boot_dmg_f(&mut self) -> Result<(), Error> {
-        self.load_boot_file(BootRom::DmgBootix)?;
+    pub fn load_boot_dmg(&mut self, boot_rom: Option<BootRom>) -> Result<(), Error> {
+        let boot_rom = boot_rom.unwrap_or(BootRom::DmgBootix);
+        if !boot_rom.is_cgb() {
+            return Err(Error::IncompatibleBootRom);
+        }
+        self.load_boot_static(boot_rom);
         Ok(())
     }
 
-    pub fn load_boot_cgb_f(&mut self) -> Result<(), Error> {
-        self.load_boot_file(BootRom::Cgb)?;
+    pub fn load_boot_cgb(&mut self, boot_rom: Option<BootRom>) -> Result<(), Error> {
+        let boot_rom = boot_rom.unwrap_or(BootRom::Cgb);
+        if !boot_rom.is_cgb() {
+            return Err(Error::IncompatibleBootRom);
+        }
+        self.load_boot_static(boot_rom);
+        Ok(())
+    }
+
+    pub fn load_boot_default_f(&mut self, boot_rom: Option<BootRom>) -> Result<(), Error> {
+        self.load_boot_dmg_f(boot_rom)?;
+        Ok(())
+    }
+
+    pub fn load_boot_smart_f(&mut self, boot_rom: Option<BootRom>) -> Result<(), Error> {
+        match self.mode() {
+            GameBoyMode::Dmg => self.load_boot_dmg_f(boot_rom)?,
+            GameBoyMode::Cgb => self.load_boot_cgb_f(boot_rom)?,
+            GameBoyMode::Sgb => unimplemented!(),
+        }
+        Ok(())
+    }
+
+    pub fn load_boot_dmg_f(&mut self, boot_rom: Option<BootRom>) -> Result<(), Error> {
+        let boot_rom = boot_rom.unwrap_or(BootRom::DmgBootix);
+        if !boot_rom.is_cgb() {
+            return Err(Error::IncompatibleBootRom);
+        }
+        self.load_boot_file(boot_rom)?;
+        Ok(())
+    }
+
+    pub fn load_boot_cgb_f(&mut self, boot_rom: Option<BootRom>) -> Result<(), Error> {
+        let boot_rom = boot_rom.unwrap_or(BootRom::Cgb);
+        if !boot_rom.is_cgb() {
+            return Err(Error::IncompatibleBootRom);
+        }
+        self.load_boot_file(boot_rom)?;
         Ok(())
     }
 
