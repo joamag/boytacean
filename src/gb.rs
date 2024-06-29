@@ -1197,7 +1197,7 @@ impl GameBoy {
 
     pub fn load_boot_cgb(&mut self, boot_rom: Option<BootRom>) -> Result<(), Error> {
         let boot_rom = boot_rom.unwrap_or(BootRom::Cgb);
-        if !boot_rom.is_cgb() {
+        if !boot_rom.is_cgb_compat() {
             return Err(Error::IncompatibleBootRom);
         }
         self.load_boot_static(boot_rom);
@@ -1229,7 +1229,7 @@ impl GameBoy {
 
     pub fn load_boot_cgb_f(&mut self, boot_rom: Option<BootRom>) -> Result<(), Error> {
         let boot_rom = boot_rom.unwrap_or(BootRom::Cgb);
-        if !boot_rom.is_cgb() {
+        if !boot_rom.is_cgb_compat() {
             return Err(Error::IncompatibleBootRom);
         }
         self.load_boot_file(boot_rom)?;

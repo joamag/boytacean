@@ -209,8 +209,17 @@ impl BootRom {
     pub fn is_dmg_compat(&self) -> bool {
         matches!(
             self,
-            BootRom::Dmg | BootRom::Sgb | BootRom::DmgBootix | BootRom::MgbBootix | BootRom::Cgb
+            BootRom::Dmg
+                | BootRom::Sgb
+                | BootRom::DmgBootix
+                | BootRom::MgbBootix
+                | BootRom::Cgb
+                | BootRom::Other
         )
+    }
+
+    pub fn is_cgb_compat(&self) -> bool {
+        matches!(self, BootRom::Cgb | BootRom::Other)
     }
 }
 
