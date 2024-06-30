@@ -94,7 +94,7 @@ mod tests {
             0x0100,
             TestOptions {
                 boot_rom: Some(BootRom::Dmg),
-                ..TestOptions::default()
+                ..Default::default()
             },
         )
         .unwrap();
