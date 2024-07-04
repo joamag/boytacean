@@ -13,6 +13,7 @@ pub const STAT_ADDR: u16 = 0xff41;
 pub const SCY_ADDR: u16 = 0xff42;
 pub const SCX_ADDR: u16 = 0xff43;
 pub const LY_ADDR: u16 = 0xff44;
+pub const LYC_ADDR: u16 = 0xff45;
 
 // DMA registers
 pub const DMA_ADDR: u16 = 0xff46;

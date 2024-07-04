@@ -15,7 +15,7 @@ use crate::{
         rgb888_to_rgb565_u16, Pixel, PixelAlpha, RGB1555_SIZE, RGB565_SIZE, RGB888_SIZE, RGB_SIZE,
         XRGB8888_SIZE,
     },
-    consts::{LCDC_ADDR, LY_ADDR, SCX_ADDR, SCY_ADDR, STAT_ADDR},
+    consts::{LCDC_ADDR, LYC_ADDR, LY_ADDR, SCX_ADDR, SCY_ADDR, STAT_ADDR},
     gb::{GameBoyConfig, GameBoyMode},
     mmu::BusComponent,
     util::SharedThread,
@@ -807,7 +807,8 @@ impl Ppu {
             SCY_ADDR => self.scy,
             SCX_ADDR => self.scx,
             LY_ADDR => self.ly,
-            0xff45 => self.lyc,
+            // 0xFF45 — LYC: LY compare
+            LYC_ADDR => self.lyc,
             0xff47 => self.palettes[0],
             0xff48 => self.palettes[1],
             0xff49 => self.palettes[2],
@@ -889,7 +890,8 @@ impl Ppu {
             }
             SCY_ADDR => self.scy = value,
             SCX_ADDR => self.scx = value,
-            0xff45 => self.lyc = value,
+            // 0xFF45 — LYC: LY compare
+            LYC_ADDR => self.lyc = value,
             0xff47 => {
                 if value == self.palettes[0] {
                     return;
