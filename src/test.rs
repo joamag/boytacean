@@ -79,8 +79,8 @@ pub fn run_image_test(
 mod tests {
     use crate::{
         consts::{
-            BGP_ADDR, DIV_ADDR, DMA_ADDR, IF_ADDR, LCDC_ADDR, LYC_ADDR, LY_ADDR, SCX_ADDR,
-            SCY_ADDR, STAT_ADDR, TAC_ADDR, TIMA_ADDR, TMA_ADDR,
+            BGP_ADDR, DIV_ADDR, DMA_ADDR, IF_ADDR, LCDC_ADDR, LYC_ADDR, LY_ADDR, OBP0_ADDR,
+            OBP1_ADDR, SCX_ADDR, SCY_ADDR, STAT_ADDR, TAC_ADDR, TIMA_ADDR, TMA_ADDR,
         },
         data::BootRom,
     };
@@ -120,6 +120,8 @@ mod tests {
         assert_eq!(result.ppu().read(LY_ADDR), 0x99);
         assert_eq!(result.ppu().read(LYC_ADDR), 0x00);
         assert_eq!(result.ppu().read(BGP_ADDR), 0xfc);
+        assert_eq!(result.ppu().read(OBP0_ADDR), 0x00);
+        assert_eq!(result.ppu().read(OBP1_ADDR), 0x00);
 
         assert_eq!(result.ppu().read(DMA_ADDR), 0xff);
     }

@@ -15,6 +15,8 @@ pub const SCX_ADDR: u16 = 0xff43;
 pub const LY_ADDR: u16 = 0xff44;
 pub const LYC_ADDR: u16 = 0xff45;
 pub const BGP_ADDR: u16 = 0xff47;
+pub const OBP0_ADDR: u16 = 0xff48;
+pub const OBP1_ADDR: u16 = 0xff49;
 
 // DMA registers
 pub const DMA_ADDR: u16 = 0xff46;

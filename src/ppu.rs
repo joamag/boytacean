@@ -15,7 +15,9 @@ use crate::{
         rgb888_to_rgb565_u16, Pixel, PixelAlpha, RGB1555_SIZE, RGB565_SIZE, RGB888_SIZE, RGB_SIZE,
         XRGB8888_SIZE,
     },
-    consts::{BGP_ADDR, LCDC_ADDR, LYC_ADDR, LY_ADDR, SCX_ADDR, SCY_ADDR, STAT_ADDR},
+    consts::{
+        BGP_ADDR, LCDC_ADDR, LYC_ADDR, LY_ADDR, OBP0_ADDR, OBP1_ADDR, SCX_ADDR, SCY_ADDR, STAT_ADDR,
+    },
     gb::{GameBoyConfig, GameBoyMode},
     mmu::BusComponent,
     util::SharedThread,
@@ -809,10 +811,12 @@ impl Ppu {
             LY_ADDR => self.ly,
             // 0xFF45 — LYC
             LYC_ADDR => self.lyc,
-            // 0xFF47 — BGP: BG palette data (Non-CGB Mode only)
+            // 0xFF47 — BGP (Non-CGB Mode only)
             BGP_ADDR => self.palettes[0],
-            0xff48 => self.palettes[1],
-            0xff49 => self.palettes[2],
+            // 0xFF48 — OBP0 (Non-CGB Mode only)
+            OBP0_ADDR => self.palettes[1],
+            // 0xFF49 — OBP1 (Non-CGB Mode only)
+            OBP1_ADDR => self.palettes[2],
             0xff4a => self.wy,
             0xff4b => self.wx,
             // 0xFF4F — VBK (CGB only)
@@ -893,7 +897,7 @@ impl Ppu {
             SCX_ADDR => self.scx = value,
             // 0xFF45 — LYC: LY compare
             LYC_ADDR => self.lyc = value,
-            // 0xFF47 — BGP: BG palette data (Non-CGB Mode only)
+            // 0xFF47 — BGP (Non-CGB Mode only)
             BGP_ADDR => {
                 if value == self.palettes[0] {
                     return;
@@ -905,7 +909,8 @@ impl Ppu {
                 }
                 self.palettes[0] = value;
             }
-            0xff48 => {
+            // 0xFF48 — OBP0 (Non-CGB Mode only)
+            OBP0_ADDR => {
                 if value == self.palettes[1] {
                     return;
                 }
@@ -920,7 +925,8 @@ impl Ppu {
                 }
                 self.palettes[1] = value;
             }
-            0xff49 => {
+            // 0xFF49 — OBP0 (Non-CGB Mode only)
+            OBP1_ADDR => {
                 if value == self.palettes[2] {
                     return;
                 }
