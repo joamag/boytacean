@@ -16,7 +16,8 @@ use crate::{
         XRGB8888_SIZE,
     },
     consts::{
-        BGP_ADDR, LCDC_ADDR, LYC_ADDR, LY_ADDR, OBP0_ADDR, OBP1_ADDR, SCX_ADDR, SCY_ADDR, STAT_ADDR,
+        BGP_ADDR, LCDC_ADDR, LYC_ADDR, LY_ADDR, OBP0_ADDR, OBP1_ADDR, SCX_ADDR, SCY_ADDR,
+        STAT_ADDR, WX_ADDR, WY_ADDR,
     },
     gb::{GameBoyConfig, GameBoyMode},
     mmu::BusComponent,
@@ -817,8 +818,10 @@ impl Ppu {
             OBP0_ADDR => self.palettes[1],
             // 0xFF49 — OBP1 (Non-CGB Mode only)
             OBP1_ADDR => self.palettes[2],
-            0xff4a => self.wy,
-            0xff4b => self.wx,
+            // 0xFF4A — WX
+            WX_ADDR => self.wy,
+            // 0xFF4B — WY
+            WY_ADDR => self.wx,
             // 0xFF4F — VBK (CGB only)
             0xff4f => self.vram_bank | 0xfe,
             // 0xFF68 — BCPS/BGPI (CGB only)
@@ -941,8 +944,10 @@ impl Ppu {
                 }
                 self.palettes[2] = value;
             }
-            0xff4a => self.wy = value,
-            0xff4b => self.wx = value,
+            // 0xFF4A — WX
+            WX_ADDR => self.wy = value,
+            // 0xFF4B — WY
+            WY_ADDR => self.wx = value,
             // 0xFF4F — VBK (CGB only)
             0xff4f => {
                 self.vram_bank = value & 0x01;
