@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * Support for SIMD based color space conversion - [#45](https://gitlab.stage.hive.pt/joamag/boytacean/-/issues/45)
 * Support for `window.requestAnimationFrame()` and game loop inversion of control - [#26](https://gitlab.stage.hive.pt/joamag/boytacean/-/issues/26)
+* Custom Boot ROM support for CGB - [#34](https://gitlab.stage.hive.pt/joamag/boytacean/-/issues/34)
 
 ### Changed
 
