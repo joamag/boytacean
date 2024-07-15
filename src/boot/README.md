@@ -1,6 +1,6 @@
-# Boytacean Boot ROM files
+# Boytacean Boot ROMs
 
-These files have been forked from the [SameBoy](https://github.com/LIJI32/SameBoy) boot Roms.
+The source code for the Boot ROMs has been forked from the [SameBoy](https://github.com/LIJI32/SameBoy) boot Roms with some slight changes to adequate to the specific requirements of Boytacean.
 
 Special thanks to the original creators and maintainers of [SameBoy](https://github.com/LIJI32/SameBoy) for their work and contributions to the open source community. Their work has been invaluable to the development of the Boytacean project.
 
