@@ -450,12 +450,16 @@ export class GameboyEmulator extends EmulatorLogic implements Emulator {
                 Feature.Keyboard,
                 Feature.KeyboardGB,
                 Feature.Framerate,
-                Feature.BootRomInfo,
-                Feature.RomTypeInfo,
                 Feature.SaveState
             ],
             ...(this.extraSettings?.debug ?? false
-                ? [Feature.Cyclerate, Feature.EmulationSpeed]
+                ? [
+                      Feature.LoopMode,
+                      Feature.BootRomInfo,
+                      Feature.RomTypeInfo,
+                      Feature.Cyclerate,
+                      Feature.EmulationSpeed
+                  ]
                 : [])
         ];
     }
