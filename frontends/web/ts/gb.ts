@@ -455,6 +455,7 @@ export class GameboyEmulator extends EmulatorLogic implements Emulator {
             ...(this.extraSettings?.debug ?? false
                 ? [
                       Feature.LoopMode,
+                      Feature.DisplayFrequency,
                       Feature.BootRomInfo,
                       Feature.RomTypeInfo,
                       Feature.Cyclerate,
@@ -590,6 +591,16 @@ export class GameboyEmulator extends EmulatorLogic implements Emulator {
         this.logicFrequency = value;
         this.gameBoy?.set_clock_freq(value);
         this.trigger("frequency", value);
+    }
+
+    get displayFrequency(): number {
+        return this.visualFrequency;
+    }
+
+    set displayFrequency(value: number) {
+        value = Math.max(value, 0);
+        this.visualFrequency = value;
+        this.trigger("display-frequency", value);
     }
 
     get frequencySpecs(): FrequencySpecs {
