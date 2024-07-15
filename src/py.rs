@@ -84,6 +84,10 @@ impl GameBoy {
         self.system.clocks(count)
     }
 
+    pub fn clocks_cycles(&mut self, limit: usize) -> u64 {
+        self.system.clocks_cycles(limit)
+    }
+
     pub fn next_frame(&mut self) -> u32 {
         self.system.next_frame()
     }
@@ -160,6 +164,10 @@ impl GameBoy {
 
     pub fn clock_freq_s(&self) -> String {
         self.system.clock_freq_s()
+    }
+
+    pub fn boot_rom_s(&self) -> String {
+        self.system.boot_rom_s()
     }
 
     pub fn timer_div(&self) -> u8 {

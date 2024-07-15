@@ -69,10 +69,11 @@ class GameBoy:
 # Boytacean
 This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built using the [Rust Programming Language](https://www.rust-lang.org) and is running inside this browser with the help of [WebAssembly](https://webassembly.org).
 
-| Field   | Value               |
-| ------- | ------------------- |
-| Version | {self.version}      |
-| Clock   | {self.clock_freq_s} |
+| Field      | Value               |
+| ---------- | ------------------- |
+| Version    | {self.version}      |
+| Boot ROM   | {self.boot_rom_s}   |
+| Clock      | {self.clock_freq_s} |
 """
 
     def boot(self):
@@ -110,6 +111,9 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
 
     def clocks(self, count: int) -> int:
         return self._system.clocks(count)
+
+    def clocks_cycles(self, limit: int) -> int:
+        return self._system.clocks_cycles(limit)
 
     def next_frame(self) -> int:
         cycles = self._system.next_frame()
@@ -225,6 +229,10 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
     @property
     def clock_freq_s(self) -> str:
         return self._system.clock_freq_s()
+
+    @property
+    def boot_rom_s(self) -> str:
+        return self._system.boot_rom_s()
 
     @property
     def timer_div(self) -> int:
