@@ -444,6 +444,7 @@ export class GameboyEmulator extends EmulatorLogic implements Emulator {
             Feature.Benchmark,
             Feature.Keyboard,
             Feature.KeyboardGB,
+            Feature.BootRomInfo,
             Feature.RomTypeInfo,
             Feature.SaveState
         ];
@@ -558,6 +559,7 @@ export class GameboyEmulator extends EmulatorLogic implements Emulator {
             data: this.romData ?? undefined,
             size: this.romSize,
             extra: {
+                bootRom: this.gameBoy?.boot_rom_s(),
                 romType: this.cartridge?.rom_type_s(),
                 romSize: this.cartridge?.rom_size_s(),
                 ramSize: this.cartridge?.ram_size_s()

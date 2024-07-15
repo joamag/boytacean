@@ -32,12 +32,12 @@ impl GameBoy {
         self.system.boot();
     }
 
-    pub fn load(&mut self, boot: bool) {
-        self.system.load(boot);
+    pub fn load(&mut self, boot: bool) -> PyResult<()> {
+        self.system.load(boot).map_err(PyErr::new::<PyException, _>)
     }
 
     pub fn load_boot(&mut self, data: &[u8]) {
-        self.system.load_boot(data)
+        self.system.load_boot(data);
     }
 
     pub fn load_boot_path(&mut self, path: &str) -> PyResult<()> {

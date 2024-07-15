@@ -39,11 +39,11 @@ impl MbcType {
         match self {
             MbcType::NoMbc => 0x00,
             MbcType::Mbc1 => 0x03,
-            MbcType::Mbc2 => unimplemented!(),
+            MbcType::Mbc2 => unimplemented!("MBC2 is not supported"),
             MbcType::Mbc3 => 0x03,
             MbcType::Mbc5 => 0x0f,
-            MbcType::Mbc6 => unimplemented!(),
-            MbcType::Mbc7 => unimplemented!(),
+            MbcType::Mbc6 => unimplemented!("MBC6 is not supported"),
+            MbcType::Mbc7 => unimplemented!("MBC7 is not supported"),
             MbcType::Unknown => unimplemented!(),
         }
     }

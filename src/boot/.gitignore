@@ -1,0 +1,6 @@
+*.lre
+*.2bpp
+*.pb12
+*.tilemap
+
+/bin

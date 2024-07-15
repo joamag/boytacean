@@ -1,6 +1,18 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
+"""
+Simple script to dump the binary contents of a file in different formats.
+Useful to statically include the binary content of a file in a Rust file
+to ship its contents as part of the binary.
+
+Usage:
+    python boot_dump.py <filename> [mode]
+
+    filename: the file to dump
+    mode: the output format (buffer, hex, hexbytes, bytes)
+"""
+
 import sys
 import binascii
 
@@ -13,15 +25,14 @@ def print_buffer(filename, mode="buffer"):
         file.close()
 
     if mode == "buffer":
-        buffer = [str(ord(byte)) for byte in data]
+        buffer = [str(_ord(byte)) for byte in data]
         buffer_s = ", ".join(buffer)
-
         print("[%s]" % buffer_s)
 
     elif mode == "hex":
         counter = 0
         for byte in data:
-            print("[0x%04x] 0x%02x" % (counter, ord(byte)))
+            print("[0x%04x] 0x%02x" % (counter, _ord(byte)))
             counter += 1
 
     elif mode == "hexbytes":
@@ -33,6 +44,10 @@ def print_buffer(filename, mode="buffer"):
 
     elif mode == "bytes":
         print(repr(data))
+
+
+def _ord(byte):
+    return byte if isinstance(byte, int) else ord(byte)
 
 
 if __name__ == "__main__":

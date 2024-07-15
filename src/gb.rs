@@ -13,7 +13,7 @@ use crate::{
         shark::{GameShark, GameSharkCode},
     },
     cpu::Cpu,
-    data::{BootRom, CGB_BOOT, DMG_BOOT, DMG_BOOTIX, MGB_BOOTIX, SGB_BOOT},
+    data::{BootRom, CGB_BOOT, CGB_BOYTACEAN, DMG_BOOT, DMG_BOOTIX, MGB_BOOTIX, SGB_BOOT},
     devices::{printer::PrinterDevice, stdout::StdoutDevice},
     dma::Dma,
     error::Error,
@@ -660,11 +660,14 @@ impl GameBoy {
         self.load(boot).unwrap();
     }
 
-    /// Loads the boot machine state and sets the Program Counter
-    /// (PC) to the post boot address.
+    /// Loads the machine directly to after the boot execution state,
+    /// setting the state of the system accordingly and updating the
+    /// Program Counter (PC) to the post boot address (0x0100).
     ///
-    /// Should allow the machine to jump to the cartridge execution
-    /// skipping the boot sequence.
+    /// Should allow the machine to jump to the cartridge (ROM) execution
+    /// directly, skipping the boot sequence.
+    ///
+    /// Currently supports only DMG machines.
     pub fn load_boot_state(&mut self) {
         self.cpu.boot();
     }
@@ -917,6 +920,10 @@ impl GameBoy {
         self.boot_rom = value;
     }
 
+    pub fn boot_rom_s(&self) -> String {
+        String::from(self.boot_rom().description())
+    }
+
     pub fn attach_null_serial(&mut self) {
         self.attach_serial(Box::<NullDevice>::default());
     }
@@ -1113,11 +1120,11 @@ impl GameBoy {
     }
 
     pub fn load(&mut self, boot: bool) -> Result<(), Error> {
-        let boot_rom = self.boot_rom().normalize();
+        let boot_rom = self.boot_rom().reusable(self.mode());
         match self.mode() {
             GameBoyMode::Dmg => self.load_dmg(boot, boot_rom)?,
             GameBoyMode::Cgb => self.load_cgb(boot, boot_rom)?,
-            GameBoyMode::Sgb => unimplemented!(),
+            GameBoyMode::Sgb => unimplemented!("SGB is not supported"),
         }
         Ok(())
     }
@@ -1145,6 +1152,7 @@ impl GameBoy {
     pub fn load_boot_path(&mut self, path: &str) -> Result<(), Error> {
         let data = read_file(path)?;
         self.load_boot(&data);
+        self.boot_rom = BootRom::Other;
         Ok(())
     }
 
@@ -1155,6 +1163,7 @@ impl GameBoy {
             BootRom::DmgBootix => self.load_boot(&DMG_BOOTIX),
             BootRom::MgbBootix => self.load_boot(&MGB_BOOTIX),
             BootRom::Cgb => self.load_boot(&CGB_BOOT),
+            BootRom::CgbBoytacean => self.load_boot(&CGB_BOYTACEAN),
             BootRom::Other | BootRom::None => (),
         }
         self.boot_rom = boot_rom;
@@ -1167,6 +1176,7 @@ impl GameBoy {
             BootRom::DmgBootix => self.load_boot_path("./res/boot/dmg_bootix.bin")?,
             BootRom::MgbBootix => self.load_boot_path("./res/boot/mgb_bootix.bin")?,
             BootRom::Cgb => self.load_boot_path("./res/boot/cgb_boot.bin")?,
+            BootRom::CgbBoytacean => self.load_boot_path("./res/boot/cgb_boytacean.bin")?,
             BootRom::Other | BootRom::None => (),
         }
         self.boot_rom = boot_rom;
@@ -1181,7 +1191,7 @@ impl GameBoy {
         match self.mode() {
             GameBoyMode::Dmg => self.load_boot_dmg(boot_rom)?,
             GameBoyMode::Cgb => self.load_boot_cgb(boot_rom)?,
-            GameBoyMode::Sgb => unimplemented!(),
+            GameBoyMode::Sgb => unimplemented!("SGB is not supported"),
         }
         Ok(())
     }
@@ -1196,7 +1206,7 @@ impl GameBoy {
     }
 
     pub fn load_boot_cgb(&mut self, boot_rom: Option<BootRom>) -> Result<(), Error> {
-        let boot_rom = boot_rom.unwrap_or(BootRom::Cgb);
+        let boot_rom = boot_rom.unwrap_or(BootRom::CgbBoytacean);
         if !boot_rom.is_cgb_compat() {
             return Err(Error::IncompatibleBootRom);
         }
@@ -1213,7 +1223,7 @@ impl GameBoy {
         match self.mode() {
             GameBoyMode::Dmg => self.load_boot_dmg_f(boot_rom)?,
             GameBoyMode::Cgb => self.load_boot_cgb_f(boot_rom)?,
-            GameBoyMode::Sgb => unimplemented!(),
+            GameBoyMode::Sgb => unimplemented!("SGB is not supported"),
         }
         Ok(())
     }
