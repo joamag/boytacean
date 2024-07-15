@@ -99,7 +99,8 @@ You can use some GET parameters to control the initial behavior of the emulator.
 | `url`        | String  | The same as `rom_url`.                                                                         |
 | `fullscreen` | Boolean | If the emulator should start in fullscreen mode.                                               |
 | `fs`         | Boolean | The same as `fullscreen`.                                                                      |
-| `debug`      | Boolean | If the "debugger" should start visible.                                                        |
+| `debug`      | Boolean | If the "debugger" should start visible and information shown in `verbose` mode.                |
+| `verbose`    | Boolean | If information should be shown in verbose mode.                                                |
 | `keyboard`   | Boolean | If the on-screen keyboard should start visible.                                                |
 | `palette`    | String  | The name of the palette to be set at startup( eg: `christmas`, `hogwards`, `mariobros`, etc.). |
 

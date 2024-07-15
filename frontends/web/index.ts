@@ -27,6 +27,7 @@ const BACKGROUNDS = [
         params.get("fullscreen") ?? params.get("fs") ?? ""
     );
     const debug = ["1", "true", "True"].includes(params.get("debug") ?? "");
+    const verbose = ["1", "true", "True"].includes(params.get("verbose") ?? "");
     const keyboard = ["1", "true", "True"].includes(
         params.get("keyboard") ?? ""
     );
@@ -40,7 +41,10 @@ const BACKGROUNDS = [
 
     // creates the emulator structure and initializes the
     // React app with both the parameters and the emulator
-    const emulator = new GameboyEmulator({ background: background });
+    const emulator = new GameboyEmulator({
+        background: background,
+        debug: debug || verbose
+    });
     await emulator.init();
     startApp("app", {
         emulator: emulator,

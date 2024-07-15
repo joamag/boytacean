@@ -154,7 +154,7 @@ export class GameboyEmulator extends EmulatorLogic implements Emulator {
      * opaque local storage operations, associated setting
      * name with its value as a string.
      */
-    private extraSettings: Record<string, string> = {};
+    private extraSettings: Record<string, string | boolean> = {};
 
     /**
      * Current frame structure used in the clocking operations
@@ -199,23 +199,22 @@ export class GameboyEmulator extends EmulatorLogic implements Emulator {
         // processed in the current tick operation, this value is
         // calculated using the logic and visual frequencies and
         // the current Game Boy multiplier (DMG vs CGB)
-        const cycles = Math.round(
+        const tickCycles = Math.round(
             (this.logicFrequency * (this.gameBoy?.multiplier() ?? 1)) /
                 this.visualFrequency
         );
 
-        // initializes the counter of cycles with the pending number
-        // of cycles coming from the previous tick
-        let counterCycles = this.pending;
+        // calculates the target cycles for clocking in the current
+        // tick operation, this is the ideal value and the concrete
+        // execution should not match this value
+        const targetCycles = tickCycles - this.pending;
 
         // clocks the system by the target number of cycles (deducted
         // by the carryover cycles) and then in case there's at least
         // a frame to be processed triggers the frame event, allowing
         // the deferred retrieval of the frame buffer
-        this.clockFrame = this.gameBoy.clocks_frame_buffer(
-            cycles - counterCycles
-        );
-        counterCycles += Number(this.clockFrame.cycles);
+        this.clockFrame = this.gameBoy.clocks_frame_buffer(targetCycles);
+        const executedCycles = Number(this.clockFrame.cycles);
         if (this.clockFrame.frames > 0) {
             this.trigger("frame");
         }
@@ -229,16 +228,21 @@ export class GameboyEmulator extends EmulatorLogic implements Emulator {
         // then we need to check if a RAM flush to local
         // storage operation is required
         if (this.cartridge && this.cartridge.has_battery()) {
-            this.flushCycles -= counterCycles - this.pending;
+            this.flushCycles -= executedCycles;
             if (this.flushCycles <= 0) {
                 this.saveRam();
                 this.flushCycles = this.logicFrequency * STORE_RATE;
             }
         }
 
+        // triggers the tick event, indicating that a new tick
+        // operation has been performed and providing some information
+        // about the number of cycles that have been executed
+        this.trigger("tick", { cycles: executedCycles });
+
         // calculates the new number of pending (overflow) cycles
         // that are going to be added to the next iteration
-        this.pending = counterCycles - cycles;
+        this.pending = executedCycles - targetCycles;
     }
 
     async hardReset() {
@@ -437,16 +441,22 @@ export class GameboyEmulator extends EmulatorLogic implements Emulator {
 
     get features(): Feature[] {
         return [
-            Feature.Help,
-            Feature.Debug,
-            Feature.Themes,
-            Feature.Palettes,
-            Feature.Benchmark,
-            Feature.Keyboard,
-            Feature.KeyboardGB,
-            Feature.BootRomInfo,
-            Feature.RomTypeInfo,
-            Feature.SaveState
+            ...[
+                Feature.Help,
+                Feature.Debug,
+                Feature.Themes,
+                Feature.Palettes,
+                Feature.Benchmark,
+                Feature.Keyboard,
+                Feature.KeyboardGB,
+                Feature.Framerate,
+                Feature.BootRomInfo,
+                Feature.RomTypeInfo,
+                Feature.SaveState
+            ],
+            ...(this.extraSettings?.debug ?? false
+                ? [Feature.Cyclerate, Feature.EmulationSpeed]
+                : [])
         ];
     }
 
