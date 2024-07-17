@@ -4,7 +4,13 @@ The source code for the Boot ROMs has been forked from the [SameBoy](https://git
 
 Special thanks to the original creators and maintainers of [SameBoy](https://github.com/LIJI32/SameBoy) for their work and contributions to the open source community. Their work has been invaluable to the development of the Boytacean project.
 
-## 2bpp file format
+## Dependencies
+
+* [rgbds](https://rgbds.gbdev.io)
+* [GNU make](https://www.gnu.org/software/make/manual/make.html)
+* [Python](https://www.python.org)
+
+## 2BPP file format
 
 To convert a PNG into the 2BPP format, use the following command:
 

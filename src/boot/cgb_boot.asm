@@ -1,5 +1,5 @@
 ; Boytacean CGB bootstrap ROM
-; Boostraped from the Sameboy code
+; Boostraped from the Sameboy code (https://github.com/LIJI32/SameBoy)
 
 include "common.inc"
 
@@ -133,7 +133,7 @@ ELSE
 .endTilemap
 ENDC
 
-    ; Expand Palettes
+; Expand Palettes
     ld de, AnimationColors
     ld c, 8
     ld hl, hBgPalettes
@@ -720,7 +720,7 @@ LoadTileset:
     cp $1C
     jr nz, .CGBROMLogoLoop
     inc hl
-    ; fallthrough
+; fallthrough
 ReadTrademarkSymbol:
     ld de, TrademarkSymbol
     ld c, TrademarkSymbolEnd - TrademarkSymbol
@@ -734,7 +734,7 @@ ReadTrademarkSymbol:
     ret
 
 DoIntroAnimation:
-    ; Animate the intro
+; Animate the intro
     ld a, 1
     ldh [rVBK], a
     ld d, 26
@@ -742,14 +742,14 @@ DoIntroAnimation:
     ld b, 2
     call WaitBFrames
     ld hl, _SCRN0 + 6 * SCRN_VX_B + 0
-    ld c, 3 ; Row count
+    ld c, 3 ; row count
 .loop
     ld a, [hl]
-    cp $F ; Already blue
+    cp $F ; already blue
     jr z, .nextTile
     inc [hl]
     and $7
-    jr z, .nextLine ; Changed a white tile, go to next line
+    jr z, .nextLine ; changes a white tile, go to next line
 .nextTile
     inc hl
     jr .loop
@@ -773,7 +773,7 @@ IF !DEF(FAST)
 .frameLoop
     push bc
 
-    ; Brighten Color
+; Brighten Color
     ld a, [hli]
     ld e, a
     ld a, [hld]
@@ -781,7 +781,7 @@ IF !DEF(FAST)
     ; RGB(1,1,1)
     ld bc, $0421
 
-   ; Is blue maxed?
+; Is blue maxed?
     ld a, e
     and $1F
     cp $1F
@@ -789,7 +789,7 @@ IF !DEF(FAST)
     dec c
 .blueNotMaxed
 
-    ; Is green maxed?
+; Is green maxed?
     ld a, e
     cp $E0
     jr c, .greenNotMaxed
@@ -800,7 +800,7 @@ IF !DEF(FAST)
     res 5, c
 .greenNotMaxed
 
-    ; Is red maxed?
+; Is red maxed?
     ld a, d
     and $7C
     cp $7C
@@ -827,7 +827,7 @@ IF !DEF(FAST)
 ENDC
     ld a, 2
     ldh [rSVBK], a
-    ; Clear RAM Bank 2 (Like the original boot ROM)
+; Clear RAM Bank 2 (Like the original boot ROM)
     ld hl, _RAMBANK
     call ClearMemoryPage
     inc a
@@ -839,7 +839,7 @@ ENDC
     cpl
     ldh [rJOYP], a
 
-    ; Final values for CGB mode
+; Final values for CGB mode
     ld d, a
     ld e, c
     ld l, $0D
@@ -859,21 +859,21 @@ ENDC
     jr nz, .emulateDMGForCGBGame
 .skipDMGForCGBCheck
 IF DEF(AGB)
-    ; Set registers to match the original AGB-CGB boot
-    ; AF = $1100, C = 0
+; Set registers to match the original AGB-CGB boot
+; AF = $1100, C = 0
     xor a
     ld c, a
     add a, BOOTUP_A_CGB
     ld h, c
-    ; B is set to BOOTUP_B_AGB (1) after ret
+; B is set to BOOTUP_B_AGB (1) after ret
 ELSE
-    ; Set registers to match the original CGB boot
-    ; AF = $1180, C = 0
+; Set registers to match the original CGB boot
+; AF = $1180, C = 0
     xor a
     ld c, a
     ld a, BOOTUP_A_CGB
     ld h, c
-    ; B is set to the title checksum (BOOTUP_B_CGB, 0)
+; B is set to the title checksum (BOOTUP_B_CGB, 0)
 ENDC
     ret
 
@@ -884,7 +884,7 @@ ENDC
     ret
 
 GetKeyComboPalette:
-    ld hl, KeyCombinationPalettes - 1 ; Return value is 1-based, 0 means nothing down
+    ld hl, KeyCombinationPalettes - 1 ; return value is 1-based, 0 means nothing down
     ld c, a
     ld b, 0
     add hl, bc
@@ -913,7 +913,7 @@ EmulateDMG:
     call WaitFrame
     call LoadPalettesFromIndex
     ld a, 4
-    ; Set the final values for DMG mode
+; Set the final values for DMG mode
     ld de, 8
     ld l, $7C
     ret
@@ -958,11 +958,11 @@ GetPaletteIndex:
     cp b
     jr nz, .searchLoop
 
-    ; We might have a match, Do duplicate/4th letter check
+; We might have a match, Do duplicate/4th letter check
     ld a, l
     sub FirstChecksumWithDuplicate - TitleChecksums + 1
     jr c, .match ; Does not have a duplicate, must be a match!
-    ; Has a duplicate; check 4th letter
+; Has a duplicate; check 4th letter
     push hl
     ld a, l
     add Dups4thLetterArray - FirstChecksumWithDuplicate - 1 ; -1 since hl was incremented
@@ -987,7 +987,7 @@ GetPaletteIndex:
     xor a
     ret
 
-; optimizations in callers rely on this returning with b = 0
+; Optimizations in callers rely on this returning with b = 0
 GetPaletteCombo:
     ld hl, PaletteCombinations
     ld b, 0
@@ -998,13 +998,13 @@ GetPaletteCombo:
 LoadPalettesFromIndex: ; a = index of combination
     call GetPaletteCombo
 
-    ; Obj Palettes
+; Obj Palettes
     ld e, 0
 .loadObjPalette
     ld a, [hli]
     push hl
     ld hl, Palettes
-    ; b is already 0
+; b is already 0
     ld c, a
     add hl, bc
     ld d, 4 * 2
@@ -1016,9 +1016,9 @@ LoadPalettesFromIndex: ; a = index of combination
     ld e, OAMF_BANK1
     jr .loadObjPalette
 .loadBGPalette
-    ;BG Palette
+; BG Palette
     ld c, [hl]
-    ; b is already 0
+; b is already 0
     ld hl, Palettes
     add hl, bc
     ld d, 8
@@ -1072,7 +1072,7 @@ GetInputPaletteIndex:
     rra
     jr nc, .directionLoop
 
-    ; c = 1: Right, 2: Left, 3: Up, 4: Down
+; c = 1: Right, 2: Left, 3: Up, 4: Down
 
     ld a, P1F_GET_BTN
     ldh [rJOYP], a
@@ -1088,7 +1088,7 @@ GetInputPaletteIndex:
     ret z ; No change, don't load
     ld a, l
     ldh [hInputPalette], a
-    ; Slide into change Animation Palette
+; Slide into change Animation Palette
 
 ChangeAnimationPalette:
     push bc
@@ -1131,7 +1131,7 @@ ChangeAnimationPalette:
     inc hl
     inc hl
 .isNotWhite
-    ; Mixing code by ISSOtm
+; Mixing code by ISSOtm
     ldh a, [hBgPalettes + 7 * 8 + 2]
     and ~$21
     ld b, a
