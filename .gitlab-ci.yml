@@ -13,6 +13,7 @@ stages:
   - deploy
 
 before_script:
+  - source ./.gitlab/common.sh
   - apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y -q pkg-config g++ cmake
   - curl -sf -L https://static.rust-lang.org/rustup.sh | sh -s -- -y
   - export PATH=$PATH:$HOME/.cargo/bin
@@ -67,6 +68,13 @@ build-pyo3:
     - rustc --version
     - cargo build --features python
     - cargo build --release --features python
+
+build-boot:
+  stage: build
+  script:
+    - install_rgbds
+    - cd src/boot
+    - make
 
 test-rust:
   stage: test
