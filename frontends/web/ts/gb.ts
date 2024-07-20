@@ -459,6 +459,7 @@ export class GameboyEmulator extends EmulatorLogic implements Emulator {
                       Feature.BootRomInfo,
                       Feature.RomTypeInfo,
                       Feature.Cyclerate,
+                      Feature.Animationrate,
                       Feature.EmulationSpeed
                   ]
                 : [])
