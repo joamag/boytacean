@@ -252,6 +252,12 @@ pub enum CgbMode {
     CgbOnly = 0xc0,
 }
 
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
+pub enum SgbMode {
+    NoSgb = 0x00,
+    SgbFunctions = 0x03,
+}
+
 impl CgbMode {
     pub fn description(&self) -> &'static str {
         match self {
@@ -631,6 +637,13 @@ impl Cartridge {
             0x80 => CgbMode::CgbCompatible,
             0xc0 => CgbMode::CgbOnly,
             _ => CgbMode::NoCgb,
+        }
+    }
+
+    pub fn sgb_flag(&self) -> SgbMode {
+        match self.rom_data[0x0146] {
+            0x03 => SgbMode::SgbFunctions,
+            _ => SgbMode::NoSgb,
         }
     }
 
