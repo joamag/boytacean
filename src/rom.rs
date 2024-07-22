@@ -245,6 +245,46 @@ impl Display for RamSize {
     }
 }
 
+
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
+pub enum Region {
+    World,
+    Japan,
+    USA,
+    Europe,
+    Spain,
+    Italy,
+    France,
+    Germany,
+    Korean,
+    Australia,
+    Unknown,
+}
+
+impl Region {
+    pub fn description(&self) -> &'static str {
+        match self {
+            Region::World => "World",
+            Region::Japan => "Japan",
+            Region::USA => "USA",
+            Region::Europe => "Europe",
+            Region::Spain => "Spain",
+            Region::Italy => "Italy",
+            Region::France => "France",
+            Region::Germany => "Germany",
+            Region::Korean => "Korea",
+            Region::Australia => "Australia",
+            Region::Unknown => "Unknown",
+        }
+    }
+}
+
+impl Display for Region {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.description())
+    }
+}
+
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 pub enum CgbMode {
     NoCgb = 0x00,
@@ -744,6 +784,29 @@ impl Cartridge {
         String::from(self.ram_size().description())
     }
 
+    pub fn region(&self) -> Region {
+        if self.gb_mode() != GameBoyMode::Cgb {
+            return Region::Unknown;
+        }
+        let region = 
+        std::str::from_utf8(&self.rom_data[0x013f..0x0143])
+            .unwrap()
+            .trim();
+        match region.chars().last() {
+            Some('A') => Region::World,
+            Some('J') => Region::Japan,
+            Some('E') => Region::USA,
+            Some('P') | Some('X') | Some('Y') => Region::Europe,
+            Some('S') => Region::Spain,
+            Some('I') => Region::Italy,
+            Some('F') => Region::France,
+            Some('D') => Region::Germany,
+            Some('K') => Region::Korean,
+            Some('U') => Region::Australia,
+            _ => Region::Unknown
+        }
+    }
+
     pub fn has_battery(&self) -> bool {
         matches!(
             self.rom_type(),
@@ -798,15 +861,18 @@ impl Cartridge {
     }
 
     pub fn description(&self, column_length: usize) -> String {
-        let name_l = format!("{:width$}", "Name", width = column_length);
+        let title_l = format!("{:width$}", "Title", width = column_length);
+        let region_l = format!("{:width$}", "Region", width = column_length);
         let type_l = format!("{:width$}", "Type", width = column_length);
         let rom_size_l = format!("{:width$}", "ROM Size", width = column_length);
         let ram_size_l = format!("{:width$}", "RAM Size", width = column_length);
         let cgb_l = format!("{:width$}", "CGB Mode", width = column_length);
         format!(
-            "{}  {}\n{}  {}\n{}  {}\n{}  {}\n{}  {}",
-            name_l,
+            "{}  {}\n{}  {}\n{}  {}\n{}  {}\n{}  {}\n{}  {}",
+            title_l,
             self.title(),
+            region_l,
+            self.region(),
             type_l,
             self.rom_type(),
             rom_size_l,
