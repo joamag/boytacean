@@ -149,6 +149,7 @@ impl Display for RomType {
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum RomSize {
     Size32K,
     Size64K,
@@ -201,6 +202,7 @@ impl Display for RomSize {
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum RamSize {
     NoRam,
     Unused,
@@ -247,6 +249,7 @@ impl Display for RamSize {
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Region {
     World,
     Japan,
@@ -286,6 +289,7 @@ impl Display for Region {
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum CgbMode {
     NoCgb = 0x00,
     CgbCompatible = 0x80,
@@ -293,6 +297,7 @@ pub enum CgbMode {
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum SgbMode {
     NoSgb = 0x00,
     SgbFunctions = 0x03,
