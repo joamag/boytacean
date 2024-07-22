@@ -16,18 +16,21 @@ jobs:
           rustup install 1.74.0
           rustup override set 1.74.0
           rustup default stable-msvc
+      - name: Setup SDL
+        run: |
+          cd frontends/sdl
+          cargo install cargo-vcpkg && cargo vcpkg -v build
       - name: Test Base
         run: cargo test
+      - name: Build Base
+        run: cargo build --release
       - name: Test SDL
         run: |
           cd frontends/sdl
           cargo test
-      - name: Build Base
-        run: cargo build --release
       - name: Build SDL
         run: |
           cd frontends/sdl
-          cargo install cargo-vcpkg && cargo vcpkg -v build
           cargo build --release
       - name: Build Libretro
         run: |
@@ -44,19 +47,23 @@ jobs:
         run: |
           rustup install 1.74.0
           rustup override set 1.74.0
+      - name: Setup SDL
+        run: |
+          cd frontends/sdl
+          cargo install cargo-vcpkg && cargo vcpkg -v build
       - name: Test Base
         run: cargo test
+      - name: Build Base
+        run: cargo build --release
       - name: Test SDL
         run: |
           cd frontends/sdl
           cargo test
-      - name: Build Base
-        run: cargo build --release
       - name: Build SDL
         run: |
           cd frontends/sdl
           cargo install cargo-vcpkg && cargo vcpkg -v build
-          cargo build --releases
+          cargo build --release
       - name: Build Libretro
         run: |
           cd frontends/libretro
