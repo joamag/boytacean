@@ -80,7 +80,7 @@ mod tests {
         },
         data::BootRom,
         license::Licensee,
-        rom::Region,
+        rom::{RamSize, Region, RomSize},
     };
 
     use super::{run_serial_test, run_step_test, TestOptions};
@@ -138,6 +138,8 @@ mod tests {
         assert_eq!(game_boy.rom_i().title().as_str(), "CPU_INSTRS");
         assert_eq!(game_boy.rom_i().licensee(), Licensee::None);
         assert_eq!(game_boy.rom_i().region(), Region::Unknown);
+        assert_eq!(game_boy.rom_i().rom_size(), RomSize::Size64K);
+        assert_eq!(game_boy.rom_i().ram_size(), RamSize::NoRam);
         assert!(game_boy.rom_i().valid_checksum());
     }
 
@@ -153,6 +155,8 @@ mod tests {
         assert_eq!(game_boy.rom_i().title().as_str(), "INSTR_TIMING");
         assert_eq!(game_boy.rom_i().licensee(), Licensee::None);
         assert_eq!(game_boy.rom_i().region(), Region::Unknown);
+        assert_eq!(game_boy.rom_i().rom_size(), RomSize::Size32K);
+        assert_eq!(game_boy.rom_i().ram_size(), RamSize::NoRam);
         assert!(game_boy.rom_i().valid_checksum());
     }
 }
