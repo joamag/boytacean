@@ -79,6 +79,7 @@ mod tests {
             WY_ADDR,
         },
         data::BootRom,
+        gb::GameBoyMode,
         license::Licensee,
         rom::{RamSize, Region, RomSize},
     };
@@ -135,6 +136,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(result, "cpu_instrs\n\n01:ok  02:ok  03:ok  04:ok  05:ok  06:ok  07:ok  08:ok  09:ok  10:ok  11:ok  \n\nPassed all tests\n");
+        assert_eq!(game_boy.rom_i().gb_mode(), GameBoyMode::Cgb);
         assert_eq!(game_boy.rom_i().title().as_str(), "CPU_INSTRS");
         assert_eq!(game_boy.rom_i().licensee(), Licensee::None);
         assert_eq!(game_boy.rom_i().region(), Region::Unknown);
@@ -152,6 +154,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(result, "instr_timing\n\n\nPassed\n");
+        assert_eq!(game_boy.rom_i().gb_mode(), GameBoyMode::Cgb);
         assert_eq!(game_boy.rom_i().title().as_str(), "INSTR_TIMING");
         assert_eq!(game_boy.rom_i().licensee(), Licensee::None);
         assert_eq!(game_boy.rom_i().region(), Region::Unknown);

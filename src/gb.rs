@@ -48,7 +48,7 @@ use std::{
 // CGB = Game Boy Color
 // SGB = Super Game Boy
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum GameBoyMode {
     Dmg = 1,
     Cgb = 2,
