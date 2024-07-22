@@ -302,7 +302,7 @@ impl Licensee {
             _ => Licensee::Unknown,
         };
         if licensee == Licensee::NewLicensee {
-            let new_code_s = std::str::from_utf8(new_code).unwrap();
+            let new_code_s = std::str::from_utf8(new_code).unwrap_or("");
             licensee = match new_code_s {
                 "00" => Licensee::None,
                 "01" => Licensee::NintendoResearchDevelopment1,

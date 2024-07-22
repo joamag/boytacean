@@ -667,7 +667,7 @@ impl Cartridge {
     pub fn title(&self) -> String {
         String::from(
             std::str::from_utf8(&self.rom_data[0x0134..self.title_offset])
-                .unwrap()
+                .unwrap_or("")
                 .trim(),
         )
     }
@@ -794,7 +794,7 @@ impl Cartridge {
             return Region::Unknown;
         }
         let region = std::str::from_utf8(&self.rom_data[0x013f..=0x0142])
-            .unwrap()
+            .unwrap_or("")
             .trim();
         match region.chars().last() {
             Some('A') => Region::World,
