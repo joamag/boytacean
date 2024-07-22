@@ -9,15 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+*
+
+### Changed
+
+*
+
+### Fixed
+
+*
+
+## [0.10.4] - 2024-07-16
+
+### Added
+
 * Support for cartridge region detection
 
 ### Changed
 
 * Bumped web packages
-
-### Fixed
-
-*
 
 ## [0.10.3] - 2024-07-16
 
