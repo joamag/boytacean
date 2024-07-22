@@ -245,7 +245,6 @@ impl Display for RamSize {
     }
 }
 
-
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 pub enum Region {
     World,
@@ -788,8 +787,7 @@ impl Cartridge {
         if self.gb_mode() != GameBoyMode::Cgb {
             return Region::Unknown;
         }
-        let region = 
-        std::str::from_utf8(&self.rom_data[0x013f..0x0143])
+        let region = std::str::from_utf8(&self.rom_data[0x013f..0x0143])
             .unwrap()
             .trim();
         match region.chars().last() {
@@ -803,7 +801,7 @@ impl Cartridge {
             Some('D') => Region::Germany,
             Some('K') => Region::Korean,
             Some('U') => Region::Australia,
-            _ => Region::Unknown
+            _ => Region::Unknown,
         }
     }
 
