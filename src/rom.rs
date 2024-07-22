@@ -864,6 +864,18 @@ impl Cartridge {
         self.game_shark = None;
     }
 
+    pub fn checksum(&self) -> u8 {
+        let mut sum: u8 = 0;
+        for i in 0x0134..=0x014c {
+            sum = sum.wrapping_sub(self.rom_data[i]).wrapping_sub(1);
+        }
+        sum
+    }
+
+    pub fn valid_checksum(&self) -> bool {
+        self.rom_data[0x014d] == self.checksum()
+    }
+
     pub fn description(&self, column_length: usize) -> String {
         let title_l = format!("{:width$}", "Title", width = column_length);
         let publisher_l = format!("{:width$}", "Publisher", width = column_length);
