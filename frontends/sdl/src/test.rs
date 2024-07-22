@@ -40,7 +40,6 @@ pub fn save_image(pixels: &[u8], width: u32, height: u32, file_path: &str) {
 mod tests {
     use boytacean::{
         gb::GameBoyMode,
-        ppu::FRAME_BUFFER_SIZE,
         test::{run_image_test, TestOptions},
     };
 
@@ -48,7 +47,7 @@ mod tests {
 
     #[test]
     fn test_blargg_cpu_instrs() {
-        let result: [u8; FRAME_BUFFER_SIZE] = run_image_test(
+        let (result, _) = run_image_test(
             "../../res/roms/test/blargg/cpu/cpu_instrs.gb",
             Some(300000000),
             TestOptions::default(),
@@ -60,7 +59,7 @@ mod tests {
 
     #[test]
     fn test_blargg_instr_timing() {
-        let result: [u8; FRAME_BUFFER_SIZE] = run_image_test(
+        let (result, _) = run_image_test(
             "../../res/roms/test/blargg/instr_timing/instr_timing.gb",
             Some(50000000),
             TestOptions::default(),
@@ -72,7 +71,7 @@ mod tests {
 
     #[test]
     fn test_blargg_interrupt_time() {
-        let result: [u8; FRAME_BUFFER_SIZE] = run_image_test(
+        let (result, _) = run_image_test(
             "../../res/roms/test/blargg/interrupt_time/interrupt_time.gb",
             Some(20000000),
             TestOptions {
@@ -88,7 +87,7 @@ mod tests {
 
     #[test]
     fn test_blargg_dmg_sound() {
-        let result: [u8; FRAME_BUFFER_SIZE] = run_image_test(
+        let (result, _) = run_image_test(
             "../../res/roms/test/blargg/dmg_sound/01-registers.gb",
             Some(50000000),
             TestOptions::default(),
@@ -97,7 +96,7 @@ mod tests {
         let image_result = compare_images(&result, "res/test/blargg/dmg_sound/01-registers.png");
         assert!(image_result);
 
-        let result: [u8; FRAME_BUFFER_SIZE] = run_image_test(
+        let (result, _) = run_image_test(
             "../../res/roms/test/blargg/dmg_sound/02-len ctr.gb",
             Some(50000000),
             TestOptions::default(),
@@ -106,7 +105,7 @@ mod tests {
         let image_result = compare_images(&result, "res/test/blargg/dmg_sound/02-len ctr.png");
         assert!(image_result);
 
-        let result: [u8; FRAME_BUFFER_SIZE] = run_image_test(
+        let (result, _) = run_image_test(
             "../../res/roms/test/blargg/dmg_sound/03-trigger.gb",
             Some(100000000),
             TestOptions::default(),
@@ -118,7 +117,7 @@ mod tests {
 
     #[test]
     fn test_dmg_acid2() {
-        let result: [u8; FRAME_BUFFER_SIZE] = run_image_test(
+        let (result, _) = run_image_test(
             "../../res/roms/test/dmg_acid2.gb",
             Some(50000000),
             TestOptions::default(),
@@ -130,7 +129,7 @@ mod tests {
 
     #[test]
     fn test_cgb_acid2() {
-        let result: [u8; FRAME_BUFFER_SIZE] = run_image_test(
+        let (result, _) = run_image_test(
             "../../res/roms/test/cgb_acid2.gbc",
             Some(50000000),
             TestOptions {
@@ -145,7 +144,7 @@ mod tests {
 
     #[test]
     fn test_firstwhite() {
-        let result: [u8; FRAME_BUFFER_SIZE] = run_image_test(
+        let (result, _) = run_image_test(
             "../../res/roms/test/firstwhite.gb",
             Some(50000000),
             TestOptions::default(),
