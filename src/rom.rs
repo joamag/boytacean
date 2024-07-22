@@ -10,6 +10,7 @@ use crate::{
     debugln,
     error::Error,
     gb::GameBoyMode,
+    license::Licensee,
     mmu::BusComponent,
     util::read_file,
     warnln,
@@ -671,6 +672,10 @@ impl Cartridge {
         )
     }
 
+    pub fn licensee(&self) -> Licensee {
+        Licensee::from_data(self.rom_data[0x014b], &self.rom_data[0x0144..=0x0145])
+    }
+
     pub fn cgb_flag(&self) -> CgbMode {
         match self.rom_data[0x0143] {
             0x80 => CgbMode::CgbCompatible,
@@ -693,9 +698,10 @@ impl Cartridge {
         }
     }
 
-    /// A cartridge is considered legacy if it does
+    /// A cartridge is considered legacy (DMG only) if it does
     /// not have a CGB flag bit (bit 7 of 0x0143) set.
-    /// These are the monochromatic only Cartridges built
+    ///
+    /// These are the monochromatic only cartridges built
     /// for the original DMG Game Boy.
     pub fn is_legacy(&self) -> bool {
         self.rom_data[0x0143] & 0x80 == 0x00
@@ -787,7 +793,7 @@ impl Cartridge {
         if self.gb_mode() != GameBoyMode::Cgb {
             return Region::Unknown;
         }
-        let region = std::str::from_utf8(&self.rom_data[0x013f..0x0143])
+        let region = std::str::from_utf8(&self.rom_data[0x013f..=0x0142])
             .unwrap()
             .trim();
         match region.chars().last() {
@@ -860,15 +866,18 @@ impl Cartridge {
 
     pub fn description(&self, column_length: usize) -> String {
         let title_l = format!("{:width$}", "Title", width = column_length);
+        let publisher_l = format!("{:width$}", "Publisher", width = column_length);
         let region_l = format!("{:width$}", "Region", width = column_length);
         let type_l = format!("{:width$}", "Type", width = column_length);
         let rom_size_l = format!("{:width$}", "ROM Size", width = column_length);
         let ram_size_l = format!("{:width$}", "RAM Size", width = column_length);
         let cgb_l = format!("{:width$}", "CGB Mode", width = column_length);
         format!(
-            "{}  {}\n{}  {}\n{}  {}\n{}  {}\n{}  {}\n{}  {}",
+            "{}  {}\n{}  {}\n{}  {}\n{}  {}\n{}  {}\n{}  {}\n{}  {}",
             title_l,
             self.title(),
+            publisher_l,
+            self.licensee(),
             region_l,
             self.region(),
             type_l,
