@@ -9,7 +9,7 @@
 //! use boytacean::gb::GameBoy;
 //! let game_boy = GameBoy::new(None);
 //! game_boy.load(false).unwrap();
-//! game_boy.tick();
+//! game_boy.clock();
 //! ```
 
 use std::{
