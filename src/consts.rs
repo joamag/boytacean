@@ -27,3 +27,7 @@ pub const HDMA2_ADDR: u16 = 0xff52;
 pub const HDMA3_ADDR: u16 = 0xff53;
 pub const HDMA4_ADDR: u16 = 0xff54;
 pub const HDMA5_ADDR: u16 = 0xff55;
+
+// Serial registers
+pub const SB_ADDR: u16 = 0xff01;
+pub const SC_ADDR: u16 = 0xff02;

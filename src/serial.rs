@@ -1,6 +1,10 @@
 //! Serial transfer (Link Cable) functions and structures.
 
-use crate::{mmu::BusComponent, warnln};
+use crate::{
+    consts::{SB_ADDR, SC_ADDR},
+    mmu::BusComponent,
+    warnln,
+};
 
 pub trait SerialDevice {
     /// Sends a byte (u8) to the attached serial connection.
@@ -89,9 +93,9 @@ impl Serial {
     pub fn read(&mut self, addr: u16) -> u8 {
         match addr {
             // 0xFF01 — SB: Serial transfer data
-            0xff01 => self.data,
+            SB_ADDR => self.data,
             // 0xFF02 — SC: Serial transfer control
-            0xff02 =>
+            SC_ADDR =>
             {
                 #[allow(clippy::bool_to_int_with_if)]
                 (if self.shift_clock { 0x01 } else { 0x00 }
@@ -108,9 +112,9 @@ impl Serial {
     pub fn write(&mut self, addr: u16, value: u8) {
         match addr {
             // 0xFF01 — SB: Serial transfer data
-            0xff01 => self.data = value,
+            SB_ADDR => self.data = value,
             // 0xFF02 — SC: Serial transfer control
-            0xff02 => {
+            SC_ADDR => {
                 self.shift_clock = value & 0x01 == 0x01;
                 self.clock_speed = value & 0x02 == 0x02;
                 self.transferring = value & 0x80 == 0x80;
