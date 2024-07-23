@@ -1,3 +1,5 @@
+//! Assorted utility functions and structures.
+
 use std::{
     cell::RefCell,
     fs::File,

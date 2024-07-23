@@ -1,3 +1,5 @@
+//! Game Boy licensee vendors information and static enumerations.
+
 use std::fmt::{self, Display, Formatter};
 
 #[cfg(feature = "wasm")]

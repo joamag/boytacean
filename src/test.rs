@@ -80,7 +80,7 @@ mod tests {
         },
         data::BootRom,
         gb::GameBoyMode,
-        license::Licensee,
+        licensee::Licensee,
         rom::{RamSize, Region, RomSize},
     };
 

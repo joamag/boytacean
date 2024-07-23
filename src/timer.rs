@@ -1,3 +1,5 @@
+//! Timer functions and structures.
+
 use crate::{
     consts::{DIV_ADDR, TAC_ADDR, TIMA_ADDR, TMA_ADDR},
     mmu::BusComponent,

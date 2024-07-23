@@ -1,3 +1,5 @@
+//! Cartridge (ROM) related functions and structures.
+
 use core::fmt;
 use std::{
     cmp::max,
@@ -10,7 +12,7 @@ use crate::{
     debugln,
     error::Error,
     gb::GameBoyMode,
-    license::Licensee,
+    licensee::Licensee,
     mmu::BusComponent,
     util::read_file,
     warnln,

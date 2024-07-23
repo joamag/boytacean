@@ -1,3 +1,5 @@
+//! CPU instructions implementation for the Sharp LR35902.
+
 use crate::cpu::Cpu;
 
 pub const INSTRUCTIONS: [Instruction; 256] = [

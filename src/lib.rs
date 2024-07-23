@@ -14,7 +14,7 @@ pub mod gb;
 pub mod gen;
 pub mod info;
 pub mod inst;
-pub mod license;
+pub mod licensee;
 pub mod macros;
 pub mod mmu;
 pub mod pad;
