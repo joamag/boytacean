@@ -343,6 +343,7 @@ pub struct PpuRegisters {
 /// Outputs the screen as a RGB 8 bit frame buffer.
 ///
 /// # Basic usage
+///
 /// ```rust
 /// use boytacean::ppu::Ppu;
 /// let mut ppu = Ppu::default();

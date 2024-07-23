@@ -1,4 +1,16 @@
-//! Main Game Boy emulation entrypoint functions and structures.
+//! Game Boy emulation entrypoint and associated functions and structures.
+//!
+//! Most of the meaningful publicly available functions and structures to build
+//! a working emulator should be present here.
+//!
+//! # Examples
+//!
+//! ```rust
+//! use boytacean::gb::GameBoy;
+//! let game_boy = GameBoy::new(None);
+//! game_boy.load(false).unwrap();
+//! game_boy.tick();
+//! ```
 
 use std::{
     collections::VecDeque,
