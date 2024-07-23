@@ -5,11 +5,16 @@
 //!
 //! # Examples
 //!
+//! Creates a simple [`GameBoy`] instance and boots the boot ROM. Does that by
+//! clocking the CPU until PC reaches 0x0100 (post boot address).
+//!
 //! ```rust
-//! use boytacean::gb::GameBoy;
-//! let game_boy = GameBoy::new(None);
+//! use boytacean::gb::{GameBoy, GameBoyMode};
+//! let mut game_boy = GameBoy::new(Some(GameBoyMode::Dmg));
 //! game_boy.load(false).unwrap();
-//! game_boy.clock();
+//! game_boy.load_rom_empty().unwrap();
+//! let cycles = game_boy.step_to(0x0100);
+//! println!("Ran {} cycles", cycles);
 //! ```
 
 use std::{
@@ -534,7 +539,8 @@ impl GameBoy {
 
     /// Function equivalent to `clock()` but that allows pre-emptive
     /// breaking of the clock cycle loop if the PC (Program Counter)
-    /// reaches the provided address.
+    /// reaches the provided address, making sure that in such a situation
+    /// the devices are not clocked.
     pub fn clock_step(&mut self, addr: u16) -> u16 {
         let cycles = self.cpu_clock() as u16;
         if self.cpu_i().pc() == addr {
@@ -1306,6 +1312,11 @@ impl GameBoy {
             }
             None => self.load_rom(&data, None),
         }
+    }
+
+    pub fn load_rom_empty(&mut self) -> Result<&mut Cartridge, Error> {
+        let data = [0u8; 32 * 1024];
+        self.load_rom(&data, None)
     }
 
     pub fn attach_serial(&mut self, device: Box<dyn SerialDevice>) {
