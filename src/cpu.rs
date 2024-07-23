@@ -1,7 +1,15 @@
+//! Implementation of the core CPU ([Sharp LR35902](https://en.wikipedia.org/wiki/Game_Boy) logic for the Game Boy.
+//!
+//! Does not include the instruction set implementation, only the core
+//! CPU logic and the CPU struct definition.
+//!
+//! Most of the core CPU logic is implemented in the [`Cpu::clock`] method.
+
 use std::sync::Mutex;
 
 use crate::{
     apu::Apu,
+    consts::LCDC_ADDR,
     debugln,
     dma::Dma,
     gb::GameBoyConfig,
@@ -92,8 +100,10 @@ impl Cpu {
     }
 
     /// Sets the CPU registers and some of the memory space to the
-    /// state expected after the Game Boy boot ROM executes, using
-    /// these values it's possible to skip the boot loading process.
+    /// expected state after a typical Game Boy boot ROM finishes.
+    ///
+    /// Using this strategy it's possible to skip the "normal" boot
+    /// loading process for the original DMG Game Boy.
     pub fn boot(&mut self) {
         self.pc = 0x0100;
         self.sp = 0xfffe;
@@ -113,7 +123,7 @@ impl Cpu {
         // boot memory overlap and setting the LCD control
         // register to enabled (required by some ROMs)
         self.mmu.set_boot_active(false);
-        self.mmu.write(0xff40, 0x91);
+        self.mmu.write(LCDC_ADDR, 0x91);
     }
 
     pub fn clock(&mut self) -> u8 {
