@@ -67,6 +67,12 @@ impl Display for PrinterState {
     }
 }
 
+impl From<u8> for PrinterState {
+    fn from(value: u8) -> Self {
+        Self::from_u8(value)
+    }
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum PrinterCommand {
     Init = 0x01,
@@ -101,6 +107,12 @@ impl PrinterCommand {
 impl Display for PrinterCommand {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.description())
+    }
+}
+
+impl From<u8> for PrinterCommand {
+    fn from(value: u8) -> Self {
+        Self::from_u8(value)
     }
 }
 

@@ -61,6 +61,12 @@ impl BosBlockKind {
     }
 }
 
+impl From<u8> for BosBlockKind {
+    fn from(value: u8) -> Self {
+        Self::from_u8(value)
+    }
+}
+
 pub trait Serialize {
     /// Writes the data from the internal structure into the
     /// provided buffer.

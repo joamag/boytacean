@@ -40,6 +40,12 @@ impl PadKey {
     }
 }
 
+impl From<u8> for PadKey {
+    fn from(value: u8) -> Self {
+        Self::from_u8(value)
+    }
+}
+
 pub struct Pad {
     down: bool,
     up: bool,

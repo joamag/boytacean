@@ -1,3 +1,5 @@
+//! Serial transfer (Link Cable) functions and structures.
+
 use crate::{mmu::BusComponent, warnln};
 
 pub trait SerialDevice {

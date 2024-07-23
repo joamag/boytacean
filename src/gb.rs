@@ -110,6 +110,18 @@ impl Display for GameBoyMode {
     }
 }
 
+impl From<u8> for GameBoyMode {
+    fn from(value: u8) -> Self {
+        Self::from_u8(value)
+    }
+}
+
+impl From<&str> for GameBoyMode {
+    fn from(value: &str) -> Self {
+        Self::from_string(value)
+    }
+}
+
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum GameBoySpeed {
@@ -151,6 +163,12 @@ impl GameBoySpeed {
 impl Display for GameBoySpeed {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.description())
+    }
+}
+
+impl From<u8> for GameBoySpeed {
+    fn from(value: u8) -> Self {
+        Self::from_u8(value)
     }
 }
 
