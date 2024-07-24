@@ -426,9 +426,11 @@ impl Cartridge {
 
     pub fn read(&mut self, addr: u16) -> u8 {
         match addr & 0xf000 {
+            // 0x0000-0x7FFF: 16 KiB ROM bank 00 & 16 KiB ROM Bank 01–NN
             0x0000 | 0x1000 | 0x2000 | 0x3000 | 0x4000 | 0x5000 | 0x6000 | 0x7000 => {
                 (self.handler.read_rom)(self, addr)
             }
+            // 0xA000-0xBFFF: 8 KiB External RAM
             0xa000 | 0xb000 => (self.handler.read_ram)(self, addr),
             _ => {
                 debugln!("Reading from unknown Cartridge control 0x{:04x}", addr);
@@ -439,9 +441,11 @@ impl Cartridge {
 
     pub fn write(&mut self, addr: u16, value: u8) {
         match addr & 0xf000 {
+            // 0x0000-0x7FFF: 16 KiB ROM bank 00 & 16 KiB ROM Bank 01–NN
             0x0000 | 0x1000 | 0x2000 | 0x3000 | 0x4000 | 0x5000 | 0x6000 | 0x7000 => {
                 (self.handler.write_rom)(self, addr, value)
             }
+            // 0xA000-0xBFFF: 8 KiB External RAM
             0xa000 | 0xb000 => (self.handler.write_ram)(self, addr, value),
             _ => debugln!("Writing to unknown Cartridge address 0x{:04x}", addr),
         }
