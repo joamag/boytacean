@@ -17,7 +17,7 @@ crate-type = ["cdylib", "rlib"]
 [features]
 default = []
 wasm = ["wasm-bindgen", "js-sys"]
-python = ["pyo3"]
+python = ["pyo3", "boytacean-common/python"]
 simd = []
 debug = []
 pedantic = []
@@ -25,6 +25,8 @@ cpulog = []
 gen-mock = []
 
 [dependencies]
+boytacean-common = { path = "crates/common" }
+boytacean-encoding = { path = "crates/encoding" }
 wasm-bindgen = { version = "0.2", optional = true }
 js-sys = { version = "0.3", optional = true }
 pyo3 = { version = "0.20", optional = true }
@@ -56,11 +58,16 @@ opt-level = 3
 codegen-units = 1
 
 [workspace]
-members = [".", "frontends/libretro", "frontends/sdl"]
+members = [".", "frontends/libretro", "frontends/sdl", "crates/common", "crates/encoding"]
+package = { version = "0.10.4", authors = ["João Magalhães <joamag@gmail.com>"], edition = "2018" }
 
 [package.metadata.docs.rs]
 features = ["wasm", "gen-mock"]
 
 [[bench]]
 name = "color"
+harness = false
+
+[[bench]]
+name = "encoding"
 harness = false

@@ -8,7 +8,6 @@ pub mod test;
 use audio::Audio;
 use boytacean::{
     devices::{printer::PrinterDevice, stdout::StdoutDevice},
-    error::Error,
     gb::{AudioProvider, GameBoy, GameBoyMode},
     info::Info,
     pad::PadKey,
@@ -18,6 +17,7 @@ use boytacean::{
     state::StateManager,
     util::{replace_ext, write_file},
 };
+use boytacean_common::error::Error;
 use chrono::Utc;
 use clap::Parser;
 use image::{ColorType, ImageBuffer, Rgb};

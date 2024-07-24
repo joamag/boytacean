@@ -1,7 +1,8 @@
+use boytacean_common::error::Error;
+
 use crate::{
     data::BootRom,
     devices::buffer::BufferDevice,
-    error::Error,
     gb::{GameBoy, GameBoyMode},
     ppu::FRAME_BUFFER_SIZE,
 };

@@ -17,6 +17,7 @@
 //! println!("Ran {} cycles", cycles);
 //! ```
 
+use boytacean_common::error::Error;
 use std::{
     collections::VecDeque,
     fmt::{self, Display, Formatter},
@@ -33,7 +34,6 @@ use crate::{
     data::{BootRom, CGB_BOOT, CGB_BOYTACEAN, DMG_BOOT, DMG_BOOTIX, MGB_BOOTIX, SGB_BOOT},
     devices::{printer::PrinterDevice, stdout::StdoutDevice},
     dma::Dma,
-    error::Error,
     info::Info,
     mmu::Mmu,
     pad::{Pad, PadKey},

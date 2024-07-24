@@ -1,9 +1,8 @@
+use boytacean_common::error::Error;
 use std::{
     collections::HashMap,
     fmt::{self, Display, Formatter},
 };
-
-use crate::error::Error;
 
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;

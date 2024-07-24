@@ -1,4 +1,7 @@
-//! Error related data structures.
+//! Error related data structures to be shared and used.
+//!
+//! This module contains the [`Error`] enum, which is used to represent
+//! errors that can occur within Boytacean domain.
 
 use std::fmt::{self, Display, Formatter};
 
@@ -8,6 +11,7 @@ use std::fmt::{self, Display, Formatter};
 /// to provide a more detailed error message.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Error {
+    InvalidData,
     RomSize,
     IncompatibleBootRom,
     CustomError(String),
@@ -16,6 +20,7 @@ pub enum Error {
 impl Error {
     pub fn description(&self) -> &str {
         match self {
+            Error::InvalidData => "Invalid data format",
             Error::RomSize => "Invalid ROM size",
             Error::IncompatibleBootRom => "Incompatible Boot ROM",
             Error::CustomError(message) => message,

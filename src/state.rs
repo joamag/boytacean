@@ -6,6 +6,7 @@
 //! The [BESS](https://github.com/LIJI32/SameBoy/blob/master/BESS.md) format is a format developed by the [SameBoy](https://sameboy.github.io/) emulator and is used to store the emulator state
 //! in agnostic and compatible way.
 
+use boytacean_common::error::Error;
 use std::{
     convert::TryInto,
     fmt::{self, Display, Formatter},
@@ -15,7 +16,6 @@ use std::{
 };
 
 use crate::{
-    error::Error,
     gb::{GameBoy, GameBoySpeed},
     info::Info,
     ppu::{DISPLAY_HEIGHT, DISPLAY_WIDTH, FRAME_BUFFER_SIZE},
@@ -104,7 +104,7 @@ impl BosState {
     /// buffer represents a valid BOS (Boytacean Save)
     /// file structure, thought magic string validation.
     pub fn is_bos(data: &mut Cursor<Vec<u8>>) -> bool {
-        let mut buffer = [0x00; 4];
+        let mut buffer = [0x00; size_of::<u32>()];
         data.read_exact(&mut buffer).unwrap();
         let magic = u32::from_le_bytes(buffer);
         data.rewind().unwrap();
@@ -213,13 +213,13 @@ impl Serialize for BosState {
     }
 
     fn read(&mut self, data: &mut Cursor<Vec<u8>>) {
-        let mut buffer = [0x00; 4];
+        let mut buffer = [0x00; size_of::<u32>()];
         data.read_exact(&mut buffer).unwrap();
         self.magic = u32::from_le_bytes(buffer);
-        let mut buffer = [0x00; 1];
+        let mut buffer = [0x00; size_of::<u8>()];
         data.read_exact(&mut buffer).unwrap();
         self.version = u8::from_le_bytes(buffer);
-        let mut buffer = [0x00; 1];
+        let mut buffer = [0x00; size_of::<u8>()];
         data.read_exact(&mut buffer).unwrap();
         self.block_count = u8::from_le_bytes(buffer);
 
@@ -291,10 +291,10 @@ impl Serialize for BosBlock {
     }
 
     fn read(&mut self, data: &mut Cursor<Vec<u8>>) {
-        let mut buffer = [0x00; 1];
+        let mut buffer = [0x00; size_of::<u8>()];
         data.read_exact(&mut buffer).unwrap();
         self.kind = BosBlockKind::from_u8(u8::from_le_bytes(buffer));
-        let mut buffer = [0x00; 4];
+        let mut buffer = [0x00; size_of::<u32>()];
         data.read_exact(&mut buffer).unwrap();
         self.size = u32::from_le_bytes(buffer);
     }
@@ -493,7 +493,7 @@ impl BessState {
     /// file structure, thought magic string validation.
     pub fn is_bess(data: &mut Cursor<Vec<u8>>) -> bool {
         data.seek(SeekFrom::End(-4)).unwrap();
-        let mut buffer = [0x00; 4];
+        let mut buffer = [0x00; size_of::<u32>()];
         data.read_exact(&mut buffer).unwrap();
         let magic = u32::from_le_bytes(buffer);
         data.rewind().unwrap();
@@ -665,7 +665,7 @@ impl Serialize for BessBlockHeader {
         let mut buffer = [0x00; 4];
         data.read_exact(&mut buffer).unwrap();
         self.magic = String::from_utf8(Vec::from(buffer)).unwrap();
-        let mut buffer = [0x00; 4];
+        let mut buffer = [0x00; size_of::<u32>()];
         data.read_exact(&mut buffer).unwrap();
         self.size = u32::from_le_bytes(buffer);
     }
@@ -766,10 +766,10 @@ impl Serialize for BessBuffer {
     }
 
     fn read(&mut self, data: &mut Cursor<Vec<u8>>) {
-        let mut buffer = [0x00; 4];
+        let mut buffer = [0x00; size_of::<u32>()];
         data.read_exact(&mut buffer).unwrap();
         self.size = u32::from_le_bytes(buffer);
-        let mut buffer = [0x00; 4];
+        let mut buffer = [0x00; size_of::<u32>()];
         data.read_exact(&mut buffer).unwrap();
         self.offset = u32::from_le_bytes(buffer);
         self.buffer = self.load_buffer(data);
@@ -810,10 +810,10 @@ impl Serialize for BessFooter {
     }
 
     fn read(&mut self, data: &mut Cursor<Vec<u8>>) {
-        let mut buffer = [0x00; 4];
+        let mut buffer = [0x00; size_of::<u32>()];
         data.read_exact(&mut buffer).unwrap();
         self.start_offset = u32::from_le_bytes(buffer);
-        let mut buffer = [0x00; 4];
+        let mut buffer = [0x00; size_of::<u32>()];
         data.read_exact(&mut buffer).unwrap();
         self.magic = u32::from_le_bytes(buffer);
     }
@@ -1172,10 +1172,10 @@ impl Serialize for BessCore {
     fn read(&mut self, data: &mut Cursor<Vec<u8>>) {
         self.header.read(data);
 
-        let mut buffer = [0x00; 2];
+        let mut buffer = [0x00; size_of::<u16>()];
         data.read_exact(&mut buffer).unwrap();
         self.major = u16::from_le_bytes(buffer);
-        let mut buffer = [0x00; 2];
+        let mut buffer = [0x00; size_of::<u16>()];
         data.read_exact(&mut buffer).unwrap();
         self.minor = u16::from_le_bytes(buffer);
 
@@ -1183,35 +1183,35 @@ impl Serialize for BessCore {
         data.read_exact(&mut buffer).unwrap();
         self.model = String::from_utf8(Vec::from(buffer)).unwrap();
 
-        let mut buffer = [0x00; 2];
+        let mut buffer = [0x00; size_of::<u16>()];
         data.read_exact(&mut buffer).unwrap();
         self.pc = u16::from_le_bytes(buffer);
-        let mut buffer = [0x00; 2];
+        let mut buffer = [0x00; size_of::<u16>()];
         data.read_exact(&mut buffer).unwrap();
         self.af = u16::from_le_bytes(buffer);
-        let mut buffer = [0x00; 2];
+        let mut buffer = [0x00; size_of::<u16>()];
         data.read_exact(&mut buffer).unwrap();
         self.bc = u16::from_le_bytes(buffer);
-        let mut buffer = [0x00; 2];
+        let mut buffer = [0x00; size_of::<u16>()];
         data.read_exact(&mut buffer).unwrap();
         self.de = u16::from_le_bytes(buffer);
-        let mut buffer = [0x00; 2];
+        let mut buffer = [0x00; size_of::<u16>()];
         data.read_exact(&mut buffer).unwrap();
         self.hl = u16::from_le_bytes(buffer);
-        let mut buffer = [0x00; 2];
+        let mut buffer = [0x00; size_of::<u16>()];
         data.read_exact(&mut buffer).unwrap();
         self.sp = u16::from_le_bytes(buffer);
 
         let mut buffer = [0x00; 1];
         data.read_exact(&mut buffer).unwrap();
         self.ime = buffer[0] != 0;
-        let mut buffer = [0x00; 1];
+        let mut buffer = [0x00; size_of::<u8>()];
         data.read_exact(&mut buffer).unwrap();
         self.ie = u8::from_le_bytes(buffer);
-        let mut buffer = [0x00; 1];
+        let mut buffer = [0x00; size_of::<u8>()];
         data.read_exact(&mut buffer).unwrap();
         self.execution_mode = u8::from_le_bytes(buffer);
-        let mut buffer = [0x00; 1];
+        let mut buffer = [0x00; size_of::<u8>()];
         data.read_exact(&mut buffer).unwrap();
         self._padding = u8::from_le_bytes(buffer);
 
@@ -1382,10 +1382,10 @@ impl Serialize for BessMbc {
     fn read(&mut self, data: &mut Cursor<Vec<u8>>) {
         self.header.read(data);
         for _ in 0..(self.header.size / 3) {
-            let mut buffer = [0x00; 2];
+            let mut buffer = [0x00; size_of::<u16>()];
             data.read_exact(&mut buffer).unwrap();
             let address = u16::from_le_bytes(buffer);
-            let mut buffer = [0x00; 1];
+            let mut buffer = [0x00; size_of::<u8>()];
             data.read_exact(&mut buffer).unwrap();
             let value = u8::from_le_bytes(buffer);
             self.registers.push(BessMbrRegister::new(address, value));
@@ -1567,6 +1567,7 @@ impl StateManager {
 
     /// Obtains the thumbnail of the save state file, this thumbnail is
     /// stored in raw RGB format.
+    ///
     /// This operation is currently only supported for the BOS format.
     pub fn thumbnail(data: &[u8], format: Option<SaveStateFormat>) -> Result<Vec<u8>, Error> {
         let data = &mut Cursor::new(data.to_vec());
@@ -1627,8 +1628,11 @@ impl StateManager {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use boytacean_encoding::zippy::{decode_zippy, encode_zippy};
+
     use crate::gb::GameBoy;
+
+    use super::{SaveStateFormat, StateManager};
 
     #[test]
     fn test_load_bos() {
@@ -1650,5 +1654,20 @@ mod tests {
         let data = StateManager::save(&mut gb, Some(SaveStateFormat::Bess)).unwrap();
         StateManager::load(&data, &mut gb, Some(SaveStateFormat::Bess)).unwrap();
         StateManager::load(&data, &mut gb, None).unwrap();
+    }
+
+    #[test]
+    fn test_compression() {
+        let mut gb = GameBoy::default();
+        gb.load(true).unwrap();
+        gb.load_rom_file("res/roms/test/firstwhite.gb", None)
+            .unwrap();
+        gb.step_to(0x0100);
+        let data = StateManager::save(&mut gb, Some(SaveStateFormat::Bess)).unwrap();
+        let encoded = encode_zippy(&data).unwrap();
+        let decoded = decode_zippy(&encoded).unwrap();
+        assert_eq!(data, decoded);
+        assert_eq!(encoded.len(), 804);
+        assert_eq!(decoded.len(), 25154);
     }
 }
