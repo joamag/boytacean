@@ -1,0 +1,7 @@
+[package]
+name = "boytacean-encoding"
+version = "0.10.4"
+edition = "2018"
+
+[dependencies]
+boytacean-common = { path = "../common" }

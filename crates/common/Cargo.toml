@@ -1,0 +1,10 @@
+[package]
+name = "boytacean-common"
+version = "0.10.4"
+edition = "2018"
+
+[dependencies]
+pyo3 = { version = "0.20", optional = true }
+
+[features]
+python = ["pyo3"]

@@ -14,18 +14,12 @@ debug = ["boytacean/debug"]
 pedantic = ["boytacean/pedantic"]
 cpulog = ["boytacean/cpulog"]
 
-[dependencies.boytacean]
-path = "../.."
-
-[dependencies.clap]
-version = "4"
-features = ["derive"]
-
-[dependencies.image]
-version = "0.24"
-
-[dependencies.chrono]
-version = "0.4"
+[dependencies]
+boytacean = { path = "../.." }
+boytacean-common = { path = "../../crates/common" }
+clap = { version = "4", features = ["derive"] }
+image = "0.24"
+chrono = "0.4"
 
 [dependencies.sdl2]
 version = "0.36"

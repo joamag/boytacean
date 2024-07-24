@@ -27,11 +27,14 @@
 use built::{write_built_file_with_opts, Options};
 use chrono::Utc;
 use regex::Regex;
-use std::fs::{File, OpenOptions};
-use std::io::Write;
-use std::path::Path;
-use std::process::Command;
-use std::{env, str};
+use std::{
+    env,
+    fs::{File, OpenOptions},
+    io::Write,
+    path::Path,
+    process::Command,
+    str,
+};
 
 const BUILD_OUT_FILE: &str = "build.rs";
 const GEN_DIR: &str = "./src/gen";

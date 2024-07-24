@@ -1,9 +1,10 @@
+use boytacean_common::error::Error;
 use std::{
     collections::HashMap,
     fmt::{self, Display, Formatter},
 };
 
-use crate::{error::Error, rom::RomType};
+use crate::rom::RomType;
 
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;

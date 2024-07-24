@@ -1,5 +1,6 @@
 //! Cartridge (ROM) related functions and structures.
 
+use boytacean_common::error::Error;
 use core::fmt;
 use std::{
     cmp::max,
@@ -10,7 +11,6 @@ use std::{
 use crate::{
     cheats::{genie::GameGenie, shark::GameShark},
     debugln,
-    error::Error,
     gb::GameBoyMode,
     licensee::Licensee,
     mmu::BusComponent,

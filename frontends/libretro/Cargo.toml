@@ -2,7 +2,7 @@
 name = "boytacean-libretro"
 version = "0.10.4"
 authors = ["João Magalhães <joamag@gmail.com>"]
-description = "A Lib Retro frontend for Boytacen"
+description = "A Libretro frontend for Boytacen"
 license = "Apache-2.0"
 keywords = ["gameboy", "emulator", "rust", "libretro"]
 edition = "2018"
@@ -16,5 +16,5 @@ debug = ["boytacean/debug"]
 pedantic = ["boytacean/pedantic"]
 cpulog = ["boytacean/cpulog"]
 
-[dependencies.boytacean]
-path = "../.."
+[dependencies]
+boytacean = { path = "../.." }
