@@ -349,7 +349,7 @@ impl Apu {
         }
     }
 
-    pub fn read(&mut self, addr: u16) -> u8 {
+    pub fn read(&self, addr: u16) -> u8 {
         match addr {
             // 0xFF10 — NR10: Channel 1 sweep
             0xff10 => {
@@ -449,6 +449,7 @@ impl Apu {
 
             _ => {
                 warnln!("Reading from unknown APU location 0x{:04x}", addr);
+                #[allow(unreachable_code)]
                 0xff
             }
         }
@@ -658,11 +659,11 @@ impl Apu {
         }
     }
 
-    pub fn read_unsafe(&mut self, addr: u16) -> u8 {
+    pub fn read_raw(&mut self, addr: u16) -> u8 {
         self.read(addr)
     }
 
-    pub fn write_unsafe(&mut self, addr: u16, value: u8) {
+    pub fn write_raw(&mut self, addr: u16, value: u8) {
         self.write(addr, value);
     }
 
@@ -1079,7 +1080,7 @@ impl Apu {
 }
 
 impl BusComponent for Apu {
-    fn read(&mut self, addr: u16) -> u8 {
+    fn read(&self, addr: u16) -> u8 {
         self.read(addr)
     }
 

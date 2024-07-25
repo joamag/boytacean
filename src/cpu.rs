@@ -5,10 +5,14 @@
 //!
 //! Most of the core CPU logic is implemented in the [`Cpu::clock`] method.
 
-use std::sync::Mutex;
+use std::{
+    fmt::{self, Display, Formatter},
+    sync::Mutex,
+};
 
 use crate::{
     apu::Apu,
+    assert_pedantic_gb,
     consts::LCDC_ADDR,
     debugln,
     dma::Dma,
@@ -23,6 +27,8 @@ use crate::{
 };
 
 pub const PREFIX: u8 = 0xcb;
+
+pub type Instruction = &'static (fn(&mut Cpu), u8, &'static str);
 
 pub struct Cpu {
     pub pc: u16,
@@ -50,6 +56,11 @@ pub struct Cpu {
     /// taken by the current or last CPU operation.
     pub cycles: u8,
 
+    /// Reference to the PC (Program Counter) of the previous executed
+    /// instruction, used to provide a reference to the instruction
+    /// so that it can be logged or used for debugging purposes.
+    pub ppc: u16,
+
     /// The pointer to the parent configuration of the running
     /// Game Boy emulator, that can be used to control the behaviour
     /// of Game Boy emulation.
@@ -76,6 +87,7 @@ impl Cpu {
             halted: false,
             mmu,
             cycles: 0,
+            ppc: 0x0,
             gbc,
         }
     }
@@ -131,10 +143,18 @@ impl Cpu {
         // is going to be used in the fetching phase
         let pc = self.pc;
 
-        #[cfg(feature = "debug")]
-        if (0x8000..0x9fff).contains(&pc) {
-            panic!("Invalid PC area at 0x{:04x}", pc);
-        }
+        // runs a series of assertions to guarantee CPU execution
+        // state, only if pedantic mode is set
+        assert_pedantic_gb!(
+            !(0x8000..=0x9fff).contains(&pc),
+            "Invalid PC area at 0x{:04x}",
+            pc
+        );
+        assert_pedantic_gb!(
+            !self.mmu.boot_active() || pc <= 0x08ff,
+            "Invalid boot address: {:04x}",
+            pc
+        );
 
         // @TODO this is so bad, need to improve this by an order
         // of magnitude, to be able to have better performance
@@ -265,21 +285,13 @@ impl Cpu {
             return 4;
         }
 
-        // fetches the current instruction and increments
-        // the PC (program counter) accordingly
-        let mut opcode = self.mmu.read(self.pc);
-        self.pc = self.pc.wrapping_add(1);
-
-        let is_prefix = opcode == PREFIX;
-        let inst: &(fn(&mut Cpu), u8, &str);
-
-        if is_prefix {
-            opcode = self.mmu.read(self.pc);
-            self.pc = self.pc.wrapping_add(1);
-            inst = &EXTENDED[opcode as usize];
-        } else {
-            inst = &INSTRUCTIONS[opcode as usize];
-        }
+        // fetches the current instruction and updates the PC
+        // (Program Counter) according to the final value returned
+        // by the fetch operation (we may need to fetch instruction
+        // more than one byte of length)
+        let (inst, pc) = self.fetch(self.pc);
+        self.ppc = self.pc;
+        self.pc = pc;
 
         #[allow(unused_variables)]
         let (inst_fn, inst_time, inst_str) = inst;
@@ -300,19 +312,7 @@ impl Cpu {
 
         #[cfg(feature = "cpulog")]
         {
-            let title_str = format!("[0x{:04x}] {}", self.pc - 1, inst_str);
-            let inst_time_str = format!("({} cycles)", inst_time);
-            let registers_str = format!("[PC=0x{:04x} SP=0x{:04x}] [A=0x{:02x} B=0x{:02x} C=0x{:02x} D=0x{:02x} E=0x{:02x} H=0x{:02x} L=0x{:02x}]",
-            self.pc, self.sp, self.a, self.b, self.c, self.d, self.e, self.h, self.l);
-            println!(
-                "{0: <24} {1: <11} {2: <10}",
-                title_str, inst_time_str, registers_str
-            );
-        }
-
-        #[cfg(feature = "pedantic")]
-        if self.mmu.boot_active() && self.pc - 1 > 0x08ff {
-            panic!("Invalid boot address: {:04x}", self.pc - 1);
+            println!("{}", self.description(inst, self.ppc));
         }
 
         // calls the current instruction and increments the number of
@@ -325,6 +325,33 @@ impl Cpu {
         // returns the number of cycles that the operation
         // that has been executed has taken
         self.cycles
+    }
+
+    #[inline(always)]
+    fn fetch(&self, pc: u16) -> (Instruction, u16) {
+        let mut pc = pc;
+
+        // fetches the current instruction and increments
+        // the PC (program counter) accordingly
+        let mut opcode = self.mmu.read(pc);
+        pc = pc.wrapping_add(1);
+
+        // checks if the current instruction is a prefix
+        // instruction, in case it is, fetches the next
+        // instruction and increments the PC accordingly
+        let inst: Instruction;
+        let is_prefix = opcode == PREFIX;
+        if is_prefix {
+            opcode = self.mmu.read(pc);
+            pc = pc.wrapping_add(1);
+            inst = &EXTENDED[opcode as usize];
+        } else {
+            inst = &INSTRUCTIONS[opcode as usize];
+        }
+
+        // returns both the fetched instruction and the
+        // updated PC (Program Counter) value
+        (inst, pc)
     }
 
     #[inline(always)]
@@ -617,12 +644,35 @@ impl Cpu {
     pub fn set_gbc(&mut self, value: SharedThread<GameBoyConfig>) {
         self.gbc = value;
     }
+
+    pub fn description(&self, inst: Instruction, inst_pc: u16) -> String {
+        let (_, inst_time, inst_str) = inst;
+        let title_str: String = format!("[0x{:04x}] {}", inst_pc, inst_str);
+        let inst_time_str = format!("({} cycles)", inst_time);
+        let registers_str = format!("[PC=0x{:04x} SP=0x{:04x}] [A=0x{:02x} B=0x{:02x} C=0x{:02x} D=0x{:02x} E=0x{:02x} H=0x{:02x} L=0x{:02x}]",
+        self.pc, self.sp, self.a, self.b, self.c, self.d, self.e, self.h, self.l);
+        format!(
+            "{0: <24} {1: <11} {2: <10}",
+            title_str, inst_time_str, registers_str
+        )
+    }
+
+    pub fn description_default(&self) -> String {
+        let (inst, _) = self.fetch(self.ppc);
+        self.description(inst, self.ppc)
+    }
 }
 
 impl Default for Cpu {
     fn default() -> Self {
         let gbc = SharedThread::new(Mutex::new(GameBoyConfig::default()));
         Cpu::new(Mmu::default(), gbc)
+    }
+}
+
+impl Display for Cpu {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.description_default())
     }
 }
 

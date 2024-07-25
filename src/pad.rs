@@ -75,7 +75,7 @@ impl Pad {
         }
     }
 
-    pub fn read(&mut self, addr: u16) -> u8 {
+    pub fn read(&self, addr: u16) -> u8 {
         match addr {
             // 0xFF00 — P1/JOYP: Joypad
             0xff00 => {
@@ -107,6 +107,7 @@ impl Pad {
             }
             _ => {
                 warnln!("Reading from unknown Pad location 0x{:04x}", addr);
+                #[allow(unreachable_code)]
                 0xff
             }
         }
@@ -174,7 +175,7 @@ impl Pad {
 }
 
 impl BusComponent for Pad {
-    fn read(&mut self, addr: u16) -> u8 {
+    fn read(&self, addr: u16) -> u8 {
         self.read(addr)
     }
 

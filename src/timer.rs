@@ -3,7 +3,7 @@
 use crate::{
     consts::{DIV_ADDR, TAC_ADDR, TIMA_ADDR, TMA_ADDR},
     mmu::BusComponent,
-    warnln,
+    panic_gb, warnln,
 };
 
 pub struct Timer {
@@ -73,7 +73,7 @@ impl Timer {
         }
     }
 
-    pub fn read(&mut self, addr: u16) -> u8 {
+    pub fn read(&self, addr: u16) -> u8 {
         match addr {
             // 0xFF04 — DIV: Divider register
             DIV_ADDR => self.div,
@@ -85,6 +85,7 @@ impl Timer {
             TAC_ADDR => self.tac | 0xf8,
             _ => {
                 warnln!("Reding from unknown Timer location 0x{:04x}", addr);
+                #[allow(unreachable_code)]
                 0xff
             }
         }
@@ -106,7 +107,7 @@ impl Timer {
                     0x01 => self.tima_ratio = 16,
                     0x02 => self.tima_ratio = 64,
                     0x03 => self.tima_ratio = 256,
-                    value => panic!("Invalid TAC value 0x{:02x}", value),
+                    value => panic_gb!("Invalid TAC value 0x{:02x}", value),
                 }
                 self.tima_enabled = (value & 0x04) == 0x04;
             }
@@ -151,7 +152,7 @@ impl Timer {
 }
 
 impl BusComponent for Timer {
-    fn read(&mut self, addr: u16) -> u8 {
+    fn read(&self, addr: u16) -> u8 {
         self.read(addr)
     }
 

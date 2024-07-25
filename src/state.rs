@@ -1659,7 +1659,7 @@ mod tests {
         assert_eq!(bess_core.de, 0x0000);
         assert_eq!(bess_core.hl, 0x0000);
         assert_eq!(bess_core.sp, 0x0000);
-        assert_eq!(bess_core.ime, false);
+        assert!(!bess_core.ime);
         assert_eq!(bess_core.ie, 0x00);
         assert_eq!(bess_core.execution_mode, 0);
         assert_eq!(bess_core.io_registers.len(), 128);

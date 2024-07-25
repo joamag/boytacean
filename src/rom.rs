@@ -14,6 +14,7 @@ use crate::{
     gb::GameBoyMode,
     licensee::Licensee,
     mmu::BusComponent,
+    panic_gb,
     util::read_file,
     warnln,
 };
@@ -424,7 +425,7 @@ impl Cartridge {
         Self::from_data(&data)
     }
 
-    pub fn read(&mut self, addr: u16) -> u8 {
+    pub fn read(&self, addr: u16) -> u8 {
         match addr {
             // 0x0000-0x7FFF: 16 KiB ROM bank 00 & 16 KiB ROM Bank 01–NN
             0x0000..=0x7fff => (self.handler.read_rom)(self, addr),
@@ -930,7 +931,7 @@ impl Cartridge {
 }
 
 impl BusComponent for Cartridge {
-    fn read(&mut self, addr: u16) -> u8 {
+    fn read(&self, addr: u16) -> u8 {
         self.read(addr)
     }
 
@@ -968,7 +969,7 @@ pub static NO_MBC: Mbc = Mbc {
             // to this address for some reason (probably related to
             // some kind of MBC1 compatibility issue)
             0x2000 => (),
-            _ => panic!("Writing to unknown Cartridge ROM location 0x{:04x}", addr),
+            _ => panic_gb!("Writing to unknown Cartridge ROM location 0x{:04x}", addr),
         };
     },
     read_ram: |rom: &Cartridge, addr: u16| -> u8 { rom.ram_data[(addr - 0xa000) as usize] },
@@ -988,6 +989,7 @@ pub static MBC1: Mbc = Mbc {
                 .unwrap_or(&0x0),
             _ => {
                 warnln!("Reading from unknown Cartridge ROM location 0x{:04x}", addr);
+                #[allow(unreachable_code)]
                 0xff
             }
         }
@@ -1033,7 +1035,10 @@ pub static MBC1: Mbc = Mbc {
     write_ram: |rom: &mut Cartridge, addr: u16, value: u8| {
         if !rom.ram_enabled {
             warnln!("Attempt to write to ERAM while write protect is active");
-            return;
+            #[allow(unreachable_code)]
+            {
+                return;
+            }
         }
         rom.ram_data[rom.ram_offset + (addr - 0xa000) as usize] = value;
     },
@@ -1050,6 +1055,7 @@ pub static MBC3: Mbc = Mbc {
                 .unwrap_or(&0x0),
             _ => {
                 warnln!("Reading from unknown Cartridge ROM location 0x{:04x}", addr);
+                #[allow(unreachable_code)]
                 0xff
             }
         }
@@ -1089,7 +1095,10 @@ pub static MBC3: Mbc = Mbc {
     write_ram: |rom: &mut Cartridge, addr: u16, value: u8| {
         if !rom.ram_enabled {
             warnln!("Attempt to write to ERAM while write protect is active");
-            return;
+            #[allow(unreachable_code)]
+            {
+                return;
+            }
         }
         rom.ram_data[rom.ram_offset + (addr - 0xa000) as usize] = value;
     },
@@ -1106,6 +1115,7 @@ pub static MBC5: Mbc = Mbc {
                 .unwrap_or(&0x0),
             _ => {
                 warnln!("Reading from unknown Cartridge ROM location 0x{:04x}", addr);
+                #[allow(unreachable_code)]
                 0xff
             }
         }
@@ -1159,7 +1169,10 @@ pub static MBC5: Mbc = Mbc {
     write_ram: |rom: &mut Cartridge, addr: u16, value: u8| {
         if !rom.ram_enabled {
             warnln!("Attempt to write to ERAM while write protect is active");
-            return;
+            #[allow(unreachable_code)]
+            {
+                return;
+            }
         }
         rom.ram_data[rom.ram_offset + (addr - 0xa000) as usize] = value;
     },

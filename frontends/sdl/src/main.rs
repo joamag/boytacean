@@ -258,12 +258,12 @@ impl Emulator {
         }
     }
 
-    #[cfg(not(feature = "slow"))]
-    pub fn start_base(&mut self) {}
-
-    #[cfg(feature = "slow")]
     pub fn start_base(&mut self) {
-        self.logic_frequency = 100;
+        self.system.set_diag();
+        #[cfg(feature = "slow")]
+        {
+            self.logic_frequency = 100;
+        }
     }
 
     pub fn start_graphics(&mut self, sdl: &Sdl, screen_scale: f32) {
@@ -420,6 +420,10 @@ impl Emulator {
         }
     }
 
+    pub fn print_debug(&mut self) {
+        println!("{}", self.system.description_debug());
+    }
+
     pub fn limited(&self) -> bool {
         !self.unlimited
     }
@@ -504,6 +508,10 @@ impl Emulator {
                         keycode: Some(Keycode::P),
                         ..
                     } => self.toggle_palette(),
+                    Event::KeyDown {
+                        keycode: Some(Keycode::C),
+                        ..
+                    } => self.print_debug(),
                     Event::KeyDown {
                         keycode: Some(Keycode::E),
                         keymod,
@@ -1030,7 +1038,7 @@ fn main() {
         let mode = Cartridge::from_file(&args.rom_path).unwrap().gb_mode();
         game_boy.set_mode(mode);
     }
-    let device: Box<dyn SerialDevice> = build_device(&args.device);
+    let device: Box<dyn SerialDevice> = build_device(&args.device).unwrap();
     game_boy.set_ppu_enabled(!args.no_ppu);
     game_boy.set_apu_enabled(!args.no_apu);
     game_boy.set_dma_enabled(!args.no_dma);
@@ -1070,10 +1078,10 @@ fn main() {
     run(args, &mut emulator);
 }
 
-fn build_device(device: &str) -> Box<dyn SerialDevice> {
+fn build_device(device: &str) -> Result<Box<dyn SerialDevice>, Error> {
     match device {
-        "null" => Box::<NullDevice>::default(),
-        "stdout" => Box::<StdoutDevice>::default(),
+        "null" => Ok(Box::<NullDevice>::default()),
+        "stdout" => Ok(Box::<StdoutDevice>::default()),
         "printer" => {
             let mut printer = Box::<PrinterDevice>::default();
             printer.set_callback(|image_buffer| {
@@ -1087,9 +1095,12 @@ fn build_device(device: &str) -> Box<dyn SerialDevice> {
                 )
                 .unwrap();
             });
-            printer
+            Ok(printer)
         }
-        _ => panic!("Unsupported device: {}", device),
+        _ => Err(Error::InvalidParameter(format!(
+            "Unsupported device: {}",
+            device
+        ))),
     }
 }
 

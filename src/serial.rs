@@ -90,7 +90,7 @@ impl Serial {
         }
     }
 
-    pub fn read(&mut self, addr: u16) -> u8 {
+    pub fn read(&self, addr: u16) -> u8 {
         match addr {
             // 0xFF01 — SB: Serial transfer data
             SB_ADDR => self.data,
@@ -104,6 +104,7 @@ impl Serial {
             }
             _ => {
                 warnln!("Reding from unknown Serial location 0x{:04x}", addr);
+                #[allow(unreachable_code)]
                 0xff
             }
         }
@@ -209,7 +210,7 @@ impl Serial {
 }
 
 impl BusComponent for Serial {
-    fn read(&mut self, addr: u16) -> u8 {
+    fn read(&self, addr: u16) -> u8 {
         self.read(addr)
     }
 
