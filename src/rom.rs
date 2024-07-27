@@ -425,13 +425,11 @@ impl Cartridge {
     }
 
     pub fn read(&mut self, addr: u16) -> u8 {
-        match addr & 0xf000 {
+        match addr {
             // 0x0000-0x7FFF: 16 KiB ROM bank 00 & 16 KiB ROM Bank 01–NN
-            0x0000 | 0x1000 | 0x2000 | 0x3000 | 0x4000 | 0x5000 | 0x6000 | 0x7000 => {
-                (self.handler.read_rom)(self, addr)
-            }
+            0x0000..=0x7fff => (self.handler.read_rom)(self, addr),
             // 0xA000-0xBFFF: 8 KiB External RAM
-            0xa000 | 0xb000 => (self.handler.read_ram)(self, addr),
+            0xa000..=0xbfff => (self.handler.read_ram)(self, addr),
             _ => {
                 debugln!("Reading from unknown Cartridge control 0x{:04x}", addr);
                 0x00
@@ -440,13 +438,11 @@ impl Cartridge {
     }
 
     pub fn write(&mut self, addr: u16, value: u8) {
-        match addr & 0xf000 {
+        match addr {
             // 0x0000-0x7FFF: 16 KiB ROM bank 00 & 16 KiB ROM Bank 01–NN
-            0x0000 | 0x1000 | 0x2000 | 0x3000 | 0x4000 | 0x5000 | 0x6000 | 0x7000 => {
-                (self.handler.write_rom)(self, addr, value)
-            }
+            0x0000..=0x7fff => (self.handler.write_rom)(self, addr, value),
             // 0xA000-0xBFFF: 8 KiB External RAM
-            0xa000 | 0xb000 => (self.handler.write_ram)(self, addr, value),
+            0xa000..=0xbfff => (self.handler.write_ram)(self, addr, value),
             _ => debugln!("Writing to unknown Cartridge address 0x{:04x}", addr),
         }
     }
@@ -984,9 +980,9 @@ pub static NO_MBC: Mbc = Mbc {
 pub static MBC1: Mbc = Mbc {
     name: "MBC1",
     read_rom: |rom: &Cartridge, addr: u16| -> u8 {
-        match addr & 0xf000 {
-            0x0000 | 0x1000 | 0x2000 | 0x3000 => rom.rom_data[addr as usize],
-            0x4000 | 0x5000 | 0x6000 | 0x7000 => *rom
+        match addr {
+            0x0000..=0x3fff => rom.rom_data[addr as usize],
+            0x4000..=0x7fff => *rom
                 .rom_data
                 .get(rom.rom_offset + (addr - 0x4000) as usize)
                 .unwrap_or(&0x0),
@@ -997,13 +993,13 @@ pub static MBC1: Mbc = Mbc {
         }
     },
     write_rom: |rom: &mut Cartridge, addr: u16, value: u8| {
-        match addr & 0xf000 {
+        match addr {
             // RAM enabled flag
-            0x0000 | 0x1000 => {
+            0x0000..=0x1fff => {
                 rom.ram_enabled = (value & 0x0f) == 0x0a;
             }
             // ROM bank selection 5 lower bits
-            0x2000 | 0x3000 => {
+            0x2000..=0x3fff => {
                 let mut rom_bank = value as u16 & 0x1f;
                 rom_bank &= rom.rom_bank_count * 2 - 1;
                 if rom_bank == 0 {
@@ -1012,7 +1008,7 @@ pub static MBC1: Mbc = Mbc {
                 rom.set_rom_bank(rom_bank);
             }
             // RAM bank selection and ROM bank selection upper bits
-            0x4000 | 0x5000 => {
+            0x4000..=0x5fff => {
                 let ram_bank = value & 0x03;
                 if ram_bank as u16 >= rom.ram_bank_count {
                     return;
@@ -1020,7 +1016,7 @@ pub static MBC1: Mbc = Mbc {
                 rom.set_ram_bank(ram_bank);
             }
             // ROM mode selection
-            0x6000 | 0x7000 => {
+            0x6000..=0x7fff => {
                 if value == 0x1 && rom.rom_bank_count > 32 {
                     unimplemented!("Advanced ROM banking mode for MBC1 is not implemented");
                 }
@@ -1046,9 +1042,9 @@ pub static MBC1: Mbc = Mbc {
 pub static MBC3: Mbc = Mbc {
     name: "MBC3",
     read_rom: |rom: &Cartridge, addr: u16| -> u8 {
-        match addr & 0xf000 {
-            0x0000 | 0x1000 | 0x2000 | 0x3000 => rom.rom_data[addr as usize],
-            0x4000 | 0x5000 | 0x6000 | 0x7000 => *rom
+        match addr {
+            0x0000..=0x3fff => rom.rom_data[addr as usize],
+            0x4000..=0x7fff => *rom
                 .rom_data
                 .get(rom.rom_offset + (addr - 0x4000) as usize)
                 .unwrap_or(&0x0),
@@ -1059,13 +1055,13 @@ pub static MBC3: Mbc = Mbc {
         }
     },
     write_rom: |rom: &mut Cartridge, addr: u16, value: u8| {
-        match addr & 0xf000 {
+        match addr {
             // RAM enabled flag
-            0x0000 | 0x1000 => {
+            0x0000..=0x1fff => {
                 rom.ram_enabled = (value & 0x0f) == 0x0a;
             }
             // ROM bank selection
-            0x2000 | 0x3000 => {
+            0x2000..=0x3fff => {
                 let mut rom_bank = value as u16 & 0x7f;
                 rom_bank &= rom.rom_bank_count * 2 - 1;
                 if rom_bank == 0 {
@@ -1074,7 +1070,7 @@ pub static MBC3: Mbc = Mbc {
                 rom.set_rom_bank(rom_bank);
             }
             // RAM bank selection
-            0x4000 | 0x5000 => {
+            0x4000..=0x5fff => {
                 let ram_bank = value & 0x03;
                 if ram_bank as u16 >= rom.ram_bank_count {
                     return;
@@ -1102,9 +1098,9 @@ pub static MBC3: Mbc = Mbc {
 pub static MBC5: Mbc = Mbc {
     name: "MBC5",
     read_rom: |rom: &Cartridge, addr: u16| -> u8 {
-        match addr & 0xf000 {
-            0x0000 | 0x1000 | 0x2000 | 0x3000 => rom.rom_data[addr as usize],
-            0x4000 | 0x5000 | 0x6000 | 0x7000 => *rom
+        match addr {
+            0x0000..=0x3fff => rom.rom_data[addr as usize],
+            0x4000..=0x7fff => *rom
                 .rom_data
                 .get(rom.rom_offset + (addr - 0x4000) as usize)
                 .unwrap_or(&0x0),
@@ -1115,9 +1111,9 @@ pub static MBC5: Mbc = Mbc {
         }
     },
     write_rom: |rom: &mut Cartridge, addr: u16, value: u8| {
-        match addr & 0xf000 {
+        match addr {
             // RAM enabled flag
-            0x0000 | 0x1000 => {
+            0x0000..=0x1fff => {
                 rom.ram_enabled = (value & 0x0f) == 0x0a;
             }
             // ROM bank selection 8 lower bits
@@ -1131,7 +1127,7 @@ pub static MBC5: Mbc = Mbc {
                 rom.set_rom_bank(rom_bank);
             }
             // RAM bank selection
-            0x4000 | 0x5000 => {
+            0x4000..=0x5fff => {
                 let mut ram_bank = value & 0x0f;
 
                 // handles the rumble flag for the cartridges
