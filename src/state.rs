@@ -88,6 +88,17 @@ pub trait State {
     fn to_gb(&self, gb: &mut GameBoy) -> Result<(), Error>;
 }
 
+pub trait StateBox {
+    /// Obtains a new instance of the state from the provided
+    /// `GameBoy` instance and returns it as a boxed value.
+    fn from_gb(gb: &mut GameBoy) -> Result<Box<Self>, Error>
+    where
+        Self: Sized;
+
+    /// Applies the state to the provided `GameBoy` instance.
+    fn to_gb(&self, gb: &mut GameBoy) -> Result<(), Error>;
+}
+
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 #[derive(Default)]
 pub struct BosState {
@@ -248,16 +259,16 @@ impl Serialize for BosState {
     }
 }
 
-impl State for BosState {
-    fn from_gb(gb: &mut GameBoy) -> Result<Self, Error> {
-        Ok(Self {
+impl StateBox for BosState {
+    fn from_gb(gb: &mut GameBoy) -> Result<Box<Self>, Error> {
+        Ok(Box::new(Self {
             magic: BOS_MAGIC_UINT,
             version: BOS_VERSION,
             block_count: 2,
             info: Some(BosInfo::from_gb(gb)?),
             image_buffer: Some(BosImageBuffer::from_gb(gb)?),
-            bess: BessState::from_gb(gb)?,
-        })
+            bess: *BessState::from_gb(gb)?,
+        }))
     }
 
     fn to_gb(&self, gb: &mut GameBoy) -> Result<(), Error> {
@@ -606,16 +617,16 @@ impl Serialize for BessState {
     }
 }
 
-impl State for BessState {
-    fn from_gb(gb: &mut GameBoy) -> Result<Self, Error> {
-        Ok(Self {
+impl StateBox for BessState {
+    fn from_gb(gb: &mut GameBoy) -> Result<Box<Self>, Error> {
+        Ok(Box::new(Self {
             footer: BessFooter::default(),
             name: BessName::from_gb(gb)?,
             info: BessInfo::from_gb(gb)?,
             core: BessCore::from_gb(gb)?,
             mbc: BessMbc::from_gb(gb)?,
             end: BessBlock::from_magic(String::from("END ")),
-        })
+        }))
     }
 
     fn to_gb(&self, gb: &mut GameBoy) -> Result<(), Error> {
@@ -1630,9 +1641,48 @@ impl StateManager {
 mod tests {
     use boytacean_encoding::zippy::{decode_zippy, encode_zippy};
 
-    use crate::gb::GameBoy;
+    use crate::{gb::GameBoy, state::State};
 
-    use super::{SaveStateFormat, StateManager};
+    use super::{BessCore, SaveStateFormat, StateManager};
+
+    #[test]
+    fn test_bess_core() {
+        let mut gb = GameBoy::default();
+        gb.load(true).unwrap();
+        gb.load_rom_file("res/roms/test/firstwhite.gb", None)
+            .unwrap();
+        let bess_core = BessCore::from_gb(&mut gb).unwrap();
+        assert_eq!(bess_core.model, "GDB ");
+        assert_eq!(bess_core.pc, 0x0000);
+        assert_eq!(bess_core.af, 0x0000);
+        assert_eq!(bess_core.bc, 0x0000);
+        assert_eq!(bess_core.de, 0x0000);
+        assert_eq!(bess_core.hl, 0x0000);
+        assert_eq!(bess_core.sp, 0x0000);
+        assert_eq!(bess_core.ime, false);
+        assert_eq!(bess_core.ie, 0x00);
+        assert_eq!(bess_core.execution_mode, 0);
+        assert_eq!(bess_core.io_registers.len(), 128);
+        assert_eq!(
+            bess_core.io_registers,
+            [
+                63, 0, 0, 255, 0, 0, 0, 248, 255, 255, 255, 255, 255, 255, 255, 224, 128, 63, 0,
+                255, 191, 255, 63, 0, 255, 191, 127, 255, 159, 255, 191, 255, 255, 0, 0, 191, 0, 0,
+                240, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 134, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 126, 255, 254, 0, 255, 255,
+                255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+                255, 255, 255, 255, 255, 0, 0, 0, 0, 255, 255, 255, 255, 249, 255, 255, 255, 255,
+                255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255
+            ]
+        );
+        assert_eq!(bess_core.ram.size, 0x2000);
+        assert_eq!(bess_core.vram.size, 0x2000);
+        assert_eq!(bess_core.mbc_ram.size, 0x2000);
+        assert_eq!(bess_core.oam.size, 0x00a0);
+        assert_eq!(bess_core.hram.size, 0x007f);
+        assert_eq!(bess_core.background_palettes.size, 0x0000);
+        assert_eq!(bess_core.object_palettes.size, 0x0000);
+    }
 
     #[test]
     fn test_load_bos() {
@@ -1667,7 +1717,7 @@ mod tests {
         let encoded = encode_zippy(&data).unwrap();
         let decoded = decode_zippy(&encoded).unwrap();
         assert_eq!(data, decoded);
-        assert_eq!(encoded.len(), 804);
+        assert_eq!(encoded.len(), 811);
         assert_eq!(decoded.len(), 25154);
     }
 }

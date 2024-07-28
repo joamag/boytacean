@@ -4,7 +4,6 @@ use std::sync::Mutex;
 
 use crate::{
     apu::Apu,
-    debugln,
     dma::Dma,
     gb::{Components, GameBoyConfig, GameBoyMode, GameBoySpeed},
     pad::Pad,
@@ -13,6 +12,7 @@ use crate::{
     serial::Serial,
     timer::Timer,
     util::SharedThread,
+    warnln,
 };
 
 pub const BOOT_SIZE_DMG: usize = 256;
@@ -319,9 +319,9 @@ impl Mmu {
     }
 
     pub fn read(&mut self, addr: u16) -> u8 {
-        match addr & 0xf000 {
-            // BOOT (256 B) + ROM0 (4 KB/16 KB)
-            0x0000 => {
+        match addr {
+            // 0x0000-0x0FFF - BOOT (256 B) + ROM0 (4 KB/16 KB)
+            0x0000..=0x0fff => {
                 // in case the boot mode is active and the
                 // address is withing boot memory reads from it
                 if self.boot_active && addr <= 0x00fe {
@@ -342,209 +342,194 @@ impl Mmu {
                 self.rom.read(addr)
             }
 
-            // ROM 0 (12 KB/16 KB)
-            0x1000 | 0x2000 | 0x3000 => self.rom.read(addr),
+            // 0x1000-0x3FFF - ROM 0 (12 KB/16 KB)
+            // 0x4000-0x7FFF - ROM 1 (Banked) (16 KB)
+            0x1000..=0x7fff => self.rom.read(addr),
 
-            // ROM 1 (Banked) (16 KB)
-            0x4000 | 0x5000 | 0x6000 | 0x7000 => self.rom.read(addr),
+            // 0x8000-0x9FFF - Graphics: VRAM (8 KB)
+            0x8000..=0x9fff => self.ppu.read(addr),
 
-            // Graphics: VRAM (8 KB)
-            0x8000 | 0x9000 => self.ppu.read(addr),
+            // 0xA000-0xBFFF - External RAM (8 KB)
+            0xa000..=0xbfff => self.rom.read(addr),
 
-            // External RAM (8 KB)
-            0xa000 | 0xb000 => self.rom.read(addr),
+            // 0xC000-0xCFFF - Working RAM 0 (4 KB)
+            0xc000..=0xcfff => self.ram[(addr & 0x0fff) as usize],
 
-            // Working RAM 0 (4 KB)
-            0xc000 => self.ram[(addr & 0x0fff) as usize],
+            // 0xD000..=0xDFFF - Working RAM 1 (Banked) (4KB)
+            0xd000..=0xdfff => self.ram[(self.ram_offset + (addr & 0x0fff)) as usize],
 
-            // Working RAM 1 (Banked) (4KB)
-            0xd000 => self.ram[(self.ram_offset + (addr & 0x0fff)) as usize],
+            // 0xE000..=0xFDFF - Working RAM Shadow
+            0xe000..=0xfdff => self.ram[(addr & 0x1fff) as usize],
 
-            // Working RAM Shadow
-            0xe000 => self.ram[(addr & 0x1fff) as usize],
+            // 0xFE00-0xFE9F - Object attribute memory (OAM)
+            0xfe00..=0xfe9f => self.ppu.read(addr),
 
-            // Working RAM Shadow, I/O, Zero-page RAM
-            0xf000 => match addr & 0x0f00 {
-                0x000 | 0x100 | 0x200 | 0x300 | 0x400 | 0x500 | 0x600 | 0x700 | 0x800 | 0x900
-                | 0xa00 | 0xb00 | 0xc00 | 0xd00 => self.ram[(addr & 0x1fff) as usize],
-                0xe00 => self.ppu.read(addr),
-                0xf00 => match addr & 0x00ff {
-                    // 0xFF01-0xFF02 - Serial data transfer
-                    0x01..=0x02 => self.serial.read(addr),
+            // 0xFEA0-0xFEFF - Not Usable
+            0xfea0..=0xfeff => 0xff,
 
-                    // 0xFF0F — IF: Interrupt flag
-                    0x0f =>
-                    {
-                        #[allow(clippy::bool_to_int_with_if)]
-                        (if self.ppu.int_vblank() { 0x01 } else { 0x00 }
-                            | if self.ppu.int_stat() { 0x02 } else { 0x00 }
-                            | if self.timer.int_tima() { 0x04 } else { 0x00 }
-                            | if self.serial.int_serial() { 0x08 } else { 0x00 }
-                            | if self.pad.int_pad() { 0x10 } else { 0x00 }
-                            | 0xe0)
-                    }
+            // 0xFF00 - Joypad input
+            0xff00 => self.pad.read(addr),
 
-                    // 0xFF4C - KEY0: Compatibility flag (CGB only)
-                    0x4c => self.key0,
+            // 0xFF01-0xFF02 - Serial data transfer
+            0xff01..=0xff02 => self.serial.read(addr),
 
-                    // 0xFF4D - KEY1: Speed switching (CGB only)
-                    0x4d => (false as u8) | ((self.speed as u8) << 7),
+            // 0xFF04-0xFF07 - Timer and divider
+            0xff04..=0xff07 => self.timer.read(addr),
 
-                    // 0xFF50 - Boot active flag
-                    0x50 => u8::from(!self.boot_active),
+            // 0xFF0F — IF: Interrupt flag
+            0xff0f =>
+            {
+                #[allow(clippy::bool_to_int_with_if)]
+                (if self.ppu.int_vblank() { 0x01 } else { 0x00 }
+                    | if self.ppu.int_stat() { 0x02 } else { 0x00 }
+                    | if self.timer.int_tima() { 0x04 } else { 0x00 }
+                    | if self.serial.int_serial() { 0x08 } else { 0x00 }
+                    | if self.pad.int_pad() { 0x10 } else { 0x00 }
+                    | 0xe0)
+            }
 
-                    // 0xFF70 - SVBK: WRAM bank (CGB only)
-                    0x70 => self.ram_bank & 0x07,
+            // 0xFF10-0xFF26 — Audio
+            // 0xFF10-0xFF26 — Wave pattern
+            0xff10..=0xff26 | 0xff30..=0xff3f => self.apu.read(addr),
 
-                    // 0xFF80-0xFFFE - High RAM (HRAM)
-                    0x80..=0xfe => self.ppu.read(addr),
+            // 0xFF40-0xFF45 - PPU registers
+            // 0xFF47-0xFF4B - PPU registers
+            0xff40..=0xff45 | 0xff47..=0xff4b => self.ppu.read(addr),
 
-                    // 0xFFFF — IE: Interrupt enable
-                    0xff => self.ie,
+            // 0xFF46 — DMA: OAM DMA source address & start
+            0xff46 => self.dma.read(addr),
 
-                    // Other registers
-                    _ => match addr & 0x00f0 {
-                        0x00 => match addr & 0x00ff {
-                            0x00 => self.pad.read(addr),
-                            0x04..=0x07 => self.timer.read(addr),
-                            _ => {
-                                debugln!("Reading from unknown IO control 0x{:04x}", addr);
-                                0x00
-                            }
-                        },
-                        0x10 | 0x20 | 0x30 => self.apu.read(addr),
-                        0x40 | 0x60 | 0x70 => match addr & 0x00ff {
-                            // 0xFF46 — DMA: OAM DMA source address & start
-                            0x0046 => self.dma.read(addr),
+            // 0xFF4C - KEY0: Compatibility flag (CGB only)
+            0xff4c => self.key0,
 
-                            // VRAM related read
-                            _ => self.ppu.read(addr),
-                        },
-                        0x50 => match addr & 0x00ff {
-                            0x51..=0x55 => self.dma.read(addr),
-                            _ => {
-                                debugln!("Reading from unknown IO control 0x{:04x}", addr);
-                                0x00
-                            }
-                        },
-                        _ => {
-                            debugln!("Reading from unknown IO control 0x{:04x}", addr);
-                            0x00
-                        }
-                    },
-                },
-                addr => panic!("Reading from unknown location 0x{:04x}", addr),
-            },
+            // 0xFF4D - KEY1: Speed switching (CGB only)
+            0xff4d => (if self.switching { 0x01 } else { 0x00 }) | ((self.speed as u8) << 7) | 0x7e,
 
-            addr => panic!("Reading from unknown location 0x{:04x}", addr),
+            // 0xFF4F - VRAM Bank Select (CGB only)
+            0xff4f => self.ppu.read(addr),
+
+            // 0xFF50 - Boot active flag
+            0xff50 => u8::from(!self.boot_active),
+
+            // 0xFF51-0xFF55 - VRAM DMA (HDMA) (CGB only)
+            0xff51..=0xff55 => self.dma.read(addr),
+
+            // 0xFF68-0xFF6B - BG / OBJ Palettes (CGB only)
+            0xff68..=0xff6b => self.ppu.read(addr),
+
+            // 0xFF70 - SVBK: WRAM bank (CGB only)
+            0xff70 => (self.ram_bank & 0x07) | 0xf8,
+
+            // 0xFF80-0xFFFE - High RAM (HRAM)
+            0xff80..=0xfffe => self.ppu.read(addr),
+
+            // 0xFFFF — IE: Interrupt enable
+            0xffff => self.ie,
+
+            addr => {
+                warnln!("Reading from unknown location 0x{:04x}", addr);
+                0xff
+            }
         }
     }
 
     pub fn write(&mut self, addr: u16, value: u8) {
-        match addr & 0xf000 {
-            // BOOT (256 B) + ROM0 (4 KB/16 KB)
-            0x0000 => self.rom.write(addr, value),
+        match addr {
+            // 0x0000-0x0FFF - BOOT (256 B) + ROM0 (4 KB/16 KB)
+            // 0x1000-0x3FFF - ROM 0 (12 KB/16 KB)
+            // 0x4000-0x7FFF - ROM 1 (Banked) (16 KB)
+            0x0000..=0x7fff => self.rom.write(addr, value),
 
-            // ROM 0 (12 KB/16 KB)
-            0x1000 | 0x2000 | 0x3000 => self.rom.write(addr, value),
+            // 0x8000-0x9FFF - Graphics: VRAM (8 KB)
+            0x8000..=0x9fff => self.ppu.write(addr, value),
 
-            // ROM 1 (Banked) (16 KB)
-            0x4000 | 0x5000 | 0x6000 | 0x7000 => self.rom.write(addr, value),
+            // 0xA000-0xBFFF - External RAM (8 KB)
+            0xa000..=0xbfff => self.rom.write(addr, value),
 
-            // Graphics: VRAM (8 KB)
-            0x8000 | 0x9000 => self.ppu.write(addr, value),
+            // 0xC000-0xCFFF - Working RAM 0 (4 KB)
+            0xc000..=0xcfff => self.ram[(addr & 0x0fff) as usize] = value,
 
-            // External RAM (8 KB)
-            0xa000 | 0xb000 => self.rom.write(addr, value),
+            // 0xD000..=0xDFFF - Working RAM 1 (Banked) (4KB)
+            0xd000..=0xdfff => self.ram[(self.ram_offset + (addr & 0x0fff)) as usize] = value,
 
-            // Working RAM 0 (4 KB)
-            0xc000 => self.ram[(addr & 0x0fff) as usize] = value,
+            // 0xE000..=0xFDFF - Working RAM Shadow
+            0xe000..=0xfdff => self.ram[(addr & 0x1fff) as usize] = value,
 
-            // Working RAM 1 (Banked) (4KB)
-            0xd000 => self.ram[(self.ram_offset + (addr & 0x0fff)) as usize] = value,
+            // 0xFE00-0xFE9F - Object attribute memory (OAM)
+            0xfe00..=0xfe9f => self.ppu.write(addr, value),
 
-            // Working RAM Shadow
-            0xe000 => self.ram[(addr & 0x1fff) as usize] = value,
+            // 0xFEA0-0xFEFF - Not Usable
+            0xfea0..=0xfeff => {}
 
-            // Working RAM Shadow, I/O, Zero-page RAM
-            0xf000 => match addr & 0x0f00 {
-                0x000 | 0x100 | 0x200 | 0x300 | 0x400 | 0x500 | 0x600 | 0x700 | 0x800 | 0x900
-                | 0xa00 | 0xb00 | 0xc00 | 0xd00 => {
-                    self.ram[(addr & 0x1fff) as usize] = value;
+            // 0xFF00 - Joypad input
+            0xff00 => self.pad.write(addr, value),
+
+            // 0xFF01-0xFF02 - Serial data transfer
+            0xff01..=0xff02 => self.serial.write(addr, value),
+
+            // 0xFF04-0xFF07 - Timer and divider
+            0xff04..=0xff07 => self.timer.write(addr, value),
+
+            // 0xFF0F — IF: Interrupt flag
+            0xff0f => {
+                self.ppu.set_int_vblank(value & 0x01 == 0x01);
+                self.ppu.set_int_stat(value & 0x02 == 0x02);
+                self.timer.set_int_tima(value & 0x04 == 0x04);
+                self.serial.set_int_serial(value & 0x08 == 0x08);
+                self.pad.set_int_pad(value & 0x10 == 0x10);
+            }
+
+            // 0xFF10-0xFF26 — Audio
+            // 0xFF10-0xFF26 — Wave pattern
+            0xff10..=0xff26 | 0xff30..=0xff3f => self.apu.write(addr, value),
+
+            // 0xFF40-0xFF45 - PPU registers
+            // 0xFF47-0xFF4B - PPU registers
+            0xff40..=0xff45 | 0xff47..=0xff4b => self.ppu.write(addr, value),
+
+            // 0xFF46 — DMA: OAM DMA source address & start
+            0xff46 => self.dma.write(addr, value),
+
+            // 0xFF4C - KEY0: Compatibility flag (CGB only)
+            0xff4c => {
+                self.key0 = value;
+                if value == 0x04 {
+                    self.ppu().set_dmg_compat(true);
                 }
-                0xe00 => self.ppu.write(addr, value),
-                0xf00 => match addr & 0x00ff {
-                    // 0xFF01-0xFF02 - Serial data transfer
-                    0x01..=0x02 => self.serial.write(addr, value),
+            }
 
-                    // 0xFF0F — IF: Interrupt flag
-                    0x0f => {
-                        self.ppu.set_int_vblank(value & 0x01 == 0x01);
-                        self.ppu.set_int_stat(value & 0x02 == 0x02);
-                        self.timer.set_int_tima(value & 0x04 == 0x04);
-                        self.serial.set_int_serial(value & 0x08 == 0x08);
-                        self.pad.set_int_pad(value & 0x10 == 0x10);
-                    }
+            // 0xFF4D - KEY1: Speed switching (CGB only)
+            0xff4d => self.switching = value & 0x01 == 0x01,
 
-                    // 0xFF4C - KEY0: Compatibility flag (CGB only)
-                    0x4c => {
-                        self.key0 = value;
-                        if value == 0x04 {
-                            self.ppu().set_dmg_compat(true);
-                        }
-                    }
+            // 0xFF4F - VRAM Bank Select (CGB only)
+            0xff4f => self.ppu.write(addr, value),
 
-                    // 0xFF4D - KEY1: Speed switching (CGB only)
-                    0x4d => {
-                        self.switching = value & 0x01 == 0x01;
-                    }
+            // 0xFF50 - Boot active flag
+            0xff50 => self.boot_active = value == 0x00,
 
-                    // 0xFF50 - Boot active flag
-                    0x50 => self.boot_active = value == 0x00,
+            // 0xFF51-0xFF55 - VRAM DMA (HDMA) (CGB only)
+            0xff51..=0xff55 => self.dma.write(addr, value),
 
-                    // 0xFF70 - SVBK: WRAM bank (CGB only)
-                    0x70 => {
-                        let mut ram_bank = value & 0x07;
-                        if ram_bank == 0x0 {
-                            ram_bank = 0x1;
-                        }
-                        self.ram_bank = ram_bank;
-                        self.ram_offset = self.ram_bank as u16 * 0x1000;
-                    }
+            // 0xFF68-0xFF6B - BG / OBJ Palettes (CGB only)
+            0xff68..=0xff6b => self.ppu.write(addr, value),
 
-                    // 0xFF80-0xFFFE - High RAM (HRAM)
-                    0x80..=0xfe => self.ppu.write(addr, value),
+            // 0xFF70 - SVBK: WRAM bank (CGB only)
+            0xff70 => {
+                let mut ram_bank = value & 0x07;
+                if ram_bank == 0x0 {
+                    ram_bank = 0x1;
+                }
+                self.ram_bank = ram_bank;
+                self.ram_offset = self.ram_bank as u16 * 0x1000;
+            }
 
-                    // 0xFFFF — IE: Interrupt enable
-                    0xff => self.ie = value,
+            // 0xFF80-0xFFFE - High RAM (HRAM)
+            0xff80..=0xfffe => self.ppu.write(addr, value),
 
-                    // Other registers
-                    _ => match addr & 0x00f0 {
-                        0x00 => match addr & 0x00ff {
-                            0x00 => self.pad.write(addr, value),
-                            0x04..=0x07 => self.timer.write(addr, value),
-                            _ => debugln!("Writing to unknown IO control 0x{:04x}", addr),
-                        },
-                        0x10 | 0x20 | 0x30 => self.apu.write(addr, value),
-                        0x40 | 0x60 | 0x70 => match addr & 0x00ff {
-                            // 0xFF46 — DMA: OAM DMA source address & start
-                            0x0046 => self.dma.write(addr, value),
+            // 0xFFFF — IE: Interrupt enable
+            0xffff => self.ie = value,
 
-                            // VRAM related write
-                            _ => self.ppu.write(addr, value),
-                        },
-                        #[allow(clippy::single_match)]
-                        0x50 => match addr & 0x00ff {
-                            0x51..=0x55 => self.dma.write(addr, value),
-                            _ => debugln!("Writing to unknown IO control 0x{:04x}", addr),
-                        },
-                        _ => debugln!("Writing to unknown IO control 0x{:04x}", addr),
-                    },
-                },
-                addr => panic!("Writing to unknown location 0x{:04x}", addr),
-            },
-
-            addr => panic!("Writing to unknown location 0x{:04x}", addr),
+            addr => warnln!("Writing to unknown location 0x{:04x}", addr),
         }
     }
 
