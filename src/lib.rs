@@ -8,6 +8,7 @@ pub mod consts;
 pub mod cpu;
 pub mod data;
 pub mod devices;
+pub mod diag;
 pub mod dma;
 pub mod gb;
 pub mod gen;

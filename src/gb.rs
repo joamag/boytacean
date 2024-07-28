@@ -1022,6 +1022,15 @@ impl GameBoy {
             self.serial_i().device().description(),
         )
     }
+
+    pub fn description_debug(&self) -> String {
+        format!(
+            "{}\nCPU:\n{}\nDMA:\n{}",
+            self.description(12),
+            self.cpu_i().description_default(),
+            self.dma_i().description()
+        )
+    }
 }
 
 /// Gameboy implementations that are meant with performance

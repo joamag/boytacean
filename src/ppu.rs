@@ -21,6 +21,7 @@ use crate::{
     },
     gb::{GameBoyConfig, GameBoyMode},
     mmu::BusComponent,
+    panic_gb,
     util::SharedThread,
     warnln,
 };
@@ -780,7 +781,7 @@ impl Ppu {
         }
     }
 
-    pub fn read(&mut self, addr: u16) -> u8 {
+    pub fn read(&self, addr: u16) -> u8 {
         match addr {
             0x8000..=0x9fff => self.vram[(self.vram_offset + (addr & 0x1fff)) as usize],
             0xfe00..=0xfe9f => self.oam[(addr & 0x009f) as usize],
@@ -837,6 +838,7 @@ impl Ppu {
             0xff6c => (if self.obj_priority { 0x01 } else { 0x00 }) | 0xfe,
             _ => {
                 warnln!("Reading from unknown PPU location 0x{:04x}", addr);
+                #[allow(unreachable_code)]
                 0xff
             }
         }
@@ -1777,7 +1779,7 @@ impl Ppu {
                     } else if obj.palette == 1 {
                         (&self.palette_obj_1, 0_u8)
                     } else {
-                        panic!("Invalid object palette: {:02x}", obj.palette);
+                        panic_gb!("Invalid object palette: {:02x}", obj.palette);
                     }
                 } else {
                     (&self.palettes_color_obj[obj.palette_cgb as usize], 0_u8)
@@ -1787,7 +1789,7 @@ impl Ppu {
             } else if obj.palette == 1 {
                 (&self.palette_obj_1, 2_u8)
             } else {
-                panic!("Invalid object palette: {:02x}", obj.palette);
+                panic_gb!("Invalid object palette: {:02x}", obj.palette);
             };
 
             // obtains the current integer value (raw) for the palette in use
@@ -1987,7 +1989,7 @@ impl Ppu {
             let color_index: usize = (value as usize >> (index * 2)) & 3;
             match color_index {
                 0..=3 => *palette_item = palette_colors[color_index],
-                color_index => panic!("Invalid palette color index {:04x}", color_index),
+                color_index => panic_gb!("Invalid palette color index {:04x}", color_index),
             }
         }
     }
@@ -2045,7 +2047,7 @@ impl Ppu {
 }
 
 impl BusComponent for Ppu {
-    fn read(&mut self, addr: u16) -> u8 {
+    fn read(&self, addr: u16) -> u8 {
         self.read(addr)
     }
 

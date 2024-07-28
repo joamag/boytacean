@@ -453,7 +453,10 @@ pub extern "C" fn retro_serialize(data: *mut c_void, size: usize) -> bool {
         Ok(state) => state,
         Err(err) => {
             warnln!("Failed to save state: {}", err);
-            return false;
+            #[allow(unreachable_code)]
+            {
+                return false;
+            }
         }
     };
     if state.len() > size {
@@ -462,7 +465,10 @@ pub extern "C" fn retro_serialize(data: *mut c_void, size: usize) -> bool {
             state.len(),
             size
         );
-        return false;
+        #[allow(unreachable_code)]
+        {
+            return false;
+        }
     }
     unsafe {
         ptr::copy_nonoverlapping(state.as_ptr(), data as *mut u8, state.len());
@@ -477,7 +483,10 @@ pub extern "C" fn retro_unserialize(data: *const c_void, size: usize) -> bool {
     let state = unsafe { from_raw_parts(data as *const u8, size) };
     if let Err(err) = StateManager::load(state, instance, None) {
         warnln!("Failed to load state: {}", err);
-        return false;
+        #[allow(unreachable_code)]
+        {
+            return false;
+        }
     }
     true
 }

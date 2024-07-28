@@ -1,3 +1,5 @@
+#![allow(clippy::uninlined_format_args)]
+
 //! Error related data structures to be shared and used.
 //!
 //! This module contains the [`Error`] enum, which is used to represent
@@ -14,16 +16,18 @@ pub enum Error {
     InvalidData,
     RomSize,
     IncompatibleBootRom,
+    InvalidParameter(String),
     CustomError(String),
 }
 
 impl Error {
-    pub fn description(&self) -> &str {
+    pub fn description(&self) -> String {
         match self {
-            Error::InvalidData => "Invalid data format",
-            Error::RomSize => "Invalid ROM size",
-            Error::IncompatibleBootRom => "Incompatible Boot ROM",
-            Error::CustomError(message) => message,
+            Error::InvalidData => String::from("Invalid data format"),
+            Error::RomSize => String::from("Invalid ROM size"),
+            Error::IncompatibleBootRom => String::from("Incompatible Boot ROM"),
+            Error::InvalidParameter(message) => format!("Invalid parameter: {}", message),
+            Error::CustomError(message) => String::from(message),
         }
     }
 }

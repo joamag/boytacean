@@ -266,7 +266,10 @@ impl SerialDevice for PrinterDevice {
             PrinterState::MagicBytes1 => {
                 if byte != 0x88 {
                     warnln!("Printer: Invalid magic byte 1: {:02x}", byte);
-                    return;
+                    #[allow(unreachable_code)]
+                    {
+                        return;
+                    }
                 }
                 self.command = PrinterCommand::Other;
                 self.command_length = 0;
@@ -277,7 +280,10 @@ impl SerialDevice for PrinterDevice {
                         self.state = PrinterState::MagicBytes1;
                     }
                     warnln!("Printer: Invalid magic byte 2: {:02x}", byte);
-                    return;
+                    #[allow(unreachable_code)]
+                    {
+                        return;
+                    }
                 }
             }
             PrinterState::Identification => self.command = PrinterCommand::from_u8(byte),
@@ -308,7 +314,10 @@ impl SerialDevice for PrinterDevice {
             }
             PrinterState::Other => {
                 warnln!("Printer: Invalid state: {:02x}", self.state as u8);
-                return;
+                #[allow(unreachable_code)]
+                {
+                    return;
+                }
             }
         }
 

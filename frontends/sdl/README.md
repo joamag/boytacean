@@ -106,4 +106,4 @@ cargo run -- --rom-path ../../res/roms/test/blargg/cpu/cpu_instrs.gb --cycles 10
 | `debug`    | Activates the base `debug` feature from Boytacean.                                                                                         |
 | `pedantic` | Additional safety instructions are executed to make sure the machine does no run "out of tracks", making sure to run many `panic()` calls. |
 | `slow`     | Runs the emulator at a very slow page 60x slower to allow visual debugging.                                                                |
-| `cpulog`   | Prints a log of the CPU instruction executed.                                                                                              |
+| `cpulog`   | Prints a log of the CPU instruction executed - will fill the stdout quickly.                                                               |

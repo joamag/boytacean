@@ -4,9 +4,11 @@ use std::sync::Mutex;
 
 use crate::{
     apu::Apu,
+    assert_pedantic_gb,
     dma::Dma,
     gb::{Components, GameBoyConfig, GameBoyMode, GameBoySpeed},
     pad::Pad,
+    panic_gb,
     ppu::Ppu,
     rom::Cartridge,
     serial::Serial,
@@ -22,9 +24,9 @@ pub const RAM_SIZE_DMG: usize = 8192;
 pub const RAM_SIZE_CGB: usize = 32768;
 
 pub trait BusComponent {
-    fn read(&mut self, addr: u16) -> u8;
+    fn read(&self, addr: u16) -> u8;
     fn write(&mut self, addr: u16, value: u8);
-    fn read_many(&mut self, addr: u16, count: usize) -> Vec<u8> {
+    fn read_many(&self, addr: u16, count: usize) -> Vec<u8> {
         (0..count)
             .map(|offset| self.read(addr + offset as u16))
             .collect()
@@ -196,7 +198,7 @@ impl Mmu {
                 match base_addr {
                     0xa000 => self.rom.ram_data_mut()[addr as usize] = value,
                     0xc000 => self.ram[addr as usize] = value,
-                    _ => panic!("Invalid base address for write: 0x{:04x}", base_addr),
+                    _ => panic_gb!("Invalid base address for write: 0x{:04x}", base_addr),
                 }
             }
         }
@@ -306,6 +308,20 @@ impl Mmu {
         //
         // we should also respect General-Purpose DMA vs HBlank DMA
         if self.dma.active_hdma() {
+            // runs a series of pre-validation on the HDMA transfer in
+            // pedantic mode is currently active (performance hit)
+            assert_pedantic_gb!(
+                (0x0000..=0x7ff0).contains(&self.dma.source())
+                    || (0xa000..=0xdff0).contains(&self.dma.source()),
+                "Invalid HDMA source start memory address 0x{:04x}",
+                self.dma.source()
+            );
+            assert_pedantic_gb!(
+                (0x8000..=0x9ff0).contains(&self.dma.destination()),
+                "Invalid HDMA destination start memory address 0x{:04x}",
+                self.dma.destination()
+            );
+
             // only runs the DMA transfer if the system is in CGB mode
             // this avoids issues when writing to DMG unmapped registers
             // that would otherwise cause the system to crash
@@ -318,19 +334,13 @@ impl Mmu {
         }
     }
 
-    pub fn read(&mut self, addr: u16) -> u8 {
+    pub fn read(&self, addr: u16) -> u8 {
         match addr {
             // 0x0000-0x0FFF - BOOT (256 B) + ROM0 (4 KB/16 KB)
             0x0000..=0x0fff => {
                 // in case the boot mode is active and the
                 // address is withing boot memory reads from it
-                if self.boot_active && addr <= 0x00fe {
-                    // if we're reading from this location we can
-                    // safely assume that we're exiting the boot
-                    // loading sequence and disable boot
-                    if addr == 0x00fe {
-                        self.boot_active = false;
-                    }
+                if self.boot_active && addr <= 0x00ff {
                     return self.boot[addr as usize];
                 }
                 if self.boot_active
@@ -428,6 +438,7 @@ impl Mmu {
 
             addr => {
                 warnln!("Reading from unknown location 0x{:04x}", addr);
+                #[allow(unreachable_code)]
                 0xff
             }
         }
@@ -535,9 +546,9 @@ impl Mmu {
 
     /// Reads a byte from a certain memory address, without the typical
     /// Game Boy verifications, allowing deep read of values.
-    pub fn read_unsafe(&mut self, addr: u16) -> u8 {
+    pub fn read_raw(&mut self, addr: u16) -> u8 {
         match addr {
-            0xff10..=0xff3f => self.apu.read_unsafe(addr),
+            0xff10..=0xff3f => self.apu.read_raw(addr),
             _ => self.read(addr),
         }
     }
@@ -546,9 +557,9 @@ impl Mmu {
     /// Game Boy verification process. This allows for faster memory
     /// access in registers and other memory areas that are typically
     /// inaccessible.
-    pub fn write_unsafe(&mut self, addr: u16, value: u8) {
+    pub fn write_raw(&mut self, addr: u16, value: u8) {
         match addr {
-            0xff10..=0xff3f => self.apu.write_unsafe(addr, value),
+            0xff10..=0xff3f => self.apu.write_raw(addr, value),
             _ => self.write(addr, value),
         }
     }
@@ -574,7 +585,7 @@ impl Mmu {
         let mut data: Vec<u8> = vec![];
 
         for index in 0..count {
-            let byte = self.read_unsafe(addr + index);
+            let byte = self.read_raw(addr + index);
             data.push(byte);
         }
 
@@ -583,7 +594,7 @@ impl Mmu {
 
     pub fn write_many_unsafe(&mut self, addr: u16, data: &[u8]) {
         for (index, byte) in data.iter().enumerate() {
-            self.write_unsafe(addr + index as u16, *byte)
+            self.write_raw(addr + index as u16, *byte)
         }
     }
 

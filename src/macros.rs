@@ -32,7 +32,7 @@ macro_rules! infoln {
 macro_rules! warnln {
     ($($rest:tt)*) => {
         {
-            panic!($($rest)*);
+            $crate::panic_gb!($($rest)*);
         }
     }
 }
