@@ -213,7 +213,9 @@ export class GameboyEmulator extends EmulatorLogic implements Emulator {
         // by the carryover cycles) and then in case there's at least
         // a frame to be processed triggers the frame event, allowing
         // the deferred retrieval of the frame buffer
-        this.clockFrame = this.gameBoy.clocks_frame_buffer(targetCycles);
+        this.clockFrame = this.gameBoy.clocks_frame_buffer(
+            Math.max(targetCycles, 0)
+        );
         const executedCycles = Number(this.clockFrame.cycles);
         if (this.clockFrame.frames > 0) {
             this.trigger("frame");
@@ -452,7 +454,7 @@ export class GameboyEmulator extends EmulatorLogic implements Emulator {
                 Feature.Framerate,
                 Feature.SaveState
             ],
-            ...(this.extraSettings?.debug ?? false
+            ...((this.extraSettings?.debug ?? false)
                 ? [
                       Feature.LoopMode,
                       Feature.DisplayFrequency,
