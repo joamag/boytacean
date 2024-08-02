@@ -440,6 +440,9 @@ pub extern "C" fn retro_get_memory_data(_memory_id: u32) -> *mut c_void {
 pub extern "C" fn retro_serialize_size() -> usize {
     debugln!("retro_serialize_size()");
     let instance = unsafe { EMULATOR.as_mut().unwrap() };
+
+    // uses BESS file format for its static nature, meaning that the final
+    // size of the serialized state is known in advance
     StateManager::save(instance, Some(SaveStateFormat::Bess))
         .unwrap()
         .len()
