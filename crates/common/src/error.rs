@@ -5,7 +5,11 @@
 //! This module contains the [`Error`] enum, which is used to represent
 //! errors that can occur within Boytacean domain.
 
-use std::fmt::{self, Display, Formatter};
+use std::{
+    fmt::{self, Display, Formatter},
+    io,
+    string::FromUtf8Error,
+};
 
 /// Top level enum for error handling within Boytacean.
 ///
@@ -35,5 +39,17 @@ impl Error {
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.description())
+    }
+}
+
+impl From<io::Error> for Error {
+    fn from(_error: io::Error) -> Self {
+        Error::CustomError(String::from("IO error"))
+    }
+}
+
+impl From<FromUtf8Error> for Error {
+    fn from(_error: FromUtf8Error) -> Self {
+        Error::CustomError(String::from("From UTF8 error"))
     }
 }

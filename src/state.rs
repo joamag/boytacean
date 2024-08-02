@@ -130,12 +130,12 @@ impl BoscState {
     /// buffer represents a valid BOSC (Boytacean Save
     /// Compressed) file structure, thought magic
     /// string validation.
-    pub fn is_bosc(data: &mut Cursor<Vec<u8>>) -> bool {
+    pub fn is_bosc(data: &mut Cursor<Vec<u8>>) -> Result<bool, Error> {
         let mut buffer = [0x00; size_of::<u32>()];
-        data.read_exact(&mut buffer).unwrap();
+        data.read_exact(&mut buffer)?;
         let magic = u32::from_le_bytes(buffer);
-        data.rewind().unwrap();
-        magic == BOSC_MAGIC_UINT
+        data.rewind()?;
+        Ok(magic == BOSC_MAGIC_UINT)
     }
 
     pub fn verify(&self) -> Result<(), Error> {
@@ -149,32 +149,32 @@ impl BoscState {
 
 impl Serialize for BoscState {
     fn write(&mut self, buffer: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
-        buffer.write_all(&self.magic.to_le_bytes()).unwrap();
-        buffer.write_all(&self.version.to_le_bytes()).unwrap();
+        buffer.write_all(&self.magic.to_le_bytes())?;
+        buffer.write_all(&self.version.to_le_bytes())?;
 
         let mut cursor = Cursor::new(vec![]);
         self.bos.write(&mut cursor)?;
-        cursor.rewind().unwrap();
+        cursor.rewind()?;
         let mut bos_buffer = vec![];
-        cursor.read_to_end(&mut bos_buffer).unwrap();
+        cursor.read_to_end(&mut bos_buffer)?;
 
-        let bos_compressed = encode_zippy(&bos_buffer).unwrap();
-        buffer.write_all(&bos_compressed).unwrap();
+        let bos_compressed = encode_zippy(&bos_buffer)?;
+        buffer.write_all(&bos_compressed)?;
 
         Ok(())
     }
 
     fn read(&mut self, data: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
         let mut buffer = [0x00; size_of::<u32>()];
-        data.read_exact(&mut buffer).unwrap();
+        data.read_exact(&mut buffer)?;
         self.magic = u32::from_le_bytes(buffer);
         let mut buffer = [0x00; size_of::<u8>()];
-        data.read_exact(&mut buffer).unwrap();
+        data.read_exact(&mut buffer)?;
         self.version = u8::from_le_bytes(buffer);
 
         let mut bos_compressed = vec![];
-        data.read_to_end(&mut bos_compressed).unwrap();
-        let bos_buffer = decode_zippy(&bos_compressed).unwrap();
+        data.read_to_end(&mut bos_compressed)?;
+        let bos_buffer = decode_zippy(&bos_compressed)?;
         let mut bos_cursor = Cursor::new(bos_buffer);
 
         self.bos.read(&mut bos_cursor)?;
@@ -214,12 +214,12 @@ impl BosState {
     /// Checks if the data contained in the provided
     /// buffer represents a valid BOS (Boytacean Save)
     /// file structure, thought magic string validation.
-    pub fn is_bos(data: &mut Cursor<Vec<u8>>) -> bool {
+    pub fn is_bos(data: &mut Cursor<Vec<u8>>) -> Result<bool, Error> {
         let mut buffer = [0x00; size_of::<u32>()];
-        data.read_exact(&mut buffer).unwrap();
+        data.read_exact(&mut buffer)?;
         let magic = u32::from_le_bytes(buffer);
-        data.rewind().unwrap();
-        magic == BOS_MAGIC_UINT
+        data.rewind()?;
+        Ok(magic == BOS_MAGIC_UINT)
     }
 
     pub fn verify(&self) -> Result<(), Error> {
@@ -309,9 +309,9 @@ impl Serialize for BosState {
     fn write(&mut self, buffer: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
         self.block_count = self.build_block_count();
 
-        buffer.write_all(&self.magic.to_le_bytes()).unwrap();
-        buffer.write_all(&self.version.to_le_bytes()).unwrap();
-        buffer.write_all(&self.block_count.to_le_bytes()).unwrap();
+        buffer.write_all(&self.magic.to_le_bytes())?;
+        buffer.write_all(&self.version.to_le_bytes())?;
+        buffer.write_all(&self.block_count.to_le_bytes())?;
 
         if let Some(info) = &mut self.info {
             info.write(buffer)?;
@@ -327,19 +327,19 @@ impl Serialize for BosState {
 
     fn read(&mut self, data: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
         let mut buffer = [0x00; size_of::<u32>()];
-        data.read_exact(&mut buffer).unwrap();
+        data.read_exact(&mut buffer)?;
         self.magic = u32::from_le_bytes(buffer);
         let mut buffer = [0x00; size_of::<u8>()];
-        data.read_exact(&mut buffer).unwrap();
+        data.read_exact(&mut buffer)?;
         self.version = u8::from_le_bytes(buffer);
         let mut buffer = [0x00; size_of::<u8>()];
-        data.read_exact(&mut buffer).unwrap();
+        data.read_exact(&mut buffer)?;
         self.block_count = u8::from_le_bytes(buffer);
 
         for _ in 0..self.block_count {
             let block = BosBlock::from_data(data)?;
             let offset = -((size_of::<u8>() + size_of::<u32>()) as i64);
-            data.seek(SeekFrom::Current(offset)).unwrap();
+            data.seek(SeekFrom::Current(offset))?;
 
             match block.kind {
                 BosBlockKind::Info => {
@@ -349,8 +349,8 @@ impl Serialize for BosState {
                     self.image_buffer = Some(BosImageBuffer::from_data(data)?);
                 }
                 _ => {
-                    data.seek(SeekFrom::Current(-offset)).unwrap();
-                    data.seek(SeekFrom::Current(block.size as i64)).unwrap();
+                    data.seek(SeekFrom::Current(-offset))?;
+                    data.seek(SeekFrom::Current(block.size as i64))?;
                 }
             }
         }
@@ -401,17 +401,17 @@ impl BosBlock {
 
 impl Serialize for BosBlock {
     fn write(&mut self, buffer: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
-        buffer.write_all(&(self.kind as u8).to_le_bytes()).unwrap();
-        buffer.write_all(&self.size.to_le_bytes()).unwrap();
+        buffer.write_all(&(self.kind as u8).to_le_bytes())?;
+        buffer.write_all(&self.size.to_le_bytes())?;
         Ok(())
     }
 
     fn read(&mut self, data: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
         let mut buffer = [0x00; size_of::<u8>()];
-        data.read_exact(&mut buffer).unwrap();
+        data.read_exact(&mut buffer)?;
         self.kind = BosBlockKind::from_u8(u8::from_le_bytes(buffer));
         let mut buffer = [0x00; size_of::<u32>()];
-        data.read_exact(&mut buffer).unwrap();
+        data.read_exact(&mut buffer)?;
         self.size = u32::from_le_bytes(buffer);
         Ok(())
     }
@@ -460,25 +460,17 @@ impl Serialize for BosInfo {
     fn write(&mut self, buffer: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
         self.header.write(buffer)?;
 
-        buffer
-            .write_all(&(size_of::<u64>() as u32).to_le_bytes())
-            .unwrap();
-        buffer.write_all(&self.timestamp.to_le_bytes()).unwrap();
+        buffer.write_all(&(size_of::<u64>() as u32).to_le_bytes())?;
+        buffer.write_all(&self.timestamp.to_le_bytes())?;
 
-        buffer
-            .write_all(&(self.agent.as_bytes().len() as u32).to_le_bytes())
-            .unwrap();
-        buffer.write_all(self.agent.as_bytes()).unwrap();
+        buffer.write_all(&(self.agent.as_bytes().len() as u32).to_le_bytes())?;
+        buffer.write_all(self.agent.as_bytes())?;
 
-        buffer
-            .write_all(&(self.agent_version.as_bytes().len() as u32).to_le_bytes())
-            .unwrap();
-        buffer.write_all(self.agent_version.as_bytes()).unwrap();
+        buffer.write_all(&(self.agent_version.as_bytes().len() as u32).to_le_bytes())?;
+        buffer.write_all(self.agent_version.as_bytes())?;
 
-        buffer
-            .write_all(&(self.model.as_bytes().len() as u32).to_le_bytes())
-            .unwrap();
-        buffer.write_all(self.model.as_bytes()).unwrap();
+        buffer.write_all(&(self.model.as_bytes().len() as u32).to_le_bytes())?;
+        buffer.write_all(self.model.as_bytes())?;
 
         Ok(())
     }
@@ -487,28 +479,28 @@ impl Serialize for BosInfo {
         self.header.read(data)?;
 
         let mut buffer = [0x00; size_of::<u32>()];
-        data.read_exact(&mut buffer).unwrap();
+        data.read_exact(&mut buffer)?;
         let mut buffer = vec![0x00; u32::from_le_bytes(buffer) as usize];
-        data.read_exact(&mut buffer).unwrap();
+        data.read_exact(&mut buffer)?;
         self.timestamp = u64::from_le_bytes(buffer.try_into().unwrap());
 
         let mut buffer = [0x00; size_of::<u32>()];
-        data.read_exact(&mut buffer).unwrap();
+        data.read_exact(&mut buffer)?;
         let mut buffer = vec![0x00; u32::from_le_bytes(buffer) as usize];
-        data.read_exact(&mut buffer).unwrap();
-        self.agent = String::from_utf8(buffer).unwrap();
+        data.read_exact(&mut buffer)?;
+        self.agent = String::from_utf8(buffer)?;
 
         let mut buffer = [0x00; size_of::<u32>()];
-        data.read_exact(&mut buffer).unwrap();
+        data.read_exact(&mut buffer)?;
         let mut buffer = vec![0x00; u32::from_le_bytes(buffer) as usize];
-        data.read_exact(&mut buffer).unwrap();
-        self.agent_version = String::from_utf8(buffer).unwrap();
+        data.read_exact(&mut buffer)?;
+        self.agent_version = String::from_utf8(buffer)?;
 
         let mut buffer = [0x00; size_of::<u32>()];
-        data.read_exact(&mut buffer).unwrap();
+        data.read_exact(&mut buffer)?;
         let mut buffer = vec![0x00; u32::from_le_bytes(buffer) as usize];
-        data.read_exact(&mut buffer).unwrap();
-        self.model = String::from_utf8(buffer).unwrap();
+        data.read_exact(&mut buffer)?;
+        self.model = String::from_utf8(buffer)?;
 
         Ok(())
     }
@@ -572,13 +564,13 @@ impl BosImageBuffer {
 impl Serialize for BosImageBuffer {
     fn write(&mut self, buffer: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
         self.header.write(buffer)?;
-        buffer.write_all(&self.image).unwrap();
+        buffer.write_all(&self.image)?;
         Ok(())
     }
 
     fn read(&mut self, data: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
         self.header.read(data)?;
-        data.read_exact(&mut self.image).unwrap();
+        data.read_exact(&mut self.image)?;
         Ok(())
     }
 }
@@ -614,13 +606,13 @@ impl BessState {
     /// Checks if the data contained in the provided
     /// buffer represents a valid BESS (Best Effort Save State)
     /// file structure, thought magic string validation.
-    pub fn is_bess(data: &mut Cursor<Vec<u8>>) -> bool {
-        data.seek(SeekFrom::End(-4)).unwrap();
+    pub fn is_bess(data: &mut Cursor<Vec<u8>>) -> Result<bool, Error> {
+        data.seek(SeekFrom::End(-4))?;
         let mut buffer = [0x00; size_of::<u32>()];
-        data.read_exact(&mut buffer).unwrap();
+        data.read_exact(&mut buffer)?;
         let magic = u32::from_le_bytes(buffer);
-        data.rewind().unwrap();
-        magic == BESS_MAGIC
+        data.rewind()?;
+        Ok(magic == BESS_MAGIC)
     }
 
     pub fn description(&self, column_length: usize) -> String {
@@ -663,7 +655,7 @@ impl BessState {
     /// Dumps the core data into the provided buffer and returns.
     /// This will effectively populate the majority of the save
     /// file with the core emulator contents.
-    fn dump_core(&mut self, buffer: &mut Cursor<Vec<u8>>) {
+    fn dump_core(&mut self, buffer: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
         let mut buffers = [
             &mut self.core.ram,
             &mut self.core.vram,
@@ -676,14 +668,16 @@ impl BessState {
 
         for item in buffers.iter_mut() {
             item.offset = buffer.position() as u32;
-            buffer.write_all(&item.buffer).unwrap();
+            buffer.write_all(&item.buffer)?;
         }
+
+        Ok(())
     }
 }
 
 impl Serialize for BessState {
     fn write(&mut self, buffer: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
-        self.dump_core(buffer);
+        self.dump_core(buffer)?;
         self.footer.start_offset = buffer.position() as u32;
         self.name.write(buffer)?;
         self.info.write(buffer)?;
@@ -699,10 +693,9 @@ impl Serialize for BessState {
         // to read the footer, and then places the
         // the cursor in the start of the BESS data
         // according to the footer information
-        data.seek(SeekFrom::End(-8)).unwrap();
+        data.seek(SeekFrom::End(-8))?;
         self.footer.read(data)?;
-        data.seek(SeekFrom::Start(self.footer.start_offset as u64))
-            .unwrap();
+        data.seek(SeekFrom::Start(self.footer.start_offset as u64))?;
 
         loop {
             // reads the block header information and then moves the
@@ -710,7 +703,7 @@ impl Serialize for BessState {
             // re-read the block data
             let block = BessBlockHeader::from_data(data)?;
             let offset = -((size_of::<u32>() * 2) as i64);
-            data.seek(SeekFrom::Current(offset)).unwrap();
+            data.seek(SeekFrom::Current(offset))?;
 
             match block.magic.as_str() {
                 "NAME" => self.name = BessName::from_data(data)?,
@@ -783,17 +776,17 @@ impl BessBlockHeader {
 
 impl Serialize for BessBlockHeader {
     fn write(&mut self, buffer: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
-        buffer.write_all(self.magic.as_bytes()).unwrap();
-        buffer.write_all(&self.size.to_le_bytes()).unwrap();
+        buffer.write_all(self.magic.as_bytes())?;
+        buffer.write_all(&self.size.to_le_bytes())?;
         Ok(())
     }
 
     fn read(&mut self, data: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
         let mut buffer = [0x00; 4];
-        data.read_exact(&mut buffer).unwrap();
-        self.magic = String::from_utf8(Vec::from(buffer)).unwrap();
+        data.read_exact(&mut buffer)?;
+        self.magic = String::from_utf8(Vec::from(buffer))?;
         let mut buffer = [0x00; size_of::<u32>()];
-        data.read_exact(&mut buffer).unwrap();
+        data.read_exact(&mut buffer)?;
         self.size = u32::from_le_bytes(buffer);
         Ok(())
     }
@@ -837,14 +830,14 @@ impl BessBlock {
 impl Serialize for BessBlock {
     fn write(&mut self, buffer: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
         self.header.write(buffer)?;
-        buffer.write_all(&self.buffer).unwrap();
+        buffer.write_all(&self.buffer)?;
         Ok(())
     }
 
     fn read(&mut self, data: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
         self.header.read(data)?;
         self.buffer.reserve_exact(self.header.size as usize);
-        data.read_exact(&mut self.buffer).unwrap();
+        data.read_exact(&mut self.buffer)?;
         Ok(())
     }
 }
@@ -879,31 +872,31 @@ impl BessBuffer {
 
     /// Loads the internal buffer structure with the provided
     /// data according to the size and offset defined.
-    fn load_buffer(&self, data: &mut Cursor<Vec<u8>>) -> Vec<u8> {
+    fn load_buffer(&self, data: &mut Cursor<Vec<u8>>) -> Result<Vec<u8>, Error> {
         let mut buffer = vec![0x00; self.size as usize];
         let position = data.position();
-        data.seek(SeekFrom::Start(self.offset as u64)).unwrap();
-        data.read_exact(&mut buffer).unwrap();
+        data.seek(SeekFrom::Start(self.offset as u64))?;
+        data.read_exact(&mut buffer)?;
         data.set_position(position);
-        buffer
+        Ok(buffer)
     }
 }
 
 impl Serialize for BessBuffer {
     fn write(&mut self, buffer: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
-        buffer.write_all(&self.size.to_le_bytes()).unwrap();
-        buffer.write_all(&self.offset.to_le_bytes()).unwrap();
+        buffer.write_all(&self.size.to_le_bytes())?;
+        buffer.write_all(&self.offset.to_le_bytes())?;
         Ok(())
     }
 
     fn read(&mut self, data: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
         let mut buffer = [0x00; size_of::<u32>()];
-        data.read_exact(&mut buffer).unwrap();
+        data.read_exact(&mut buffer)?;
         self.size = u32::from_le_bytes(buffer);
         let mut buffer = [0x00; size_of::<u32>()];
-        data.read_exact(&mut buffer).unwrap();
+        data.read_exact(&mut buffer)?;
         self.offset = u32::from_le_bytes(buffer);
-        self.buffer = self.load_buffer(data);
+        self.buffer = self.load_buffer(data)?;
         Ok(())
     }
 }
@@ -937,17 +930,17 @@ impl BessFooter {
 
 impl Serialize for BessFooter {
     fn write(&mut self, buffer: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
-        buffer.write_all(&self.start_offset.to_le_bytes()).unwrap();
-        buffer.write_all(&self.magic.to_le_bytes()).unwrap();
+        buffer.write_all(&self.start_offset.to_le_bytes())?;
+        buffer.write_all(&self.magic.to_le_bytes())?;
         Ok(())
     }
 
     fn read(&mut self, data: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
         let mut buffer = [0x00; size_of::<u32>()];
-        data.read_exact(&mut buffer).unwrap();
+        data.read_exact(&mut buffer)?;
         self.start_offset = u32::from_le_bytes(buffer);
         let mut buffer = [0x00; size_of::<u32>()];
-        data.read_exact(&mut buffer).unwrap();
+        data.read_exact(&mut buffer)?;
         self.magic = u32::from_le_bytes(buffer);
         Ok(())
     }
@@ -982,15 +975,15 @@ impl BessName {
 impl Serialize for BessName {
     fn write(&mut self, buffer: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
         self.header.write(buffer)?;
-        buffer.write_all(self.name.as_bytes()).unwrap();
+        buffer.write_all(self.name.as_bytes())?;
         Ok(())
     }
 
     fn read(&mut self, data: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
         self.header.read(data)?;
         let mut buffer = vec![0x00; self.header.size as usize];
-        data.read_exact(&mut buffer).unwrap();
-        self.name = String::from_utf8(buffer).unwrap();
+        data.read_exact(&mut buffer)?;
+        self.name = String::from_utf8(buffer)?;
         Ok(())
     }
 }
@@ -1065,15 +1058,15 @@ impl BessInfo {
 impl Serialize for BessInfo {
     fn write(&mut self, buffer: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
         self.header.write(buffer)?;
-        buffer.write_all(&self.title).unwrap();
-        buffer.write_all(&self.checksum).unwrap();
+        buffer.write_all(&self.title)?;
+        buffer.write_all(&self.checksum)?;
         Ok(())
     }
 
     fn read(&mut self, data: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
         self.header.read(data)?;
-        data.read_exact(&mut self.title).unwrap();
-        data.read_exact(&mut self.checksum).unwrap();
+        data.read_exact(&mut self.title)?;
+        data.read_exact(&mut self.checksum)?;
         Ok(())
     }
 }
@@ -1277,26 +1270,24 @@ impl Serialize for BessCore {
     fn write(&mut self, buffer: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
         self.header.write(buffer)?;
 
-        buffer.write_all(&self.major.to_le_bytes()).unwrap();
-        buffer.write_all(&self.minor.to_le_bytes()).unwrap();
+        buffer.write_all(&self.major.to_le_bytes())?;
+        buffer.write_all(&self.minor.to_le_bytes())?;
 
-        buffer.write_all(self.model.as_bytes()).unwrap();
+        buffer.write_all(self.model.as_bytes())?;
 
-        buffer.write_all(&self.pc.to_le_bytes()).unwrap();
-        buffer.write_all(&self.af.to_le_bytes()).unwrap();
-        buffer.write_all(&self.bc.to_le_bytes()).unwrap();
-        buffer.write_all(&self.de.to_le_bytes()).unwrap();
-        buffer.write_all(&self.hl.to_le_bytes()).unwrap();
-        buffer.write_all(&self.sp.to_le_bytes()).unwrap();
+        buffer.write_all(&self.pc.to_le_bytes())?;
+        buffer.write_all(&self.af.to_le_bytes())?;
+        buffer.write_all(&self.bc.to_le_bytes())?;
+        buffer.write_all(&self.de.to_le_bytes())?;
+        buffer.write_all(&self.hl.to_le_bytes())?;
+        buffer.write_all(&self.sp.to_le_bytes())?;
 
-        buffer.write_all(&(self.ime as u8).to_le_bytes()).unwrap();
-        buffer.write_all(&self.ie.to_le_bytes()).unwrap();
-        buffer
-            .write_all(&self.execution_mode.to_le_bytes())
-            .unwrap();
-        buffer.write_all(&self._padding.to_le_bytes()).unwrap();
+        buffer.write_all(&(self.ime as u8).to_le_bytes())?;
+        buffer.write_all(&self.ie.to_le_bytes())?;
+        buffer.write_all(&self.execution_mode.to_le_bytes())?;
+        buffer.write_all(&self._padding.to_le_bytes())?;
 
-        buffer.write_all(&self.io_registers).unwrap();
+        buffer.write_all(&self.io_registers)?;
 
         self.ram.write(buffer)?;
         self.vram.write(buffer)?;
@@ -1313,49 +1304,49 @@ impl Serialize for BessCore {
         self.header.read(data)?;
 
         let mut buffer = [0x00; size_of::<u16>()];
-        data.read_exact(&mut buffer).unwrap();
+        data.read_exact(&mut buffer)?;
         self.major = u16::from_le_bytes(buffer);
         let mut buffer = [0x00; size_of::<u16>()];
-        data.read_exact(&mut buffer).unwrap();
+        data.read_exact(&mut buffer)?;
         self.minor = u16::from_le_bytes(buffer);
 
         let mut buffer = [0x00; 4];
-        data.read_exact(&mut buffer).unwrap();
-        self.model = String::from_utf8(Vec::from(buffer)).unwrap();
+        data.read_exact(&mut buffer)?;
+        self.model = String::from_utf8(Vec::from(buffer))?;
 
         let mut buffer = [0x00; size_of::<u16>()];
-        data.read_exact(&mut buffer).unwrap();
+        data.read_exact(&mut buffer)?;
         self.pc = u16::from_le_bytes(buffer);
         let mut buffer = [0x00; size_of::<u16>()];
-        data.read_exact(&mut buffer).unwrap();
+        data.read_exact(&mut buffer)?;
         self.af = u16::from_le_bytes(buffer);
         let mut buffer = [0x00; size_of::<u16>()];
-        data.read_exact(&mut buffer).unwrap();
+        data.read_exact(&mut buffer)?;
         self.bc = u16::from_le_bytes(buffer);
         let mut buffer = [0x00; size_of::<u16>()];
-        data.read_exact(&mut buffer).unwrap();
+        data.read_exact(&mut buffer)?;
         self.de = u16::from_le_bytes(buffer);
         let mut buffer = [0x00; size_of::<u16>()];
-        data.read_exact(&mut buffer).unwrap();
+        data.read_exact(&mut buffer)?;
         self.hl = u16::from_le_bytes(buffer);
         let mut buffer = [0x00; size_of::<u16>()];
-        data.read_exact(&mut buffer).unwrap();
+        data.read_exact(&mut buffer)?;
         self.sp = u16::from_le_bytes(buffer);
 
         let mut buffer = [0x00; 1];
-        data.read_exact(&mut buffer).unwrap();
+        data.read_exact(&mut buffer)?;
         self.ime = buffer[0] != 0;
         let mut buffer = [0x00; size_of::<u8>()];
-        data.read_exact(&mut buffer).unwrap();
+        data.read_exact(&mut buffer)?;
         self.ie = u8::from_le_bytes(buffer);
         let mut buffer = [0x00; size_of::<u8>()];
-        data.read_exact(&mut buffer).unwrap();
+        data.read_exact(&mut buffer)?;
         self.execution_mode = u8::from_le_bytes(buffer);
         let mut buffer = [0x00; size_of::<u8>()];
-        data.read_exact(&mut buffer).unwrap();
+        data.read_exact(&mut buffer)?;
         self._padding = u8::from_le_bytes(buffer);
 
-        data.read_exact(&mut self.io_registers).unwrap();
+        data.read_exact(&mut self.io_registers)?;
 
         self.ram.read(data)?;
         self.vram.read(data)?;
@@ -1516,8 +1507,8 @@ impl Serialize for BessMbc {
     fn write(&mut self, buffer: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
         self.header.write(buffer)?;
         for register in self.registers.iter() {
-            buffer.write_all(&register.address.to_le_bytes()).unwrap();
-            buffer.write_all(&register.value.to_le_bytes()).unwrap();
+            buffer.write_all(&register.address.to_le_bytes())?;
+            buffer.write_all(&register.value.to_le_bytes())?;
         }
         Ok(())
     }
@@ -1526,10 +1517,10 @@ impl Serialize for BessMbc {
         self.header.read(data)?;
         for _ in 0..(self.header.size / 3) {
             let mut buffer = [0x00; size_of::<u16>()];
-            data.read_exact(&mut buffer).unwrap();
+            data.read_exact(&mut buffer)?;
             let address = u16::from_le_bytes(buffer);
             let mut buffer = [0x00; size_of::<u8>()];
-            data.read_exact(&mut buffer).unwrap();
+            data.read_exact(&mut buffer)?;
             let value = u8::from_le_bytes(buffer);
             self.registers.push(BessMbrRegister::new(address, value));
         }
@@ -1673,11 +1664,11 @@ impl StateManager {
         let format = match format {
             Some(format) => format,
             None => {
-                if BoscState::is_bosc(data) {
+                if BoscState::is_bosc(data)? {
                     SaveStateFormat::Bosc
-                } else if BosState::is_bos(data) {
+                } else if BosState::is_bos(data)? {
                     SaveStateFormat::Bos
-                } else if BessState::is_bess(data) {
+                } else if BessState::is_bess(data)? {
                     SaveStateFormat::Bess
                 } else {
                     return Err(Error::CustomError(String::from(
@@ -1708,11 +1699,11 @@ impl StateManager {
 
     pub fn read_bos_auto(data: &[u8]) -> Result<BosState, Error> {
         let data = &mut Cursor::new(data.to_vec());
-        let format = if BoscState::is_bosc(data) {
+        let format = if BoscState::is_bosc(data)? {
             SaveStateFormat::Bosc
-        } else if BosState::is_bos(data) {
+        } else if BosState::is_bos(data)? {
             SaveStateFormat::Bos
-        } else if BessState::is_bess(data) {
+        } else if BessState::is_bess(data)? {
             return Err(Error::CustomError(String::from(
                 "Incompatible save state file format (BESS)",
             )));
@@ -1766,9 +1757,9 @@ impl StateManager {
         let format = match format {
             Some(format) => format,
             None => {
-                if BosState::is_bos(data) {
+                if BosState::is_bos(data)? {
                     SaveStateFormat::Bos
-                } else if BessState::is_bess(data) {
+                } else if BessState::is_bess(data)? {
                     SaveStateFormat::Bess
                 } else {
                     return Err(Error::CustomError(String::from(
@@ -1781,12 +1772,17 @@ impl StateManager {
             SaveStateFormat::Bosc => {
                 let mut state = BoscState::default();
                 state.read(data)?;
-                Ok(state.bos.image_buffer.unwrap().image.to_vec())
+                Ok(state
+                    .bos
+                    .image_buffer
+                    .ok_or(Error::InvalidData)?
+                    .image
+                    .to_vec())
             }
             SaveStateFormat::Bos => {
                 let mut state = BosState::default();
                 state.read(data)?;
-                Ok(state.image_buffer.unwrap().image.to_vec())
+                Ok(state.image_buffer.ok_or(Error::InvalidData)?.image.to_vec())
             }
             SaveStateFormat::Bess => Err(Error::CustomError(String::from(
                 "Format foes not support thumbnail",
