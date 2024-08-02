@@ -1669,6 +1669,36 @@ impl StateManager {
         Ok(())
     }
 
+    pub fn read_bos_auto(data: &[u8]) -> Result<BosState, Error> {
+        let data = &mut Cursor::new(data.to_vec());
+        let format = if BoscState::is_bosc(data) {
+            SaveStateFormat::Bosc
+        } else if BosState::is_bos(data) {
+            SaveStateFormat::Bos
+        } else if BessState::is_bess(data) {
+            return Err(Error::CustomError(String::from(
+                "Incompatible save state file format (BESS)",
+            )));
+        } else {
+            return Err(Error::CustomError(String::from(
+                "Unknown save state file format",
+            )));
+        };
+        match format {
+            SaveStateFormat::Bosc => {
+                let mut state = BoscState::default();
+                state.read(data);
+                Ok(state.bos)
+            }
+            SaveStateFormat::Bos => {
+                let mut state = BosState::default();
+                state.read(data);
+                Ok(state)
+            }
+            _ => unreachable!(),
+        }
+    }
+
     pub fn read_bosc(data: &[u8]) -> Result<BoscState, Error> {
         let data = &mut Cursor::new(data.to_vec());
         let mut state = BoscState::default();
@@ -1741,6 +1771,10 @@ impl StateManager {
         format: Option<SaveStateFormat>,
     ) -> Result<(), String> {
         Self::load(data, gb, format).map_err(|e| e.to_string())
+    }
+
+    pub fn read_bos_auto_wa(data: &[u8]) -> Result<BosState, String> {
+        Self::read_bos_auto(data).map_err(|e| e.to_string())
     }
 
     pub fn read_bosc_wa(data: &[u8]) -> Result<BoscState, String> {
