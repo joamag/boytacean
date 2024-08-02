@@ -7,6 +7,7 @@
 //! in agnostic and compatible way.
 
 use boytacean_common::error::Error;
+use boytacean_encoding::zippy::{decode_zippy, encode_zippy};
 use std::{
     convert::TryInto,
     fmt::{self, Display, Formatter},
@@ -26,11 +27,20 @@ use crate::{
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
 
+/// Magic string for the BOSC (Boytacean Save Compressed) format.
+pub const BOSC_MAGIC: &str = "BOSC\0";
+
+/// Magic string ("BOSC") in little endian unsigned 32 bit format.
+pub const BOSC_MAGIC_UINT: u32 = 0x43534f42;
+
 /// Magic string for the BOS (Boytacean Save) format.
 pub const BOS_MAGIC: &str = "BOS\0";
 
 /// Magic string ("BOS\0") in little endian unsigned 32 bit format.
 pub const BOS_MAGIC_UINT: u32 = 0x00534f42;
+
+/// Current version of the BOS (Boytacean Save Compressed) format.
+pub const BOSC_VERSION: u8 = 1;
 
 /// Current version of the BOS (Boytacean Save) format.
 pub const BOS_VERSION: u8 = 1;
@@ -40,7 +50,15 @@ pub const BESS_MAGIC: u32 = 0x53534542;
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 pub enum SaveStateFormat {
+    /// Boytacean Save Compressed format (BOSC).
+    /// This format uses the Zippy compression algorithm
+    /// to compress the underlying BOS contents.
+    Bosc,
+
+    /// Boytacean Save format (uncompressed) (BOS).
     Bos,
+
+    /// Best Effort Save State format (BESS).
     Bess,
 }
 
@@ -97,6 +115,84 @@ pub trait StateBox {
 
     /// Applies the state to the provided `GameBoy` instance.
     fn to_gb(&self, gb: &mut GameBoy) -> Result<(), Error>;
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
+#[derive(Default)]
+pub struct BoscState {
+    magic: u32,
+    version: u8,
+    bos: BosState,
+}
+
+impl BoscState {
+    /// Checks if the data contained in the provided
+    /// buffer represents a valid BOSC (Boytacean Save
+    /// Compressed) file structure, thought magic
+    /// string validation.
+    pub fn is_bosc(data: &mut Cursor<Vec<u8>>) -> bool {
+        let mut buffer = [0x00; size_of::<u32>()];
+        data.read_exact(&mut buffer).unwrap();
+        let magic = u32::from_le_bytes(buffer);
+        data.rewind().unwrap();
+        magic == BOSC_MAGIC_UINT
+    }
+
+    pub fn verify(&self) -> Result<(), Error> {
+        if self.magic != BOSC_MAGIC_UINT {
+            return Err(Error::CustomError(String::from("Invalid magic")));
+        }
+        self.bos.verify()?;
+        Ok(())
+    }
+}
+
+impl Serialize for BoscState {
+    fn write(&mut self, buffer: &mut Cursor<Vec<u8>>) {
+        buffer.write_all(&self.magic.to_le_bytes()).unwrap();
+        buffer.write_all(&self.version.to_le_bytes()).unwrap();
+
+        let mut cursor = Cursor::new(vec![]);
+        self.bos.write(&mut cursor);
+        cursor.rewind().unwrap();
+        let mut bos_buffer = vec![];
+        cursor.read_to_end(&mut bos_buffer).unwrap();
+
+        let bos_compressed = encode_zippy(&bos_buffer).unwrap();
+        buffer.write_all(&bos_compressed).unwrap();
+    }
+
+    fn read(&mut self, data: &mut Cursor<Vec<u8>>) {
+        let mut buffer = [0x00; size_of::<u32>()];
+        data.read_exact(&mut buffer).unwrap();
+        self.magic = u32::from_le_bytes(buffer);
+        let mut buffer = [0x00; size_of::<u8>()];
+        data.read_exact(&mut buffer).unwrap();
+        self.version = u8::from_le_bytes(buffer);
+
+        let mut bos_compressed = vec![];
+        data.read_to_end(&mut bos_compressed).unwrap();
+        let bos_buffer = decode_zippy(&bos_compressed).unwrap();
+        let mut bos_cursor = Cursor::new(bos_buffer);
+
+        self.bos.read(&mut bos_cursor);
+    }
+}
+
+impl StateBox for BoscState {
+    fn from_gb(gb: &mut GameBoy) -> Result<Box<Self>, Error> {
+        Ok(Box::new(Self {
+            magic: BOSC_MAGIC_UINT,
+            version: BOSC_VERSION,
+            bos: *BosState::from_gb(gb)?,
+        }))
+    }
+
+    fn to_gb(&self, gb: &mut GameBoy) -> Result<(), Error> {
+        self.verify()?;
+        self.bos.to_gb(gb)?;
+        Ok(())
+    }
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
@@ -1515,7 +1611,11 @@ impl StateManager {
     pub fn save(gb: &mut GameBoy, format: Option<SaveStateFormat>) -> Result<Vec<u8>, Error> {
         let mut data = Cursor::new(vec![]);
         match format {
-            Some(SaveStateFormat::Bos) | None => {
+            Some(SaveStateFormat::Bosc) | None => {
+                let mut state = BoscState::from_gb(gb)?;
+                state.write(&mut data);
+            }
+            Some(SaveStateFormat::Bos) => {
                 let mut state = BosState::from_gb(gb)?;
                 state.write(&mut data);
             }
@@ -1536,7 +1636,9 @@ impl StateManager {
         let format = match format {
             Some(format) => format,
             None => {
-                if BosState::is_bos(data) {
+                if BoscState::is_bosc(data) {
+                    SaveStateFormat::Bosc
+                } else if BosState::is_bos(data) {
                     SaveStateFormat::Bos
                 } else if BessState::is_bess(data) {
                     SaveStateFormat::Bess
@@ -1548,6 +1650,11 @@ impl StateManager {
             }
         };
         match format {
+            SaveStateFormat::Bosc => {
+                let mut state = BoscState::default();
+                state.read(data);
+                state.to_gb(gb)?;
+            }
             SaveStateFormat::Bos => {
                 let mut state = BosState::default();
                 state.read(data);
@@ -1560,6 +1667,43 @@ impl StateManager {
             }
         }
         Ok(())
+    }
+
+    pub fn read_bos_auto(data: &[u8]) -> Result<BosState, Error> {
+        let data = &mut Cursor::new(data.to_vec());
+        let format = if BoscState::is_bosc(data) {
+            SaveStateFormat::Bosc
+        } else if BosState::is_bos(data) {
+            SaveStateFormat::Bos
+        } else if BessState::is_bess(data) {
+            return Err(Error::CustomError(String::from(
+                "Incompatible save state file format (BESS)",
+            )));
+        } else {
+            return Err(Error::CustomError(String::from(
+                "Unknown save state file format",
+            )));
+        };
+        match format {
+            SaveStateFormat::Bosc => {
+                let mut state = BoscState::default();
+                state.read(data);
+                Ok(state.bos)
+            }
+            SaveStateFormat::Bos => {
+                let mut state = BosState::default();
+                state.read(data);
+                Ok(state)
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn read_bosc(data: &[u8]) -> Result<BoscState, Error> {
+        let data = &mut Cursor::new(data.to_vec());
+        let mut state = BoscState::default();
+        state.read(data);
+        Ok(state)
     }
 
     pub fn read_bos(data: &[u8]) -> Result<BosState, Error> {
@@ -1597,6 +1741,11 @@ impl StateManager {
             }
         };
         match format {
+            SaveStateFormat::Bosc => {
+                let mut state = BoscState::default();
+                state.read(data);
+                Ok(state.bos.image_buffer.unwrap().image.to_vec())
+            }
             SaveStateFormat::Bos => {
                 let mut state = BosState::default();
                 state.read(data);
@@ -1622,6 +1771,14 @@ impl StateManager {
         format: Option<SaveStateFormat>,
     ) -> Result<(), String> {
         Self::load(data, gb, format).map_err(|e| e.to_string())
+    }
+
+    pub fn read_bos_auto_wa(data: &[u8]) -> Result<BosState, String> {
+        Self::read_bos_auto(data).map_err(|e| e.to_string())
+    }
+
+    pub fn read_bosc_wa(data: &[u8]) -> Result<BoscState, String> {
+        Self::read_bosc(data).map_err(|e| e.to_string())
     }
 
     pub fn read_bos_wa(data: &[u8]) -> Result<BosState, String> {
@@ -1682,6 +1839,17 @@ mod tests {
         assert_eq!(bess_core.hram.size, 0x007f);
         assert_eq!(bess_core.background_palettes.size, 0x0000);
         assert_eq!(bess_core.object_palettes.size, 0x0000);
+    }
+
+    #[test]
+    fn test_load_bosc() {
+        let mut gb = GameBoy::default();
+        gb.load(true).unwrap();
+        gb.load_rom_file("res/roms/test/firstwhite.gb", None)
+            .unwrap();
+        let data = StateManager::save(&mut gb, Some(SaveStateFormat::Bosc)).unwrap();
+        StateManager::load(&data, &mut gb, Some(SaveStateFormat::Bosc)).unwrap();
+        StateManager::load(&data, &mut gb, None).unwrap();
     }
 
     #[test]

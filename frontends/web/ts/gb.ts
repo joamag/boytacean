@@ -720,7 +720,7 @@ export class GameboyEmulator extends EmulatorLogic implements Emulator {
 
     serializeState(): Uint8Array {
         if (!this.gameBoy) throw new Error("Unable to serialize state");
-        return StateManager.save_wa(this.gameBoy, SaveStateFormat.Bos);
+        return StateManager.save_wa(this.gameBoy);
     }
 
     unserializeState(data: Uint8Array) {
@@ -729,7 +729,7 @@ export class GameboyEmulator extends EmulatorLogic implements Emulator {
     }
 
     buildState(index: number, data: Uint8Array): SaveState {
-        const state = StateManager.read_bos_wa(data);
+        const state = StateManager.read_bos_auto_wa(data);
         return {
             index: index,
             timestamp: Number(state.timestamp_wa()),
