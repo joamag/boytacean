@@ -725,7 +725,7 @@ export class GameboyEmulator extends EmulatorLogic implements Emulator {
 
     unserializeState(data: Uint8Array) {
         if (!this.gameBoy) throw new Error("Unable to unserialize state");
-        StateManager.load_wa(data, this.gameBoy, SaveStateFormat.Bos);
+        StateManager.load_wa(data, this.gameBoy);
     }
 
     buildState(index: number, data: Uint8Array): SaveState {
