@@ -1655,7 +1655,7 @@ impl StateManager {
                 state.to_gb(gb)?;
             }
             SaveStateFormat::Bosc => {
-                let mut state = BosState::default();
+                let mut state = BoscState::default();
                 state.read(data);
                 state.to_gb(gb)?;
             }
