@@ -39,7 +39,6 @@ import {
     GameBoySpeed,
     Info,
     PadKey,
-    SaveStateFormat,
     StateManager,
     ClockFrame
 } from "../lib/boytacean";
