@@ -17,4 +17,4 @@ pedantic = ["boytacean/pedantic"]
 cpulog = ["boytacean/cpulog"]
 
 [dependencies]
-boytacean = { path = "../.." }
+boytacean = { path = "../..", version = "0.10.4" }

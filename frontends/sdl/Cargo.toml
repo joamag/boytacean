@@ -15,8 +15,8 @@ pedantic = ["boytacean/pedantic"]
 cpulog = ["boytacean/cpulog"]
 
 [dependencies]
-boytacean = { path = "../.." }
-boytacean-common = { path = "../../crates/common" }
+boytacean = { path = "../..", version = "0.10.4" }
+boytacean-common = { path = "../../crates/common", version = "0.10.4" }
 clap = { version = "4", features = ["derive"] }
 image = "0.24"
 chrono = "0.4"

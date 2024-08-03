@@ -9,3 +9,11 @@ install_rgbds() {
     export PATH="$CI_PROJECT_DIR/rgbds:$PATH"
     rgbasm --version
 }
+
+cargo_publish_all() {
+    members=$(cargo metadata --no-deps --format-version=1 | jq -r '.packages[] | select(.publish == null) | .manifest_path')
+    for member in $members; do
+        echo "Publishing crate: $member"
+        cargo publish --manifest-path "$member" --no-verify
+    done
+}
