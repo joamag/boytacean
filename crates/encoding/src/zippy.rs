@@ -51,11 +51,7 @@ impl Zippy {
         Ok(Self {
             name,
             description,
-            crc32: if options.crc32 {
-                crc32(data)
-            } else {
-                0xffffff
-            },
+            crc32: if options.crc32 { crc32(data) } else { 0xffffff },
             data: data.to_vec(),
         })
     }
