@@ -1408,7 +1408,7 @@ impl GameBoy {
     }
 
     pub fn load_rom_wa(&mut self, data: &[u8]) -> Result<Cartridge, String> {
-        let rom = self.load_rom(data, None).map_err(|e| e.to_string())?;
+        let rom = self.load_rom(data, None)?;
         rom.set_rumble_cb(|active| {
             rumble_callback(active);
         });
@@ -1450,9 +1450,7 @@ impl GameBoy {
     /// cartridge data parsing to obtain the CGB flag.
     /// It will also have to clone the data buffer.
     pub fn infer_mode_wa(&mut self, data: &[u8]) -> Result<(), String> {
-        let mode = Cartridge::from_data(data)
-            .map_err(|e| e.to_string())?
-            .gb_mode();
+        let mode = Cartridge::from_data(data)?.gb_mode();
         self.set_mode(mode);
         Ok(())
     }

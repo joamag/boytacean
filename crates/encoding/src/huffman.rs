@@ -52,28 +52,20 @@ pub fn decode_huffman(data: &[u8]) -> Result<Vec<u8>, Error> {
     let mut reader = Cursor::new(data);
 
     let mut buffer = [0x00; size_of::<u32>()];
-    reader
-        .read_exact(&mut buffer)
-        .map_err(|_| Error::InvalidData)?;
+    reader.read_exact(&mut buffer)?;
     let tree_length = u32::from_be_bytes(buffer);
 
     let mut buffer = vec![0; tree_length as usize];
-    reader
-        .read_exact(&mut buffer)
-        .map_err(|_| Error::InvalidData)?;
+    reader.read_exact(&mut buffer)?;
     let tree = decode_tree(&mut buffer.as_slice());
 
     let mut buffer = [0x00; size_of::<u64>()];
-    reader
-        .read_exact(&mut buffer)
-        .map_err(|_| Error::InvalidData)?;
+    reader.read_exact(&mut buffer)?;
     let data_length = u64::from_be_bytes(buffer);
 
     let mut buffer =
         vec![0; data.len() - size_of::<u32>() - tree_length as usize - size_of::<u64>()];
-    reader
-        .read_exact(&mut buffer)
-        .map_err(|_| Error::InvalidData)?;
+    reader.read_exact(&mut buffer)?;
 
     let result = decode_data(&buffer, &tree, data_length);
 

@@ -85,6 +85,28 @@ impl From<u8> for BosBlockKind {
     }
 }
 
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
+pub struct FromGbOptions {
+    thumbnail: bool,
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
+impl FromGbOptions {
+    pub fn new(thumbnail: bool) -> Self {
+        Self { thumbnail }
+    }
+}
+
+impl Default for FromGbOptions {
+    fn default() -> Self {
+        Self { thumbnail: true }
+    }
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
+#[derive(Default)]
+pub struct ToGbOptions;
+
 pub trait Serialize {
     /// Writes the data from the internal structure into the
     /// provided buffer.
@@ -109,12 +131,12 @@ pub trait State {
 pub trait StateBox {
     /// Obtains a new instance of the state from the provided
     /// `GameBoy` instance and returns it as a boxed value.
-    fn from_gb(gb: &mut GameBoy) -> Result<Box<Self>, Error>
+    fn from_gb(gb: &mut GameBoy, options: &FromGbOptions) -> Result<Box<Self>, Error>
     where
         Self: Sized;
 
     /// Applies the state to the provided `GameBoy` instance.
-    fn to_gb(&self, gb: &mut GameBoy) -> Result<(), Error>;
+    fn to_gb(&self, gb: &mut GameBoy, options: &ToGbOptions) -> Result<(), Error>;
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
@@ -184,17 +206,17 @@ impl Serialize for BoscState {
 }
 
 impl StateBox for BoscState {
-    fn from_gb(gb: &mut GameBoy) -> Result<Box<Self>, Error> {
+    fn from_gb(gb: &mut GameBoy, options: &FromGbOptions) -> Result<Box<Self>, Error> {
         Ok(Box::new(Self {
             magic: BOSC_MAGIC_UINT,
             version: BOSC_VERSION,
-            bos: *BosState::from_gb(gb)?,
+            bos: *BosState::from_gb(gb, options)?,
         }))
     }
 
-    fn to_gb(&self, gb: &mut GameBoy) -> Result<(), Error> {
+    fn to_gb(&self, gb: &mut GameBoy, options: &ToGbOptions) -> Result<(), Error> {
         self.verify()?;
-        self.bos.to_gb(gb)?;
+        self.bos.to_gb(gb, options)?;
         Ok(())
     }
 }
@@ -283,25 +305,33 @@ impl BosState {
             Err(Error::CustomError(String::from("No image available")))
         }
     }
+
+    pub fn has_image(&self) -> bool {
+        self.image_buffer.is_some()
+    }
 }
 
 #[cfg(feature = "wasm")]
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 impl BosState {
     pub fn timestamp_wa(&self) -> Result<u64, String> {
-        Self::timestamp(self).map_err(|e| e.to_string())
+        Ok(Self::timestamp(self)?)
     }
 
     pub fn agent_wa(&self) -> Result<String, String> {
-        Self::agent(self).map_err(|e| e.to_string())
+        Ok(Self::agent(self)?)
     }
 
     pub fn model_wa(&self) -> Result<String, String> {
-        Self::model(self).map_err(|e| e.to_string())
+        Ok(Self::model(self)?)
     }
 
     pub fn image_eager_wa(&self) -> Result<Vec<u8>, String> {
-        Self::image_eager(self).map_err(|e| e.to_string())
+        Ok(Self::image_eager(self)?)
+    }
+
+    pub fn has_image_wa(&self) -> bool {
+        self.has_image()
     }
 }
 
@@ -364,20 +394,24 @@ impl Serialize for BosState {
 }
 
 impl StateBox for BosState {
-    fn from_gb(gb: &mut GameBoy) -> Result<Box<Self>, Error> {
+    fn from_gb(gb: &mut GameBoy, options: &FromGbOptions) -> Result<Box<Self>, Error> {
         Ok(Box::new(Self {
             magic: BOS_MAGIC_UINT,
             version: BOS_VERSION,
             block_count: 2,
             info: Some(BosInfo::from_gb(gb)?),
-            image_buffer: Some(BosImageBuffer::from_gb(gb)?),
-            bess: *BessState::from_gb(gb)?,
+            image_buffer: if options.thumbnail {
+                Some(BosImageBuffer::from_gb(gb)?)
+            } else {
+                None
+            },
+            bess: *BessState::from_gb(gb, options)?,
         }))
     }
 
-    fn to_gb(&self, gb: &mut GameBoy) -> Result<(), Error> {
+    fn to_gb(&self, gb: &mut GameBoy, options: &ToGbOptions) -> Result<(), Error> {
         self.verify()?;
-        self.bess.to_gb(gb)?;
+        self.bess.to_gb(gb, options)?;
         Ok(())
     }
 }
@@ -726,7 +760,7 @@ impl Serialize for BessState {
 }
 
 impl StateBox for BessState {
-    fn from_gb(gb: &mut GameBoy) -> Result<Box<Self>, Error> {
+    fn from_gb(gb: &mut GameBoy, _options: &FromGbOptions) -> Result<Box<Self>, Error> {
         Ok(Box::new(Self {
             footer: BessFooter::default(),
             name: BessName::from_gb(gb)?,
@@ -737,7 +771,7 @@ impl StateBox for BessState {
         }))
     }
 
-    fn to_gb(&self, gb: &mut GameBoy) -> Result<(), Error> {
+    fn to_gb(&self, gb: &mut GameBoy, _options: &ToGbOptions) -> Result<(), Error> {
         self.verify()?;
         self.name.to_gb(gb)?;
         self.info.to_gb(gb)?;
@@ -1609,10 +1643,11 @@ impl StateManager {
         file_path: &str,
         gb: &mut GameBoy,
         format: Option<SaveStateFormat>,
+        options: Option<FromGbOptions>,
     ) -> Result<(), Error> {
         let mut file = File::create(file_path)
             .map_err(|_| Error::CustomError(format!("Failed to create file: {}", file_path)))?;
-        let data = Self::save(gb, format)?;
+        let data = Self::save(gb, format, options)?;
         file.write_all(&data)
             .map_err(|_| Error::CustomError(format!("Failed to write to file: {}", file_path)))?;
         file.flush()
@@ -1624,31 +1659,37 @@ impl StateManager {
         file_path: &str,
         gb: &mut GameBoy,
         format: Option<SaveStateFormat>,
+        options: Option<ToGbOptions>,
     ) -> Result<(), Error> {
         let mut file = File::open(file_path)
             .map_err(|_| Error::CustomError(format!("Failed to open file: {}", file_path)))?;
         let mut data = vec![];
         file.read_to_end(&mut data)
             .map_err(|_| Error::CustomError(format!("Failed to read from file: {}", file_path)))?;
-        Self::load(&data, gb, format)?;
+        Self::load(&data, gb, format, options)?;
         Ok(())
     }
 }
 
 impl StateManager {
-    pub fn save(gb: &mut GameBoy, format: Option<SaveStateFormat>) -> Result<Vec<u8>, Error> {
+    pub fn save(
+        gb: &mut GameBoy,
+        format: Option<SaveStateFormat>,
+        options: Option<FromGbOptions>,
+    ) -> Result<Vec<u8>, Error> {
+        let options = options.unwrap_or_default();
         let mut data = Cursor::new(vec![]);
         match format {
             Some(SaveStateFormat::Bosc) | None => {
-                let mut state = BoscState::from_gb(gb)?;
+                let mut state = BoscState::from_gb(gb, &options)?;
                 state.write(&mut data)?;
             }
             Some(SaveStateFormat::Bos) => {
-                let mut state = BosState::from_gb(gb)?;
+                let mut state = BosState::from_gb(gb, &options)?;
                 state.write(&mut data)?;
             }
             Some(SaveStateFormat::Bess) => {
-                let mut state = BessState::from_gb(gb)?;
+                let mut state = BessState::from_gb(gb, &options)?;
                 state.write(&mut data)?;
             }
         }
@@ -1659,7 +1700,9 @@ impl StateManager {
         data: &[u8],
         gb: &mut GameBoy,
         format: Option<SaveStateFormat>,
+        options: Option<ToGbOptions>,
     ) -> Result<(), Error> {
+        let options = options.unwrap_or_default();
         let data = &mut Cursor::new(data.to_vec());
         let format = match format {
             Some(format) => format,
@@ -1681,17 +1724,17 @@ impl StateManager {
             SaveStateFormat::Bosc => {
                 let mut state = BoscState::default();
                 state.read(data)?;
-                state.to_gb(gb)?;
+                state.to_gb(gb, &options)?;
             }
             SaveStateFormat::Bos => {
                 let mut state = BosState::default();
                 state.read(data)?;
-                state.to_gb(gb)?;
+                state.to_gb(gb, &options)?;
             }
             SaveStateFormat::Bess => {
                 let mut state = BessState::default();
                 state.read(data)?;
-                state.to_gb(gb)?;
+                state.to_gb(gb, &options)?;
             }
         }
         Ok(())
@@ -1794,36 +1837,41 @@ impl StateManager {
 #[cfg(feature = "wasm")]
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 impl StateManager {
-    pub fn save_wa(gb: &mut GameBoy, format: Option<SaveStateFormat>) -> Result<Vec<u8>, String> {
-        Self::save(gb, format).map_err(|e| e.to_string())
+    pub fn save_wa(
+        gb: &mut GameBoy,
+        format: Option<SaveStateFormat>,
+        options: Option<FromGbOptions>,
+    ) -> Result<Vec<u8>, String> {
+        Ok(Self::save(gb, format, options)?)
     }
 
     pub fn load_wa(
         data: &[u8],
         gb: &mut GameBoy,
         format: Option<SaveStateFormat>,
+        options: Option<ToGbOptions>,
     ) -> Result<(), String> {
-        Self::load(data, gb, format).map_err(|e| e.to_string())
+        Ok(Self::load(data, gb, format, options)?)
     }
 
     pub fn read_bos_auto_wa(data: &[u8]) -> Result<BosState, String> {
-        Self::read_bos_auto(data).map_err(|e| e.to_string())
+        Ok(Self::read_bos_auto(data)?)
     }
 
     pub fn read_bosc_wa(data: &[u8]) -> Result<BoscState, String> {
-        Self::read_bosc(data).map_err(|e| e.to_string())
+        Ok(Self::read_bosc(data)?)
     }
 
     pub fn read_bos_wa(data: &[u8]) -> Result<BosState, String> {
-        Self::read_bos(data).map_err(|e| e.to_string())
+        Ok(Self::read_bos(data)?)
     }
 
     pub fn read_bess_wa(data: &[u8]) -> Result<BessState, String> {
-        Self::read_bess(data).map_err(|e| e.to_string())
+        Ok(Self::read_bess(data)?)
     }
 
     pub fn thumbnail_wa(data: &[u8], format: Option<SaveStateFormat>) -> Result<Vec<u8>, String> {
-        Self::thumbnail(data, format).map_err(|e| e.to_string())
+        Ok(Self::thumbnail(data, format)?)
     }
 }
 
@@ -1880,9 +1928,9 @@ mod tests {
         gb.load(true).unwrap();
         gb.load_rom_file("res/roms/test/firstwhite.gb", None)
             .unwrap();
-        let data = StateManager::save(&mut gb, Some(SaveStateFormat::Bosc)).unwrap();
-        StateManager::load(&data, &mut gb, Some(SaveStateFormat::Bosc)).unwrap();
-        StateManager::load(&data, &mut gb, None).unwrap();
+        let data = StateManager::save(&mut gb, Some(SaveStateFormat::Bosc), None).unwrap();
+        StateManager::load(&data, &mut gb, Some(SaveStateFormat::Bosc), None).unwrap();
+        StateManager::load(&data, &mut gb, None, None).unwrap();
     }
 
     #[test]
@@ -1891,9 +1939,9 @@ mod tests {
         gb.load(true).unwrap();
         gb.load_rom_file("res/roms/test/firstwhite.gb", None)
             .unwrap();
-        let data = StateManager::save(&mut gb, Some(SaveStateFormat::Bos)).unwrap();
-        StateManager::load(&data, &mut gb, Some(SaveStateFormat::Bos)).unwrap();
-        StateManager::load(&data, &mut gb, None).unwrap();
+        let data = StateManager::save(&mut gb, Some(SaveStateFormat::Bos), None).unwrap();
+        StateManager::load(&data, &mut gb, Some(SaveStateFormat::Bos), None).unwrap();
+        StateManager::load(&data, &mut gb, None, None).unwrap();
     }
 
     #[test]
@@ -1902,9 +1950,9 @@ mod tests {
         gb.load(true).unwrap();
         gb.load_rom_file("res/roms/test/firstwhite.gb", None)
             .unwrap();
-        let data = StateManager::save(&mut gb, Some(SaveStateFormat::Bess)).unwrap();
-        StateManager::load(&data, &mut gb, Some(SaveStateFormat::Bess)).unwrap();
-        StateManager::load(&data, &mut gb, None).unwrap();
+        let data = StateManager::save(&mut gb, Some(SaveStateFormat::Bess), None).unwrap();
+        StateManager::load(&data, &mut gb, Some(SaveStateFormat::Bess), None).unwrap();
+        StateManager::load(&data, &mut gb, None, None).unwrap();
     }
 
     #[test]
@@ -1914,7 +1962,7 @@ mod tests {
         gb.load_rom_file("res/roms/test/firstwhite.gb", None)
             .unwrap();
         gb.step_to(0x0100);
-        let data = StateManager::save(&mut gb, Some(SaveStateFormat::Bess)).unwrap();
+        let data = StateManager::save(&mut gb, Some(SaveStateFormat::Bess), None).unwrap();
         let encoded = encode_zippy(&data).unwrap();
         let decoded = decode_zippy(&encoded).unwrap();
         assert_eq!(data, decoded);

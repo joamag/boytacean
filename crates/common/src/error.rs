@@ -53,3 +53,9 @@ impl From<FromUtf8Error> for Error {
         Error::CustomError(String::from("From UTF8 error"))
     }
 }
+
+impl From<Error> for String {
+    fn from(error: Error) -> Self {
+        error.description()
+    }
+}

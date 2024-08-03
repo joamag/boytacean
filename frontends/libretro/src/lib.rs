@@ -443,7 +443,7 @@ pub extern "C" fn retro_serialize_size() -> usize {
 
     // uses BESS file format for its static nature, meaning that the final
     // size of the serialized state is known in advance
-    StateManager::save(instance, Some(SaveStateFormat::Bess))
+    StateManager::save(instance, Some(SaveStateFormat::Bess), None)
         .unwrap()
         .len()
 }
@@ -452,7 +452,7 @@ pub extern "C" fn retro_serialize_size() -> usize {
 pub extern "C" fn retro_serialize(data: *mut c_void, size: usize) -> bool {
     debugln!("retro_serialize()");
     let instance = unsafe { EMULATOR.as_mut().unwrap() };
-    let state = match StateManager::save(instance, Some(SaveStateFormat::Bess)) {
+    let state = match StateManager::save(instance, Some(SaveStateFormat::Bess), None) {
         Ok(state) => state,
         Err(err) => {
             warnln!("Failed to save state: {}", err);
@@ -484,7 +484,7 @@ pub extern "C" fn retro_unserialize(data: *const c_void, size: usize) -> bool {
     debugln!("retro_unserialize()");
     let instance = unsafe { EMULATOR.as_mut().unwrap() };
     let state = unsafe { from_raw_parts(data as *const u8, size) };
-    if let Err(err) = StateManager::load(state, instance, None) {
+    if let Err(err) = StateManager::load(state, instance, None, None) {
         warnln!("Failed to load state: {}", err);
         #[allow(unreachable_code)]
         {
