@@ -98,6 +98,12 @@ impl Crc32 {
     }
 }
 
+impl Default for Crc32 {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub fn crc32(data: &[u8]) -> u32 {
     let mut crc32 = Crc32::new();
     crc32.update(data);
