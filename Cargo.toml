@@ -58,7 +58,14 @@ opt-level = 3
 codegen-units = 1
 
 [workspace]
-members = [".", "frontends/libretro", "frontends/sdl", "crates/common", "crates/encoding"]
+members = [
+    ".",
+    "frontends/libretro",
+    "frontends/sdl",
+    "crates/common",
+    "crates/encoding",
+    "crates/hashing"
+]
 package = { version = "0.10.4", authors = ["João Magalhães <joamag@gmail.com>"], edition = "2018" }
 
 [package.metadata.docs.rs]

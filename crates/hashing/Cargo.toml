@@ -1,0 +1,4 @@
+[package]
+name = "boytacean-hashing"
+version = "0.10.4"
+edition = "2018"
