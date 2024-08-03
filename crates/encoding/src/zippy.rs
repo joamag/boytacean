@@ -1,4 +1,7 @@
-use std::io::{Cursor, Read, Write};
+use std::{
+    io::{Cursor, Read, Write},
+    mem::size_of,
+};
 
 use boytacean_common::error::Error;
 use boytacean_hashing::crc32::crc32;
