@@ -178,14 +178,14 @@ impl GameBoy {
     }
 
     pub fn save_state(&mut self, py: Python) -> PyResult<PyObject> {
-        match StateManager::save(&mut self.system, None) {
+        match StateManager::save(&mut self.system, None, None) {
             Ok(data) => Ok(PyBytes::new(py, &data).into()),
             Err(e) => Err(PyErr::new::<PyException, _>(e)),
         }
     }
 
     pub fn load_state(&mut self, data: &[u8]) -> PyResult<()> {
-        StateManager::load(data, &mut self.system, None).map_err(PyErr::new::<PyException, _>)
+        StateManager::load(data, &mut self.system, None, None).map_err(PyErr::new::<PyException, _>)
     }
 }
 
