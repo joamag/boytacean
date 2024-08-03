@@ -1,4 +1,5 @@
 use std::{
+    default,
     io::{Cursor, Read, Write},
     mem::size_of,
 };
@@ -23,12 +24,38 @@ pub struct Zippy {
     data: Vec<u8>,
 }
 
+pub struct ZippyOptions {
+    crc32: bool,
+}
+
+impl ZippyOptions {
+    pub fn new(crc32: bool) -> Self {
+        Self { crc32 }
+    }
+}
+
+impl default::Default for ZippyOptions {
+    fn default() -> Self {
+        Self { crc32: true }
+    }
+}
+
 impl Zippy {
-    pub fn build(data: &[u8], name: String, description: String) -> Result<Self, Error> {
+    pub fn build(
+        data: &[u8],
+        name: String,
+        description: String,
+        options: Option<ZippyOptions>,
+    ) -> Result<Self, Error> {
+        let options = options.unwrap_or_default();
         Ok(Self {
             name,
             description,
-            crc32: crc32(&data),
+            crc32: if options.crc32 {
+                crc32(&data)
+            } else {
+                0xffffff
+            },
             data: data.to_vec(),
         })
     }
@@ -43,7 +70,7 @@ impl Zippy {
         Ok(magic == ZIPPY_MAGIC_UINT)
     }
 
-    pub fn decode(data: &[u8]) -> Result<Zippy, Error> {
+    pub fn decode(data: &[u8], _options: Option<ZippyOptions>) -> Result<Zippy, Error> {
         let mut data = Cursor::new(data);
 
         let mut buffer = [0x00; size_of::<u32>()];
@@ -112,12 +139,12 @@ impl Zippy {
     }
 }
 
-pub fn encode_zippy(data: &[u8]) -> Result<Vec<u8>, Error> {
-    Ok(Zippy::build(&data, String::from(""), String::from(""))?.encode()?)
+pub fn encode_zippy(data: &[u8], options: Option<ZippyOptions>) -> Result<Vec<u8>, Error> {
+    Ok(Zippy::build(&data, String::from(""), String::from(""), options)?.encode()?)
 }
 
-pub fn decode_zippy(data: &[u8]) -> Result<Vec<u8>, Error> {
-    Ok(Zippy::decode(&data)?.data().to_vec())
+pub fn decode_zippy(data: &[u8], options: Option<ZippyOptions>) -> Result<Vec<u8>, Error> {
+    Ok(Zippy::decode(&data, options)?.data().to_vec())
 }
 
 #[cfg(test)]
@@ -132,10 +159,10 @@ mod tests {
         let name = String::from("Test");
         let description = String::from("Test description");
 
-        let zippy = Zippy::build(&data, name.clone(), description.clone()).unwrap();
+        let zippy = Zippy::build(&data, name.clone(), description.clone(), None).unwrap();
         let encoded = zippy.encode().unwrap();
 
-        let decoded = Zippy::decode(&encoded).unwrap();
+        let decoded = Zippy::decode(&encoded, None).unwrap();
         assert_eq!(decoded.name, name);
         assert_eq!(decoded.description, description);
         assert_eq!(decoded.data, data);
@@ -147,10 +174,10 @@ mod tests {
         let name = String::from("Test");
         let description = String::from("Test description");
 
-        let zippy = Zippy::build(&data, name.clone(), description.clone()).unwrap();
+        let zippy = Zippy::build(&data, name.clone(), description.clone(), None).unwrap();
         let encoded = zippy.encode().unwrap();
 
-        let decoded_data = decode_zippy(&encoded).unwrap();
+        let decoded_data = decode_zippy(&encoded, None).unwrap();
         assert_eq!(decoded_data, data);
     }
 
@@ -160,16 +187,16 @@ mod tests {
         let name = String::from("Test");
         let description = String::from("Test description");
 
-        let zippy = Zippy::build(&data, name.clone(), description.clone()).unwrap();
+        let zippy = Zippy::build(&data, name.clone(), description.clone(), None).unwrap();
         let encoded = zippy.encode().unwrap();
 
-        let zippy = Zippy::decode(&encoded).unwrap();
+        let zippy = Zippy::decode(&encoded, None).unwrap();
         assert!(zippy.check_crc32());
     }
 
     #[test]
     fn test_decode_invalid() {
-        let decoded_data = decode_zippy(b"invalid");
+        let decoded_data = decode_zippy(b"invalid", None);
         assert!(decoded_data.is_err());
         assert_eq!(decoded_data.unwrap_err(), Error::InvalidData);
     }

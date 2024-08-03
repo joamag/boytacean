@@ -177,7 +177,7 @@ impl Serialize for BoscState {
         let mut cursor = Cursor::new(vec![]);
         self.bos.write(&mut cursor)?;
 
-        let bos_compressed = encode_zippy(&cursor.into_inner())?;
+        let bos_compressed = encode_zippy(&cursor.into_inner(), None)?;
         buffer.write_all(&bos_compressed)?;
 
         Ok(())
@@ -193,7 +193,7 @@ impl Serialize for BoscState {
 
         let mut bos_compressed = vec![];
         data.read_to_end(&mut bos_compressed)?;
-        let bos_buffer = decode_zippy(&bos_compressed)?;
+        let bos_buffer = decode_zippy(&bos_compressed, None)?;
         let mut bos_cursor = Cursor::new(bos_buffer);
 
         self.bos.read(&mut bos_cursor)?;
@@ -1960,8 +1960,8 @@ mod tests {
             .unwrap();
         gb.step_to(0x0100);
         let data = StateManager::save(&mut gb, Some(SaveStateFormat::Bess), None).unwrap();
-        let encoded = encode_zippy(&data).unwrap();
-        let decoded = decode_zippy(&encoded).unwrap();
+        let encoded = encode_zippy(&data, None).unwrap();
+        let decoded = decode_zippy(&encoded, None).unwrap();
         assert_eq!(data, decoded);
         assert_eq!(encoded.len(), 831);
         assert_eq!(decoded.len(), 25154);

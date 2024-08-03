@@ -33,6 +33,7 @@ pyo3 = { version = "0.20", optional = true }
 
 [dev-dependencies]
 criterion = "0.5"
+boytacean-hashing = { path = "crates/hashing", version = "0.10.4" }
 
 [build-dependencies]
 chrono = "0.4"
@@ -77,4 +78,8 @@ harness = false
 
 [[bench]]
 name = "encoding"
+harness = false
+
+[[bench]]
+name = "hashing"
 harness = false

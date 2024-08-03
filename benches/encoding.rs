@@ -58,7 +58,7 @@ fn benchmark_encoding(c: &mut Criterion) {
 
     group.bench_function("encode_zippy", |b| {
         b.iter(|| {
-            let encoded = encode_zippy(black_box(&data)).unwrap();
+            let encoded = encode_zippy(black_box(&data), None).unwrap();
             black_box(encoded);
         })
     });
@@ -71,7 +71,7 @@ fn benchmark_decoding(c: &mut Criterion) {
     let data = generate_data(data_size);
     let encoded_huffman = encode_huffman(black_box(&data)).unwrap();
     let encoded_rle = encode_rle(black_box(&data));
-    let encoded_zippy = encode_zippy(black_box(&data)).unwrap();
+    let encoded_zippy = encode_zippy(black_box(&data), None).unwrap();
 
     let mut group = c.benchmark_group("decoding");
     group.throughput(Throughput::Bytes(data.len() as u64));
@@ -92,7 +92,7 @@ fn benchmark_decoding(c: &mut Criterion) {
 
     group.bench_function("decode_zippy", |b| {
         b.iter(|| {
-            let decoded = decode_zippy(black_box(&encoded_zippy)).unwrap();
+            let decoded = decode_zippy(black_box(&encoded_zippy), None).unwrap();
             black_box(decoded);
         })
     });
