@@ -134,6 +134,10 @@ impl Zippy {
         self.crc32 == crc32(&self.data)
     }
 
+    pub fn crc32(&self) -> u32 {
+        self.crc32
+    }
+
     pub fn data(&self) -> &[u8] {
         &self.data
     }
@@ -151,7 +155,7 @@ pub fn decode_zippy(data: &[u8], options: Option<ZippyOptions>) -> Result<Vec<u8
 mod tests {
     use boytacean_common::error::Error;
 
-    use super::{decode_zippy, Zippy};
+    use super::{decode_zippy, Zippy, ZippyOptions};
 
     #[test]
     fn test_build_and_encode() {
@@ -192,6 +196,26 @@ mod tests {
 
         let zippy = Zippy::decode(&encoded, None).unwrap();
         assert!(zippy.check_crc32());
+    }
+
+    #[test]
+    fn test_no_crc32_zippy() {
+        let data = vec![1, 2, 3, 4, 5];
+        let name = String::from("Test");
+        let description = String::from("Test description");
+
+        let zippy = Zippy::build(
+            &data,
+            name.clone(),
+            description.clone(),
+            Some(ZippyOptions::new(false)),
+        )
+        .unwrap();
+        let encoded = zippy.encode().unwrap();
+
+        let zippy = Zippy::decode(&encoded, None).unwrap();
+        assert!(!zippy.check_crc32());
+        assert_eq!(zippy.crc32(), 0xffffffff);
     }
 
     #[test]
