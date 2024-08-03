@@ -3,7 +3,7 @@
 //! The CRC32 algorithm is a widely used checksum algorithm that is used in many
 //! network protocols and file formats. The algorithm is based on a polynomial
 //! division of the input data and a predefined polynomial value.
-//! 
+//!
 //! This implementation is optimized for modern CPUs by using hardware acceleration
 //! when available.
 
