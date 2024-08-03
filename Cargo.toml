@@ -33,6 +33,7 @@ pyo3 = { version = "0.20", optional = true }
 
 [dev-dependencies]
 criterion = "0.5"
+boytacean-hashing = { path = "crates/hashing", version = "0.10.4" }
 
 [build-dependencies]
 chrono = "0.4"
@@ -58,7 +59,14 @@ opt-level = 3
 codegen-units = 1
 
 [workspace]
-members = [".", "frontends/libretro", "frontends/sdl", "crates/common", "crates/encoding"]
+members = [
+    ".",
+    "frontends/libretro",
+    "frontends/sdl",
+    "crates/common",
+    "crates/encoding",
+    "crates/hashing"
+]
 package = { version = "0.10.4", authors = ["João Magalhães <joamag@gmail.com>"], edition = "2018" }
 
 [package.metadata.docs.rs]
@@ -70,4 +78,8 @@ harness = false
 
 [[bench]]
 name = "encoding"
+harness = false
+
+[[bench]]
+name = "hashing"
 harness = false

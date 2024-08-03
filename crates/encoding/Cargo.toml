@@ -5,3 +5,4 @@ edition = "2018"
 
 [dependencies]
 boytacean-common = { path = "../common", version = "0.10.4" }
+boytacean-hashing = { path = "../hashing", version = "0.10.4" }
