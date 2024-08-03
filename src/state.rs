@@ -28,7 +28,7 @@ use crate::{
 use wasm_bindgen::prelude::*;
 
 /// Magic string for the BOSC (Boytacean Save Compressed) format.
-pub const BOSC_MAGIC: &str = "BOSC\0";
+pub const BOSC_MAGIC: &str = "BOSC";
 
 /// Magic string ("BOSC") in little endian unsigned 32 bit format.
 pub const BOSC_MAGIC_UINT: u32 = 0x43534f42;
@@ -176,11 +176,8 @@ impl Serialize for BoscState {
 
         let mut cursor = Cursor::new(vec![]);
         self.bos.write(&mut cursor)?;
-        cursor.rewind()?;
-        let mut bos_buffer = vec![];
-        cursor.read_to_end(&mut bos_buffer)?;
 
-        let bos_compressed = encode_zippy(&bos_buffer)?;
+        let bos_compressed = encode_zippy(&cursor.into_inner())?;
         buffer.write_all(&bos_compressed)?;
 
         Ok(())
@@ -1966,7 +1963,7 @@ mod tests {
         let encoded = encode_zippy(&data).unwrap();
         let decoded = decode_zippy(&encoded).unwrap();
         assert_eq!(data, decoded);
-        assert_eq!(encoded.len(), 811);
+        assert_eq!(encoded.len(), 831);
         assert_eq!(decoded.len(), 25154);
     }
 }
