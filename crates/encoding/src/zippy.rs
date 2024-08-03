@@ -152,6 +152,19 @@ mod tests {
     }
 
     #[test]
+    fn test_crc32_zippy() {
+        let data = vec![1, 2, 3, 4, 5];
+        let name = String::from("Test");
+        let description = String::from("Test description");
+
+        let zippy = Zippy::build(&data, name.clone(), description.clone()).unwrap();
+        let encoded = zippy.encode().unwrap();
+
+        let zippy = Zippy::decode(&encoded).unwrap();
+        assert!(zippy.check_crc32());
+    }
+
+    #[test]
     fn test_decode_invalid() {
         let decoded_data = decode_zippy(b"invalid");
         assert!(decoded_data.is_err());
