@@ -123,7 +123,7 @@ mod tests {
     #[test]
     fn test_crc32_single_byte() {
         let data: [u8; 1] = [0xab];
-        assert_eq!(crc32(&data), 0x930695Ed);
+        assert_eq!(crc32(&data), 0x930695ed);
     }
 
     #[test]

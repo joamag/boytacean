@@ -52,7 +52,7 @@ impl Zippy {
             name,
             description,
             crc32: if options.crc32 {
-                crc32(&data)
+                crc32(data)
             } else {
                 0xffffff
             },
@@ -140,11 +140,11 @@ impl Zippy {
 }
 
 pub fn encode_zippy(data: &[u8], options: Option<ZippyOptions>) -> Result<Vec<u8>, Error> {
-    Ok(Zippy::build(&data, String::from(""), String::from(""), options)?.encode()?)
+    Zippy::build(data, String::from(""), String::from(""), options)?.encode()
 }
 
 pub fn decode_zippy(data: &[u8], options: Option<ZippyOptions>) -> Result<Vec<u8>, Error> {
-    Ok(Zippy::decode(&data, options)?.data().to_vec())
+    Ok(Zippy::decode(data, options)?.data().to_vec())
 }
 
 #[cfg(test)]
