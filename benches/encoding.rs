@@ -1,43 +1,13 @@
+use boytacean_common::bench::generate_data;
 use boytacean_encoding::{
     huffman::{decode_huffman, encode_huffman},
     rle::{decode_rle, encode_rle},
     zippy::{decode_zippy, encode_zippy},
 };
-
 use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
 
-fn generate_data(size: usize) -> Vec<u8> {
-    let patterns: [&[u8]; 6] = [
-        b"aaaaa",
-        b"bbbbbbbbb",
-        b"ccccc",
-        b"dddd",
-        b"eeeeeeeeee",
-        b"ffff",
-    ];
-
-    let mut data = Vec::with_capacity(size);
-    let mut pattern_index = 0;
-
-    while data.len() < size {
-        let pattern = patterns[pattern_index];
-        pattern_index = (pattern_index + 1) % patterns.len();
-        for _ in 0..3 {
-            // Repeat each pattern 3 times
-            data.extend_from_slice(pattern);
-            if data.len() >= size {
-                break;
-            }
-        }
-    }
-
-    data.truncate(size);
-    data
-}
-
 fn benchmark_encoding(c: &mut Criterion) {
-    let data_size = 10_000_000_usize;
-    let data = generate_data(data_size);
+    let data = generate_data(10_000_000_usize);
 
     let mut group = c.benchmark_group("encoding");
     group.throughput(Throughput::Bytes(data.len() as u64));
@@ -67,8 +37,7 @@ fn benchmark_encoding(c: &mut Criterion) {
 }
 
 fn benchmark_decoding(c: &mut Criterion) {
-    let data_size: usize = 10_000_000_usize;
-    let data = generate_data(data_size);
+    let data = generate_data(10_000_000_usize);
     let encoded_huffman = encode_huffman(black_box(&data)).unwrap();
     let encoded_rle = encode_rle(black_box(&data));
     let encoded_zippy = encode_zippy(black_box(&data), None).unwrap();

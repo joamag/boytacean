@@ -1,3 +1,9 @@
+//! Static boot ROMs binary data for the Game Boy.
+//!
+//! Used to build include some of the most relevant boot ROMs for the
+//! Game Boy directly in the resulting binaries - allowing a *"just works"*
+//! experience for the users.
+
 use std::fmt::{self, Display, Formatter};
 
 #[cfg(feature = "wasm")]
