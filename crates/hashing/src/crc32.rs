@@ -7,15 +7,6 @@
 //! This implementation is optimized for modern CPUs by using hardware acceleration
 //! when available.
 
-#[cfg(all(feature = "simd", target_arch = "x86_64"))]
-use std::{
-    arch::{
-        is_x86_feature_detected,
-        x86_64::{__m256i, _mm256_loadu_si256},
-    },
-    simd::u8x32,
-};
-
 #[cfg(all(feature = "simd", target_arch = "aarch64"))]
 use std::arch::{
     aarch64::{__crc32b, __crc32d},
@@ -67,16 +58,6 @@ impl Crc32 {
     }
 
     pub fn update(&mut self, bytes: &[u8]) {
-        #[cfg(all(feature = "simd", target_arch = "x86_64"))]
-        {
-            if is_x86_feature_detected!("avx2") {
-                unsafe {
-                    self.update_hw_avx2(bytes);
-                }
-                return;
-            }
-        }
-
         #[cfg(all(feature = "simd", target_arch = "aarch64"))]
         {
             if is_aarch64_feature_detected!("crc") {
@@ -98,27 +79,6 @@ impl Crc32 {
         let mut value = self.value;
         for &byte in bytes {
             let index = (value ^ byte as u32) & 0xFF;
-            value = CRC32_TABLE[index as usize] ^ (value >> 8);
-        }
-        self.value = value;
-    }
-
-    #[cfg(all(feature = "simd", target_arch = "x86_64"))]
-    #[target_feature(enable = "avx2")]
-    unsafe fn update_hw_avx2(&mut self, bytes: &[u8]) {
-        let mut value = self.value;
-        let mut remaining_bytes = bytes;
-        while remaining_bytes.len() >= 32 {
-            let chunk = _mm256_loadu_si256(remaining_bytes.as_ptr() as *const __m256i);
-            let chunk_values = u8x32::from(chunk);
-            for byte in chunk_values.as_array() {
-                let index = (value ^ *byte as u32) & 0xff;
-                value = CRC32_TABLE[index as usize] ^ (value >> 8);
-            }
-            remaining_bytes = &remaining_bytes[32..];
-        }
-        for &byte in remaining_bytes {
-            let index = (value ^ byte as u32) & 0xff;
             value = CRC32_TABLE[index as usize] ^ (value >> 8);
         }
         self.value = value;
