@@ -1,14 +1,6 @@
 use boytacean::color::rgb888_to_rgb1555_scalar;
-
+use boytacean_common::bench::multiply_array_size;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-
-fn multiply_array_size<T: Clone>(arr: &[T], multiplier: usize) -> Vec<T> {
-    let mut new_arr = Vec::with_capacity(arr.len() * multiplier);
-    for _ in 0..multiplier {
-        new_arr.extend_from_slice(arr);
-    }
-    new_arr
-}
 
 fn benchmark_rgb_conversion(c: &mut Criterion) {
     let rgb888_pixels: Vec<u8> = vec![255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 0];

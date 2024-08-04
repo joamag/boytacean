@@ -1,3 +1,4 @@
+pub mod bench;
 pub mod error;
 
 #[cfg(feature = "python")]
