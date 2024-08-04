@@ -54,16 +54,6 @@ impl Crc32 {
         Self { value: 0xffffffff }
     }
 
-    #[cfg(target_arch = "x86_64")]
-    #[target_feature(enable = "sse4.2")]
-    unsafe fn update_hw_x86(&mut self, bytes: &[u8]) {
-        let mut value = self.value;
-        for &byte in bytes {
-            value = _mm_crc32_u8(value, byte);
-        }
-        self.value = value;
-    }
-
     #[cfg(target_arch = "aarch64")]
     #[target_feature(enable = "crc")]
     unsafe fn update_hw_aarch64(&mut self, bytes: &[u8]) {
