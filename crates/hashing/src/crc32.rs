@@ -8,7 +8,10 @@
 //! when available.
 
 #[cfg(all(feature = "simd", target_arch = "aarch64"))]
-use std::arch::{aarch64::__crc32b, is_aarch64_feature_detected};
+use std::arch::{
+    aarch64::{__crc32b, __crc32d},
+    is_aarch64_feature_detected,
+};
 
 const CRC32_TABLE: [u32; 256] = [
     0x00000000, 0x77073096, 0xee0e612c, 0x990951ba, 0x076dc419, 0x706af48f, 0xe963a535, 0x9e6495a3,
@@ -54,16 +57,6 @@ impl Crc32 {
         Self { value: 0xffffffff }
     }
 
-    #[cfg(all(feature = "simd", target_arch = "aarch64"))]
-    #[target_feature(enable = "crc")]
-    unsafe fn update_hw_aarch64(&mut self, bytes: &[u8]) {
-        let mut value = self.value;
-        for &byte in bytes {
-            value = __crc32b(value, byte);
-        }
-        self.value = value;
-    }
-
     pub fn update(&mut self, bytes: &[u8]) {
         #[cfg(all(feature = "simd", target_arch = "aarch64"))]
         {
@@ -75,6 +68,14 @@ impl Crc32 {
             }
         }
 
+        self.update_sw(bytes);
+    }
+
+    pub fn finalize(self) -> u32 {
+        self.value ^ 0xffffffff
+    }
+
+    fn update_sw(&mut self, bytes: &[u8]) {
         let mut value = self.value;
         for &byte in bytes {
             let index = (value ^ byte as u32) & 0xFF;
@@ -83,8 +84,30 @@ impl Crc32 {
         self.value = value;
     }
 
-    pub fn finalize(self) -> u32 {
-        self.value ^ 0xffffffff
+    #[cfg(all(feature = "simd", target_arch = "aarch64"))]
+    #[target_feature(enable = "crc")]
+    unsafe fn update_hw_aarch64(&mut self, bytes: &[u8]) {
+        let mut value = self.value;
+        let mut i = 0;
+        while i + 8 <= bytes.len() {
+            let chunk = u64::from_ne_bytes([
+                bytes[i],
+                bytes[i + 1],
+                bytes[i + 2],
+                bytes[i + 3],
+                bytes[i + 4],
+                bytes[i + 5],
+                bytes[i + 6],
+                bytes[i + 7],
+            ]);
+            value = __crc32d(value, chunk);
+            i += 8;
+        }
+        while i < bytes.len() {
+            value = __crc32b(value, bytes[i]);
+            i += 1;
+        }
+        self.value = value;
     }
 }
 
