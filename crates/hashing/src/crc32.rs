@@ -1,11 +1,13 @@
-//! CRC-32 implementation according to the CRC-32/ISO-HDLC specification.
+//! CRC-32 implementation according to the CRC-32 (ISO-HDLC) specification.
 //!
 //! The CRC-32 algorithm is a widely used checksum algorithm that is used in many
 //! network protocols and file formats. The algorithm is based on a polynomial
 //! division of the input data and a predefined polynomial value.
 //!
+//! The polynomial used in this implementation is 0x04C11DB7.
+//!
 //! This implementation is optimized for modern CPUs by using hardware acceleration
-//! when available.
+//! when available. Current support includes only CRC for aarch64.
 
 #[cfg(all(feature = "simd", target_arch = "aarch64"))]
 use std::arch::is_aarch64_feature_detected;

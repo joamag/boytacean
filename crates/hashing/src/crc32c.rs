@@ -4,8 +4,10 @@
 //! network protocols and file formats. The algorithm is based on a polynomial
 //! division of the input data and a predefined polynomial value.
 //!
+//! The polynomial used in this implementation is 0x1EDC6F41.
+//!
 //! This implementation is optimized for modern CPUs by using hardware acceleration
-//! when available.
+//! when available. Current support includes SSE4.2 for x86_64 and CRC for aarch64.
 
 #[cfg(all(feature = "simd", target_arch = "x86_64"))]
 use std::arch::is_x86_feature_detected;
