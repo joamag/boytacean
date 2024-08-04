@@ -7,7 +7,7 @@
 //! This implementation is optimized for modern CPUs by using hardware acceleration
 //! when available.
 
-#[cfg(target_arch = "aarch64")]
+#[cfg(all(feature = "simd", target_arch = "aarch64"))]
 use std::arch::{aarch64::__crc32b, is_aarch64_feature_detected};
 
 const CRC32_TABLE: [u32; 256] = [
@@ -54,7 +54,7 @@ impl Crc32 {
         Self { value: 0xffffffff }
     }
 
-    #[cfg(target_arch = "aarch64")]
+    #[cfg(all(feature = "simd", target_arch = "aarch64"))]
     #[target_feature(enable = "crc")]
     unsafe fn update_hw_aarch64(&mut self, bytes: &[u8]) {
         let mut value = self.value;
@@ -65,7 +65,7 @@ impl Crc32 {
     }
 
     pub fn update(&mut self, bytes: &[u8]) {
-        #[cfg(target_arch = "aarch64")]
+        #[cfg(all(feature = "simd", target_arch = "aarch64"))]
         {
             if is_aarch64_feature_detected!("crc") {
                 unsafe {
