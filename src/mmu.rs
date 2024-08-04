@@ -424,6 +424,9 @@ impl Mmu {
             // 0xFF51-0xFF55 - VRAM DMA (HDMA) (CGB only)
             0xff51..=0xff55 => self.dma.read(addr),
 
+            // 0xFF56 - RP: Infrared communications port (CGB only)
+            0xff56 => 0xff,
+
             // 0xFF68-0xFF6B - BG / OBJ Palettes (CGB only)
             0xff68..=0xff6b => self.ppu.read(addr),
 
@@ -520,6 +523,9 @@ impl Mmu {
 
             // 0xFF51-0xFF55 - VRAM DMA (HDMA) (CGB only)
             0xff51..=0xff55 => self.dma.write(addr, value),
+
+            // 0xFF56 - RP: Infrared communications port (CGB only)
+            0xff56 => {}
 
             // 0xFF68-0xFF6B - BG / OBJ Palettes (CGB only)
             0xff68..=0xff6b => self.ppu.write(addr, value),

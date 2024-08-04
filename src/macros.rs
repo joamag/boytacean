@@ -1,3 +1,5 @@
+//! Assorted set of macros to be used in the context of Boytacean.
+
 #[cfg(feature = "debug")]
 #[macro_export]
 macro_rules! debugln {
