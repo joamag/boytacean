@@ -982,7 +982,9 @@ pub static MBC1: Mbc = Mbc {
     name: "MBC1",
     read_rom: |rom: &Cartridge, addr: u16| -> u8 {
         match addr {
+            // 0x0000-0x3FFF - ROM bank X0
             0x0000..=0x3fff => rom.rom_data[addr as usize],
+            // 0x4000-0x7FFF - ROM bank 01-7F
             0x4000..=0x7fff => *rom
                 .rom_data
                 .get(rom.rom_offset + (addr - 0x4000) as usize)
@@ -996,11 +998,11 @@ pub static MBC1: Mbc = Mbc {
     },
     write_rom: |rom: &mut Cartridge, addr: u16, value: u8| {
         match addr {
-            // RAM enabled flag
+            // 0x0000-0x1FFF - RAM enabled flag
             0x0000..=0x1fff => {
                 rom.ram_enabled = (value & 0x0f) == 0x0a;
             }
-            // ROM bank selection 5 lower bits
+            // 0x2000-0x3FFF - ROM bank selection 5 lower bits
             0x2000..=0x3fff => {
                 let mut rom_bank = value as u16 & 0x1f;
                 rom_bank &= rom.rom_bank_count * 2 - 1;
@@ -1009,7 +1011,7 @@ pub static MBC1: Mbc = Mbc {
                 }
                 rom.set_rom_bank(rom_bank);
             }
-            // RAM bank selection and ROM bank selection upper bits
+            // 0x4000-0x5FFF - RAM bank selection and ROM bank selection upper bits
             0x4000..=0x5fff => {
                 let ram_bank = value & 0x03;
                 if ram_bank as u16 >= rom.ram_bank_count {
@@ -1017,7 +1019,7 @@ pub static MBC1: Mbc = Mbc {
                 }
                 rom.set_ram_bank(ram_bank);
             }
-            // ROM mode selection
+            // 0x6000-0x7FFF - ROM mode selection
             0x6000..=0x7fff => {
                 if value == 0x1 && rom.rom_bank_count > 32 {
                     unimplemented!("Advanced ROM banking mode for MBC1 is not implemented");
@@ -1048,7 +1050,9 @@ pub static MBC3: Mbc = Mbc {
     name: "MBC3",
     read_rom: |rom: &Cartridge, addr: u16| -> u8 {
         match addr {
+            // 0x0000-0x3FFF - ROM bank 00
             0x0000..=0x3fff => rom.rom_data[addr as usize],
+            // 0x4000-0x7FFF - ROM bank 01-7F
             0x4000..=0x7fff => *rom
                 .rom_data
                 .get(rom.rom_offset + (addr - 0x4000) as usize)
@@ -1062,11 +1066,11 @@ pub static MBC3: Mbc = Mbc {
     },
     write_rom: |rom: &mut Cartridge, addr: u16, value: u8| {
         match addr {
-            // RAM enabled flag
+            // 0x0000-0x1FFF - RAM enabled flag
             0x0000..=0x1fff => {
                 rom.ram_enabled = (value & 0x0f) == 0x0a;
             }
-            // ROM bank selection
+            // 0x2000-0x3FFF - ROM bank selection
             0x2000..=0x3fff => {
                 let mut rom_bank = value as u16 & 0x7f;
                 rom_bank &= rom.rom_bank_count * 2 - 1;
@@ -1075,7 +1079,7 @@ pub static MBC3: Mbc = Mbc {
                 }
                 rom.set_rom_bank(rom_bank);
             }
-            // RAM bank selection
+            // 0x4000-0x5FFF - RAM bank selection
             0x4000..=0x5fff => {
                 let ram_bank = value & 0x03;
                 if ram_bank as u16 >= rom.ram_bank_count {
@@ -1108,7 +1112,9 @@ pub static MBC5: Mbc = Mbc {
     name: "MBC5",
     read_rom: |rom: &Cartridge, addr: u16| -> u8 {
         match addr {
+            // 0x0000-0x3FFF - ROM bank 00
             0x0000..=0x3fff => rom.rom_data[addr as usize],
+            // 0x4000-0x7FFF - ROM bank 00-1FF
             0x4000..=0x7fff => *rom
                 .rom_data
                 .get(rom.rom_offset + (addr - 0x4000) as usize)
@@ -1122,21 +1128,21 @@ pub static MBC5: Mbc = Mbc {
     },
     write_rom: |rom: &mut Cartridge, addr: u16, value: u8| {
         match addr {
-            // RAM enabled flag
+            // 0x0000-0x1FFF - RAM enabled flag
             0x0000..=0x1fff => {
                 rom.ram_enabled = (value & 0x0f) == 0x0a;
             }
-            // ROM bank selection 8 lower bits
-            0x2000 => {
+            // 0x2000-0x2FFF - ROM bank selection 8 lower bits
+            0x2000..=0x2fff => {
                 let rom_bank = value as u16;
                 rom.set_rom_bank(rom_bank);
             }
-            // ROM bank selection 9th bit
-            0x3000 => {
+            // 0x3000-0x3FFF - ROM bank selection 9th bit
+            0x3000..=0x3fff => {
                 let rom_bank = (rom.rom_bank() & 0x00ff) + (((value & 0x01) as u16) << 8);
                 rom.set_rom_bank(rom_bank);
             }
-            // RAM bank selection
+            // 0x4000-0x5FFF - RAM bank selection
             0x4000..=0x5fff => {
                 let mut ram_bank = value & 0x0f;
 
