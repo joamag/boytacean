@@ -247,8 +247,12 @@ export class GameboyEmulator extends EmulatorLogic implements Emulator {
     }
 
     async hardReset() {
-        await wasm(true);
-        await this.boot({ restore: false });
+        await wasm(false);
+        await this.boot({
+            engine: this._engine || "auto",
+            restore: false,
+            reuse: false
+        });
     }
 
     /**
