@@ -8,10 +8,7 @@
 //! when available.
 
 #[cfg(all(feature = "simd", target_arch = "aarch64"))]
-use std::arch::{
-    aarch64::{__crc32b, __crc32d},
-    is_aarch64_feature_detected,
-};
+use std::arch::is_aarch64_feature_detected;
 
 const CRC32_TABLE: [u32; 256] = [
     0x00000000, 0x77073096, 0xee0e612c, 0x990951ba, 0x076dc419, 0x706af48f, 0xe963a535, 0x9e6495a3,
@@ -67,7 +64,6 @@ impl Crc32 {
                 return;
             }
         }
-
         self.update_sw(bytes);
     }
 
@@ -87,6 +83,8 @@ impl Crc32 {
     #[cfg(all(feature = "simd", target_arch = "aarch64"))]
     #[target_feature(enable = "crc")]
     unsafe fn update_hw_aarch64(&mut self, bytes: &[u8]) {
+        use std::arch::aarch64::{__crc32b, __crc32d};
+
         let mut value = self.value;
         let mut i = 0;
         while i + 8 <= bytes.len() {
