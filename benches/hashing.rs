@@ -1,4 +1,4 @@
-use boytacean_hashing::crc32::crc32;
+use boytacean_hashing::{crc32::crc32, crc32c::crc32c};
 use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
 
 fn generate_data(size: usize) -> Vec<u8> {
@@ -40,6 +40,13 @@ fn benchmark_hashing(c: &mut Criterion) {
     group.bench_function("crc32", |b| {
         b.iter(|| {
             let encoded = crc32(black_box(&data));
+            black_box(encoded);
+        })
+    });
+
+    group.bench_function("crc32c", |b| {
+        b.iter(|| {
+            let encoded = crc32c(black_box(&data));
             black_box(encoded);
         })
     });

@@ -5,7 +5,7 @@ use std::{
 };
 
 use boytacean_common::error::Error;
-use boytacean_hashing::crc32::crc32;
+use boytacean_hashing::crc32c::crc32c;
 
 use crate::{
     huffman::{decode_huffman, encode_huffman},
@@ -52,7 +52,7 @@ impl Zippy {
             name,
             description,
             crc32: if options.crc32 {
-                crc32(data)
+                crc32c(data)
             } else {
                 0xffffffff
             },
@@ -131,7 +131,7 @@ impl Zippy {
     }
 
     pub fn check_crc32(&self) -> bool {
-        self.crc32 == crc32(&self.data)
+        self.crc32 == crc32c(&self.data)
     }
 
     pub fn crc32(&self) -> u32 {
@@ -196,6 +196,7 @@ mod tests {
 
         let zippy = Zippy::decode(&encoded, None).unwrap();
         assert!(zippy.check_crc32());
+        assert_eq!(zippy.crc32(), 0x53518fab);
     }
 
     #[test]
