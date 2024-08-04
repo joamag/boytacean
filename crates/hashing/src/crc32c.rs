@@ -1,4 +1,5 @@
-//! CRC-32C implementation according to the CRC-32C (Castagnoli) specification.
+//! [CRC-32C](https://en.wikipedia.org/wiki/Cyclic_redundancy_check)
+//! implementation according to the CRC-32C (Castagnoli) specification.
 //!
 //! The CRC-32C algorithm is a widely used checksum algorithm that is used in many
 //! network protocols and file formats. The algorithm is based on a polynomial

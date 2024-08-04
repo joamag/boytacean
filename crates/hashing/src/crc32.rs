@@ -1,4 +1,5 @@
-//! CRC-32 implementation according to the CRC-32 (ISO-HDLC) specification.
+//! [CRC-32](https://en.wikipedia.org/wiki/Cyclic_redundancy_check)
+//! implementation according to the CRC-32 (ISO-HDLC) specification.
 //!
 //! The CRC-32 algorithm is a widely used checksum algorithm that is used in many
 //! network protocols and file formats. The algorithm is based on a polynomial
