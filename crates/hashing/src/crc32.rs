@@ -7,9 +7,6 @@
 //! This implementation is optimized for modern CPUs by using hardware acceleration
 //! when available.
 
-#[cfg(target_arch = "x86_64")]
-use std::arch::{is_x86_feature_detected, x86_64::_mm_crc32_u8};
-
 #[cfg(target_arch = "aarch64")]
 use std::arch::{aarch64::__crc32b, is_aarch64_feature_detected};
 
@@ -78,16 +75,6 @@ impl Crc32 {
     }
 
     pub fn update(&mut self, bytes: &[u8]) {
-        #[cfg(target_arch = "x86_64")]
-        {
-            if is_x86_feature_detected!("sse4.2") {
-                unsafe {
-                    self.update_hw_x86(bytes);
-                }
-                return;
-            }
-        }
-
         #[cfg(target_arch = "aarch64")]
         {
             if is_aarch64_feature_detected!("crc") {
