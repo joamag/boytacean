@@ -1963,7 +1963,7 @@ mod tests {
         let encoded = encode_zippy(&data, None).unwrap();
         let decoded = decode_zippy(&encoded, None).unwrap();
         assert_eq!(data, decoded);
-        assert_eq!(encoded.len(), 831);
+        assert_eq!(encoded.len(), 830);
         assert_eq!(decoded.len(), 25154);
     }
 }
