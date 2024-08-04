@@ -728,14 +728,23 @@ export class GameboyEmulator extends EmulatorLogic implements Emulator {
     }
 
     buildState(index: number, data: Uint8Array): SaveState {
-        const state = StateManager.read_bos_auto_wa(data);
-        return {
-            index: index,
-            timestamp: Number(state.timestamp_wa()),
-            agent: state.agent_wa(),
-            model: state.model_wa(),
-            thumbnail: state.has_image_wa() ? state.image_eager_wa() : undefined
-        };
+        try {
+            const state = StateManager.read_bos_auto_wa(data);
+            return {
+                index: index,
+                timestamp: Number(state.timestamp_wa()),
+                agent: state.agent_wa(),
+                model: state.model_wa(),
+                thumbnail: state.has_image_wa()
+                    ? state.image_eager_wa()
+                    : undefined
+            };
+        } catch (err) {
+            return {
+                index: index,
+                error: err
+            };
+        }
     }
 
     pauseVideo() {
