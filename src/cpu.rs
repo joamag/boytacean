@@ -1,4 +1,4 @@
-//! Implementation of the core CPU ([Sharp LR35902](https://en.wikipedia.org/wiki/Game_Boy) logic for the Game Boy.
+//! Implementation of the core CPU ([Sharp LR35902](https://en.wikipedia.org/wiki/Game_Boy)) logic for the Game Boy.
 //!
 //! Does not include the instruction set implementation, only the core
 //! CPU logic and the CPU struct definition.
