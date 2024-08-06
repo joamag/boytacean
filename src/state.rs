@@ -1813,11 +1813,9 @@ impl StateManager {
                 state.read(data)?;
                 Ok(state)
             }
-            SaveStateFormat::Bess => {
-                Err(Error::CustomError(String::from(
-                    "Incompatible save state file format (BESS)",
-                )))
-            }
+            SaveStateFormat::Bess => Err(Error::CustomError(String::from(
+                "Incompatible save state file format (BESS)",
+            ))),
         }
     }
 
