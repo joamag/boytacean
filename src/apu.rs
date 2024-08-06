@@ -660,11 +660,44 @@ impl Apu {
     }
 
     pub fn read_raw(&mut self, addr: u16) -> u8 {
-        self.read(addr)
+        match addr {
+            // 0xFF11 — NR11: Channel 1 length timer & duty cycle
+            0xff11 => ((64 - self.ch1_length_timer) & 0x3f) | ((self.ch1_wave_duty & 0x03) << 6),
+
+            // 0xFF1B — NR31: Channel 3 length timer
+            0xff1b => (255 - self.ch3_length_timer as u8).saturating_add(1),
+            // 0xFF1E — NR34: Channel 3 wavelength high & control
+            // @TODO: Add the extra VALUES
+            0xff1e => (if self.ch3_length_enabled { 0x40 } else { 0x00 }) | 0xbf,
+
+            // 0xFF20 — NR41: Channel 4 length timer
+            0xff20 => (64 - self.ch4_length_timer) & 0x3f,
+
+            _ => self.read(addr),
+        }
     }
 
     pub fn write_raw(&mut self, addr: u16, value: u8) {
-        self.write(addr, value);
+        match addr {
+            // 0xFF26 — NR52: Sound on/off
+            0xff26 => {
+                self.ch1_enabled = value & 0x01 == 0x01;
+                self.ch2_enabled = value & 0x02 == 0x02;
+                self.ch3_enabled = value & 0x04 == 0x04;
+                self.ch4_enabled = value & 0x08 == 0x08;
+                self.sound_enabled = value & 0x80 == 0x80;
+                self.ch1_dac = self.ch1_enabled;
+                self.ch2_dac = self.ch2_enabled;
+                self.ch3_dac = self.ch3_enabled;
+                self.ch4_dac = self.ch4_enabled;
+                if !self.sound_enabled {
+                    self.reset();
+                    self.sound_enabled = false;
+                }
+            }
+
+            _ => self.write(addr, value),
+        }
     }
 
     #[inline(always)]
