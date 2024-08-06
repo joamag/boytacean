@@ -17,7 +17,7 @@ use std::{
 };
 
 use crate::{
-    gb::{GameBoy, GameBoySpeed},
+    gb::{GameBoy, GameBoyMode, GameBoySpeed},
     info::Info,
     ppu::{DISPLAY_HEIGHT, DISPLAY_WIDTH, FRAME_BUFFER_SIZE},
     rom::{CgbMode, MbcType},
@@ -104,8 +104,21 @@ impl Default for FromGbOptions {
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
-#[derive(Default)]
-pub struct ToGbOptions;
+pub struct ToGbOptions {
+    reload: bool,
+}
+
+impl ToGbOptions {
+    pub fn new(reload: bool) -> Self {
+        Self { reload }
+    }
+}
+
+impl Default for ToGbOptions {
+    fn default() -> Self {
+        Self { reload: true }
+    }
+}
 
 pub trait Serialize {
     /// Writes the data from the internal structure into the
@@ -137,6 +150,10 @@ pub trait StateBox {
 
     /// Applies the state to the provided `GameBoy` instance.
     fn to_gb(&self, gb: &mut GameBoy, options: &ToGbOptions) -> Result<(), Error>;
+
+    /// Obtains the Game Boy execution mode expected by the
+    /// state instance.
+    fn mode(&self) -> Result<GameBoyMode, Error>;
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
@@ -215,6 +232,10 @@ impl StateBox for BoscState {
         self.verify()?;
         self.bos.to_gb(gb, options)?;
         Ok(())
+    }
+
+    fn mode(&self) -> Result<GameBoyMode, Error> {
+        Ok(self.bos.mode()?)
     }
 }
 
@@ -410,6 +431,10 @@ impl StateBox for BosState {
         self.verify()?;
         self.bess.to_gb(gb, options)?;
         Ok(())
+    }
+
+    fn mode(&self) -> Result<GameBoyMode, Error> {
+        Ok(self.bess.mode()?)
     }
 }
 
@@ -775,6 +800,15 @@ impl StateBox for BessState {
         self.core.to_gb(gb)?;
         self.mbc.to_gb(gb)?;
         Ok(())
+    }
+
+    fn mode(&self) -> Result<GameBoyMode, Error> {
+        match self.core.model.chars().next() {
+            Some('G') => Ok(GameBoyMode::Dmg),
+            Some('S') => Ok(GameBoyMode::Sgb),
+            Some('C') => Ok(GameBoyMode::Cgb),
+            None | Some(_) => Err(Error::InvalidData),
+        }
     }
 }
 
@@ -1720,18 +1754,15 @@ impl StateManager {
         match format {
             SaveStateFormat::Bosc => {
                 let mut state = BoscState::default();
-                state.read(data)?;
-                state.to_gb(gb, &options)?;
+                Self::load_inner(&mut state, data, gb, &options)?;
             }
             SaveStateFormat::Bos => {
                 let mut state = BosState::default();
-                state.read(data)?;
-                state.to_gb(gb, &options)?;
+                Self::load_inner(&mut state, data, gb, &options)?;
             }
             SaveStateFormat::Bess => {
                 let mut state = BessState::default();
-                state.read(data)?;
-                state.to_gb(gb, &options)?;
+                Self::load_inner(&mut state, data, gb, &options)?;
             }
         }
         Ok(())
@@ -1828,6 +1859,32 @@ impl StateManager {
                 "Format foes not support thumbnail",
             ))),
         }
+    }
+
+    fn load_inner<T: Serialize + StateBox + Default>(
+        state: &mut T,
+        data: &mut Cursor<Vec<u8>>,
+        gb: &mut GameBoy,
+        options: &ToGbOptions,
+    ) -> Result<(), Error> {
+        state.read(data)?;
+
+        // in case the hardware model in the (saved) state is
+        // different from the current hardware model, we need
+        // to set the hardware model
+        if state.mode()? != gb.mode() {
+            gb.set_mode(state.mode()?);
+        }
+
+        // reload the Game Boy machine to make sure we're in
+        // a clean state before loading the state
+        if options.reload {
+            gb.reload();
+        }
+
+        state.to_gb(gb, options)?;
+
+        Ok(())
     }
 }
 
