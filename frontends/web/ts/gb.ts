@@ -739,6 +739,7 @@ export class GameboyEmulator extends EmulatorLogic implements Emulator {
                 timestamp: Number(state.timestamp_wa()),
                 agent: state.agent_wa(),
                 model: state.model_wa(),
+                format: StateManager.format_str_wa(data),
                 size: data.length,
                 thumbnail: state.has_image_wa()
                     ? state.image_eager_wa()

@@ -62,6 +62,37 @@ pub enum SaveStateFormat {
     Bess,
 }
 
+impl SaveStateFormat {
+    pub fn description(&self) -> String {
+        match self {
+            Self::Bosc => String::from("BOSC"),
+            Self::Bos => String::from("BOS"),
+            Self::Bess => String::from("BESS"),
+        }
+    }
+
+    pub fn from_str(value: &str) -> Self {
+        match value {
+            "BOSC" => Self::Bosc,
+            "BOS" => Self::Bos,
+            "BESS" => Self::Bess,
+            _ => Self::Bos,
+        }
+    }
+}
+
+impl From<&str> for SaveStateFormat {
+    fn from(value: &str) -> Self {
+        Self::from_str(value)
+    }
+}
+
+impl Display for SaveStateFormat {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.description())
+    }
+}
+
 #[derive(Clone, Copy)]
 pub enum BosBlockKind {
     Info = 0x01,
@@ -1769,32 +1800,24 @@ impl StateManager {
     }
 
     pub fn read_bos_auto(data: &[u8]) -> Result<BosState, Error> {
-        let data = &mut Cursor::new(data.to_vec());
-        let format = if BoscState::is_bosc(data)? {
-            SaveStateFormat::Bosc
-        } else if BosState::is_bos(data)? {
-            SaveStateFormat::Bos
-        } else if BessState::is_bess(data)? {
-            return Err(Error::CustomError(String::from(
-                "Incompatible save state file format (BESS)",
-            )));
-        } else {
-            return Err(Error::CustomError(String::from(
-                "Unknown save state file format",
-            )));
-        };
-        match format {
+        match Self::format(data)? {
             SaveStateFormat::Bosc => {
                 let mut state = BoscState::default();
+                let data = &mut Cursor::new(data.to_vec());
                 state.read(data)?;
                 Ok(state.bos)
             }
             SaveStateFormat::Bos => {
                 let mut state = BosState::default();
+                let data = &mut Cursor::new(data.to_vec());
                 state.read(data)?;
                 Ok(state)
             }
-            _ => unreachable!(),
+            SaveStateFormat::Bess => {
+                return Err(Error::CustomError(String::from(
+                    "Incompatible save state file format (BESS)",
+                )));
+            }
         }
     }
 
@@ -1819,29 +1842,32 @@ impl StateManager {
         Ok(state)
     }
 
+    pub fn format(data: &[u8]) -> Result<SaveStateFormat, Error> {
+        let data = &mut Cursor::new(data.to_vec());
+        if BoscState::is_bosc(data)? {
+            Ok(SaveStateFormat::Bosc)
+        } else if BosState::is_bos(data)? {
+            Ok(SaveStateFormat::Bos)
+        } else if BessState::is_bess(data)? {
+            Ok(SaveStateFormat::Bess)
+        } else {
+            Err(Error::InvalidData)
+        }
+    }
+
     /// Obtains the thumbnail of the save state file, this thumbnail is
     /// stored in raw RGB format.
     ///
     /// This operation is currently only supported for the BOS format.
     pub fn thumbnail(data: &[u8], format: Option<SaveStateFormat>) -> Result<Vec<u8>, Error> {
-        let data = &mut Cursor::new(data.to_vec());
         let format = match format {
             Some(format) => format,
-            None => {
-                if BosState::is_bos(data)? {
-                    SaveStateFormat::Bos
-                } else if BessState::is_bess(data)? {
-                    SaveStateFormat::Bess
-                } else {
-                    return Err(Error::CustomError(String::from(
-                        "Unknown save state file format",
-                    )));
-                }
-            }
+            None => Self::format(data)?,
         };
         match format {
             SaveStateFormat::Bosc => {
                 let mut state = BoscState::default();
+                let data = &mut Cursor::new(data.to_vec());
                 state.read(data)?;
                 Ok(state
                     .bos
@@ -1852,6 +1878,7 @@ impl StateManager {
             }
             SaveStateFormat::Bos => {
                 let mut state = BosState::default();
+                let data = &mut Cursor::new(data.to_vec());
                 state.read(data)?;
                 Ok(state.image_buffer.ok_or(Error::InvalidData)?.image.to_vec())
             }
@@ -1922,6 +1949,14 @@ impl StateManager {
 
     pub fn read_bess_wa(data: &[u8]) -> Result<BessState, String> {
         Ok(Self::read_bess(data)?)
+    }
+
+    pub fn format_wa(data: &[u8]) -> Result<SaveStateFormat, String> {
+        Ok(Self::format(data)?)
+    }
+
+    pub fn format_str_wa(data: &[u8]) -> Result<String, String> {
+        Ok(Self::format(data)?.to_string())
     }
 
     pub fn thumbnail_wa(data: &[u8], format: Option<SaveStateFormat>) -> Result<Vec<u8>, String> {
