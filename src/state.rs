@@ -235,7 +235,7 @@ impl StateBox for BoscState {
     }
 
     fn mode(&self) -> Result<GameBoyMode, Error> {
-        Ok(self.bos.mode()?)
+        self.bos.mode()
     }
 }
 
@@ -434,7 +434,7 @@ impl StateBox for BosState {
     }
 
     fn mode(&self) -> Result<GameBoyMode, Error> {
-        Ok(self.bess.mode()?)
+        self.bess.mode()
     }
 }
 
