@@ -71,7 +71,7 @@ impl SaveStateFormat {
         }
     }
 
-    pub fn from_str(value: &str) -> Self {
+    pub fn from_string(value: &str) -> Self {
         match value {
             "BOSC" => Self::Bosc,
             "BOS" => Self::Bos,
@@ -83,7 +83,7 @@ impl SaveStateFormat {
 
 impl From<&str> for SaveStateFormat {
     fn from(value: &str) -> Self {
-        Self::from_str(value)
+        Self::from_string(value)
     }
 }
 
@@ -1814,9 +1814,9 @@ impl StateManager {
                 Ok(state)
             }
             SaveStateFormat::Bess => {
-                return Err(Error::CustomError(String::from(
+                Err(Error::CustomError(String::from(
                     "Incompatible save state file format (BESS)",
-                )));
+                )))
             }
         }
     }
