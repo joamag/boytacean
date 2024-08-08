@@ -161,7 +161,10 @@ deploy-crates:
   stage: deploy
   script:
     - cargo login $CRATES_TOKEN
-    - cargo_publish_all
+    - cargo publish --package boytacean-common --no-verify
+    - cargo publish --package boytacean-hashing --no-verify
+    - cargo publish --package boytacean-encoding --no-verify
+    - cargo publish --package boytacean --no-verify
   dependencies:
     - build-rust
   only:
