@@ -215,7 +215,11 @@ impl Zippy {
 
     #[inline(always)]
     fn read_crc32_feature(&mut self, data: &mut Cursor<&[u8]>) -> Result<(), Error> {
-        let payload: [u8; 4] = Self::read_payload(data)?.try_into().unwrap();
+        let payload = Self::read_payload(data)?;
+        if payload.len() != size_of::<u32>() {
+            return Err(Error::InvalidData);
+        }
+        let payload: [u8; 4] = payload.try_into().unwrap();
         self.crc32 = u32::from_le_bytes(payload);
         Ok(())
     }
