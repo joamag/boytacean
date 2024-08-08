@@ -24,7 +24,7 @@ sudo apt install libsdl2-dev libasound2-dev libpulse-dev
 
 #### Build SDL in Windows
 
-For windows the vcpkg based SDL building is simpler:
+For Windows the vcpkg based SDL building is simpler:
 
 ```bash
 cargo install cargo-vcpkg
