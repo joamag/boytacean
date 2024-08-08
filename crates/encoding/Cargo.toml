@@ -1,11 +1,11 @@
 [package]
 name = "boytacean-encoding"
-version = "0.10.4"
+version = "0.10.5"
 edition = "2018"
 
 [features]
 simd = ["boytacean-hashing/simd"]
 
 [dependencies]
-boytacean-common = { path = "../common", version = "0.10.4" }
-boytacean-hashing = { path = "../hashing", version = "0.10.4" }
+boytacean-common = { path = "../common", version = "0.10.5" }
+boytacean-hashing = { path = "../hashing", version = "0.10.5" }

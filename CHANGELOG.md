@@ -9,13 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-* `Licensee` enumeration with the description of the publisher of the ROM
-* Support for Zippy encoding format for fast compression
-* New hashing crate that includes CRC-32 and CRC-32C implementations
+*
 
 ### Changed
 
 *
+
+### Fixed
+
+*
+
+## [0.10.5] - 2024-08-08
+
+### Added
+
+* `Licensee` enumeration with the description of the publisher of the ROM
+* Support for Zippy encoding format for fast compression
+* New hashing crate that includes CRC-32 and CRC-32C implementations
 
 ### Fixed
 
