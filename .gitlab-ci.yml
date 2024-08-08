@@ -14,7 +14,7 @@ stages:
 
 before_script:
   - source ./.gitlab/common.sh
-  - apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y -q pkg-config g++ cmake
+  - apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y -q pkg-config g++ cmake jq
   - curl -sf -L https://static.rust-lang.org/rustup.sh | sh -s -- -y
   - export PATH=$PATH:$HOME/.cargo/bin
   - curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.1/install.sh | bash
