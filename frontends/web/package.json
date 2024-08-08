@@ -1,6 +1,6 @@
 {
     "name": "boytacean-web",
-    "version": "0.10.5",
+    "version": "0.10.6",
     "description": "The web version of Boytacean",
     "repository": {
         "type": "git",
@@ -24,7 +24,7 @@
         "@typescript-eslint/eslint-plugin": "^7.16.1",
         "@typescript-eslint/parser": "^7.16.1",
         "buffer": "^6.0.3",
-        "emukit": "^0.10.5",
+        "emukit": "^0.10.6",
         "eslint": "^8.57.0",
         "jszip": "^3.10.1",
         "nodemon": "^3.1.4",

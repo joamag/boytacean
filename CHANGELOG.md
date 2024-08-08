@@ -13,11 +13,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-* Improved Zippy format to include opaque feature support, for future proof
+*
 
 ### Fixed
 
 *
+
+## [0.10.6] - 2024-08-08
+
+### Changed
+
+* Improved Zippy format to include opaque feature support, for future proof
 
 ## [0.10.5] - 2024-08-08
 
