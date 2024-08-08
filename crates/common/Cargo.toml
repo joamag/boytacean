@@ -1,7 +1,7 @@
 [package]
 name = "boytacean-common"
 description = "Commons library for Boytacen."
-version = "0.10.6"
+version = "0.10.7"
 authors = ["João Magalhães <joamag@gmail.com>"]
 license = "Apache-2.0"
 edition = "2018"
