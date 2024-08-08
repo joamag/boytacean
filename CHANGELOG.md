@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-* Unit test that was failing
+*
 
 ## [0.10.7] - 2024-08-08
 
