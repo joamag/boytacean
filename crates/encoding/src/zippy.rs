@@ -243,7 +243,7 @@ pub fn decode_zippy(data: &[u8], options: Option<ZippyOptions>) -> Result<Vec<u8
 mod tests {
     use boytacean_common::error::Error;
 
-    use super::{decode_zippy, Zippy, ZippyOptions};
+    use super::{decode_zippy, Zippy, ZippyFeatures, ZippyOptions};
 
     #[test]
     fn test_build_and_encode() {
@@ -283,6 +283,7 @@ mod tests {
         let encoded = zippy.encode().unwrap();
 
         let zippy = Zippy::decode(&encoded, None).unwrap();
+        assert!(zippy.has_feature(ZippyFeatures::Crc32));
         assert!(zippy.check_crc32());
         assert_eq!(zippy.crc32(), 0x53518fab);
     }
@@ -304,6 +305,7 @@ mod tests {
         let encoded = zippy.encode().unwrap();
 
         let zippy = Zippy::decode(&encoded, None).unwrap();
+        assert!(zippy.has_feature(ZippyFeatures::Crc32));
         assert!(!zippy.check_crc32());
         assert_eq!(zippy.crc32(), 0xffffffff);
     }
