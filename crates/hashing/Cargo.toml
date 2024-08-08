@@ -1,6 +1,9 @@
 [package]
 name = "boytacean-hashing"
+description = "Hashing library for Boytacen."
 version = "0.10.5"
+authors = ["João Magalhães <joamag@gmail.com>"]
+license = "Apache-2.0"
 edition = "2018"
 
 [features]
