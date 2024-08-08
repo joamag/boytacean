@@ -161,7 +161,7 @@ deploy-crates:
   stage: deploy
   script:
     - cargo login $CRATES_TOKEN
-    - cargo publish --no-verify
+    - cargo_publish_all
   dependencies:
     - build-rust
   only:
