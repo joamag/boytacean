@@ -18,8 +18,11 @@ use std::{
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Error {
     InvalidData,
+    InvalidKey,
     RomSize,
     IncompatibleBootRom,
+    MissingOption(String),
+    IoError(String),
     InvalidParameter(String),
     CustomError(String),
 }
@@ -28,8 +31,11 @@ impl Error {
     pub fn description(&self) -> String {
         match self {
             Error::InvalidData => String::from("Invalid data format"),
+            Error::InvalidKey => String::from("Invalid key"),
             Error::RomSize => String::from("Invalid ROM size"),
             Error::IncompatibleBootRom => String::from("Incompatible Boot ROM"),
+            Error::MissingOption(option) => format!("Missing option: {}", option),
+            Error::IoError(message) => format!("IO error: {}", message),
             Error::InvalidParameter(message) => format!("Invalid parameter: {}", message),
             Error::CustomError(message) => String::from(message),
         }
@@ -43,8 +49,8 @@ impl Display for Error {
 }
 
 impl From<io::Error> for Error {
-    fn from(_error: io::Error) -> Self {
-        Error::CustomError(String::from("IO error"))
+    fn from(error: io::Error) -> Self {
+        Error::IoError(error.to_string())
     }
 }
 
