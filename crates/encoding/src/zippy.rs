@@ -1,6 +1,8 @@
 use std::{
     collections::HashSet,
+    convert::TryInto,
     default,
+    hash::Hash,
     io::{Cursor, Read, Write},
     iter::FromIterator,
     mem::size_of,
@@ -23,6 +25,16 @@ pub enum ZippyFeatures {
     Crc32,
     Encrypted,
     Other,
+}
+
+impl From<&ZippyFeatures> for &str {
+    fn from(value: &ZippyFeatures) -> Self {
+        match value {
+            ZippyFeatures::Crc32 => "crc32",
+            ZippyFeatures::Encrypted => "encrypted",
+            ZippyFeatures::Other => "other",
+        }
+    }
 }
 
 impl From<u32> for ZippyFeatures {
@@ -113,27 +125,22 @@ impl Zippy {
 
         let name = Self::read_string(&mut data)?;
         let description = Self::read_string(&mut data)?;
-        let features = Self::read_features(&mut data)?;
 
-        let crc32 = if features.contains(&ZippyFeatures::Crc32) {
-            Self::read_u32(&mut data)?
-        } else {
-            0xffffffff
-        };
-
-        let data_length = Self::read_u32(&mut data)?;
-        let mut buffer = vec![0; data_length as usize];
-        data.read_exact(&mut buffer)?;
-
-        let decoded = decode_rle(&decode_huffman(&buffer)?);
-
-        Ok(Zippy {
+        let mut instance = Self {
             name,
             description,
-            features,
-            crc32,
-            data: decoded,
-        })
+            features: HashSet::new(),
+            crc32: 0xffffffff,
+            data: vec![],
+        };
+
+        instance.read_features(&mut data)?;
+
+        let buffer = Self::read_payload(&mut data)?;
+        let decoded = decode_rle(&decode_huffman(&buffer)?);
+        instance.data = decoded;
+
+        Ok(instance)
     }
 
     pub fn encode(&self) -> Result<Vec<u8>, Error> {
@@ -144,14 +151,10 @@ impl Zippy {
 
         Self::write_string(&mut buffer, &self.name)?;
         Self::write_string(&mut buffer, &self.description)?;
-        Self::write_features(&mut buffer, &self.features)?;
 
-        if self.has_feature(ZippyFeatures::Crc32) {
-            Self::write_u32(&mut buffer, self.crc32)?;
-        }
+        self.write_features(&mut buffer)?;
 
-        Self::write_u32(&mut buffer, encoded.len() as u32)?;
-        buffer.write_all(&encoded)?;
+        Self::write_payload(&mut buffer, &encoded)?;
 
         Ok(buffer.into_inner())
     }
@@ -188,14 +191,39 @@ impl Zippy {
     }
 
     #[inline(always)]
-    fn read_features(data: &mut Cursor<&[u8]>) -> Result<HashSet<ZippyFeatures>, Error> {
-        let mut features = HashSet::new();
+    fn read_payload(data: &mut Cursor<&[u8]>) -> Result<Vec<u8>, Error> {
+        let size = Self::read_u32(data)?;
+        let mut payload = vec![0; size as usize];
+        data.read_exact(&mut payload)?;
+        Ok(payload)
+    }
+
+    #[inline(always)]
+    fn read_features(&mut self, data: &mut Cursor<&[u8]>) -> Result<(), Error> {
         let num_features = Self::read_u32(data)?;
         for _ in 0..num_features {
-            let feature = Self::read_string(data)?;
-            features.insert(ZippyFeatures::from(feature.as_str()));
+            let feature_str = Self::read_string(data)?;
+            let feature = ZippyFeatures::from(feature_str.as_str());
+            match feature {
+                ZippyFeatures::Crc32 => self.read_crc32_feature(data)?,
+                _ => self.read_empty_feature(data)?,
+            };
+            self.features.insert(feature);
         }
-        Ok(features)
+        Ok(())
+    }
+
+    #[inline(always)]
+    fn read_crc32_feature(&mut self, data: &mut Cursor<&[u8]>) -> Result<(), Error> {
+        let payload: [u8; 4] = Self::read_payload(data)?.try_into().unwrap();
+        self.crc32 = u32::from_le_bytes(payload);
+        Ok(())
+    }
+
+    #[inline(always)]
+    fn read_empty_feature(&mut self, data: &mut Cursor<&[u8]>) -> Result<(), Error> {
+        Self::read_payload(data)?;
+        Ok(())
     }
 
     #[inline(always)]
@@ -212,21 +240,36 @@ impl Zippy {
     }
 
     #[inline(always)]
-    fn write_features(
-        data: &mut Cursor<Vec<u8>>,
-        features: &HashSet<ZippyFeatures>,
-    ) -> Result<(), Error> {
-        Self::write_u32(data, features.len() as u32)?;
-        for feature in features {
-            Self::write_string(
-                data,
-                match feature {
-                    ZippyFeatures::Crc32 => "crc32",
-                    ZippyFeatures::Encrypted => "encrypted",
-                    _ => "other",
-                },
-            )?;
+    fn write_payload(data: &mut Cursor<Vec<u8>>, value: &[u8]) -> Result<(), Error> {
+        Self::write_u32(data, value.len() as u32)?;
+        data.write_all(value)?;
+        Ok(())
+    }
+
+    #[inline(always)]
+    fn write_features(&self, data: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
+        Self::write_u32(data, self.features.len() as u32)?;
+        for feature in &self.features {
+            match feature {
+                ZippyFeatures::Crc32 => self.write_crc32_feature(data)?,
+                _ => self.write_empty_feature(data, feature.into())?,
+            }
         }
+        Ok(())
+    }
+
+    #[inline(always)]
+    fn write_crc32_feature(&self, data: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
+        Self::write_string(data, "crc32")?;
+        Self::write_u32(data, size_of::<u32>() as u32)?;
+        Self::write_u32(data, self.crc32)?;
+        Ok(())
+    }
+
+    #[inline(always)]
+    fn write_empty_feature(&self, data: &mut Cursor<Vec<u8>>, name: &str) -> Result<(), Error> {
+        Self::write_string(data, name)?;
+        Self::write_u32(data, 0)?;
         Ok(())
     }
 }
@@ -315,5 +358,28 @@ mod tests {
         let decoded_data = decode_zippy(b"invalid", None);
         assert!(decoded_data.is_err());
         assert_eq!(decoded_data.unwrap_err(), Error::InvalidData);
+    }
+
+    #[test]
+    fn test_dummy_feature() {
+        let data = vec![1, 2, 3, 4, 5];
+        let name = String::from("Test");
+        let description = String::from("Test description");
+
+        let zippy = Zippy::build(
+            &data,
+            name.clone(),
+            description.clone(),
+            Some(vec![ZippyFeatures::Other]),
+            Some(ZippyOptions::new(false)),
+        )
+        .unwrap();
+        let encoded = zippy.encode().unwrap();
+
+        let zippy = Zippy::decode(&encoded, None).unwrap();
+        assert!(zippy.has_feature(ZippyFeatures::Other));
+        assert!(!zippy.has_feature(ZippyFeatures::Crc32));
+        assert!(!zippy.check_crc32());
+        assert_eq!(zippy.crc32(), 0xffffffff);
     }
 }
