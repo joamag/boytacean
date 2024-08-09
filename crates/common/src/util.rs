@@ -1,6 +1,8 @@
 //! Assorted utility functions and structures.
+//!
+//! This module contains various utility functions and structures
+//! that are used throughout the Boytacean codebase.
 
-use boytacean_common::error::Error;
 use std::{
     cell::RefCell,
     fs::File,
@@ -9,6 +11,8 @@ use std::{
     rc::Rc,
     sync::{Arc, Mutex},
 };
+
+use crate::error::Error;
 
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;

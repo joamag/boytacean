@@ -16,7 +16,7 @@ crate-type = ["cdylib", "rlib"]
 
 [features]
 default = []
-wasm = ["wasm-bindgen", "js-sys"]
+wasm = ["wasm-bindgen", "js-sys", "boytacean-common/wasm"]
 python = ["pyo3", "boytacean-common/python"]
 simd = ["boytacean-encoding/simd", "boytacean-hashing/simd"]
 debug = []

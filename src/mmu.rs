@@ -1,5 +1,6 @@
 //! MMU (Memory Management Unit) functions and structures.
 
+use boytacean_common::util::SharedThread;
 use std::sync::Mutex;
 
 use crate::{
@@ -13,7 +14,6 @@ use crate::{
     rom::Cartridge,
     serial::Serial,
     timer::Timer,
-    util::SharedThread,
     warnln,
 };
 

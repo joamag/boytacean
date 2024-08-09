@@ -6,7 +6,10 @@
 //! The [BESS](https://github.com/LIJI32/SameBoy/blob/master/BESS.md) format is a format developed by the [SameBoy](https://sameboy.github.io/) emulator and is used to store the emulator state
 //! in agnostic and compatible way.
 
-use boytacean_common::error::Error;
+use boytacean_common::{
+    error::Error,
+    util::{get_timestamp, save_bmp},
+};
 use boytacean_encoding::zippy::{decode_zippy, encode_zippy};
 use std::{
     convert::TryInto,
@@ -21,7 +24,6 @@ use crate::{
     info::Info,
     ppu::{DISPLAY_HEIGHT, DISPLAY_WIDTH, FRAME_BUFFER_SIZE},
     rom::{CgbMode, MbcType},
-    util::{get_timestamp, save_bmp},
 };
 
 #[cfg(feature = "wasm")]

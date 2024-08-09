@@ -1,9 +1,8 @@
 //! General information about the crate and the emulator.
 
-use crate::{
-    gen::{COMPILATION_DATE, COMPILATION_TIME, COMPILER, COMPILER_VERSION, NAME, VERSION},
-    util::capitalize,
-};
+use boytacean_common::util::capitalize;
+
+use crate::gen::{COMPILATION_DATE, COMPILATION_TIME, COMPILER, COMPILER_VERSION, NAME, VERSION};
 
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;

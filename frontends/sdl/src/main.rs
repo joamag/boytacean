@@ -15,9 +15,11 @@ use boytacean::{
     rom::Cartridge,
     serial::{NullDevice, SerialDevice},
     state::StateManager,
+};
+use boytacean_common::{
+    error::Error,
     util::{replace_ext, write_file},
 };
-use boytacean_common::error::Error;
 use chrono::Utc;
 use clap::Parser;
 use image::{ColorType, ImageBuffer, Rgb};

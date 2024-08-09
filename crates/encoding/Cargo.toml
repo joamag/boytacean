@@ -12,3 +12,7 @@ simd = ["boytacean-hashing/simd"]
 [dependencies]
 boytacean-common = { path = "../common", version = "0.10.7" }
 boytacean-hashing = { path = "../hashing", version = "0.10.7" }
+
+[[bin]]
+name = "zippy"
+path = "src/cli/zippy.rs"

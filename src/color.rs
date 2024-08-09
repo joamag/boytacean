@@ -1,6 +1,6 @@
 //! Color manipulation functions and constants.
 
-use crate::util::copy_fast;
+use boytacean_common::util::copy_fast;
 
 pub const RGB_SIZE: usize = 3;
 pub const RGBA_SIZE: usize = 4;

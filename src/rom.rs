@@ -1,6 +1,6 @@
 //! Cartridge (ROM) related functions and structures.
 
-use boytacean_common::error::Error;
+use boytacean_common::{error::Error, util::read_file};
 use core::fmt;
 use std::{
     cmp::max,
@@ -14,9 +14,7 @@ use crate::{
     gb::GameBoyMode,
     licensee::Licensee,
     mmu::BusComponent,
-    panic_gb,
-    util::read_file,
-    warnln,
+    panic_gb, warnln,
 };
 
 #[cfg(feature = "wasm")]

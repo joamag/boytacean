@@ -1,3 +1,5 @@
+use boytacean_common::error::Error;
+use boytacean_hashing::crc32c::crc32c;
 use std::{
     collections::HashSet,
     convert::TryInto,
@@ -7,9 +9,6 @@ use std::{
     iter::FromIterator,
     mem::size_of,
 };
-
-use boytacean_common::error::Error;
-use boytacean_hashing::crc32c::crc32c;
 
 use crate::{
     codec::Codec,

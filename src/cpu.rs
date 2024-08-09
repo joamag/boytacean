@@ -5,6 +5,7 @@
 //!
 //! Most of the core CPU logic is implemented in the [`Cpu::clock`] method.
 
+use boytacean_common::util::SharedThread;
 use std::{
     fmt::{self, Display, Formatter},
     sync::Mutex,
@@ -23,7 +24,6 @@ use crate::{
     ppu::Ppu,
     serial::Serial,
     timer::Timer,
-    util::SharedThread,
 };
 
 pub const PREFIX: u8 = 0xcb;

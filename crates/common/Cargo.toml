@@ -7,7 +7,10 @@ license = "Apache-2.0"
 edition = "2018"
 
 [dependencies]
+wasm-bindgen = { version = "0.2", optional = true }
+js-sys = { version = "0.3", optional = true }
 pyo3 = { version = "0.20", optional = true }
 
 [features]
+wasm = ["wasm-bindgen", "js-sys"]
 python = ["pyo3"]

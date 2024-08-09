@@ -1,5 +1,6 @@
 //! PPU (Picture Processing Unit) functions and structures.
 
+use boytacean_common::util::SharedThread;
 use core::fmt;
 use std::{
     borrow::BorrowMut,
@@ -21,9 +22,7 @@ use crate::{
     },
     gb::{GameBoyConfig, GameBoyMode},
     mmu::BusComponent,
-    panic_gb,
-    util::SharedThread,
-    warnln,
+    panic_gb, warnln,
 };
 
 #[cfg(feature = "wasm")]

@@ -17,7 +17,10 @@
 //! println!("Ran {} cycles", cycles);
 //! ```
 
-use boytacean_common::error::Error;
+use boytacean_common::{
+    error::Error,
+    util::{read_file, SharedThread},
+};
 use std::{
     collections::VecDeque,
     fmt::{self, Display, Formatter},
@@ -44,7 +47,6 @@ use crate::{
     rom::{Cartridge, RamSize},
     serial::{NullDevice, Serial, SerialDevice},
     timer::Timer,
-    util::{read_file, SharedThread},
 };
 
 #[cfg(feature = "wasm")]
