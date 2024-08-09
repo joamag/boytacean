@@ -8,3 +8,6 @@ edition = "2018"
 
 [features]
 simd = []
+
+[dependencies]
+boytacean-common = { path = "../common", version = "0.10.7" }
