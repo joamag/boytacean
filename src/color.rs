@@ -108,9 +108,8 @@ pub fn rgb888_to_rgb1555_scalar(rgb888_pixels: &[u8], rgb1555_pixels: &mut [u8])
 /// `rgb1555_pixels` must be a multiple of 2.
 #[cfg(feature = "simd")]
 pub fn rgb888_to_rgb1555_simd(rgb888_pixels: &[u8], rgb1555_pixels: &mut [u8]) {
+    use boytacean_common::util::interleave_arrays;
     use std::simd::u8x16;
-
-    use crate::util::interleave_arrays;
 
     const SIMD_WIDTH: usize = 16;
 
