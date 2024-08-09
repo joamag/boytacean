@@ -48,9 +48,9 @@ fn benchmark_encoding(c: &mut Criterion) {
 
 fn benchmark_decoding(c: &mut Criterion) {
     let data = generate_data(10_000_000_usize);
-    let encoded_huffman = encode_huffman(black_box(&data)).unwrap();
-    let encoded_rle = encode_rle(black_box(&data)).unwrap();
-    let encoded_zippy = encode_zippy(black_box(&data), None, None).unwrap();
+    let encoded_huffman = encode_huffman(&data).unwrap();
+    let encoded_rle = encode_rle(&data).unwrap();
+    let encoded_zippy = encode_zippy(&data, None, None).unwrap();
 
     let mut group = c.benchmark_group("decoding");
     group.throughput(Throughput::Bytes(data.len() as u64));
@@ -77,7 +77,7 @@ fn benchmark_decoding(c: &mut Criterion) {
     });
 
     let mut data = generate_data(10_000_000_usize);
-    encrypt_rc4(black_box(&mut data), b"testkey").unwrap();
+    encrypt_rc4(&mut data, b"testkey").unwrap();
 
     group.bench_function("decrypt_rc4", |b| {
         b.iter(|| {
