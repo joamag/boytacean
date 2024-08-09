@@ -115,7 +115,7 @@ mod tests {
     }
 
     #[test]
-    fn test_rc4_with_different_keys() {
+    fn test_rc4_different_keys() {
         let key1 = b"key1";
         let key2 = b"key2";
         let plaintext = b"hello world";
