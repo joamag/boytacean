@@ -38,8 +38,7 @@ fn benchmark_encoding(c: &mut Criterion) {
 
     group.bench_function("encrypt_rc4", |b| {
         b.iter(|| {
-            let encoded = encrypt_rc4(black_box(&mut data), b"testkey").unwrap();
-            black_box(encoded);
+            encrypt_rc4(black_box(&mut data), b"testkey").unwrap();
         })
     });
 
@@ -81,8 +80,7 @@ fn benchmark_decoding(c: &mut Criterion) {
 
     group.bench_function("decrypt_rc4", |b| {
         b.iter(|| {
-            let encoded = decrypt_rc4(black_box(&mut data), b"testkey").unwrap();
-            black_box(encoded);
+            decrypt_rc4(black_box(&mut data), b"testkey").unwrap();
         })
     });
 
