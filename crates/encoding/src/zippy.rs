@@ -12,6 +12,7 @@ use boytacean_common::error::Error;
 use boytacean_hashing::crc32c::crc32c;
 
 use crate::{
+    codec::Codec,
     huffman::{decode_huffman, encode_huffman},
     rc4::{rc4_decrypt, rc4_encrypt},
     rle::{decode_rle, encode_rle},
@@ -21,7 +22,7 @@ pub const ZIPPY_MAGIC: &str = "ZIPY";
 
 pub const ZIPPY_MAGIC_UINT: u32 = 0x5a495059;
 
-pub const ZIPPY_CYPHER_TEST: &[u8; 22] = b"ZIPPY_CYPHER_SIGNATURE";
+pub const ZIPPY_CIPHER_TEST: &[u8; 22] = b"ZIPPY_CIPHER_SIGNATURE";
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum ZippyFeatures {
@@ -80,6 +81,7 @@ pub struct Zippy {
     data: Vec<u8>,
 }
 
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct ZippyOptions {
     crc32: bool,
     key: Option<String>,
@@ -98,6 +100,17 @@ impl default::Default for ZippyOptions {
             key: None,
         }
     }
+}
+
+pub struct ZippyEncodeOptions {
+    name: Option<String>,
+    description: Option<String>,
+    features: Option<Vec<ZippyFeatures>>,
+    options: Option<ZippyOptions>,
+}
+
+pub struct ZippyDecodeOptions {
+    options: Option<ZippyOptions>,
 }
 
 impl Zippy {
@@ -121,17 +134,27 @@ impl Zippy {
         })
     }
 
-    pub fn is_zippy(data: &[u8]) -> Result<bool, Error> {
-        let mut data = Cursor::new(data);
+    pub fn encode_data(&self) -> Result<Vec<u8>, Error> {
+        let mut buffer = Cursor::new(vec![]);
+        let mut encoded = encode_huffman(&encode_rle(&self.data)?)?;
 
-        let mut buffer = [0x00; size_of::<u32>()];
-        data.read_exact(&mut buffer)?;
-        let magic = u32::from_le_bytes(buffer);
+        if self.has_feature(ZippyFeatures::EncryptedRc4) {
+            rc4_encrypt(&mut encoded, self.key()?)?;
+        }
 
-        Ok(magic == ZIPPY_MAGIC_UINT)
+        Self::write_u32(&mut buffer, ZIPPY_MAGIC_UINT)?;
+
+        Self::write_string(&mut buffer, &self.name)?;
+        Self::write_string(&mut buffer, &self.description)?;
+
+        self.write_features(&mut buffer)?;
+
+        Self::write_buffer(&mut buffer, &encoded)?;
+
+        Ok(buffer.into_inner())
     }
 
-    pub fn decode(data: &[u8], options: Option<ZippyOptions>) -> Result<Zippy, Error> {
+    pub fn decode_data(data: &[u8], options: Option<ZippyOptions>) -> Result<Zippy, Error> {
         let options = options.unwrap_or_default();
 
         let mut data = Cursor::new(data);
@@ -157,33 +180,23 @@ impl Zippy {
 
         let mut buffer = Self::read_buffer(&mut data)?;
         if instance.has_feature(ZippyFeatures::EncryptedRc4) {
-            rc4_decrypt(instance.key()?, &mut buffer)
+            rc4_decrypt(&mut buffer, instance.key()?)?;
         }
 
-        let decoded = decode_rle(&decode_huffman(&buffer)?);
+        let decoded = decode_rle(&decode_huffman(&buffer)?)?;
         instance.data = decoded;
 
         Ok(instance)
     }
 
-    pub fn encode(&self) -> Result<Vec<u8>, Error> {
-        let mut buffer = Cursor::new(vec![]);
-        let mut encoded = encode_huffman(&encode_rle(&self.data))?;
+    pub fn is_zippy(data: &[u8]) -> Result<bool, Error> {
+        let mut data = Cursor::new(data);
 
-        if self.has_feature(ZippyFeatures::EncryptedRc4) {
-            rc4_encrypt(self.key()?, &mut encoded)
-        }
+        let mut buffer = [0x00; size_of::<u32>()];
+        data.read_exact(&mut buffer)?;
+        let magic = u32::from_le_bytes(buffer);
 
-        Self::write_u32(&mut buffer, ZIPPY_MAGIC_UINT)?;
-
-        Self::write_string(&mut buffer, &self.name)?;
-        Self::write_string(&mut buffer, &self.description)?;
-
-        self.write_features(&mut buffer)?;
-
-        Self::write_buffer(&mut buffer, &encoded)?;
-
-        Ok(buffer.into_inner())
+        Ok(magic == ZIPPY_MAGIC_UINT)
     }
 
     pub fn check_crc32(&self) -> bool {
@@ -255,8 +268,8 @@ impl Zippy {
     #[inline(always)]
     fn read_rc4_feature(&mut self, data: &mut Cursor<&[u8]>) -> Result<(), Error> {
         let mut test_data = Self::read_buffer(data)?;
-        rc4_decrypt(self.key()?, &mut test_data);
-        if test_data != ZIPPY_CYPHER_TEST {
+        rc4_decrypt(&mut test_data, self.key()?)?;
+        if test_data != ZIPPY_CIPHER_TEST {
             return Err(Error::InvalidKey);
         }
         Ok(())
@@ -311,8 +324,8 @@ impl Zippy {
 
     #[inline(always)]
     fn write_rc4_feature(&self, data: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
-        let mut test_data = ZIPPY_CYPHER_TEST.to_vec();
-        rc4_encrypt(self.key()?, &mut test_data);
+        let mut test_data = ZIPPY_CIPHER_TEST.to_vec();
+        rc4_encrypt(&mut test_data, self.key()?)?;
         Self::write_string(data, ZippyFeatures::EncryptedRc4.into())?;
         Self::write_buffer(data, &test_data)?;
         Ok(())
@@ -335,16 +348,46 @@ impl Zippy {
     }
 }
 
+impl Codec for Zippy {
+    type EncodeOptions = ZippyEncodeOptions;
+    type DecodeOptions = ZippyDecodeOptions;
+
+    fn encode(data: &[u8], options: &Self::EncodeOptions) -> Result<Vec<u8>, Error> {
+        Self::build(
+            data,
+            options.name.clone().unwrap_or_default(),
+            options.description.clone().unwrap_or_default(),
+            options.features.clone(),
+            options.options.clone(),
+        )?
+        .encode_data()
+    }
+
+    fn decode(data: &[u8], options: &Self::DecodeOptions) -> Result<Vec<u8>, Error> {
+        Ok(Zippy::decode_data(data, options.options.clone())?
+            .data()
+            .to_vec())
+    }
+}
+
 pub fn encode_zippy(
     data: &[u8],
     features: Option<Vec<ZippyFeatures>>,
     options: Option<ZippyOptions>,
 ) -> Result<Vec<u8>, Error> {
-    Zippy::build(data, String::from(""), String::from(""), features, options)?.encode()
+    Zippy::encode(
+        data,
+        &ZippyEncodeOptions {
+            name: None,
+            description: None,
+            features,
+            options,
+        },
+    )
 }
 
 pub fn decode_zippy(data: &[u8], options: Option<ZippyOptions>) -> Result<Vec<u8>, Error> {
-    Ok(Zippy::decode(data, options)?.data().to_vec())
+    Zippy::decode(data, &ZippyDecodeOptions { options })
 }
 
 #[cfg(test)]
@@ -360,9 +403,9 @@ mod tests {
         let description = String::from("Test description");
 
         let zippy = Zippy::build(&data, name.clone(), description.clone(), None, None).unwrap();
-        let encoded = zippy.encode().unwrap();
+        let encoded = zippy.encode_data().unwrap();
 
-        let decoded = Zippy::decode(&encoded, None).unwrap();
+        let decoded = Zippy::decode_data(&encoded, None).unwrap();
         assert_eq!(decoded.name, name);
         assert_eq!(decoded.description, description);
         assert_eq!(decoded.data, data);
@@ -375,7 +418,7 @@ mod tests {
         let description = String::from("Test description");
 
         let zippy = Zippy::build(&data, name.clone(), description.clone(), None, None).unwrap();
-        let encoded = zippy.encode().unwrap();
+        let encoded = zippy.encode_data().unwrap();
 
         let decoded_data = decode_zippy(&encoded, None).unwrap();
         assert_eq!(decoded_data, data);
@@ -388,9 +431,9 @@ mod tests {
         let description = String::from("Test description");
 
         let zippy = Zippy::build(&data, name.clone(), description.clone(), None, None).unwrap();
-        let encoded = zippy.encode().unwrap();
+        let encoded = zippy.encode_data().unwrap();
 
-        let zippy = Zippy::decode(&encoded, None).unwrap();
+        let zippy = Zippy::decode_data(&encoded, None).unwrap();
         assert!(zippy.has_feature(ZippyFeatures::Crc32));
         assert!(zippy.check_crc32());
         assert_eq!(zippy.crc32(), 0x53518fab);
@@ -410,9 +453,9 @@ mod tests {
             Some(ZippyOptions::new(false, None)),
         )
         .unwrap();
-        let encoded = zippy.encode().unwrap();
+        let encoded = zippy.encode_data().unwrap();
 
-        let zippy = Zippy::decode(&encoded, None).unwrap();
+        let zippy = Zippy::decode_data(&encoded, None).unwrap();
         assert!(zippy.has_feature(ZippyFeatures::Crc32));
         assert!(!zippy.check_crc32());
         assert_eq!(zippy.crc32(), 0xffffffff);
@@ -439,9 +482,9 @@ mod tests {
             Some(ZippyOptions::new(false, None)),
         )
         .unwrap();
-        let encoded = zippy.encode().unwrap();
+        let encoded = zippy.encode_data().unwrap();
 
-        let zippy = Zippy::decode(&encoded, None).unwrap();
+        let zippy = Zippy::decode_data(&encoded, None).unwrap();
         assert!(zippy.has_feature(ZippyFeatures::Other));
         assert!(!zippy.has_feature(ZippyFeatures::Crc32));
         assert!(!zippy.check_crc32());

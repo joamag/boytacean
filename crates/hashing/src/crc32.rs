@@ -10,6 +10,10 @@
 //! This implementation is optimized for modern CPUs by using hardware acceleration
 //! when available. Current support includes only CRC for aarch64.
 
+use boytacean_common::error::Error;
+
+use crate::hash::Hash;
+
 #[cfg(all(feature = "simd", target_arch = "aarch64"))]
 use std::arch::is_aarch64_feature_detected;
 
@@ -112,6 +116,17 @@ impl Crc32 {
     }
 }
 
+impl Hash for Crc32 {
+    type Options = ();
+
+    fn hash(data: &[u8], _options: &Self::Options) -> Result<Vec<u8>, Error> {
+        let mut crc32 = Crc32::new();
+        crc32.update(data);
+        let result = crc32.finalize();
+        Ok(result.to_le_bytes().to_vec())
+    }
+}
+
 impl Default for Crc32 {
     fn default() -> Self {
         Self::new()
@@ -126,7 +141,9 @@ pub fn crc32(data: &[u8]) -> u32 {
 
 #[cfg(test)]
 mod tests {
-    use super::crc32;
+    use crate::hash::Hash;
+
+    use super::{crc32, Crc32};
 
     #[test]
     fn test_crc32_empty() {
@@ -150,5 +167,12 @@ mod tests {
     fn test_crc32_large_data() {
         let data: Vec<u8> = vec![0xff; 1000];
         assert_eq!(crc32(&data), 0xe0533230);
+    }
+
+    #[test]
+    fn test_crc32_hash() {
+        let data: Vec<u8> = vec![0xff; 1000];
+        let result = Crc32::hash(&data, &()).unwrap();
+        assert_eq!(result, [0x30, 0x32, 0x53, 0xe0]);
     }
 }
