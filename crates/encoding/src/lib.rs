@@ -1,3 +1,5 @@
+#![allow(clippy::uninlined_format_args)]
+
 pub mod cipher;
 pub mod codec;
 pub mod huffman;
