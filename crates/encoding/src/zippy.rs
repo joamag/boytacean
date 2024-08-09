@@ -21,7 +21,7 @@ pub const ZIPPY_MAGIC: &str = "ZIPY";
 
 pub const ZIPPY_MAGIC_UINT: u32 = 0x5a495059;
 
-pub const ZIPPY_CYPHER_TEST: &[u8; 22] = b"ZIPPY_CYPHER_SIGNATURE";
+pub const ZIPPY_CIPHER_TEST: &[u8; 22] = b"ZIPPY_CIPHER_SIGNATURE";
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum ZippyFeatures {
@@ -157,7 +157,7 @@ impl Zippy {
 
         let mut buffer = Self::read_buffer(&mut data)?;
         if instance.has_feature(ZippyFeatures::EncryptedRc4) {
-            rc4_decrypt(instance.key()?, &mut buffer)
+            rc4_decrypt(&mut buffer, instance.key()?)
         }
 
         let decoded = decode_rle(&decode_huffman(&buffer)?);
@@ -171,7 +171,7 @@ impl Zippy {
         let mut encoded = encode_huffman(&encode_rle(&self.data))?;
 
         if self.has_feature(ZippyFeatures::EncryptedRc4) {
-            rc4_encrypt(self.key()?, &mut encoded)
+            rc4_encrypt(&mut encoded, self.key()?)
         }
 
         Self::write_u32(&mut buffer, ZIPPY_MAGIC_UINT)?;
@@ -255,8 +255,8 @@ impl Zippy {
     #[inline(always)]
     fn read_rc4_feature(&mut self, data: &mut Cursor<&[u8]>) -> Result<(), Error> {
         let mut test_data = Self::read_buffer(data)?;
-        rc4_decrypt(self.key()?, &mut test_data);
-        if test_data != ZIPPY_CYPHER_TEST {
+        rc4_decrypt(&mut test_data, self.key()?);
+        if test_data != ZIPPY_CIPHER_TEST {
             return Err(Error::InvalidKey);
         }
         Ok(())
@@ -311,8 +311,8 @@ impl Zippy {
 
     #[inline(always)]
     fn write_rc4_feature(&self, data: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
-        let mut test_data = ZIPPY_CYPHER_TEST.to_vec();
-        rc4_encrypt(self.key()?, &mut test_data);
+        let mut test_data = ZIPPY_CIPHER_TEST.to_vec();
+        rc4_encrypt(&mut test_data, self.key()?);
         Self::write_string(data, ZippyFeatures::EncryptedRc4.into())?;
         Self::write_buffer(data, &test_data)?;
         Ok(())

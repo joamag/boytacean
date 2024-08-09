@@ -1,3 +1,7 @@
+use crate::cipher::Cipher;
+
+pub struct Rc4Options;
+
 pub struct Rc4 {
     s: [u8; 256],
     i: u8,
@@ -35,13 +39,26 @@ impl Rc4 {
     }
 }
 
-pub fn rc4_encrypt(key: &[u8], data: &mut [u8]) {
-    let mut rc4 = Rc4::new(key);
-    rc4.process(data);
+impl Cipher for Rc4 {
+    type EncryptOptions = Rc4Options;
+    type DecryptOptions = Rc4Options;
+
+    fn encrypt(data: &mut [u8], key: &[u8], _options: &Self::EncryptOptions) {
+        let mut rc4 = Rc4::new(key);
+        rc4.process(data);
+    }
+
+    fn decrypt(data: &mut [u8], key: &[u8], options: &Self::DecryptOptions) {
+        Self::encrypt(data, key, options);
+    }
 }
 
-pub fn rc4_decrypt(key: &[u8], data: &mut [u8]) {
-    rc4_encrypt(key, data)
+pub fn rc4_encrypt(data: &mut [u8], key: &[u8]) {
+    Rc4::encrypt(data, key, &(Rc4Options {}))
+}
+
+pub fn rc4_decrypt(data: &mut [u8], key: &[u8]) {
+    rc4_encrypt(data, key)
 }
 
 #[cfg(test)]
