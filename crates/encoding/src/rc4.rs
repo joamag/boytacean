@@ -54,12 +54,12 @@ impl Cipher for Rc4 {
     }
 }
 
-pub fn rc4_encrypt(data: &mut [u8], key: &[u8]) -> Result<(), Error> {
+pub fn encrypt_rc4(data: &mut [u8], key: &[u8]) -> Result<(), Error> {
     Rc4::encrypt(data, key, &())
 }
 
-pub fn rc4_decrypt(data: &mut [u8], key: &[u8]) -> Result<(), Error> {
-    rc4_encrypt(data, key)
+pub fn decrypt_rc4(data: &mut [u8], key: &[u8]) -> Result<(), Error> {
+    encrypt_rc4(data, key)
 }
 
 #[cfg(test)]

@@ -1,6 +1,7 @@
 use boytacean_common::bench::generate_data;
 use boytacean_encoding::{
     huffman::{decode_huffman, encode_huffman},
+    rc4::{decrypt_rc4, encrypt_rc4},
     rle::{decode_rle, encode_rle},
     zippy::{decode_zippy, encode_zippy},
 };
@@ -29,6 +30,15 @@ fn benchmark_encoding(c: &mut Criterion) {
     group.bench_function("encode_zippy", |b| {
         b.iter(|| {
             let encoded = encode_zippy(black_box(&data), None, None).unwrap();
+            black_box(encoded);
+        })
+    });
+
+    let mut data = generate_data(10_000_000_usize);
+
+    group.bench_function("encrypt_rc4", |b| {
+        b.iter(|| {
+            let encoded = encrypt_rc4(black_box(&mut data), b"testkey").unwrap();
             black_box(encoded);
         })
     });
@@ -63,6 +73,16 @@ fn benchmark_decoding(c: &mut Criterion) {
         b.iter(|| {
             let decoded = decode_zippy(black_box(&encoded_zippy), None).unwrap();
             black_box(decoded);
+        })
+    });
+
+    let mut data = generate_data(10_000_000_usize);
+    encrypt_rc4(black_box(&mut data), b"testkey").unwrap();
+
+    group.bench_function("decrypt_rc4", |b| {
+        b.iter(|| {
+            let encoded = decrypt_rc4(black_box(&mut data), b"testkey").unwrap();
+            black_box(encoded);
         })
     });
 

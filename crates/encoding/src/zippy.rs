@@ -14,7 +14,7 @@ use boytacean_hashing::crc32c::crc32c;
 use crate::{
     codec::Codec,
     huffman::{decode_huffman, encode_huffman},
-    rc4::{rc4_decrypt, rc4_encrypt},
+    rc4::{decrypt_rc4, encrypt_rc4},
     rle::{decode_rle, encode_rle},
 };
 
@@ -139,7 +139,7 @@ impl Zippy {
         let mut encoded = encode_huffman(&encode_rle(&self.data)?)?;
 
         if self.has_feature(ZippyFeatures::EncryptedRc4) {
-            rc4_encrypt(&mut encoded, self.key()?)?;
+            encrypt_rc4(&mut encoded, self.key()?)?;
         }
 
         Self::write_u32(&mut buffer, ZIPPY_MAGIC_UINT)?;
@@ -180,7 +180,7 @@ impl Zippy {
 
         let mut buffer = Self::read_buffer(&mut data)?;
         if instance.has_feature(ZippyFeatures::EncryptedRc4) {
-            rc4_decrypt(&mut buffer, instance.key()?)?;
+            decrypt_rc4(&mut buffer, instance.key()?)?;
         }
 
         let decoded = decode_rle(&decode_huffman(&buffer)?)?;
@@ -268,7 +268,7 @@ impl Zippy {
     #[inline(always)]
     fn read_rc4_feature(&mut self, data: &mut Cursor<&[u8]>) -> Result<(), Error> {
         let mut test_data = Self::read_buffer(data)?;
-        rc4_decrypt(&mut test_data, self.key()?)?;
+        decrypt_rc4(&mut test_data, self.key()?)?;
         if test_data != ZIPPY_CIPHER_TEST {
             return Err(Error::InvalidKey);
         }
@@ -325,7 +325,7 @@ impl Zippy {
     #[inline(always)]
     fn write_rc4_feature(&self, data: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
         let mut test_data = ZIPPY_CIPHER_TEST.to_vec();
-        rc4_encrypt(&mut test_data, self.key()?)?;
+        encrypt_rc4(&mut test_data, self.key()?)?;
         Self::write_string(data, ZippyFeatures::EncryptedRc4.into())?;
         Self::write_buffer(data, &test_data)?;
         Ok(())
