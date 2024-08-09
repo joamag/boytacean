@@ -1,6 +1,6 @@
-use crate::cipher::Cipher;
+use boytacean_common::error::Error;
 
-pub struct Rc4Options;
+use crate::cipher::Cipher;
 
 pub struct Rc4 {
     s: [u8; 256],
@@ -40,24 +40,25 @@ impl Rc4 {
 }
 
 impl Cipher for Rc4 {
-    type EncryptOptions = Rc4Options;
-    type DecryptOptions = Rc4Options;
+    type EncryptOptions = ();
+    type DecryptOptions = ();
 
-    fn encrypt(data: &mut [u8], key: &[u8], _options: &Self::EncryptOptions) {
+    fn encrypt(data: &mut [u8], key: &[u8], _options: &Self::EncryptOptions) -> Result<(), Error> {
         let mut rc4 = Rc4::new(key);
         rc4.process(data);
+        Ok(())
     }
 
-    fn decrypt(data: &mut [u8], key: &[u8], options: &Self::DecryptOptions) {
-        Self::encrypt(data, key, options);
+    fn decrypt(data: &mut [u8], key: &[u8], options: &Self::DecryptOptions) -> Result<(), Error> {
+        Self::encrypt(data, key, options)
     }
 }
 
-pub fn rc4_encrypt(data: &mut [u8], key: &[u8]) {
-    Rc4::encrypt(data, key, &(Rc4Options {}))
+pub fn rc4_encrypt(data: &mut [u8], key: &[u8]) -> Result<(), Error> {
+    Rc4::encrypt(data, key, &())
 }
 
-pub fn rc4_decrypt(data: &mut [u8], key: &[u8]) {
+pub fn rc4_decrypt(data: &mut [u8], key: &[u8]) -> Result<(), Error> {
     rc4_encrypt(data, key)
 }
 

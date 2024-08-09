@@ -1,3 +1,5 @@
+use boytacean_common::error::Error;
+
 use crate::codec::Codec;
 
 pub struct Rle;
@@ -6,9 +8,9 @@ impl Codec for Rle {
     type EncodeOptions = ();
     type DecodeOptions = ();
 
-    fn encode(data: &[u8], _options: &Self::EncodeOptions) -> Vec<u8> {
+    fn encode(data: &[u8], _options: &Self::EncodeOptions) -> Result<Vec<u8>, Error> {
         if data.is_empty() {
-            return Vec::new();
+            return Ok(Vec::new());
         }
 
         let mut encoded = Vec::new();
@@ -28,10 +30,10 @@ impl Codec for Rle {
         encoded.push(prev_byte);
         encoded.push(count);
 
-        encoded
+        Ok(encoded)
     }
 
-    fn decode(data: &[u8], _options: &Self::DecodeOptions) -> Vec<u8> {
+    fn decode(data: &[u8], _options: &Self::DecodeOptions) -> Result<Vec<u8>, Error> {
         let mut decoded = Vec::new();
 
         let mut iter = data.iter();
@@ -41,14 +43,14 @@ impl Codec for Rle {
             }
         }
 
-        decoded
+        Ok(decoded)
     }
 }
 
-pub fn encode_rle(data: &[u8]) -> Vec<u8> {
+pub fn encode_rle(data: &[u8]) -> Result<Vec<u8>, Error> {
     Rle::encode(data, &())
 }
 
-pub fn decode_rle(data: &[u8]) -> Vec<u8> {
+pub fn decode_rle(data: &[u8]) -> Result<Vec<u8>, Error> {
     Rle::decode(data, &())
 }

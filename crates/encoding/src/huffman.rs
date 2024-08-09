@@ -6,6 +6,8 @@ use std::{
     mem::size_of,
 };
 
+use crate::codec::Codec;
+
 #[derive(Debug, Eq, PartialEq)]
 struct Node {
     frequency: u32,
@@ -26,210 +28,227 @@ impl PartialOrd for Node {
     }
 }
 
-pub fn encode_huffman(data: &[u8]) -> Result<Vec<u8>, Error> {
-    let frequency_map = build_frequency(data);
-    let tree = build_tree(&frequency_map)
-        .ok_or(Error::CustomError(String::from("Failed to build tree")))?;
+pub struct Huffman;
 
-    let mut codes = vec![Vec::new(); 256];
-    build_codes(&tree, Vec::new(), &mut codes);
-
-    let encoded_tree = encode_tree(&tree);
-    let encoded_data = encode_data(data, &codes);
-    let tree_length = encoded_tree.len() as u32;
-    let data_length = data.len() as u64;
-
-    let mut result = Vec::new();
-    result.extend(tree_length.to_be_bytes());
-    result.extend(encoded_tree);
-    result.extend(data_length.to_be_bytes());
-    result.extend(encoded_data);
-
-    Ok(result)
-}
-
-pub fn decode_huffman(data: &[u8]) -> Result<Vec<u8>, Error> {
-    let mut reader = Cursor::new(data);
-
-    let mut buffer = [0x00; size_of::<u32>()];
-    reader.read_exact(&mut buffer)?;
-    let tree_length = u32::from_be_bytes(buffer);
-
-    let mut buffer = vec![0; tree_length as usize];
-    reader.read_exact(&mut buffer)?;
-    let tree = decode_tree(&mut buffer.as_slice());
-
-    let mut buffer = [0x00; size_of::<u64>()];
-    reader.read_exact(&mut buffer)?;
-    let data_length = u64::from_be_bytes(buffer);
-
-    let mut buffer =
-        vec![0; data.len() - size_of::<u32>() - tree_length as usize - size_of::<u64>()];
-    reader.read_exact(&mut buffer)?;
-
-    let result = decode_data(&buffer, &tree, data_length);
-
-    Ok(result)
-}
-
-fn build_frequency(data: &[u8]) -> [u32; 256] {
-    let mut frequency_map = [0_u32; 256];
-    for &byte in data {
-        frequency_map[byte as usize] += 1;
-    }
-    frequency_map
-}
-
-fn build_tree(frequency_map: &[u32; 256]) -> Option<Box<Node>> {
-    let mut heap: BinaryHeap<Box<Node>> = BinaryHeap::new();
-
-    for (byte, &frequency) in frequency_map.iter().enumerate() {
-        if frequency == 0 {
-            continue;
+impl Huffman {
+    fn build_frequency(data: &[u8]) -> [u32; 256] {
+        let mut frequency_map = [0_u32; 256];
+        for &byte in data {
+            frequency_map[byte as usize] += 1;
         }
-        heap.push(Box::new(Node {
-            frequency,
-            character: Some(byte as u8),
-            left: None,
-            right: None,
-        }));
+        frequency_map
     }
 
-    while heap.len() > 1 {
-        let left = heap.pop().unwrap();
-        let right = heap.pop().unwrap();
+    fn build_tree(frequency_map: &[u32; 256]) -> Option<Box<Node>> {
+        let mut heap: BinaryHeap<Box<Node>> = BinaryHeap::new();
 
-        let merged = Box::new(Node {
-            frequency: left.frequency + right.frequency,
-            character: None,
-            left: Some(left),
-            right: Some(right),
-        });
-
-        heap.push(merged);
-    }
-
-    heap.pop()
-}
-
-fn build_codes(node: &Node, prefix: Vec<u8>, codes: &mut [Vec<u8>]) {
-    if let Some(character) = node.character {
-        codes[character as usize] = prefix;
-    } else {
-        if let Some(ref left) = node.left {
-            let mut left_prefix = prefix.clone();
-            left_prefix.push(0);
-            build_codes(left, left_prefix, codes);
-        }
-        if let Some(ref right) = node.right {
-            let mut right_prefix = prefix;
-            right_prefix.push(1);
-            build_codes(right, right_prefix, codes);
-        }
-    }
-}
-
-fn encode_data(data: &[u8], codes: &[Vec<u8>]) -> Vec<u8> {
-    let mut bit_buffer = Vec::new();
-    let mut current_byte = 0u8;
-    let mut bit_count = 0;
-
-    for &byte in data {
-        let code = &codes[byte as usize];
-        for &bit in code {
-            current_byte <<= 1;
-            if bit == 1 {
-                current_byte |= 1;
+        for (byte, &frequency) in frequency_map.iter().enumerate() {
+            if frequency == 0 {
+                continue;
             }
-            bit_count += 1;
+            heap.push(Box::new(Node {
+                frequency,
+                character: Some(byte as u8),
+                left: None,
+                right: None,
+            }));
+        }
 
-            if bit_count == 8 {
-                bit_buffer.push(current_byte);
-                current_byte = 0;
-                bit_count = 0;
+        while heap.len() > 1 {
+            let left = heap.pop().unwrap();
+            let right = heap.pop().unwrap();
+
+            let merged = Box::new(Node {
+                frequency: left.frequency + right.frequency,
+                character: None,
+                left: Some(left),
+                right: Some(right),
+            });
+
+            heap.push(merged);
+        }
+
+        heap.pop()
+    }
+
+    fn build_codes(node: &Node, prefix: Vec<u8>, codes: &mut [Vec<u8>]) {
+        if let Some(character) = node.character {
+            codes[character as usize] = prefix;
+        } else {
+            if let Some(ref left) = node.left {
+                let mut left_prefix = prefix.clone();
+                left_prefix.push(0);
+                Self::build_codes(left, left_prefix, codes);
+            }
+            if let Some(ref right) = node.right {
+                let mut right_prefix = prefix;
+                right_prefix.push(1);
+                Self::build_codes(right, right_prefix, codes);
             }
         }
     }
 
-    if bit_count > 0 {
-        current_byte <<= 8 - bit_count;
-        bit_buffer.push(current_byte);
-    }
+    fn encode_data(data: &[u8], codes: &[Vec<u8>]) -> Vec<u8> {
+        let mut bit_buffer = Vec::new();
+        let mut current_byte = 0u8;
+        let mut bit_count = 0;
 
-    bit_buffer
-}
+        for &byte in data {
+            let code = &codes[byte as usize];
+            for &bit in code {
+                current_byte <<= 1;
+                if bit == 1 {
+                    current_byte |= 1;
+                }
+                bit_count += 1;
 
-fn decode_data(encoded: &[u8], root: &Node, data_length: u64) -> Vec<u8> {
-    let mut decoded = Vec::new();
-    let mut current_node = root;
-    let mut bit_index = 0;
-
-    for &byte in encoded {
-        if decoded.len() as u64 == data_length {
-            break;
+                if bit_count == 8 {
+                    bit_buffer.push(current_byte);
+                    current_byte = 0;
+                    bit_count = 0;
+                }
+            }
         }
 
-        for bit_offset in (0..8).rev() {
-            let bit = (byte >> bit_offset) & 1;
-            current_node = if bit == 0 {
-                current_node.left.as_deref().unwrap()
-            } else {
-                current_node.right.as_deref().unwrap()
-            };
+        if bit_count > 0 {
+            current_byte <<= 8 - bit_count;
+            bit_buffer.push(current_byte);
+        }
 
-            if let Some(character) = current_node.character {
-                decoded.push(character);
-                current_node = root;
-            }
+        bit_buffer
+    }
 
+    fn decode_data(encoded: &[u8], root: &Node, data_length: u64) -> Vec<u8> {
+        let mut decoded = Vec::new();
+        let mut current_node = root;
+        let mut bit_index = 0;
+
+        for &byte in encoded {
             if decoded.len() as u64 == data_length {
                 break;
             }
 
-            bit_index += 1;
-            if bit_index == encoded.len() * 8 {
-                break;
+            for bit_offset in (0..8).rev() {
+                let bit = (byte >> bit_offset) & 1;
+                current_node = if bit == 0 {
+                    current_node.left.as_deref().unwrap()
+                } else {
+                    current_node.right.as_deref().unwrap()
+                };
+
+                if let Some(character) = current_node.character {
+                    decoded.push(character);
+                    current_node = root;
+                }
+
+                if decoded.len() as u64 == data_length {
+                    break;
+                }
+
+                bit_index += 1;
+                if bit_index == encoded.len() * 8 {
+                    break;
+                }
             }
         }
+
+        decoded
     }
 
-    decoded
+    fn encode_tree(node: &Node) -> Vec<u8> {
+        let mut result = Vec::new();
+        if let Some(character) = node.character {
+            result.push(1);
+            result.push(character);
+        } else {
+            result.push(0);
+            if let Some(ref left) = node.left {
+                result.extend(Self::encode_tree(left));
+            }
+            if let Some(ref right) = node.right {
+                result.extend(Self::encode_tree(right));
+            }
+        }
+        result
+    }
+
+    fn decode_tree(data: &mut &[u8]) -> Box<Node> {
+        let mut node = Box::new(Node {
+            frequency: 0,
+            character: None,
+            left: None,
+            right: None,
+        });
+
+        if data[0] == 1 {
+            node.character = Some(data[1]);
+            *data = &data[2..];
+        } else {
+            *data = &data[1..];
+            node.left = Some(Self::decode_tree(data));
+            node.right = Some(Self::decode_tree(data));
+        }
+        node
+    }
 }
 
-fn encode_tree(node: &Node) -> Vec<u8> {
-    let mut result = Vec::new();
-    if let Some(character) = node.character {
-        result.push(1);
-        result.push(character);
-    } else {
-        result.push(0);
-        if let Some(ref left) = node.left {
-            result.extend(encode_tree(left));
-        }
-        if let Some(ref right) = node.right {
-            result.extend(encode_tree(right));
-        }
+impl Codec for Huffman {
+    type EncodeOptions = ();
+    type DecodeOptions = ();
+
+    fn encode(data: &[u8], _options: &Self::EncodeOptions) -> Result<Vec<u8>, Error> {
+        let frequency_map = Self::build_frequency(data);
+        let tree = Self::build_tree(&frequency_map)
+            .ok_or(Error::CustomError(String::from("Failed to build tree")))?;
+
+        let mut codes = vec![Vec::new(); 256];
+        Self::build_codes(&tree, Vec::new(), &mut codes);
+
+        let encoded_tree = Self::encode_tree(&tree);
+        let encoded_data = Self::encode_data(data, &codes);
+        let tree_length = encoded_tree.len() as u32;
+        let data_length = data.len() as u64;
+
+        let mut result = Vec::new();
+        result.extend(tree_length.to_be_bytes());
+        result.extend(encoded_tree);
+        result.extend(data_length.to_be_bytes());
+        result.extend(encoded_data);
+
+        Ok(result)
     }
-    result
+
+    fn decode(data: &[u8], _options: &Self::DecodeOptions) -> Result<Vec<u8>, Error> {
+        let mut reader = Cursor::new(data);
+
+        let mut buffer = [0x00; size_of::<u32>()];
+        reader.read_exact(&mut buffer)?;
+        let tree_length = u32::from_be_bytes(buffer);
+
+        let mut buffer = vec![0; tree_length as usize];
+        reader.read_exact(&mut buffer)?;
+        let tree = Self::decode_tree(&mut buffer.as_slice());
+
+        let mut buffer = [0x00; size_of::<u64>()];
+        reader.read_exact(&mut buffer)?;
+        let data_length = u64::from_be_bytes(buffer);
+
+        let mut buffer =
+            vec![0; data.len() - size_of::<u32>() - tree_length as usize - size_of::<u64>()];
+        reader.read_exact(&mut buffer)?;
+
+        let result = Self::decode_data(&buffer, &tree, data_length);
+
+        Ok(result)
+    }
 }
 
-fn decode_tree(data: &mut &[u8]) -> Box<Node> {
-    let mut node = Box::new(Node {
-        frequency: 0,
-        character: None,
-        left: None,
-        right: None,
-    });
+pub fn encode_huffman(data: &[u8]) -> Result<Vec<u8>, Error> {
+    Huffman::encode(data, &())
+}
 
-    if data[0] == 1 {
-        node.character = Some(data[1]);
-        *data = &data[2..];
-    } else {
-        *data = &data[1..];
-        node.left = Some(decode_tree(data));
-        node.right = Some(decode_tree(data));
-    }
-    node
+pub fn decode_huffman(data: &[u8]) -> Result<Vec<u8>, Error> {
+    Huffman::decode(data, &())
 }
 
 #[cfg(test)]
