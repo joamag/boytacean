@@ -1,4 +1,7 @@
-use std::io::{Cursor, Read};
+use std::{
+    io::{Cursor, Read},
+    mem::size_of,
+};
 
 use crate::error::Error;
 
