@@ -60,7 +60,7 @@ pub const BESS_MAGIC: u32 = 0x53534542;
 /// this trait to allow the state to be saved and restored
 /// in a consistent way.
 pub trait StateComponent {
-    fn get_state(&self) -> Result<Vec<u8>, Error>;
+    fn state(&self) -> Result<Vec<u8>, Error>;
     fn set_state(&mut self, data: &[u8]) -> Result<(), Error>;
 }
 
