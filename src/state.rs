@@ -52,10 +52,10 @@ pub const BESS_MAGIC: u32 = 0x53534542;
 
 /// Represents a component that is able to store and retrieve
 /// the state of its internal structure.
-/// 
+///
 /// This trait is used to define the behavior of the state
 /// components that are used to store the emulator state.
-/// 
+///
 /// Ideally each of Game Boy's components should implement
 /// this trait to allow the state to be saved and restored
 /// in a consistent way.
