@@ -7,20 +7,6 @@ use crate::gb::GameBoy;
 static mut GLOBAL_INSTANCE: *const GameBoy = null();
 
 impl GameBoy {
-    /// Obtains the global instance of the Game Boy emulator
-    /// ready to be used in diagnostics.
-    ///
-    /// If the global instance is not set, it will return `None`.
-    fn global() -> Option<&'static Self> {
-        unsafe {
-            if GLOBAL_INSTANCE.is_null() {
-                None
-            } else {
-                Some(&*GLOBAL_INSTANCE)
-            }
-        }
-    }
-
     /// Sets the current instance as the one going to be used
     /// in panic diagnostics.
     pub fn set_diag(&self) {
@@ -32,6 +18,20 @@ impl GameBoy {
     pub fn dump_diagnostics() {
         if let Some(gb) = Self::global() {
             gb.dump_diagnostics_s();
+        }
+    }
+
+    /// Obtains the global instance of the Game Boy emulator
+    /// ready to be used in diagnostics.
+    ///
+    /// If the global instance is not set, it will return `None`.
+    fn global() -> Option<&'static Self> {
+        unsafe {
+            if GLOBAL_INSTANCE.is_null() {
+                None
+            } else {
+                Some(&*GLOBAL_INSTANCE)
+            }
         }
     }
 
