@@ -160,7 +160,7 @@ pub fn interleave_arrays(a: &[u8], b: &[u8], output: &mut [u8]) {
 }
 
 #[cfg(not(feature = "wasm"))]
-pub fn get_timestamp() -> u64 {
+pub fn timestamp() -> u64 {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     let now = SystemTime::now();
@@ -169,7 +169,7 @@ pub fn get_timestamp() -> u64 {
 
 #[cfg(feature = "wasm")]
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
-pub fn get_timestamp() -> u64 {
+pub fn timestamp() -> u64 {
     use js_sys::Date;
 
     (Date::now() / 1000.0) as u64

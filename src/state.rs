@@ -8,7 +8,7 @@
 
 use boytacean_common::{
     error::Error,
-    util::{get_timestamp, save_bmp},
+    util::{timestamp, save_bmp},
 };
 use boytacean_encoding::zippy::{decode_zippy, encode_zippy};
 use std::{
@@ -597,7 +597,7 @@ impl Serialize for BosInfo {
 
 impl State for BosInfo {
     fn from_gb(gb: &mut GameBoy) -> Result<Self, Error> {
-        let timestamp = get_timestamp();
+        let timestamp = timestamp();
         Ok(Self::new(
             gb.mode().to_string(Some(true)),
             timestamp,
