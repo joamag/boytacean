@@ -6,9 +6,7 @@
 //! errors that can occur within Boytacean domain.
 
 use std::{
-    fmt::{self, Display, Formatter},
-    io,
-    string::FromUtf8Error,
+    error, fmt::{self, Display, Formatter}, io, string::FromUtf8Error
 };
 
 /// Top level enum for error handling within Boytacean.
@@ -39,6 +37,30 @@ impl Error {
             Error::InvalidParameter(message) => format!("Invalid parameter: {}", message),
             Error::CustomError(message) => String::from(message),
         }
+    }
+}
+
+impl error::Error for Error {
+    fn description(&self) -> &str {
+        match self {
+            Error::InvalidData => "Invalid data format",
+            Error::InvalidKey => "Invalid key",
+            Error::RomSize => "Invalid ROM size",
+            Error::IncompatibleBootRom => "Incompatible Boot ROM",
+            Error::MissingOption(_) => "Missing option",
+            Error::IoError(_) => "IO error",
+            Error::InvalidParameter(_) => "Invalid parameter",
+            Error::CustomError(_) => "Custom error",
+            
+        }
+    }
+
+    fn cause(&self) -> Option<&dyn error::Error> {
+        None
+    }
+
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+        None
     }
 }
 
