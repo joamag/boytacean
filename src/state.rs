@@ -8,7 +8,7 @@
 
 use boytacean_common::{
     error::Error,
-    util::{timestamp, save_bmp},
+    util::{save_bmp, timestamp},
 };
 use boytacean_encoding::zippy::{decode_zippy, encode_zippy};
 use std::{
