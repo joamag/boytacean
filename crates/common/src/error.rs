@@ -6,7 +6,10 @@
 //! errors that can occur within Boytacean domain.
 
 use std::{
-    error, fmt::{self, Display, Formatter}, io, string::FromUtf8Error
+    error,
+    fmt::{self, Display, Formatter},
+    io,
+    string::FromUtf8Error,
 };
 
 /// Top level enum for error handling within Boytacean.
@@ -51,7 +54,6 @@ impl error::Error for Error {
             Error::IoError(_) => "IO error",
             Error::InvalidParameter(_) => "Invalid parameter",
             Error::CustomError(_) => "Custom error",
-            
         }
     }
 
