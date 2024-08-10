@@ -1,4 +1,5 @@
 pub mod bench;
+pub mod data;
 pub mod error;
 pub mod util;
 
