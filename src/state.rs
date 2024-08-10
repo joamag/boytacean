@@ -601,7 +601,7 @@ impl State for BosInfo {
         Ok(Self::new(
             gb.mode().to_string(Some(true)),
             timestamp,
-            Info::name(),
+            Info::name_lower(),
             Info::version(),
         ))
     }

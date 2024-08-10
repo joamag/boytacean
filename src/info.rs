@@ -17,6 +17,12 @@ impl Info {
         capitalize(NAME)
     }
 
+    /// Obtains the name of the emulator in lowercase.
+    /// Useful for file paths and other cases where.
+    pub fn name_lower() -> String {
+        String::from(NAME)
+    }
+
     /// Obtains the version of the emulator.
     pub fn version() -> String {
         String::from(VERSION)
