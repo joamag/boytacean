@@ -1,9 +1,27 @@
 use std::{
-    io::{Cursor, Read},
+    io::{Cursor, Read, Write},
     mem::size_of,
 };
 
 use crate::error::Error;
+
+#[inline(always)]
+pub fn write_u8(data: &mut Cursor<Vec<u8>>, value: u8) -> Result<(), Error> {
+    data.write_all(&value.to_le_bytes())?;
+    Ok(())
+}
+
+#[inline(always)]
+pub fn write_u16(data: &mut Cursor<Vec<u8>>, value: u16) -> Result<(), Error> {
+    data.write_all(&value.to_le_bytes())?;
+    Ok(())
+}
+
+#[inline(always)]
+pub fn write_u32(data: &mut Cursor<Vec<u8>>, value: u32) -> Result<(), Error> {
+    data.write_all(&value.to_le_bytes())?;
+    Ok(())
+}
 
 #[inline(always)]
 pub fn read_u8(data: &mut Cursor<&[u8]>) -> Result<u8, Error> {

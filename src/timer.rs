@@ -1,9 +1,9 @@
 //! Timer functions and structures.
 
-use std::io::{Cursor, Write};
+use std::io::Cursor;
 
 use boytacean_common::{
-    data::{read_u16, read_u8},
+    data::{read_u16, read_u8, write_u16, write_u8},
     error::Error,
 };
 
@@ -173,15 +173,15 @@ impl BusComponent for Timer {
 impl StateComponent for Timer {
     fn state(&self) -> Result<Vec<u8>, Error> {
         let mut cursor = Cursor::new(vec![]);
-        cursor.write(&self.div.to_le_bytes())?;
-        cursor.write(&self.tima.to_le_bytes())?;
-        cursor.write(&self.tma.to_le_bytes())?;
-        cursor.write(&self.tac.to_le_bytes())?;
-        cursor.write(&self.div_clock.to_le_bytes())?;
-        cursor.write(&self.tima_clock.to_le_bytes())?;
-        cursor.write(&(self.tima_enabled as u8).to_le_bytes())?;
-        cursor.write(&self.tima_ratio.to_le_bytes())?;
-        cursor.write(&(self.int_tima as u8).to_le_bytes())?;
+        write_u8(&mut cursor, self.div)?;
+        write_u8(&mut cursor, self.tima)?;
+        write_u8(&mut cursor, self.tma)?;
+        write_u8(&mut cursor, self.tac)?;
+        write_u16(&mut cursor, self.div_clock)?;
+        write_u16(&mut cursor, self.tima_clock)?;
+        write_u8(&mut cursor, self.tima_enabled as u8)?;
+        write_u16(&mut cursor, self.tima_ratio)?;
+        write_u8(&mut cursor, self.int_tima as u8)?;
         Ok(cursor.into_inner())
     }
 
