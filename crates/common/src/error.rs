@@ -4,6 +4,7 @@
 //! errors that can occur within Boytacean domain.
 
 use std::{
+    backtrace::Backtrace,
     error,
     fmt::{self, Display, Formatter},
     io,
@@ -85,5 +86,30 @@ impl From<FromUtf8Error> for Error {
 impl From<Error> for String {
     fn from(error: Error) -> Self {
         error.description()
+    }
+}
+
+#[derive(Debug)]
+pub struct TraceError {
+    error: Error,
+    backtrace: Backtrace,
+}
+
+impl TraceError {
+    pub fn new(error: Error) -> Self {
+        Self {
+            error,
+            backtrace: Backtrace::capture(),
+        }
+    }
+
+    pub fn backtrace(&self) -> Option<&Backtrace> {
+        Some(&self.backtrace)
+    }
+}
+
+impl Display for TraceError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.error.description())
     }
 }
