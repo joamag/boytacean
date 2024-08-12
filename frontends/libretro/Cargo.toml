@@ -5,7 +5,7 @@ authors = ["João Magalhães <joamag@gmail.com>"]
 description = "A Libretro frontend for Boytacen"
 license = "Apache-2.0"
 keywords = ["gameboy", "emulator", "rust", "libretro"]
-edition = "2018"
+edition = "2021"
 readme = "README.md"
 
 [lib]

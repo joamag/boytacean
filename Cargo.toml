@@ -6,7 +6,7 @@ authors = ["João Magalhães <joamag@gmail.com>"]
 license = "Apache-2.0"
 repository = "https://github.com/joamag/boytacean"
 keywords = ["gameboy", "emulator", "rust"]
-edition = "2018"
+edition = "2021"
 exclude = ["/frontends", "/res/roms", "/res/screens", "/res/videos"]
 build = "build.rs"
 readme = "README.md"
@@ -67,7 +67,7 @@ members = [
     "crates/encoding",
     "crates/hashing"
 ]
-package = { version = "0.10.7", authors = ["João Magalhães <joamag@gmail.com>"], edition = "2018" }
+package = { version = "0.10.7", authors = ["João Magalhães <joamag@gmail.com>"], edition = "2021" }
 
 [package.metadata.docs.rs]
 features = ["wasm", "gen-mock"]

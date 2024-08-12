@@ -4,7 +4,7 @@ description = "Codecs library for Boytacen."
 version = "0.10.7"
 authors = ["João Magalhães <joamag@gmail.com>"]
 license = "Apache-2.0"
-edition = "2018"
+edition = "2021"
 
 [features]
 simd = ["boytacean-hashing/simd"]

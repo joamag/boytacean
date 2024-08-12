@@ -1,5 +1,3 @@
-#![allow(clippy::uninlined_format_args)]
-
 pub mod consts;
 pub mod palettes;
 pub mod structs;

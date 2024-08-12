@@ -1,5 +1,3 @@
-#![allow(clippy::uninlined_format_args)]
-
 //! Error related data structures to be shared and used.
 //!
 //! This module contains the [`Error`] enum, which is used to represent
@@ -35,9 +33,9 @@ impl Error {
             Error::InvalidKey => String::from("Invalid key"),
             Error::RomSize => String::from("Invalid ROM size"),
             Error::IncompatibleBootRom => String::from("Incompatible Boot ROM"),
-            Error::MissingOption(option) => format!("Missing option: {}", option),
-            Error::IoError(message) => format!("IO error: {}", message),
-            Error::InvalidParameter(message) => format!("Invalid parameter: {}", message),
+            Error::MissingOption(option) => format!("Missing option: {option}"),
+            Error::IoError(message) => format!("IO error: {message}"),
+            Error::InvalidParameter(message) => format!("Invalid parameter: {message}"),
             Error::CustomError(message) => String::from(message),
         }
     }

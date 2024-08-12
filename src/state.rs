@@ -1710,12 +1710,12 @@ impl StateManager {
         options: Option<FromGbOptions>,
     ) -> Result<(), Error> {
         let mut file = File::create(file_path)
-            .map_err(|_| Error::CustomError(format!("Failed to create file: {}", file_path)))?;
+            .map_err(|_| Error::CustomError(format!("Failed to create file: {file_path}")))?;
         let data = Self::save(gb, format, options)?;
         file.write_all(&data)
-            .map_err(|_| Error::CustomError(format!("Failed to write to file: {}", file_path)))?;
+            .map_err(|_| Error::CustomError(format!("Failed to write to file: {file_path}")))?;
         file.flush()
-            .map_err(|_| Error::CustomError(format!("Failed to flush file: {}", file_path)))?;
+            .map_err(|_| Error::CustomError(format!("Failed to flush file: {file_path}")))?;
         Ok(())
     }
 
@@ -1726,10 +1726,10 @@ impl StateManager {
         options: Option<ToGbOptions>,
     ) -> Result<(), Error> {
         let mut file = File::open(file_path)
-            .map_err(|_| Error::CustomError(format!("Failed to open file: {}", file_path)))?;
+            .map_err(|_| Error::CustomError(format!("Failed to open file: {file_path}")))?;
         let mut data = vec![];
         file.read_to_end(&mut data)
-            .map_err(|_| Error::CustomError(format!("Failed to read from file: {}", file_path)))?;
+            .map_err(|_| Error::CustomError(format!("Failed to read from file: {file_path}")))?;
         Self::load(&data, gb, format, options)?;
         Ok(())
     }
