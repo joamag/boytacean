@@ -23,6 +23,7 @@ export const TilesGB: FC<TilesGBProps> = ({
     const classes = () =>
         ["tiles-gb", contentBox ? "content-box" : "", ...style].join(" ");
     const intervalsRef = useRef<number>();
+    const canvasRef = useRef<HTMLCanvasElement>(null);
     useEffect(() => {
         return () => {
             if (intervalsRef.current) {
@@ -45,6 +46,7 @@ export const TilesGB: FC<TilesGBProps> = ({
             <Canvas
                 width={128}
                 height={192}
+                canvasRef={canvasRef}
                 scale={2}
                 scaledWidth={width}
                 onCanvas={onCanvas}

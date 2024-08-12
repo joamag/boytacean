@@ -80,6 +80,7 @@ export const AudioGB: FC<AudioGBProps> = ({
         onClick?: (key: string) => void
     ) => {
         const classes = ["audio-wave", ...styles].join(" ");
+        const canvasRef = useRef<HTMLCanvasElement>(null);
         const onCanvas = (structure: CanvasStructure) => {
             const drawWave = () => {
                 const values = audioOutput[key];
@@ -117,6 +118,7 @@ export const AudioGB: FC<AudioGBProps> = ({
                 <Canvas
                     width={range}
                     height={rangeVolume}
+                    canvasRef={canvasRef}
                     onCanvas={onCanvas}
                 />
             </div>
@@ -172,9 +174,9 @@ export const AudioGB: FC<AudioGBProps> = ({
             <div className={classes} onClick={() => onClick && onClick(key)}>
                 <h4>{name}</h4>
                 <Canvas
-                    canvasRef={canvasRef}
                     width={range}
                     height={rangeVolume}
+                    canvasRef={canvasRef}
                     init={false}
                 />
             </div>
