@@ -88,7 +88,7 @@ impl GameBoyMode {
             1 => GameBoyMode::Dmg,
             2 => GameBoyMode::Cgb,
             3 => GameBoyMode::Sgb,
-            _ => panic!("Invalid mode value: {}", value),
+            _ => panic!("Invalid mode value: {value}"),
         }
     }
 
@@ -97,7 +97,7 @@ impl GameBoyMode {
             "dmg" | "DMG" => GameBoyMode::Dmg,
             "cgb" | "CGB" => GameBoyMode::Cgb,
             "sgb" | "SGB" => GameBoyMode::Sgb,
-            _ => panic!("Invalid mode value: {}", value),
+            _ => panic!("Invalid mode value: {value}"),
         }
     }
 
@@ -174,7 +174,7 @@ impl GameBoySpeed {
         match value {
             0 => GameBoySpeed::Normal,
             1 => GameBoySpeed::Double,
-            _ => panic!("Invalid speed value: {}", value),
+            _ => panic!("Invalid speed value: {value}"),
         }
     }
 }

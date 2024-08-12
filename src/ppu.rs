@@ -174,7 +174,7 @@ impl PaletteInfo {
             } else {
                 buffer.push(',');
             }
-            buffer.push_str(format!("{:06x}", color).as_str());
+            buffer.push_str(format!("{color:06x}").as_str());
         }
         buffer
     }
@@ -237,7 +237,7 @@ impl Display for Tile {
             }
             buffer.push('\n');
         }
-        write!(f, "{}", buffer)
+        write!(f, "{buffer}")
     }
 }
 

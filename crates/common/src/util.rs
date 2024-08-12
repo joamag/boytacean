@@ -28,23 +28,23 @@ pub type SharedThread<T> = Arc<Mutex<T>>;
 /// Reads the contents of the file at the given path into
 /// a vector of bytes.
 pub fn read_file(path: &str) -> Result<Vec<u8>, Error> {
-    let mut file = File::open(path)
-        .map_err(|_| Error::CustomError(format!("Failed to open file: {}", path)))?;
+    let mut file =
+        File::open(path).map_err(|_| Error::CustomError(format!("Failed to open file: {path}")))?;
     let mut data = Vec::new();
     file.read_to_end(&mut data)
-        .map_err(|_| Error::CustomError(format!("Failed to read from file: {}", path)))?;
+        .map_err(|_| Error::CustomError(format!("Failed to read from file: {path}")))?;
     Ok(data)
 }
 
 /// Writes the given data to the file at the given path.
 pub fn write_file(path: &str, data: &[u8], flush: Option<bool>) -> Result<(), Error> {
     let mut file = File::create(path)
-        .map_err(|_| Error::CustomError(format!("Failed to create file: {}", path)))?;
+        .map_err(|_| Error::CustomError(format!("Failed to create file: {path}")))?;
     file.write_all(data)
-        .map_err(|_| Error::CustomError(format!("Failed to write to file: {}", path)))?;
+        .map_err(|_| Error::CustomError(format!("Failed to write to file: {path}")))?;
     if flush.unwrap_or(true) {
         file.flush()
-            .map_err(|_| Error::CustomError(format!("Failed to flush file: {}", path)))?;
+            .map_err(|_| Error::CustomError(format!("Failed to flush file: {path}")))?;
     }
     Ok(())
 }
@@ -75,7 +75,7 @@ pub fn capitalize(string: &str) -> String {
 
 pub fn save_bmp(path: &str, pixels: &[u8], width: u32, height: u32) -> Result<(), Error> {
     let file = File::create(path)
-        .map_err(|_| Error::CustomError(format!("Failed to create file: {}", path)))?;
+        .map_err(|_| Error::CustomError(format!("Failed to create file: {path}")))?;
     let mut writer = BufWriter::new(file);
 
     // writes the BMP file header

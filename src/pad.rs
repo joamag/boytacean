@@ -35,7 +35,7 @@ impl PadKey {
             6 => PadKey::Select,
             7 => PadKey::A,
             8 => PadKey::B,
-            _ => panic!("Invalid pad key value: {}", value),
+            _ => panic!("Invalid pad key value: {value}"),
         }
     }
 }

@@ -1,5 +1,3 @@
-#![allow(clippy::uninlined_format_args)]
-
 pub mod audio;
 pub mod data;
 pub mod sdl;
@@ -881,7 +879,7 @@ impl Emulator {
     /// taking into consideration the provided directory path.
     /// The generated file name is `{base}.{suffix}{index}`.
     fn sequence_name(base: &str, index: u8, suffix: &str, dir_path: &str) -> String {
-        let file_name = format!("{}.{}{}", base, suffix, index);
+        let file_name = format!("{base}.{suffix}{index}");
         let mut file_buf = PathBuf::from(dir_path);
         file_buf.push(file_name);
         file_buf.to_str().unwrap().to_string()
@@ -892,14 +890,14 @@ impl Emulator {
     /// same directory.
     fn best_name(base: &str, ext: &str, dir_path: &str) -> String {
         let mut index = 0_usize;
-        let mut name = format!("{}.{}", base, ext);
+        let mut name = format!("{base}.{ext}");
 
         let mut path_buf = PathBuf::from(dir_path);
         path_buf.push(&name);
 
         while path_buf.exists() {
             index += 1;
-            name = format!("{}-{}.{}", base, index, ext);
+            name = format!("{base}-{index}.{ext}");
             path_buf = PathBuf::from(dir_path);
             path_buf.push(&name);
         }
@@ -1100,8 +1098,7 @@ fn build_device(device: &str) -> Result<Box<dyn SerialDevice>, Error> {
             Ok(printer)
         }
         _ => Err(Error::InvalidParameter(format!(
-            "Unsupported device: {}",
-            device
+            "Unsupported device: {device}"
         ))),
     }
 }

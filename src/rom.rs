@@ -531,8 +531,7 @@ impl Cartridge {
             RomType::Mbc5RumbleRamBattery => &MBC5,
             rom_type => {
                 return Err(Error::CustomError(format!(
-                    "No MBC controller available for {}",
-                    rom_type
+                    "No MBC controller available for {rom_type}"
                 )))
             }
         })

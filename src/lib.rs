@@ -1,4 +1,3 @@
-#![allow(clippy::uninlined_format_args)]
 #![cfg_attr(feature = "simd", feature(portable_simd))]
 
 pub mod apu;
