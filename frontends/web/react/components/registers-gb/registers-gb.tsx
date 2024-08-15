@@ -1,4 +1,4 @@
-import React, { FC, useEffect, useRef, useState } from "react";
+import React, { FC, useEffect, useState } from "react";
 import { GameBoySpeed } from "../../../lib/boytacean";
 
 import "./registers-gb.css";
@@ -21,7 +21,6 @@ export const RegistersGB: FC<RegistersGBProps> = ({
         {}
     );
     const [speed, setSpeed] = useState<GameBoySpeed>(GameBoySpeed.Normal);
-    const intervalsRef = useRef<number>();
     useEffect(() => {
         const updateValues = () => {
             const registers = getRegisters();
@@ -29,14 +28,14 @@ export const RegistersGB: FC<RegistersGBProps> = ({
             setRegisters(registers);
             setSpeed(speed);
         };
-        setInterval(() => updateValues(), interval);
+
         updateValues();
+
+        const updateInterval = setInterval(() => updateValues(), interval);
         return () => {
-            if (intervalsRef.current) {
-                clearInterval(intervalsRef.current);
-            }
+            clearInterval(updateInterval);
         };
-    }, []);
+    }, [getRegisters, getSpeed, interval]);
     const renderRegister = (
         key: string,
         value?: number,

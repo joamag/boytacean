@@ -1,4 +1,4 @@
-import React, { FC, useEffect, useRef, useState } from "react";
+import React, { FC, useCallback, useEffect, useRef, useState } from "react";
 import { Canvas, CanvasStructure, PixelFormat } from "emukit";
 import { WebglPlot, WebglLine, ColorRGBA } from "webgl-plot";
 import { GameboyEmulator } from "../../../ts";
@@ -15,7 +15,12 @@ type AudioGBProps = {
     rangeVolume?: number;
     engine?: "webgl" | "canvas";
     style?: string[];
-    renderWave?: (name: string, key: string, styles?: string[]) => JSX.Element;
+    renderWave?: (
+        name: string,
+        key: string,
+        styles?: string[],
+        onClick?: (key: string) => void
+    ) => JSX.Element;
 };
 
 export const AudioGB: FC<AudioGBProps> = ({
@@ -46,44 +51,151 @@ export const AudioGB: FC<AudioGBProps> = ({
     const [ch4Enabled, setCh4Enabled] = useState(
         emulator.instance?.audio_ch4_enabled() ?? true
     );
-    const intervalsRef = useRef<number>();
-    const intervalsExtraRef = useRef<number>();
 
-    useEffect(() => {
-        const updateAudioOutput = () => {
-            const _audioOutput = getAudioOutput();
-            for (const [key, value] of Object.entries(_audioOutput)) {
-                const values = audioOutput[key] ?? new Array(range).fill(0);
-                values.push(value);
-                if (values.length > range) {
-                    values.shift();
+    useEffect(
+        () => {
+            const updateAudioOutput = () => {
+                const _audioOutput = getAudioOutput();
+                for (const [key, value] of Object.entries(_audioOutput)) {
+                    const values = audioOutput[key] ?? new Array(range).fill(0);
+                    values.push(value);
+                    if (values.length > range) {
+                        values.shift();
+                    }
+                    audioOutput[key] = values;
                 }
-                audioOutput[key] = values;
-            }
-            setAudioOutput(audioOutput);
-        };
-        setInterval(() => updateAudioOutput(), interval);
-        updateAudioOutput();
-        return () => {
-            if (intervalsRef.current) {
-                clearInterval(intervalsRef.current);
-            }
-            if (intervalsExtraRef.current) {
-                clearInterval(intervalsExtraRef.current);
-            }
-        };
-    }, []);
+                setAudioOutput(audioOutput);
+            };
+
+            updateAudioOutput();
+
+            const audioInterval = setInterval(
+                () => updateAudioOutput(),
+                interval
+            );
+            return () => {
+                clearInterval(audioInterval);
+            };
+        },
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [audioOutput, interval, range]
+    );
+
     const renderAudioWave = (
         name: string,
         key: string,
-        styles: string[] = [],
+        styles?: string[],
         onClick?: (key: string) => void
-    ) => {
-        const classes = ["audio-wave", ...styles].join(" ");
-        const canvasRef = useRef<HTMLCanvasElement>(null);
-        const onCanvas = (structure: CanvasStructure) => {
+    ): JSX.Element => {
+        if (renderWave) {
+            return renderWave(name, key, styles, onClick);
+        }
+        if (engine === "canvas") {
+            return (
+                <AudioWave
+                    key={key}
+                    name={name}
+                    index={key}
+                    audioOutput={audioOutput}
+                    drawInterval={drawInterval}
+                    color={color}
+                    range={range}
+                    rangeVolume={rangeVolume}
+                    styles={styles}
+                    onClick={onClick}
+                />
+            );
+        }
+        return (
+            <AudioWaveWebGL
+                key={key}
+                name={name}
+                index={key}
+                audioOutput={audioOutput}
+                drawInterval={drawInterval}
+                color={color}
+                range={range}
+                rangeVolume={rangeVolume}
+                styles={styles}
+                onClick={onClick}
+            />
+        );
+    };
+
+    return (
+        <div className={classes()}>
+            <div className="section">
+                {renderAudioWave("Master", "master", ["master"])}
+                {renderAudioWave(
+                    "CH1",
+                    "ch1",
+                    ["ch1", "selector", ch1Enabled ? "" : "disabled"],
+                    () => {
+                        emulator.instance?.set_audio_ch1_enabled(!ch1Enabled);
+                        setCh1Enabled(!ch1Enabled);
+                    }
+                )}
+                {renderAudioWave(
+                    "CH2",
+                    "ch2",
+                    ["ch2", "selector", ch2Enabled ? "" : "disabled"],
+                    () => {
+                        emulator.instance?.set_audio_ch2_enabled(!ch2Enabled);
+                        setCh2Enabled(!ch2Enabled);
+                    }
+                )}
+                {renderAudioWave(
+                    "CH3",
+                    "ch3",
+                    ["ch3", "selector", ch3Enabled ? "" : "disabled"],
+                    () => {
+                        emulator.instance?.set_audio_ch3_enabled(!ch3Enabled);
+                        setCh3Enabled(!ch3Enabled);
+                    }
+                )}
+                {renderAudioWave(
+                    "CH4",
+                    "ch4",
+                    ["ch4", "selector", ch4Enabled ? "" : "disabled"],
+                    () => {
+                        emulator.instance?.set_audio_ch4_enabled(!ch4Enabled);
+                        setCh4Enabled(!ch4Enabled);
+                    }
+                )}
+            </div>
+        </div>
+    );
+};
+
+type AudioWaveProps = {
+    name: string;
+    index: string;
+    audioOutput: Record<string, number[]>;
+    drawInterval?: number;
+    color?: number;
+    range?: number;
+    rangeVolume?: number;
+    styles?: string[];
+    onClick?: (key: string) => void;
+};
+
+const AudioWave: FC<AudioWaveProps> = ({
+    name,
+    index,
+    audioOutput,
+    drawInterval = 1000 / 60,
+    color = 0x58b09cff,
+    range = 128,
+    rangeVolume = 32,
+    styles = [],
+    onClick
+}) => {
+    const classes = ["audio-wave", ...styles].join(" ");
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const onCanvas = useCallback(
+        (structure: CanvasStructure) => {
             const drawWave = () => {
-                const values = audioOutput[key];
+                const values = audioOutput[index];
                 if (!values) {
                     return;
                 }
@@ -106,126 +218,103 @@ export const AudioGB: FC<AudioGBProps> = ({
                     0
                 );
             };
+
             drawWave();
-            intervalsExtraRef.current = setInterval(
-                () => drawWave(),
-                drawInterval
-            );
-        };
-        return (
-            <div className={classes} onClick={() => onClick && onClick(key)}>
-                <h4>{name}</h4>
-                <Canvas
-                    width={range}
-                    height={rangeVolume}
-                    canvasRef={canvasRef}
-                    onCanvas={onCanvas}
-                />
-            </div>
-        );
-    };
-    const renderAudioWaveWgl = (
-        name: string,
-        key: string,
-        styles: string[] = [],
-        onClick?: (key: string) => void
-    ) => {
-        const canvasRef = useRef<HTMLCanvasElement>(null);
-        const classes = ["audio-wave", ...styles].join(" ");
-        useEffect(() => {
-            if (!canvasRef.current) return;
 
-            // converts the canvas to the expected size according
-            // to the device pixel ratio value
-            const devicePixelRatio = window.devicePixelRatio || 1;
-            canvasRef.current.width = range * devicePixelRatio;
-            canvasRef.current.height = rangeVolume * devicePixelRatio;
-
-            // creates the WGL Plot object with the canvas element
-            // that is associated with the current audio wave
-            const wglPlot = new WebglPlot(canvasRef.current);
-
-            const colorRgba = new ColorRGBA(...intToColor2(color));
-            const line = new WebglLine(colorRgba, range);
-
-            line.arrangeX();
-            wglPlot.addLine(line);
-
-            const drawWave = () => {
-                const values = audioOutput[key];
-                if (!values) {
-                    return;
-                }
-
-                values.forEach((value, index) => {
-                    const valueN = Math.min(value, rangeVolume - 1);
-                    line.setY(index, valueN / rangeVolume - 1);
-                });
-
-                wglPlot.update();
+            const interval = setInterval(() => drawWave(), drawInterval);
+            return () => {
+                clearInterval(interval);
             };
-            drawWave();
-            intervalsExtraRef.current = setInterval(
-                () => drawWave(),
-                drawInterval
-            );
-        }, [canvasRef]);
-        return (
-            <div className={classes} onClick={() => onClick && onClick(key)}>
-                <h4>{name}</h4>
-                <Canvas
-                    width={range}
-                    height={rangeVolume}
-                    canvasRef={canvasRef}
-                    init={false}
-                />
-            </div>
-        );
-    };
-    let renderMethod =
-        engine === "webgl" ? renderAudioWaveWgl : renderAudioWave;
-    renderMethod = renderWave ?? renderMethod;
+        },
+        [index, audioOutput, drawInterval, color, range, rangeVolume]
+    );
     return (
-        <div className={classes()}>
-            <div className="section">
-                {renderMethod("Master", "master", ["master"])}
-                {renderMethod(
-                    "CH1",
-                    "ch1",
-                    ["selector", ch1Enabled ? "" : "disabled"],
-                    () => {
-                        emulator.instance?.set_audio_ch1_enabled(!ch1Enabled);
-                        setCh1Enabled(!ch1Enabled);
-                    }
-                )}
-                {renderMethod(
-                    "CH2",
-                    "ch2",
-                    ["selector", ch2Enabled ? "" : "disabled"],
-                    () => {
-                        emulator.instance?.set_audio_ch2_enabled(!ch2Enabled);
-                        setCh2Enabled(!ch2Enabled);
-                    }
-                )}
-                {renderMethod(
-                    "CH3",
-                    "ch3",
-                    ["selector", ch3Enabled ? "" : "disabled"],
-                    () => {
-                        emulator.instance?.set_audio_ch3_enabled(!ch3Enabled);
-                        setCh3Enabled(!ch3Enabled);
-                    }
-                )}
-                {renderMethod(
-                    "CH4",
-                    "ch4",
-                    ["selector", ch4Enabled ? "" : "disabled"],
-                    () => {
-                        emulator.instance?.set_audio_ch4_enabled(!ch4Enabled);
-                        setCh4Enabled(!ch4Enabled);
-                    }
-                )}
-            </div>
+        <div className={classes} onClick={() => onClick && onClick(index)}>
+            <h4>{name}</h4>
+            <Canvas
+                width={range}
+                height={rangeVolume}
+                canvasRef={canvasRef}
+                onCanvas={onCanvas}
+            />
+        </div>
+    );
+};
+
+type AudioWaveWebGLProps = {
+    name: string;
+    index: string;
+    audioOutput: Record<string, number[]>;
+    drawInterval?: number;
+    color?: number;
+    range?: number;
+    rangeVolume?: number;
+    styles?: string[];
+    onClick?: (key: string) => void;
+};
+
+const AudioWaveWebGL: FC<AudioWaveWebGLProps> = ({
+    name,
+    index,
+    audioOutput,
+    drawInterval = 1000 / 60,
+    color = 0x58b09cff,
+    range = 128,
+    rangeVolume = 32,
+    styles = [],
+    onClick
+}) => {
+    const classes = ["audio-wave", ...styles].join(" ");
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    useEffect(() => {
+        if (!canvasRef.current) return;
+
+        // converts the canvas to the expected size according
+        // to the device pixel ratio value
+        const devicePixelRatio = window.devicePixelRatio || 1;
+        canvasRef.current.width = range * devicePixelRatio;
+        canvasRef.current.height = rangeVolume * devicePixelRatio;
+
+        // creates the WGL Plot object with the canvas element
+        // that is associated with the current audio wave
+        const wglPlot = new WebglPlot(canvasRef.current);
+
+        const colorRgba = new ColorRGBA(...intToColor2(color));
+        const line = new WebglLine(colorRgba, range);
+
+        line.arrangeX();
+        wglPlot.addLine(line);
+
+        const drawWave = () => {
+            const values = audioOutput[index];
+            if (!values) {
+                return;
+            }
+
+            values.forEach((value, index) => {
+                const valueN = Math.min(value, rangeVolume - 1);
+                line.setY(index, valueN / rangeVolume - 1);
+            });
+
+            wglPlot.update();
+        };
+
+        drawWave();
+
+        const interval = setInterval(() => drawWave(), drawInterval);
+        return () => {
+            clearInterval(interval);
+        };
+    }, [audioOutput, index, drawInterval, color, range, rangeVolume]);
+    return (
+        <div className={classes} onClick={() => onClick && onClick(index)}>
+            <h4>{name}</h4>
+            <Canvas
+                width={range}
+                height={rangeVolume}
+                canvasRef={canvasRef}
+                init={false}
+            />
         </div>
     );
 };

@@ -56,7 +56,7 @@ export const SerialSection: FC<SerialSectionProps> = ({
             emulator.unbind("logger", onLogger);
             emulator.unbind("printer", onPrinter);
         };
-    }, []);
+    }, [emulator]);
 
     const onDeviceChange = (option: string) => {
         emulator.loadSerialDevice(option as SerialDevice);
