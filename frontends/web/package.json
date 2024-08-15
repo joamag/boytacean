@@ -26,6 +26,7 @@
         "buffer": "^6.0.3",
         "emukit": "^0.10.7",
         "eslint": "^8.57.0",
+        "eslint-plugin-react-hooks": "^4.6.2",
         "jszip": "^3.10.1",
         "nodemon": "^3.1.4",
         "parcel": "^2.12.0",

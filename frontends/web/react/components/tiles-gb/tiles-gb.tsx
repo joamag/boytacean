@@ -1,4 +1,4 @@
-import React, { FC, useEffect, useRef } from "react";
+import React, { FC, useCallback, useEffect, useRef } from "react";
 import { Canvas, CanvasStructure, PixelFormat } from "emukit";
 
 import "./tiles-gb.css";
@@ -31,16 +31,20 @@ export const TilesGB: FC<TilesGBProps> = ({
             }
         };
     }, []);
-    const onCanvas = (structure: CanvasStructure) => {
-        const drawTiles = () => {
-            for (let index = 0; index < tileCount; index++) {
-                const pixels = getTile(index);
-                drawTile(index, pixels, structure);
-            }
-        };
-        drawTiles();
-        intervalsRef.current = setInterval(() => drawTiles(), interval);
-    };
+    const onCanvas = useCallback(
+        (structure: CanvasStructure) => {
+            const drawTiles = () => {
+                for (let index = 0; index < tileCount; index++) {
+                    const pixels = getTile(index);
+                    drawTile(index, pixels, structure);
+                }
+            };
+            drawTiles();
+            intervalsRef.current = setInterval(() => drawTiles(), interval);
+        },
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [tileCount, interval]
+    );
     return (
         <div className={classes()}>
             <Canvas

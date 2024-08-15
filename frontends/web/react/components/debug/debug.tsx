@@ -90,7 +90,7 @@ const DebugSettingsContent: FC<EmulatorProps> = ({ emulator }) => {
         return () => {
             emulator.unbind("audio-state", onAudioState);
         };
-    }, []);
+    }, [emulator]);
 
     const onPpuChange = (option: string) => {
         emulator.instance?.set_ppu_enabled(option === "on");
