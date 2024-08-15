@@ -21,21 +21,25 @@ export const RegistersGB: FC<RegistersGBProps> = ({
         {}
     );
     const [speed, setSpeed] = useState<GameBoySpeed>(GameBoySpeed.Normal);
-    useEffect(() => {
-        const updateValues = () => {
-            const registers = getRegisters();
-            const speed = getSpeed();
-            setRegisters(registers);
-            setSpeed(speed);
-        };
+    useEffect(
+        () => {
+            const updateValues = () => {
+                const registers = getRegisters();
+                const speed = getSpeed();
+                setRegisters(registers);
+                setSpeed(speed);
+            };
 
-        updateValues();
+            updateValues();
 
-        const updateInterval = setInterval(() => updateValues(), interval);
-        return () => {
-            clearInterval(updateInterval);
-        };
-    }, [getRegisters, getSpeed, interval]);
+            const updateInterval = setInterval(() => updateValues(), interval);
+            return () => {
+                clearInterval(updateInterval);
+            };
+        },
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [interval]
+    );
     const renderRegister = (
         key: string,
         value?: number,
