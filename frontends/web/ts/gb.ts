@@ -988,8 +988,17 @@ console.image = (url: string, size = 80) => {
 
 const wasm = async (setHook = true) => {
     // waits for the WASM module to be (hard) re-loaded
-    // this should be an expensive operation
-    await _wasm({ module_or_path: require("../lib/boytacean_bg.wasm") });
+    // this should be an expensive operation, uses conditional
+    // logic to determine if the new set of arguments for
+    // wasm-bindgen should be used
+    const isNeo = _wasm
+        .toString()
+        .startsWith("async function __wbg_init(module_or_path");
+    if (isNeo) {
+        await _wasm({ module_or_path: require("../lib/boytacean_bg.wasm") });
+    } else {
+        await _wasm();
+    }
 
     // in case the set hook flag is set, then tries to
     // set the panic hook for the WASM module, this call
