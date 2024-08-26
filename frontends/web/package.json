@@ -24,7 +24,7 @@
         "@typescript-eslint/eslint-plugin": "^7.18.0",
         "@typescript-eslint/parser": "^7.18.0",
         "buffer": "^6.0.3",
-        "emukit": "^0.10.7",
+        "emukit": "^0.10.8",
         "eslint": "^8.57.0",
         "eslint-plugin-react-hooks": "^4.6.2",
         "jszip": "^3.10.1",
