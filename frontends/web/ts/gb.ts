@@ -33,7 +33,7 @@ import {
 
 import {
     Cartridge,
-    default as _wasm,
+    default as wasm,
     GameBoy,
     GameBoyMode,
     GameBoySpeed,
@@ -172,7 +172,7 @@ export class GameboyEmulator extends EmulatorLogic implements Emulator {
     async init() {
         // initializes the WASM module, this is required
         // so that the global symbols become available
-        await wasm();
+        await __wasm();
     }
 
     /**
@@ -247,7 +247,7 @@ export class GameboyEmulator extends EmulatorLogic implements Emulator {
     }
 
     async hardReset() {
-        await wasm(false);
+        await __wasm(false);
         await this.boot({
             engine: this._engine || "auto",
             restore: false,
@@ -986,10 +986,10 @@ console.image = (url: string, size = 80) => {
     console.log("%c     ", style);
 };
 
-const wasm = async (setHook = true) => {
+const __wasm = async (setHook = true) => {
     // waits for the WASM module to be (hard) re-loaded
     // this should be an expensive operation
-    await _wasm();
+    await wasm();
 
     // in case the set hook flag is set, then tries to
     // set the panic hook for the WASM module, this call
