@@ -1,4 +1,4 @@
-import React, { FC, useCallback, useEffect, useRef } from "react";
+import React, { FC, useCallback, useEffect, useMemo, useRef } from "react";
 import { Canvas, CanvasStructure, PixelFormat } from "emukit";
 
 import "./tiles-gb.css";
@@ -20,8 +20,10 @@ export const TilesGB: FC<TilesGBProps> = ({
     interval = 1000,
     style = []
 }) => {
-    const classes = () =>
-        ["tiles-gb", contentBox ? "content-box" : "", ...style].join(" ");
+    const classes = useMemo(
+        () => ["tiles-gb", contentBox ? "content-box" : "", ...style].join(" "),
+        [contentBox, style]
+    );
     const intervalsRef = useRef<number>();
     const canvasRef = useRef<HTMLCanvasElement>(null);
     useEffect(() => {
@@ -46,7 +48,7 @@ export const TilesGB: FC<TilesGBProps> = ({
         [tileCount, interval]
     );
     return (
-        <div className={classes()}>
+        <div className={classes}>
             <Canvas
                 width={128}
                 height={192}

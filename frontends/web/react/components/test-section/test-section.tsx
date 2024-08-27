@@ -1,4 +1,4 @@
-import React, { FC } from "react";
+import React, { FC, useMemo } from "react";
 import { TextInput } from "emukit";
 
 import "./test-section.css";
@@ -8,9 +8,12 @@ type TestSectionProps = {
 };
 
 export const TestSection: FC<TestSectionProps> = ({ style = [] }) => {
-    const classes = () => ["test-section", ...style].join(" ");
+    const classes = useMemo(
+        () => ["test-section", ...style].join(" "),
+        [style]
+    );
     return (
-        <div className={classes()}>
+        <div className={classes}>
             <TextInput size="small" placeholder="XXX-XXX-XXX" />
         </div>
     );

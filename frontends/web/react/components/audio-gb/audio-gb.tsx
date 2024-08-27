@@ -1,4 +1,11 @@
-import React, { FC, useCallback, useEffect, useRef, useState } from "react";
+import React, {
+    FC,
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState
+} from "react";
 import { Canvas, CanvasStructure, PixelFormat } from "emukit";
 import { WebglPlot, WebglLine, ColorRGBA } from "webgl-plot";
 import { GameboyEmulator } from "../../../ts";
@@ -35,7 +42,7 @@ export const AudioGB: FC<AudioGBProps> = ({
     style = [],
     renderWave
 }) => {
-    const classes = () => ["audio-gb", ...style].join(" ");
+    const classes = useMemo(() => ["audio-gb", ...style].join(" "), [style]);
     const [audioOutput, setAudioOutput] = useState<Record<string, number[]>>(
         {}
     );
@@ -123,7 +130,7 @@ export const AudioGB: FC<AudioGBProps> = ({
     };
 
     return (
-        <div className={classes()}>
+        <div className={classes}>
             <div className="section">
                 {renderAudioWave("Master", "master", ["master"])}
                 {renderAudioWave(
@@ -190,7 +197,10 @@ const AudioWave: FC<AudioWaveProps> = ({
     styles = [],
     onClick
 }) => {
-    const classes = ["audio-wave", ...styles].join(" ");
+    const classes = useMemo(
+        () => ["audio-wave", ...styles].join(" "),
+        [styles]
+    );
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const onCanvas = useCallback(
         (structure: CanvasStructure) => {
@@ -264,7 +274,10 @@ const AudioWaveWebGL: FC<AudioWaveWebGLProps> = ({
     styles = [],
     onClick
 }) => {
-    const classes = ["audio-wave", ...styles].join(" ");
+    const classes = useMemo(
+        () => ["audio-wave", ...styles].join(" "),
+        [styles]
+    );
     const canvasRef = useRef<HTMLCanvasElement>(null);
     useEffect(() => {
         if (!canvasRef.current) return;

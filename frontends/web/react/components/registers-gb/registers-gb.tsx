@@ -1,4 +1,4 @@
-import React, { FC, useEffect, useState } from "react";
+import React, { FC, useEffect, useMemo, useState } from "react";
 import { GameBoySpeed } from "../../../lib/boytacean";
 
 import "./registers-gb.css";
@@ -16,7 +16,10 @@ export const RegistersGB: FC<RegistersGBProps> = ({
     interval = 50,
     style = []
 }) => {
-    const classes = () => ["registers-gb", ...style].join(" ");
+    const classes = useMemo(
+        () => ["registers-gb", ...style].join(" "),
+        [style]
+    );
     const [registers, setRegisters] = useState<Record<string, string | number>>(
         {}
     );
@@ -46,11 +49,11 @@ export const RegistersGB: FC<RegistersGBProps> = ({
         size = 2,
         styles: string[] = []
     ) => {
-        const classes = ["register", ...styles].join(" ");
+        const classes = () => ["register", ...styles].join(" ");
         const valueS =
             value?.toString(16).toUpperCase().padStart(size, "0") ?? value;
         return (
-            <div className={classes}>
+            <div className={classes()}>
                 <span className="register-key">{key}</span>
                 <span className="register-value">
                     {valueS ? `0x${valueS}` : "-"}
@@ -59,7 +62,7 @@ export const RegistersGB: FC<RegistersGBProps> = ({
         );
     };
     return (
-        <div className={classes()}>
+        <div className={classes}>
             <div className="section">
                 <h4>CPU {speed == GameBoySpeed.Double ? "2x" : ""}</h4>
                 {renderRegister("PC", registers.pc as number, 4)}
