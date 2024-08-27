@@ -1,9 +1,10 @@
-import React, { FC, useCallback, useEffect, useState } from "react";
 import { ButtonSwitch, Info, Pair } from "emukit";
+import React, { FC, useCallback, useEffect, useState } from "react";
+
+import { GameboyEmulator } from "../../../ts";
 import { AudioGB } from "../audio-gb/audio-gb";
 import { RegistersGB } from "../registers-gb/registers-gb";
 import { TilesGB } from "../tiles-gb/tiles-gb";
-import { GameboyEmulator } from "../../../ts";
 
 import "./debug.css";
 

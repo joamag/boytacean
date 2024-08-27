@@ -1,3 +1,4 @@
+import { Canvas, CanvasStructure, PixelFormat } from "emukit";
 import React, {
     FC,
     useCallback,
@@ -6,8 +7,8 @@ import React, {
     useRef,
     useState
 } from "react";
-import { Canvas, CanvasStructure, PixelFormat } from "emukit";
-import { WebglPlot, WebglLine, ColorRGBA } from "webgl-plot";
+import { ColorRGBA, WebglLine, WebglPlot } from "webgl-plot";
+
 import { GameboyEmulator } from "../../../ts";
 
 import "./audio-gb.css";

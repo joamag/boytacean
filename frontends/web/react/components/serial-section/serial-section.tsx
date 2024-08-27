@@ -1,5 +1,6 @@
-import React, { FC, useEffect, useMemo, useRef, useState } from "react";
 import { ButtonSwitch, Emulator, Info, Pair, PanelTab } from "emukit";
+import React, { FC, useEffect, useMemo, useRef, useState } from "react";
+
 import { GameboyEmulator, SerialDevice, bufferToDataUrl } from "../../../ts";
 
 import "./serial-section.css";

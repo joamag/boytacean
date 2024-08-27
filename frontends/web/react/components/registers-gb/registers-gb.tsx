@@ -1,4 +1,5 @@
 import React, { FC, useEffect, useMemo, useState } from "react";
+
 import { GameBoySpeed } from "../../../lib/boytacean";
 
 import "./registers-gb.css";

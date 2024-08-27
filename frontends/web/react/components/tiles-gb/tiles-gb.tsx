@@ -1,5 +1,5 @@
-import React, { FC, useCallback, useEffect, useMemo, useRef } from "react";
 import { Canvas, CanvasStructure, PixelFormat } from "emukit";
+import React, { FC, useCallback, useEffect, useMemo, useRef } from "react";
 
 import "./tiles-gb.css";
 

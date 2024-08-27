@@ -1,5 +1,5 @@
-import React, { FC, useMemo } from "react";
 import { TextInput } from "emukit";
+import React, { FC, useMemo } from "react";
 
 import "./test-section.css";
 

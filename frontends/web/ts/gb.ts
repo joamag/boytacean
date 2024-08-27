@@ -1,4 +1,3 @@
-import { loadAsync } from "jszip";
 import {
     AudioSpecs,
     base64ToBuffer,
@@ -20,7 +19,20 @@ import {
     SectionInfo,
     Size
 } from "emukit";
-import { PALETTES, PALETTES_MAP } from "./palettes";
+import { loadAsync } from "jszip";
+
+import {
+    default as _wasm,
+    Cartridge,
+    ClockFrame,
+    GameBoy,
+    GameBoyMode,
+    GameBoySpeed,
+    Info,
+    PadKey,
+    StateManager
+} from "../lib/boytacean";
+import info from "../package.json";
 import {
     DebugAudio,
     DebugGeneral,
@@ -31,18 +43,7 @@ import {
     TestSection
 } from "../react";
 
-import {
-    Cartridge,
-    default as _wasm,
-    GameBoy,
-    GameBoyMode,
-    GameBoySpeed,
-    Info,
-    PadKey,
-    StateManager,
-    ClockFrame
-} from "../lib/boytacean";
-import info from "../package.json";
+import { PALETTES, PALETTES_MAP } from "./palettes";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 declare const require: any;

@@ -1,4 +1,5 @@
 import { startApp } from "emukit";
+
 import { GameboyEmulator } from "./ts";
 
 const BACKGROUNDS = [
