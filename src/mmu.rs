@@ -418,7 +418,7 @@ impl Mmu {
             // 0xFF4F - VRAM Bank Select (CGB only)
             0xff4f => self.ppu.read(addr),
 
-            // 0xFF50 - Boot active flag
+            // 0xFF50 - BOOT: Boot active flag
             0xff50 => u8::from(!self.boot_active),
 
             // 0xFF51-0xFF55 - VRAM DMA (HDMA) (CGB only)
@@ -518,7 +518,7 @@ impl Mmu {
             // 0xFF4F - VRAM Bank Select (CGB only)
             0xff4f => self.ppu.write(addr, value),
 
-            // 0xFF50 - Boot active flag
+            // 0xFF50 - BOOT: Boot active flag
             0xff50 => self.boot_active = value == 0x00,
 
             // 0xFF51-0xFF55 - VRAM DMA (HDMA) (CGB only)
@@ -587,7 +587,7 @@ impl Mmu {
         }
     }
 
-    pub fn read_many_unsafe(&mut self, addr: u16, count: u16) -> Vec<u8> {
+    pub fn read_many_raw(&mut self, addr: u16, count: u16) -> Vec<u8> {
         let mut data: Vec<u8> = vec![];
 
         for index in 0..count {
@@ -598,7 +598,7 @@ impl Mmu {
         data
     }
 
-    pub fn write_many_unsafe(&mut self, addr: u16, data: &[u8]) {
+    pub fn write_many_raw(&mut self, addr: u16, data: &[u8]) {
         for (index, byte) in data.iter().enumerate() {
             self.write_raw(addr + index as u16, *byte)
         }
