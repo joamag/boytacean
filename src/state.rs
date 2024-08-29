@@ -1524,6 +1524,10 @@ impl State for BessCore {
         gb.mmu().write_many(0xfe00, &self.oam.buffer);
         gb.mmu().write_many(0xff80, &self.hram.buffer);
 
+        // need to disable (OAM) DMA transfer to avoid unwanted
+        // DMA transfers when loading the state
+        gb.dma().set_active_dma(false);
+
         if gb.is_cgb() {
             // updates the internal palettes for the CGB with the values
             // stored in the BESS state
@@ -1540,7 +1544,7 @@ impl State for BessCore {
                 GameBoySpeed::Normal
             });
 
-            // need to disable DMA transfer to avoid unwanted
+            // need to disable HDMA transfer to avoid unwanted
             // DMA transfers when loading the state
             gb.dma().set_active_hdma(false);
         }
