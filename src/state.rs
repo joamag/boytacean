@@ -1476,7 +1476,7 @@ impl State for BessCore {
             // The loading of the registers should be done in a much
             // more manual way like SameBoy does here:
             // https://github.com/LIJI32/SameBoy/blob/7e6f1f866e89430adaa6be839aecc4a2ccabd69c/Core/save_state.c#L673
-            gb.mmu().read_many(0xff00, 128).try_into().unwrap(),
+            gb.mmu().read_many_raw(0xff00, 128).try_into().unwrap(),
         );
         core.ram.fill_buffer(gb.mmu().ram());
         core.vram.fill_buffer(gb.ppu().vram_device());
@@ -1524,9 +1524,10 @@ impl State for BessCore {
         gb.mmu().write_many(0xfe00, &self.oam.buffer);
         gb.mmu().write_many(0xff80, &self.hram.buffer);
 
-        // need to disable (OAM) DMA transfer to avoid unwanted
-        // DMA transfers when loading the state
+        // disables a series of operations that would otherwise be
+        // triggered by the writing of associated registers
         gb.dma().set_active_dma(false);
+        gb.serial().set_transferring(false);
 
         if gb.is_cgb() {
             // updates the internal palettes for the CGB with the values

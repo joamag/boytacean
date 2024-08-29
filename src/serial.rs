@@ -182,6 +182,14 @@ impl Serial {
         self.set_int_serial(false);
     }
 
+    pub fn transferring(&self) -> bool {
+        self.transferring
+    }
+
+    pub fn set_transferring(&mut self, value: bool) {
+        self.transferring = value;
+    }
+
     pub fn device(&self) -> &dyn SerialDevice {
         self.device.as_ref()
     }

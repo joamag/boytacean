@@ -20,6 +20,28 @@ pub const OBP1_ADDR: u16 = 0xff49;
 pub const WX_ADDR: u16 = 0xff4a;
 pub const WY_ADDR: u16 = 0xff4b;
 
+// APU registers
+pub const NR10_ADDR: u16 = 0xff10;
+pub const NR11_ADDR: u16 = 0xff11;
+pub const NR12_ADDR: u16 = 0xff12;
+pub const NR13_ADDR: u16 = 0xff13;
+pub const NR14_ADDR: u16 = 0xff14;
+pub const NR20_ADDR: u16 = 0xff15;
+pub const NR21_ADDR: u16 = 0xff16;
+pub const NR22_ADDR: u16 = 0xff17;
+pub const NR23_ADDR: u16 = 0xff18;
+pub const NR24_ADDR: u16 = 0xff19;
+pub const NR30_ADDR: u16 = 0xff1a;
+pub const NR31_ADDR: u16 = 0xff1b;
+pub const NR32_ADDR: u16 = 0xff1c;
+pub const NR33_ADDR: u16 = 0xff1d;
+pub const NR34_ADDR: u16 = 0xff1e;
+pub const NR40_ADDR: u16 = 0xff1f;
+pub const NR41_ADDR: u16 = 0xff20;
+pub const NR42_ADDR: u16 = 0xff21;
+pub const NR43_ADDR: u16 = 0xff22;
+pub const NR44_ADDR: u16 = 0xff23;
+
 // DMA registers
 pub const DMA_ADDR: u16 = 0xff46;
 pub const HDMA1_ADDR: u16 = 0xff51;
