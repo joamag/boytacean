@@ -13,7 +13,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+*
+
+### Fixed
+
+*
+
+## [0.10.8] - 2024-08-30
+
+### Changed
+
 * Memoised some of the class generation process
+* Updated Emukit version, for faster performance
 
 ### Fixed
 
