@@ -1107,7 +1107,7 @@ impl BessName {
     }
 
     pub fn format_name(name: &str, version: &str) -> String {
-        format!("{} v{}", name, version)
+        format!("{name} v{version}")
     }
 
     pub fn build_name(&mut self, name: &str, version: &str) {

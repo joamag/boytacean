@@ -338,6 +338,7 @@ pub struct PpuRegisters {
 
 /// Represents the Game Boy PPU (Pixel Processing Unit) and controls
 /// all of the logic behind the graphics processing and presentation.
+///
 /// Should store both the VRAM and HRAM together with the internal
 /// graphic related registers.
 /// Outputs the screen as a RGB 8 bit frame buffer.
