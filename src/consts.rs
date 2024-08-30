@@ -41,6 +41,9 @@ pub const NR41_ADDR: u16 = 0xff20;
 pub const NR42_ADDR: u16 = 0xff21;
 pub const NR43_ADDR: u16 = 0xff22;
 pub const NR44_ADDR: u16 = 0xff23;
+pub const NR50_ADDR: u16 = 0xff24;
+pub const NR51_ADDR: u16 = 0xff25;
+pub const NR52_ADDR: u16 = 0xff26;
 
 // DMA registers
 pub const DMA_ADDR: u16 = 0xff46;
