@@ -722,17 +722,17 @@ export class GameboyEmulator extends EmulatorLogic implements Emulator {
         return romData;
     }
 
-    serializeState(): Uint8Array {
+    async serializeState(): Promise<Uint8Array> {
         if (!this.gameBoy) throw new Error("Unable to serialize state");
         return StateManager.save_wa(this.gameBoy);
     }
 
-    unserializeState(data: Uint8Array) {
+    async unserializeState(data: Uint8Array) {
         if (!this.gameBoy) throw new Error("Unable to unserialize state");
         StateManager.load_wa(data, this.gameBoy);
     }
 
-    buildState(index: number, data: Uint8Array): SaveState {
+    async buildState(index: number, data: Uint8Array): Promise<SaveState> {
         try {
             const state = StateManager.read_bos_auto_wa(data);
             return {
