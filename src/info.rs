@@ -7,6 +7,9 @@ use crate::gen::{COMPILATION_DATE, COMPILATION_TIME, COMPILER, COMPILER_VERSION,
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
 
+#[cfg(feature = "wasm")]
+use crate::gen::dependencies_map;
+
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 pub struct Info;
 
@@ -50,5 +53,20 @@ impl Info {
 
     pub fn compilation_time() -> String {
         String::from(COMPILATION_TIME)
+    }
+}
+
+#[cfg(feature = "wasm")]
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
+impl Info {
+    pub fn wasm_engine() -> Option<String> {
+        let dependencies = dependencies_map();
+        if !dependencies.contains_key("wasm-bindgen") {
+            return None;
+        }
+        Some(String::from(format!(
+            "wasm-bindgen/{}",
+            *dependencies.get("wasm-bindgen").unwrap()
+        )))
     }
 }

@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-*
+* Warning message in wasm-bindgen loading
 
 ## [0.10.9] - 2024-08-30
 

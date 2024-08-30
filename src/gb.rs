@@ -53,7 +53,7 @@ use crate::{
 use wasm_bindgen::prelude::*;
 
 #[cfg(feature = "wasm")]
-use crate::{color::Pixel, gen::dependencies_map, ppu::Palette};
+use crate::{color::Pixel, ppu::Palette};
 
 #[cfg(feature = "wasm")]
 use std::{
@@ -1465,17 +1465,6 @@ impl GameBoy {
             .try_into()
             .unwrap();
         self.ppu().set_palette_colors(&palette);
-    }
-
-    pub fn wasm_engine_wa(&self) -> Option<String> {
-        let dependencies = dependencies_map();
-        if !dependencies.contains_key("wasm-bindgen") {
-            return None;
-        }
-        Some(String::from(format!(
-            "wasm-bindgen/{}",
-            *dependencies.get("wasm-bindgen").unwrap()
-        )))
     }
 
     fn js_to_pixel(value: &JsValue) -> Pixel {
