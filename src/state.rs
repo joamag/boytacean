@@ -193,7 +193,9 @@ pub trait StateBox {
 
     /// Applies the state to the provided `GameBoy` instance.
     fn to_gb(&self, gb: &mut GameBoy, options: &ToGbOptions) -> Result<(), Error>;
+}
 
+pub trait StateConfig {
     /// Obtains the Game Boy execution mode expected by the
     /// state instance.
     fn mode(&self) -> Result<GameBoyMode, Error>;
@@ -276,7 +278,9 @@ impl StateBox for BoscState {
         self.bos.to_gb(gb, options)?;
         Ok(())
     }
+}
 
+impl StateConfig for BoscState {
     fn mode(&self) -> Result<GameBoyMode, Error> {
         self.bos.mode()
     }
@@ -456,18 +460,11 @@ impl Serialize for BosState {
 
 impl StateBox for BosState {
     fn from_gb(gb: &mut GameBoy, options: &FromGbOptions) -> Result<Box<Self>, Error> {
-        let mut bos_info = BosInfo::from_gb(gb)?;
-        if let Some(agent) = options.agent.clone() {
-            bos_info.agent = agent;
-        }
-        if let Some(agent_version) = options.agent_version.clone() {
-            bos_info.agent_version = agent_version;
-        }
         Ok(Box::new(Self {
             magic: BOS_MAGIC_UINT,
             version: BOS_VERSION,
             block_count: 2,
-            info: Some(bos_info),
+            info: Some(*<BosInfo as StateBox>::from_gb(gb, options)?),
             image_buffer: if options.thumbnail {
                 Some(BosImageBuffer::from_gb(gb)?)
             } else {
@@ -482,7 +479,9 @@ impl StateBox for BosState {
         self.bess.to_gb(gb, options)?;
         Ok(())
     }
+}
 
+impl StateConfig for BosState {
     fn mode(&self) -> Result<GameBoyMode, Error> {
         self.bess.mode()
     }
@@ -624,6 +623,25 @@ impl State for BosInfo {
     }
 
     fn to_gb(&self, _gb: &mut GameBoy) -> Result<(), Error> {
+        Ok(())
+    }
+}
+
+impl StateBox for BosInfo {
+    fn from_gb(gb: &mut GameBoy, options: &FromGbOptions) -> Result<Box<Self>, Error>
+    where
+        Self: Sized,
+    {
+        let timestamp = timestamp();
+        Ok(Box::new(Self::new(
+            gb.mode().to_string(Some(true)),
+            timestamp,
+            options.agent.clone().unwrap_or(Info::name_lower()),
+            options.agent_version.clone().unwrap_or(Info::version()),
+        )))
+    }
+
+    fn to_gb(&self, _gb: &mut GameBoy, _options: &ToGbOptions) -> Result<(), Error> {
         Ok(())
     }
 }
@@ -832,10 +850,10 @@ impl Serialize for BessState {
 }
 
 impl StateBox for BessState {
-    fn from_gb(gb: &mut GameBoy, _options: &FromGbOptions) -> Result<Box<Self>, Error> {
+    fn from_gb(gb: &mut GameBoy, options: &FromGbOptions) -> Result<Box<Self>, Error> {
         Ok(Box::new(Self {
             footer: BessFooter::default(),
-            name: BessName::from_gb(gb)?,
+            name: *<BessName as StateBox>::from_gb(gb, options)?,
             info: BessInfo::from_gb(gb)?,
             core: BessCore::from_gb(gb)?,
             mbc: BessMbc::from_gb(gb)?,
@@ -843,15 +861,17 @@ impl StateBox for BessState {
         }))
     }
 
-    fn to_gb(&self, gb: &mut GameBoy, _options: &ToGbOptions) -> Result<(), Error> {
+    fn to_gb(&self, gb: &mut GameBoy, options: &ToGbOptions) -> Result<(), Error> {
         self.verify()?;
-        self.name.to_gb(gb)?;
+        StateBox::to_gb(&self.name, gb, options)?;
         self.info.to_gb(gb)?;
         self.core.to_gb(gb)?;
         self.mbc.to_gb(gb)?;
         Ok(())
     }
+}
 
+impl StateConfig for BessState {
     fn mode(&self) -> Result<GameBoyMode, Error> {
         match self.core.model.chars().next() {
             Some('G') => Ok(GameBoyMode::Dmg),
@@ -1085,6 +1105,14 @@ impl BessName {
         instance.read(data)?;
         Ok(instance)
     }
+
+    pub fn format_name(name: &str, version: &str) -> String {
+        format!("{} v{}", name, version)
+    }
+
+    pub fn build_name(&mut self, name: &str, version: &str) {
+        self.name = Self::format_name(name, version);
+    }
 }
 
 impl Serialize for BessName {
@@ -1105,10 +1133,29 @@ impl Serialize for BessName {
 
 impl State for BessName {
     fn from_gb(_gb: &mut GameBoy) -> Result<Self, Error> {
-        Ok(Self::new(format!("{} v{}", Info::name(), Info::version())))
+        Ok(Self::new(Self::format_name(
+            &Info::name(),
+            &Info::version(),
+        )))
     }
 
     fn to_gb(&self, _gb: &mut GameBoy) -> Result<(), Error> {
+        Ok(())
+    }
+}
+
+impl StateBox for BessName {
+    fn from_gb(_gb: &mut GameBoy, options: &FromGbOptions) -> Result<Box<Self>, Error>
+    where
+        Self: Sized,
+    {
+        Ok(Box::new(Self::new(Self::format_name(
+            &options.agent.clone().unwrap_or(Info::name()),
+            &options.agent_version.clone().unwrap_or(Info::version()),
+        ))))
+    }
+
+    fn to_gb(&self, _gb: &mut GameBoy, _options: &ToGbOptions) -> Result<(), Error> {
         Ok(())
     }
 }
@@ -1910,7 +1957,7 @@ impl StateManager {
         }
     }
 
-    fn load_inner<T: Serialize + StateBox + Default>(
+    fn load_inner<T: Serialize + StateBox + StateConfig + Default>(
         state: &mut T,
         data: &mut Cursor<Vec<u8>>,
         gb: &mut GameBoy,
@@ -2070,6 +2117,48 @@ mod tests {
     }
 
     #[test]
+    fn test_bos_agent_version() {
+        let mut gb = GameBoy::default();
+        gb.load(true).unwrap();
+        gb.load_rom_file("res/roms/test/firstwhite.gb", None)
+            .unwrap();
+        let data = StateManager::save(
+            &mut gb,
+            Some(SaveStateFormat::Bos),
+            Some(FromGbOptions {
+                agent: Some(String::from("test-agent")),
+                agent_version: Some(String::from("1.2.3")),
+                ..Default::default()
+            }),
+        )
+        .unwrap();
+        let loaded_state = StateManager::read_bos(&data).unwrap();
+        let info = loaded_state.info.unwrap();
+        assert_eq!(info.agent, "test-agent");
+        assert_eq!(info.agent_version, "1.2.3");
+    }
+
+    #[test]
+    fn test_bess_agent_version() {
+        let mut gb = GameBoy::default();
+        gb.load(true).unwrap();
+        gb.load_rom_file("res/roms/test/firstwhite.gb", None)
+            .unwrap();
+        let data = StateManager::save(
+            &mut gb,
+            Some(SaveStateFormat::Bess),
+            Some(FromGbOptions {
+                agent: Some(String::from("TestAgent")),
+                agent_version: Some(String::from("1.2.3")),
+                ..Default::default()
+            }),
+        )
+        .unwrap();
+        let loaded_state = StateManager::read_bess(&data).unwrap();
+        assert_eq!(loaded_state.name.name, "TestAgent v1.2.3");
+    }
+
+    #[test]
     fn test_compression() {
         let mut gb = GameBoy::default();
         gb.load(true).unwrap();
@@ -2088,7 +2177,7 @@ mod tests {
         let encoded = encode_zippy(&data, None, None).unwrap();
         let decoded = decode_zippy(&encoded, None).unwrap();
         assert_eq!(data, decoded);
-        assert_eq!(encoded.len(), 847);
-        assert_eq!(decoded.len(), 25155);
+        assert_eq!(encoded.len(), 841);
+        assert_eq!(decoded.len(), 25153);
     }
 }
