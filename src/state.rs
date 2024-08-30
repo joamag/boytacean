@@ -121,18 +121,28 @@ impl From<u8> for BosBlockKind {
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 pub struct FromGbOptions {
     thumbnail: bool,
+    agent: Option<String>,
+    agent_version: Option<String>,
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 impl FromGbOptions {
-    pub fn new(thumbnail: bool) -> Self {
-        Self { thumbnail }
+    pub fn new(thumbnail: bool, agent: Option<String>, agent_version: Option<String>) -> Self {
+        Self {
+            thumbnail,
+            agent,
+            agent_version,
+        }
     }
 }
 
 impl Default for FromGbOptions {
     fn default() -> Self {
-        Self { thumbnail: true }
+        Self {
+            thumbnail: true,
+            agent: None,
+            agent_version: None,
+        }
     }
 }
 
@@ -446,11 +456,18 @@ impl Serialize for BosState {
 
 impl StateBox for BosState {
     fn from_gb(gb: &mut GameBoy, options: &FromGbOptions) -> Result<Box<Self>, Error> {
+        let mut bos_info = BosInfo::from_gb(gb)?;
+        if let Some(agent) = options.agent.clone() {
+            bos_info.agent = agent;
+        }
+        if let Some(agent_version) = options.agent_version.clone() {
+            bos_info.agent_version = agent_version;
+        }
         Ok(Box::new(Self {
             magic: BOS_MAGIC_UINT,
             version: BOS_VERSION,
             block_count: 2,
-            info: Some(BosInfo::from_gb(gb)?),
+            info: Some(bos_info),
             image_buffer: if options.thumbnail {
                 Some(BosImageBuffer::from_gb(gb)?)
             } else {
@@ -1973,7 +1990,10 @@ impl StateManager {
 mod tests {
     use boytacean_encoding::zippy::{decode_zippy, encode_zippy};
 
-    use crate::{gb::GameBoy, state::State};
+    use crate::{
+        gb::GameBoy,
+        state::{FromGbOptions, State},
+    };
 
     use super::{BessCore, SaveStateFormat, StateManager};
 
@@ -2056,11 +2076,19 @@ mod tests {
         gb.load_rom_file("res/roms/test/firstwhite.gb", None)
             .unwrap();
         gb.step_to(0x0100);
-        let data = StateManager::save(&mut gb, Some(SaveStateFormat::Bess), None).unwrap();
+        let data = StateManager::save(
+            &mut gb,
+            Some(SaveStateFormat::Bess),
+            Some(FromGbOptions {
+                agent_version: Some(String::from("0.0.0")),
+                ..Default::default()
+            }),
+        )
+        .unwrap();
         let encoded = encode_zippy(&data, None, None).unwrap();
         let decoded = decode_zippy(&encoded, None).unwrap();
         assert_eq!(data, decoded);
-        assert_eq!(encoded.len(), 850);
-        assert_eq!(decoded.len(), 25154);
+        assert_eq!(encoded.len(), 847);
+        assert_eq!(decoded.len(), 25155);
     }
 }
