@@ -1,5 +1,26 @@
-//! Main GameBoy emulation entrypoint functions and structures.
+//! Game Boy emulation entrypoint and associated functions and structures.
+//!
+//! Most of the meaningful publicly available functions and structures to build
+//! a working emulator should be present here.
+//!
+//! # Examples
+//!
+//! Creates a simple [`GameBoy`] instance and boots the boot ROM. Does that by
+//! clocking the CPU until PC reaches 0x0100 (post boot address).
+//!
+//! ```rust
+//! use boytacean::gb::{GameBoy, GameBoyMode};
+//! let mut game_boy = GameBoy::new(Some(GameBoyMode::Dmg));
+//! game_boy.load(true).unwrap();
+//! game_boy.load_rom_empty().unwrap();
+//! let cycles = game_boy.step_to(0x0100);
+//! println!("Ran {} cycles", cycles);
+//! ```
 
+use boytacean_common::{
+    error::Error,
+    util::{read_file, SharedThread},
+};
 use std::{
     collections::VecDeque,
     fmt::{self, Display, Formatter},
@@ -13,10 +34,9 @@ use crate::{
         shark::{GameShark, GameSharkCode},
     },
     cpu::Cpu,
-    data::{BootRom, CGB_BOOT, DMG_BOOT, DMG_BOOTIX, MGB_BOOTIX, SGB_BOOT},
+    data::{BootRom, CGB_BOOT, CGB_BOYTACEAN, DMG_BOOT, DMG_BOOTIX, MGB_BOOTIX, SGB_BOOT},
     devices::{printer::PrinterDevice, stdout::StdoutDevice},
     dma::Dma,
-    error::Error,
     info::Info,
     mmu::Mmu,
     pad::{Pad, PadKey},
@@ -27,17 +47,13 @@ use crate::{
     rom::{Cartridge, RamSize},
     serial::{NullDevice, Serial, SerialDevice},
     timer::Timer,
-    util::{read_file, SharedThread},
 };
 
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
 
 #[cfg(feature = "wasm")]
-use crate::{
-    gen::dependencies_map,
-    ppu::{Palette, Pixel},
-};
+use crate::{color::Pixel, ppu::Palette};
 
 #[cfg(feature = "wasm")]
 use std::{
@@ -51,7 +67,7 @@ use std::{
 // CGB = Game Boy Color
 // SGB = Super Game Boy
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum GameBoyMode {
     Dmg = 1,
     Cgb = 2,
@@ -72,7 +88,7 @@ impl GameBoyMode {
             1 => GameBoyMode::Dmg,
             2 => GameBoyMode::Cgb,
             3 => GameBoyMode::Sgb,
-            _ => panic!("Invalid mode value: {}", value),
+            _ => panic!("Invalid mode value: {value}"),
         }
     }
 
@@ -81,7 +97,7 @@ impl GameBoyMode {
             "dmg" | "DMG" => GameBoyMode::Dmg,
             "cgb" | "CGB" => GameBoyMode::Cgb,
             "sgb" | "SGB" => GameBoyMode::Sgb,
-            _ => panic!("Invalid mode value: {}", value),
+            _ => panic!("Invalid mode value: {value}"),
         }
     }
 
@@ -110,6 +126,18 @@ impl GameBoyMode {
 impl Display for GameBoyMode {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.description())
+    }
+}
+
+impl From<u8> for GameBoyMode {
+    fn from(value: u8) -> Self {
+        Self::from_u8(value)
+    }
+}
+
+impl From<&str> for GameBoyMode {
+    fn from(value: &str) -> Self {
+        Self::from_string(value)
     }
 }
 
@@ -146,7 +174,7 @@ impl GameBoySpeed {
         match value {
             0 => GameBoySpeed::Normal,
             1 => GameBoySpeed::Double,
-            _ => panic!("Invalid speed value: {}", value),
+            _ => panic!("Invalid speed value: {value}"),
         }
     }
 }
@@ -154,6 +182,12 @@ impl GameBoySpeed {
 impl Display for GameBoySpeed {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.description())
+    }
+}
+
+impl From<u8> for GameBoySpeed {
+    fn from(value: u8) -> Self {
+        Self::from_u8(value)
     }
 }
 
@@ -311,39 +345,60 @@ pub trait AudioProvider {
     fn clear_audio_buffer(&mut self);
 }
 
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
+pub struct ClockFrame {
+    pub cycles: u64,
+    pub frames: u16,
+    frame_buffer: Option<Vec<u8>>,
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
+impl ClockFrame {
+    pub fn frame_buffer_eager(&mut self) -> Option<Vec<u8>> {
+        self.frame_buffer.take()
+    }
+}
+
 /// Top level structure that abstracts the usage of the
 /// Game Boy system under the Boytacean emulator.
+///
 /// Should serve as the main entry-point API.
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 pub struct GameBoy {
     /// The current running mode of the emulator, this
     /// may affect many aspects of the emulation, like
     /// CPU frequency, PPU frequency, Boot rome size, etc.
+    ///
     /// This is a clone of the configuration value
     /// kept for performance reasons.
     mode: GameBoyMode,
 
     /// If the PPU is enabled, it will be clocked.
+    ///
     /// This is a clone of the configuration value
     /// kept for performance reasons.
     ppu_enabled: bool,
 
     /// If the APU is enabled, it will be clocked.
+    ///
     /// This is a clone of the configuration value
     /// kept for performance reasons.
     apu_enabled: bool,
 
     /// If the DMA is enabled, it will be clocked.
+    ///
     /// This is a clone of the configuration value
     /// kept for performance reasons.
     dma_enabled: bool,
 
     /// If the timer is enabled, it will be clocked.
+    ///
     /// This is a clone of the configuration value
     /// kept for performance reasons.
     timer_enabled: bool,
 
     /// If the serial is enabled, it will be clocked.
+    ///
     /// This is a clone of the configuration value
     /// kept for performance reasons.
     serial_enabled: bool,
@@ -354,9 +409,20 @@ pub struct GameBoy {
     /// logic to match the current frequency. For example
     /// the APU will adjust its internal clock to match
     /// this hint.
+    ///
     /// This is a clone of the configuration value
     /// kept for performance reasons.
     clock_freq: u32,
+
+    /// The boot ROM that will (or was) used to boot the
+    /// current Game Boy system.
+    ///
+    /// This should be explicitly set by the developed when
+    /// set the boot ROM in the system's memory.
+    ///
+    /// The loading process used to load the boot ROM is not
+    /// taken in consideration for this value.
+    boot_rom: BootRom,
 
     /// Reference to the Game Boy CPU component to be
     /// used as the main element of the system, when
@@ -368,6 +434,7 @@ pub struct GameBoy {
     /// Game Boy configuration structure that can be
     /// used by the GB components to access global
     /// configuration values on the current emulator.
+    ///
     /// If performance is required (may value access)
     /// the values should be cloned and stored locally.
     gbc: SharedThread<GameBoyConfig>,
@@ -401,6 +468,7 @@ impl GameBoy {
 
         Self {
             mode,
+            boot_rom: BootRom::None,
             ppu_enabled: true,
             apu_enabled: true,
             dma_enabled: true,
@@ -429,7 +497,7 @@ impl GameBoy {
     pub fn reload(&mut self) {
         let rom = self.rom().clone();
         self.reset();
-        self.load(true);
+        self.load(true).unwrap();
         self.load_cartridge(rom).unwrap();
     }
 
@@ -473,7 +541,8 @@ impl GameBoy {
 
     /// Function equivalent to `clock()` but that allows pre-emptive
     /// breaking of the clock cycle loop if the PC (Program Counter)
-    /// reaches the provided address.
+    /// reaches the provided address, making sure that in such a situation
+    /// the devices are not clocked.
     pub fn clock_step(&mut self, addr: u16) -> u16 {
         let cycles = self.cpu_clock() as u16;
         if self.cpu_i().pc() == addr {
@@ -494,25 +563,61 @@ impl GameBoy {
         cycles
     }
 
+    /// Clocks the emulator until the limit of cycles that has been
+    /// provided and returns the amount of cycles that have been
+    /// clocked.
+    pub fn clocks_cycles(&mut self, limit: usize) -> u64 {
+        let mut cycles = 0_u64;
+        while cycles < limit as u64 {
+            cycles += self.clock() as u64;
+        }
+        cycles
+    }
+
+    /// Clocks the emulator until the limit of cycles that has been
+    /// provided and returns the amount of cycles that have been
+    /// clocked together with the frame buffer of the PPU.
+    ///
+    /// Allows a caller to clock the emulator and at the same time
+    /// retrieve the frame buffer of the PPU at the proper timing
+    /// (on V-Blank).
+    ///
+    /// This method allows for complex foreign call optimizations
+    /// by preventing the need to call the emulator clock multiple
+    /// times to obtain the right frame buffer retrieval timing.
+    pub fn clocks_frame_buffer(&mut self, limit: usize) -> ClockFrame {
+        let mut cycles = 0_u64;
+        let mut frames = 0_u16;
+        let mut frame_buffer: Option<Vec<u8>> = None;
+        let mut last_frame = self.ppu_frame();
+        while cycles < limit as u64 {
+            cycles += self.clock() as u64;
+            if self.ppu_frame() != last_frame {
+                frame_buffer = Some(self.frame_buffer().to_vec());
+                last_frame = self.ppu_frame();
+                frames += 1;
+            }
+        }
+        ClockFrame {
+            cycles,
+            frames,
+            frame_buffer,
+        }
+    }
+
     pub fn next_frame(&mut self) -> u32 {
         let mut cycles = 0u32;
         let current_frame = self.ppu_frame();
-        loop {
+        while self.ppu_frame() == current_frame {
             cycles += self.clock() as u32;
-            if self.ppu_frame() != current_frame {
-                break;
-            }
         }
         cycles
     }
 
     pub fn step_to(&mut self, addr: u16) -> u32 {
         let mut cycles = 0u32;
-        loop {
+        while self.cpu_i().pc() != addr {
             cycles += self.clock_step(addr) as u32;
-            if self.cpu_i().pc() == addr {
-                break;
-            }
         }
         cycles
     }
@@ -587,60 +692,20 @@ impl GameBoy {
         self.load_boot_state();
     }
 
-    pub fn load(&mut self, boot: bool) {
-        match self.mode() {
-            GameBoyMode::Dmg => self.load_dmg(boot),
-            GameBoyMode::Cgb => self.load_cgb(boot),
-            GameBoyMode::Sgb => unimplemented!(),
-        }
+    /// Unsafe load strategy that will panic the current system
+    /// in case there are boot ROM loading issues.
+    pub fn load_unsafe(&mut self, boot: bool) {
+        self.load(boot).unwrap();
     }
 
-    pub fn load_dmg(&mut self, boot: bool) {
-        self.mmu().allocate_dmg();
-        if boot {
-            self.load_boot_dmg();
-        }
-    }
-
-    pub fn load_cgb(&mut self, boot: bool) {
-        self.mmu().allocate_cgb();
-        if boot {
-            self.load_boot_cgb();
-        }
-    }
-
-    pub fn load_boot(&mut self, data: &[u8]) {
-        self.cpu.mmu().write_boot(0x0000, data);
-    }
-
-    pub fn load_boot_static(&mut self, boot_rom: BootRom) {
-        match boot_rom {
-            BootRom::Dmg => self.load_boot(&DMG_BOOT),
-            BootRom::Sgb => self.load_boot(&SGB_BOOT),
-            BootRom::DmgBootix => self.load_boot(&DMG_BOOTIX),
-            BootRom::MgbBootix => self.load_boot(&MGB_BOOTIX),
-            BootRom::Cgb => self.load_boot(&CGB_BOOT),
-            BootRom::None => (),
-        }
-    }
-
-    pub fn load_boot_default(&mut self) {
-        self.load_boot_dmg();
-    }
-
-    pub fn load_boot_dmg(&mut self) {
-        self.load_boot_static(BootRom::DmgBootix);
-    }
-
-    pub fn load_boot_cgb(&mut self) {
-        self.load_boot_static(BootRom::Cgb);
-    }
-
-    /// Loads the boot machine state and sets the Program Counter
-    /// (PC) to the post boot address.
+    /// Loads the machine directly to after the boot execution state,
+    /// setting the state of the system accordingly and updating the
+    /// Program Counter (PC) to the post boot address (0x0100).
     ///
-    /// Should allow the machine to jump to the cartridge execution
-    /// skipping the boot sequence.
+    /// Should allow the machine to jump to the cartridge (ROM) execution
+    /// directly, skipping the boot sequence.
+    ///
+    /// Currently supports only DMG machines.
     pub fn load_boot_state(&mut self) {
         self.cpu.boot();
     }
@@ -885,6 +950,18 @@ impl GameBoy {
         format!("{:.02} Mhz", self.clock_freq() as f32 / 1000.0 / 1000.0)
     }
 
+    pub fn boot_rom(&self) -> BootRom {
+        self.boot_rom
+    }
+
+    pub fn set_boot_rom(&mut self, value: BootRom) {
+        self.boot_rom = value;
+    }
+
+    pub fn boot_rom_s(&self) -> String {
+        String::from(self.boot_rom().description())
+    }
+
     pub fn attach_null_serial(&mut self) {
         self.attach_serial(Box::<NullDevice>::default());
     }
@@ -924,16 +1001,19 @@ impl GameBoy {
     pub fn description(&self, column_length: usize) -> String {
         let version_l = format!("{:width$}", "Version", width = column_length);
         let mode_l = format!("{:width$}", "Mode", width = column_length);
+        let boot_rom_l = format!("{:width$}", "Boot ROM", width = column_length);
         let clock_l = format!("{:width$}", "Clock", width = column_length);
         let ram_size_l = format!("{:width$}", "RAM Size", width = column_length);
         let vram_size_l = format!("{:width$}", "VRAM Size", width = column_length);
         let serial_l = format!("{:width$}", "Serial", width = column_length);
         format!(
-            "{}  {}\n{}  {}\n{}  {}\n{}  {}\n{}  {}\n{}  {}",
+            "{}  {}\n{}  {}\n{}  {}\n{}  {}\n{}  {}\n{}  {}\n{}  {}",
             version_l,
             Info::version(),
             mode_l,
             self.mode(),
+            boot_rom_l,
+            self.boot_rom(),
             clock_l,
             self.clock_freq_s(),
             ram_size_l,
@@ -942,6 +1022,15 @@ impl GameBoy {
             self.vram_size(),
             serial_l,
             self.serial_i().device().description(),
+        )
+    }
+
+    pub fn description_debug(&self) -> String {
+        format!(
+            "{}\nCPU:\n{}\nDMA:\n{}",
+            self.description(12),
+            self.cpu_i().description_default(),
+            self.dma_i().description()
         )
     }
 }
@@ -1077,10 +1166,54 @@ impl GameBoy {
         self.mmu_i().rom_i()
     }
 
+    pub fn load(&mut self, boot: bool) -> Result<(), Error> {
+        let boot_rom = self.boot_rom().reusable(self.mode());
+        match self.mode() {
+            GameBoyMode::Dmg => self.load_dmg(boot, boot_rom)?,
+            GameBoyMode::Cgb => self.load_cgb(boot, boot_rom)?,
+            GameBoyMode::Sgb => unimplemented!("SGB is not supported"),
+        }
+        Ok(())
+    }
+
+    pub fn load_dmg(&mut self, boot: bool, boot_rom: Option<BootRom>) -> Result<(), Error> {
+        self.mmu().allocate_dmg();
+        if boot {
+            self.load_boot_dmg(boot_rom)?;
+        }
+        Ok(())
+    }
+
+    pub fn load_cgb(&mut self, boot: bool, boot_rom: Option<BootRom>) -> Result<(), Error> {
+        self.mmu().allocate_cgb();
+        if boot {
+            self.load_boot_cgb(boot_rom)?;
+        }
+        Ok(())
+    }
+
+    pub fn load_boot(&mut self, data: &[u8]) {
+        self.cpu.mmu().write_boot(0x0000, data);
+    }
+
     pub fn load_boot_path(&mut self, path: &str) -> Result<(), Error> {
         let data = read_file(path)?;
         self.load_boot(&data);
+        self.boot_rom = BootRom::Other;
         Ok(())
+    }
+
+    pub fn load_boot_static(&mut self, boot_rom: BootRom) {
+        match boot_rom {
+            BootRom::Dmg => self.load_boot(&DMG_BOOT),
+            BootRom::Sgb => self.load_boot(&SGB_BOOT),
+            BootRom::DmgBootix => self.load_boot(&DMG_BOOTIX),
+            BootRom::MgbBootix => self.load_boot(&MGB_BOOTIX),
+            BootRom::Cgb => self.load_boot(&CGB_BOOT),
+            BootRom::CgbBoytacean => self.load_boot(&CGB_BOYTACEAN),
+            BootRom::Other | BootRom::None => (),
+        }
+        self.boot_rom = boot_rom;
     }
 
     pub fn load_boot_file(&mut self, boot_rom: BootRom) -> Result<(), Error> {
@@ -1090,23 +1223,73 @@ impl GameBoy {
             BootRom::DmgBootix => self.load_boot_path("./res/boot/dmg_bootix.bin")?,
             BootRom::MgbBootix => self.load_boot_path("./res/boot/mgb_bootix.bin")?,
             BootRom::Cgb => self.load_boot_path("./res/boot/cgb_boot.bin")?,
-            BootRom::None => (),
+            BootRom::CgbBoytacean => self.load_boot_path("./res/boot/cgb_boytacean.bin")?,
+            BootRom::Other | BootRom::None => (),
+        }
+        self.boot_rom = boot_rom;
+        Ok(())
+    }
+
+    pub fn load_boot_default(&mut self, boot_rom: Option<BootRom>) -> Result<(), Error> {
+        self.load_boot_dmg(boot_rom)
+    }
+
+    pub fn load_boot_smart(&mut self, boot_rom: Option<BootRom>) -> Result<(), Error> {
+        match self.mode() {
+            GameBoyMode::Dmg => self.load_boot_dmg(boot_rom)?,
+            GameBoyMode::Cgb => self.load_boot_cgb(boot_rom)?,
+            GameBoyMode::Sgb => unimplemented!("SGB is not supported"),
         }
         Ok(())
     }
 
-    pub fn load_boot_default_f(&mut self) -> Result<(), Error> {
-        self.load_boot_dmg_f()?;
+    pub fn load_boot_dmg(&mut self, boot_rom: Option<BootRom>) -> Result<(), Error> {
+        let boot_rom = boot_rom.unwrap_or(BootRom::DmgBootix);
+        if !boot_rom.is_dmg_compat() {
+            return Err(Error::IncompatibleBootRom);
+        }
+        self.load_boot_static(boot_rom);
         Ok(())
     }
 
-    pub fn load_boot_dmg_f(&mut self) -> Result<(), Error> {
-        self.load_boot_file(BootRom::DmgBootix)?;
+    pub fn load_boot_cgb(&mut self, boot_rom: Option<BootRom>) -> Result<(), Error> {
+        let boot_rom = boot_rom.unwrap_or(BootRom::CgbBoytacean);
+        if !boot_rom.is_cgb_compat() {
+            return Err(Error::IncompatibleBootRom);
+        }
+        self.load_boot_static(boot_rom);
         Ok(())
     }
 
-    pub fn load_boot_cgb_f(&mut self) -> Result<(), Error> {
-        self.load_boot_file(BootRom::Cgb)?;
+    pub fn load_boot_default_f(&mut self, boot_rom: Option<BootRom>) -> Result<(), Error> {
+        self.load_boot_dmg_f(boot_rom)?;
+        Ok(())
+    }
+
+    pub fn load_boot_smart_f(&mut self, boot_rom: Option<BootRom>) -> Result<(), Error> {
+        match self.mode() {
+            GameBoyMode::Dmg => self.load_boot_dmg_f(boot_rom)?,
+            GameBoyMode::Cgb => self.load_boot_cgb_f(boot_rom)?,
+            GameBoyMode::Sgb => unimplemented!("SGB is not supported"),
+        }
+        Ok(())
+    }
+
+    pub fn load_boot_dmg_f(&mut self, boot_rom: Option<BootRom>) -> Result<(), Error> {
+        let boot_rom = boot_rom.unwrap_or(BootRom::DmgBootix);
+        if !boot_rom.is_dmg_compat() {
+            return Err(Error::IncompatibleBootRom);
+        }
+        self.load_boot_file(boot_rom)?;
+        Ok(())
+    }
+
+    pub fn load_boot_cgb_f(&mut self, boot_rom: Option<BootRom>) -> Result<(), Error> {
+        let boot_rom = boot_rom.unwrap_or(BootRom::Cgb);
+        if !boot_rom.is_cgb_compat() {
+            return Err(Error::IncompatibleBootRom);
+        }
+        self.load_boot_file(boot_rom)?;
         Ok(())
     }
 
@@ -1140,6 +1323,11 @@ impl GameBoy {
             }
             None => self.load_rom(&data, None),
         }
+    }
+
+    pub fn load_rom_empty(&mut self) -> Result<&mut Cartridge, Error> {
+        let data = [0u8; 32 * 1024];
+        self.load_rom(&data, None)
     }
 
     pub fn attach_serial(&mut self, device: Box<dyn SerialDevice>) {
@@ -1222,7 +1410,7 @@ impl GameBoy {
     }
 
     pub fn load_rom_wa(&mut self, data: &[u8]) -> Result<Cartridge, String> {
-        let rom = self.load_rom(data, None).map_err(|e| e.to_string())?;
+        let rom = self.load_rom(data, None)?;
         rom.set_rumble_cb(|active| {
             rumble_callback(active);
         });
@@ -1264,9 +1452,7 @@ impl GameBoy {
     /// cartridge data parsing to obtain the CGB flag.
     /// It will also have to clone the data buffer.
     pub fn infer_mode_wa(&mut self, data: &[u8]) -> Result<(), String> {
-        let mode = Cartridge::from_data(data)
-            .map_err(|e| e.to_string())?
-            .gb_mode();
+        let mode = Cartridge::from_data(data)?.gb_mode();
         self.set_mode(mode);
         Ok(())
     }
@@ -1279,17 +1465,6 @@ impl GameBoy {
             .try_into()
             .unwrap();
         self.ppu().set_palette_colors(&palette);
-    }
-
-    pub fn wasm_engine_wa(&self) -> Option<String> {
-        let dependencies = dependencies_map();
-        if !dependencies.contains_key("wasm-bindgen") {
-            return None;
-        }
-        Some(String::from(format!(
-            "wasm-bindgen/{}",
-            *dependencies.get("wasm-bindgen").unwrap()
-        )))
     }
 
     fn js_to_pixel(value: &JsValue) -> Pixel {

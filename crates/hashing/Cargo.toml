@@ -1,0 +1,13 @@
+[package]
+name = "boytacean-hashing"
+description = "Hashing library for Boytacen."
+version = "0.10.12"
+authors = ["João Magalhães <joamag@gmail.com>"]
+license = "Apache-2.0"
+edition = "2021"
+
+[features]
+simd = []
+
+[dependencies]
+boytacean-common = { path = "../common", version = "0.10.12" }

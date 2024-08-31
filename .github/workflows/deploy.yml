@@ -122,6 +122,10 @@ jobs:
     steps:
       - name: Checkout code from repository
         uses: actions/checkout@v4
+      - name: Install Dependencies
+        run: |
+          apt-get update
+          apt-get install -y -q cmake
       - name: Install wasm-pack
         run: cargo install wasm-pack
       - name: Build WASM

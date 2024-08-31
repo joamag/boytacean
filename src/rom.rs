@@ -1,3 +1,6 @@
+//! Cartridge (ROM) related functions and structures.
+
+use boytacean_common::{error::Error, util::read_file};
 use core::fmt;
 use std::{
     cmp::max,
@@ -8,11 +11,10 @@ use std::{
 use crate::{
     cheats::{genie::GameGenie, shark::GameShark},
     debugln,
-    error::Error,
     gb::GameBoyMode,
+    licensee::Licensee,
     mmu::BusComponent,
-    util::read_file,
-    warnln,
+    panic_gb, warnln,
 };
 
 #[cfg(feature = "wasm")]
@@ -39,11 +41,11 @@ impl MbcType {
         match self {
             MbcType::NoMbc => 0x00,
             MbcType::Mbc1 => 0x03,
-            MbcType::Mbc2 => unimplemented!(),
+            MbcType::Mbc2 => unimplemented!("MBC2 is not supported"),
             MbcType::Mbc3 => 0x03,
             MbcType::Mbc5 => 0x0f,
-            MbcType::Mbc6 => unimplemented!(),
-            MbcType::Mbc7 => unimplemented!(),
+            MbcType::Mbc6 => unimplemented!("MBC6 is not supported"),
+            MbcType::Mbc7 => unimplemented!("MBC7 is not supported"),
             MbcType::Unknown => unimplemented!(),
         }
     }
@@ -148,6 +150,7 @@ impl Display for RomType {
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum RomSize {
     Size32K,
     Size64K,
@@ -200,6 +203,7 @@ impl Display for RomSize {
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum RamSize {
     NoRam,
     Unused,
@@ -246,10 +250,58 @@ impl Display for RamSize {
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Region {
+    World,
+    Japan,
+    USA,
+    Europe,
+    Spain,
+    Italy,
+    France,
+    Germany,
+    Korean,
+    Australia,
+    Unknown,
+}
+
+impl Region {
+    pub fn description(&self) -> &'static str {
+        match self {
+            Region::World => "World",
+            Region::Japan => "Japan",
+            Region::USA => "USA",
+            Region::Europe => "Europe",
+            Region::Spain => "Spain",
+            Region::Italy => "Italy",
+            Region::France => "France",
+            Region::Germany => "Germany",
+            Region::Korean => "Korea",
+            Region::Australia => "Australia",
+            Region::Unknown => "Unknown",
+        }
+    }
+}
+
+impl Display for Region {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.description())
+    }
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum CgbMode {
     NoCgb = 0x00,
     CgbCompatible = 0x80,
     CgbOnly = 0xc0,
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum SgbMode {
+    NoSgb = 0x00,
+    SgbFunctions = 0x03,
 }
 
 impl CgbMode {
@@ -371,12 +423,12 @@ impl Cartridge {
         Self::from_data(&data)
     }
 
-    pub fn read(&mut self, addr: u16) -> u8 {
-        match addr & 0xf000 {
-            0x0000 | 0x1000 | 0x2000 | 0x3000 | 0x4000 | 0x5000 | 0x6000 | 0x7000 => {
-                (self.handler.read_rom)(self, addr)
-            }
-            0xa000 | 0xb000 => (self.handler.read_ram)(self, addr),
+    pub fn read(&self, addr: u16) -> u8 {
+        match addr {
+            // 0x0000-0x7FFF: 16 KiB ROM bank 00 & 16 KiB ROM Bank 01–NN
+            0x0000..=0x7fff => (self.handler.read_rom)(self, addr),
+            // 0xA000-0xBFFF: 8 KiB External RAM
+            0xa000..=0xbfff => (self.handler.read_ram)(self, addr),
             _ => {
                 debugln!("Reading from unknown Cartridge control 0x{:04x}", addr);
                 0x00
@@ -385,11 +437,11 @@ impl Cartridge {
     }
 
     pub fn write(&mut self, addr: u16, value: u8) {
-        match addr & 0xf000 {
-            0x0000 | 0x1000 | 0x2000 | 0x3000 | 0x4000 | 0x5000 | 0x6000 | 0x7000 => {
-                (self.handler.write_rom)(self, addr, value)
-            }
-            0xa000 | 0xb000 => (self.handler.write_ram)(self, addr, value),
+        match addr {
+            // 0x0000-0x7FFF: 16 KiB ROM bank 00 & 16 KiB ROM Bank 01–NN
+            0x0000..=0x7fff => (self.handler.write_rom)(self, addr, value),
+            // 0xA000-0xBFFF: 8 KiB External RAM
+            0xa000..=0xbfff => (self.handler.write_ram)(self, addr, value),
             _ => debugln!("Writing to unknown Cartridge address 0x{:04x}", addr),
         }
     }
@@ -479,8 +531,7 @@ impl Cartridge {
             RomType::Mbc5RumbleRamBattery => &MBC5,
             rom_type => {
                 return Err(Error::CustomError(format!(
-                    "No MBC controller available for {}",
-                    rom_type
+                    "No MBC controller available for {rom_type}"
                 )))
             }
         })
@@ -621,9 +672,13 @@ impl Cartridge {
     pub fn title(&self) -> String {
         String::from(
             std::str::from_utf8(&self.rom_data[0x0134..self.title_offset])
-                .unwrap()
+                .unwrap_or("")
                 .trim(),
         )
+    }
+
+    pub fn licensee(&self) -> Licensee {
+        Licensee::from_data(self.rom_data[0x014b], &self.rom_data[0x0144..=0x0145])
     }
 
     pub fn cgb_flag(&self) -> CgbMode {
@@ -634,6 +689,13 @@ impl Cartridge {
         }
     }
 
+    pub fn sgb_flag(&self) -> SgbMode {
+        match self.rom_data[0x0146] {
+            0x03 => SgbMode::SgbFunctions,
+            _ => SgbMode::NoSgb,
+        }
+    }
+
     pub fn gb_mode(&self) -> GameBoyMode {
         match self.cgb_flag() {
             CgbMode::CgbCompatible | CgbMode::CgbOnly => GameBoyMode::Cgb,
@@ -641,9 +703,10 @@ impl Cartridge {
         }
     }
 
-    /// A cartridge is considered legacy if it does
+    /// A cartridge is considered legacy (DMG only) if it does
     /// not have a CGB flag bit (bit 7 of 0x0143) set.
-    /// These are the monochromatic only Cartridges built
+    ///
+    /// These are the monochromatic only cartridges built
     /// for the original DMG Game Boy.
     pub fn is_legacy(&self) -> bool {
         self.rom_data[0x0143] & 0x80 == 0x00
@@ -731,6 +794,28 @@ impl Cartridge {
         String::from(self.ram_size().description())
     }
 
+    pub fn region(&self) -> Region {
+        if self.gb_mode() != GameBoyMode::Cgb {
+            return Region::Unknown;
+        }
+        let region = std::str::from_utf8(&self.rom_data[0x013f..=0x0142])
+            .unwrap_or("")
+            .trim();
+        match region.chars().last() {
+            Some('A') => Region::World,
+            Some('J') => Region::Japan,
+            Some('E') => Region::USA,
+            Some('P') | Some('X') | Some('Y') => Region::Europe,
+            Some('S') => Region::Spain,
+            Some('I') => Region::Italy,
+            Some('F') => Region::France,
+            Some('D') => Region::Germany,
+            Some('K') => Region::Korean,
+            Some('U') => Region::Australia,
+            _ => Region::Unknown,
+        }
+    }
+
     pub fn has_battery(&self) -> bool {
         matches!(
             self.rom_type(),
@@ -784,16 +869,34 @@ impl Cartridge {
         self.game_shark = None;
     }
 
+    pub fn checksum(&self) -> u8 {
+        let mut sum: u8 = 0;
+        for i in 0x0134..=0x014c {
+            sum = sum.wrapping_sub(self.rom_data[i]).wrapping_sub(1);
+        }
+        sum
+    }
+
+    pub fn valid_checksum(&self) -> bool {
+        self.rom_data[0x014d] == self.checksum()
+    }
+
     pub fn description(&self, column_length: usize) -> String {
-        let name_l = format!("{:width$}", "Name", width = column_length);
+        let title_l = format!("{:width$}", "Title", width = column_length);
+        let publisher_l = format!("{:width$}", "Publisher", width = column_length);
+        let region_l = format!("{:width$}", "Region", width = column_length);
         let type_l = format!("{:width$}", "Type", width = column_length);
         let rom_size_l = format!("{:width$}", "ROM Size", width = column_length);
         let ram_size_l = format!("{:width$}", "RAM Size", width = column_length);
         let cgb_l = format!("{:width$}", "CGB Mode", width = column_length);
         format!(
-            "{}  {}\n{}  {}\n{}  {}\n{}  {}\n{}  {}",
-            name_l,
+            "{}  {}\n{}  {}\n{}  {}\n{}  {}\n{}  {}\n{}  {}\n{}  {}",
+            title_l,
             self.title(),
+            publisher_l,
+            self.licensee(),
+            region_l,
+            self.region(),
             type_l,
             self.rom_type(),
             rom_size_l,
@@ -825,7 +928,7 @@ impl Cartridge {
 }
 
 impl BusComponent for Cartridge {
-    fn read(&mut self, addr: u16) -> u8 {
+    fn read(&self, addr: u16) -> u8 {
         self.read(addr)
     }
 
@@ -863,7 +966,7 @@ pub static NO_MBC: Mbc = Mbc {
             // to this address for some reason (probably related to
             // some kind of MBC1 compatibility issue)
             0x2000 => (),
-            _ => panic!("Writing to unknown Cartridge ROM location 0x{:04x}", addr),
+            _ => panic_gb!("Writing to unknown Cartridge ROM location 0x{:04x}", addr),
         };
     },
     read_ram: |rom: &Cartridge, addr: u16| -> u8 { rom.ram_data[(addr - 0xa000) as usize] },
@@ -875,26 +978,29 @@ pub static NO_MBC: Mbc = Mbc {
 pub static MBC1: Mbc = Mbc {
     name: "MBC1",
     read_rom: |rom: &Cartridge, addr: u16| -> u8 {
-        match addr & 0xf000 {
-            0x0000 | 0x1000 | 0x2000 | 0x3000 => rom.rom_data[addr as usize],
-            0x4000 | 0x5000 | 0x6000 | 0x7000 => *rom
+        match addr {
+            // 0x0000-0x3FFF - ROM bank X0
+            0x0000..=0x3fff => rom.rom_data[addr as usize],
+            // 0x4000-0x7FFF - ROM bank 01-7F
+            0x4000..=0x7fff => *rom
                 .rom_data
                 .get(rom.rom_offset + (addr - 0x4000) as usize)
                 .unwrap_or(&0x0),
             _ => {
                 warnln!("Reading from unknown Cartridge ROM location 0x{:04x}", addr);
+                #[allow(unreachable_code)]
                 0xff
             }
         }
     },
     write_rom: |rom: &mut Cartridge, addr: u16, value: u8| {
-        match addr & 0xf000 {
-            // RAM enabled flag
-            0x0000 | 0x1000 => {
+        match addr {
+            // 0x0000-0x1FFF - RAM enabled flag
+            0x0000..=0x1fff => {
                 rom.ram_enabled = (value & 0x0f) == 0x0a;
             }
-            // ROM bank selection 5 lower bits
-            0x2000 | 0x3000 => {
+            // 0x2000-0x3FFF - ROM bank selection 5 lower bits
+            0x2000..=0x3fff => {
                 let mut rom_bank = value as u16 & 0x1f;
                 rom_bank &= rom.rom_bank_count * 2 - 1;
                 if rom_bank == 0 {
@@ -902,16 +1008,16 @@ pub static MBC1: Mbc = Mbc {
                 }
                 rom.set_rom_bank(rom_bank);
             }
-            // RAM bank selection and ROM bank selection upper bits
-            0x4000 | 0x5000 => {
+            // 0x4000-0x5FFF - RAM bank selection and ROM bank selection upper bits
+            0x4000..=0x5fff => {
                 let ram_bank = value & 0x03;
                 if ram_bank as u16 >= rom.ram_bank_count {
                     return;
                 }
                 rom.set_ram_bank(ram_bank);
             }
-            // ROM mode selection
-            0x6000 | 0x7000 => {
+            // 0x6000-0x7FFF - ROM mode selection
+            0x6000..=0x7fff => {
                 if value == 0x1 && rom.rom_bank_count > 32 {
                     unimplemented!("Advanced ROM banking mode for MBC1 is not implemented");
                 }
@@ -928,7 +1034,10 @@ pub static MBC1: Mbc = Mbc {
     write_ram: |rom: &mut Cartridge, addr: u16, value: u8| {
         if !rom.ram_enabled {
             warnln!("Attempt to write to ERAM while write protect is active");
-            return;
+            #[allow(unreachable_code)]
+            {
+                return;
+            }
         }
         rom.ram_data[rom.ram_offset + (addr - 0xa000) as usize] = value;
     },
@@ -937,26 +1046,29 @@ pub static MBC1: Mbc = Mbc {
 pub static MBC3: Mbc = Mbc {
     name: "MBC3",
     read_rom: |rom: &Cartridge, addr: u16| -> u8 {
-        match addr & 0xf000 {
-            0x0000 | 0x1000 | 0x2000 | 0x3000 => rom.rom_data[addr as usize],
-            0x4000 | 0x5000 | 0x6000 | 0x7000 => *rom
+        match addr {
+            // 0x0000-0x3FFF - ROM bank 00
+            0x0000..=0x3fff => rom.rom_data[addr as usize],
+            // 0x4000-0x7FFF - ROM bank 01-7F
+            0x4000..=0x7fff => *rom
                 .rom_data
                 .get(rom.rom_offset + (addr - 0x4000) as usize)
                 .unwrap_or(&0x0),
             _ => {
                 warnln!("Reading from unknown Cartridge ROM location 0x{:04x}", addr);
+                #[allow(unreachable_code)]
                 0xff
             }
         }
     },
     write_rom: |rom: &mut Cartridge, addr: u16, value: u8| {
-        match addr & 0xf000 {
-            // RAM enabled flag
-            0x0000 | 0x1000 => {
+        match addr {
+            // 0x0000-0x1FFF - RAM enabled flag
+            0x0000..=0x1fff => {
                 rom.ram_enabled = (value & 0x0f) == 0x0a;
             }
-            // ROM bank selection
-            0x2000 | 0x3000 => {
+            // 0x2000-0x3FFF - ROM bank selection
+            0x2000..=0x3fff => {
                 let mut rom_bank = value as u16 & 0x7f;
                 rom_bank &= rom.rom_bank_count * 2 - 1;
                 if rom_bank == 0 {
@@ -964,8 +1076,8 @@ pub static MBC3: Mbc = Mbc {
                 }
                 rom.set_rom_bank(rom_bank);
             }
-            // RAM bank selection
-            0x4000 | 0x5000 => {
+            // 0x4000-0x5FFF - RAM bank selection
+            0x4000..=0x5fff => {
                 let ram_bank = value & 0x03;
                 if ram_bank as u16 >= rom.ram_bank_count {
                     return;
@@ -984,7 +1096,10 @@ pub static MBC3: Mbc = Mbc {
     write_ram: |rom: &mut Cartridge, addr: u16, value: u8| {
         if !rom.ram_enabled {
             warnln!("Attempt to write to ERAM while write protect is active");
-            return;
+            #[allow(unreachable_code)]
+            {
+                return;
+            }
         }
         rom.ram_data[rom.ram_offset + (addr - 0xa000) as usize] = value;
     },
@@ -993,36 +1108,39 @@ pub static MBC3: Mbc = Mbc {
 pub static MBC5: Mbc = Mbc {
     name: "MBC5",
     read_rom: |rom: &Cartridge, addr: u16| -> u8 {
-        match addr & 0xf000 {
-            0x0000 | 0x1000 | 0x2000 | 0x3000 => rom.rom_data[addr as usize],
-            0x4000 | 0x5000 | 0x6000 | 0x7000 => *rom
+        match addr {
+            // 0x0000-0x3FFF - ROM bank 00
+            0x0000..=0x3fff => rom.rom_data[addr as usize],
+            // 0x4000-0x7FFF - ROM bank 00-1FF
+            0x4000..=0x7fff => *rom
                 .rom_data
                 .get(rom.rom_offset + (addr - 0x4000) as usize)
                 .unwrap_or(&0x0),
             _ => {
                 warnln!("Reading from unknown Cartridge ROM location 0x{:04x}", addr);
+                #[allow(unreachable_code)]
                 0xff
             }
         }
     },
     write_rom: |rom: &mut Cartridge, addr: u16, value: u8| {
-        match addr & 0xf000 {
-            // RAM enabled flag
-            0x0000 | 0x1000 => {
+        match addr {
+            // 0x0000-0x1FFF - RAM enabled flag
+            0x0000..=0x1fff => {
                 rom.ram_enabled = (value & 0x0f) == 0x0a;
             }
-            // ROM bank selection 8 lower bits
-            0x2000 => {
+            // 0x2000-0x2FFF - ROM bank selection 8 lower bits
+            0x2000..=0x2fff => {
                 let rom_bank = value as u16;
                 rom.set_rom_bank(rom_bank);
             }
-            // ROM bank selection 9th bit
-            0x3000 => {
+            // 0x3000-0x3FFF - ROM bank selection 9th bit
+            0x3000..=0x3fff => {
                 let rom_bank = (rom.rom_bank() & 0x00ff) + (((value & 0x01) as u16) << 8);
                 rom.set_rom_bank(rom_bank);
             }
-            // RAM bank selection
-            0x4000 | 0x5000 => {
+            // 0x4000-0x5FFF - RAM bank selection
+            0x4000..=0x5fff => {
                 let mut ram_bank = value & 0x0f;
 
                 // handles the rumble flag for the cartridges
@@ -1054,7 +1172,10 @@ pub static MBC5: Mbc = Mbc {
     write_ram: |rom: &mut Cartridge, addr: u16, value: u8| {
         if !rom.ram_enabled {
             warnln!("Attempt to write to ERAM while write protect is active");
-            return;
+            #[allow(unreachable_code)]
+            {
+                return;
+            }
         }
         rom.ram_data[rom.ram_offset + (addr - 0xa000) as usize] = value;
     },

@@ -35,8 +35,14 @@ impl PadKey {
             6 => PadKey::Select,
             7 => PadKey::A,
             8 => PadKey::B,
-            _ => panic!("Invalid pad key value: {}", value),
+            _ => panic!("Invalid pad key value: {value}"),
         }
+    }
+}
+
+impl From<u8> for PadKey {
+    fn from(value: u8) -> Self {
+        Self::from_u8(value)
     }
 }
 
@@ -69,7 +75,7 @@ impl Pad {
         }
     }
 
-    pub fn read(&mut self, addr: u16) -> u8 {
+    pub fn read(&self, addr: u16) -> u8 {
         match addr {
             // 0xFF00 — P1/JOYP: Joypad
             0xff00 => {
@@ -101,6 +107,7 @@ impl Pad {
             }
             _ => {
                 warnln!("Reading from unknown Pad location 0x{:04x}", addr);
+                #[allow(unreachable_code)]
                 0xff
             }
         }
@@ -168,7 +175,7 @@ impl Pad {
 }
 
 impl BusComponent for Pad {
-    fn read(&mut self, addr: u16) -> u8 {
+    fn read(&self, addr: u16) -> u8 {
         self.read(addr)
     }
 

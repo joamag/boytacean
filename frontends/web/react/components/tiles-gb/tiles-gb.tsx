@@ -1,5 +1,5 @@
-import React, { FC, useEffect, useRef } from "react";
 import { Canvas, CanvasStructure, PixelFormat } from "emukit";
+import React, { FC, useCallback, useEffect, useMemo, useRef } from "react";
 
 import "./tiles-gb.css";
 
@@ -20,9 +20,12 @@ export const TilesGB: FC<TilesGBProps> = ({
     interval = 1000,
     style = []
 }) => {
-    const classes = () =>
-        ["tiles-gb", contentBox ? "content-box" : "", ...style].join(" ");
+    const classes = useMemo(
+        () => ["tiles-gb", contentBox ? "content-box" : "", ...style].join(" "),
+        [contentBox, style]
+    );
     const intervalsRef = useRef<number>();
+    const canvasRef = useRef<HTMLCanvasElement>(null);
     useEffect(() => {
         return () => {
             if (intervalsRef.current) {
@@ -30,21 +33,26 @@ export const TilesGB: FC<TilesGBProps> = ({
             }
         };
     }, []);
-    const onCanvas = (structure: CanvasStructure) => {
-        const drawTiles = () => {
-            for (let index = 0; index < tileCount; index++) {
-                const pixels = getTile(index);
-                drawTile(index, pixels, structure);
-            }
-        };
-        drawTiles();
-        intervalsRef.current = setInterval(() => drawTiles(), interval);
-    };
+    const onCanvas = useCallback(
+        (structure: CanvasStructure) => {
+            const drawTiles = () => {
+                for (let index = 0; index < tileCount; index++) {
+                    const pixels = getTile(index);
+                    drawTile(index, pixels, structure);
+                }
+            };
+            drawTiles();
+            intervalsRef.current = setInterval(() => drawTiles(), interval);
+        },
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [tileCount, interval]
+    );
     return (
-        <div className={classes()}>
+        <div className={classes}>
             <Canvas
                 width={128}
                 height={192}
+                canvasRef={canvasRef}
                 scale={2}
                 scaledWidth={width}
                 onCanvas={onCanvas}

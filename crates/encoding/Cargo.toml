@@ -1,0 +1,18 @@
+[package]
+name = "boytacean-encoding"
+description = "Codecs library for Boytacen."
+version = "0.10.12"
+authors = ["João Magalhães <joamag@gmail.com>"]
+license = "Apache-2.0"
+edition = "2021"
+
+[features]
+simd = ["boytacean-hashing/simd"]
+
+[dependencies]
+boytacean-common = { path = "../common", version = "0.10.12" }
+boytacean-hashing = { path = "../hashing", version = "0.10.12" }
+
+[[bin]]
+name = "zippy"
+path = "src/cli/zippy.rs"

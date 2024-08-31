@@ -1,3 +1,8 @@
+//! Assorted utility functions and structures.
+//!
+//! This module contains various utility functions and structures
+//! that are used throughout the Boytacean codebase.
+
 use std::{
     cell::RefCell,
     fs::File,
@@ -23,23 +28,23 @@ pub type SharedThread<T> = Arc<Mutex<T>>;
 /// Reads the contents of the file at the given path into
 /// a vector of bytes.
 pub fn read_file(path: &str) -> Result<Vec<u8>, Error> {
-    let mut file = File::open(path)
-        .map_err(|_| Error::CustomError(format!("Failed to open file: {}", path)))?;
+    let mut file =
+        File::open(path).map_err(|_| Error::CustomError(format!("Failed to open file: {path}")))?;
     let mut data = Vec::new();
     file.read_to_end(&mut data)
-        .map_err(|_| Error::CustomError(format!("Failed to read from file: {}", path)))?;
+        .map_err(|_| Error::CustomError(format!("Failed to read from file: {path}")))?;
     Ok(data)
 }
 
 /// Writes the given data to the file at the given path.
 pub fn write_file(path: &str, data: &[u8], flush: Option<bool>) -> Result<(), Error> {
     let mut file = File::create(path)
-        .map_err(|_| Error::CustomError(format!("Failed to create file: {}", path)))?;
+        .map_err(|_| Error::CustomError(format!("Failed to create file: {path}")))?;
     file.write_all(data)
-        .map_err(|_| Error::CustomError(format!("Failed to write to file: {}", path)))?;
+        .map_err(|_| Error::CustomError(format!("Failed to write to file: {path}")))?;
     if flush.unwrap_or(true) {
         file.flush()
-            .map_err(|_| Error::CustomError(format!("Failed to flush file: {}", path)))?;
+            .map_err(|_| Error::CustomError(format!("Failed to flush file: {path}")))?;
     }
     Ok(())
 }
@@ -70,7 +75,7 @@ pub fn capitalize(string: &str) -> String {
 
 pub fn save_bmp(path: &str, pixels: &[u8], width: u32, height: u32) -> Result<(), Error> {
     let file = File::create(path)
-        .map_err(|_| Error::CustomError(format!("Failed to create file: {}", path)))?;
+        .map_err(|_| Error::CustomError(format!("Failed to create file: {path}")))?;
     let mut writer = BufWriter::new(file);
 
     // writes the BMP file header
@@ -114,8 +119,48 @@ pub fn save_bmp(path: &str, pixels: &[u8], width: u32, height: u32) -> Result<()
     Ok(())
 }
 
+/// Copies the contents of the source slice into the destination slice.
+///
+/// This function is optimized for performance and uses pointer-based
+/// operations to copy the data as fast as possible.
+pub fn copy_fast(src: &[u8], dst: &mut [u8], count: usize) {
+    assert!(src.len() >= count);
+    assert!(dst.len() >= count);
+
+    unsafe {
+        let src_ptr = src.as_ptr();
+        let dst_ptr = dst.as_mut_ptr();
+        std::ptr::copy_nonoverlapping(src_ptr, dst_ptr, count);
+    }
+}
+
+// Interleaves two arrays of bytes into a single array using
+// a pointer-based approach for performance reasons.
+pub fn interleave_arrays(a: &[u8], b: &[u8], output: &mut [u8]) {
+    assert_eq!(a.len(), b.len());
+    assert_eq!(output.len(), a.len() + b.len());
+
+    let len = a.len();
+
+    unsafe {
+        let mut out_ptr = output.as_mut_ptr();
+        let mut a_ptr = a.as_ptr();
+        let mut b_ptr = b.as_ptr();
+
+        for _ in 0..len {
+            std::ptr::write(out_ptr, *a_ptr);
+            out_ptr = out_ptr.add(1);
+            a_ptr = a_ptr.add(1);
+
+            std::ptr::write(out_ptr, *b_ptr);
+            out_ptr = out_ptr.add(1);
+            b_ptr = b_ptr.add(1);
+        }
+    }
+}
+
 #[cfg(not(feature = "wasm"))]
-pub fn get_timestamp() -> u64 {
+pub fn timestamp() -> u64 {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     let now = SystemTime::now();
@@ -124,7 +169,7 @@ pub fn get_timestamp() -> u64 {
 
 #[cfg(feature = "wasm")]
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
-pub fn get_timestamp() -> u64 {
+pub fn timestamp() -> u64 {
     use js_sys::Date;
 
     (Date::now() / 1000.0) as u64

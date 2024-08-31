@@ -1,3 +1,4 @@
+from os import getenv
 from time import time
 from boytacean import VISUAL_FREQ
 from boytacean.pyboy import PyBoy
@@ -10,7 +11,7 @@ ROM_NAME = splitext(basename(ROM_PATH))[0]
 IMAGE_NAME = f"{ROM_NAME}_pyboy_iface.png"
 
 FRAME_COUNT = 12000
-LOAD_GRAPHICS = False
+LOAD_GRAPHICS = bool(getenv("LOAD_GRAPHICS", True))
 
 with PyBoy(
     ROM_PATH,

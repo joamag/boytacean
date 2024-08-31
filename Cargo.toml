@@ -1,12 +1,12 @@
 [package]
 name = "boytacean"
 description = "A Game Boy emulator that is written in Rust."
-version = "0.10.2"
+version = "0.10.12"
 authors = ["João Magalhães <joamag@gmail.com>"]
 license = "Apache-2.0"
 repository = "https://github.com/joamag/boytacean"
 keywords = ["gameboy", "emulator", "rust"]
-edition = "2018"
+edition = "2021"
 exclude = ["/frontends", "/res/roms", "/res/screens", "/res/videos"]
 build = "build.rs"
 readme = "README.md"
@@ -15,17 +15,25 @@ readme = "README.md"
 crate-type = ["cdylib", "rlib"]
 
 [features]
-wasm = ["wasm-bindgen", "js-sys"]
-python = ["pyo3"]
+default = []
+wasm = ["wasm-bindgen", "js-sys", "boytacean-common/wasm"]
+python = ["pyo3", "boytacean-common/python"]
+simd = ["boytacean-encoding/simd", "boytacean-hashing/simd"]
 debug = []
 pedantic = []
 cpulog = []
 gen-mock = []
 
 [dependencies]
+boytacean-common = { path = "crates/common", version = "0.10.12" }
+boytacean-encoding = { path = "crates/encoding", version = "0.10.12" }
+boytacean-hashing = { path = "crates/hashing", version = "0.10.12" }
 wasm-bindgen = { version = "0.2", optional = true }
 js-sys = { version = "0.3", optional = true }
 pyo3 = { version = "0.20", optional = true }
+
+[dev-dependencies]
+criterion = "0.5"
 
 [build-dependencies]
 chrono = "0.4"
@@ -44,8 +52,34 @@ debug = false
 lto = true
 opt-level = 3
 
+[profile.bench]
+debug = false
+lto = true
+opt-level = 3
+codegen-units = 1
+
 [workspace]
-members = [".", "frontends/libretro", "frontends/sdl"]
+members = [
+    ".",
+    "frontends/libretro",
+    "frontends/sdl",
+    "crates/common",
+    "crates/encoding",
+    "crates/hashing"
+]
+package = { version = "0.10.12", authors = ["João Magalhães <joamag@gmail.com>"], edition = "2021" }
 
 [package.metadata.docs.rs]
 features = ["wasm", "gen-mock"]
+
+[[bench]]
+name = "color"
+harness = false
+
+[[bench]]
+name = "encoding"
+harness = false
+
+[[bench]]
+name = "hashing"
+harness = false

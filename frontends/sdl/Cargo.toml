@@ -1,11 +1,11 @@
 [package]
 name = "boytacean-sdl"
-version = "0.10.2"
+version = "0.10.12"
 authors = ["João Magalhães <joamag@gmail.com>"]
 description = "An SDL frontend for Boytacen"
 license = "Apache-2.0"
 keywords = ["gameboy", "emulator", "rust", "sdl"]
-edition = "2018"
+edition = "2021"
 readme = "README.md"
 
 [features]
@@ -14,18 +14,12 @@ debug = ["boytacean/debug"]
 pedantic = ["boytacean/pedantic"]
 cpulog = ["boytacean/cpulog"]
 
-[dependencies.boytacean]
-path = "../.."
-
-[dependencies.clap]
-version = "4"
-features = ["derive"]
-
-[dependencies.image]
-version = "0.24"
-
-[dependencies.chrono]
-version = "0.4"
+[dependencies]
+boytacean = { path = "../..", version = "0.10.12" }
+boytacean-common = { path = "../../crates/common", version = "0.10.12" }
+clap = { version = "4", features = ["derive"] }
+image = "0.24"
+chrono = "0.4"
 
 [dependencies.sdl2]
 version = "0.36"

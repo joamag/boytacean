@@ -13,7 +13,8 @@ stages:
   - deploy
 
 before_script:
-  - apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y -q pkg-config g++
+  - source ./.gitlab/common.sh
+  - apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y -q pkg-config g++ cmake jq
   - curl -sf -L https://static.rust-lang.org/rustup.sh | sh -s -- -y
   - export PATH=$PATH:$HOME/.cargo/bin
   - curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.1/install.sh | bash
@@ -26,7 +27,7 @@ build-rust:
   stage: build
   parallel:
     matrix:
-      - RUST_VERSION: ["1.65.0", "1.66.0", "stable", "nightly"]
+      - RUST_VERSION: ["1.67.0", "1.68.0", "stable", "nightly"]
   script:
     - rustup toolchain install $RUST_VERSION
     - rustup override set $RUST_VERSION
@@ -68,16 +69,25 @@ build-pyo3:
     - cargo build --features python
     - cargo build --release --features python
 
+build-boot:
+  stage: build
+  script:
+    - install_rgbds
+    - cd src/boot
+    - make
+
 test-rust:
   stage: test
   parallel:
     matrix:
-      - RUST_VERSION: ["1.65.0", "1.66.0", "stable", "nightly"]
+      - RUST_VERSION: ["1.74.0", "1.75.0", "stable", "nightly"]
   script:
     - rustup toolchain install $RUST_VERSION
     - rustup override set $RUST_VERSION
     - rustc --version
     - cargo test
+    - if [[ $RUST_VERSION != nightly ]]; then cargo bench; fi
+    - if [[ $RUST_VERSION == nightly ]]; then cargo bench --features simd; fi
 
 test-pyo3:
   stage: test
@@ -151,7 +161,10 @@ deploy-crates:
   stage: deploy
   script:
     - cargo login $CRATES_TOKEN
-    - cargo publish --no-verify
+    - cargo publish --package boytacean-common --no-verify
+    - cargo publish --package boytacean-hashing --no-verify
+    - cargo publish --package boytacean-encoding --no-verify
+    - cargo publish --package boytacean --no-verify
   dependencies:
     - build-rust
   only:

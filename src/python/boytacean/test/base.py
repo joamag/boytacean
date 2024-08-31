@@ -17,3 +17,5 @@ class BaseTest(unittest.TestCase):
             gb.next_frame()
 
         self.assertEqual(gb.rom_title, "POCKET-DEMO")
+        self.assertEqual(gb.boot_rom_s, "DMG Bootix")
+        self.assertEqual(gb.clock_freq_s, "4.19 Mhz")

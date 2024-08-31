@@ -1,7 +1,6 @@
-use pyo3::{conversion::IntoPy, exceptions::PyException, prelude::*, types::PyBytes};
+use pyo3::{exceptions::PyException, prelude::*, types::PyBytes};
 
 use crate::{
-    error::Error,
     gb::{GameBoy as GameBoyBase, GameBoyMode},
     gen::{COMPILATION_DATE, COMPILATION_TIME, COMPILER, COMPILER_VERSION, NAME, VERSION},
     info::Info,
@@ -32,12 +31,12 @@ impl GameBoy {
         self.system.boot();
     }
 
-    pub fn load(&mut self, boot: bool) {
-        self.system.load(boot);
+    pub fn load(&mut self, boot: bool) -> PyResult<()> {
+        self.system.load(boot).map_err(PyErr::new::<PyException, _>)
     }
 
     pub fn load_boot(&mut self, data: &[u8]) {
-        self.system.load_boot(data)
+        self.system.load_boot(data);
     }
 
     pub fn load_boot_path(&mut self, path: &str) -> PyResult<()> {
@@ -82,6 +81,10 @@ impl GameBoy {
 
     pub fn clocks(&mut self, count: usize) -> u64 {
         self.system.clocks(count)
+    }
+
+    pub fn clocks_cycles(&mut self, limit: usize) -> u64 {
+        self.system.clocks_cycles(limit)
     }
 
     pub fn next_frame(&mut self) -> u32 {
@@ -162,6 +165,10 @@ impl GameBoy {
         self.system.clock_freq_s()
     }
 
+    pub fn boot_rom_s(&self) -> String {
+        self.system.boot_rom_s()
+    }
+
     pub fn timer_div(&self) -> u8 {
         self.system.timer_i().div()
     }
@@ -171,14 +178,14 @@ impl GameBoy {
     }
 
     pub fn save_state(&mut self, py: Python) -> PyResult<PyObject> {
-        match StateManager::save(&mut self.system, None) {
+        match StateManager::save(&mut self.system, None, None) {
             Ok(data) => Ok(PyBytes::new(py, &data).into()),
             Err(e) => Err(PyErr::new::<PyException, _>(e)),
         }
     }
 
     pub fn load_state(&mut self, data: &[u8]) -> PyResult<()> {
-        StateManager::load(data, &mut self.system, None).map_err(PyErr::new::<PyException, _>)
+        StateManager::load(data, &mut self.system, None, None).map_err(PyErr::new::<PyException, _>)
     }
 }
 
@@ -198,10 +205,4 @@ fn boytacean(_py: Python, module: &PyModule) -> PyResult<()> {
     module.add("VISUAL_FREQ", GameBoyBase::VISUAL_FREQ)?;
     module.add("LCD_CYCLES", GameBoyBase::LCD_CYCLES)?;
     Ok(())
-}
-
-impl IntoPy<PyObject> for Error {
-    fn into_py(self, py: Python<'_>) -> PyObject {
-        self.to_string().into_py(py)
-    }
 }

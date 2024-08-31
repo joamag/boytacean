@@ -1,9 +1,10 @@
-import React, { FC, useEffect, useState } from "react";
 import { ButtonSwitch, Info, Pair } from "emukit";
+import React, { FC, useCallback, useEffect, useState } from "react";
+
+import { GameboyEmulator } from "../../../ts";
 import { AudioGB } from "../audio-gb/audio-gb";
 import { RegistersGB } from "../registers-gb/registers-gb";
 import { TilesGB } from "../tiles-gb/tiles-gb";
-import { GameboyEmulator } from "../../../ts";
 
 import "./debug.css";
 
@@ -90,27 +91,38 @@ const DebugSettingsContent: FC<EmulatorProps> = ({ emulator }) => {
         return () => {
             emulator.unbind("audio-state", onAudioState);
         };
-    }, []);
+    }, [emulator]);
 
-    const onPpuChange = (option: string) => {
-        emulator.instance?.set_ppu_enabled(option === "on");
-    };
-
-    const onApuChange = (option: string) => {
-        emulator.instance?.set_apu_enabled(option === "on");
-    };
-
-    const onDmaChange = (option: string) => {
-        emulator.instance?.set_dma_enabled(option === "on");
-    };
-
-    const onTimerChange = (option: string) => {
-        emulator.instance?.set_timer_enabled(option === "on");
-    };
-
-    const onSerialChange = (option: string) => {
-        emulator.instance?.set_serial_enabled(option === "on");
-    };
+    const onPpuChange = useCallback(
+        (option: string) => {
+            emulator.instance?.set_ppu_enabled(option === "on");
+        },
+        [emulator]
+    );
+    const onApuChange = useCallback(
+        (option: string) => {
+            emulator.instance?.set_apu_enabled(option === "on");
+        },
+        [emulator]
+    );
+    const onDmaChange = useCallback(
+        (option: string) => {
+            emulator.instance?.set_dma_enabled(option === "on");
+        },
+        [emulator]
+    );
+    const onTimerChange = useCallback(
+        (option: string) => {
+            emulator.instance?.set_timer_enabled(option === "on");
+        },
+        [emulator]
+    );
+    const onSerialChange = useCallback(
+        (option: string) => {
+            emulator.instance?.set_serial_enabled(option === "on");
+        },
+        [emulator]
+    );
 
     return (
         <Info key={updated}>

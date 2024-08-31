@@ -1,6 +1,17 @@
+//! APU (Audio Processing Unit) functions and structures.
+
 use std::collections::VecDeque;
 
-use crate::{gb::GameBoy, mmu::BusComponent, warnln};
+use crate::{
+    consts::{
+        NR10_ADDR, NR11_ADDR, NR12_ADDR, NR13_ADDR, NR14_ADDR, NR20_ADDR, NR21_ADDR, NR22_ADDR,
+        NR23_ADDR, NR24_ADDR, NR30_ADDR, NR31_ADDR, NR32_ADDR, NR33_ADDR, NR34_ADDR, NR40_ADDR,
+        NR41_ADDR, NR42_ADDR, NR43_ADDR, NR44_ADDR, NR50_ADDR, NR51_ADDR, NR52_ADDR,
+    },
+    gb::GameBoy,
+    mmu::BusComponent,
+    warnln,
+};
 
 const DUTY_TABLE: [[u8; 8]; 4] = [
     [0, 0, 0, 0, 0, 0, 0, 1],
@@ -347,79 +358,79 @@ impl Apu {
         }
     }
 
-    pub fn read(&mut self, addr: u16) -> u8 {
+    pub fn read(&self, addr: u16) -> u8 {
         match addr {
             // 0xFF10 — NR10: Channel 1 sweep
-            0xff10 => {
+            NR10_ADDR => {
                 (self.ch1_sweep_slope & 0x07)
                     | (if self.ch1_sweep_increase { 0x00 } else { 0x08 })
                     | ((self.ch1_sweep_pace & 0x07) << 4)
                     | 0x80
             }
             // 0xFF11 — NR11: Channel 1 length timer & duty cycle
-            0xff11 => ((self.ch1_wave_duty & 0x03) << 6) | 0x3f,
+            NR11_ADDR => ((self.ch1_wave_duty & 0x03) << 6) | 0x3f,
             // 0xFF12 — NR12: Channel 1 volume & envelope
-            0xff12 => {
+            NR12_ADDR => {
                 (self.ch1_pace & 0x07)
                     | ((self.ch1_direction & 0x01) << 3)
                     | ((self.ch1_volume & 0x0f) << 4)
             }
             // 0xFF13 — NR13: Channel 1 wavelength low
-            0xff13 => 0xff,
+            NR13_ADDR => 0xff,
             // 0xFF14 — NR14: Channel 1 wavelength high & control
-            0xff14 => (if self.ch1_length_enabled { 0x40 } else { 0x00 }) | 0xbf,
+            NR14_ADDR => (if self.ch1_length_enabled { 0x40 } else { 0x00 }) | 0xbf,
 
-            // 0xFF15 — Not used
-            0xff15 => 0xff,
+            // 0xFF15 — NR20: Not used
+            NR20_ADDR => 0xff,
             // 0xFF16 — NR21: Channel 2 length timer & duty cycle
-            0xff16 => ((self.ch2_wave_duty & 0x03) << 6) | 0x3f,
+            NR21_ADDR => ((self.ch2_wave_duty & 0x03) << 6) | 0x3f,
             // 0xFF17 — NR22: Channel 2 volume & envelope
-            0xff17 => {
+            NR22_ADDR => {
                 (self.ch2_pace & 0x07)
                     | ((self.ch2_direction & 0x01) << 3)
                     | ((self.ch2_volume & 0x0f) << 4)
             }
             // 0xFF18 — NR23: Channel 2 wavelength low
-            0xff18 => 0xff,
+            NR23_ADDR => 0xff,
             // 0xFF19 — NR24: Channel 2 wavelength high & control
-            0xff19 => (if self.ch2_length_enabled { 0x40 } else { 0x00 }) | 0xbf,
+            NR24_ADDR => (if self.ch2_length_enabled { 0x40 } else { 0x00 }) | 0xbf,
 
             // 0xFF1A — NR30: Channel 3 DAC enable
-            0xff1a => (if self.ch3_dac { 0x80 } else { 0x00 }) | 0x7f,
+            NR30_ADDR => (if self.ch3_dac { 0x80 } else { 0x00 }) | 0x7f,
             // 0xFF1B — NR31: Channel 3 length timer
-            0xff1b => 0xff,
+            NR31_ADDR => 0xff,
             // 0xFF1C — NR32: Channel 3 output level
-            0xff1c => ((self.ch3_output_level & 0x03) << 5) | 0x9f,
+            NR32_ADDR => ((self.ch3_output_level & 0x03) << 5) | 0x9f,
             // 0xFF1D — NR33: Channel 3 wavelength low
-            0xff1d => 0xff,
+            NR33_ADDR => 0xff,
             // 0xFF1E — NR34: Channel 3 wavelength high & control
-            0xff1e => (if self.ch3_length_enabled { 0x40 } else { 0x00 }) | 0xbf,
+            NR34_ADDR => (if self.ch3_length_enabled { 0x40 } else { 0x00 }) | 0xbf,
 
-            // 0xFF1F — Not used
-            0xff1f => 0xff,
+            // 0xFF1F — NR40: Not used
+            NR40_ADDR => 0xff,
             // 0xFF20 — NR41: Channel 4 length timer
-            0xff20 => 0xff,
+            NR41_ADDR => 0xff,
             // 0xFF21 — NR42: Channel 4 volume & envelope
-            0xff21 => {
+            NR42_ADDR => {
                 (self.ch4_pace & 0x07)
                     | ((self.ch4_direction & 0x01) << 3)
                     | ((self.ch4_volume & 0x0f) << 4)
             }
             // 0xFF22 — NR43: Channel 4 frequency & randomness
-            0xff22 => {
+            NR43_ADDR => {
                 (self.ch4_divisor & 0x07)
                     | if self.ch4_width_mode { 0x08 } else { 0x00 }
                     | ((self.ch4_clock_shift & 0x0f) << 4)
             }
             // 0xFF23 — NR44: Channel 4 control
-            0xff23 => (if self.ch4_length_enabled { 0x40 } else { 0x00 }) | 0xbf,
+            NR44_ADDR => (if self.ch4_length_enabled { 0x40 } else { 0x00 }) | 0xbf,
 
             // 0xFF24 — NR50: Master volume & VIN panning
-            0xff24 => self.master,
+            NR50_ADDR => self.master,
             // 0xFF25 — NR51: Sound panning
-            0xff25 => self.glob_panning,
+            NR51_ADDR => self.glob_panning,
             // 0xFF26 — NR52: Sound on/off
-            0xff26 =>
+            NR52_ADDR =>
             {
                 #[allow(clippy::bool_to_int_with_if)]
                 ((if self.ch1_enabled && self.ch1_dac {
@@ -447,6 +458,7 @@ impl Apu {
 
             _ => {
                 warnln!("Reading from unknown APU location 0x{:04x}", addr);
+                #[allow(unreachable_code)]
                 0xff
             }
         }
@@ -461,19 +473,19 @@ impl Apu {
 
         match addr {
             // 0xFF10 — NR10: Channel 1 sweep
-            0xff10 => {
+            NR10_ADDR => {
                 self.ch1_sweep_slope = value & 0x07;
                 self.ch1_sweep_increase = value & 0x08 == 0x00;
                 self.ch1_sweep_pace = (value & 0x70) >> 4;
                 self.ch1_sweep_sequence = 0;
             }
             // 0xFF11 — NR11: Channel 1 length timer & duty cycle
-            0xff11 => {
+            NR11_ADDR => {
                 self.ch1_length_timer = 64 - (value & 0x3f);
                 self.ch1_wave_duty = (value & 0xc0) >> 6;
             }
             // 0xFF12 — NR12: Channel 1 volume & envelope
-            0xff12 => {
+            NR12_ADDR => {
                 self.ch1_pace = value & 0x07;
                 self.ch1_direction = (value & 0x08) >> 3;
                 self.ch1_volume = (value & 0xf0) >> 4;
@@ -485,18 +497,18 @@ impl Apu {
                 }
             }
             // 0xFF13 — NR13: Channel 1 wavelength low
-            0xff13 => {
+            NR13_ADDR => {
                 self.ch1_wave_length = (self.ch1_wave_length & 0xff00) | value as u16;
             }
             // 0xFF14 — NR14: Channel 1 wavelength high & control
-            0xff14 => {
+            NR14_ADDR => {
                 let length_trigger = value & 0x40 == 0x40;
                 let trigger = value & 0x80 == 0x80;
                 let length_edge = length_trigger && !self.ch1_length_enabled;
                 self.ch1_wave_length =
                     (self.ch1_wave_length & 0x00ff) | (((value & 0x07) as u16) << 8);
                 self.ch1_length_enabled = value & 0x40 == 0x40;
-                self.ch1_enabled |= value & 0x80 == 0x80;
+                self.ch1_enabled |= trigger;
                 if length_edge && self.sequencer_step % 2 == 1 {
                     self.tick_length(Channel::Ch1);
                 }
@@ -508,15 +520,15 @@ impl Apu {
                 }
             }
 
-            // 0xFF15 — Not used
-            0xff15 => (),
+            // 0xFF15 — NR20: Not used
+            NR20_ADDR => (),
             // 0xFF16 — NR21: Channel 2 length timer & duty cycle
-            0xff16 => {
+            NR21_ADDR => {
                 self.ch2_length_timer = 64 - (value & 0x3f);
                 self.ch2_wave_duty = (value & 0xc0) >> 6;
             }
             // 0xFF17 — NR22: Channel 2 volume & envelope
-            0xff17 => {
+            NR22_ADDR => {
                 self.ch2_pace = value & 0x07;
                 self.ch2_direction = (value & 0x08) >> 3;
                 self.ch2_volume = (value & 0xf0) >> 4;
@@ -528,11 +540,11 @@ impl Apu {
                 }
             }
             // 0xFF18 — NR23: Channel 2 wavelength low
-            0xff18 => {
+            NR23_ADDR => {
                 self.ch2_wave_length = (self.ch2_wave_length & 0xff00) | value as u16;
             }
             // 0xFF19 — NR24: Channel 2 wavelength high & control
-            0xff19 => {
+            NR24_ADDR => {
                 let length_trigger = value & 0x40 == 0x40;
                 let trigger = value & 0x80 == 0x80;
                 let length_edge = length_trigger && !self.ch2_length_enabled;
@@ -552,26 +564,26 @@ impl Apu {
             }
 
             // 0xFF1A — NR30: Channel 3 DAC enable
-            0xff1a => {
+            NR30_ADDR => {
                 self.ch3_dac = value & 0x80 == 0x80;
                 if !self.ch3_dac {
                     self.ch3_enabled = false;
                 }
             }
             // 0xFF1B — NR31: Channel 3 length timer
-            0xff1b => {
+            NR31_ADDR => {
                 self.ch3_length_timer = 256 - (value as u16);
             }
             // 0xFF1C — NR32: Channel 3 output level
-            0xff1c => {
+            NR32_ADDR => {
                 self.ch3_output_level = (value & 0x60) >> 5;
             }
             // 0xFF1D — NR33: Channel 3 wavelength low
-            0xff1d => {
+            NR33_ADDR => {
                 self.ch3_wave_length = (self.ch3_wave_length & 0xff00) | value as u16;
             }
             // 0xFF1E — NR34: Channel 3 wavelength high & control
-            0xff1e => {
+            NR34_ADDR => {
                 let length_trigger = value & 0x40 == 0x40;
                 let trigger = value & 0x80 == 0x80;
                 let length_edge = length_trigger && !self.ch3_length_enabled;
@@ -591,13 +603,13 @@ impl Apu {
             }
 
             // 0xFF1F — Not used
-            0xff1f => (),
+            NR40_ADDR => (),
             // 0xFF20 — NR41: Channel 4 length timer
-            0xff20 => {
+            NR41_ADDR => {
                 self.ch4_length_timer = 64 - (value & 0x3f);
             }
             // 0xFF21 — NR42: Channel 4 volume & envelope
-            0xff21 => {
+            NR42_ADDR => {
                 self.ch4_pace = value & 0x07;
                 self.ch4_direction = (value & 0x08) >> 3;
                 self.ch4_volume = (value & 0xf0) >> 4;
@@ -609,13 +621,13 @@ impl Apu {
                 }
             }
             // 0xFF22 — NR43: Channel 4 frequency & randomness
-            0xff22 => {
+            NR43_ADDR => {
                 self.ch4_divisor = value & 0x07;
                 self.ch4_width_mode = value & 0x08 == 0x08;
                 self.ch4_clock_shift = (value & 0xf0) >> 4;
             }
             // 0xFF23 — NR44: Channel 4 control
-            0xff23 => {
+            NR44_ADDR => {
                 let length_trigger = value & 0x40 == 0x40;
                 let trigger = value & 0x80 == 0x80;
                 let length_edge = length_trigger && !self.ch4_length_enabled;
@@ -633,15 +645,15 @@ impl Apu {
             }
 
             // 0xFF24 — NR50: Master volume & VIN panning
-            0xff24 => {
+            NR50_ADDR => {
                 self.master = value;
             }
             // 0xFF25 — NR51: Sound panning
-            0xff25 => {
+            NR51_ADDR => {
                 self.glob_panning = value;
             }
             // 0xFF26 — NR52: Sound on/off
-            0xff26 => {
+            NR52_ADDR => {
                 self.sound_enabled = value & 0x80 == 0x80;
                 if !self.sound_enabled {
                     self.reset();
@@ -656,12 +668,72 @@ impl Apu {
         }
     }
 
-    pub fn read_unsafe(&mut self, addr: u16) -> u8 {
-        self.read(addr)
+    pub fn read_raw(&mut self, addr: u16) -> u8 {
+        match addr {
+            // 0xFF11 — NR11: Channel 1 length timer & duty cycle
+            NR11_ADDR => ((64 - self.ch1_length_timer) & 0x3f) | ((self.ch1_wave_duty & 0x03) << 6),
+            // 0xFF14 — NR14: Channel 1 wavelength high & control
+            NR14_ADDR => {
+                (if self.ch1_length_enabled { 0x40 } else { 0x00 })
+                    | (if self.ch1_enabled { 0x80 } else { 0x00 })
+                    | (((self.ch1_wave_length & 0x0700 >> 8) as u8) << 3)
+                    | 0x38
+            }
+
+            // 0xFF16 — NR21: Channel 2 length timer & duty cycle
+            NR21_ADDR => ((64 - self.ch2_length_timer) & 0x3f) | ((self.ch2_wave_duty & 0x03) << 6),
+            // 0xFF19 — NR24: Channel 2 wavelength high & control
+            NR24_ADDR => {
+                (if self.ch2_length_enabled { 0x40 } else { 0x00 })
+                    | (if self.ch2_enabled { 0x80 } else { 0x00 })
+                    | (((self.ch2_wave_length & 0x0700 >> 8) as u8) << 3)
+                    | 0x38
+            }
+
+            // 0xFF1B — NR31: Channel 3 length timer
+            NR31_ADDR => (255 - self.ch3_length_timer as u8).saturating_add(1),
+            // 0xFF1E — NR34: Channel 3 wavelength high & control
+            NR34_ADDR => {
+                (if self.ch3_length_enabled { 0x40 } else { 0x00 })
+                    | (if self.ch3_enabled { 0x80 } else { 0x00 })
+                    | (((self.ch3_wave_length & 0x0700 >> 8) as u8) << 3)
+                    | 0x38
+            }
+
+            // 0xFF20 — NR41: Channel 4 length timer
+            NR41_ADDR => (64 - self.ch4_length_timer) & 0x3f,
+            // 0xFF23 — NR44: Channel 4 control
+            NR44_ADDR => {
+                (if self.ch4_length_enabled { 0x40 } else { 0x00 })
+                    | (if self.ch4_enabled { 0x80 } else { 0x00 })
+                    | 0x3f
+            }
+
+            _ => self.read(addr),
+        }
     }
 
-    pub fn write_unsafe(&mut self, addr: u16, value: u8) {
-        self.write(addr, value);
+    pub fn write_raw(&mut self, addr: u16, value: u8) {
+        match addr {
+            // 0xFF26 — NR52: Sound on/off
+            NR52_ADDR => {
+                self.ch1_enabled = value & 0x01 == 0x01;
+                self.ch2_enabled = value & 0x02 == 0x02;
+                self.ch3_enabled = value & 0x04 == 0x04;
+                self.ch4_enabled = value & 0x08 == 0x08;
+                self.sound_enabled = value & 0x80 == 0x80;
+                self.ch1_dac = self.ch1_enabled;
+                self.ch2_dac = self.ch2_enabled;
+                self.ch3_dac = self.ch3_enabled;
+                self.ch4_dac = self.ch4_enabled;
+                if !self.sound_enabled {
+                    self.reset();
+                    self.sound_enabled = false;
+                }
+            }
+
+            _ => self.write(addr, value),
+        }
     }
 
     #[inline(always)]
@@ -1077,7 +1149,7 @@ impl Apu {
 }
 
 impl BusComponent for Apu {
-    fn read(&mut self, addr: u16) -> u8 {
+    fn read(&self, addr: u16) -> u8 {
         self.read(addr)
     }
 

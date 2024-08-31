@@ -1,16 +1,15 @@
-#![allow(clippy::uninlined_format_args)]
-
 pub mod consts;
 pub mod palettes;
 pub mod structs;
 
 use boytacean::{
+    color::XRGB8888_SIZE,
     debugln,
     gb::{AudioProvider, GameBoy},
     info::Info,
     infoln,
     pad::PadKey,
-    ppu::{DISPLAY_HEIGHT, DISPLAY_WIDTH, FRAME_BUFFER_SIZE, XRGB8888_SIZE},
+    ppu::{DISPLAY_HEIGHT, DISPLAY_WIDTH, FRAME_BUFFER_SIZE},
     rom::Cartridge,
     state::{SaveStateFormat, StateManager},
     warnln,
@@ -400,7 +399,7 @@ pub unsafe extern "C" fn retro_load_game(game: *const RetroGameInfo) -> bool {
     let mode = rom.gb_mode();
     instance.set_mode(mode);
     instance.reset();
-    instance.load(true);
+    instance.load(true).unwrap();
     instance.load_cartridge(rom).unwrap();
     update_vars();
     true
@@ -439,7 +438,10 @@ pub extern "C" fn retro_get_memory_data(_memory_id: u32) -> *mut c_void {
 pub extern "C" fn retro_serialize_size() -> usize {
     debugln!("retro_serialize_size()");
     let instance = unsafe { EMULATOR.as_mut().unwrap() };
-    StateManager::save(instance, Some(SaveStateFormat::Bess))
+
+    // uses BESS file format for its static nature, meaning that the final
+    // size of the serialized state is known in advance
+    StateManager::save(instance, Some(SaveStateFormat::Bess), None)
         .unwrap()
         .len()
 }
@@ -448,11 +450,14 @@ pub extern "C" fn retro_serialize_size() -> usize {
 pub extern "C" fn retro_serialize(data: *mut c_void, size: usize) -> bool {
     debugln!("retro_serialize()");
     let instance = unsafe { EMULATOR.as_mut().unwrap() };
-    let state = match StateManager::save(instance, Some(SaveStateFormat::Bess)) {
+    let state = match StateManager::save(instance, Some(SaveStateFormat::Bess), None) {
         Ok(state) => state,
         Err(err) => {
             warnln!("Failed to save state: {}", err);
-            return false;
+            #[allow(unreachable_code)]
+            {
+                return false;
+            }
         }
     };
     if state.len() > size {
@@ -461,7 +466,10 @@ pub extern "C" fn retro_serialize(data: *mut c_void, size: usize) -> bool {
             state.len(),
             size
         );
-        return false;
+        #[allow(unreachable_code)]
+        {
+            return false;
+        }
     }
     unsafe {
         ptr::copy_nonoverlapping(state.as_ptr(), data as *mut u8, state.len());
@@ -474,9 +482,12 @@ pub extern "C" fn retro_unserialize(data: *const c_void, size: usize) -> bool {
     debugln!("retro_unserialize()");
     let instance = unsafe { EMULATOR.as_mut().unwrap() };
     let state = unsafe { from_raw_parts(data as *const u8, size) };
-    if let Err(err) = StateManager::load(state, instance, None) {
+    if let Err(err) = StateManager::load(state, instance, None, None) {
         warnln!("Failed to load state: {}", err);
-        return false;
+        #[allow(unreachable_code)]
+        {
+            return false;
+        }
     }
     true
 }

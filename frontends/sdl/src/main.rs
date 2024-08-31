@@ -1,5 +1,3 @@
-#![allow(clippy::uninlined_format_args)]
-
 pub mod audio;
 pub mod data;
 pub mod sdl;
@@ -8,7 +6,6 @@ pub mod test;
 use audio::Audio;
 use boytacean::{
     devices::{printer::PrinterDevice, stdout::StdoutDevice},
-    error::Error,
     gb::{AudioProvider, GameBoy, GameBoyMode},
     info::Info,
     pad::PadKey,
@@ -16,6 +13,9 @@ use boytacean::{
     rom::Cartridge,
     serial::{NullDevice, SerialDevice},
     state::StateManager,
+};
+use boytacean_common::{
+    error::Error,
     util::{replace_ext, write_file},
 };
 use chrono::Utc;
@@ -75,23 +75,84 @@ pub struct EmulatorOptions {
     features: Option<Vec<&'static str>>,
 }
 
+/// Main structure used to control the logic execution of
+/// an emulator in an SDL context.
+///
+/// The way the structure is defined should be as agnostic
+/// as possible to the underlying system, meaning that it
+/// should be able to run in different systems without any
+/// major changes.
 pub struct Emulator {
+    /// Reference to the system that is going to be used to
+    /// run the emulation.
     system: GameBoy,
+
+    /// Flag that controls if the emulator should run in
+    /// auto mode, meaning that the mode should be inferred
+    /// from the ROM file.
     auto_mode: bool,
+
+    /// Flag that controls if the emulator should run in an
+    /// unlimited mode, meaning that no speed limit is imposed.
     unlimited: bool,
+
+    /// Reference to the SDL system that is going to be used
+    /// to render the graphics and handle the input.
     sdl: Option<SdlSystem>,
+
+    /// Reference to the audio provider that is going to be used
+    /// to handle the audio output.
     audio: Option<Audio>,
+
+    /// The title of the emulator that is going to be displayed
+    /// in the window title.
     title: String,
+
+    /// The path to the ROM file that is going to be loaded into
+    /// the emulator.
     rom_path: String,
+
+    /// The path to the RAM file (save state) that is going to be
+    /// to load state from.
     ram_path: String,
+
+    /// Path to the directory where storage of files is located, this
+    /// value is going to be used to save files.
+    ///
+    /// Example usage of this directory includes screenshots, save states
+    /// and other files that are going to be saved to the file system.
     dir_path: String,
+
+    /// The frequency at which the logic of the emulator is going to
+    /// be executed, this value is going to be used to control the
+    /// speed of the emulation.
     logic_frequency: u32,
+
+    /// The frequency at which the visual part of the emulator is going
+    /// to be executed, this value is going to be used to control the
+    /// speed of the visual part of the emulation (eg: 60 FPS).
     visual_frequency: f32,
+
+    /// The time at which the next tick is going to be executed, this
+    /// value is expressed in milliseconds.
     next_tick_time: f32,
+
+    /// Integer representation of the `next_tick_time` value.
     next_tick_time_i: u32,
+
+    /// Flag that controls if the emulator is running above its reference
+    /// speed.
     fast: bool,
+
+    /// Set of features that are going to be enabled in the emulator, this
+    /// value is going to be used to control the behavior of the emulator.
     features: Vec<&'static str>,
+
+    /// Set of palettes that are going to be used to control the color
+    /// of the emulator frame buffer.
     palettes: [PaletteInfo; 7],
+
+    /// Index of the current palette controlling the palette being used.
     palette_index: usize,
 }
 
@@ -197,12 +258,12 @@ impl Emulator {
         }
     }
 
-    #[cfg(not(feature = "slow"))]
-    pub fn start_base(&mut self) {}
-
-    #[cfg(feature = "slow")]
     pub fn start_base(&mut self) {
-        self.logic_frequency = 100;
+        self.system.set_diag();
+        #[cfg(feature = "slow")]
+        {
+            self.logic_frequency = 100;
+        }
     }
 
     pub fn start_graphics(&mut self, sdl: &Sdl, screen_scale: f32) {
@@ -259,7 +320,7 @@ impl Emulator {
 
     pub fn reset(&mut self) -> Result<(), Error> {
         self.system.reset();
-        self.system.load(true);
+        self.system.load(true)?;
         self.load_rom(None)?;
         Ok(())
     }
@@ -302,7 +363,7 @@ impl Emulator {
     }
 
     fn save_state(&mut self, file_path: &str) {
-        if let Err(message) = StateManager::save_file(file_path, &mut self.system, None) {
+        if let Err(message) = StateManager::save_file(file_path, &mut self.system, None, None) {
             println!("Error saving state: {}", message)
         } else {
             println!("Saved state into: {}", file_path)
@@ -310,7 +371,7 @@ impl Emulator {
     }
 
     fn load_state(&mut self, file_path: &str) {
-        if let Err(message) = StateManager::load_file(file_path, &mut self.system, None) {
+        if let Err(message) = StateManager::load_file(file_path, &mut self.system, None, None) {
             println!("Error loading state: {}", message)
         } else {
             println!("Loaded state from: {}", file_path)
@@ -357,6 +418,10 @@ impl Emulator {
                 .set_fullscreen(sdl2::video::FullscreenType::Off)
                 .unwrap()
         }
+    }
+
+    pub fn print_debug(&mut self) {
+        println!("{}", self.system.description_debug());
     }
 
     pub fn limited(&self) -> bool {
@@ -443,6 +508,10 @@ impl Emulator {
                         keycode: Some(Keycode::P),
                         ..
                     } => self.toggle_palette(),
+                    Event::KeyDown {
+                        keycode: Some(Keycode::C),
+                        ..
+                    } => self.print_debug(),
                     Event::KeyDown {
                         keycode: Some(Keycode::E),
                         keymod,
@@ -535,7 +604,7 @@ impl Emulator {
                             self.system.set_mode(mode);
                         }
                         self.system.reset();
-                        self.system.load(true);
+                        self.system.load(true).unwrap();
                         self.load_rom(Some(&filename)).unwrap();
                     }
                     _ => (),
@@ -810,7 +879,7 @@ impl Emulator {
     /// taking into consideration the provided directory path.
     /// The generated file name is `{base}.{suffix}{index}`.
     fn sequence_name(base: &str, index: u8, suffix: &str, dir_path: &str) -> String {
-        let file_name = format!("{}.{}{}", base, suffix, index);
+        let file_name = format!("{base}.{suffix}{index}");
         let mut file_buf = PathBuf::from(dir_path);
         file_buf.push(file_name);
         file_buf.to_str().unwrap().to_string()
@@ -821,14 +890,14 @@ impl Emulator {
     /// same directory.
     fn best_name(base: &str, ext: &str, dir_path: &str) -> String {
         let mut index = 0_usize;
-        let mut name = format!("{}.{}", base, ext);
+        let mut name = format!("{base}.{ext}");
 
         let mut path_buf = PathBuf::from(dir_path);
         path_buf.push(&name);
 
         while path_buf.exists() {
             index += 1;
-            name = format!("{}-{}.{}", base, index, ext);
+            name = format!("{base}-{index}.{ext}");
             path_buf = PathBuf::from(dir_path);
             path_buf.push(&name);
         }
@@ -969,13 +1038,15 @@ fn main() {
         let mode = Cartridge::from_file(&args.rom_path).unwrap().gb_mode();
         game_boy.set_mode(mode);
     }
-    let device: Box<dyn SerialDevice> = build_device(&args.device);
+    let device: Box<dyn SerialDevice> = build_device(&args.device).unwrap();
     game_boy.set_ppu_enabled(!args.no_ppu);
     game_boy.set_apu_enabled(!args.no_apu);
     game_boy.set_dma_enabled(!args.no_dma);
     game_boy.set_timer_enabled(!args.no_timer);
     game_boy.attach_serial(device);
-    game_boy.load(!args.no_boot && args.boot_rom_path.is_empty());
+    game_boy
+        .load(!args.no_boot && args.boot_rom_path.is_empty())
+        .unwrap();
     if args.no_boot {
         game_boy.load_boot_state();
     }
@@ -1007,10 +1078,10 @@ fn main() {
     run(args, &mut emulator);
 }
 
-fn build_device(device: &str) -> Box<dyn SerialDevice> {
+fn build_device(device: &str) -> Result<Box<dyn SerialDevice>, Error> {
     match device {
-        "null" => Box::<NullDevice>::default(),
-        "stdout" => Box::<StdoutDevice>::default(),
+        "null" => Ok(Box::<NullDevice>::default()),
+        "stdout" => Ok(Box::<StdoutDevice>::default()),
         "printer" => {
             let mut printer = Box::<PrinterDevice>::default();
             printer.set_callback(|image_buffer| {
@@ -1024,9 +1095,11 @@ fn build_device(device: &str) -> Box<dyn SerialDevice> {
                 )
                 .unwrap();
             });
-            printer
+            Ok(printer)
         }
-        _ => panic!("Unsupported device: {}", device),
+        _ => Err(Error::InvalidParameter(format!(
+            "Unsupported device: {device}"
+        ))),
     }
 }
 

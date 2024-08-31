@@ -1,5 +1,6 @@
 //! PPU (Picture Processing Unit) functions and structures.
 
+use boytacean_common::util::SharedThread;
 use core::fmt;
 use std::{
     borrow::BorrowMut,
@@ -10,10 +11,18 @@ use std::{
 };
 
 use crate::{
+    color::{
+        rgb555_to_rgb888, rgb888_to_rgb1555_array, rgb888_to_rgb1555_u16, rgb888_to_rgb565,
+        rgb888_to_rgb565_u16, Pixel, PixelAlpha, RGB1555_SIZE, RGB565_SIZE, RGB888_SIZE, RGB_SIZE,
+        XRGB8888_SIZE,
+    },
+    consts::{
+        BGP_ADDR, LCDC_ADDR, LYC_ADDR, LY_ADDR, OBP0_ADDR, OBP1_ADDR, SCX_ADDR, SCY_ADDR,
+        STAT_ADDR, WX_ADDR, WY_ADDR,
+    },
     gb::{GameBoyConfig, GameBoyMode},
     mmu::BusComponent,
-    util::SharedThread,
-    warnln,
+    panic_gb, warnln,
 };
 
 #[cfg(feature = "wasm")]
@@ -25,12 +34,6 @@ pub const VRAM_SIZE: usize = VRAM_SIZE_CGB;
 pub const HRAM_SIZE: usize = 128;
 pub const OAM_SIZE: usize = 260;
 pub const PALETTE_SIZE: usize = 4;
-pub const RGB_SIZE: usize = 3;
-pub const RGBA_SIZE: usize = 4;
-pub const RGB888_SIZE: usize = 3;
-pub const XRGB8888_SIZE: usize = 4;
-pub const RGB1555_SIZE: usize = 2;
-pub const RGB565_SIZE: usize = 2;
 pub const TILE_WIDTH: usize = 8;
 pub const TILE_HEIGHT: usize = 8;
 pub const TILE_WIDTH_I: usize = 7;
@@ -105,22 +108,6 @@ pub const BASIC_PALETTE: Palette = [
     [0x00, 0x00, 0x00],
 ];
 
-/// Defines the Game Boy pixel type as a buffer
-/// with the size of RGB (3 bytes).
-pub type Pixel = [u8; RGB_SIZE];
-
-/// Defines a transparent Game Boy pixel type as a buffer
-/// with the size of RGBA (4 bytes).
-pub type PixelAlpha = [u8; RGBA_SIZE];
-
-/// Defines a pixel with 5 bits per channel plus a padding
-/// bit at the beginning.
-pub type PixelRgb1555 = [u8; RGB1555_SIZE];
-
-/// Defines a pixel with 5 bits per channel except for the
-/// green channel which uses 6 bits.
-pub type PixelRgb565 = [u8; RGB565_SIZE];
-
 /// Defines a type that represents a color palette
 /// within the Game Boy context.
 pub type Palette = [Pixel; PALETTE_SIZE];
@@ -187,7 +174,7 @@ impl PaletteInfo {
             } else {
                 buffer.push(',');
             }
-            buffer.push_str(format!("{:06x}", color).as_str());
+            buffer.push_str(format!("{color:06x}").as_str());
         }
         buffer
     }
@@ -250,7 +237,7 @@ impl Display for Tile {
             }
             buffer.push('\n');
         }
-        write!(f, "{}", buffer)
+        write!(f, "{buffer}")
     }
 }
 
@@ -351,11 +338,13 @@ pub struct PpuRegisters {
 
 /// Represents the Game Boy PPU (Pixel Processing Unit) and controls
 /// all of the logic behind the graphics processing and presentation.
+///
 /// Should store both the VRAM and HRAM together with the internal
 /// graphic related registers.
 /// Outputs the screen as a RGB 8 bit frame buffer.
 ///
 /// # Basic usage
+///
 /// ```rust
 /// use boytacean::ppu::Ppu;
 /// let mut ppu = Ppu::default();
@@ -553,9 +542,9 @@ pub struct Ppu {
     /// the identifier wraps on the u16 edges.
     frame_index: u16,
 
-    // Index of the last frame that was rendered, this value is used
-    // to control the delayed rendering of the frame buffer and should
-    // avoid some resource usage
+    /// Index of the last frame that was rendered, this value is used
+    /// to control the deferred rendering of the frame buffer and should
+    /// prevent unnecessary resource usage.
     frame_buffer_index: u16,
 
     stat_hblank: bool,
@@ -644,7 +633,7 @@ impl Ppu {
             palette_address_obj: 0x0,
             first_frame: false,
             frame_index: 0,
-            frame_buffer_index: std::u16::MAX,
+            frame_buffer_index: u16::MAX,
             stat_hblank: false,
             stat_vblank: false,
             stat_oam: false,
@@ -699,7 +688,7 @@ impl Ppu {
         self.palette_address_obj = 0x0;
         self.first_frame = false;
         self.frame_index = 0;
-        self.frame_buffer_index = std::u16::MAX;
+        self.frame_buffer_index = u16::MAX;
         self.stat_hblank = false;
         self.stat_vblank = false;
         self.stat_oam = false;
@@ -707,6 +696,19 @@ impl Ppu {
         self.int_vblank = false;
         self.int_stat = false;
         self.dmg_compat = false;
+    }
+
+    pub fn clear_screen(&mut self, hard: bool) {
+        self.mode = PpuMode::HBlank;
+        self.mode_clock = 0;
+        self.ly = 0;
+        self.int_vblank = false;
+        self.int_stat = false;
+        self.window_counter = 0;
+        if hard {
+            self.first_frame = true;
+            self.clear_frame_buffer();
+        }
     }
 
     pub fn clock(&mut self, cycles: u16) {
@@ -792,14 +794,14 @@ impl Ppu {
         }
     }
 
-    pub fn read(&mut self, addr: u16) -> u8 {
+    pub fn read(&self, addr: u16) -> u8 {
         match addr {
             0x8000..=0x9fff => self.vram[(self.vram_offset + (addr & 0x1fff)) as usize],
             0xfe00..=0xfe9f => self.oam[(addr & 0x009f) as usize],
             // Not Usable
             0xfea0..=0xfeff => 0xff,
             0xff80..=0xfffe => self.hram[(addr & 0x007f) as usize],
-            0xff40 =>
+            LCDC_ADDR =>
             {
                 #[allow(clippy::bool_to_int_with_if)]
                 (if self.switch_bg { 0x01 } else { 0x00 }
@@ -811,23 +813,30 @@ impl Ppu {
                     | if self.window_map { 0x40 } else { 0x00 }
                     | if self.switch_lcd { 0x80 } else { 0x00 })
             }
-            0xff41 => {
+            STAT_ADDR => {
                 (if self.stat_hblank { 0x08 } else { 0x00 }
                     | if self.stat_vblank { 0x10 } else { 0x00 }
                     | if self.stat_oam { 0x20 } else { 0x00 }
                     | if self.stat_lyc { 0x40 } else { 0x00 }
                     | if self.lyc == self.ly { 0x04 } else { 0x00 }
-                    | (self.mode as u8 & 0x03))
+                    | (self.mode as u8 & 0x03)
+                    | 0x80)
             }
-            0xff42 => self.scy,
-            0xff43 => self.scx,
-            0xff44 => self.ly,
-            0xff45 => self.lyc,
-            0xff47 => self.palettes[0],
-            0xff48 => self.palettes[1],
-            0xff49 => self.palettes[2],
-            0xff4a => self.wy,
-            0xff4b => self.wx,
+            SCY_ADDR => self.scy,
+            SCX_ADDR => self.scx,
+            LY_ADDR => self.ly,
+            // 0xFF45 — LYC
+            LYC_ADDR => self.lyc,
+            // 0xFF47 — BGP (Non-CGB Mode only)
+            BGP_ADDR => self.palettes[0],
+            // 0xFF48 — OBP0 (Non-CGB Mode only)
+            OBP0_ADDR => self.palettes[1],
+            // 0xFF49 — OBP1 (Non-CGB Mode only)
+            OBP1_ADDR => self.palettes[2],
+            // 0xFF4A — WX
+            WX_ADDR => self.wy,
+            // 0xFF4B — WY
+            WY_ADDR => self.wx,
             // 0xFF4F — VBK (CGB only)
             0xff4f => self.vram_bank | 0xfe,
             // 0xFF68 — BCPS/BGPI (CGB only)
@@ -839,17 +848,10 @@ impl Ppu {
             // 0xFF6B — OCPD/OBPD (CGB only)
             0xff6b => self.palettes_color[1][self.palette_address_obj as usize],
             // 0xFF6C — OPRI (CGB only)
-            0xff6c =>
-            {
-                #[allow(clippy::bool_to_int_with_if)]
-                if self.obj_priority {
-                    0x01
-                } else {
-                    0x00
-                }
-            }
+            0xff6c => (if self.obj_priority { 0x01 } else { 0x00 }) | 0xfe,
             _ => {
                 warnln!("Reading from unknown PPU location 0x{:04x}", addr);
+                #[allow(unreachable_code)]
                 0xff
             }
         }
@@ -872,7 +874,7 @@ impl Ppu {
             // Not Usable
             0xfea0..=0xfeff => (),
             0xff80..=0xfffe => self.hram[(addr & 0x007f) as usize] = value,
-            0xff40 => {
+            LCDC_ADDR => {
                 self.switch_bg = value & 0x01 == 0x01;
                 self.switch_obj = value & 0x02 == 0x02;
                 self.obj_size = value & 0x04 == 0x04;
@@ -886,26 +888,21 @@ impl Ppu {
                 // to clear the screen, this is the expected
                 // behaviour for this specific situation
                 if !self.switch_lcd {
-                    self.mode = PpuMode::HBlank;
-                    self.mode_clock = 0;
-                    self.ly = 0;
-                    self.int_vblank = false;
-                    self.int_stat = false;
-                    self.window_counter = 0;
-                    self.first_frame = true;
-                    self.clear_frame_buffer();
+                    self.clear_screen(true)
                 }
             }
-            0xff41 => {
+            STAT_ADDR => {
                 self.stat_hblank = value & 0x08 == 0x08;
                 self.stat_vblank = value & 0x10 == 0x10;
                 self.stat_oam = value & 0x20 == 0x20;
                 self.stat_lyc = value & 0x40 == 0x40;
             }
-            0xff42 => self.scy = value,
-            0xff43 => self.scx = value,
-            0xff45 => self.lyc = value,
-            0xff47 => {
+            SCY_ADDR => self.scy = value,
+            SCX_ADDR => self.scx = value,
+            // 0xFF45 — LYC: LY compare
+            LYC_ADDR => self.lyc = value,
+            // 0xFF47 — BGP (Non-CGB Mode only)
+            BGP_ADDR => {
                 if value == self.palettes[0] {
                     return;
                 }
@@ -916,7 +913,8 @@ impl Ppu {
                 }
                 self.palettes[0] = value;
             }
-            0xff48 => {
+            // 0xFF48 — OBP0 (Non-CGB Mode only)
+            OBP0_ADDR => {
                 if value == self.palettes[1] {
                     return;
                 }
@@ -931,7 +929,8 @@ impl Ppu {
                 }
                 self.palettes[1] = value;
             }
-            0xff49 => {
+            // 0xFF49 — OBP0 (Non-CGB Mode only)
+            OBP1_ADDR => {
                 if value == self.palettes[2] {
                     return;
                 }
@@ -946,8 +945,10 @@ impl Ppu {
                 }
                 self.palettes[2] = value;
             }
-            0xff4a => self.wy = value,
-            0xff4b => self.wx = value,
+            // 0xFF4A — WX
+            WX_ADDR => self.wy = value,
+            // 0xFF4B — WY
+            WY_ADDR => self.wx = value,
             // 0xFF4F — VBK (CGB only)
             0xff4f => {
                 self.vram_bank = value & 0x01;
@@ -1053,16 +1054,7 @@ impl Ppu {
     pub fn frame_buffer_rgb1555(&mut self) -> [u8; FRAME_BUFFER_RGB1555_SIZE] {
         let frame_buffer = self.frame_buffer();
         let mut buffer = [0u8; FRAME_BUFFER_RGB1555_SIZE];
-        for index in 0..DISPLAY_SIZE {
-            let (r, g, b) = (
-                frame_buffer[index * RGB_SIZE],
-                frame_buffer[index * RGB_SIZE + 1],
-                frame_buffer[index * RGB_SIZE + 2],
-            );
-            let rgb1555 = Self::rgb888_to_rgb1555(r, g, b);
-            buffer[index * RGB1555_SIZE] = rgb1555[0];
-            buffer[index * RGB1555_SIZE + 1] = rgb1555[1];
-        }
+        rgb888_to_rgb1555_array(frame_buffer, &mut buffer);
         buffer
     }
 
@@ -1075,7 +1067,7 @@ impl Ppu {
                 frame_buffer[index * RGB_SIZE + 1],
                 frame_buffer[index * RGB_SIZE + 2],
             );
-            *pixel = Self::rgb888_to_rgb1555_u16(r, g, b);
+            *pixel = rgb888_to_rgb1555_u16(r, g, b);
         }
         buffer
     }
@@ -1089,7 +1081,7 @@ impl Ppu {
                 frame_buffer[index * RGB_SIZE + 1],
                 frame_buffer[index * RGB_SIZE + 2],
             );
-            let rgb565 = Self::rgb888_to_rgb565(r, g, b);
+            let rgb565 = rgb888_to_rgb565(r, g, b);
             buffer[index * RGB565_SIZE] = rgb565[0];
             buffer[index * RGB565_SIZE + 1] = rgb565[1];
         }
@@ -1105,7 +1097,7 @@ impl Ppu {
                 frame_buffer[index * RGB_SIZE + 1],
                 frame_buffer[index * RGB_SIZE + 2],
             );
-            *pixel = Self::rgb888_to_rgb565_u16(r, g, b);
+            *pixel = rgb888_to_rgb565_u16(r, g, b);
         }
         buffer
     }
@@ -1281,7 +1273,7 @@ impl Ppu {
         let color = &self.palette_colors[shade_index as usize];
         self.color_buffer.fill(0);
         self.shade_buffer.fill(shade_index);
-        self.frame_buffer_index = std::u16::MAX;
+        self.frame_buffer_index = u16::MAX;
         for pixel in self.frame_buffer.chunks_mut(RGB_SIZE) {
             pixel[0] = color[0];
             pixel[1] = color[1];
@@ -1793,7 +1785,7 @@ impl Ppu {
                     } else if obj.palette == 1 {
                         (&self.palette_obj_1, 0_u8)
                     } else {
-                        panic!("Invalid object palette: {:02x}", obj.palette);
+                        panic_gb!("Invalid object palette: {:02x}", obj.palette);
                     }
                 } else {
                     (&self.palettes_color_obj[obj.palette_cgb as usize], 0_u8)
@@ -1803,7 +1795,7 @@ impl Ppu {
             } else if obj.palette == 1 {
                 (&self.palette_obj_1, 2_u8)
             } else {
-                panic!("Invalid object palette: {:02x}", obj.palette);
+                panic_gb!("Invalid object palette: {:02x}", obj.palette);
             };
 
             // obtains the current integer value (raw) for the palette in use
@@ -1936,7 +1928,7 @@ impl Ppu {
     }
 
     /// Runs an update operation on the LCD STAT interrupt meaning
-    /// that the flag that control will be updated in case the conditions
+    /// that the flag that controls it will be updated in case the conditions
     /// required for the LCD STAT interrupt to be triggered are met.
     fn update_stat(&mut self) {
         self.int_stat = self.stat_level();
@@ -2003,7 +1995,7 @@ impl Ppu {
             let color_index: usize = (value as usize >> (index * 2)) & 3;
             match color_index {
                 0..=3 => *palette_item = palette_colors[color_index],
-                color_index => panic!("Invalid palette color index {:04x}", color_index),
+                color_index => panic_gb!("Invalid palette color index {:04x}", color_index),
             }
         }
     }
@@ -2020,7 +2012,7 @@ impl Ppu {
     ) {
         let palette_offset = (palette_index * 4 * 2) as usize;
         let color_offset = (color_index * 2) as usize;
-        palette[color_index as usize] = Self::rgb555_to_rgb888(
+        palette[color_index as usize] = rgb555_to_rgb888(
             palette_color[palette_offset + color_offset],
             palette_color[palette_offset + color_offset + 1],
         );
@@ -2052,48 +2044,16 @@ impl Ppu {
     /// represent the 4 colors of the palette in the RGB555 format.
     fn compute_color_palette(palette: &mut Palette, palette_color: &[u8; 8]) {
         for color_index in 0..palette.len() {
-            palette[color_index] = Self::rgb555_to_rgb888(
+            palette[color_index] = rgb555_to_rgb888(
                 palette_color[color_index * 2],
                 palette_color[color_index * 2 + 1],
             );
         }
     }
-
-    fn rgb555_to_rgb888(first: u8, second: u8) -> Pixel {
-        let r = (first & 0x1f) << 3;
-        let g = (((first & 0xe0) >> 5) | ((second & 0x03) << 3)) << 3;
-        let b = ((second & 0x7c) >> 2) << 3;
-        [r, g, b]
-    }
-
-    fn rgb888_to_rgb1555(first: u8, second: u8, third: u8) -> PixelRgb1555 {
-        let pixel = Self::rgb888_to_rgb1555_u16(first, second, third);
-        [pixel as u8, (pixel >> 8) as u8]
-    }
-
-    fn rgb888_to_rgb1555_u16(first: u8, second: u8, third: u8) -> u16 {
-        let r = (first as u16 >> 3) & 0x1f;
-        let g = (second as u16 >> 3) & 0x1f;
-        let b = (third as u16 >> 3) & 0x1f;
-        let a = 1;
-        (a << 15) | (r << 10) | (g << 5) | b
-    }
-
-    fn rgb888_to_rgb565(first: u8, second: u8, third: u8) -> PixelRgb565 {
-        let pixel = Self::rgb888_to_rgb565_u16(first, second, third);
-        [pixel as u8, (pixel >> 8) as u8]
-    }
-
-    fn rgb888_to_rgb565_u16(first: u8, second: u8, third: u8) -> u16 {
-        let r = (first as u16 >> 3) & 0x1f;
-        let g = (second as u16 >> 2) & 0x3f;
-        let b = (third as u16 >> 3) & 0x1f;
-        (r << 11) | (g << 5) | b
-    }
 }
 
 impl BusComponent for Ppu {
-    fn read(&mut self, addr: u16) -> u8 {
+    fn read(&self, addr: u16) -> u8 {
         self.read(addr)
     }
 

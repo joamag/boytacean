@@ -99,7 +99,8 @@ You can use some GET parameters to control the initial behavior of the emulator.
 | `url`        | String  | The same as `rom_url`.                                                                         |
 | `fullscreen` | Boolean | If the emulator should start in fullscreen mode.                                               |
 | `fs`         | Boolean | The same as `fullscreen`.                                                                      |
-| `debug`      | Boolean | If the "debugger" should start visible.                                                        |
+| `debug`      | Boolean | If the "debugger" should start visible and information shown in `verbose` mode.                |
+| `verbose`    | Boolean | If information should be shown in verbose mode.                                                |
 | `keyboard`   | Boolean | If the on-screen keyboard should start visible.                                                |
 | `palette`    | String  | The name of the palette to be set at startup( eg: `christmas`, `hogwards`, `mariobros`, etc.). |
 
@@ -128,4 +129,5 @@ Boytacean is currently licensed under the [Apache License, Version 2.0](http://w
 [![Build Status](https://github.com/joamag/boytacean/workflows/Main%20Workflow/badge.svg)](https://github.com/joamag/boytacean/actions)
 [![crates Status](https://img.shields.io/crates/v/boytacean)](https://crates.io/crates/boytacean)
 [![npm Status](https://img.shields.io/npm/v/boytacean.svg)](https://www.npmjs.com/package/boytacean)
+[![PyPi Status](https://img.shields.io/pypi/v/boytacean.svg)](https://pypi.python.org/pypi/boytacean)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://www.apache.org/licenses/)

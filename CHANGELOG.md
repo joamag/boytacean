@@ -19,6 +19,84 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 *
 
+## [0.10.12] - 2024-08-30
+
+### Fixed
+
+* Extra react reference
+
+## [0.10.11] - 2024-08-30
+
+### Fixed
+
+* Major PPU related issue in state loading, which used to create PPU mode related issues
+
+## [0.10.10] - 2024-08-30
+
+### Fixed
+
+* Warning message in wasm-bindgen loading
+
+## [0.10.9] - 2024-08-30
+
+### Fixed
+
+* Unit test issue
+
+## [0.10.8] - 2024-08-30
+
+### Changed
+
+* Memoised some of the class generation process
+* Updated Emukit version, for faster performance
+
+### Fixed
+
+* Issue related with DMA transfer being triggered while loading state
+* Sound glitch in loading save state, by setting proper sound raw values
+
+## [0.10.7] - 2024-08-08
+
+### Fixed
+
+* Unit test that was failing
+
+## [0.10.6] - 2024-08-08
+
+### Changed
+
+* Improved Zippy format to include opaque feature support, for future proof
+
+## [0.10.5] - 2024-08-08
+
+### Added
+
+* `Licensee` enumeration with the description of the publisher of the ROM
+* Support for Zippy encoding format for fast compression
+* New hashing crate that includes CRC-32 and CRC-32C implementations
+
+### Fixed
+
+* Issue with the web frontend and `hardReset()` implementation
+
+## [0.10.4] - 2024-07-16
+
+### Added
+
+* Support for cartridge region detection
+
+### Changed
+
+* Bumped web packages
+
+## [0.10.3] - 2024-07-16
+
+### Added
+
+* Support for SIMD based color space conversion - [#45](https://gitlab.stage.hive.pt/joamag/boytacean/-/issues/45)
+* Support for `window.requestAnimationFrame()` and game loop inversion of control - [#26](https://gitlab.stage.hive.pt/joamag/boytacean/-/issues/26)
+* Custom Boot ROM support for CGB - [#34](https://gitlab.stage.hive.pt/joamag/boytacean/-/issues/34)
+
 ## [0.10.2] - 2024-06-07
 
 ### Fixed

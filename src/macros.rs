@@ -1,3 +1,5 @@
+//! Assorted set of macros to be used in the context of Boytacean.
+
 #[cfg(feature = "debug")]
 #[macro_export]
 macro_rules! debugln {
@@ -32,7 +34,7 @@ macro_rules! infoln {
 macro_rules! warnln {
     ($($rest:tt)*) => {
         {
-            panic!($($rest)*);
+            $crate::panic_gb!($($rest)*);
         }
     }
 }

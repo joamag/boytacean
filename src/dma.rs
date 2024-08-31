@@ -1,13 +1,46 @@
+//! DMA (Direct Memory Access) functions and structures.
+
+use std::fmt::{self, Display, Formatter};
+
 use crate::{
     consts::{DMA_ADDR, HDMA1_ADDR, HDMA2_ADDR, HDMA3_ADDR, HDMA4_ADDR, HDMA5_ADDR},
     mmu::BusComponent,
-    warnln,
+    panic_gb, warnln,
 };
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum DmaMode {
     General = 0x00,
     HBlank = 0x01,
+}
+
+impl DmaMode {
+    pub fn description(&self) -> &'static str {
+        match self {
+            DmaMode::General => "General-Purpose DMA",
+            DmaMode::HBlank => "HBlank DMA",
+        }
+    }
+
+    pub fn from_u8(value: u8) -> Self {
+        match value {
+            0x00 => DmaMode::General,
+            0x01 => DmaMode::HBlank,
+            _ => DmaMode::General,
+        }
+    }
+}
+
+impl Display for DmaMode {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.description())
+    }
+}
+
+impl From<u8> for DmaMode {
+    fn from(value: u8) -> Self {
+        Self::from_u8(value)
+    }
 }
 
 pub struct Dma {
@@ -51,7 +84,7 @@ impl Dma {
 
     pub fn clock(&mut self, _cycles: u16) {}
 
-    pub fn read(&mut self, addr: u16) -> u8 {
+    pub fn read(&self, addr: u16) -> u8 {
         match addr {
             // 0xFF46 — DMA: OAM DMA source address & start
             DMA_ADDR => self.value_dma,
@@ -61,6 +94,7 @@ impl Dma {
             }
             _ => {
                 warnln!("Reading from unknown DMA location 0x{:04x}", addr);
+                #[allow(unreachable_code)]
                 0xff
             }
         }
@@ -84,14 +118,27 @@ impl Dma {
             HDMA4_ADDR => self.destination = (self.destination & 0xff00) | ((value & 0xf0) as u16),
             // 0xFF55 — HDMA5: VRAM DMA length/mode/start (CGB only)
             HDMA5_ADDR => {
-                self.length = (((value & 0x7f) + 0x1) as u16) << 4;
-                self.mode = match (value & 80) >> 7 {
-                    0 => DmaMode::General,
-                    1 => DmaMode::HBlank,
-                    _ => DmaMode::General,
-                };
-                self.pending = self.length;
-                self.active_hdma = true;
+                // in case there's an active HDMA transfer and the
+                // bit 7 is set to 0, the transfer is stopped
+                if value & 0x80 == 0x00 && self.active_hdma && self.mode == DmaMode::HBlank {
+                    self.pending = 0;
+                    self.active_hdma = false;
+                } else {
+                    // ensures destination is set within VRAM range
+                    // required for compatibility with some games (know bug)
+                    self.destination = 0x8000 | (self.destination & 0x1fff);
+                    self.length = (((value & 0x7f) + 0x1) as u16) << 4;
+                    self.mode = ((value & 80) >> 7).into();
+                    self.pending = self.length;
+                    self.active_hdma = true;
+
+                    // @TODO: implement HBlank DMA using the proper timing
+                    // and during the HBlank period as described in the
+                    // https://gbdev.io/pandocs/CGB_Registers.html#lcd-vram-dma-transfers
+                    if self.mode == DmaMode::HBlank {
+                        panic_gb!("HBlank DMA not implemented");
+                    }
+                }
             }
             _ => warnln!("Writing to unknown DMA location 0x{:04x}", addr),
         }
@@ -172,10 +219,32 @@ impl Dma {
     pub fn active(&self) -> bool {
         self.active_dma || self.active_hdma
     }
+
+    pub fn description(&self) -> String {
+        format!(
+            "DMA: {}\nHDMA: {}",
+            self.description_dma(),
+            self.description_hdma()
+        )
+    }
+
+    pub fn description_dma(&self) -> String {
+        format!(
+            "active: {}, cycles: {}, value: 0x{:02x}",
+            self.active_dma, self.cycles_dma, self.value_dma
+        )
+    }
+
+    pub fn description_hdma(&self) -> String {
+        format!(
+            "active: {}, length: 0x{:04x}, mode: {}, source: 0x{:04x}, destination: 0x{:04x}",
+            self.active_hdma, self.length, self.mode, self.source, self.destination
+        )
+    }
 }
 
 impl BusComponent for Dma {
-    fn read(&mut self, addr: u16) -> u8 {
+    fn read(&self, addr: u16) -> u8 {
         self.read(addr)
     }
 
@@ -187,6 +256,12 @@ impl BusComponent for Dma {
 impl Default for Dma {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl Display for Dma {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.description())
     }
 }
 

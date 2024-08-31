@@ -1,5 +1,6 @@
-import React, { FC, useEffect, useRef, useState } from "react";
 import { ButtonSwitch, Emulator, Info, Pair, PanelTab } from "emukit";
+import React, { FC, useEffect, useMemo, useRef, useState } from "react";
+
 import { GameboyEmulator, SerialDevice, bufferToDataUrl } from "../../../ts";
 
 import "./serial-section.css";
@@ -19,7 +20,10 @@ export const SerialSection: FC<SerialSectionProps> = ({
     emulator,
     style = []
 }) => {
-    const classes = () => ["serial-section", ...style].join(" ");
+    const classes = useMemo(
+        () => ["serial-section", ...style].join(" "),
+        [style]
+    );
     const [loggerData, setLoggerData] = useState<string>();
     const [printerImageUrls, setPrinterImageUrls] = useState<string[]>();
     const loggerDataRef = useRef<string[]>([]);
@@ -56,7 +60,7 @@ export const SerialSection: FC<SerialSectionProps> = ({
             emulator.unbind("logger", onLogger);
             emulator.unbind("printer", onPrinter);
         };
-    }, []);
+    }, [emulator]);
 
     const onDeviceChange = (option: string) => {
         emulator.loadSerialDevice(option as SerialDevice);
@@ -113,7 +117,7 @@ export const SerialSection: FC<SerialSectionProps> = ({
         return ["Settings", "Logger", "Printer"];
     };
     return (
-        <div className={classes()}>
+        <div className={classes}>
             <PanelTab
                 tabs={getTabs()}
                 tabNames={getTabNames()}

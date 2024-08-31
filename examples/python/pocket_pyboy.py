@@ -1,3 +1,4 @@
+from os import getenv
 from time import time
 from pyboy import PyBoy
 from os.path import dirname, realpath, join, splitext, basename
@@ -9,7 +10,7 @@ IMAGE_NAME = f"{ROM_NAME}_pyboy.png"
 
 FRAME_COUNT = 12000
 VISUAL_FREQ = 59.7275
-LOAD_GRAPHICS = False
+LOAD_GRAPHICS = bool(getenv("LOAD_GRAPHICS", True))
 
 with PyBoy(
     ROM_PATH,

@@ -1,5 +1,3 @@
-#![allow(clippy::uninlined_format_args)]
-
 //! Build script (https://doc.rust-lang.org/cargo/reference/build-scripts.html)
 //! This script is executed as the first step in the compilation process.
 //! Here we export metadata constants to a `constants/generated.rs` file which is then
@@ -27,11 +25,14 @@
 use built::{write_built_file_with_opts, Options};
 use chrono::Utc;
 use regex::Regex;
-use std::fs::{File, OpenOptions};
-use std::io::Write;
-use std::path::Path;
-use std::process::Command;
-use std::{env, str};
+use std::{
+    env,
+    fs::{File, OpenOptions},
+    io::Write,
+    path::Path,
+    process::Command,
+    str,
+};
 
 const BUILD_OUT_FILE: &str = "build.rs";
 const GEN_DIR: &str = "./src/gen";
@@ -52,7 +53,7 @@ fn main() {
         .write(true)
         .create(true)
         .open(dest_path)
-        .unwrap_or_else(|_| panic!("Can't open '{}'", BUILD_OUT_FILE));
+        .unwrap_or_else(|_| panic!("Can't open '{BUILD_OUT_FILE}'"));
 
     writeln!(file, "//! Global constants, such as compiler version used, features, platform information and others.\n").unwrap();
     writeln!(file, "// @generated\n").unwrap();
@@ -181,12 +182,12 @@ where
         std::any::type_name::<T>(),
         val
     )
-    .unwrap_or_else(|_| panic!("Failed to write '{}' to 'build_constants.rs'", key));
+    .unwrap_or_else(|_| panic!("Failed to write '{key}' to 'build_constants.rs'"));
 }
 
 fn write_str_constant(file: &mut File, key: &str, val: &str) {
-    writeln!(file, "pub const {}: &str = \"{}\";", key, val)
-        .unwrap_or_else(|_| panic!("Failed to write '{}' to 'build_constants.rs'", key));
+    writeln!(file, "pub const {key}: &str = \"{val}\";")
+        .unwrap_or_else(|_| panic!("Failed to write '{key}' to 'build_constants.rs'"));
 }
 
 fn write_vec_constant<T>(file: &mut File, key: &str, vec: Vec<T>)
@@ -201,7 +202,7 @@ where
         } else {
             list_str.push_str(", ");
         }
-        list_str.push_str(format!("\"{}\"", value).as_str());
+        list_str.push_str(format!("\"{value}\"").as_str());
     }
     writeln!(
         file,
@@ -211,5 +212,5 @@ where
         vec.len(),
         list_str
     )
-    .unwrap_or_else(|_| panic!("Failed to write '{}' to 'build_constants.rs'", key));
+    .unwrap_or_else(|_| panic!("Failed to write '{key}' to 'build_constants.rs'"));
 }

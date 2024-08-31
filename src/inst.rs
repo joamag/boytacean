@@ -1,3 +1,5 @@
+//! ISA (instruction set architecture) implementation for the [Sharp LR35902](https://en.wikipedia.org/wiki/Game_Boy) CPU.
+
 use crate::cpu::Cpu;
 
 pub const INSTRUCTIONS: [Instruction; 256] = [

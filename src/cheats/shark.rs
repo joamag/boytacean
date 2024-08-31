@@ -1,9 +1,10 @@
+use boytacean_common::error::Error;
 use std::{
     collections::HashMap,
     fmt::{self, Display, Formatter},
 };
 
-use crate::{error::Error, rom::RomType};
+use crate::rom::RomType;
 
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
@@ -63,7 +64,7 @@ impl GameShark {
     pub fn get_addr(&self, addr: u16) -> Result<&GameSharkCode, Error> {
         match self.codes.get(&addr) {
             Some(code) => Ok(code),
-            None => Err(Error::CustomError(format!("Invalid address: {}", addr))),
+            None => Err(Error::CustomError(format!("Invalid address: 0x{addr:04x}"))),
         }
     }
 
@@ -123,8 +124,7 @@ impl GameSharkCode {
 
         if code_length != 8 {
             return Err(Error::CustomError(format!(
-                "Invalid GameShark code length: {} digits",
-                code_length
+                "Invalid GameShark code length: {code_length} digits"
             )));
         }
 
@@ -132,22 +132,21 @@ impl GameSharkCode {
 
         let ram_bank_slice = &code_u[0..=1];
         let mut ram_bank = u8::from_str_radix(ram_bank_slice, 16)
-            .map_err(|e| Error::CustomError(format!("Invalid RAM bank: {}", e)))?
+            .map_err(|e| Error::CustomError(format!("Invalid RAM bank: {e}")))?
             & rom_type.mbc_type().ram_bank_mask();
         ram_bank = if ram_bank == 0x00 { 0x01 } else { ram_bank };
 
         let new_data_slice = &code_u[2..=3];
         let new_data = u8::from_str_radix(new_data_slice, 16)
-            .map_err(|e| Error::CustomError(format!("Invalid new data: {}", e)))?;
+            .map_err(|e| Error::CustomError(format!("Invalid new data: {e}")))?;
 
         let addr_slice = format!("{}{}", &code_u[6..=7], &code_u[4..=5]);
         let addr = u16::from_str_radix(&addr_slice, 16)
-            .map_err(|e| Error::CustomError(format!("Invalid address: {}", e)))?;
+            .map_err(|e| Error::CustomError(format!("Invalid address: {e}")))?;
 
         if !(0xa000..=0xdfff).contains(&addr) {
             return Err(Error::CustomError(format!(
-                "Invalid cheat address: 0x{:04x}",
-                addr
+                "Invalid cheat address: 0x{addr:04x}",
             )));
         }
 

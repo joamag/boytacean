@@ -1,3 +1,4 @@
+from os import getenv
 from time import time
 from boytacean import GameBoy, VISUAL_FREQ
 from os.path import dirname, realpath, join, splitext, basename
@@ -8,7 +9,7 @@ ROM_NAME = splitext(basename(ROM_PATH))[0]
 IMAGE_NAME = f"{ROM_NAME}.png"
 
 FRAME_COUNT = 12000
-LOAD_GRAPHICS = False
+LOAD_GRAPHICS = bool(getenv("LOAD_GRAPHICS", True))
 
 gb = GameBoy(apu_enabled=False, serial_enabled=False, load_graphics=LOAD_GRAPHICS)
 gb.load_rom(ROM_PATH)
