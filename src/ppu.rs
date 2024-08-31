@@ -698,6 +698,19 @@ impl Ppu {
         self.dmg_compat = false;
     }
 
+    pub fn clear_screen(&mut self, hard: bool) {
+        self.mode = PpuMode::HBlank;
+        self.mode_clock = 0;
+        self.ly = 0;
+        self.int_vblank = false;
+        self.int_stat = false;
+        self.window_counter = 0;
+        if hard {
+            self.first_frame = true;
+            self.clear_frame_buffer();
+        }
+    }
+
     pub fn clock(&mut self, cycles: u16) {
         // in case the LCD is currently off then we skip the current
         // clock operation the PPU should not work
@@ -875,14 +888,7 @@ impl Ppu {
                 // to clear the screen, this is the expected
                 // behaviour for this specific situation
                 if !self.switch_lcd {
-                    self.mode = PpuMode::HBlank;
-                    self.mode_clock = 0;
-                    self.ly = 0;
-                    self.int_vblank = false;
-                    self.int_stat = false;
-                    self.window_counter = 0;
-                    self.first_frame = true;
-                    self.clear_frame_buffer();
+                    self.clear_screen(true)
                 }
             }
             STAT_ADDR => {
@@ -1922,7 +1928,7 @@ impl Ppu {
     }
 
     /// Runs an update operation on the LCD STAT interrupt meaning
-    /// that the flag that control will be updated in case the conditions
+    /// that the flag that controls it will be updated in case the conditions
     /// required for the LCD STAT interrupt to be triggered are met.
     fn update_stat(&mut self) {
         self.int_stat = self.stat_level();

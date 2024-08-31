@@ -394,11 +394,15 @@ export class GameboyEmulator extends EmulatorLogic implements Emulator {
 
         // in case there's a battery involved tries to load the
         // current RAM from the local storage
-        if (cartridge.has_battery()) this.loadRam();
+        if (cartridge.has_battery()) {
+            this.loadRam();
+        }
 
         // in case the restore (state) flag is set
         // then resumes the machine execution
-        if (restore) this.resume();
+        if (restore) {
+            await this.resume();
+        }
 
         // triggers the booted event indicating that the
         // emulator has finished the loading process

@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-*
+* Major PPU related issue in state loading, which used to create PPU mode related issues
 
 ## [0.10.10] - 2024-08-30
 

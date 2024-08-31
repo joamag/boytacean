@@ -1593,6 +1593,10 @@ impl State for BessCore {
         gb.dma().set_active_dma(false);
         gb.serial().set_transferring(false);
 
+        // clears the PPU screen reseting the mode cycle counter
+        // and other PPU cycle control structures
+        gb.ppu().clear_screen(false);
+
         if gb.is_cgb() {
             // updates the internal palettes for the CGB with the values
             // stored in the BESS state
