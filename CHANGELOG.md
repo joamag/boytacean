@@ -19,6 +19,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 *
 
+## [0.10.12] - 2024-08-30
+
+### Fixed
+
+* Extra react reference
+
 ## [0.10.11] - 2024-08-30
 
 ### Fixed
