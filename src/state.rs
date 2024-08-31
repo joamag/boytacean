@@ -1593,7 +1593,7 @@ impl State for BessCore {
         gb.dma().set_active_dma(false);
         gb.serial().set_transferring(false);
 
-        // clears the PPU screen reseting the mode cycle counter
+        // clears the PPU screen resetting the mode cycle clock
         // and other PPU cycle control structures
         gb.ppu().clear_screen(false);
 
