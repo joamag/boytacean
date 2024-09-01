@@ -201,6 +201,24 @@ pub trait StateConfig {
     fn mode(&self) -> Result<GameBoyMode, Error>;
 }
 
+pub trait StateInfo {
+    fn timestamp(&self) -> Result<u64, Error>;
+    fn agent(&self) -> Result<String, Error>;
+    fn model(&self) -> Result<String, Error>;
+    fn image_eager(&self) -> Result<Vec<u8>, Error>;
+    fn has_image(&self) -> bool;
+}
+
+#[cfg(feature = "wasm")]
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
+pub trait StateInfoWa {
+    fn timestamp_wa(&self) -> Result<u64, String>;
+    fn agent_wa(&self) -> Result<String, String>;
+    fn model_wa(&self) -> Result<String, String>;
+    fn image_eager_wa(&self) -> Result<Vec<u8>, String>;
+    fn has_image_wa(&self) -> bool;
+}
+
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 #[derive(Default)]
 pub struct BoscState {
@@ -338,8 +356,8 @@ impl BosState {
     }
 }
 
-impl BosState {
-    pub fn timestamp(&self) -> Result<u64, Error> {
+impl StateInfo for BosState {
+    fn timestamp(&self) -> Result<u64, Error> {
         if let Some(info) = &self.info {
             Ok(info.timestamp)
         } else {
@@ -347,7 +365,7 @@ impl BosState {
         }
     }
 
-    pub fn agent(&self) -> Result<String, Error> {
+    fn agent(&self) -> Result<String, Error> {
         if let Some(info) = &self.info {
             Ok(format!("{}/{}", info.agent, info.agent_version))
         } else {
@@ -355,7 +373,7 @@ impl BosState {
         }
     }
 
-    pub fn model(&self) -> Result<String, Error> {
+    fn model(&self) -> Result<String, Error> {
         if let Some(info) = &self.info {
             Ok(info.model.clone())
         } else {
@@ -363,7 +381,7 @@ impl BosState {
         }
     }
 
-    pub fn image_eager(&self) -> Result<Vec<u8>, Error> {
+    fn image_eager(&self) -> Result<Vec<u8>, Error> {
         if let Some(image_buffer) = &self.image_buffer {
             Ok(image_buffer.image.to_vec())
         } else {
@@ -371,31 +389,31 @@ impl BosState {
         }
     }
 
-    pub fn has_image(&self) -> bool {
+    fn has_image(&self) -> bool {
         self.image_buffer.is_some()
     }
 }
 
 #[cfg(feature = "wasm")]
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
-impl BosState {
-    pub fn timestamp_wa(&self) -> Result<u64, String> {
+impl StateInfoWa for BosState {
+    fn timestamp_wa(&self) -> Result<u64, String> {
         Ok(Self::timestamp(self)?)
     }
 
-    pub fn agent_wa(&self) -> Result<String, String> {
+    fn agent_wa(&self) -> Result<String, String> {
         Ok(Self::agent(self)?)
     }
 
-    pub fn model_wa(&self) -> Result<String, String> {
+    fn model_wa(&self) -> Result<String, String> {
         Ok(Self::model(self)?)
     }
 
-    pub fn image_eager_wa(&self) -> Result<Vec<u8>, String> {
+    fn image_eager_wa(&self) -> Result<Vec<u8>, String> {
         Ok(Self::image_eager(self)?)
     }
 
-    pub fn has_image_wa(&self) -> bool {
+    fn has_image_wa(&self) -> bool {
         self.has_image()
     }
 }
@@ -796,6 +814,52 @@ impl BessState {
         }
 
         Ok(())
+    }
+}
+
+impl StateInfo for BessState {
+    fn timestamp(&self) -> Result<u64, Error> {
+        Ok(0)
+    }
+
+    fn agent(&self) -> Result<String, Error> {
+        Ok(self.name.name.clone())
+    }
+
+    fn model(&self) -> Result<String, Error> {
+        Ok(self.core.mode().into())
+    }
+
+    fn image_eager(&self) -> Result<Vec<u8>, Error> {
+        Err(Error::NotImplemented)
+    }
+
+    fn has_image(&self) -> bool {
+        false
+    }
+}
+
+#[cfg(feature = "wasm")]
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
+impl StateInfoWa for BessState {
+    fn timestamp_wa(&self) -> Result<u64, String> {
+        Ok(Self::timestamp(self)?)
+    }
+
+    fn agent_wa(&self) -> Result<String, String> {
+        Ok(Self::agent(self)?)
+    }
+
+    fn model_wa(&self) -> Result<String, String> {
+        Ok(Self::model(self)?)
+    }
+
+    fn image_eager_wa(&self) -> Result<Vec<u8>, String> {
+        Ok(Self::image_eager(self)?)
+    }
+
+    fn has_image_wa(&self) -> bool {
+        self.has_image()
     }
 }
 
@@ -1375,6 +1439,19 @@ impl BessCore {
         Ok(())
     }
 
+    pub fn mode(&self) -> GameBoyMode {
+        if self.is_dmg() {
+            return GameBoyMode::Dmg;
+        }
+        if self.is_cgb() {
+            return GameBoyMode::Cgb;
+        }
+        if self.is_sgb() {
+            return GameBoyMode::Sgb;
+        }
+        GameBoyMode::Dmg
+    }
+
     /// Obtains the BESS (Game Boy) model string using the
     /// provided `GameBoy` instance.
     fn bess_model(gb: &GameBoy) -> String {
@@ -1423,6 +1500,13 @@ impl BessCore {
     fn is_cgb(&self) -> bool {
         if let Some(first_char) = self.model.chars().next() {
             return first_char == 'C';
+        }
+        false
+    }
+
+    fn is_sgb(&self) -> bool {
+        if let Some(first_char) = self.model.chars().next() {
+            return first_char == 'S';
         }
         false
     }

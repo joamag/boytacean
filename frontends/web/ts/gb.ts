@@ -30,6 +30,7 @@ import {
     GameBoySpeed,
     Info,
     PadKey,
+    SaveStateFormat,
     StateManager
 } from "../lib/boytacean";
 import info from "../package.json";
@@ -535,6 +536,10 @@ export class GameboyEmulator extends EmulatorLogic implements Emulator {
         return ["gb", "gbc", "zip"];
     }
 
+    get stateExts(): string[] {
+        return ["sav", ...Array.from({ length: 10 }, (_, i) => `s${i + 1}`)];
+    }
+
     get pixelFormat(): PixelFormat {
         return PixelFormat.RGB;
     }
@@ -738,10 +743,23 @@ export class GameboyEmulator extends EmulatorLogic implements Emulator {
 
     async buildState(index: number, data: Uint8Array): Promise<SaveState> {
         try {
-            const state = StateManager.read_bos_auto_wa(data);
+            let state = null;
+            const format = StateManager.format_wa(data);
+            switch (format) {
+                case SaveStateFormat.Bos:
+                case SaveStateFormat.Bosc:
+                    state = StateManager.read_bos_auto_wa(data);
+                    break;
+                case SaveStateFormat.Bess:
+                    state = StateManager.read_bess_wa(data);
+                    break;
+                default:
+                    throw new Error(`Invalid state format ${format}`);
+            }
+            const timestamp = Number(state.timestamp_wa());
             return {
                 index: index,
-                timestamp: Number(state.timestamp_wa()),
+                timestamp: timestamp > 0 ? timestamp : undefined,
                 agent: state.agent_wa(),
                 model: state.model_wa(),
                 format: StateManager.format_str_wa(data),
