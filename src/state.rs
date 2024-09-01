@@ -205,6 +205,7 @@ pub trait StateInfo {
     fn timestamp(&self) -> Result<u64, Error>;
     fn agent(&self) -> Result<String, Error>;
     fn model(&self) -> Result<String, Error>;
+    fn title(&self) -> Result<String, Error>;
     fn image_eager(&self) -> Result<Vec<u8>, Error>;
     fn has_image(&self) -> bool;
 }
@@ -371,6 +372,10 @@ impl StateInfo for BosState {
         }
     }
 
+    fn title(&self) -> Result<String, Error> {
+        self.bess.title()
+    }
+
     fn image_eager(&self) -> Result<Vec<u8>, Error> {
         if let Some(image_buffer) = &self.image_buffer {
             Ok(image_buffer.image.to_vec())
@@ -397,6 +402,10 @@ impl BosState {
 
     pub fn model_wa(&self) -> Result<String, String> {
         Ok(Self::model(self)?)
+    }
+
+    pub fn title_wa(&self) -> Result<String, String> {
+        Ok(Self::title(self)?)
     }
 
     pub fn image_eager_wa(&self) -> Result<Vec<u8>, String> {
@@ -820,6 +829,10 @@ impl StateInfo for BessState {
         Ok(self.core.mode().into())
     }
 
+    fn title(&self) -> Result<String, Error> {
+        Ok(self.info.title())
+    }
+
     fn image_eager(&self) -> Result<Vec<u8>, Error> {
         Err(Error::NotImplemented)
     }
@@ -842,6 +855,10 @@ impl BessState {
 
     pub fn model_wa(&self) -> Result<String, String> {
         Ok(Self::model(self)?)
+    }
+
+    pub fn title_wa(&self) -> Result<String, String> {
+        Ok(Self::title(self)?)
     }
 
     pub fn image_eager_wa(&self) -> Result<Vec<u8>, String> {
@@ -2002,6 +2019,30 @@ impl StateManager {
         }
     }
 
+    /// Validates the provided state data and runs a series of simple
+    /// validations according to the provided params.
+    pub fn validate(data: &[u8], title: Option<String>) -> Result<(), Error> {
+        match Self::format(data)? {
+            SaveStateFormat::Bosc | SaveStateFormat::Bos => {
+                let state = Self::read_bos_auto(data)?;
+                if let Some(title) = title {
+                    if state.title()? != title {
+                        return Err(Error::InvalidData);
+                    }
+                }
+            }
+            SaveStateFormat::Bess => {
+                let state = Self::read_bess(data)?;
+                if let Some(title) = title {
+                    if state.title()? != title {
+                        return Err(Error::InvalidData);
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Obtains the thumbnail of the save state file, this thumbnail is
     /// stored in raw RGB format.
     ///
@@ -2104,6 +2145,10 @@ impl StateManager {
 
     pub fn format_str_wa(data: &[u8]) -> Result<String, String> {
         Ok(Self::format(data)?.to_string())
+    }
+
+    pub fn validate_wa(data: &[u8], title: Option<String>) -> Result<(), String> {
+        Ok(Self::validate(data, title)?)
     }
 
     pub fn thumbnail_wa(data: &[u8], format: Option<SaveStateFormat>) -> Result<Vec<u8>, String> {

@@ -17,7 +17,8 @@ import {
     RomInfo,
     SaveState,
     SectionInfo,
-    Size
+    Size,
+    Validation
 } from "emukit";
 import { loadAsync } from "jszip";
 
@@ -775,6 +776,10 @@ export class GameboyEmulator extends EmulatorLogic implements Emulator {
                 error: err
             };
         }
+    }
+
+    async validateState(data: Uint8Array, validation: Validation) {
+        StateManager.validate_wa(data, validation.title);
     }
 
     pauseVideo() {
