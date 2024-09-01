@@ -209,16 +209,6 @@ pub trait StateInfo {
     fn has_image(&self) -> bool;
 }
 
-#[cfg(feature = "wasm")]
-#[cfg_attr(feature = "wasm", wasm_bindgen)]
-pub trait StateInfoWa {
-    fn timestamp_wa(&self) -> Result<u64, String>;
-    fn agent_wa(&self) -> Result<String, String>;
-    fn model_wa(&self) -> Result<String, String>;
-    fn image_eager_wa(&self) -> Result<Vec<u8>, String>;
-    fn has_image_wa(&self) -> bool;
-}
-
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 #[derive(Default)]
 pub struct BoscState {
@@ -396,24 +386,24 @@ impl StateInfo for BosState {
 
 #[cfg(feature = "wasm")]
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
-impl StateInfoWa for BosState {
-    fn timestamp_wa(&self) -> Result<u64, String> {
+impl BosState {
+    pub fn timestamp_wa(&self) -> Result<u64, String> {
         Ok(Self::timestamp(self)?)
     }
 
-    fn agent_wa(&self) -> Result<String, String> {
+    pub fn agent_wa(&self) -> Result<String, String> {
         Ok(Self::agent(self)?)
     }
 
-    fn model_wa(&self) -> Result<String, String> {
+    pub fn model_wa(&self) -> Result<String, String> {
         Ok(Self::model(self)?)
     }
 
-    fn image_eager_wa(&self) -> Result<Vec<u8>, String> {
+    pub fn image_eager_wa(&self) -> Result<Vec<u8>, String> {
         Ok(Self::image_eager(self)?)
     }
 
-    fn has_image_wa(&self) -> bool {
+    pub fn has_image_wa(&self) -> bool {
         self.has_image()
     }
 }
@@ -841,24 +831,24 @@ impl StateInfo for BessState {
 
 #[cfg(feature = "wasm")]
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
-impl StateInfoWa for BessState {
-    fn timestamp_wa(&self) -> Result<u64, String> {
+impl BessState {
+    pub fn timestamp_wa(&self) -> Result<u64, String> {
         Ok(Self::timestamp(self)?)
     }
 
-    fn agent_wa(&self) -> Result<String, String> {
+    pub fn agent_wa(&self) -> Result<String, String> {
         Ok(Self::agent(self)?)
     }
 
-    fn model_wa(&self) -> Result<String, String> {
+    pub fn model_wa(&self) -> Result<String, String> {
         Ok(Self::model(self)?)
     }
 
-    fn image_eager_wa(&self) -> Result<Vec<u8>, String> {
+    pub fn image_eager_wa(&self) -> Result<Vec<u8>, String> {
         Ok(Self::image_eager(self)?)
     }
 
-    fn has_image_wa(&self) -> bool {
+    pub fn has_image_wa(&self) -> bool {
         self.has_image()
     }
 }
