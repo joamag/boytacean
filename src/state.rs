@@ -201,6 +201,15 @@ pub trait StateConfig {
     fn mode(&self) -> Result<GameBoyMode, Error>;
 }
 
+pub trait StateInfo {
+    fn timestamp(&self) -> Result<u64, Error>;
+    fn agent(&self) -> Result<String, Error>;
+    fn model(&self) -> Result<String, Error>;
+    fn title(&self) -> Result<String, Error>;
+    fn image_eager(&self) -> Result<Vec<u8>, Error>;
+    fn has_image(&self) -> bool;
+}
+
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 #[derive(Default)]
 pub struct BoscState {
@@ -338,8 +347,8 @@ impl BosState {
     }
 }
 
-impl BosState {
-    pub fn timestamp(&self) -> Result<u64, Error> {
+impl StateInfo for BosState {
+    fn timestamp(&self) -> Result<u64, Error> {
         if let Some(info) = &self.info {
             Ok(info.timestamp)
         } else {
@@ -347,7 +356,7 @@ impl BosState {
         }
     }
 
-    pub fn agent(&self) -> Result<String, Error> {
+    fn agent(&self) -> Result<String, Error> {
         if let Some(info) = &self.info {
             Ok(format!("{}/{}", info.agent, info.agent_version))
         } else {
@@ -355,7 +364,7 @@ impl BosState {
         }
     }
 
-    pub fn model(&self) -> Result<String, Error> {
+    fn model(&self) -> Result<String, Error> {
         if let Some(info) = &self.info {
             Ok(info.model.clone())
         } else {
@@ -363,7 +372,11 @@ impl BosState {
         }
     }
 
-    pub fn image_eager(&self) -> Result<Vec<u8>, Error> {
+    fn title(&self) -> Result<String, Error> {
+        self.bess.title()
+    }
+
+    fn image_eager(&self) -> Result<Vec<u8>, Error> {
         if let Some(image_buffer) = &self.image_buffer {
             Ok(image_buffer.image.to_vec())
         } else {
@@ -371,7 +384,7 @@ impl BosState {
         }
     }
 
-    pub fn has_image(&self) -> bool {
+    fn has_image(&self) -> bool {
         self.image_buffer.is_some()
     }
 }
@@ -389,6 +402,10 @@ impl BosState {
 
     pub fn model_wa(&self) -> Result<String, String> {
         Ok(Self::model(self)?)
+    }
+
+    pub fn title_wa(&self) -> Result<String, String> {
+        Ok(Self::title(self)?)
     }
 
     pub fn image_eager_wa(&self) -> Result<Vec<u8>, String> {
@@ -796,6 +813,60 @@ impl BessState {
         }
 
         Ok(())
+    }
+}
+
+impl StateInfo for BessState {
+    fn timestamp(&self) -> Result<u64, Error> {
+        Ok(0)
+    }
+
+    fn agent(&self) -> Result<String, Error> {
+        Ok(self.name.name.clone())
+    }
+
+    fn model(&self) -> Result<String, Error> {
+        Ok(self.core.mode().into())
+    }
+
+    fn title(&self) -> Result<String, Error> {
+        Ok(self.info.title())
+    }
+
+    fn image_eager(&self) -> Result<Vec<u8>, Error> {
+        Err(Error::NotImplemented)
+    }
+
+    fn has_image(&self) -> bool {
+        false
+    }
+}
+
+#[cfg(feature = "wasm")]
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
+impl BessState {
+    pub fn timestamp_wa(&self) -> Result<u64, String> {
+        Ok(Self::timestamp(self)?)
+    }
+
+    pub fn agent_wa(&self) -> Result<String, String> {
+        Ok(Self::agent(self)?)
+    }
+
+    pub fn model_wa(&self) -> Result<String, String> {
+        Ok(Self::model(self)?)
+    }
+
+    pub fn title_wa(&self) -> Result<String, String> {
+        Ok(Self::title(self)?)
+    }
+
+    pub fn image_eager_wa(&self) -> Result<Vec<u8>, String> {
+        Ok(Self::image_eager(self)?)
+    }
+
+    pub fn has_image_wa(&self) -> bool {
+        self.has_image()
     }
 }
 
@@ -1375,6 +1446,19 @@ impl BessCore {
         Ok(())
     }
 
+    pub fn mode(&self) -> GameBoyMode {
+        if self.is_dmg() {
+            return GameBoyMode::Dmg;
+        }
+        if self.is_cgb() {
+            return GameBoyMode::Cgb;
+        }
+        if self.is_sgb() {
+            return GameBoyMode::Sgb;
+        }
+        GameBoyMode::Dmg
+    }
+
     /// Obtains the BESS (Game Boy) model string using the
     /// provided `GameBoy` instance.
     fn bess_model(gb: &GameBoy) -> String {
@@ -1423,6 +1507,13 @@ impl BessCore {
     fn is_cgb(&self) -> bool {
         if let Some(first_char) = self.model.chars().next() {
             return first_char == 'C';
+        }
+        false
+    }
+
+    fn is_sgb(&self) -> bool {
+        if let Some(first_char) = self.model.chars().next() {
+            return first_char == 'S';
         }
         false
     }
@@ -1928,6 +2019,30 @@ impl StateManager {
         }
     }
 
+    /// Validates the provided state data and runs a series of simple
+    /// validations according to the provided params.
+    pub fn validate(data: &[u8], title: Option<String>) -> Result<(), Error> {
+        match Self::format(data)? {
+            SaveStateFormat::Bosc | SaveStateFormat::Bos => {
+                let state = Self::read_bos_auto(data)?;
+                if let Some(title) = title {
+                    if state.title()? != title {
+                        return Err(Error::InvalidData);
+                    }
+                }
+            }
+            SaveStateFormat::Bess => {
+                let state = Self::read_bess(data)?;
+                if let Some(title) = title {
+                    if state.title()? != title {
+                        return Err(Error::InvalidData);
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Obtains the thumbnail of the save state file, this thumbnail is
     /// stored in raw RGB format.
     ///
@@ -2030,6 +2145,10 @@ impl StateManager {
 
     pub fn format_str_wa(data: &[u8]) -> Result<String, String> {
         Ok(Self::format(data)?.to_string())
+    }
+
+    pub fn validate_wa(data: &[u8], title: Option<String>) -> Result<(), String> {
+        Ok(Self::validate(data, title)?)
     }
 
     pub fn thumbnail_wa(data: &[u8], format: Option<SaveStateFormat>) -> Result<Vec<u8>, String> {

@@ -141,6 +141,12 @@ impl From<&str> for GameBoyMode {
     }
 }
 
+impl From<GameBoyMode> for String {
+    fn from(value: GameBoyMode) -> Self {
+        value.to_string(Some(true))
+    }
+}
+
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum GameBoySpeed {

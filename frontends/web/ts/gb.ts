@@ -17,7 +17,9 @@ import {
     RomInfo,
     SaveState,
     SectionInfo,
-    Size
+    Size,
+    TickParams,
+    Validation
 } from "emukit";
 import { loadAsync } from "jszip";
 
@@ -30,6 +32,7 @@ import {
     GameBoySpeed,
     Info,
     PadKey,
+    SaveStateFormat,
     StateManager
 } from "../lib/boytacean";
 import info from "../package.json";
@@ -189,20 +192,17 @@ export class GameboyEmulator extends EmulatorLogic implements Emulator {
      * - Triggers the frame event in case there's a frame to be processed.
      * - Triggers the audio event, allowing the deferred retrieval of the audio buffer.
      * - Flushes the RAM to the local storage in case the cartridge is battery backed.
+     *
+     * @params params The parameters to be used in the tick operation.
      */
-    async tick() {
+    async tick(params: TickParams) {
         // in case the reference to the system is not set then
         // returns the control flow immediately (not possible to tick)
         if (!this.gameBoy) return;
 
-        // calculates the number of cycles that are going to be
-        // processed in the current tick operation, this value is
-        // calculated using the logic and visual frequencies and
-        // the current Game Boy multiplier (DMG vs CGB)
-        const tickCycles = Math.round(
-            (this.logicFrequency * (this.gameBoy?.multiplier() ?? 1)) /
-                this.visualFrequency
-        );
+        // uses the Game Boy multiplier to re-calculate the number
+        // of cycles to be used for the tick
+        const tickCycles = params.cycles * (this.gameBoy?.multiplier() ?? 1);
 
         // calculates the target cycles for clocking in the current
         // tick operation, this is the ideal value and the concrete
@@ -218,7 +218,7 @@ export class GameboyEmulator extends EmulatorLogic implements Emulator {
         );
         const executedCycles = Number(this.clockFrame.cycles);
         if (this.clockFrame.frames > 0) {
-            this.trigger("frame");
+            this.trigger("frame", { count: this.clockFrame.frames });
         }
 
         // triggers the audio event, meaning that the audio should be
@@ -470,6 +470,7 @@ export class GameboyEmulator extends EmulatorLogic implements Emulator {
                       Feature.RomTypeInfo,
                       Feature.Cyclerate,
                       Feature.Animationrate,
+                      Feature.SkippedTicks,
                       Feature.EmulationSpeed
                   ]
                 : [])
@@ -533,6 +534,10 @@ export class GameboyEmulator extends EmulatorLogic implements Emulator {
 
     get romExts(): string[] {
         return ["gb", "gbc", "zip"];
+    }
+
+    get stateExts(): string[] {
+        return ["sav", ...Array.from({ length: 10 }, (_, i) => `s${i + 1}`)];
     }
 
     get pixelFormat(): PixelFormat {
@@ -738,12 +743,26 @@ export class GameboyEmulator extends EmulatorLogic implements Emulator {
 
     async buildState(index: number, data: Uint8Array): Promise<SaveState> {
         try {
-            const state = StateManager.read_bos_auto_wa(data);
+            let state = null;
+            const format = StateManager.format_wa(data);
+            switch (format) {
+                case SaveStateFormat.Bos:
+                case SaveStateFormat.Bosc:
+                    state = StateManager.read_bos_auto_wa(data);
+                    break;
+                case SaveStateFormat.Bess:
+                    state = StateManager.read_bess_wa(data);
+                    break;
+                default:
+                    throw new Error(`Invalid state format ${format}`);
+            }
+            const timestamp = Number(state.timestamp_wa());
             return {
                 index: index,
-                timestamp: Number(state.timestamp_wa()),
+                timestamp: timestamp > 0 ? timestamp : undefined,
                 agent: state.agent_wa(),
                 model: state.model_wa(),
+                title: state.title_wa(),
                 format: StateManager.format_str_wa(data),
                 size: data.length,
                 thumbnail: state.has_image_wa()
@@ -756,6 +775,10 @@ export class GameboyEmulator extends EmulatorLogic implements Emulator {
                 error: err
             };
         }
+    }
+
+    async validateState(data: Uint8Array, validation: Validation) {
+        StateManager.validate_wa(data, validation.title);
     }
 
     pauseVideo() {
