@@ -18,6 +18,8 @@ import {
     SaveState,
     SectionInfo,
     Size,
+    TickMode,
+    TickParams,
     Validation
 } from "emukit";
 import { loadAsync } from "jszip";
@@ -191,8 +193,10 @@ export class GameboyEmulator extends EmulatorLogic implements Emulator {
      * - Triggers the frame event in case there's a frame to be processed.
      * - Triggers the audio event, allowing the deferred retrieval of the audio buffer.
      * - Flushes the RAM to the local storage in case the cartridge is battery backed.
+     *
+     * @params params The parameters to be used in the tick operation.
      */
-    async tick() {
+    async tick(params: TickParams) {
         // in case the reference to the system is not set then
         // returns the control flow immediately (not possible to tick)
         if (!this.gameBoy) return;
@@ -201,10 +205,22 @@ export class GameboyEmulator extends EmulatorLogic implements Emulator {
         // processed in the current tick operation, this value is
         // calculated using the logic and visual frequencies and
         // the current Game Boy multiplier (DMG vs CGB)
-        const tickCycles = Math.round(
-            (this.logicFrequency * (this.gameBoy?.multiplier() ?? 1)) /
-                this.visualFrequency
-        );
+        let tickCycles = 0;
+        switch (params.mode) {
+            case TickMode.Synced:
+                tickCycles = Math.round(
+                    (this.logicFrequency * (this.gameBoy?.multiplier() ?? 1)) /
+                        this.visualFrequency
+                );
+                break;
+            case TickMode.Desynced:
+                tickCycles = Math.round(
+                    this.logicFrequency *
+                        (this.gameBoy?.multiplier() ?? 1) *
+                        ((params.elapsedTime ?? 1000) / 1000)
+                );
+                break;
+        }
 
         // calculates the target cycles for clocking in the current
         // tick operation, this is the ideal value and the concrete
