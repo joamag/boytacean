@@ -218,7 +218,7 @@ export class GameboyEmulator extends EmulatorLogic implements Emulator {
         );
         const executedCycles = Number(this.clockFrame.cycles);
         if (this.clockFrame.frames > 0) {
-            this.trigger("frame");
+            this.trigger("frame", { count: this.clockFrame.frames });
         }
 
         // triggers the audio event, meaning that the audio should be
