@@ -18,7 +18,6 @@ import {
     SaveState,
     SectionInfo,
     Size,
-    TickMode,
     TickParams,
     Validation
 } from "emukit";
@@ -201,26 +200,9 @@ export class GameboyEmulator extends EmulatorLogic implements Emulator {
         // returns the control flow immediately (not possible to tick)
         if (!this.gameBoy) return;
 
-        // calculates the number of cycles that are going to be
-        // processed in the current tick operation, this value is
-        // calculated using the logic and visual frequencies and
-        // the current Game Boy multiplier (DMG vs CGB)
-        let tickCycles = 0;
-        switch (params.mode) {
-            case TickMode.Synced:
-                tickCycles = Math.round(
-                    (this.logicFrequency * (this.gameBoy?.multiplier() ?? 1)) /
-                        this.visualFrequency
-                );
-                break;
-            case TickMode.Desynced:
-                tickCycles = Math.round(
-                    this.logicFrequency *
-                        (this.gameBoy?.multiplier() ?? 1) *
-                        ((params.elapsedTime ?? 1000) / 1000)
-                );
-                break;
-        }
+        // uses the Game Boy multiplier to re-calculate the number
+        // of cycles to be used for the tick
+        const tickCycles = params.cycles * (this.gameBoy?.multiplier() ?? 1);
 
         // calculates the target cycles for clocking in the current
         // tick operation, this is the ideal value and the concrete
