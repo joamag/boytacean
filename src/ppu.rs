@@ -11,6 +11,7 @@ use std::{
 };
 
 use crate::{
+    assert_pedantic_gb,
     color::{
         rgb555_to_rgb888, rgb888_to_rgb1555_array, rgb888_to_rgb1555_u16, rgb888_to_rgb565,
         rgb888_to_rgb565_u16, Pixel, PixelAlpha, RGB1555_SIZE, RGB565_SIZE, RGB888_SIZE, RGB_SIZE,
@@ -718,6 +719,17 @@ impl Ppu {
             return;
         }
 
+        // runs a series of pre-emptive PPU state validations to ensure
+        // that no core invariants are being violated, this is a pedantic
+        // only check, proper features must be set
+        assert_pedantic_gb!(cycles < 80, "Invalid number of cycles in PPU: {}", cycles);
+        assert_pedantic_gb!(
+            self.mode_clock < 600,
+            "Invalid mode clock: {}",
+            self.mode_clock
+        );
+        assert_pedantic_gb!(self.ly < 154, "Invalid LY value: {}", self.ly);
+
         // increments the current mode clock by the provided amount
         // of CPU cycles (probably coming from a previous CPU clock)
         self.mode_clock += cycles;
@@ -824,8 +836,9 @@ impl Ppu {
             }
             SCY_ADDR => self.scy,
             SCX_ADDR => self.scx,
+            // 0xFF44 — LY: LCD Y coordinate
             LY_ADDR => self.ly,
-            // 0xFF45 — LYC
+            // 0xFF45 — LYC: LY compare
             LYC_ADDR => self.lyc,
             // 0xFF47 — BGP (Non-CGB Mode only)
             BGP_ADDR => self.palettes[0],
