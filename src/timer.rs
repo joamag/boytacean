@@ -185,7 +185,7 @@ impl StateComponent for Timer {
         Ok(cursor.into_inner())
     }
 
-    fn set_state(&mut self, data: &[u8]) -> Result<(), boytacean_common::error::Error> {
+    fn set_state(&mut self, data: &[u8]) -> Result<(), Error> {
         let mut cursor = Cursor::new(data);
         self.div = read_u8(&mut cursor)?;
         self.tima = read_u8(&mut cursor)?;
