@@ -7,7 +7,7 @@
 //! in agnostic and compatible way.
 
 use boytacean_common::{
-    data::{read_vec_u8, write_u8},
+    data::{read_bytes, read_u8, write_u8},
     error::Error,
     util::{save_bmp, timestamp},
 };
@@ -321,6 +321,7 @@ pub struct BosState {
     block_count: u8,
     info: Option<BosInfo>,
     image_buffer: Option<BosImageBuffer>,
+    device_states: Vec<BosDeviceState>,
     bess: BessState,
 }
 
@@ -361,6 +362,7 @@ impl BosState {
         if self.image_buffer.is_some() {
             count += 1;
         }
+        count += self.device_states.len() as u8;
         count
     }
 }
@@ -449,6 +451,9 @@ impl Serialize for BosState {
         if let Some(image_buffer) = &mut self.image_buffer {
             image_buffer.write(buffer)?;
         }
+        for device_state in &mut self.device_states {
+            device_state.write(buffer)?;
+        }
 
         self.bess.write(buffer)?;
 
@@ -478,6 +483,9 @@ impl Serialize for BosState {
                 BosBlockKind::ImageBuffer => {
                     self.image_buffer = Some(BosImageBuffer::from_data(data)?);
                 }
+                BosBlockKind::DeviceState => {
+                    self.device_states.push(BosDeviceState::from_data(data)?);
+                }
                 _ => {
                     data.seek(SeekFrom::Current(-offset))?;
                     data.seek(SeekFrom::Current(block.size as i64))?;
@@ -505,6 +513,10 @@ impl StateBox for BosState {
             } else {
                 None
             },
+            device_states: vec![
+                BosDeviceState::from_gb(gb, GameBoyDevice::Dma)?,
+                BosDeviceState::from_gb(gb, GameBoyDevice::Timer)?,
+            ],
             bess: *BessState::from_gb(gb, options)?,
         }))
     }
@@ -512,6 +524,9 @@ impl StateBox for BosState {
     fn to_gb(&self, gb: &mut GameBoy, options: &ToGbOptions) -> Result<(), Error> {
         self.verify()?;
         self.bess.to_gb(gb, options)?;
+        for device_state in &self.device_states {
+            device_state.to_gb(gb)?;
+        }
         Ok(())
     }
 }
@@ -760,7 +775,7 @@ impl BosDeviceState {
     pub fn new(device: GameBoyDevice, state: Vec<u8>) -> Self {
         Self {
             header: BosBlock::new(
-                BosBlockKind::ImageBuffer,
+                BosBlockKind::DeviceState,
                 (size_of::<u8>() + state.len()) as u32,
             ),
             device,
@@ -772,6 +787,23 @@ impl BosDeviceState {
         let mut instance = Self::default();
         instance.read(data)?;
         Ok(instance)
+    }
+
+    fn from_gb(gb: &mut GameBoy, device: GameBoyDevice) -> Result<Self, Error> {
+        match device {
+            GameBoyDevice::Dma => Ok(Self::new(device, gb.dma_i().state()?)),
+            GameBoyDevice::Timer => Ok(Self::new(device, gb.timer_i().state()?)),
+            _ => Err(Error::NotImplemented),
+        }
+    }
+
+    fn to_gb(&self, gb: &mut GameBoy) -> Result<(), Error> {
+        match self.device {
+            GameBoyDevice::Dma => gb.dma().set_state(&self.state)?,
+            GameBoyDevice::Timer => gb.timer().set_state(&self.state)?,
+            _ => return Err(Error::NotImplemented),
+        }
+        Ok(())
     }
 }
 
@@ -785,20 +817,9 @@ impl Serialize for BosDeviceState {
 
     fn read(&mut self, data: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
         self.header.read(data)?;
-        self.device = read_vec_u8(data)?.into();
-
-        // @TODO: tenho de ler N bytes para o state
-
-        Ok(())
-    }
-}
-
-impl State for BosDeviceState {
-    fn from_gb(gb: &mut GameBoy) -> Result<Self, Error> {
-        Ok(Self::new(gb.ppu_i().frame_buffer_raw()))
-    }
-
-    fn to_gb(&self, _gb: &mut GameBoy) -> Result<(), Error> {
+        self.device = read_u8(data)?.into();
+        let state_len = self.header.size as usize - size_of::<u8>();
+        self.state.append(&mut read_bytes(data, state_len)?);
         Ok(())
     }
 }

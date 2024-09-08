@@ -198,7 +198,7 @@ impl From<u8> for GameBoySpeed {
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum GameBoyDevice {
     Cpu = 0,
     Mmu = 1,
