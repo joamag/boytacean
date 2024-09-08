@@ -118,8 +118,7 @@ pub fn read_i64<R: Read>(reader: &mut R) -> Result<i64, Error> {
 #[inline(always)]
 pub fn read_bytes<R: Read>(reader: &mut R, count: usize) -> Result<Vec<u8>, Error> {
     let mut buffer = vec![0; count];
-    let bytes_read = reader.read(&mut buffer)?;
-    buffer.truncate(bytes_read);
+    reader.read_exact(&mut buffer)?;
     Ok(buffer)
 }
 
