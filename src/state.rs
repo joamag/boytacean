@@ -7,7 +7,7 @@
 //! in agnostic and compatible way.
 
 use boytacean_common::{
-    data::{read_u8, write_u8},
+    data::{read_vec_u8, write_u8},
     error::Error,
     util::{save_bmp, timestamp},
 };
@@ -785,8 +785,10 @@ impl Serialize for BosDeviceState {
 
     fn read(&mut self, data: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
         self.header.read(data)?;
-        self.device = read_u8(data)?.into(); // PORQUE O VEC U8 AQUI?????
-        data.read_exact(&mut self.image)?;
+        self.device = read_vec_u8(data)?.into();
+
+        // @TODO: tenho de ler N bytes para o state
+
         Ok(())
     }
 }
