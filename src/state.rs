@@ -7,6 +7,7 @@
 //! in agnostic and compatible way.
 
 use boytacean_common::{
+    data::{read_u8, write_u8},
     error::Error,
     util::{save_bmp, timestamp},
 };
@@ -17,10 +18,11 @@ use std::{
     fs::File,
     io::{Cursor, Read, Seek, SeekFrom, Write},
     mem::size_of,
+    vec,
 };
 
 use crate::{
-    gb::{GameBoy, GameBoyMode, GameBoySpeed},
+    gb::{GameBoy, GameBoyDevice, GameBoyMode, GameBoySpeed},
     info::Info,
     ppu::{DISPLAY_HEIGHT, DISPLAY_WIDTH, FRAME_BUFFER_SIZE},
     rom::{CgbMode, MbcType},
@@ -113,6 +115,7 @@ impl Display for SaveStateFormat {
 pub enum BosBlockKind {
     Info = 0x01,
     ImageBuffer = 0x02,
+    DeviceState = 0x03,
     Unknown = 0xff,
 }
 
@@ -121,6 +124,7 @@ impl BosBlockKind {
         match value {
             0x01 => Self::Info,
             0x02 => Self::ImageBuffer,
+            0x03 => Self::DeviceState,
             _ => Self::Unknown,
         }
     }
@@ -743,6 +747,63 @@ impl State for BosImageBuffer {
 impl Default for BosImageBuffer {
     fn default() -> Self {
         Self::new([0x00; FRAME_BUFFER_SIZE])
+    }
+}
+
+pub struct BosDeviceState {
+    header: BosBlock,
+    device: GameBoyDevice,
+    state: Vec<u8>,
+}
+
+impl BosDeviceState {
+    pub fn new(device: GameBoyDevice, state: Vec<u8>) -> Self {
+        Self {
+            header: BosBlock::new(
+                BosBlockKind::ImageBuffer,
+                (size_of::<u8>() + state.len()) as u32,
+            ),
+            device,
+            state,
+        }
+    }
+
+    pub fn from_data(data: &mut Cursor<Vec<u8>>) -> Result<Self, Error> {
+        let mut instance = Self::default();
+        instance.read(data)?;
+        Ok(instance)
+    }
+}
+
+impl Serialize for BosDeviceState {
+    fn write(&mut self, buffer: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
+        self.header.write(buffer)?;
+        write_u8(buffer, self.device as u8)?;
+        buffer.write_all(&self.state)?;
+        Ok(())
+    }
+
+    fn read(&mut self, data: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
+        self.header.read(data)?;
+        self.device = read_u8(data)?.into(); // PORQUE O VEC U8 AQUI?????
+        data.read_exact(&mut self.image)?;
+        Ok(())
+    }
+}
+
+impl State for BosDeviceState {
+    fn from_gb(gb: &mut GameBoy) -> Result<Self, Error> {
+        Ok(Self::new(gb.ppu_i().frame_buffer_raw()))
+    }
+
+    fn to_gb(&self, _gb: &mut GameBoy) -> Result<(), Error> {
+        Ok(())
+    }
+}
+
+impl Default for BosDeviceState {
+    fn default() -> Self {
+        Self::new(GameBoyDevice::Unknown, vec![])
     }
 }
 

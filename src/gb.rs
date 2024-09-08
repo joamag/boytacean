@@ -199,6 +199,82 @@ impl From<u8> for GameBoySpeed {
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 #[derive(Clone, Copy, PartialEq, Eq)]
+pub enum GameBoyDevice {
+    Cpu = 0,
+    Mmu = 1,
+    Ppu = 3,
+    Apu = 4,
+    Dma = 5,
+    Pad = 6,
+    Timer = 7,
+    Serial = 8,
+    Unknown = 100,
+}
+
+impl GameBoyDevice {
+    pub fn description(&self) -> &'static str {
+        match self {
+            GameBoyDevice::Cpu => "CPU",
+            GameBoyDevice::Mmu => "MMU",
+            GameBoyDevice::Ppu => "PPU",
+            GameBoyDevice::Apu => "APU",
+            GameBoyDevice::Dma => "DMA",
+            GameBoyDevice::Pad => "GamePad",
+            GameBoyDevice::Timer => "Timer",
+            GameBoyDevice::Serial => "Serial",
+            GameBoyDevice::Unknown => "Unknown",
+        }
+    }
+
+    pub fn from_u8(value: u8) -> Self {
+        match value {
+            0 => GameBoyDevice::Cpu,
+            1 => GameBoyDevice::Mmu,
+            3 => GameBoyDevice::Ppu,
+            4 => GameBoyDevice::Apu,
+            5 => GameBoyDevice::Dma,
+            6 => GameBoyDevice::Pad,
+            7 => GameBoyDevice::Timer,
+            8 => GameBoyDevice::Serial,
+            _ => GameBoyDevice::Unknown,
+        }
+    }
+
+    pub fn into_u8(&self) -> u8 {
+        match self {
+            GameBoyDevice::Cpu => 0,
+            GameBoyDevice::Mmu => 1,
+            GameBoyDevice::Ppu => 3,
+            GameBoyDevice::Apu => 4,
+            GameBoyDevice::Dma => 5,
+            GameBoyDevice::Pad => 6,
+            GameBoyDevice::Timer => 7,
+            GameBoyDevice::Serial => 8,
+            GameBoyDevice::Unknown => 100,
+        }
+    }
+}
+
+impl Display for GameBoyDevice {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.description())
+    }
+}
+
+impl From<u8> for GameBoyDevice {
+    fn from(value: u8) -> Self {
+        Self::from_u8(value)
+    }
+}
+
+impl From<GameBoyDevice> for u8 {
+    fn from(value: GameBoyDevice) -> Self {
+        value.into_u8()
+    }
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct GameBoyConfig {
     /// The current running mode of the emulator, this
     /// may affect many aspects of the emulation, like
