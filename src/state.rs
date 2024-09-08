@@ -7,7 +7,7 @@
 //! in agnostic and compatible way.
 
 use boytacean_common::{
-    data::{read_bytes, read_u8, write_u8},
+    data::{read_bytes, read_u32, read_u64, read_u8, write_bytes, write_u32, write_u64, write_u8},
     error::Error,
     util::{save_bmp, timestamp},
 };
@@ -616,17 +616,17 @@ impl Serialize for BosInfo {
     fn write(&mut self, buffer: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
         self.header.write(buffer)?;
 
-        buffer.write_all(&(size_of::<u64>() as u32).to_le_bytes())?;
-        buffer.write_all(&self.timestamp.to_le_bytes())?;
+        write_u32(buffer, size_of::<u64>() as u32)?;
+        write_u64(buffer, self.timestamp)?;
 
-        buffer.write_all(&(self.agent.as_bytes().len() as u32).to_le_bytes())?;
-        buffer.write_all(self.agent.as_bytes())?;
+        write_u32(buffer, self.agent.as_bytes().len() as u32)?;
+        write_bytes(buffer, self.agent.as_bytes())?;
 
-        buffer.write_all(&(self.agent_version.as_bytes().len() as u32).to_le_bytes())?;
-        buffer.write_all(self.agent_version.as_bytes())?;
+        write_u32(buffer, self.agent_version.as_bytes().len() as u32)?;
+        write_bytes(buffer, self.agent_version.as_bytes())?;
 
-        buffer.write_all(&(self.model.as_bytes().len() as u32).to_le_bytes())?;
-        buffer.write_all(self.model.as_bytes())?;
+        write_u32(buffer, self.model.as_bytes().len() as u32)?;
+        write_bytes(buffer, self.model.as_bytes())?;
 
         Ok(())
     }
@@ -634,29 +634,17 @@ impl Serialize for BosInfo {
     fn read(&mut self, data: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
         self.header.read(data)?;
 
-        let mut buffer = [0x00; size_of::<u32>()];
-        data.read_exact(&mut buffer)?;
-        let mut buffer = vec![0x00; u32::from_le_bytes(buffer) as usize];
-        data.read_exact(&mut buffer)?;
-        self.timestamp = u64::from_le_bytes(buffer.try_into().unwrap());
+        read_u32(data)?;
+        self.timestamp = read_u64(data)?;
 
-        let mut buffer = [0x00; size_of::<u32>()];
-        data.read_exact(&mut buffer)?;
-        let mut buffer = vec![0x00; u32::from_le_bytes(buffer) as usize];
-        data.read_exact(&mut buffer)?;
-        self.agent = String::from_utf8(buffer)?;
+        let buffer_len = read_u32(data)? as usize;
+        self.agent = String::from_utf8(read_bytes(data, buffer_len)?)?;
 
-        let mut buffer = [0x00; size_of::<u32>()];
-        data.read_exact(&mut buffer)?;
-        let mut buffer = vec![0x00; u32::from_le_bytes(buffer) as usize];
-        data.read_exact(&mut buffer)?;
-        self.agent_version = String::from_utf8(buffer)?;
+        let buffer_len = read_u32(data)? as usize;
+        self.agent_version = String::from_utf8(read_bytes(data, buffer_len)?)?;
 
-        let mut buffer = [0x00; size_of::<u32>()];
-        data.read_exact(&mut buffer)?;
-        let mut buffer = vec![0x00; u32::from_le_bytes(buffer) as usize];
-        data.read_exact(&mut buffer)?;
-        self.model = String::from_utf8(buffer)?;
+        let buffer_len = read_u32(data)? as usize;
+        self.model = String::from_utf8(read_bytes(data, buffer_len)?)?;
 
         Ok(())
     }

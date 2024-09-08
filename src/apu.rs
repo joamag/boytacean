@@ -1,12 +1,12 @@
 //! APU (Audio Processing Unit) functions and structures.
 
-use std::{
-    collections::VecDeque,
-    io::{Cursor, Read, Write},
-};
+use std::{collections::VecDeque, io::Cursor};
 
 use boytacean_common::{
-    data::{read_i16, read_i32, read_u16, read_u8, write_i16, write_i32, write_u16, write_u8},
+    data::{
+        read_i16, read_i32, read_into, read_u16, read_u8, write_bytes, write_i16, write_i32,
+        write_u16, write_u8,
+    },
     error::Error,
 };
 
@@ -1243,7 +1243,7 @@ impl StateComponent for Apu {
         write_u8(&mut cursor, self.ch3_out_enabled as u8)?;
         write_u8(&mut cursor, self.ch4_out_enabled as u8)?;
 
-        cursor.write(&self.wave_ram)?;
+        write_bytes(&mut cursor, &self.wave_ram)?;
 
         write_u16(&mut cursor, self.sampling_rate)?;
         write_u8(&mut cursor, self.channels)?;
@@ -1330,7 +1330,7 @@ impl StateComponent for Apu {
         self.ch3_out_enabled = read_u8(&mut cursor)? != 0;
         self.ch4_out_enabled = read_u8(&mut cursor)? != 0;
 
-        cursor.read_exact(&mut self.wave_ram)?;
+        read_into(&mut cursor, &mut self.wave_ram)?;
 
         self.sampling_rate = read_u16(&mut cursor)?;
         self.channels = read_u8(&mut cursor)?;

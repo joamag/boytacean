@@ -42,6 +42,24 @@ pub fn write_i32<W: Write>(writer: &mut W, value: i32) -> Result<(), Error> {
 }
 
 #[inline(always)]
+pub fn write_u64<W: Write>(writer: &mut W, value: u64) -> Result<(), Error> {
+    writer.write_all(&value.to_le_bytes())?;
+    Ok(())
+}
+
+#[inline(always)]
+pub fn write_i64<W: Write>(writer: &mut W, value: i64) -> Result<(), Error> {
+    writer.write_all(&value.to_le_bytes())?;
+    Ok(())
+}
+
+#[inline(always)]
+pub fn write_bytes<W: Write>(writer: &mut W, buffer: &[u8]) -> Result<(), Error> {
+    writer.write_all(buffer)?;
+    Ok(())
+}
+
+#[inline(always)]
 pub fn read_u8<R: Read>(reader: &mut R) -> Result<u8, Error> {
     let mut buffer = [0x00; size_of::<u8>()];
     reader.read_exact(&mut buffer)?;
@@ -84,9 +102,29 @@ pub fn read_i32<R: Read>(reader: &mut R) -> Result<i32, Error> {
 }
 
 #[inline(always)]
+pub fn read_u64<R: Read>(reader: &mut R) -> Result<u64, Error> {
+    let mut buffer = [0x00; size_of::<u64>()];
+    reader.read_exact(&mut buffer)?;
+    Ok(u64::from_le_bytes(buffer))
+}
+
+#[inline(always)]
+pub fn read_i64<R: Read>(reader: &mut R) -> Result<i64, Error> {
+    let mut buffer = [0x00; size_of::<i64>()];
+    reader.read_exact(&mut buffer)?;
+    Ok(i64::from_le_bytes(buffer))
+}
+
+#[inline(always)]
 pub fn read_bytes<R: Read>(reader: &mut R, count: usize) -> Result<Vec<u8>, Error> {
     let mut buffer = vec![0; count];
     let bytes_read = reader.read(&mut buffer)?;
     buffer.truncate(bytes_read);
     Ok(buffer)
+}
+
+#[inline(always)]
+pub fn read_into<R: Read>(reader: &mut R, buffer: &mut [u8]) -> Result<(), Error> {
+    reader.read_exact(buffer)?;
+    Ok(())
 }
