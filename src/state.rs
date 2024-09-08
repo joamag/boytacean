@@ -514,6 +514,7 @@ impl StateBox for BosState {
                 None
             },
             device_states: vec![
+                BosDeviceState::from_gb(gb, GameBoyDevice::Apu)?,
                 BosDeviceState::from_gb(gb, GameBoyDevice::Dma)?,
                 BosDeviceState::from_gb(gb, GameBoyDevice::Timer)?,
             ],
@@ -791,6 +792,7 @@ impl BosDeviceState {
 
     fn from_gb(gb: &mut GameBoy, device: GameBoyDevice) -> Result<Self, Error> {
         match device {
+            GameBoyDevice::Apu => Ok(Self::new(device, gb.apu_i().state()?)),
             GameBoyDevice::Dma => Ok(Self::new(device, gb.dma_i().state()?)),
             GameBoyDevice::Timer => Ok(Self::new(device, gb.timer_i().state()?)),
             _ => Err(Error::NotImplemented),
@@ -799,6 +801,7 @@ impl BosDeviceState {
 
     fn to_gb(&self, gb: &mut GameBoy) -> Result<(), Error> {
         match self.device {
+            GameBoyDevice::Apu => gb.apu().set_state(&self.state)?,
             GameBoyDevice::Dma => gb.dma().set_state(&self.state)?,
             GameBoyDevice::Timer => gb.timer().set_state(&self.state)?,
             _ => return Err(Error::NotImplemented),

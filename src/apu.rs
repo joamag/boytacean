@@ -1,6 +1,14 @@
 //! APU (Audio Processing Unit) functions and structures.
 
-use std::collections::VecDeque;
+use std::{
+    collections::VecDeque,
+    io::{Cursor, Read, Write},
+};
+
+use boytacean_common::{
+    data::{read_i16, read_i32, read_u16, read_u8, write_i16, write_i32, write_u16, write_u8},
+    error::Error,
+};
 
 use crate::{
     consts::{
@@ -10,6 +18,7 @@ use crate::{
     },
     gb::GameBoy,
     mmu::BusComponent,
+    state::StateComponent,
     warnln,
 };
 
@@ -1155,6 +1164,182 @@ impl BusComponent for Apu {
 
     fn write(&mut self, addr: u16, value: u8) {
         self.write(addr, value);
+    }
+}
+
+impl StateComponent for Apu {
+    fn state(&self) -> Result<Vec<u8>, Error> {
+        let mut cursor = Cursor::new(vec![]);
+
+        write_i16(&mut cursor, self.ch1_timer)?;
+        write_u8(&mut cursor, self.ch1_sequence)?;
+        write_u8(&mut cursor, self.ch1_envelope_sequence)?;
+        write_u8(&mut cursor, self.ch1_envelope_enabled as u8)?;
+        write_u8(&mut cursor, self.ch1_sweep_sequence)?;
+        write_u8(&mut cursor, self.ch1_output)?;
+        write_u8(&mut cursor, self.ch1_dac as u8)?;
+        write_u8(&mut cursor, self.ch1_sweep_slope)?;
+        write_u8(&mut cursor, self.ch1_sweep_increase as u8)?;
+        write_u8(&mut cursor, self.ch1_sweep_pace)?;
+        write_u8(&mut cursor, self.ch1_length_timer)?;
+        write_u8(&mut cursor, self.ch1_wave_duty)?;
+        write_u8(&mut cursor, self.ch1_pace)?;
+        write_u8(&mut cursor, self.ch1_direction)?;
+        write_u8(&mut cursor, self.ch1_volume)?;
+        write_u16(&mut cursor, self.ch1_wave_length)?;
+        write_u8(&mut cursor, self.ch1_length_enabled as u8)?;
+        write_u8(&mut cursor, self.ch1_enabled as u8)?;
+
+        write_i16(&mut cursor, self.ch2_timer)?;
+        write_u8(&mut cursor, self.ch2_sequence)?;
+        write_u8(&mut cursor, self.ch2_envelope_sequence)?;
+        write_u8(&mut cursor, self.ch2_envelope_enabled as u8)?;
+        write_u8(&mut cursor, self.ch2_output)?;
+        write_u8(&mut cursor, self.ch2_dac as u8)?;
+        write_u8(&mut cursor, self.ch2_length_timer)?;
+        write_u8(&mut cursor, self.ch2_wave_duty)?;
+        write_u8(&mut cursor, self.ch2_pace)?;
+        write_u8(&mut cursor, self.ch2_direction)?;
+        write_u8(&mut cursor, self.ch2_volume)?;
+        write_u16(&mut cursor, self.ch2_wave_length)?;
+        write_u8(&mut cursor, self.ch2_length_enabled as u8)?;
+        write_u8(&mut cursor, self.ch2_enabled as u8)?;
+
+        write_i16(&mut cursor, self.ch3_timer)?;
+        write_u8(&mut cursor, self.ch3_position)?;
+        write_u8(&mut cursor, self.ch3_output)?;
+        write_u8(&mut cursor, self.ch3_dac as u8)?;
+        write_u16(&mut cursor, self.ch3_length_timer)?;
+        write_u8(&mut cursor, self.ch3_output_level)?;
+        write_u16(&mut cursor, self.ch3_wave_length)?;
+        write_u8(&mut cursor, self.ch3_length_enabled as u8)?;
+        write_u8(&mut cursor, self.ch3_enabled as u8)?;
+
+        write_i32(&mut cursor, self.ch4_timer)?;
+        write_u8(&mut cursor, self.ch4_envelope_sequence)?;
+        write_u8(&mut cursor, self.ch4_envelope_enabled as u8)?;
+        write_u8(&mut cursor, self.ch4_output)?;
+        write_u8(&mut cursor, self.ch4_dac as u8)?;
+        write_u8(&mut cursor, self.ch4_length_timer)?;
+        write_u8(&mut cursor, self.ch4_pace)?;
+        write_u8(&mut cursor, self.ch4_direction)?;
+        write_u8(&mut cursor, self.ch4_volume)?;
+        write_u8(&mut cursor, self.ch4_divisor)?;
+        write_u8(&mut cursor, self.ch4_width_mode as u8)?;
+        write_u8(&mut cursor, self.ch4_clock_shift)?;
+        write_u16(&mut cursor, self.ch4_lfsr)?;
+        write_u8(&mut cursor, self.ch4_length_enabled as u8)?;
+        write_u8(&mut cursor, self.ch4_enabled as u8)?;
+
+        write_u8(&mut cursor, self.master)?;
+        write_u8(&mut cursor, self.glob_panning)?;
+
+        write_u8(&mut cursor, self.right_enabled as u8)?;
+        write_u8(&mut cursor, self.left_enabled as u8)?;
+        write_u8(&mut cursor, self.sound_enabled as u8)?;
+
+        write_u8(&mut cursor, self.ch1_out_enabled as u8)?;
+        write_u8(&mut cursor, self.ch2_out_enabled as u8)?;
+        write_u8(&mut cursor, self.ch3_out_enabled as u8)?;
+        write_u8(&mut cursor, self.ch4_out_enabled as u8)?;
+
+        cursor.write(&self.wave_ram)?;
+
+        write_u16(&mut cursor, self.sampling_rate)?;
+        write_u8(&mut cursor, self.channels)?;
+
+        write_u16(&mut cursor, self.sequencer)?;
+        write_u8(&mut cursor, self.sequencer_step)?;
+        write_i16(&mut cursor, self.output_timer)?;
+
+        Ok(cursor.into_inner())
+    }
+
+    fn set_state(&mut self, data: &[u8]) -> Result<(), Error> {
+        let mut cursor = Cursor::new(data);
+
+        self.ch1_timer = read_i16(&mut cursor)?;
+        self.ch1_sequence = read_u8(&mut cursor)?;
+        self.ch1_envelope_sequence = read_u8(&mut cursor)?;
+        self.ch1_envelope_enabled = read_u8(&mut cursor)? != 0;
+        self.ch1_sweep_sequence = read_u8(&mut cursor)?;
+        self.ch1_output = read_u8(&mut cursor)?;
+        self.ch1_dac = read_u8(&mut cursor)? != 0;
+        self.ch1_sweep_slope = read_u8(&mut cursor)?;
+        self.ch1_sweep_increase = read_u8(&mut cursor)? != 0;
+        self.ch1_sweep_pace = read_u8(&mut cursor)?;
+        self.ch1_length_timer = read_u8(&mut cursor)?;
+        self.ch1_wave_duty = read_u8(&mut cursor)?;
+        self.ch1_pace = read_u8(&mut cursor)?;
+        self.ch1_direction = read_u8(&mut cursor)?;
+        self.ch1_volume = read_u8(&mut cursor)?;
+        self.ch1_wave_length = read_u16(&mut cursor)?;
+        self.ch1_length_enabled = read_u8(&mut cursor)? != 0;
+        self.ch1_enabled = read_u8(&mut cursor)? != 0;
+
+        self.ch2_timer = read_i16(&mut cursor)?;
+        self.ch2_sequence = read_u8(&mut cursor)?;
+        self.ch2_envelope_sequence = read_u8(&mut cursor)?;
+        self.ch2_envelope_enabled = read_u8(&mut cursor)? != 0;
+        self.ch2_output = read_u8(&mut cursor)?;
+        self.ch2_dac = read_u8(&mut cursor)? != 0;
+        self.ch2_length_timer = read_u8(&mut cursor)?;
+        self.ch2_wave_duty = read_u8(&mut cursor)?;
+        self.ch2_pace = read_u8(&mut cursor)?;
+        self.ch2_direction = read_u8(&mut cursor)?;
+        self.ch2_volume = read_u8(&mut cursor)?;
+        self.ch2_wave_length = read_u16(&mut cursor)?;
+        self.ch2_length_enabled = read_u8(&mut cursor)? != 0;
+        self.ch2_enabled = read_u8(&mut cursor)? != 0;
+
+        self.ch3_timer = read_i16(&mut cursor)?;
+        self.ch3_position = read_u8(&mut cursor)?;
+        self.ch3_output = read_u8(&mut cursor)?;
+        self.ch3_dac = read_u8(&mut cursor)? != 0;
+        self.ch3_length_timer = read_u16(&mut cursor)?;
+        self.ch3_output_level = read_u8(&mut cursor)?;
+        self.ch3_wave_length = read_u16(&mut cursor)?;
+        self.ch3_length_enabled = read_u8(&mut cursor)? != 0;
+        self.ch3_enabled = read_u8(&mut cursor)? != 0;
+
+        self.ch4_timer = read_i32(&mut cursor)?;
+        self.ch4_envelope_sequence = read_u8(&mut cursor)?;
+        self.ch4_envelope_enabled = read_u8(&mut cursor)? != 0;
+        self.ch4_output = read_u8(&mut cursor)?;
+        self.ch4_dac = read_u8(&mut cursor)? != 0;
+        self.ch4_length_timer = read_u8(&mut cursor)?;
+        self.ch4_pace = read_u8(&mut cursor)?;
+        self.ch4_direction = read_u8(&mut cursor)?;
+        self.ch4_volume = read_u8(&mut cursor)?;
+        self.ch4_divisor = read_u8(&mut cursor)?;
+        self.ch4_width_mode = read_u8(&mut cursor)? != 0;
+        self.ch4_clock_shift = read_u8(&mut cursor)?;
+        self.ch4_lfsr = read_u16(&mut cursor)?;
+        self.ch4_length_enabled = read_u8(&mut cursor)? != 0;
+        self.ch4_enabled = read_u8(&mut cursor)? != 0;
+
+        self.master = read_u8(&mut cursor)?;
+        self.glob_panning = read_u8(&mut cursor)?;
+
+        self.right_enabled = read_u8(&mut cursor)? != 0;
+        self.left_enabled = read_u8(&mut cursor)? != 0;
+        self.sound_enabled = read_u8(&mut cursor)? != 0;
+
+        self.ch1_out_enabled = read_u8(&mut cursor)? != 0;
+        self.ch2_out_enabled = read_u8(&mut cursor)? != 0;
+        self.ch3_out_enabled = read_u8(&mut cursor)? != 0;
+        self.ch4_out_enabled = read_u8(&mut cursor)? != 0;
+
+        cursor.read_exact(&mut self.wave_ram)?;
+
+        self.sampling_rate = read_u16(&mut cursor)?;
+        self.channels = read_u8(&mut cursor)?;
+
+        self.sequencer = read_u16(&mut cursor)?;
+        self.sequencer_step = read_u8(&mut cursor)?;
+        self.output_timer = read_i16(&mut cursor)?;
+
+        Ok(())
     }
 }
 
