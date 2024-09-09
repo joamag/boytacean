@@ -1164,18 +1164,14 @@ impl BessBuffer {
 
 impl Serialize for BessBuffer {
     fn write(&mut self, buffer: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
-        buffer.write_all(&self.size.to_le_bytes())?;
-        buffer.write_all(&self.offset.to_le_bytes())?;
+        write_u32(buffer, self.size)?;
+        write_u32(buffer, self.offset)?;
         Ok(())
     }
 
     fn read(&mut self, data: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
-        let mut buffer = [0x00; size_of::<u32>()];
-        data.read_exact(&mut buffer)?;
-        self.size = u32::from_le_bytes(buffer);
-        let mut buffer = [0x00; size_of::<u32>()];
-        data.read_exact(&mut buffer)?;
-        self.offset = u32::from_le_bytes(buffer);
+        self.size = read_u32(data)?;
+        self.offset = read_u32(data)?;
         self.buffer = self.load_buffer(data)?;
         Ok(())
     }
