@@ -7,7 +7,10 @@
 //! in agnostic and compatible way.
 
 use boytacean_common::{
-    data::{read_bytes, read_u32, read_u64, read_u8, write_bytes, write_u32, write_u64, write_u8},
+    data::{
+        read_bytes, read_into, read_u32, read_u64, read_u8, write_bytes, write_u32, write_u64,
+        write_u8,
+    },
     error::Error,
     util::{save_bmp, timestamp},
 };
@@ -267,7 +270,7 @@ impl Serialize for BoscState {
         self.bos.write(&mut cursor)?;
 
         let bos_compressed = encode_zippy(&cursor.into_inner(), None, None)?;
-        buffer.write_all(&bos_compressed)?;
+        write_bytes(buffer, &bos_compressed)?;
 
         Ok(())
     }
@@ -713,13 +716,13 @@ impl BosImageBuffer {
 impl Serialize for BosImageBuffer {
     fn write(&mut self, buffer: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
         self.header.write(buffer)?;
-        buffer.write_all(&self.image)?;
+        write_bytes(buffer, &self.image)?;
         Ok(())
     }
 
     fn read(&mut self, data: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
         self.header.read(data)?;
-        data.read_exact(&mut self.image)?;
+        read_into(data, &mut self.image)?;
         Ok(())
     }
 }
@@ -788,7 +791,7 @@ impl Serialize for BosDeviceState {
     fn write(&mut self, buffer: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
         self.header.write(buffer)?;
         write_u8(buffer, self.device as u8)?;
-        buffer.write_all(&self.state)?;
+        write_bytes(buffer, &self.state)?;
         Ok(())
     }
 
@@ -1057,18 +1060,14 @@ impl BessBlockHeader {
 
 impl Serialize for BessBlockHeader {
     fn write(&mut self, buffer: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
-        buffer.write_all(self.magic.as_bytes())?;
-        buffer.write_all(&self.size.to_le_bytes())?;
+        write_bytes(buffer, self.magic.as_bytes())?;
+        write_u32(buffer, self.size)?;
         Ok(())
     }
 
     fn read(&mut self, data: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
-        let mut buffer = [0x00; 4];
-        data.read_exact(&mut buffer)?;
-        self.magic = String::from_utf8(Vec::from(buffer))?;
-        let mut buffer = [0x00; size_of::<u32>()];
-        data.read_exact(&mut buffer)?;
-        self.size = u32::from_le_bytes(buffer);
+        self.magic = String::from_utf8(read_bytes(data, 4)?)?;
+        self.size = read_u32(data)?;
         Ok(())
     }
 }
