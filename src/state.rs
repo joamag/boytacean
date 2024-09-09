@@ -260,7 +260,7 @@ impl BoscState {
 
 impl Serialize for BoscState {
     fn write(&mut self, buffer: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
-        write_u8(buffer, self.magic)?;
+        write_u32(buffer, self.magic)?;
         write_u8(buffer, self.version)?;
 
         let mut cursor = Cursor::new(vec![]);
@@ -273,7 +273,7 @@ impl Serialize for BoscState {
     }
 
     fn read(&mut self, data: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
-        self.magic = read_u8(data)?;
+        self.magic = read_u32(data)?;
         self.version = read_u8(data)?;
 
         let mut bos_compressed = vec![];
