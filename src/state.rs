@@ -1206,18 +1206,14 @@ impl BessFooter {
 
 impl Serialize for BessFooter {
     fn write(&mut self, buffer: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
-        buffer.write_all(&self.start_offset.to_le_bytes())?;
-        buffer.write_all(&self.magic.to_le_bytes())?;
+        write_u32(buffer, self.start_offset)?;
+        write_u32(buffer, self.magic)?;
         Ok(())
     }
 
     fn read(&mut self, data: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
-        let mut buffer = [0x00; size_of::<u32>()];
-        data.read_exact(&mut buffer)?;
-        self.start_offset = u32::from_le_bytes(buffer);
-        let mut buffer = [0x00; size_of::<u32>()];
-        data.read_exact(&mut buffer)?;
-        self.magic = u32::from_le_bytes(buffer);
+        self.start_offset = read_u32(data)?;
+        self.magic = read_u32(data)?;
         Ok(())
     }
 }
@@ -1259,15 +1255,13 @@ impl BessName {
 impl Serialize for BessName {
     fn write(&mut self, buffer: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
         self.header.write(buffer)?;
-        buffer.write_all(self.name.as_bytes())?;
+        write_bytes(buffer, self.name.as_bytes())?;
         Ok(())
     }
 
     fn read(&mut self, data: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
         self.header.read(data)?;
-        let mut buffer = vec![0x00; self.header.size as usize];
-        data.read_exact(&mut buffer)?;
-        self.name = String::from_utf8(buffer)?;
+        self.name = String::from_utf8(read_bytes(data, self.header.size as usize)?)?;
         Ok(())
     }
 }
