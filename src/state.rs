@@ -437,9 +437,9 @@ impl Serialize for BosState {
     fn write(&mut self, buffer: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
         self.block_count = self.build_block_count();
 
-        buffer.write_all(&self.magic.to_le_bytes())?;
-        buffer.write_all(&self.version.to_le_bytes())?;
-        buffer.write_all(&self.block_count.to_le_bytes())?;
+        write_u32(buffer, self.magic)?;
+        write_u8(buffer, self.version)?;
+        write_u8(buffer, self.block_count)?;
 
         if let Some(info) = &mut self.info {
             info.write(buffer)?;
@@ -457,15 +457,9 @@ impl Serialize for BosState {
     }
 
     fn read(&mut self, data: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
-        let mut buffer = [0x00; size_of::<u32>()];
-        data.read_exact(&mut buffer)?;
-        self.magic = u32::from_le_bytes(buffer);
-        let mut buffer = [0x00; size_of::<u8>()];
-        data.read_exact(&mut buffer)?;
-        self.version = u8::from_le_bytes(buffer);
-        let mut buffer = [0x00; size_of::<u8>()];
-        data.read_exact(&mut buffer)?;
-        self.block_count = u8::from_le_bytes(buffer);
+        self.magic = read_u32(data)?;
+        self.version = read_u8(data)?;
+        self.block_count = read_u8(data)?;
 
         for _ in 0..self.block_count {
             let block = BosBlock::from_data(data)?;
@@ -553,18 +547,14 @@ impl BosBlock {
 
 impl Serialize for BosBlock {
     fn write(&mut self, buffer: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
-        buffer.write_all(&(self.kind as u8).to_le_bytes())?;
-        buffer.write_all(&self.size.to_le_bytes())?;
+        write_u8(buffer, self.kind as u8)?;
+        write_u32(buffer, self.size)?;
         Ok(())
     }
 
     fn read(&mut self, data: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
-        let mut buffer = [0x00; size_of::<u8>()];
-        data.read_exact(&mut buffer)?;
-        self.kind = BosBlockKind::from_u8(u8::from_le_bytes(buffer));
-        let mut buffer = [0x00; size_of::<u32>()];
-        data.read_exact(&mut buffer)?;
-        self.size = u32::from_le_bytes(buffer);
+        self.kind = read_u8(data)?.into();
+        self.size = read_u32(data)?;
         Ok(())
     }
 }
