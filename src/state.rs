@@ -8,8 +8,8 @@
 
 use boytacean_common::{
     data::{
-        read_bytes, read_into, read_u32, read_u64, read_u8, write_bytes, write_u32, write_u64,
-        write_u8,
+        read_bytes, read_into, read_u16, read_u32, read_u64, read_u8, write_bytes, write_u16,
+        write_u32, write_u64, write_u8,
     },
     error::Error,
     util::{save_bmp, timestamp},
@@ -245,9 +245,7 @@ impl BoscState {
     /// Compressed) file structure, thought magic
     /// string validation.
     pub fn is_bosc(data: &mut Cursor<Vec<u8>>) -> Result<bool, Error> {
-        let mut buffer = [0x00; size_of::<u32>()];
-        data.read_exact(&mut buffer)?;
-        let magic = u32::from_le_bytes(buffer);
+        let magic = read_u32(data)?;
         data.rewind()?;
         Ok(magic == BOSC_MAGIC_UINT)
     }
@@ -329,9 +327,7 @@ impl BosState {
     /// buffer represents a valid BOS (Boytacean Save)
     /// file structure, thought magic string validation.
     pub fn is_bos(data: &mut Cursor<Vec<u8>>) -> Result<bool, Error> {
-        let mut buffer = [0x00; size_of::<u32>()];
-        data.read_exact(&mut buffer)?;
-        let magic = u32::from_le_bytes(buffer);
+        let magic = read_u32(data)?;
         data.rewind()?;
         Ok(magic == BOS_MAGIC_UINT)
     }
@@ -827,9 +823,7 @@ impl BessState {
     /// file structure, thought magic string validation.
     pub fn is_bess(data: &mut Cursor<Vec<u8>>) -> Result<bool, Error> {
         data.seek(SeekFrom::End(-4))?;
-        let mut buffer = [0x00; size_of::<u32>()];
-        data.read_exact(&mut buffer)?;
-        let magic = u32::from_le_bytes(buffer);
+        let magic = read_u32(data)?;
         data.rewind()?;
         Ok(magic == BESS_MAGIC)
     }
@@ -887,7 +881,7 @@ impl BessState {
 
         for item in buffers.iter_mut() {
             item.offset = buffer.position() as u32;
-            buffer.write_all(&item.buffer)?;
+            write_bytes(buffer, &item.buffer)?;
         }
 
         Ok(())
@@ -1110,14 +1104,14 @@ impl BessBlock {
 impl Serialize for BessBlock {
     fn write(&mut self, buffer: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
         self.header.write(buffer)?;
-        buffer.write_all(&self.buffer)?;
+        write_bytes(buffer, &self.buffer)?;
         Ok(())
     }
 
     fn read(&mut self, data: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
         self.header.read(data)?;
         self.buffer.reserve_exact(self.header.size as usize);
-        data.read_exact(&mut self.buffer)?;
+        read_into(data, &mut self.buffer)?;
         Ok(())
     }
 }
@@ -1156,7 +1150,7 @@ impl BessBuffer {
         let mut buffer = vec![0x00; self.size as usize];
         let position = data.position();
         data.seek(SeekFrom::Start(self.offset as u64))?;
-        data.read_exact(&mut buffer)?;
+        read_into(data, &mut buffer)?;
         data.set_position(position);
         Ok(buffer)
     }
@@ -1355,15 +1349,15 @@ impl BessInfo {
 impl Serialize for BessInfo {
     fn write(&mut self, buffer: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
         self.header.write(buffer)?;
-        buffer.write_all(&self.title)?;
-        buffer.write_all(&self.checksum)?;
+        write_bytes(buffer, &self.title)?;
+        write_bytes(buffer, &self.checksum)?;
         Ok(())
     }
 
     fn read(&mut self, data: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
         self.header.read(data)?;
-        data.read_exact(&mut self.title)?;
-        data.read_exact(&mut self.checksum)?;
+        read_into(data, &mut self.title)?;
+        read_into(data, &mut self.checksum)?;
         Ok(())
     }
 }
@@ -1587,24 +1581,24 @@ impl Serialize for BessCore {
     fn write(&mut self, buffer: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
         self.header.write(buffer)?;
 
-        buffer.write_all(&self.major.to_le_bytes())?;
-        buffer.write_all(&self.minor.to_le_bytes())?;
+        write_u16(buffer, self.major)?;
+        write_u16(buffer, self.minor)?;
 
-        buffer.write_all(self.model.as_bytes())?;
+        write_bytes(buffer, self.model.as_bytes())?;
 
-        buffer.write_all(&self.pc.to_le_bytes())?;
-        buffer.write_all(&self.af.to_le_bytes())?;
-        buffer.write_all(&self.bc.to_le_bytes())?;
-        buffer.write_all(&self.de.to_le_bytes())?;
-        buffer.write_all(&self.hl.to_le_bytes())?;
-        buffer.write_all(&self.sp.to_le_bytes())?;
+        write_u16(buffer, self.pc)?;
+        write_u16(buffer, self.af)?;
+        write_u16(buffer, self.bc)?;
+        write_u16(buffer, self.de)?;
+        write_u16(buffer, self.hl)?;
+        write_u16(buffer, self.sp)?;
 
-        buffer.write_all(&(self.ime as u8).to_le_bytes())?;
-        buffer.write_all(&self.ie.to_le_bytes())?;
-        buffer.write_all(&self.execution_mode.to_le_bytes())?;
-        buffer.write_all(&self._padding.to_le_bytes())?;
+        write_u8(buffer, self.ime as u8)?;
+        write_u8(buffer, self.ie)?;
+        write_u8(buffer, self.execution_mode)?;
+        write_u8(buffer, self._padding)?;
 
-        buffer.write_all(&self.io_registers)?;
+        write_bytes(buffer, &self.io_registers)?;
 
         self.ram.write(buffer)?;
         self.vram.write(buffer)?;
@@ -1620,50 +1614,24 @@ impl Serialize for BessCore {
     fn read(&mut self, data: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
         self.header.read(data)?;
 
-        let mut buffer = [0x00; size_of::<u16>()];
-        data.read_exact(&mut buffer)?;
-        self.major = u16::from_le_bytes(buffer);
-        let mut buffer = [0x00; size_of::<u16>()];
-        data.read_exact(&mut buffer)?;
-        self.minor = u16::from_le_bytes(buffer);
+        self.major = read_u16(data)?;
+        self.minor = read_u16(data)?;
 
-        let mut buffer = [0x00; 4];
-        data.read_exact(&mut buffer)?;
-        self.model = String::from_utf8(Vec::from(buffer))?;
+        self.model = String::from_utf8(read_bytes(data, 4)?)?;
 
-        let mut buffer = [0x00; size_of::<u16>()];
-        data.read_exact(&mut buffer)?;
-        self.pc = u16::from_le_bytes(buffer);
-        let mut buffer = [0x00; size_of::<u16>()];
-        data.read_exact(&mut buffer)?;
-        self.af = u16::from_le_bytes(buffer);
-        let mut buffer = [0x00; size_of::<u16>()];
-        data.read_exact(&mut buffer)?;
-        self.bc = u16::from_le_bytes(buffer);
-        let mut buffer = [0x00; size_of::<u16>()];
-        data.read_exact(&mut buffer)?;
-        self.de = u16::from_le_bytes(buffer);
-        let mut buffer = [0x00; size_of::<u16>()];
-        data.read_exact(&mut buffer)?;
-        self.hl = u16::from_le_bytes(buffer);
-        let mut buffer = [0x00; size_of::<u16>()];
-        data.read_exact(&mut buffer)?;
-        self.sp = u16::from_le_bytes(buffer);
+        self.pc = read_u16(data)?;
+        self.af = read_u16(data)?;
+        self.bc = read_u16(data)?;
+        self.de = read_u16(data)?;
+        self.hl = read_u16(data)?;
+        self.sp = read_u16(data)?;
 
-        let mut buffer = [0x00; 1];
-        data.read_exact(&mut buffer)?;
-        self.ime = buffer[0] != 0;
-        let mut buffer = [0x00; size_of::<u8>()];
-        data.read_exact(&mut buffer)?;
-        self.ie = u8::from_le_bytes(buffer);
-        let mut buffer = [0x00; size_of::<u8>()];
-        data.read_exact(&mut buffer)?;
-        self.execution_mode = u8::from_le_bytes(buffer);
-        let mut buffer = [0x00; size_of::<u8>()];
-        data.read_exact(&mut buffer)?;
-        self._padding = u8::from_le_bytes(buffer);
+        self.ime = read_u8(data)? != 0;
+        self.ie = read_u8(data)?;
+        self.execution_mode = read_u8(data)?;
+        self._padding = read_u8(data)?;
 
-        data.read_exact(&mut self.io_registers)?;
+        read_into(data, &mut self.io_registers)?;
 
         self.ram.read(data)?;
         self.vram.read(data)?;
@@ -1833,8 +1801,8 @@ impl Serialize for BessMbc {
     fn write(&mut self, buffer: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
         self.header.write(buffer)?;
         for register in self.registers.iter() {
-            buffer.write_all(&register.address.to_le_bytes())?;
-            buffer.write_all(&register.value.to_le_bytes())?;
+            write_u16(buffer, register.address)?;
+            write_u8(buffer, register.value)?;
         }
         Ok(())
     }
@@ -1842,12 +1810,8 @@ impl Serialize for BessMbc {
     fn read(&mut self, data: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
         self.header.read(data)?;
         for _ in 0..(self.header.size / 3) {
-            let mut buffer = [0x00; size_of::<u16>()];
-            data.read_exact(&mut buffer)?;
-            let address = u16::from_le_bytes(buffer);
-            let mut buffer = [0x00; size_of::<u8>()];
-            data.read_exact(&mut buffer)?;
-            let value = u8::from_le_bytes(buffer);
+            let address = read_u16(data)?;
+            let value = read_u8(data)?;
             self.registers.push(BessMbrRegister::new(address, value));
         }
         Ok(())
