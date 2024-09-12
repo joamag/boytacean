@@ -1,11 +1,14 @@
-use boytacean_common::error::Error;
+use boytacean_common::{
+    data::{read_bytes, read_string, read_u32, write_bytes, write_string, write_u32},
+    error::Error,
+};
 use boytacean_hashing::crc32c::crc32c;
 use std::{
     collections::HashSet,
     convert::TryInto,
     default,
     hash::Hash,
-    io::{Cursor, Read, Write},
+    io::{Cursor, Read},
     iter::FromIterator,
     mem::size_of,
 };
@@ -141,7 +144,7 @@ impl Zippy {
             encrypt_rc4(&mut encoded, self.key()?)?;
         }
 
-        Self::write_u32(&mut buffer, ZIPPY_MAGIC_UINT)?;
+        write_u32(&mut buffer, ZIPPY_MAGIC_UINT)?;
 
         Self::write_string(&mut buffer, &self.name)?;
         Self::write_string(&mut buffer, &self.description)?;
@@ -158,7 +161,7 @@ impl Zippy {
 
         let mut data = Cursor::new(data);
 
-        let magic = Self::read_u32(&mut data)?;
+        let magic = read_u32(&mut data)?;
         if magic != ZIPPY_MAGIC_UINT {
             return Err(Error::InvalidData);
         }
@@ -215,31 +218,20 @@ impl Zippy {
     }
 
     #[inline(always)]
-    fn read_u32(data: &mut Cursor<&[u8]>) -> Result<u32, Error> {
-        let mut buffer = [0x00; size_of::<u32>()];
-        data.read_exact(&mut buffer)?;
-        Ok(u32::from_le_bytes(buffer))
-    }
-
-    #[inline(always)]
     fn read_string(data: &mut Cursor<&[u8]>) -> Result<String, Error> {
-        let length = Self::read_u32(data)?;
-        let mut buffer = vec![0; length as usize];
-        data.read_exact(&mut buffer)?;
-        Ok(String::from_utf8(buffer)?)
+        let count = read_u32(data)?;
+        read_string(data, count as usize)
     }
 
     #[inline(always)]
     fn read_buffer(data: &mut Cursor<&[u8]>) -> Result<Vec<u8>, Error> {
-        let size = Self::read_u32(data)?;
-        let mut payload = vec![0; size as usize];
-        data.read_exact(&mut payload)?;
-        Ok(payload)
+        let count = read_u32(data)?;
+        read_bytes(data, count as usize)
     }
 
     #[inline(always)]
     fn read_features(&mut self, data: &mut Cursor<&[u8]>) -> Result<(), Error> {
-        let num_features = Self::read_u32(data)?;
+        let num_features = read_u32(data)?;
         for _ in 0..num_features {
             let feature_str = Self::read_string(data)?;
             let feature = ZippyFeatures::from(feature_str.as_str());
@@ -281,28 +273,22 @@ impl Zippy {
     }
 
     #[inline(always)]
-    fn write_u32(data: &mut Cursor<Vec<u8>>, value: u32) -> Result<(), Error> {
-        data.write_all(&value.to_le_bytes())?;
-        Ok(())
-    }
-
-    #[inline(always)]
     fn write_string(data: &mut Cursor<Vec<u8>>, value: &str) -> Result<(), Error> {
-        Self::write_u32(data, value.len() as u32)?;
-        data.write_all(value.as_bytes())?;
+        write_u32(data, value.len() as u32)?;
+        write_string(data, value)?;
         Ok(())
     }
 
     #[inline(always)]
     fn write_buffer(data: &mut Cursor<Vec<u8>>, value: &[u8]) -> Result<(), Error> {
-        Self::write_u32(data, value.len() as u32)?;
-        data.write_all(value)?;
+        write_u32(data, value.len() as u32)?;
+        write_bytes(data, value)?;
         Ok(())
     }
 
     #[inline(always)]
     fn write_features(&self, data: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
-        Self::write_u32(data, self.features.len() as u32)?;
+        write_u32(data, self.features.len() as u32)?;
         for feature in &self.features {
             match feature {
                 ZippyFeatures::Crc32 => self.write_crc32_feature(data)?,
@@ -316,8 +302,8 @@ impl Zippy {
     #[inline(always)]
     fn write_crc32_feature(&self, data: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
         Self::write_string(data, ZippyFeatures::Crc32.into())?;
-        Self::write_u32(data, size_of::<u32>() as u32)?;
-        Self::write_u32(data, self.crc32)?;
+        write_u32(data, size_of::<u32>() as u32)?;
+        write_u32(data, self.crc32)?;
         Ok(())
     }
 
@@ -333,7 +319,7 @@ impl Zippy {
     #[inline(always)]
     fn write_empty_feature(&self, data: &mut Cursor<Vec<u8>>, name: &str) -> Result<(), Error> {
         Self::write_string(data, name)?;
-        Self::write_u32(data, 0)?;
+        write_u32(data, 0)?;
         Ok(())
     }
 

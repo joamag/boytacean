@@ -54,9 +54,14 @@ pub fn write_i64<W: Write>(writer: &mut W, value: i64) -> Result<(), Error> {
 }
 
 #[inline(always)]
-pub fn write_bytes<W: Write>(writer: &mut W, buffer: &[u8]) -> Result<(), Error> {
-    writer.write_all(buffer)?;
+pub fn write_bytes<W: Write>(writer: &mut W, value: &[u8]) -> Result<(), Error> {
+    writer.write_all(value)?;
     Ok(())
+}
+
+#[inline(always)]
+pub fn write_string<W: Write>(writer: &mut W, value: &str) -> Result<(), Error> {
+    write_bytes(writer, value.as_bytes())
 }
 
 #[inline(always)]
@@ -120,6 +125,12 @@ pub fn read_bytes<R: Read>(reader: &mut R, count: usize) -> Result<Vec<u8>, Erro
     let mut buffer = vec![0; count];
     reader.read_exact(&mut buffer)?;
     Ok(buffer)
+}
+
+#[inline(always)]
+pub fn read_string<R: Read>(reader: &mut R, count: usize) -> Result<String, Error> {
+    let buffer = read_bytes(reader, count)?;
+    Ok(String::from_utf8(buffer)?)
 }
 
 #[inline(always)]
