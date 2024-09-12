@@ -6,65 +6,6 @@ use std::{
 use crate::error::Error;
 
 #[inline(always)]
-pub fn write_u8<W: Write>(writer: &mut W, value: u8) -> Result<(), Error> {
-    writer.write_all(&value.to_le_bytes())?;
-    Ok(())
-}
-
-#[inline(always)]
-pub fn write_i8<W: Write>(writer: &mut W, value: i8) -> Result<(), Error> {
-    writer.write_all(&value.to_le_bytes())?;
-    Ok(())
-}
-
-#[inline(always)]
-pub fn write_u16<W: Write>(writer: &mut W, value: u16) -> Result<(), Error> {
-    writer.write_all(&value.to_le_bytes())?;
-    Ok(())
-}
-
-#[inline(always)]
-pub fn write_i16<W: Write>(writer: &mut W, value: i16) -> Result<(), Error> {
-    writer.write_all(&value.to_le_bytes())?;
-    Ok(())
-}
-
-#[inline(always)]
-pub fn write_u32<W: Write>(writer: &mut W, value: u32) -> Result<(), Error> {
-    writer.write_all(&value.to_le_bytes())?;
-    Ok(())
-}
-
-#[inline(always)]
-pub fn write_i32<W: Write>(writer: &mut W, value: i32) -> Result<(), Error> {
-    writer.write_all(&value.to_le_bytes())?;
-    Ok(())
-}
-
-#[inline(always)]
-pub fn write_u64<W: Write>(writer: &mut W, value: u64) -> Result<(), Error> {
-    writer.write_all(&value.to_le_bytes())?;
-    Ok(())
-}
-
-#[inline(always)]
-pub fn write_i64<W: Write>(writer: &mut W, value: i64) -> Result<(), Error> {
-    writer.write_all(&value.to_le_bytes())?;
-    Ok(())
-}
-
-#[inline(always)]
-pub fn write_bytes<W: Write>(writer: &mut W, value: &[u8]) -> Result<(), Error> {
-    writer.write_all(value)?;
-    Ok(())
-}
-
-#[inline(always)]
-pub fn write_string<W: Write>(writer: &mut W, value: &str) -> Result<(), Error> {
-    write_bytes(writer, value.as_bytes())
-}
-
-#[inline(always)]
 pub fn read_u8<R: Read>(reader: &mut R) -> Result<u8, Error> {
     let mut buffer = [0x00; size_of::<u8>()];
     reader.read_exact(&mut buffer)?;
@@ -137,4 +78,63 @@ pub fn read_string<R: Read>(reader: &mut R, count: usize) -> Result<String, Erro
 pub fn read_into<R: Read>(reader: &mut R, buffer: &mut [u8]) -> Result<(), Error> {
     reader.read_exact(buffer)?;
     Ok(())
+}
+
+#[inline(always)]
+pub fn write_u8<W: Write>(writer: &mut W, value: u8) -> Result<(), Error> {
+    writer.write_all(&value.to_le_bytes())?;
+    Ok(())
+}
+
+#[inline(always)]
+pub fn write_i8<W: Write>(writer: &mut W, value: i8) -> Result<(), Error> {
+    writer.write_all(&value.to_le_bytes())?;
+    Ok(())
+}
+
+#[inline(always)]
+pub fn write_u16<W: Write>(writer: &mut W, value: u16) -> Result<(), Error> {
+    writer.write_all(&value.to_le_bytes())?;
+    Ok(())
+}
+
+#[inline(always)]
+pub fn write_i16<W: Write>(writer: &mut W, value: i16) -> Result<(), Error> {
+    writer.write_all(&value.to_le_bytes())?;
+    Ok(())
+}
+
+#[inline(always)]
+pub fn write_u32<W: Write>(writer: &mut W, value: u32) -> Result<(), Error> {
+    writer.write_all(&value.to_le_bytes())?;
+    Ok(())
+}
+
+#[inline(always)]
+pub fn write_i32<W: Write>(writer: &mut W, value: i32) -> Result<(), Error> {
+    writer.write_all(&value.to_le_bytes())?;
+    Ok(())
+}
+
+#[inline(always)]
+pub fn write_u64<W: Write>(writer: &mut W, value: u64) -> Result<(), Error> {
+    writer.write_all(&value.to_le_bytes())?;
+    Ok(())
+}
+
+#[inline(always)]
+pub fn write_i64<W: Write>(writer: &mut W, value: i64) -> Result<(), Error> {
+    writer.write_all(&value.to_le_bytes())?;
+    Ok(())
+}
+
+#[inline(always)]
+pub fn write_bytes<W: Write>(writer: &mut W, value: &[u8]) -> Result<(), Error> {
+    writer.write_all(value)?;
+    Ok(())
+}
+
+#[inline(always)]
+pub fn write_string<W: Write>(writer: &mut W, value: &str) -> Result<(), Error> {
+    write_bytes(writer, value.as_bytes())
 }

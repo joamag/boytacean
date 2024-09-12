@@ -8,7 +8,7 @@ use std::{
     convert::TryInto,
     default,
     hash::Hash,
-    io::{Cursor, Read},
+    io::{Cursor, Read, Write},
     iter::FromIterator,
     mem::size_of,
 };
@@ -218,27 +218,27 @@ impl Zippy {
     }
 
     #[inline(always)]
-    fn read_string(data: &mut Cursor<&[u8]>) -> Result<String, Error> {
-        let count = read_u32(data)?;
-        read_string(data, count as usize)
+    fn read_string<R: Read>(reader: &mut R) -> Result<String, Error> {
+        let count = read_u32(reader)?;
+        read_string(reader, count as usize)
     }
 
     #[inline(always)]
-    fn read_buffer(data: &mut Cursor<&[u8]>) -> Result<Vec<u8>, Error> {
-        let count = read_u32(data)?;
-        read_bytes(data, count as usize)
+    fn read_buffer<R: Read>(reader: &mut R) -> Result<Vec<u8>, Error> {
+        let count = read_u32(reader)?;
+        read_bytes(reader, count as usize)
     }
 
     #[inline(always)]
-    fn read_features(&mut self, data: &mut Cursor<&[u8]>) -> Result<(), Error> {
-        let num_features = read_u32(data)?;
+    fn read_features<R: Read>(&mut self, reader: &mut R) -> Result<(), Error> {
+        let num_features = read_u32(reader)?;
         for _ in 0..num_features {
-            let feature_str = Self::read_string(data)?;
+            let feature_str = Self::read_string(reader)?;
             let feature = ZippyFeatures::from(feature_str.as_str());
             match feature {
-                ZippyFeatures::Crc32 => self.read_crc32_feature(data)?,
-                ZippyFeatures::EncryptedRc4 => self.read_rc4_feature(data)?,
-                _ => self.read_empty_feature(data)?,
+                ZippyFeatures::Crc32 => self.read_crc32_feature(reader)?,
+                ZippyFeatures::EncryptedRc4 => self.read_rc4_feature(reader)?,
+                _ => self.read_empty_feature(reader)?,
             };
             self.features.insert(feature);
         }
@@ -246,8 +246,8 @@ impl Zippy {
     }
 
     #[inline(always)]
-    fn read_crc32_feature(&mut self, data: &mut Cursor<&[u8]>) -> Result<(), Error> {
-        let payload = Self::read_buffer(data)?;
+    fn read_crc32_feature<R: Read>(&mut self, reader: &mut R) -> Result<(), Error> {
+        let payload = Self::read_buffer(reader)?;
         if payload.len() != size_of::<u32>() {
             return Err(Error::InvalidData);
         }
@@ -257,8 +257,8 @@ impl Zippy {
     }
 
     #[inline(always)]
-    fn read_rc4_feature(&mut self, data: &mut Cursor<&[u8]>) -> Result<(), Error> {
-        let mut test_data = Self::read_buffer(data)?;
+    fn read_rc4_feature<R: Read>(&mut self, reader: &mut R) -> Result<(), Error> {
+        let mut test_data = Self::read_buffer(reader)?;
         decrypt_rc4(&mut test_data, self.key()?)?;
         if test_data != ZIPPY_CIPHER_TEST {
             return Err(Error::InvalidKey);
@@ -267,59 +267,59 @@ impl Zippy {
     }
 
     #[inline(always)]
-    fn read_empty_feature(&mut self, data: &mut Cursor<&[u8]>) -> Result<(), Error> {
-        Self::read_buffer(data)?;
+    fn read_empty_feature<R: Read>(&mut self, reader: &mut R) -> Result<(), Error> {
+        Self::read_buffer(reader)?;
         Ok(())
     }
 
     #[inline(always)]
-    fn write_string(data: &mut Cursor<Vec<u8>>, value: &str) -> Result<(), Error> {
-        write_u32(data, value.len() as u32)?;
-        write_string(data, value)?;
+    fn write_string<W: Write>(writer: &mut W, value: &str) -> Result<(), Error> {
+        write_u32(writer, value.len() as u32)?;
+        write_string(writer, value)?;
         Ok(())
     }
 
     #[inline(always)]
-    fn write_buffer(data: &mut Cursor<Vec<u8>>, value: &[u8]) -> Result<(), Error> {
-        write_u32(data, value.len() as u32)?;
-        write_bytes(data, value)?;
+    fn write_buffer<W: Write>(writer: &mut W, value: &[u8]) -> Result<(), Error> {
+        write_u32(writer, value.len() as u32)?;
+        write_bytes(writer, value)?;
         Ok(())
     }
 
     #[inline(always)]
-    fn write_features(&self, data: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
-        write_u32(data, self.features.len() as u32)?;
+    fn write_features<W: Write>(&self, writer: &mut W) -> Result<(), Error> {
+        write_u32(writer, self.features.len() as u32)?;
         for feature in &self.features {
             match feature {
-                ZippyFeatures::Crc32 => self.write_crc32_feature(data)?,
-                ZippyFeatures::EncryptedRc4 => self.write_rc4_feature(data)?,
-                _ => self.write_empty_feature(data, feature.into())?,
+                ZippyFeatures::Crc32 => self.write_crc32_feature(writer)?,
+                ZippyFeatures::EncryptedRc4 => self.write_rc4_feature(writer)?,
+                _ => self.write_empty_feature(writer, feature.into())?,
             }
         }
         Ok(())
     }
 
     #[inline(always)]
-    fn write_crc32_feature(&self, data: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
-        Self::write_string(data, ZippyFeatures::Crc32.into())?;
-        write_u32(data, size_of::<u32>() as u32)?;
-        write_u32(data, self.crc32)?;
+    fn write_crc32_feature<W: Write>(&self, writer: &mut W) -> Result<(), Error> {
+        Self::write_string(writer, ZippyFeatures::Crc32.into())?;
+        write_u32(writer, size_of::<u32>() as u32)?;
+        write_u32(writer, self.crc32)?;
         Ok(())
     }
 
     #[inline(always)]
-    fn write_rc4_feature(&self, data: &mut Cursor<Vec<u8>>) -> Result<(), Error> {
+    fn write_rc4_feature<W: Write>(&self, writer: &mut W) -> Result<(), Error> {
         let mut test_data = ZIPPY_CIPHER_TEST.to_vec();
         encrypt_rc4(&mut test_data, self.key()?)?;
-        Self::write_string(data, ZippyFeatures::EncryptedRc4.into())?;
-        Self::write_buffer(data, &test_data)?;
+        Self::write_string(writer, ZippyFeatures::EncryptedRc4.into())?;
+        Self::write_buffer(writer, &test_data)?;
         Ok(())
     }
 
     #[inline(always)]
-    fn write_empty_feature(&self, data: &mut Cursor<Vec<u8>>, name: &str) -> Result<(), Error> {
-        Self::write_string(data, name)?;
-        write_u32(data, 0)?;
+    fn write_empty_feature<W: Write>(&self, writer: &mut W, name: &str) -> Result<(), Error> {
+        Self::write_string(writer, name)?;
+        write_u32(writer, 0)?;
         Ok(())
     }
 
