@@ -24,6 +24,7 @@ use boytacean_common::{
 use std::{
     collections::VecDeque,
     fmt::{self, Display, Formatter},
+    io::Read,
     sync::{Arc, Mutex},
 };
 
@@ -1401,6 +1402,23 @@ impl GameBoy {
         match ram_path {
             Some(ram_path) => {
                 let ram_data = read_file(ram_path)?;
+                self.load_rom(&data, Some(&ram_data))
+            }
+            None => self.load_rom(&data, None),
+        }
+    }
+
+    pub fn load_rom_reader<R: Read>(
+        &mut self,
+        reader: &mut R,
+        ram_reader: Option<&mut R>,
+    ) -> Result<&mut Cartridge, Error> {
+        let mut data = vec![];
+        reader.read_to_end(&mut data)?;
+        match ram_reader {
+            Some(ram_reader) => {
+                let mut ram_data = vec![];
+                ram_reader.read_to_end(&mut ram_data)?;
                 self.load_rom(&data, Some(&ram_data))
             }
             None => self.load_rom(&data, None),
