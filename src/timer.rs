@@ -1,9 +1,18 @@
 //! Timer functions and structures.
 
+use std::io::Cursor;
+
+use boytacean_common::{
+    data::{read_u16, read_u8, write_u16, write_u8},
+    error::Error,
+};
+
 use crate::{
     consts::{DIV_ADDR, TAC_ADDR, TIMA_ADDR, TMA_ADDR},
     mmu::BusComponent,
-    panic_gb, warnln,
+    panic_gb,
+    state::StateComponent,
+    warnln,
 };
 
 pub struct Timer {
@@ -161,8 +170,75 @@ impl BusComponent for Timer {
     }
 }
 
+impl StateComponent for Timer {
+    fn state(&self) -> Result<Vec<u8>, Error> {
+        let mut cursor = Cursor::new(vec![]);
+        write_u8(&mut cursor, self.div)?;
+        write_u8(&mut cursor, self.tima)?;
+        write_u8(&mut cursor, self.tma)?;
+        write_u8(&mut cursor, self.tac)?;
+        write_u16(&mut cursor, self.div_clock)?;
+        write_u16(&mut cursor, self.tima_clock)?;
+        write_u8(&mut cursor, self.tima_enabled as u8)?;
+        write_u16(&mut cursor, self.tima_ratio)?;
+        write_u8(&mut cursor, self.int_tima as u8)?;
+        Ok(cursor.into_inner())
+    }
+
+    fn set_state(&mut self, data: &[u8]) -> Result<(), Error> {
+        let mut cursor = Cursor::new(data);
+        self.div = read_u8(&mut cursor)?;
+        self.tima = read_u8(&mut cursor)?;
+        self.tma = read_u8(&mut cursor)?;
+        self.tac = read_u8(&mut cursor)?;
+        self.div_clock = read_u16(&mut cursor)?;
+        self.tima_clock = read_u16(&mut cursor)?;
+        self.tima_enabled = read_u8(&mut cursor)? == 1;
+        self.tima_ratio = read_u16(&mut cursor)?;
+        self.int_tima = read_u8(&mut cursor)? == 1;
+        Ok(())
+    }
+}
+
 impl Default for Timer {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Timer;
+
+    use crate::state::StateComponent;
+
+    #[test]
+    fn test_state_and_set_state() {
+        let mut timer = Timer::new();
+        timer.div = 0x12;
+        timer.tima = 0x34;
+        timer.tma = 0x56;
+        timer.tac = 0x78;
+        timer.div_clock = 0x9abc;
+        timer.tima_clock = 0xdef0;
+        timer.tima_enabled = true;
+        timer.tima_ratio = 0x1234;
+        timer.int_tima = true;
+
+        let state = timer.state().unwrap();
+        assert_eq!(state.len(), 12);
+
+        let mut new_timer = Timer::new();
+        new_timer.set_state(&state).unwrap();
+
+        assert_eq!(timer.div, new_timer.div);
+        assert_eq!(timer.tima, new_timer.tima);
+        assert_eq!(timer.tma, new_timer.tma);
+        assert_eq!(timer.tac, new_timer.tac);
+        assert_eq!(timer.div_clock, new_timer.div_clock);
+        assert_eq!(timer.tima_clock, new_timer.tima_clock);
+        assert_eq!(timer.tima_enabled, new_timer.tima_enabled);
+        assert_eq!(timer.tima_ratio, new_timer.tima_ratio);
+        assert_eq!(timer.int_tima, new_timer.int_tima);
     }
 }
