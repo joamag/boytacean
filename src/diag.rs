@@ -6,11 +6,20 @@ use crate::gb::GameBoy;
 /// Game Boy emulator, going to be used for global diagnostics.
 static mut GLOBAL_INSTANCE: *const GameBoy = null();
 
+// Static mutable flag to enable or disable pedantic diagnostics.
+pub static mut PEDANTIC: bool = true;
+
 impl GameBoy {
     /// Sets the current instance as the one going to be used
     /// in panic diagnostics.
     pub fn set_diag(&self) {
         self.set_global();
+    }
+
+    /// Unsets the current instance as the one going to be used
+    /// in panic diagnostics.
+    pub fn unset_diag(&self) {
+        self.unset_global();
     }
 
     /// Dumps the diagnostics for the global instance of the
@@ -43,9 +52,27 @@ impl GameBoy {
         }
     }
 
+    fn unset_global(&self) {
+        unsafe {
+            GLOBAL_INSTANCE = null();
+        }
+    }
+
     fn dump_diagnostics_s(&self) {
         println!("Dumping Boytacean diagnostics:");
         println!("{}", self.description_debug());
+    }
+}
+
+pub fn enable_pedantic() {
+    unsafe {
+        PEDANTIC = true;
+    }
+}
+
+pub fn disable_pedantic() {
+    unsafe {
+        PEDANTIC = false;
     }
 }
 
@@ -84,10 +111,14 @@ macro_rules! assert_gb {
 #[macro_export]
 macro_rules! assert_pedantic_gb {
     ($cond:expr, $fmt:expr, $($arg:tt)*) => {
-        $crate::assert_gb!($cond, $fmt, $($arg)*);
+        if unsafe { $crate::diag::PEDANTIC } {
+            $crate::assert_gb!($cond, $fmt, $($arg)*);
+        }
     };
     ($cond:expr) => {
-        $crate::assert_gb!($cond);
+        if unsafe { $crate::diag::PEDANTIC } {
+            $crate::assert_gb!($cond);
+        }
     };
 }
 
