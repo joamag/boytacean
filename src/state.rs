@@ -1648,7 +1648,6 @@ impl Serialize for BessCore {
 
 impl State for BessCore {
     fn from_gb(gb: &mut GameBoy) -> Result<Self, Error> {
-        disable_pedantic!();
         let mut core = Self::new(
             Self::bess_model(gb),
             gb.cpu_i().pc(),
@@ -1660,14 +1659,18 @@ impl State for BessCore {
             gb.cpu_i().ime(),
             gb.mmu_i().ie,
             u8::from(gb.cpu().halted()),
-            // @TODO: These registers cannot be completely retrieved
-            // and because of that some audio noise is played when loading state.
-            // The loading of the registers should be done in a much
-            // more manual way like SameBoy does here:
-            // https://github.com/LIJI32/SameBoy/blob/7e6f1f866e89430adaa6be839aecc4a2ccabd69c/Core/save_state.c#L673
-            gb.mmu().read_many_raw(0xff00, 128).try_into().unwrap(),
+            {
+                disable_pedantic!();
+                // @TODO: These registers cannot be completely retrieved
+                // and because of that some audio noise is played when loading state.
+                // The loading of the registers should be done in a much
+                // more manual way like SameBoy does here:
+                // https://github.com/LIJI32/SameBoy/blob/7e6f1f866e89430adaa6be839aecc4a2ccabd69c/Core/save_state.c#L673
+                let io_registers = gb.mmu().read_many_raw(0xff00, 128).try_into().unwrap();
+                enable_pedantic!();
+                io_registers
+            },
         );
-        enable_pedantic!();
         core.ram.fill_buffer(gb.mmu().ram());
         core.vram.fill_buffer(gb.ppu().vram_device());
         core.mbc_ram.fill_buffer(gb.rom_i().ram_data());
