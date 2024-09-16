@@ -1669,7 +1669,7 @@ impl State for BessCore {
                 let io_registers = gb.mmu().read_many_raw(0xff00, 128).try_into().unwrap();
                 enable_pedantic!();
                 io_registers
-            }
+            },
         );
         core.ram.fill_buffer(gb.mmu().ram());
         core.vram.fill_buffer(gb.ppu().vram_device());

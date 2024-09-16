@@ -7,6 +7,7 @@ use crate::gb::GameBoy;
 static mut GLOBAL_INSTANCE: *const GameBoy = null();
 
 // Static mutable flag to enable or disable pedantic diagnostics.
+#[cfg(feature = "pedantic")]
 pub static mut PEDANTIC: bool = true;
 
 impl GameBoy {
@@ -64,6 +65,7 @@ impl GameBoy {
     }
 }
 
+#[cfg(feature = "pedantic")]
 #[macro_export]
 macro_rules! enable_pedantic {
     () => {
@@ -73,6 +75,13 @@ macro_rules! enable_pedantic {
     };
 }
 
+#[cfg(not(feature = "pedantic"))]
+#[macro_export]
+macro_rules! enable_pedantic {
+    () => {};
+}
+
+#[cfg(feature = "pedantic")]
 #[macro_export]
 macro_rules! disable_pedantic {
     () => {
@@ -80,6 +89,12 @@ macro_rules! disable_pedantic {
             $crate::diag::PEDANTIC = false;
         }
     };
+}
+
+#[cfg(not(feature = "pedantic"))]
+#[macro_export]
+macro_rules! disable_pedantic {
+    () => {};
 }
 
 #[macro_export]
