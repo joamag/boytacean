@@ -1660,16 +1660,16 @@ impl State for BessCore {
             gb.mmu_i().ie,
             u8::from(gb.cpu().halted()),
             {
-                disable_pedantic!();
                 // @TODO: These registers cannot be completely retrieved
                 // and because of that some audio noise is played when loading state.
                 // The loading of the registers should be done in a much
                 // more manual way like SameBoy does here:
                 // https://github.com/LIJI32/SameBoy/blob/7e6f1f866e89430adaa6be839aecc4a2ccabd69c/Core/save_state.c#L673
+                disable_pedantic!();
                 let io_registers = gb.mmu().read_many_raw(0xff00, 128).try_into().unwrap();
                 enable_pedantic!();
                 io_registers
-            },
+            }
         );
         core.ram.fill_buffer(gb.mmu().ram());
         core.vram.fill_buffer(gb.ppu().vram_device());
