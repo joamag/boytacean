@@ -34,7 +34,12 @@ macro_rules! infoln {
 macro_rules! warnln {
     ($($rest:tt)*) => {
         {
-            $crate::panic_gb!($($rest)*);
+            if unsafe { $crate::diag::PEDANTIC } {
+                $crate::panic_gb!($($rest)*);
+            } else {
+                std::print!("[WARNING] ");
+                std::println!($($rest)*);
+            }
         }
     }
 }

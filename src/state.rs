@@ -25,6 +25,7 @@ use std::{
 };
 
 use crate::{
+    disable_pedantic, enable_pedantic,
     gb::{GameBoy, GameBoyDevice, GameBoyMode, GameBoySpeed},
     info::Info,
     ppu::{DISPLAY_HEIGHT, DISPLAY_WIDTH, FRAME_BUFFER_SIZE},
@@ -1647,6 +1648,7 @@ impl Serialize for BessCore {
 
 impl State for BessCore {
     fn from_gb(gb: &mut GameBoy) -> Result<Self, Error> {
+        disable_pedantic!();
         let mut core = Self::new(
             Self::bess_model(gb),
             gb.cpu_i().pc(),
@@ -1665,6 +1667,7 @@ impl State for BessCore {
             // https://github.com/LIJI32/SameBoy/blob/7e6f1f866e89430adaa6be839aecc4a2ccabd69c/Core/save_state.c#L673
             gb.mmu().read_many_raw(0xff00, 128).try_into().unwrap(),
         );
+        enable_pedantic!();
         core.ram.fill_buffer(gb.mmu().ram());
         core.vram.fill_buffer(gb.ppu().vram_device());
         core.mbc_ram.fill_buffer(gb.rom_i().ram_data());
@@ -1703,7 +1706,9 @@ impl State for BessCore {
         // The registers should be handled in a more manual manner
         // to avoid unwanted side effects
         // https://github.com/LIJI32/SameBoy/blob/7e6f1f866e89430adaa6be839aecc4a2ccabd69c/Core/save_state.c#L1003
+        disable_pedantic!();
         gb.mmu().write_many(0xff00, &self.io_registers);
+        enable_pedantic!();
 
         gb.mmu().set_ram(self.ram.buffer.to_vec());
         gb.ppu().set_vram(&self.vram.buffer);
