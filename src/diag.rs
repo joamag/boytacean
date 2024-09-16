@@ -64,16 +64,22 @@ impl GameBoy {
     }
 }
 
-pub fn enable_pedantic() {
-    unsafe {
-        PEDANTIC = true;
-    }
+#[macro_export]
+macro_rules! enable_pedantic {
+    () => {
+        unsafe {
+            $crate::diag::PEDANTIC = true;
+        }
+    };
 }
 
-pub fn disable_pedantic() {
-    unsafe {
-        PEDANTIC = false;
-    }
+#[macro_export]
+macro_rules! disable_pedantic {
+    () => {
+        unsafe {
+            $crate::diag::PEDANTIC = false;
+        }
+    };
 }
 
 #[macro_export]
