@@ -38,7 +38,7 @@ criterion = "0.5"
 [build-dependencies]
 chrono = "0.4"
 regex = "1"
-built = "0.5"
+built = { version = "0.7", features = ["cargo-lock"] }
 
 [profile.release]
 debug = false

@@ -22,7 +22,7 @@
 //! );
 //! ```
 
-use built::{write_built_file_with_opts, Options};
+use built::write_built_file_with_opts;
 use chrono::Utc;
 use regex::Regex;
 use std::{
@@ -157,18 +157,10 @@ fn main() {
         std::mem::size_of::<usize>() * 8,
     );
 
-    let mut options = Options::default();
-    options.set_cfg(false);
-    options.set_ci(false);
-    options.set_compiler(false);
-    options.set_env(false);
-    options.set_dependencies(true);
-    options.set_features(true);
-
     let manifest_path = env::var("CARGO_MANIFEST_DIR").unwrap();
     let built_path = Path::new(GEN_DIR).join(Path::new("_build.rs"));
 
-    write_built_file_with_opts(&options, manifest_path.as_ref(), &built_path).unwrap();
+    write_built_file_with_opts(Some(manifest_path.as_ref()), &built_path).unwrap();
 }
 
 fn write_constant<T>(file: &mut File, key: &str, val: T)
