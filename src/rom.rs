@@ -518,6 +518,8 @@ impl Cartridge {
             RomType::Mbc1 => &MBC1,
             RomType::Mbc1Ram => &MBC1,
             RomType::Mbc1RamBattery => &MBC1,
+            RomType::Mbc2 => &MBC2,
+            RomType::Mbc2Battery => &MBC2,
             RomType::Mbc3TimerBattery => &MBC3,
             RomType::Mbc3TimerRamBattery => &MBC3,
             RomType::Mbc3 => &MBC3,
@@ -1040,6 +1042,76 @@ pub static MBC1: Mbc = Mbc {
             }
         }
         rom.ram_data[rom.ram_offset + (addr - 0xa000) as usize] = value;
+    },
+};
+
+pub static MBC2: Mbc = Mbc {
+    name: "MBC2",
+    read_rom: |rom: &Cartridge, addr: u16| -> u8 {
+        match addr {
+            // 0x0000-0x3FFF - ROM bank 0
+            0x0000..=0x3fff => rom.rom_data[addr as usize],
+            // 0x4000-0x7FFF - ROM bank 01-0F
+            0x4000..=0x7fff => *rom
+                .rom_data
+                .get(rom.rom_offset + (addr - 0x4000) as usize)
+                .unwrap_or(&0x0),
+            _ => {
+                warnln!("Reading from unknown Cartridge ROM location 0x{:04x}", addr);
+                #[allow(unreachable_code)]
+                0xff
+            }
+        }
+    },
+    write_rom: |rom: &mut Cartridge, addr: u16, value: u8| {
+        match addr {
+            // 0x0000–0x3FFF - RAM Enable, ROM Bank Number
+            0x0000..=0x3fff => {
+                if addr & 0x0100 == 0x0000 {
+                    rom.ram_enabled = (value & 0x0f) == 0x0a;
+                } else {
+                    let mut rom_bank = value as u16 & 0x0f;
+                    rom_bank &= rom.rom_bank_count * 2 - 1;
+                    if rom_bank == 0 {
+                        rom_bank = 1;
+                    }
+                    rom.set_rom_bank(rom_bank);
+                }
+            }
+            _ => warnln!("Writing to unknown Cartridge ROM location 0x{:04x}", addr),
+        }
+    },
+    read_ram: |rom: &Cartridge, addr: u16| -> u8 {
+        if !rom.ram_enabled {
+            return 0xff;
+        }
+        match addr {
+            // 0xA000–0xA1FF — Built-in RAM
+            0xa000..=0xa1ff => rom.ram_data[rom.ram_offset + (addr - 0xa000) as usize],
+            // 0xA200–0xBFFF — 15 "echoes" of A000–A1FF
+            0xa200..=0xbfff => rom.ram_data[rom.ram_offset + (addr - 0xa200) as usize],
+            _ => {
+                warnln!("Reading from unknown Cartridge RAM location 0x{:04x}", addr);
+                #[allow(unreachable_code)]
+                0xff
+            }
+        }
+    },
+    write_ram: |rom: &mut Cartridge, addr: u16, value: u8| {
+        if !rom.ram_enabled {
+            warnln!("Attempt to write to ERAM while write protect is active");
+            #[allow(unreachable_code)]
+            {
+                return;
+            }
+        }
+        match addr {
+            // 0xA000–0xA1FF — Built-in RAM
+            0xa000..=0xa1ff => rom.ram_data[rom.ram_offset + (addr - 0xa000) as usize] = value,
+            // 0xA200–0xBFFF — 15 "echoes" of A000–A1FF
+            0xa200..=0xbfff => rom.ram_data[rom.ram_offset + (addr - 0xa200) as usize] = value,
+            _ => warnln!("Writing to unknown Cartridge RAM location 0x{:04x}", addr),
+        }
     },
 };
 
