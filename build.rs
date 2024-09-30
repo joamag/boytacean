@@ -35,6 +35,7 @@ use std::{
 };
 
 const BUILD_OUT_FILE: &str = "build.rs";
+const BUILD_ALL_OUT_FILE: &str = "_build.rs";
 const GEN_DIR: &str = "./src/gen";
 
 fn main() {
@@ -158,7 +159,7 @@ fn main() {
     );
 
     let manifest_path = env::var("CARGO_MANIFEST_DIR").unwrap();
-    let built_path = Path::new(GEN_DIR).join(Path::new("_build.rs"));
+    let built_path = Path::new(GEN_DIR).join(Path::new(BUILD_ALL_OUT_FILE));
 
     write_built_file_with_opts(Some(manifest_path.as_ref()), &built_path).unwrap();
 }
