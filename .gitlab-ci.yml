@@ -85,7 +85,7 @@ test-rust:
     - rustup toolchain install $RUST_VERSION
     - rustup override set $RUST_VERSION
     - rustc --version
-    - if [[ $RUST_VERSION != nightly ]]; cargo test; fi
+    - if [[ $RUST_VERSION != nightly ]]; then cargo test; fi
     - if [[ $RUST_VERSION != nightly ]]; then cargo bench --features gen-mock; fi
     - if [[ $RUST_VERSION == nightly ]]; then cargo bench --features gen-mock,simd; fi
 
