@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 * Greatly improved state management in BOS
+* Support for MBC2
 
 ### Changed
 
