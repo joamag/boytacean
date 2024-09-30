@@ -36,8 +36,8 @@ build-rust:
     - rustc --version
     - cargo fmt --all -- --check
     - if [[ $RUST_VERSION != nightly ]]; then cargo clippy -- -D warnings -A unknown-lints; fi
-    - cargo build
-    - cargo build --release
+    - cargo build --features gen-mock
+    - cargo build --release --features gen-mock
 
 build-wasm:
   stage: build
@@ -86,8 +86,8 @@ test-rust:
     - rustup override set $RUST_VERSION
     - rustc --version
     - cargo test
-    - if [[ $RUST_VERSION != nightly ]]; then cargo bench; fi
-    - if [[ $RUST_VERSION == nightly ]]; then cargo bench --features simd; fi
+    - if [[ $RUST_VERSION != nightly ]]; then cargo bench --features gen-mock; fi
+    - if [[ $RUST_VERSION == nightly ]]; then cargo bench --features gen-mock,simd; fi
 
 test-pyo3:
   stage: test
