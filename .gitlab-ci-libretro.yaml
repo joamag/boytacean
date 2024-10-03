@@ -1,0 +1,14 @@
+.core-defs:
+  variables:
+    CORENAME: boytacean
+
+stages:
+  - build-prepare
+  - build-shared
+  - build-static
+
+libretro-build-windows-x64:
+  stage: build-prepare
+  extends:
+    - .libretro-windows-x64-mingw-make-default
+    - .core-defs
