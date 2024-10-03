@@ -21,3 +21,14 @@ libretro-build-windows-x64:
     expire_in: 10 min
   rules:
     - if: "$BUILD_WINDOWS"
+
+libretro-build-linux-x64:
+  stage: build-shared
+  script:
+    - cd frontends/libretro
+    - cargo build --release
+    - mv ../../target/release/${CORENAME}_libretro.so .
+  artifacts:
+    paths:
+    - ${CORENAME}_libretro.so
+    expire_in: 10 min
