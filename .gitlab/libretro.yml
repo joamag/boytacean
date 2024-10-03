@@ -8,6 +8,8 @@ stages:
   - build-static
 
 libretro-build-windows-x64:
+  extends:
+    - .core-defs
   tags:
     - msvc2010
   stage: build-shared
@@ -24,6 +26,8 @@ libretro-build-windows-x64:
   dependencies: []
 
 libretro-build-linux-x64:
+  extends:
+    - .core-defs
   stage: build-shared
   script:
     - cd frontends/libretro
