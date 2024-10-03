@@ -9,6 +9,11 @@ stages:
 
 libretro-build-windows-x64:
   stage: build-shared
-  extends:
-    - .libretro-windows-x64-mingw-make-default
-    - .core-defs
+  script:
+    - cd frontends/libretro
+    - cargo build --release
+    - mv ../../target/release/${CORENAME}_libretro.dll .
+  artifacts:
+    paths:
+    - ${CORENAME}_libretro.dll
+    expire_in: 10 min
