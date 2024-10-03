@@ -8,6 +8,8 @@ stages:
   - build-static
 
 libretro-build-windows-x64:
+  tags:
+    - msvc2010
   stage: build-shared
   script:
     - cd frontends/libretro
@@ -17,3 +19,5 @@ libretro-build-windows-x64:
     paths:
     - ${CORENAME}_libretro.dll
     expire_in: 10 min
+  rules:
+    - if: "$BUILD_WINDOWS"
