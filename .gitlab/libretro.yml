@@ -21,6 +21,7 @@ libretro-build-windows-x64:
     expire_in: 10 min
   rules:
     - if: "$BUILD_WINDOWS"
+  dependencies: []
 
 libretro-build-linux-x64:
   stage: build-shared
@@ -32,3 +33,4 @@ libretro-build-linux-x64:
     paths:
     - ${CORENAME}_libretro.so
     expire_in: 10 min
+  dependencies: []
