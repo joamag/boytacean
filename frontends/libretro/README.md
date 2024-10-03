@@ -8,7 +8,7 @@ cargo build
 
 ### Cross Compilation
 
-#### Arm64 Linux
+#### Arm64 (aarch64) Linux
 
 Download the linux toolchain from [Arm GNU Toolchain Downloads](https://developer.arm.com/downloads/-/arm-gnu-toolchain-downloads).
 
