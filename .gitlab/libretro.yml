@@ -32,7 +32,7 @@ libretro-build-linux-x64:
   script:
     - cd frontends/libretro
     - cargo build --release
-    - mv ../../target/release/${CORENAME}_libretro.so .
+    - mv ../../target/release/lib${CORENAME}_libretro.so ./${CORENAME}_libretro.so
   artifacts:
     paths:
     - ${CORENAME}_libretro.so
