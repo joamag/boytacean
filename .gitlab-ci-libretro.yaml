@@ -8,7 +8,7 @@ stages:
   - build-static
 
 libretro-build-windows-x64:
-  stage: build-prepare
+  stage: build-shared
   extends:
     - .libretro-windows-x64-mingw-make-default
     - .core-defs
