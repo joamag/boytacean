@@ -1,3 +1,6 @@
+include:
+  - local: .gitlab/libretro.yml
+
 image: hivesolutions/ubuntu_dev
 
 variables:
@@ -11,6 +14,9 @@ stages:
   - build
   - test
   - deploy
+  - build-prepare
+  - build-shared
+  - build-static
 
 before_script:
   - source ./.gitlab/common.sh
