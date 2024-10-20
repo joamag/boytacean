@@ -1,4 +1,7 @@
 //! Cartridge (ROM) related functions and structures.
+//!
+//! Includes the implementation of the Memory Bank Controllers (MBCs)
+//! that are used to handle the memory access for the cartridge.
 
 use boytacean_common::{error::Error, util::read_file};
 use core::fmt;
