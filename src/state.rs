@@ -56,6 +56,41 @@ pub const BOS_VERSION: u8 = 1;
 /// Magic number for the BESS file format.
 pub const BESS_MAGIC: u32 = 0x53534542;
 
+/// Represents the different formats for the state storage
+/// and retrieval.
+///
+/// Different formats will have different levels of detail
+/// and will require different amounts of data to be
+/// stored and retrieved.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
+pub enum StateFormat {
+    /// Minimal state format, meaning that only the most basic
+    /// elements of the component will be stored and retrieved.
+    Minimal = 1,
+
+    /// Partial state format, meaning that only the essential
+    /// elements of the component will be stored and retrieved.
+    /// All the remaining data, should inferred or computed.
+    Partial = 2,
+
+    /// Full state format, meaning that every single element
+    /// of the component will be stored and retrieved. This
+    /// should included redundant and calculated data.
+    Full = 3,
+}
+
+impl From<u8> for StateFormat {
+    fn from(value: u8) -> Self {
+        match value {
+            1 => Self::Minimal,
+            2 => Self::Partial,
+            3 => Self::Full,
+            _ => Self::Partial,
+        }
+    }
+}
+
 /// Represents a component that is able to store and retrieve
 /// the state of its internal structure.
 ///
@@ -66,22 +101,23 @@ pub const BESS_MAGIC: u32 = 0x53534542;
 /// this trait to allow the state to be saved and restored
 /// in a consistent way.
 pub trait StateComponent {
-    fn state(&self) -> Result<Vec<u8>, Error>;
-    fn set_state(&mut self, data: &[u8]) -> Result<(), Error>;
+    fn state(&self, format: Option<StateFormat>) -> Result<Vec<u8>, Error>;
+    fn set_state(&mut self, data: &[u8], format: Option<StateFormat>) -> Result<(), Error>;
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 pub enum SaveStateFormat {
     /// Boytacean Save Compressed format (BOSC).
     /// This format uses the Zippy compression algorithm
     /// to compress the underlying BOS contents.
-    Bosc,
+    Bosc = 1,
 
     /// Boytacean Save format (uncompressed) (BOS).
-    Bos,
+    Bos = 2,
 
     /// Best Effort Save State format (BESS).
-    Bess,
+    Bess = 3,
 }
 
 impl SaveStateFormat {
@@ -132,6 +168,21 @@ impl BosBlockKind {
             _ => Self::Unknown,
         }
     }
+
+    pub fn description(&self) -> String {
+        match self {
+            Self::Info => String::from("Info"),
+            Self::ImageBuffer => String::from("ImageBuffer"),
+            Self::DeviceState => String::from("DeviceState"),
+            Self::Unknown => String::from("Unknown"),
+        }
+    }
+}
+
+impl Display for BosBlockKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.description())
+    }
 }
 
 impl From<u8> for BosBlockKind {
@@ -143,15 +194,22 @@ impl From<u8> for BosBlockKind {
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 pub struct FromGbOptions {
     thumbnail: bool,
+    state_format: Option<StateFormat>,
     agent: Option<String>,
     agent_version: Option<String>,
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 impl FromGbOptions {
-    pub fn new(thumbnail: bool, agent: Option<String>, agent_version: Option<String>) -> Self {
+    pub fn new(
+        thumbnail: bool,
+        state_format: Option<StateFormat>,
+        agent: Option<String>,
+        agent_version: Option<String>,
+    ) -> Self {
         Self {
             thumbnail,
+            state_format,
             agent,
             agent_version,
         }
@@ -162,6 +220,7 @@ impl Default for FromGbOptions {
     fn default() -> Self {
         Self {
             thumbnail: true,
+            state_format: None,
             agent: None,
             agent_version: None,
         }
@@ -253,7 +312,13 @@ impl BoscState {
 
     pub fn verify(&self) -> Result<(), Error> {
         if self.magic != BOSC_MAGIC_UINT {
-            return Err(Error::CustomError(String::from("Invalid magic")));
+            return Err(Error::DataError(String::from("Invalid magic")));
+        }
+        if self.version != BOSC_VERSION {
+            return Err(Error::DataError(format!(
+                "Invalid version, expected {BOS_VERSION}, got {}",
+                self.version
+            )));
         }
         self.bos.verify()?;
         Ok(())
@@ -336,6 +401,12 @@ impl BosState {
     pub fn verify(&self) -> Result<(), Error> {
         if self.magic != BOS_MAGIC_UINT {
             return Err(Error::CustomError(String::from("Invalid magic")));
+        }
+        if self.version != BOS_VERSION {
+            return Err(Error::CustomError(format!(
+                "Invalid version, expected {BOS_VERSION}, got {}",
+                self.version
+            )));
         }
         self.bess.verify()?;
         Ok(())
@@ -463,7 +534,7 @@ impl Serialize for BosState {
 
         for _ in 0..self.block_count {
             let block = BosBlock::from_data(reader)?;
-            let offset = -((size_of::<u8>() + size_of::<u32>()) as i64);
+            let offset = -((size_of::<u8>() + size_of::<u16>() + size_of::<u32>()) as i64);
             reader.seek(SeekFrom::Current(offset))?;
 
             match block.kind {
@@ -504,9 +575,12 @@ impl StateBox for BosState {
                 None
             },
             device_states: vec![
-                BosDeviceState::from_gb(gb, GameBoyDevice::Apu)?,
-                BosDeviceState::from_gb(gb, GameBoyDevice::Dma)?,
-                BosDeviceState::from_gb(gb, GameBoyDevice::Timer)?,
+                BosDeviceState::from_gb(gb, GameBoyDevice::Cpu, options)?,
+                BosDeviceState::from_gb(gb, GameBoyDevice::Ppu, options)?,
+                BosDeviceState::from_gb(gb, GameBoyDevice::Apu, options)?,
+                BosDeviceState::from_gb(gb, GameBoyDevice::Dma, options)?,
+                BosDeviceState::from_gb(gb, GameBoyDevice::Pad, options)?,
+                BosDeviceState::from_gb(gb, GameBoyDevice::Timer, options)?,
             ],
             bess: *BessState::from_gb(gb, options)?,
         }))
@@ -516,7 +590,7 @@ impl StateBox for BosState {
         self.verify()?;
         self.bess.to_gb(gb, options)?;
         for device_state in &self.device_states {
-            device_state.to_gb(gb)?;
+            device_state.to_gb(gb, options)?;
         }
         Ok(())
     }
@@ -530,12 +604,17 @@ impl StateConfig for BosState {
 
 pub struct BosBlock {
     kind: BosBlockKind,
+    version: u16,
     size: u32,
 }
 
 impl BosBlock {
-    pub fn new(kind: BosBlockKind, size: u32) -> Self {
-        Self { kind, size }
+    pub fn new(kind: BosBlockKind, version: u16, size: u32) -> Self {
+        Self {
+            kind,
+            version,
+            size,
+        }
     }
 
     pub fn from_data<R: Read + Seek>(reader: &mut R) -> Result<Self, Error> {
@@ -543,25 +622,47 @@ impl BosBlock {
         instance.read(reader)?;
         Ok(instance)
     }
+
+    pub fn description(&self) -> String {
+        format!("{} version={} size={}", self.kind, self.version, self.size)
+    }
 }
 
 impl Serialize for BosBlock {
     fn write<W: Write + Seek>(&mut self, writer: &mut W) -> Result<(), Error> {
         write_u8(writer, self.kind as u8)?;
+        write_u16(writer, self.version)?;
         write_u32(writer, self.size)?;
         Ok(())
     }
 
     fn read<R: Read + Seek>(&mut self, reader: &mut R) -> Result<(), Error> {
+        let check = self.version != 0;
+        let expected_version = self.version;
+
         self.kind = read_u8(reader)?.into();
+        self.version = read_u16(reader)?;
         self.size = read_u32(reader)?;
+
+        if check && self.version != expected_version {
+            return Err(Error::DataError(format!(
+                "Invalid version, expected {expected_version}, got {} for block ({})",
+                self.version, self
+            )));
+        }
         Ok(())
     }
 }
 
 impl Default for BosBlock {
     fn default() -> Self {
-        Self::new(BosBlockKind::Info, 0)
+        Self::new(BosBlockKind::Info, 0, 0)
+    }
+}
+
+impl Display for BosBlock {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.description())
     }
 }
 
@@ -578,6 +679,7 @@ impl BosInfo {
         Self {
             header: BosBlock::new(
                 BosBlockKind::Info,
+                1,
                 (size_of::<u64>()
                     + size_of::<u8>() * agent.len()
                     + size_of::<u8>() * agent_version.len()
@@ -687,6 +789,7 @@ impl BosImageBuffer {
         Self {
             header: BosBlock::new(
                 BosBlockKind::ImageBuffer,
+                1,
                 (size_of::<u8>() * FRAME_BUFFER_SIZE) as u32,
             ),
             image,
@@ -743,17 +846,20 @@ impl Default for BosImageBuffer {
 pub struct BosDeviceState {
     header: BosBlock,
     device: GameBoyDevice,
+    format: StateFormat,
     state: Vec<u8>,
 }
 
 impl BosDeviceState {
-    pub fn new(device: GameBoyDevice, state: Vec<u8>) -> Self {
+    pub fn new(device: GameBoyDevice, format: StateFormat, state: Vec<u8>) -> Self {
         Self {
             header: BosBlock::new(
                 BosBlockKind::DeviceState,
-                (size_of::<u8>() + state.len()) as u32,
+                1,
+                (size_of::<u8>() + size_of::<u8>() + state.len()) as u32,
             ),
             device,
+            format,
             state,
         }
     }
@@ -764,20 +870,33 @@ impl BosDeviceState {
         Ok(instance)
     }
 
-    fn from_gb(gb: &mut GameBoy, device: GameBoyDevice) -> Result<Self, Error> {
+    fn from_gb(
+        gb: &mut GameBoy,
+        device: GameBoyDevice,
+        options: &FromGbOptions,
+    ) -> Result<Self, Error> {
+        let format: StateFormat = options.state_format.unwrap_or(StateFormat::Partial);
         match device {
-            GameBoyDevice::Apu => Ok(Self::new(device, gb.apu_i().state()?)),
-            GameBoyDevice::Dma => Ok(Self::new(device, gb.dma_i().state()?)),
-            GameBoyDevice::Timer => Ok(Self::new(device, gb.timer_i().state()?)),
+            GameBoyDevice::Cpu => Ok(Self::new(device, format, gb.cpu_i().state(Some(format))?)),
+            GameBoyDevice::Ppu => Ok(Self::new(device, format, gb.ppu_i().state(Some(format))?)),
+            GameBoyDevice::Apu => Ok(Self::new(device, format, gb.apu_i().state(Some(format))?)),
+            GameBoyDevice::Dma => Ok(Self::new(device, format, gb.dma_i().state(Some(format))?)),
+            GameBoyDevice::Pad => Ok(Self::new(device, format, gb.pad_i().state(Some(format))?)),
+            GameBoyDevice::Timer => {
+                Ok(Self::new(device, format, gb.timer_i().state(Some(format))?))
+            }
             _ => Err(Error::NotImplemented),
         }
     }
 
-    fn to_gb(&self, gb: &mut GameBoy) -> Result<(), Error> {
+    fn to_gb(&self, gb: &mut GameBoy, _options: &ToGbOptions) -> Result<(), Error> {
         match self.device {
-            GameBoyDevice::Apu => gb.apu().set_state(&self.state)?,
-            GameBoyDevice::Dma => gb.dma().set_state(&self.state)?,
-            GameBoyDevice::Timer => gb.timer().set_state(&self.state)?,
+            GameBoyDevice::Cpu => gb.cpu().set_state(&self.state, Some(self.format))?,
+            GameBoyDevice::Ppu => gb.ppu().set_state(&self.state, Some(self.format))?,
+            GameBoyDevice::Apu => gb.apu().set_state(&self.state, Some(self.format))?,
+            GameBoyDevice::Dma => gb.dma().set_state(&self.state, Some(self.format))?,
+            GameBoyDevice::Pad => gb.pad().set_state(&self.state, Some(self.format))?,
+            GameBoyDevice::Timer => gb.timer().set_state(&self.state, Some(self.format))?,
             _ => return Err(Error::NotImplemented),
         }
         Ok(())
@@ -788,6 +907,7 @@ impl Serialize for BosDeviceState {
     fn write<W: Write + Seek>(&mut self, writer: &mut W) -> Result<(), Error> {
         self.header.write(writer)?;
         write_u8(writer, self.device as u8)?;
+        write_u8(writer, self.format as u8)?;
         write_bytes(writer, &self.state)?;
         Ok(())
     }
@@ -795,7 +915,8 @@ impl Serialize for BosDeviceState {
     fn read<R: Read + Seek>(&mut self, reader: &mut R) -> Result<(), Error> {
         self.header.read(reader)?;
         self.device = read_u8(reader)?.into();
-        let state_len = self.header.size as usize - size_of::<u8>();
+        self.format = read_u8(reader)?.into();
+        let state_len = self.header.size as usize - size_of::<u8>() - size_of::<u8>();
         self.state.append(&mut read_bytes(reader, state_len)?);
         Ok(())
     }
@@ -803,7 +924,7 @@ impl Serialize for BosDeviceState {
 
 impl Default for BosDeviceState {
     fn default() -> Self {
-        Self::new(GameBoyDevice::Unknown, vec![])
+        Self::new(GameBoyDevice::Unknown, StateFormat::Partial, vec![])
     }
 }
 
@@ -1193,7 +1314,7 @@ impl BessFooter {
 
     pub fn verify(&self) -> Result<(), Error> {
         if self.magic != BESS_MAGIC {
-            return Err(Error::CustomError(String::from("Invalid magic")));
+            return Err(Error::DataError(String::from("Invalid magic")));
         }
         Ok(())
     }
@@ -1373,7 +1494,7 @@ impl State for BessInfo {
 
     fn to_gb(&self, gb: &mut GameBoy) -> Result<(), Error> {
         if self.title() != gb.rom_i().title() {
-            return Err(Error::CustomError(format!(
+            return Err(Error::DataError(format!(
                 "Invalid ROM loaded, expected '{}' (len {}) got '{}' (len {})",
                 self.title(),
                 self.title().len(),
@@ -1480,25 +1601,31 @@ impl BessCore {
 
     pub fn verify(&self) -> Result<(), Error> {
         if self.header.magic != "CORE" {
-            return Err(Error::CustomError(String::from("Invalid magic")));
+            return Err(Error::DataError(String::from("Invalid magic")));
+        }
+        if self.major != 1 {
+            return Err(Error::DataError(String::from("Invalid major version")));
+        }
+        if self.minor != 1 {
+            return Err(Error::DataError(String::from("Invalid minor version")));
         }
         if self.oam.size != 0xa0 {
-            return Err(Error::CustomError(String::from("Invalid OAM size")));
+            return Err(Error::DataError(String::from("Invalid OAM size")));
         }
         if self.hram.size != 0x7f {
-            return Err(Error::CustomError(String::from("Invalid HRAM size")));
+            return Err(Error::DataError(String::from("Invalid HRAM size")));
         }
         if (self.is_cgb() && self.background_palettes.size != 0x40)
             || (self.is_dmg() && self.background_palettes.size != 0x00)
         {
-            return Err(Error::CustomError(String::from(
+            return Err(Error::DataError(String::from(
                 "Invalid background palettes size",
             )));
         }
         if (self.is_cgb() && self.object_palettes.size != 0x40)
             || (self.is_dmg() && self.object_palettes.size != 0x00)
         {
-            return Err(Error::CustomError(String::from(
+            return Err(Error::DataError(String::from(
                 "Invalid object palettes size",
             )));
         }
@@ -1715,9 +1842,9 @@ impl State for BessCore {
 
         gb.mmu().set_ram(self.ram.buffer.to_vec());
         gb.ppu().set_vram(&self.vram.buffer);
+        gb.ppu().set_oam(&self.oam.buffer);
+        gb.ppu().set_hram(&self.hram.buffer);
         gb.rom().set_ram_data(&self.mbc_ram.buffer);
-        gb.mmu().write_many(0xfe00, &self.oam.buffer);
-        gb.mmu().write_many(0xff80, &self.hram.buffer);
 
         // disables a series of operations that would otherwise be
         // triggered by the writing of associated registers
@@ -1910,12 +2037,12 @@ impl StateManager {
         options: Option<FromGbOptions>,
     ) -> Result<(), Error> {
         let mut file = File::create(file_path)
-            .map_err(|_| Error::CustomError(format!("Failed to create file: {file_path}")))?;
+            .map_err(|_| Error::IoError(format!("Failed to create file: {file_path}")))?;
         let data = Self::save(gb, format, options)?;
         file.write_all(&data)
-            .map_err(|_| Error::CustomError(format!("Failed to write to file: {file_path}")))?;
+            .map_err(|_| Error::IoError(format!("Failed to write to file: {file_path}")))?;
         file.flush()
-            .map_err(|_| Error::CustomError(format!("Failed to flush file: {file_path}")))?;
+            .map_err(|_| Error::IoError(format!("Failed to flush file: {file_path}")))?;
         Ok(())
     }
 
@@ -1926,10 +2053,10 @@ impl StateManager {
         options: Option<ToGbOptions>,
     ) -> Result<(), Error> {
         let mut file = File::open(file_path)
-            .map_err(|_| Error::CustomError(format!("Failed to open file: {file_path}")))?;
+            .map_err(|_| Error::IoError(format!("Failed to open file: {file_path}")))?;
         let mut data = vec![];
         file.read_to_end(&mut data)
-            .map_err(|_| Error::CustomError(format!("Failed to read from file: {file_path}")))?;
+            .map_err(|_| Error::IoError(format!("Failed to read from file: {file_path}")))?;
         Self::load(&data, gb, format, options)?;
         Ok(())
     }
@@ -1978,7 +2105,7 @@ impl StateManager {
                 } else if BessState::is_bess(data)? {
                     SaveStateFormat::Bess
                 } else {
-                    return Err(Error::CustomError(String::from(
+                    return Err(Error::InvalidParameter(String::from(
                         "Unknown save state file format",
                     )));
                 }
@@ -2015,7 +2142,7 @@ impl StateManager {
                 state.read(data)?;
                 Ok(state)
             }
-            SaveStateFormat::Bess => Err(Error::CustomError(String::from(
+            SaveStateFormat::Bess => Err(Error::InvalidParameter(String::from(
                 "Incompatible save state file format (BESS)",
             ))),
         }
@@ -2106,7 +2233,7 @@ impl StateManager {
                 state.read(data)?;
                 Ok(state.image_buffer.ok_or(Error::InvalidData)?.image.to_vec())
             }
-            SaveStateFormat::Bess => Err(Error::CustomError(String::from(
+            SaveStateFormat::Bess => Err(Error::InvalidParameter(String::from(
                 "Format foes not support thumbnail",
             ))),
         }
