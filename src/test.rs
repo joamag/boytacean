@@ -19,7 +19,10 @@
 //! checks the results (via serial).
 //!
 //! ```rust
-//! use boytacean::test::run_serial_test;
+//! use boytacean::{
+//!     gb::GameBoyMode,
+//!     test::{run_serial_test, TestOptions},
+//! };
 //! let (result, game_boy) = run_serial_test(
 //!     "res/roms/test/blargg/cpu/cpu_instrs.gb",
 //!     Some(300000000),
