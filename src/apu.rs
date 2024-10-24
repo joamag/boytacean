@@ -18,7 +18,7 @@ use crate::{
     },
     gb::GameBoy,
     mmu::BusComponent,
-    state::StateComponent,
+    state::{StateComponent, StateFormat},
     warnln,
 };
 
@@ -1168,7 +1168,7 @@ impl BusComponent for Apu {
 }
 
 impl StateComponent for Apu {
-    fn state(&self) -> Result<Vec<u8>, Error> {
+    fn state(&self, _format: Option<StateFormat>) -> Result<Vec<u8>, Error> {
         let mut cursor = Cursor::new(vec![]);
 
         write_i16(&mut cursor, self.ch1_timer)?;
@@ -1255,7 +1255,7 @@ impl StateComponent for Apu {
         Ok(cursor.into_inner())
     }
 
-    fn set_state(&mut self, data: &[u8]) -> Result<(), Error> {
+    fn set_state(&mut self, data: &[u8], _format: Option<StateFormat>) -> Result<(), Error> {
         let mut cursor = Cursor::new(data);
 
         self.ch1_timer = read_i16(&mut cursor)?;
@@ -1408,171 +1408,166 @@ mod tests {
 
     #[test]
     fn test_state_and_set_state() {
-        let mut apu = Apu::default();
-        apu.ch1_timer = 1234;
-        apu.ch1_sequence = 5;
-        apu.ch1_envelope_sequence = 3;
-        apu.ch1_envelope_enabled = true;
-        apu.ch1_sweep_sequence = 2;
-        apu.ch1_output = 10;
-        apu.ch1_dac = true;
-        apu.ch1_sweep_slope = 1;
-        apu.ch1_sweep_increase = true;
-        apu.ch1_sweep_pace = 4;
-        apu.ch1_length_timer = 20;
-        apu.ch1_wave_duty = 2;
-        apu.ch1_pace = 3;
-        apu.ch1_direction = 1;
-        apu.ch1_volume = 15;
-        apu.ch1_wave_length = 2048;
-        apu.ch1_length_enabled = true;
-        apu.ch1_enabled = true;
+        let apu = Apu {
+            ch1_timer: 1234,
+            ch1_sequence: 5,
+            ch1_envelope_sequence: 3,
+            ch1_envelope_enabled: true,
+            ch1_sweep_sequence: 2,
+            ch1_output: 10,
+            ch1_dac: true,
+            ch1_sweep_slope: 1,
+            ch1_sweep_increase: true,
+            ch1_sweep_pace: 4,
+            ch1_length_timer: 20,
+            ch1_wave_duty: 2,
+            ch1_pace: 3,
+            ch1_direction: 1,
+            ch1_volume: 15,
+            ch1_wave_length: 2048,
+            ch1_length_enabled: true,
+            ch1_enabled: true,
+            ch2_timer: 5678,
+            ch2_sequence: 6,
+            ch2_envelope_sequence: 4,
+            ch2_envelope_enabled: true,
+            ch2_output: 20,
+            ch2_dac: true,
+            ch2_length_timer: 30,
+            ch2_wave_duty: 3,
+            ch2_pace: 5,
+            ch2_direction: 0,
+            ch2_volume: 10,
+            ch2_wave_length: 1024,
+            ch2_length_enabled: true,
+            ch2_enabled: true,
+            ch3_timer: 9111,
+            ch3_position: 7,
+            ch3_output: 30,
+            ch3_dac: true,
+            ch3_length_timer: 40,
+            ch3_output_level: 2,
+            ch3_wave_length: 512,
+            ch3_length_enabled: true,
+            ch3_enabled: true,
+            ch4_timer: 121314,
+            ch4_envelope_sequence: 5,
+            ch4_envelope_enabled: true,
+            ch4_output: 40,
+            ch4_dac: true,
+            ch4_length_timer: 50,
+            ch4_pace: 6,
+            ch4_direction: 1,
+            ch4_volume: 5,
+            ch4_divisor: 2,
+            ch4_width_mode: true,
+            ch4_clock_shift: 3,
+            ch4_lfsr: 0x7ff1,
+            ch4_length_enabled: true,
+            ch4_enabled: true,
+            master: 0x77,
+            glob_panning: 0x88,
+            right_enabled: true,
+            left_enabled: true,
+            sound_enabled: true,
+            ch1_out_enabled: true,
+            ch2_out_enabled: true,
+            ch3_out_enabled: true,
+            ch4_out_enabled: true,
+            wave_ram: [0x12; 16],
+            sampling_rate: 44100,
+            channels: 2,
+            sequencer: 12345,
+            sequencer_step: 6,
+            output_timer: 789,
+            ..Default::default()
+        };
 
-        apu.ch2_timer = 5678;
-        apu.ch2_sequence = 6;
-        apu.ch2_envelope_sequence = 4;
-        apu.ch2_envelope_enabled = true;
-        apu.ch2_output = 20;
-        apu.ch2_dac = true;
-        apu.ch2_length_timer = 30;
-        apu.ch2_wave_duty = 3;
-        apu.ch2_pace = 5;
-        apu.ch2_direction = 0;
-        apu.ch2_volume = 10;
-        apu.ch2_wave_length = 1024;
-        apu.ch2_length_enabled = true;
-        apu.ch2_enabled = true;
+        let state = apu.state(None).unwrap();
+        assert_eq!(state.len(), 100);
 
-        apu.ch3_timer = 9111;
-        apu.ch3_position = 7;
-        apu.ch3_output = 30;
-        apu.ch3_dac = true;
-        apu.ch3_length_timer = 40;
-        apu.ch3_output_level = 2;
-        apu.ch3_wave_length = 512;
-        apu.ch3_length_enabled = true;
-        apu.ch3_enabled = true;
-
-        apu.ch4_timer = 121314;
-        apu.ch4_envelope_sequence = 5;
-        apu.ch4_envelope_enabled = true;
-        apu.ch4_output = 40;
-        apu.ch4_dac = true;
-        apu.ch4_length_timer = 50;
-        apu.ch4_pace = 6;
-        apu.ch4_direction = 1;
-        apu.ch4_volume = 5;
-        apu.ch4_divisor = 2;
-        apu.ch4_width_mode = true;
-        apu.ch4_clock_shift = 3;
-        apu.ch4_lfsr = 0x7ff1;
-        apu.ch4_length_enabled = true;
-        apu.ch4_enabled = true;
-
-        apu.master = 0x77;
-        apu.glob_panning = 0x88;
-
-        apu.right_enabled = true;
-        apu.left_enabled = true;
-        apu.sound_enabled = true;
-
-        apu.ch1_out_enabled = true;
-        apu.ch2_out_enabled = true;
-        apu.ch3_out_enabled = true;
-        apu.ch4_out_enabled = true;
-
-        apu.wave_ram = [0x12; 16];
-
-        apu.sampling_rate = 44100;
-        apu.channels = 2;
-
-        apu.sequencer = 12345;
-        apu.sequencer_step = 6;
-        apu.output_timer = 789;
-
-        let state = apu.state().unwrap();
         let mut new_apu = Apu::default();
-        new_apu.set_state(&state).unwrap();
+        new_apu.set_state(&state, None).unwrap();
 
-        assert_eq!(apu.ch1_timer, new_apu.ch1_timer);
-        assert_eq!(apu.ch1_sequence, new_apu.ch1_sequence);
-        assert_eq!(apu.ch1_envelope_sequence, new_apu.ch1_envelope_sequence);
-        assert_eq!(apu.ch1_envelope_enabled, new_apu.ch1_envelope_enabled);
-        assert_eq!(apu.ch1_sweep_sequence, new_apu.ch1_sweep_sequence);
-        assert_eq!(apu.ch1_output, new_apu.ch1_output);
-        assert_eq!(apu.ch1_dac, new_apu.ch1_dac);
-        assert_eq!(apu.ch1_sweep_slope, new_apu.ch1_sweep_slope);
-        assert_eq!(apu.ch1_sweep_increase, new_apu.ch1_sweep_increase);
-        assert_eq!(apu.ch1_sweep_pace, new_apu.ch1_sweep_pace);
-        assert_eq!(apu.ch1_length_timer, new_apu.ch1_length_timer);
-        assert_eq!(apu.ch1_wave_duty, new_apu.ch1_wave_duty);
-        assert_eq!(apu.ch1_pace, new_apu.ch1_pace);
-        assert_eq!(apu.ch1_direction, new_apu.ch1_direction);
-        assert_eq!(apu.ch1_volume, new_apu.ch1_volume);
-        assert_eq!(apu.ch1_wave_length, new_apu.ch1_wave_length);
-        assert_eq!(apu.ch1_length_enabled, new_apu.ch1_length_enabled);
-        assert_eq!(apu.ch1_enabled, new_apu.ch1_enabled);
+        assert_eq!(new_apu.ch1_timer, 1234);
+        assert_eq!(new_apu.ch1_sequence, 5);
+        assert_eq!(new_apu.ch1_envelope_sequence, 3);
+        assert!(new_apu.ch1_envelope_enabled);
+        assert_eq!(new_apu.ch1_sweep_sequence, 2);
+        assert_eq!(new_apu.ch1_output, 10);
+        assert!(new_apu.ch1_dac);
+        assert_eq!(new_apu.ch1_sweep_slope, 1);
+        assert!(new_apu.ch1_sweep_increase);
+        assert_eq!(new_apu.ch1_sweep_pace, 4);
+        assert_eq!(new_apu.ch1_length_timer, 20);
+        assert_eq!(new_apu.ch1_wave_duty, 2);
+        assert_eq!(new_apu.ch1_pace, 3);
+        assert_eq!(new_apu.ch1_direction, 1);
+        assert_eq!(new_apu.ch1_volume, 15);
+        assert_eq!(new_apu.ch1_wave_length, 2048);
+        assert!(new_apu.ch1_length_enabled);
+        assert!(new_apu.ch1_enabled);
 
-        assert_eq!(apu.ch2_timer, new_apu.ch2_timer);
-        assert_eq!(apu.ch2_sequence, new_apu.ch2_sequence);
-        assert_eq!(apu.ch2_envelope_sequence, new_apu.ch2_envelope_sequence);
-        assert_eq!(apu.ch2_envelope_enabled, new_apu.ch2_envelope_enabled);
-        assert_eq!(apu.ch2_output, new_apu.ch2_output);
-        assert_eq!(apu.ch2_dac, new_apu.ch2_dac);
-        assert_eq!(apu.ch2_length_timer, new_apu.ch2_length_timer);
-        assert_eq!(apu.ch2_wave_duty, new_apu.ch2_wave_duty);
-        assert_eq!(apu.ch2_pace, new_apu.ch2_pace);
-        assert_eq!(apu.ch2_direction, new_apu.ch2_direction);
-        assert_eq!(apu.ch2_volume, new_apu.ch2_volume);
-        assert_eq!(apu.ch2_wave_length, new_apu.ch2_wave_length);
-        assert_eq!(apu.ch2_length_enabled, new_apu.ch2_length_enabled);
-        assert_eq!(apu.ch2_enabled, new_apu.ch2_enabled);
+        assert_eq!(new_apu.ch2_timer, 5678);
+        assert_eq!(new_apu.ch2_sequence, 6);
+        assert_eq!(new_apu.ch2_envelope_sequence, 4);
+        assert!(new_apu.ch2_envelope_enabled);
+        assert_eq!(new_apu.ch2_output, 20);
+        assert!(new_apu.ch2_dac);
+        assert_eq!(new_apu.ch2_length_timer, 30);
+        assert_eq!(new_apu.ch2_wave_duty, 3);
+        assert_eq!(new_apu.ch2_pace, 5);
+        assert_eq!(new_apu.ch2_direction, 0);
+        assert_eq!(new_apu.ch2_volume, 10);
+        assert_eq!(new_apu.ch2_wave_length, 1024);
+        assert!(new_apu.ch2_length_enabled);
+        assert!(new_apu.ch2_enabled);
 
-        assert_eq!(apu.ch3_timer, new_apu.ch3_timer);
-        assert_eq!(apu.ch3_position, new_apu.ch3_position);
-        assert_eq!(apu.ch3_output, new_apu.ch3_output);
-        assert_eq!(apu.ch3_dac, new_apu.ch3_dac);
-        assert_eq!(apu.ch3_length_timer, new_apu.ch3_length_timer);
-        assert_eq!(apu.ch3_output_level, new_apu.ch3_output_level);
-        assert_eq!(apu.ch3_wave_length, new_apu.ch3_wave_length);
-        assert_eq!(apu.ch3_length_enabled, new_apu.ch3_length_enabled);
-        assert_eq!(apu.ch3_enabled, new_apu.ch3_enabled);
+        assert_eq!(new_apu.ch3_timer, 9111);
+        assert_eq!(new_apu.ch3_position, 7);
+        assert_eq!(new_apu.ch3_output, 30);
+        assert!(new_apu.ch3_dac);
+        assert_eq!(new_apu.ch3_length_timer, 40);
+        assert_eq!(new_apu.ch3_output_level, 2);
+        assert_eq!(new_apu.ch3_wave_length, 512);
+        assert!(new_apu.ch3_length_enabled);
+        assert!(new_apu.ch3_enabled);
 
-        assert_eq!(apu.ch4_timer, new_apu.ch4_timer);
-        assert_eq!(apu.ch4_envelope_sequence, new_apu.ch4_envelope_sequence);
-        assert_eq!(apu.ch4_envelope_enabled, new_apu.ch4_envelope_enabled);
-        assert_eq!(apu.ch4_output, new_apu.ch4_output);
-        assert_eq!(apu.ch4_dac, new_apu.ch4_dac);
-        assert_eq!(apu.ch4_length_timer, new_apu.ch4_length_timer);
-        assert_eq!(apu.ch4_pace, new_apu.ch4_pace);
-        assert_eq!(apu.ch4_direction, new_apu.ch4_direction);
-        assert_eq!(apu.ch4_volume, new_apu.ch4_volume);
-        assert_eq!(apu.ch4_divisor, new_apu.ch4_divisor);
-        assert_eq!(apu.ch4_width_mode, new_apu.ch4_width_mode);
-        assert_eq!(apu.ch4_clock_shift, new_apu.ch4_clock_shift);
-        assert_eq!(apu.ch4_lfsr, new_apu.ch4_lfsr);
-        assert_eq!(apu.ch4_length_enabled, new_apu.ch4_length_enabled);
-        assert_eq!(apu.ch4_enabled, new_apu.ch4_enabled);
+        assert_eq!(new_apu.ch4_timer, 121314);
+        assert_eq!(new_apu.ch4_envelope_sequence, 5);
+        assert!(new_apu.ch4_envelope_enabled);
+        assert_eq!(new_apu.ch4_output, 40);
+        assert!(new_apu.ch4_dac);
+        assert_eq!(new_apu.ch4_length_timer, 50);
+        assert_eq!(new_apu.ch4_pace, 6);
+        assert_eq!(new_apu.ch4_direction, 1);
+        assert_eq!(new_apu.ch4_volume, 5);
+        assert_eq!(new_apu.ch4_divisor, 2);
+        assert!(new_apu.ch4_width_mode);
+        assert_eq!(new_apu.ch4_clock_shift, 3);
+        assert_eq!(new_apu.ch4_lfsr, 0x7ff1);
+        assert!(new_apu.ch4_length_enabled);
+        assert!(new_apu.ch4_enabled);
 
-        assert_eq!(apu.master, new_apu.master);
-        assert_eq!(apu.glob_panning, new_apu.glob_panning);
+        assert_eq!(new_apu.master, 0x77);
+        assert_eq!(new_apu.glob_panning, 0x88);
 
-        assert_eq!(apu.right_enabled, new_apu.right_enabled);
-        assert_eq!(apu.left_enabled, new_apu.left_enabled);
-        assert_eq!(apu.sound_enabled, new_apu.sound_enabled);
+        assert!(new_apu.right_enabled);
+        assert!(new_apu.left_enabled);
+        assert!(new_apu.sound_enabled);
 
-        assert_eq!(apu.ch1_out_enabled, new_apu.ch1_out_enabled);
-        assert_eq!(apu.ch2_out_enabled, new_apu.ch2_out_enabled);
-        assert_eq!(apu.ch3_out_enabled, new_apu.ch3_out_enabled);
-        assert_eq!(apu.ch4_out_enabled, new_apu.ch4_out_enabled);
+        assert!(new_apu.ch1_out_enabled);
+        assert!(new_apu.ch2_out_enabled);
+        assert!(new_apu.ch3_out_enabled);
+        assert!(new_apu.ch4_out_enabled);
 
-        assert_eq!(apu.wave_ram, new_apu.wave_ram);
+        assert_eq!(new_apu.wave_ram, [0x12; 16]);
 
-        assert_eq!(apu.sampling_rate, new_apu.sampling_rate);
-        assert_eq!(apu.channels, new_apu.channels);
+        assert_eq!(new_apu.sampling_rate, 44100);
+        assert_eq!(new_apu.channels, 2);
 
-        assert_eq!(apu.sequencer, new_apu.sequencer);
-        assert_eq!(apu.sequencer_step, new_apu.sequencer_step);
-        assert_eq!(apu.output_timer, new_apu.output_timer);
+        assert_eq!(new_apu.sequencer, 12345);
+        assert_eq!(new_apu.sequencer_step, 6);
+        assert_eq!(new_apu.output_timer, 789);
     }
 }

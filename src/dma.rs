@@ -14,7 +14,7 @@ use crate::{
     consts::{DMA_ADDR, HDMA1_ADDR, HDMA2_ADDR, HDMA3_ADDR, HDMA4_ADDR, HDMA5_ADDR},
     mmu::BusComponent,
     panic_gb,
-    state::StateComponent,
+    state::{StateComponent, StateFormat},
     warnln,
 };
 
@@ -277,7 +277,7 @@ impl BusComponent for Dma {
 }
 
 impl StateComponent for Dma {
-    fn state(&self) -> Result<Vec<u8>, Error> {
+    fn state(&self, _format: Option<StateFormat>) -> Result<Vec<u8>, Error> {
         let mut cursor = Cursor::new(vec![]);
         write_u16(&mut cursor, self.source)?;
         write_u16(&mut cursor, self.destination)?;
@@ -291,7 +291,7 @@ impl StateComponent for Dma {
         Ok(cursor.into_inner())
     }
 
-    fn set_state(&mut self, data: &[u8]) -> Result<(), Error> {
+    fn set_state(&mut self, data: &[u8], _format: Option<StateFormat>) -> Result<(), Error> {
         let mut cursor = Cursor::new(data);
         self.source = read_u16(&mut cursor)?;
         self.destination = read_u16(&mut cursor)?;
@@ -300,8 +300,8 @@ impl StateComponent for Dma {
         self.mode = read_u8(&mut cursor)?.into();
         self.value_dma = read_u8(&mut cursor)?;
         self.cycles_dma = read_u16(&mut cursor)?;
-        self.active_dma = read_u8(&mut cursor)? == 1;
-        self.active_hdma = read_u8(&mut cursor)? == 1;
+        self.active_dma = read_u8(&mut cursor)? != 0;
+        self.active_hdma = read_u8(&mut cursor)? != 0;
         Ok(())
     }
 }
@@ -368,31 +368,32 @@ mod tests {
 
     #[test]
     fn test_state_and_set_state() {
-        let mut dma = Dma::new();
-        dma.source = 0x1234;
-        dma.destination = 0x5678;
-        dma.length = 0x9abc;
-        dma.pending = 0xdef0;
-        dma.mode = DmaMode::HBlank;
-        dma.value_dma = 0xff;
-        dma.cycles_dma = 0x0012;
-        dma.active_dma = true;
-        dma.active_hdma = true;
+        let dma = Dma {
+            source: 0x1234,
+            destination: 0x5678,
+            length: 0x9abc,
+            pending: 0xdef0,
+            mode: DmaMode::HBlank,
+            value_dma: 0xff,
+            cycles_dma: 0x0012,
+            active_dma: true,
+            active_hdma: true,
+        };
 
-        let state = dma.state().unwrap();
+        let state = dma.state(None).unwrap();
         assert_eq!(state.len(), 14);
 
         let mut new_dma = Dma::new();
-        new_dma.set_state(&state).unwrap();
+        new_dma.set_state(&state, None).unwrap();
 
-        assert_eq!(dma.source, new_dma.source);
-        assert_eq!(dma.destination, new_dma.destination);
-        assert_eq!(dma.length, new_dma.length);
-        assert_eq!(dma.pending, new_dma.pending);
-        assert_eq!(dma.mode, new_dma.mode);
-        assert_eq!(dma.value_dma, new_dma.value_dma);
-        assert_eq!(dma.cycles_dma, new_dma.cycles_dma);
-        assert_eq!(dma.active_dma, new_dma.active_dma);
-        assert_eq!(dma.active_hdma, new_dma.active_hdma);
+        assert_eq!(new_dma.source, 0x1234);
+        assert_eq!(new_dma.destination, 0x5678);
+        assert_eq!(new_dma.length, 0x9abc);
+        assert_eq!(new_dma.pending, 0xdef0);
+        assert_eq!(new_dma.mode, DmaMode::HBlank);
+        assert_eq!(new_dma.value_dma, 0xff);
+        assert_eq!(new_dma.cycles_dma, 0x0012);
+        assert!(new_dma.active_dma);
+        assert!(new_dma.active_hdma);
     }
 }

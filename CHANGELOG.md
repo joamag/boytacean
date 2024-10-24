@@ -9,15 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-*
+* State management support for: `pad`, `ppu` and `cpu` 
 
 ### Changed
 
-*
+* Structure of the BOS save file format, breaking change!
 
 ### Fixed
 
-*
+* Major bug related to OAM masking
 
 ## [0.10.14] - 2024-10-21
 

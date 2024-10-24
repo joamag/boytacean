@@ -11,7 +11,7 @@ use crate::{
     consts::{DIV_ADDR, TAC_ADDR, TIMA_ADDR, TMA_ADDR},
     mmu::BusComponent,
     panic_gb,
-    state::StateComponent,
+    state::{StateComponent, StateFormat},
     warnln,
 };
 
@@ -171,7 +171,7 @@ impl BusComponent for Timer {
 }
 
 impl StateComponent for Timer {
-    fn state(&self) -> Result<Vec<u8>, Error> {
+    fn state(&self, _format: Option<StateFormat>) -> Result<Vec<u8>, Error> {
         let mut cursor = Cursor::new(vec![]);
         write_u8(&mut cursor, self.div)?;
         write_u8(&mut cursor, self.tima)?;
@@ -185,7 +185,7 @@ impl StateComponent for Timer {
         Ok(cursor.into_inner())
     }
 
-    fn set_state(&mut self, data: &[u8]) -> Result<(), Error> {
+    fn set_state(&mut self, data: &[u8], _format: Option<StateFormat>) -> Result<(), Error> {
         let mut cursor = Cursor::new(data);
         self.div = read_u8(&mut cursor)?;
         self.tima = read_u8(&mut cursor)?;
@@ -193,9 +193,9 @@ impl StateComponent for Timer {
         self.tac = read_u8(&mut cursor)?;
         self.div_clock = read_u16(&mut cursor)?;
         self.tima_clock = read_u16(&mut cursor)?;
-        self.tima_enabled = read_u8(&mut cursor)? == 1;
+        self.tima_enabled = read_u8(&mut cursor)? != 0;
         self.tima_ratio = read_u16(&mut cursor)?;
-        self.int_tima = read_u8(&mut cursor)? == 1;
+        self.int_tima = read_u8(&mut cursor)? != 0;
         Ok(())
     }
 }
@@ -214,31 +214,32 @@ mod tests {
 
     #[test]
     fn test_state_and_set_state() {
-        let mut timer = Timer::new();
-        timer.div = 0x12;
-        timer.tima = 0x34;
-        timer.tma = 0x56;
-        timer.tac = 0x78;
-        timer.div_clock = 0x9abc;
-        timer.tima_clock = 0xdef0;
-        timer.tima_enabled = true;
-        timer.tima_ratio = 0x1234;
-        timer.int_tima = true;
+        let timer = Timer {
+            div: 0x12,
+            tima: 0x34,
+            tma: 0x56,
+            tac: 0x78,
+            div_clock: 0x9abc,
+            tima_clock: 0xdef0,
+            tima_enabled: true,
+            tima_ratio: 0x1234,
+            int_tima: true,
+        };
 
-        let state = timer.state().unwrap();
+        let state = timer.state(None).unwrap();
         assert_eq!(state.len(), 12);
 
         let mut new_timer = Timer::new();
-        new_timer.set_state(&state).unwrap();
+        new_timer.set_state(&state, None).unwrap();
 
-        assert_eq!(timer.div, new_timer.div);
-        assert_eq!(timer.tima, new_timer.tima);
-        assert_eq!(timer.tma, new_timer.tma);
-        assert_eq!(timer.tac, new_timer.tac);
-        assert_eq!(timer.div_clock, new_timer.div_clock);
-        assert_eq!(timer.tima_clock, new_timer.tima_clock);
-        assert_eq!(timer.tima_enabled, new_timer.tima_enabled);
-        assert_eq!(timer.tima_ratio, new_timer.tima_ratio);
-        assert_eq!(timer.int_tima, new_timer.int_tima);
+        assert_eq!(new_timer.div, 0x12);
+        assert_eq!(new_timer.tima, 0x34);
+        assert_eq!(new_timer.tma, 0x56);
+        assert_eq!(new_timer.tac, 0x78);
+        assert_eq!(new_timer.div_clock, 0x9abc);
+        assert_eq!(new_timer.tima_clock, 0xdef0);
+        assert!(new_timer.tima_enabled);
+        assert_eq!(new_timer.tima_ratio, 0x1234);
+        assert!(new_timer.int_tima);
     }
 }

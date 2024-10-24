@@ -571,7 +571,7 @@ impl Mmu {
     }
 
     pub fn read_many(&mut self, addr: u16, count: u16) -> Vec<u8> {
-        let mut data: Vec<u8> = vec![];
+        let mut data: Vec<u8> = Vec::with_capacity(count as usize);
 
         for index in 0..count {
             let byte = self.read(addr + index);
@@ -588,7 +588,7 @@ impl Mmu {
     }
 
     pub fn read_many_raw(&mut self, addr: u16, count: u16) -> Vec<u8> {
-        let mut data: Vec<u8> = vec![];
+        let mut data: Vec<u8> = Vec::with_capacity(count as usize);
 
         for index in 0..count {
             let byte = self.read_raw(addr + index);
