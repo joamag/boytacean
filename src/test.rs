@@ -12,6 +12,23 @@
 //! Most of the test execution is built on top of a simple plain text
 //! based serial protocol that can be used to communicate with the emulator
 //! and obtain the results of the tests.
+//!
+//! # Examples
+//!
+//! Runs the CPU instruction tests from the Blargg's test ROMs and
+//! checks the results (via serial).
+//!
+//! ```rust
+//! use boytacean::test::run_serial_test;
+//! let (result, game_boy) = run_serial_test(
+//!     "res/roms/test/blargg/cpu/cpu_instrs.gb",
+//!     Some(300000000),
+//!     TestOptions::default(),
+//! )
+//! .unwrap();
+//! assert_eq!(result, "cpu_instrs\n\n01:ok  02:ok  03:ok  04:ok  05:ok  06:ok  07:ok  08:ok  09:ok  10:ok  11:ok  \n\nPassed all tests\n");
+//! assert_eq!(game_boy.rom_i().gb_mode(), GameBoyMode::Cgb);
+//! ```
 
 use boytacean_common::error::Error;
 
