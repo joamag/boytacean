@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-* State management support for: `pad`, `ppu` and `cpu` 
+* State management support for: `pad`, `ppu` and `cpu`
 
 ### Changed
 
