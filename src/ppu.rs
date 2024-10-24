@@ -1,4 +1,8 @@
 //! PPU (Picture Processing Unit) functions and structures.
+//!
+//! The Game Boy's Picture Processing Unit (PPU) is responsible for rendering
+//! graphics on the handheld's screen. It handles the drawing of sprites and
+//! backgrounds using tile-based graphics.
 
 use boytacean_common::{
     data::{read_into, read_u16, read_u8, write_bytes, write_u16, write_u8},

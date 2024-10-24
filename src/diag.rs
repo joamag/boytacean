@@ -1,3 +1,9 @@
+//! Low-level diagnostic utilities for debugging purposes.
+//!
+//! Some of the implementations make use of unsafe code to store
+//! a global instance of the emulator, which is going to be used
+//! in panic diagnostics
+
 use std::ptr::null;
 
 use crate::gb::GameBoy;

@@ -1,4 +1,7 @@
 //! DMA (Direct Memory Access) functions and structures.
+//!
+//! Contains implementation of both DMA (Direct Memory Access) and
+//! HDMA (HBlank Direct Memory Access).
 
 use std::{
     fmt::{self, Display, Formatter},

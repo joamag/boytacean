@@ -1,3 +1,18 @@
+//! Interactive testing building blocks and scripts.
+//!
+//! This module provides functions to run tests on the emulator
+//!
+//! The tests can be run in different modes, such as running the
+//! emulator for a fixed number of cycles, or stepping through
+//! the emulator until a specific address is reached.
+//!
+//! The tests can also be run with different options, such as enabling or
+//! disabling the PPU, APU, DMA, timer, etc..
+//!
+//! Most of the test execution is built on top of a simple plain text
+//! based serial protocol that can be used to communicate with the emulator
+//! and obtain the results of the tests.
+
 use boytacean_common::error::Error;
 
 use crate::{
