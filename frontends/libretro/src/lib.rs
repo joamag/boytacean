@@ -1,5 +1,4 @@
-#![allow(unknown_lints, clippy::manual_c_str_literals)]
-#[allow(static_mut_refs)]
+#![allow(static_mut_refs, clippy::manual_c_str_literals)]
 pub mod consts;
 pub mod core;
 pub mod palettes;
