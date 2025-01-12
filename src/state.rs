@@ -707,13 +707,13 @@ impl Serialize for BosInfo {
         write_u32(writer, size_of::<u64>() as u32)?;
         write_u64(writer, self.timestamp)?;
 
-        write_u32(writer, self.agent.as_bytes().len() as u32)?;
+        write_u32(writer, self.agent.len() as u32)?;
         write_bytes(writer, self.agent.as_bytes())?;
 
-        write_u32(writer, self.agent_version.as_bytes().len() as u32)?;
+        write_u32(writer, self.agent_version.len() as u32)?;
         write_bytes(writer, self.agent_version.as_bytes())?;
 
-        write_u32(writer, self.model.as_bytes().len() as u32)?;
+        write_u32(writer, self.model.len() as u32)?;
         write_bytes(writer, self.model.as_bytes())?;
 
         Ok(())
