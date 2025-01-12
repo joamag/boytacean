@@ -137,7 +137,7 @@ jobs:
       - name: Install Dependencies
         run: |
           apt-get update
-          apt-get install -y -q zip
+          apt-get install -y -q zip python3-jinja2
       - name: Install Rust components
         run: |
           rustup component add rustfmt
