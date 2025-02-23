@@ -603,7 +603,7 @@ fn ld_b_u8(cpu: &mut Cpu) {
 fn rlca(cpu: &mut Cpu) {
     let carry = cpu.a >> 7;
 
-    cpu.a = cpu.a << 1 | carry;
+    cpu.a = (cpu.a << 1) | carry;
 
     cpu.set_sub(false);
     cpu.set_zero(false);
@@ -717,7 +717,7 @@ fn rla(cpu: &mut Cpu) {
 
     cpu.set_carry(cpu.a & 0x80 == 0x80);
 
-    cpu.a = cpu.a << 1 | carry as u8;
+    cpu.a = (cpu.a << 1) | carry as u8;
 
     cpu.set_sub(false);
     cpu.set_zero(false);
@@ -775,7 +775,7 @@ fn rra(cpu: &mut Cpu) {
 
     cpu.set_carry((cpu.a & 0x1) == 0x1);
 
-    cpu.a = cpu.a >> 1 | ((carry as u8) << 7);
+    cpu.a = (cpu.a >> 1) | ((carry as u8) << 7);
 
     cpu.set_sub(false);
     cpu.set_zero(false);

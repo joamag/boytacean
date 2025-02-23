@@ -180,7 +180,7 @@ impl PaletteInfo {
             let r = color[0];
             let g = color[1];
             let b = color[2];
-            let color = (r as u32) << 16 | (g as u32) << 8 | b as u32;
+            let color = ((r as u32) << 16) | ((g as u32) << 8) | b as u32;
             if is_first {
                 is_first = false;
             } else {

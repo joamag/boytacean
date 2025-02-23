@@ -685,7 +685,7 @@ impl Apu {
             NR14_ADDR => {
                 (if self.ch1_length_enabled { 0x40 } else { 0x00 })
                     | (if self.ch1_enabled { 0x80 } else { 0x00 })
-                    | (((self.ch1_wave_length & 0x0700 >> 8) as u8) << 3)
+                    | (((self.ch1_wave_length & (0x0700 >> 8)) as u8) << 3)
                     | 0x38
             }
 
@@ -695,7 +695,7 @@ impl Apu {
             NR24_ADDR => {
                 (if self.ch2_length_enabled { 0x40 } else { 0x00 })
                     | (if self.ch2_enabled { 0x80 } else { 0x00 })
-                    | (((self.ch2_wave_length & 0x0700 >> 8) as u8) << 3)
+                    | (((self.ch2_wave_length & (0x0700 >> 8)) as u8) << 3)
                     | 0x38
             }
 
@@ -705,7 +705,7 @@ impl Apu {
             NR34_ADDR => {
                 (if self.ch3_length_enabled { 0x40 } else { 0x00 })
                     | (if self.ch3_enabled { 0x80 } else { 0x00 })
-                    | (((self.ch3_wave_length & 0x0700 >> 8) as u8) << 3)
+                    | (((self.ch3_wave_length & (0x0700 >> 8)) as u8) << 3)
                     | 0x38
             }
 
