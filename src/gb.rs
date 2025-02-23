@@ -1544,6 +1544,10 @@ impl GameBoy {
         self.attach_serial(printer);
     }
 
+    pub fn add_cheat_code_wa(&mut self, code: &str) -> Result<bool, String> {
+        self.add_cheat_code(code)
+    }
+
     /// Updates the emulation mode using the cartridge info
     /// for the provided data to obtain the CGB flag value
     /// and set the mode accordingly.
