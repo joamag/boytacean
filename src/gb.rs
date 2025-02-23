@@ -577,6 +577,11 @@ impl GameBoy {
         self.reset_cheats();
     }
 
+    pub fn reset_cheats(&mut self) {
+        self.reset_game_genie();
+        self.reset_game_shark();
+    }
+
     pub fn reload(&mut self) {
         let rom = self.rom().clone();
         self.reset();
@@ -1444,11 +1449,6 @@ impl GameBoy {
 
     pub fn set_speed_callback(&mut self, callback: fn(speed: GameBoySpeed)) {
         self.mmu().set_speed_callback(callback);
-    }
-
-    pub fn reset_cheats(&mut self) {
-        self.reset_game_genie();
-        self.reset_game_shark();
     }
 
     pub fn add_cheat_code(&mut self, code: &str) -> Result<bool, Error> {
