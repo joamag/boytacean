@@ -1545,7 +1545,7 @@ impl GameBoy {
     }
 
     pub fn add_cheat_code_wa(&mut self, code: &str) -> Result<bool, String> {
-        self.add_cheat_code(code)
+        Ok(self.add_cheat_code(code)?)
     }
 
     /// Updates the emulation mode using the cartridge info
