@@ -7,7 +7,7 @@ license = "Apache-2.0"
 repository = "https://github.com/joamag/boytacean"
 keywords = ["gameboy", "emulator", "rust"]
 edition = "2021"
-rust-version = "1.74"
+rust-version = "1.81"
 exclude = ["/frontends", "/res/roms", "/res/screens", "/res/videos"]
 build = "build.rs"
 readme = "README.md"
@@ -68,7 +68,7 @@ members = [
     "crates/encoding",
     "crates/hashing"
 ]
-package = { version = "0.10.14", authors = ["João Magalhães <joamag@gmail.com>"], edition = "2021", rust-version = "1.74" }
+package = { version = "0.10.14", authors = ["João Magalhães <joamag@gmail.com>"], edition = "2021", rust-version = "1.81" }
 
 [package.metadata.docs.rs]
 features = ["wasm", "gen-mock"]

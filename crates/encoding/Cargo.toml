@@ -5,7 +5,7 @@ version = "0.10.14"
 authors = ["João Magalhães <joamag@gmail.com>"]
 license = "Apache-2.0"
 edition = "2021"
-rust-version = "1.74"
+rust-version = "1.81"
 
 [features]
 simd = ["boytacean-hashing/simd"]

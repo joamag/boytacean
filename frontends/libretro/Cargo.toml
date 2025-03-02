@@ -6,7 +6,7 @@ description = "A Libretro frontend for Boytacen"
 license = "Apache-2.0"
 keywords = ["gameboy", "emulator", "rust", "libretro"]
 edition = "2021"
-rust-version = "1.74"
+rust-version = "1.81"
 readme = "README.md"
 
 [lib]
