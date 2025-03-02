@@ -99,7 +99,7 @@ test-pyo3:
   stage: test
   parallel:
     matrix:
-      - RUST_VERSION: ["1.74.0"]
+      - RUST_VERSION: ["1.81.0"]
   script:
     - rustup toolchain install $RUST_VERSION
     - rustup override set $RUST_VERSION
