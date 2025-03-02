@@ -67,7 +67,7 @@ members = [
     "crates/encoding",
     "crates/hashing"
 ]
-package = { version = "0.10.14", authors = ["João Magalhães <joamag@gmail.com>"], edition = "2021" }
+package = { version = "0.10.14", authors = ["João Magalhães <joamag@gmail.com>"], edition = "2021", rust-version = "1.74" }
 
 [package.metadata.docs.rs]
 features = ["wasm", "gen-mock"]
