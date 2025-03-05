@@ -84,6 +84,16 @@ npm install && npm run build
 cd dist && python3 -m http.server
 ```
 
+### Utilities
+
+#### BOSC Decompressor
+
+The BOSC decompressor is a simple utility that decompresses BOSC files to BOS format.
+
+```bash
+cargo run --release --bin bosc-decompress -- <input_file> <output_file>
+```
+
 ## Web front-end
 
 The Web front-end makes use of [EmuKit](https://github.com/joamag/emukit) which is a UI toolkit that provides the required infrastructure for the creation
