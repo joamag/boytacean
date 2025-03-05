@@ -17,7 +17,7 @@ jobs:
       - name: Build SDL
         run: |
           cd frontends/sdl
-          apt-get update && apt-get install -y -q zip
+          apt-get update && apt-get install -y -q zip python3-jinja2
           cargo install cargo-vcpkg && cargo vcpkg -v build
           cargo build --release
       - name: Build Libretro
