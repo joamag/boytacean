@@ -17,6 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+*
+
+## [0.11.1] - 2025-03-05
+
+### Fixed
+
 * Add new dependency to fix GitHub Action workflow
 
 ## [0.11.0] - 2025-03-05

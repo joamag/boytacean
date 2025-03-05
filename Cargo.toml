@@ -1,7 +1,7 @@
 [package]
 name = "boytacean"
 description = "A Game Boy emulator that is written in Rust."
-version = "0.11.0"
+version = "0.11.1"
 authors = ["João Magalhães <joamag@gmail.com>"]
 license = "Apache-2.0"
 repository = "https://github.com/joamag/boytacean"
@@ -26,9 +26,9 @@ cpulog = []
 gen-mock = []
 
 [dependencies]
-boytacean-common = { path = "crates/common", version = "0.11.0" }
-boytacean-encoding = { path = "crates/encoding", version = "0.11.0" }
-boytacean-hashing = { path = "crates/hashing", version = "0.11.0" }
+boytacean-common = { path = "crates/common", version = "0.11.1" }
+boytacean-encoding = { path = "crates/encoding", version = "0.11.1" }
+boytacean-hashing = { path = "crates/hashing", version = "0.11.1" }
 wasm-bindgen = { version = "0.2", optional = true }
 js-sys = { version = "0.3", optional = true }
 pyo3 = { version = "0.20", optional = true }
@@ -68,7 +68,7 @@ members = [
     "crates/encoding",
     "crates/hashing"
 ]
-package = { version = "0.11.0", authors = ["João Magalhães <joamag@gmail.com>"], edition = "2021", rust-version = "1.81" }
+package = { version = "0.11.1", authors = ["João Magalhães <joamag@gmail.com>"], edition = "2021", rust-version = "1.81" }
 
 [package.metadata.docs.rs]
 features = ["wasm", "gen-mock"]
