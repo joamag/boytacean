@@ -8,8 +8,8 @@
 
 use boytacean_common::{
     data::{
-        read_bytes, read_into, read_u16, read_u32, read_u64, read_u8, write_bytes, write_u16,
-        write_u32, write_u64, write_u8,
+        read_bytes, read_into, read_u8, read_u16, read_u32, read_u64, write_bytes, write_u8,
+        write_u16, write_u32, write_u64,
     },
     error::Error,
     util::{save_bmp, timestamp},

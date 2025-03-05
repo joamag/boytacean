@@ -537,7 +537,7 @@ impl Cartridge {
             rom_type => {
                 return Err(Error::CustomError(format!(
                     "No MBC controller available for {rom_type}"
-                )))
+                )));
             }
         })
     }

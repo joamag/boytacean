@@ -3,7 +3,7 @@
 use std::io::Cursor;
 
 use boytacean_common::{
-    data::{read_u16, read_u8, write_u16, write_u8},
+    data::{read_u8, read_u16, write_u8, write_u16},
     error::Error,
 };
 

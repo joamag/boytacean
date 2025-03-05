@@ -2,7 +2,9 @@
 
 use boytacean_common::util::capitalize;
 
-use crate::generated::{COMPILATION_DATE, COMPILATION_TIME, COMPILER, COMPILER_VERSION, NAME, VERSION};
+use crate::generated::{
+    COMPILATION_DATE, COMPILATION_TIME, COMPILER, COMPILER_VERSION, NAME, VERSION,
+};
 
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;

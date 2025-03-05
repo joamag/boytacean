@@ -1,6 +1,6 @@
 use std::{
     fmt::{self, Display, Formatter},
-    io::{stdout, Write},
+    io::{Write, stdout},
 };
 
 use crate::serial::SerialDevice;

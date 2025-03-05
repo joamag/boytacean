@@ -1,6 +1,6 @@
 use boytacean_common::bench::generate_data;
 use boytacean_hashing::{crc32::crc32, crc32c::crc32c};
-use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
+use criterion::{Criterion, Throughput, black_box, criterion_group, criterion_main};
 
 fn benchmark_hashing(c: &mut Criterion) {
     let data = generate_data(10_000_000_usize);

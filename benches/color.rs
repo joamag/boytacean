@@ -1,6 +1,6 @@
 use boytacean::color::rgb888_to_rgb1555_scalar;
 use boytacean_common::bench::multiply_array_size;
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 
 fn benchmark_rgb_conversion(c: &mut Criterion) {
     let rgb888_pixels: Vec<u8> = vec![255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 0];
