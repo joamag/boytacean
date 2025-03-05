@@ -45,6 +45,5 @@
         "process": {
             "global": "process"
         }
-    },
-    "dependencies": {}
+    }
 }
