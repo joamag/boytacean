@@ -2,10 +2,10 @@ use pyo3::{exceptions::PyException, prelude::*, types::PyBytes};
 
 use crate::{
     gb::{GameBoy as GameBoyBase, GameBoyMode},
-    gen::{COMPILATION_DATE, COMPILATION_TIME, COMPILER, COMPILER_VERSION, NAME, VERSION},
+    generated::{COMPILATION_DATE, COMPILATION_TIME, COMPILER, COMPILER_VERSION, NAME, VERSION},
     info::Info,
     pad::PadKey,
-    ppu::{PaletteInfo, DISPLAY_HEIGHT, DISPLAY_WIDTH},
+    ppu::{DISPLAY_HEIGHT, DISPLAY_WIDTH, PaletteInfo},
     state::StateManager,
 };
 

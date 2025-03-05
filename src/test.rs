@@ -110,7 +110,7 @@ pub fn run_image_test(
 mod tests {
     use crate::{
         consts::{
-            BGP_ADDR, DIV_ADDR, DMA_ADDR, IF_ADDR, LCDC_ADDR, LYC_ADDR, LY_ADDR, OBP0_ADDR,
+            BGP_ADDR, DIV_ADDR, DMA_ADDR, IF_ADDR, LCDC_ADDR, LY_ADDR, LYC_ADDR, OBP0_ADDR,
             OBP1_ADDR, SCX_ADDR, SCY_ADDR, STAT_ADDR, TAC_ADDR, TIMA_ADDR, TMA_ADDR, WX_ADDR,
             WY_ADDR,
         },
@@ -120,7 +120,7 @@ mod tests {
         rom::{RamSize, Region, RomSize},
     };
 
-    use super::{run_serial_test, run_step_test, TestOptions};
+    use super::{TestOptions, run_serial_test, run_step_test};
 
     #[test]
     fn test_boot_state() {
@@ -171,7 +171,10 @@ mod tests {
             TestOptions::default(),
         )
         .unwrap();
-        assert_eq!(result, "cpu_instrs\n\n01:ok  02:ok  03:ok  04:ok  05:ok  06:ok  07:ok  08:ok  09:ok  10:ok  11:ok  \n\nPassed all tests\n");
+        assert_eq!(
+            result,
+            "cpu_instrs\n\n01:ok  02:ok  03:ok  04:ok  05:ok  06:ok  07:ok  08:ok  09:ok  10:ok  11:ok  \n\nPassed all tests\n"
+        );
         assert_eq!(game_boy.rom_i().gb_mode(), GameBoyMode::Cgb);
         assert_eq!(game_boy.rom_i().title().as_str(), "CPU_INSTRS");
         assert_eq!(game_boy.rom_i().licensee(), Licensee::None);

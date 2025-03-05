@@ -4,8 +4,8 @@ use std::{collections::VecDeque, io::Cursor};
 
 use boytacean_common::{
     data::{
-        read_i16, read_i32, read_into, read_u16, read_u8, write_bytes, write_i16, write_i32,
-        write_u16, write_u8,
+        read_i16, read_i32, read_into, read_u8, read_u16, write_bytes, write_i16, write_i32,
+        write_u8, write_u16,
     },
     error::Error,
 };

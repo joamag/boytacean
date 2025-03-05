@@ -5,7 +5,7 @@ use boytacean_encoding::{
     rle::{decode_rle, encode_rle},
     zippy::{decode_zippy, encode_zippy},
 };
-use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
+use criterion::{Criterion, Throughput, black_box, criterion_group, criterion_main};
 
 fn benchmark_encoding(c: &mut Criterion) {
     let data = generate_data(10_000_000_usize);
