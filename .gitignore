@@ -20,7 +20,7 @@ Cargo.lock
 /frontends/*/target
 /frontends/*/ndk
 
-/src/gen/build.rs
-/src/gen/_build.rs
+/src/generated/build.rs
+/src/generated/_build.rs
 
 /src/python/boytacean.egg-info
