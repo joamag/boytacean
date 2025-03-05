@@ -452,6 +452,10 @@ impl BosState {
         count += self.device_states.len() as u8;
         count
     }
+
+    pub fn bess(&mut self) -> &mut BessState {
+        &mut self.bess
+    }
 }
 
 impl StateInfo for BosState {

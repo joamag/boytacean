@@ -23,6 +23,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         output
     };
 
+    println!(
+        "Decompressing BOSC file to BOS format {}",
+        output_path.display()
+    );
+
     // read input file with the compressed values
     let mut input_file = File::open(input_path)?;
     let mut input_data = Vec::new();
