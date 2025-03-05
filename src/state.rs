@@ -109,14 +109,30 @@ pub trait StateComponent {
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 pub enum SaveStateFormat {
     /// Boytacean Save Compressed format (BOSC).
+    ///
     /// This format uses the Zippy compression algorithm
     /// to compress the underlying BOS contents.
+    ///
+    /// The BOSC format is the default format for the
+    /// save state.
+    ///
+    /// Using a compressed file format means that BESS out-of-the
+    /// box compatibility is not possible.
     Bosc = 1,
 
     /// Boytacean Save format (uncompressed) (BOS).
+    ///
+    /// This format is the uncompressed version of the
+    /// BOSC format.
+    ///
+    /// Using an uncompressed file format means that BESS
+    /// out-of-the box compatibility is possible.
     Bos = 2,
 
     /// Best Effort Save State format (BESS).
+    ///
+    /// This is an abstract payload opaque format created
+    /// by the same people of Sameboy.
     Bess = 3,
 }
 
@@ -322,6 +338,10 @@ impl BoscState {
         }
         self.bos.verify()?;
         Ok(())
+    }
+
+    pub fn bos(&mut self) -> &mut BosState {
+        &mut self.bos
     }
 }
 

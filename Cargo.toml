@@ -73,6 +73,10 @@ package = { version = "0.10.14", authors = ["João Magalhães <joamag@gmail.com>
 [package.metadata.docs.rs]
 features = ["wasm", "gen-mock"]
 
+[[bin]]
+name = "bosc-decompress"
+path = "src/bin/bosc-decompress.rs"
+
 [[bench]]
 name = "color"
 harness = false
