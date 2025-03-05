@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-* Process package reference in GitHub Action workflow
+*
 
 ## [0.11.3] - 2025-03-05
 
