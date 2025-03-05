@@ -10,7 +10,7 @@ pub mod devices;
 pub mod diag;
 pub mod dma;
 pub mod gb;
-pub mod gen;
+pub mod generated;
 pub mod info;
 pub mod inst;
 pub mod licensee;

@@ -45,7 +45,7 @@ const BUILD_OUT_FILE: &str = "build.rs";
 const BUILD_ALL_OUT_FILE: &str = "_build.rs";
 
 #[cfg(not(feature = "gen-mock"))]
-const GEN_DIR: &str = "./src/gen";
+const GEN_DIR: &str = "./src/generated";
 
 #[cfg(not(feature = "gen-mock"))]
 fn main() {
