@@ -1,8 +1,5 @@
 use boytacean::state::{SaveStateFormat, Serialize, StateManager};
-use std::env;
-use std::fs::File;
-use std::io::Read;
-use std::path::Path;
+use std::{env, fs::File, io::Read, path::Path};
 
 fn print_usage() {
     println!("Usage: bosc-decompress <input_file> [output_file]");
