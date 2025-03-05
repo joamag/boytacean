@@ -5,9 +5,14 @@
 //!
 //! Most of the core CPU logic is implemented in the [`Cpu::clock`] method.
 
-use boytacean_common::util::SharedThread;
+use boytacean_common::{
+    data::{read_u16, read_u8, write_u16, write_u8},
+    error::Error,
+    util::SharedThread,
+};
 use std::{
     fmt::{self, Display, Formatter},
+    io::Cursor,
     sync::Mutex,
 };
 
@@ -23,6 +28,7 @@ use crate::{
     pad::Pad,
     ppu::Ppu,
     serial::Serial,
+    state::{StateComponent, StateFormat},
     timer::Timer,
 };
 
@@ -461,12 +467,12 @@ impl Cpu {
 
     #[inline(always)]
     pub fn af(&self) -> u16 {
-        (self.a as u16) << 8 | self.f() as u16
+        ((self.a as u16) << 8) | self.f() as u16
     }
 
     #[inline(always)]
     pub fn bc(&self) -> u16 {
-        (self.b as u16) << 8 | self.c as u16
+        ((self.b as u16) << 8) | self.c as u16
     }
 
     #[inline(always)]
@@ -509,7 +515,7 @@ impl Cpu {
 
     #[inline(always)]
     pub fn de(&self) -> u16 {
-        (self.d as u16) << 8 | self.e as u16
+        ((self.d as u16) << 8) | self.e as u16
     }
 
     #[inline(always)]
@@ -520,7 +526,7 @@ impl Cpu {
 
     #[inline(always)]
     pub fn hl(&self) -> u16 {
-        (self.h as u16) << 8 | self.l as u16
+        ((self.h as u16) << 8) | self.l as u16
     }
 
     #[inline(always)]
@@ -660,6 +666,52 @@ impl Cpu {
     }
 }
 
+impl StateComponent for Cpu {
+    fn state(&self, _format: Option<StateFormat>) -> Result<Vec<u8>, Error> {
+        let mut cursor = Cursor::new(vec![]);
+        write_u16(&mut cursor, self.pc)?;
+        write_u16(&mut cursor, self.sp)?;
+        write_u8(&mut cursor, self.a)?;
+        write_u8(&mut cursor, self.b)?;
+        write_u8(&mut cursor, self.c)?;
+        write_u8(&mut cursor, self.d)?;
+        write_u8(&mut cursor, self.e)?;
+        write_u8(&mut cursor, self.h)?;
+        write_u8(&mut cursor, self.l)?;
+        write_u8(&mut cursor, self.ime as u8)?;
+        write_u8(&mut cursor, self.zero as u8)?;
+        write_u8(&mut cursor, self.sub as u8)?;
+        write_u8(&mut cursor, self.half_carry as u8)?;
+        write_u8(&mut cursor, self.carry as u8)?;
+        write_u8(&mut cursor, self.halted as u8)?;
+        write_u8(&mut cursor, self.cycles)?;
+        write_u16(&mut cursor, self.ppc)?;
+        Ok(cursor.into_inner())
+    }
+
+    fn set_state(&mut self, data: &[u8], _format: Option<StateFormat>) -> Result<(), Error> {
+        let mut cursor = Cursor::new(data);
+        self.pc = read_u16(&mut cursor)?;
+        self.sp = read_u16(&mut cursor)?;
+        self.a = read_u8(&mut cursor)?;
+        self.b = read_u8(&mut cursor)?;
+        self.c = read_u8(&mut cursor)?;
+        self.d = read_u8(&mut cursor)?;
+        self.e = read_u8(&mut cursor)?;
+        self.h = read_u8(&mut cursor)?;
+        self.l = read_u8(&mut cursor)?;
+        self.ime = read_u8(&mut cursor)? != 0;
+        self.zero = read_u8(&mut cursor)? != 0;
+        self.sub = read_u8(&mut cursor)? != 0;
+        self.half_carry = read_u8(&mut cursor)? != 0;
+        self.carry = read_u8(&mut cursor)? != 0;
+        self.halted = read_u8(&mut cursor)? != 0;
+        self.cycles = read_u8(&mut cursor)?;
+        self.ppc = read_u16(&mut cursor)?;
+        Ok(())
+    }
+}
+
 impl Default for Cpu {
     fn default() -> Self {
         let gbc = SharedThread::new(Mutex::new(GameBoyConfig::default()));
@@ -675,6 +727,12 @@ impl Display for Cpu {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Mutex;
+
+    use boytacean_common::util::SharedThread;
+
+    use crate::{gb::GameBoyConfig, mmu::Mmu, state::StateComponent};
+
     use super::Cpu;
 
     #[test]
@@ -806,5 +864,54 @@ mod tests {
         assert_eq!(cycles, 8);
         assert_eq!(cpu.pc, 0xc002);
         assert_eq!(cpu.a, 0x0a ^ 0x0f);
+    }
+
+    #[test]
+    fn test_state_and_set_state() {
+        let cpu = Cpu {
+            pc: 0x1234,
+            sp: 0x5678,
+            a: 0x9a,
+            b: 0xbc,
+            c: 0xde,
+            d: 0xf0,
+            e: 0x12,
+            h: 0x34,
+            l: 0x56,
+            ime: true,
+            zero: true,
+            sub: false,
+            half_carry: true,
+            carry: false,
+            halted: true,
+            mmu: Mmu::default(),
+            cycles: 0x78,
+            ppc: 0x9abc,
+            gbc: SharedThread::new(Mutex::new(GameBoyConfig::default())),
+        };
+
+        let state = cpu.state(None).unwrap();
+        assert_eq!(state.len(), 20);
+
+        let mut new_cpu = Cpu::default();
+        new_cpu.set_state(&state, None).unwrap();
+
+        assert_eq!(new_cpu.pc, 0x1234);
+        assert_eq!(new_cpu.sp, 0x5678);
+        assert_eq!(new_cpu.a, 0x9a);
+        assert_eq!(new_cpu.b, 0xbc);
+        assert_eq!(new_cpu.c, 0xde);
+        assert_eq!(new_cpu.d, 0xf0);
+        assert_eq!(new_cpu.e, 0x12);
+        assert_eq!(new_cpu.h, 0x34);
+        assert_eq!(new_cpu.l, 0x56);
+        assert!(new_cpu.ime);
+        assert!(new_cpu.zero);
+        assert!(!new_cpu.sub);
+        assert!(new_cpu.half_carry);
+        assert!(!new_cpu.carry);
+        assert!(new_cpu.halted);
+        assert_eq!(new_cpu.cycles, 0x78);
+        assert_eq!(new_cpu.ppc, 0x9abc);
     }
 }

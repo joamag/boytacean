@@ -22,9 +22,13 @@
 //! );
 //! ```
 
-use built::{write_built_file_with_opts, Options};
+#[cfg(not(feature = "gen-mock"))]
+use built::write_built_file_with_opts;
+#[cfg(not(feature = "gen-mock"))]
 use chrono::Utc;
+#[cfg(not(feature = "gen-mock"))]
 use regex::Regex;
+#[cfg(not(feature = "gen-mock"))]
 use std::{
     env,
     fs::{File, OpenOptions},
@@ -34,9 +38,16 @@ use std::{
     str,
 };
 
+#[cfg(not(feature = "gen-mock"))]
 const BUILD_OUT_FILE: &str = "build.rs";
+
+#[cfg(not(feature = "gen-mock"))]
+const BUILD_ALL_OUT_FILE: &str = "_build.rs";
+
+#[cfg(not(feature = "gen-mock"))]
 const GEN_DIR: &str = "./src/gen";
 
+#[cfg(not(feature = "gen-mock"))]
 fn main() {
     // in case we're running under docs.rs then we must return the control
     // flow immediately as it's not possible to generate files under the
@@ -157,20 +168,16 @@ fn main() {
         std::mem::size_of::<usize>() * 8,
     );
 
-    let mut options = Options::default();
-    options.set_cfg(false);
-    options.set_ci(false);
-    options.set_compiler(false);
-    options.set_env(false);
-    options.set_dependencies(true);
-    options.set_features(true);
-
     let manifest_path = env::var("CARGO_MANIFEST_DIR").unwrap();
-    let built_path = Path::new(GEN_DIR).join(Path::new("_build.rs"));
+    let built_path = Path::new(GEN_DIR).join(Path::new(BUILD_ALL_OUT_FILE));
 
-    write_built_file_with_opts(&options, manifest_path.as_ref(), &built_path).unwrap();
+    write_built_file_with_opts(Some(manifest_path.as_ref()), &built_path).unwrap();
 }
 
+#[cfg(feature = "gen-mock")]
+fn main() {}
+
+#[cfg(not(feature = "gen-mock"))]
 fn write_constant<T>(file: &mut File, key: &str, val: T)
 where
     T: std::fmt::Display,
@@ -185,11 +192,13 @@ where
     .unwrap_or_else(|_| panic!("Failed to write '{key}' to 'build_constants.rs'"));
 }
 
+#[cfg(not(feature = "gen-mock"))]
 fn write_str_constant(file: &mut File, key: &str, val: &str) {
     writeln!(file, "pub const {key}: &str = \"{val}\";")
         .unwrap_or_else(|_| panic!("Failed to write '{key}' to 'build_constants.rs'"));
 }
 
+#[cfg(not(feature = "gen-mock"))]
 fn write_vec_constant<T>(file: &mut File, key: &str, vec: Vec<T>)
 where
     T: std::fmt::Display,

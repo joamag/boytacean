@@ -24,6 +24,7 @@ pub enum Error {
     NotImplemented,
     MissingOption(String),
     IoError(String),
+    DataError(String),
     InvalidParameter(String),
     CustomError(String),
 }
@@ -38,6 +39,7 @@ impl Error {
             Error::NotImplemented => String::from("Not implemented"),
             Error::MissingOption(option) => format!("Missing option: {option}"),
             Error::IoError(message) => format!("IO error: {message}"),
+            Error::DataError(message) => format!("Data error: {message}"),
             Error::InvalidParameter(message) => format!("Invalid parameter: {message}"),
             Error::CustomError(message) => String::from(message),
         }
@@ -54,6 +56,7 @@ impl error::Error for Error {
             Error::NotImplemented => "Not implemented",
             Error::MissingOption(_) => "Missing option",
             Error::IoError(_) => "IO error",
+            Error::DataError(_) => "Data error",
             Error::InvalidParameter(_) => "Invalid parameter",
             Error::CustomError(_) => "Custom error",
         }

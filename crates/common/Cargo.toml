@@ -1,10 +1,11 @@
 [package]
 name = "boytacean-common"
 description = "Commons library for Boytacen."
-version = "0.10.13"
+version = "0.11.0"
 authors = ["João Magalhães <joamag@gmail.com>"]
 license = "Apache-2.0"
 edition = "2021"
+rust-version = "1.81"
 
 [dependencies]
 wasm-bindgen = { version = "0.2", optional = true }

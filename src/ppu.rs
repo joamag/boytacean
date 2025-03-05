@@ -1,16 +1,26 @@
 //! PPU (Picture Processing Unit) functions and structures.
+//!
+//! The Game Boy's Picture Processing Unit (PPU) is responsible for rendering
+//! graphics on the handheld's screen. It handles the drawing of sprites and
+//! backgrounds using tile-based graphics.
 
-use boytacean_common::util::SharedThread;
+use boytacean_common::{
+    data::{read_into, read_u16, read_u8, write_bytes, write_u16, write_u8},
+    error::Error,
+    util::SharedThread,
+};
 use core::fmt;
 use std::{
     borrow::BorrowMut,
     cmp::max,
     convert::TryInto,
     fmt::{Display, Formatter},
+    io::Cursor,
     sync::{Arc, Mutex},
 };
 
 use crate::{
+    assert_pedantic_gb,
     color::{
         rgb555_to_rgb888, rgb888_to_rgb1555_array, rgb888_to_rgb1555_u16, rgb888_to_rgb565,
         rgb888_to_rgb565_u16, Pixel, PixelAlpha, RGB1555_SIZE, RGB565_SIZE, RGB888_SIZE, RGB_SIZE,
@@ -22,7 +32,9 @@ use crate::{
     },
     gb::{GameBoyConfig, GameBoyMode},
     mmu::BusComponent,
-    panic_gb, warnln,
+    panic_gb,
+    state::{StateComponent, StateFormat},
+    warnln,
 };
 
 #[cfg(feature = "wasm")]
@@ -32,7 +44,7 @@ pub const VRAM_SIZE_DMG: usize = 8192;
 pub const VRAM_SIZE_CGB: usize = 16384;
 pub const VRAM_SIZE: usize = VRAM_SIZE_CGB;
 pub const HRAM_SIZE: usize = 128;
-pub const OAM_SIZE: usize = 260;
+pub const OAM_SIZE: usize = 160;
 pub const PALETTE_SIZE: usize = 4;
 pub const TILE_WIDTH: usize = 8;
 pub const TILE_HEIGHT: usize = 8;
@@ -168,7 +180,7 @@ impl PaletteInfo {
             let r = color[0];
             let g = color[1];
             let b = color[2];
-            let color = (r as u32) << 16 | (g as u32) << 8 | b as u32;
+            let color = ((r as u32) << 16) | ((g as u32) << 8) | b as u32;
             if is_first {
                 is_first = false;
             } else {
@@ -184,7 +196,7 @@ impl PaletteInfo {
 /// should contain the pixel buffer of the tile.
 /// The tiles are always 8x8 pixels in size.
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Tile {
     /// The buffer for the tile, should contain a byte
     /// per each pixel of the tile with values ranging
@@ -194,6 +206,10 @@ pub struct Tile {
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 impl Tile {
+    pub fn new() -> Self {
+        Self { buffer: [0u8; 64] }
+    }
+
     pub fn get(&self, x: usize, y: usize) -> u8 {
         self.buffer[y * TILE_WIDTH + x]
     }
@@ -217,14 +233,18 @@ impl Tile {
     pub fn get_row(&self, y: usize) -> &[u8] {
         &self.buffer[y * TILE_WIDTH..(y + 1) * TILE_WIDTH]
     }
-}
 
-impl Tile {
     pub fn palette_buffer(&self, palette: Palette) -> Vec<u8> {
         self.buffer
             .iter()
             .flat_map(|p| palette[*p as usize])
             .collect()
+    }
+}
+
+impl Default for Tile {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -241,8 +261,24 @@ impl Display for Tile {
     }
 }
 
+impl From<&[u8]> for Tile {
+    fn from(value: &[u8]) -> Self {
+        let mut object = Tile::new();
+        object.buffer.copy_from_slice(value);
+        object
+    }
+}
+
+impl From<Tile> for Vec<u8> {
+    fn from(value: Tile) -> Self {
+        let mut buffer = Vec::with_capacity(64);
+        buffer.extend_from_slice(&value.buffer);
+        buffer
+    }
+}
+
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ObjectData {
     x: i16,
     y: i16,
@@ -289,6 +325,40 @@ impl Display for ObjectData {
     }
 }
 
+impl From<&[u8]> for ObjectData {
+    fn from(value: &[u8]) -> Self {
+        let mut object = ObjectData::new();
+        object.x = i16::from_le_bytes([value[0], value[1]]);
+        object.y = i16::from_le_bytes([value[2], value[3]]);
+        object.tile = value[4];
+        object.palette_cgb = value[5];
+        object.tile_bank = value[6];
+        object.palette = value[7];
+        object.xflip = value[8] != 0;
+        object.yflip = value[9] != 0;
+        object.bg_over = value[10] != 0;
+        object.index = value[11];
+        object
+    }
+}
+
+impl From<ObjectData> for Vec<u8> {
+    fn from(value: ObjectData) -> Self {
+        let mut buffer = Vec::with_capacity(12);
+        buffer.extend_from_slice(&value.x.to_le_bytes());
+        buffer.extend_from_slice(&value.y.to_le_bytes());
+        buffer.push(value.tile);
+        buffer.push(value.palette_cgb);
+        buffer.push(value.tile_bank);
+        buffer.push(value.palette);
+        buffer.push(if value.xflip { 1 } else { 0 });
+        buffer.push(if value.yflip { 1 } else { 0 });
+        buffer.push(if value.bg_over { 1 } else { 0 });
+        buffer.push(value.index);
+        buffer
+    }
+}
+
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct TileData {
@@ -327,6 +397,30 @@ impl Display for TileData {
     }
 }
 
+impl From<&[u8]> for TileData {
+    fn from(value: &[u8]) -> Self {
+        let mut object = TileData::new();
+        object.palette = value[0];
+        object.vram_bank = value[1];
+        object.xflip = value[2] != 0;
+        object.yflip = value[3] != 0;
+        object.priority = value[4] != 0;
+        object
+    }
+}
+
+impl From<TileData> for Vec<u8> {
+    fn from(value: TileData) -> Self {
+        let mut buffer = Vec::with_capacity(5);
+        buffer.push(value.palette);
+        buffer.push(value.vram_bank);
+        buffer.push(if value.xflip { 1 } else { 0 });
+        buffer.push(if value.yflip { 1 } else { 0 });
+        buffer.push(if value.priority { 1 } else { 0 });
+        buffer
+    }
+}
+
 pub struct PpuRegisters {
     pub scy: u8,
     pub scx: u8,
@@ -338,10 +432,14 @@ pub struct PpuRegisters {
 
 /// Represents the Game Boy PPU (Pixel Processing Unit) and controls
 /// all of the logic behind the graphics processing and presentation.
+/// The PPU is responsible for the rendering of the screen and the
+/// management of the video memory.
 ///
 /// Should store both the VRAM and HRAM together with the internal
-/// graphic related registers.
-/// Outputs the screen as a RGB 8 bit frame buffer.
+/// graphic related registers. Outputs the screen as an 8 bit RGB
+/// frame buffer.
+///
+/// Current implementation is compatible with both DMG and CGB.
 ///
 /// # Basic usage
 ///
@@ -392,7 +490,7 @@ pub struct Ppu {
     /// that is currently selected (CGB only).
     vram_offset: u16,
 
-    /// The current set of processed tiles that are store in the
+    /// The current set of processed tiles that are stored in the
     /// PPU related structures.
     tiles: [Tile; TILE_COUNT],
 
@@ -407,30 +505,39 @@ pub struct Ppu {
     palette_colors: Palette,
 
     /// The palette of colors that is currently loaded in Game Boy
-    /// and used for background (tiles) and window.
+    /// and used for background (tiles) and window. The value of
+    /// thi field can be computed value from [`Self::palettes[0]`].
     palette_bg: Palette,
 
     /// The palette that is going to be used for sprites/objects #0.
+    /// The value of this field can be computed value from [`Self::palettes[1]`].
     palette_obj_0: Palette,
 
     /// The palette that is going to be used for sprites/objects #1.
+    /// The value of this field can be computed value from [`Self::palettes[2]`].
     palette_obj_1: Palette,
 
     /// The complete set of background palettes that are going to be
     /// used in CGB emulation to provide the full set of colors (CGB only).
+    /// The value of this field can be computed value from [`Self::palettes_color[0]`].
     palettes_color_bg: [Palette; 8],
 
     /// The complete set of object/sprite palettes that are going to be
     /// used in CGB emulation to provide the full set of colors (CGB only).
+    /// The value of this field can be computed value from [`Self::palettes_color[1]`].
     palettes_color_obj: [Palette; 8],
 
-    /// The complete set of palettes in binary data so that they can
+    /// The complete set of palettes in raw binary data so that they can
     /// be re-read if required by the system.
+    /// This field contains the values required to recompute [`Self::palette_bg`],
+    /// [`Self::palette_obj_0`] and [`Self::palette_obj_1`].
     palettes: [u8; 3],
 
     /// The raw binary information (64 bytes) for the color palettes,
     /// contains binary information for both the background and
     /// the objects palettes (CGB only).
+    /// This field contains the values required to recompute [`Self::palettes_color_bg`],
+    /// and [`Self::palettes_color_obj`] .
     palettes_color: [[u8; 64]; 2],
 
     /// The complete list of attributes for the first background
@@ -577,7 +684,7 @@ pub struct Ppu {
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PpuMode {
     HBlank = 0,
     VBlank = 1,
@@ -585,11 +692,29 @@ pub enum PpuMode {
     VramRead = 3,
 }
 
+impl From<u8> for PpuMode {
+    fn from(value: u8) -> Self {
+        match value {
+            0 => PpuMode::HBlank,
+            1 => PpuMode::VBlank,
+            2 => PpuMode::OamRead,
+            3 => PpuMode::VramRead,
+            _ => PpuMode::HBlank,
+        }
+    }
+}
+
+impl From<PpuMode> for u8 {
+    fn from(value: PpuMode) -> Self {
+        value as u8
+    }
+}
+
 impl Ppu {
     pub fn new(mode: GameBoyMode, gbc: SharedThread<GameBoyConfig>) -> Self {
         Self {
             color_buffer: Box::new([0u8; COLOR_BUFFER_SIZE]),
-            shade_buffer: Box::new([0u8; COLOR_BUFFER_SIZE]),
+            shade_buffer: Box::new([0u8; SHADE_BUFFER_SIZE]),
             frame_buffer: Box::new([0u8; FRAME_BUFFER_SIZE]),
             priority_buffer: Box::new([false; COLOR_BUFFER_SIZE]),
             vram: [0u8; VRAM_SIZE],
@@ -718,6 +843,17 @@ impl Ppu {
             return;
         }
 
+        // runs a series of pre-emptive PPU state validations to ensure
+        // that no core invariants are being violated, this is a pedantic
+        // only check, proper features must be set
+        assert_pedantic_gb!(cycles < 80, "Invalid number of cycles in PPU: {}", cycles);
+        assert_pedantic_gb!(
+            self.mode_clock < 600,
+            "Invalid mode clock: {}",
+            self.mode_clock
+        );
+        assert_pedantic_gb!(self.ly < 154, "Invalid LY value: {}", self.ly);
+
         // increments the current mode clock by the provided amount
         // of CPU cycles (probably coming from a previous CPU clock)
         self.mode_clock += cycles;
@@ -796,10 +932,13 @@ impl Ppu {
 
     pub fn read(&self, addr: u16) -> u8 {
         match addr {
+            // 0x8000-0x9FFF - Graphics: VRAM (8 KB)
             0x8000..=0x9fff => self.vram[(self.vram_offset + (addr & 0x1fff)) as usize],
-            0xfe00..=0xfe9f => self.oam[(addr & 0x009f) as usize],
-            // Not Usable
+            // 0xFE00-0xFE9F - Object attribute memory (OAM)
+            0xfe00..=0xfe9f => self.oam[(addr & 0x00ff) as usize],
+            // 0xFEA0-0xFEFF - Not Usable
             0xfea0..=0xfeff => 0xff,
+            // 0xFF80-0xFFFE - High RAM (HRAM)
             0xff80..=0xfffe => self.hram[(addr & 0x007f) as usize],
             LCDC_ADDR =>
             {
@@ -822,10 +961,13 @@ impl Ppu {
                     | (self.mode as u8 & 0x03)
                     | 0x80)
             }
+            // 0xFF42 — SCY: Background Y position
             SCY_ADDR => self.scy,
+            // 0xFF43 — SCX: Background X position
             SCX_ADDR => self.scx,
+            // 0xFF44 — LY: LCD Y coordinate
             LY_ADDR => self.ly,
-            // 0xFF45 — LYC
+            // 0xFF45 — LYC: LY compare
             LYC_ADDR => self.lyc,
             // 0xFF47 — BGP (Non-CGB Mode only)
             BGP_ADDR => self.palettes[0],
@@ -859,6 +1001,7 @@ impl Ppu {
 
     pub fn write(&mut self, addr: u16, value: u8) {
         match addr {
+            // 0x8000-0x9FFF - Graphics: VRAM (8 KB)
             0x8000..=0x9fff => {
                 self.vram[(self.vram_offset + (addr & 0x1fff)) as usize] = value;
                 if addr < 0x9800 {
@@ -867,12 +1010,14 @@ impl Ppu {
                     self.update_bg_map_attrs(addr, value);
                 }
             }
+            // 0xFE00-0xFE9F - Object attribute memory (OAM)
             0xfe00..=0xfe9f => {
-                self.oam[(addr & 0x009f) as usize] = value;
+                self.oam[(addr & 0x00ff) as usize] = value;
                 self.update_object(addr, value);
             }
-            // Not Usable
+            // 0xFEA0-0xFEFF - Not Usable
             0xfea0..=0xfeff => (),
+            // 0xFF80-0xFFFE - High RAM (HRAM)
             0xff80..=0xfffe => self.hram[(addr & 0x007f) as usize] = value,
             LCDC_ADDR => {
                 self.switch_bg = value & 0x01 == 0x01;
@@ -897,7 +1042,9 @@ impl Ppu {
                 self.stat_oam = value & 0x20 == 0x20;
                 self.stat_lyc = value & 0x40 == 0x40;
             }
+            // 0xFF42 — SCY: Background Y position
             SCY_ADDR => self.scy = value,
+            // 0xFF43 — SCX: Background X position
             SCX_ADDR => self.scx = value,
             // 0xFF45 — LYC: LY compare
             LYC_ADDR => self.lyc = value,
@@ -1155,12 +1302,21 @@ impl Ppu {
         self.update_vram();
     }
 
+    pub fn oam(&self) -> &[u8; OAM_SIZE] {
+        &self.oam
+    }
+
+    pub fn set_oam(&mut self, value: &[u8]) {
+        self.oam[0..value.len()].copy_from_slice(value);
+        self.update_oam();
+    }
+
     pub fn hram(&self) -> &[u8; HRAM_SIZE] {
         &self.hram
     }
 
-    pub fn set_hram(&mut self, value: [u8; HRAM_SIZE]) {
-        self.hram = value;
+    pub fn set_hram(&mut self, value: &[u8]) {
+        self.hram[0..value.len()].copy_from_slice(value);
     }
 
     pub fn tiles(&self) -> &[Tile; TILE_COUNT] {
@@ -1295,7 +1451,7 @@ impl Ppu {
 
     /// Updates the internal PPU state (calculated values) according
     /// to the VRAM values, this should be called whenever the VRAM
-    /// is replaced.
+    /// data is replaced (eg: state loading).
     pub fn update_vram(&mut self) {
         // "saves" the old values of the VRAM bank and offset
         // as they are going to be needed later, this is required
@@ -1330,6 +1486,16 @@ impl Ppu {
 
         // restores the "old" values for VRAM bank and offset
         (self.vram_bank, self.vram_offset) = (vram_bank_old, vram_offset_old);
+    }
+
+    /// Updates the internal PPU state (calculated values) according
+    /// to the OAM values, this should be called whenever the OAM
+    /// data is replaced (eg: state loading).
+    fn update_oam(&mut self) {
+        for addr in 0xfe00..=0xfe9f {
+            let value = self.oam[(addr & 0x00ff) as usize];
+            self.update_object(addr, value);
+        }
     }
 
     /// Updates the tile structure with the value that has
@@ -1946,7 +2112,8 @@ impl Ppu {
     /// Computes the values for all of the palettes, this method
     /// is useful to "flush" color computation whenever the base
     /// palette colors are changed.
-    /// Notice that this is only applicable to the DMG running mode
+    ///
+    /// Notice that this is only applicable to the DMG running mode -
     /// either in the original DMG or in CGB with DMG compatibility.
     fn compute_palettes(&mut self) {
         if self.dmg_compat {
@@ -1988,6 +2155,7 @@ impl Ppu {
 
     /// Static method used for the base logic of computation of RGB
     /// based palettes from the internal Game Boy color indexes.
+    ///
     /// This method should be called whenever the palette indexes
     /// are changed.
     fn compute_palette(palette: &mut Palette, palette_colors: &Palette, value: u8) {
@@ -2062,6 +2230,166 @@ impl BusComponent for Ppu {
     }
 }
 
+impl StateComponent for Ppu {
+    fn state(&self, format: Option<StateFormat>) -> Result<Vec<u8>, Error> {
+        let format = format.unwrap_or(StateFormat::Minimal);
+
+        let mut cursor = Cursor::new(vec![]);
+
+        if format == StateFormat::Full {
+            write_bytes(&mut cursor, &self.color_buffer[..])?;
+            write_bytes(&mut cursor, &self.shade_buffer[..])?;
+            write_bytes(&mut cursor, &self.frame_buffer[..])?;
+            write_bytes(
+                &mut cursor,
+                &self
+                    .priority_buffer
+                    .iter()
+                    .map(|&b| if b { 1 } else { 0 })
+                    .collect::<Vec<u8>>(),
+            )?;
+            write_bytes(&mut cursor, &self.vram)?;
+            write_bytes(&mut cursor, &self.hram)?;
+            write_bytes(&mut cursor, &self.oam)?;
+        }
+
+        write_u8(&mut cursor, self.vram_bank)?;
+        write_u16(&mut cursor, self.vram_offset)?;
+
+        if format == StateFormat::Full {
+            for tile in &self.tiles {
+                let tile = &Into::<Vec<u8>>::into(*tile)[..];
+                write_bytes(&mut cursor, tile)?;
+            }
+            for obj_data in &self.obj_data {
+                let obj_data = &Into::<Vec<u8>>::into(*obj_data)[..];
+                write_bytes(&mut cursor, obj_data)?;
+            }
+            write_bytes(&mut cursor, &self.palettes)?;
+            for palette_color in &self.palettes_color {
+                write_bytes(&mut cursor, palette_color)?;
+            }
+        }
+
+        write_u8(&mut cursor, self.obj_priority as u8)?;
+        write_u8(&mut cursor, self.scy)?;
+        write_u8(&mut cursor, self.scx)?;
+        write_u8(&mut cursor, self.wy)?;
+        write_u8(&mut cursor, self.wx)?;
+        write_u8(&mut cursor, self.ly)?;
+        write_u8(&mut cursor, self.lyc)?;
+        write_u8(&mut cursor, self.mode as u8)?;
+        write_u16(&mut cursor, self.mode_clock)?;
+        write_u8(&mut cursor, self.switch_bg as u8)?;
+        write_u8(&mut cursor, self.switch_obj as u8)?;
+        write_u8(&mut cursor, self.obj_size as u8)?;
+        write_u8(&mut cursor, self.bg_map as u8)?;
+        write_u8(&mut cursor, self.bg_tile as u8)?;
+        write_u8(&mut cursor, self.switch_window as u8)?;
+        write_u8(&mut cursor, self.window_map as u8)?;
+        write_u8(&mut cursor, self.switch_lcd as u8)?;
+        write_u8(&mut cursor, self.window_counter)?;
+        write_u8(&mut cursor, self.auto_increment_bg as u8)?;
+        write_u8(&mut cursor, self.palette_address_bg)?;
+        write_u8(&mut cursor, self.auto_increment_obj as u8)?;
+        write_u8(&mut cursor, self.palette_address_obj)?;
+        write_u8(&mut cursor, self.first_frame as u8)?;
+        write_u16(&mut cursor, self.frame_index)?;
+        write_u16(&mut cursor, self.frame_buffer_index)?;
+        write_u8(&mut cursor, self.stat_hblank as u8)?;
+        write_u8(&mut cursor, self.stat_vblank as u8)?;
+        write_u8(&mut cursor, self.stat_oam as u8)?;
+        write_u8(&mut cursor, self.stat_lyc as u8)?;
+        write_u8(&mut cursor, self.int_vblank as u8)?;
+        write_u8(&mut cursor, self.int_stat as u8)?;
+        write_u8(&mut cursor, self.dmg_compat as u8)?;
+        write_u8(&mut cursor, self.gb_mode as u8)?;
+
+        Ok(cursor.into_inner())
+    }
+
+    fn set_state(&mut self, data: &[u8], format: Option<StateFormat>) -> Result<(), Error> {
+        let format: StateFormat = format.unwrap_or(StateFormat::Minimal);
+
+        let mut cursor: Cursor<&[u8]> = Cursor::new(data);
+
+        if format == StateFormat::Full {
+            let mut priority_buffer = [0u8; COLOR_BUFFER_SIZE];
+            read_into(&mut cursor, &mut self.color_buffer[..])?;
+            read_into(&mut cursor, &mut self.shade_buffer[..])?;
+            read_into(&mut cursor, &mut self.frame_buffer[..])?;
+            read_into(&mut cursor, &mut priority_buffer)?;
+            self.priority_buffer.copy_from_slice(
+                &priority_buffer
+                    .iter()
+                    .map(|&b| b != 0)
+                    .collect::<Vec<bool>>(),
+            );
+            read_into(&mut cursor, &mut self.vram[..])?;
+            read_into(&mut cursor, &mut self.hram[..])?;
+            read_into(&mut cursor, &mut self.oam[..])?;
+        }
+
+        self.vram_bank = read_u8(&mut cursor)?;
+        self.vram_offset = read_u16(&mut cursor)?;
+
+        if format == StateFormat::Full {
+            for index in 0..TILE_COUNT {
+                let mut tile = [0u8; 64];
+                read_into(&mut cursor, &mut tile)?;
+                self.tiles[index] = (&tile[..]).into();
+            }
+            for index in 0..OBJ_COUNT {
+                let mut obj_data = [0u8; 12];
+                read_into(&mut cursor, &mut obj_data)?;
+                self.obj_data[index] = (&obj_data[..]).into();
+            }
+            read_into(&mut cursor, &mut self.palettes)?;
+            for index in 0..2 {
+                let mut palette_color = [0u8; 64];
+                read_into(&mut cursor, &mut palette_color)?;
+                self.palettes_color[index] = palette_color;
+            }
+        }
+
+        self.obj_priority = read_u8(&mut cursor)? != 0;
+        self.scy = read_u8(&mut cursor)?;
+        self.scx = read_u8(&mut cursor)?;
+        self.wy = read_u8(&mut cursor)?;
+        self.wx = read_u8(&mut cursor)?;
+        self.ly = read_u8(&mut cursor)?;
+        self.lyc = read_u8(&mut cursor)?;
+        self.mode = read_u8(&mut cursor)?.into();
+        self.mode_clock = read_u16(&mut cursor)?;
+        self.switch_bg = read_u8(&mut cursor)? != 0;
+        self.switch_obj = read_u8(&mut cursor)? != 0;
+        self.obj_size = read_u8(&mut cursor)? != 0;
+        self.bg_map = read_u8(&mut cursor)? != 0;
+        self.bg_tile = read_u8(&mut cursor)? != 0;
+        self.switch_window = read_u8(&mut cursor)? != 0;
+        self.window_map = read_u8(&mut cursor)? != 0;
+        self.switch_lcd = read_u8(&mut cursor)? != 0;
+        self.window_counter = read_u8(&mut cursor)?;
+        self.auto_increment_bg = read_u8(&mut cursor)? != 0;
+        self.palette_address_bg = read_u8(&mut cursor)?;
+        self.auto_increment_obj = read_u8(&mut cursor)? != 0;
+        self.palette_address_obj = read_u8(&mut cursor)?;
+        self.first_frame = read_u8(&mut cursor)? != 0;
+        self.frame_index = read_u16(&mut cursor)?;
+        self.frame_buffer_index = read_u16(&mut cursor)?;
+        self.stat_hblank = read_u8(&mut cursor)? != 0;
+        self.stat_vblank = read_u8(&mut cursor)? != 0;
+        self.stat_oam = read_u8(&mut cursor)? != 0;
+        self.stat_lyc = read_u8(&mut cursor)? != 0;
+        self.int_vblank = read_u8(&mut cursor)? != 0;
+        self.int_stat = read_u8(&mut cursor)? != 0;
+        self.dmg_compat = read_u8(&mut cursor)? != 0;
+        self.gb_mode = read_u8(&mut cursor)?.into();
+
+        Ok(())
+    }
+}
+
 impl Default for Ppu {
     fn default() -> Self {
         Self::new(
@@ -2073,7 +2401,15 @@ impl Default for Ppu {
 
 #[cfg(test)]
 mod tests {
-    use super::Ppu;
+    use crate::{
+        gb::GameBoyMode,
+        state::{StateComponent, StateFormat},
+    };
+
+    use super::{
+        ObjectData, Ppu, PpuMode, Tile, COLOR_BUFFER_SIZE, FRAME_BUFFER_SIZE, HRAM_SIZE, OAM_SIZE,
+        OBJ_COUNT, SHADE_BUFFER_SIZE, TILE_COUNT, VRAM_SIZE,
+    };
 
     #[test]
     fn test_update_tile_simple() {
@@ -2101,5 +2437,197 @@ mod tests {
         ppu.update_tile(0x9000, 0x00);
         let result = ppu.tiles()[256].get(0, 0);
         assert_eq!(result, 3);
+    }
+
+    #[test]
+    fn test_state_and_set_state() {
+        let ppu = Ppu {
+            color_buffer: Box::new([0x01; COLOR_BUFFER_SIZE]),
+            shade_buffer: Box::new([0x02; SHADE_BUFFER_SIZE]),
+            frame_buffer: Box::new([0x03; FRAME_BUFFER_SIZE]),
+            priority_buffer: Box::new([true; COLOR_BUFFER_SIZE]),
+            vram: [0x04; VRAM_SIZE],
+            hram: [0x05; HRAM_SIZE],
+            oam: [0x06; OAM_SIZE],
+            vram_bank: 0x07,
+            vram_offset: 0x08,
+            tiles: [Tile::new(); TILE_COUNT],
+            obj_data: [ObjectData::new(); OBJ_COUNT],
+            palettes: [0x09; 3],
+            palettes_color: [[0x0a; 64]; 2],
+            obj_priority: true,
+            scy: 0x0b,
+            scx: 0x0c,
+            wy: 0x0d,
+            wx: 0x0e,
+            ly: 0x0f,
+            lyc: 0x10,
+            mode: PpuMode::OamRead,
+            mode_clock: 0x12,
+            switch_bg: true,
+            switch_obj: true,
+            obj_size: true,
+            bg_map: true,
+            bg_tile: true,
+            switch_window: true,
+            window_map: true,
+            switch_lcd: true,
+            window_counter: 0x13,
+            auto_increment_bg: true,
+            palette_address_bg: 0x14,
+            auto_increment_obj: true,
+            palette_address_obj: 0x15,
+            first_frame: true,
+            frame_index: 0x16,
+            frame_buffer_index: 0x17,
+            stat_hblank: true,
+            stat_vblank: true,
+            stat_oam: true,
+            stat_lyc: true,
+            int_vblank: true,
+            int_stat: true,
+            dmg_compat: true,
+            gb_mode: GameBoyMode::Dmg,
+            ..Default::default()
+        };
+
+        let state = ppu.state(Some(StateFormat::Full)).unwrap();
+        assert_eq!(state.len(), 204714);
+
+        let mut new_ppu = Ppu::default();
+        new_ppu.set_state(&state, Some(StateFormat::Full)).unwrap();
+
+        assert_eq!(new_ppu.color_buffer, Box::new([0x01; COLOR_BUFFER_SIZE]));
+        assert_eq!(new_ppu.shade_buffer, Box::new([0x02; SHADE_BUFFER_SIZE]));
+        assert_eq!(new_ppu.frame_buffer, Box::new([0x03; FRAME_BUFFER_SIZE]));
+        assert_eq!(new_ppu.priority_buffer, Box::new([true; COLOR_BUFFER_SIZE]));
+        assert_eq!(new_ppu.vram, [0x04; VRAM_SIZE]);
+        assert_eq!(new_ppu.hram, [0x05; HRAM_SIZE]);
+        assert_eq!(new_ppu.oam, [0x06; OAM_SIZE]);
+        assert_eq!(new_ppu.vram_bank, 0x07);
+        assert_eq!(new_ppu.vram_offset, 0x08);
+        assert_eq!(new_ppu.tiles, [Tile::new(); TILE_COUNT]);
+        assert_eq!(new_ppu.obj_data, [ObjectData::new(); OBJ_COUNT]);
+        assert_eq!(new_ppu.palettes, [0x09; 3]);
+        assert_eq!(new_ppu.palettes_color, [[0x0a; 64]; 2]);
+        assert!(new_ppu.obj_priority);
+        assert_eq!(new_ppu.scy, 0x0b);
+        assert_eq!(new_ppu.scx, 0x0c);
+        assert_eq!(new_ppu.wy, 0x0d);
+        assert_eq!(new_ppu.wx, 0x0e);
+        assert_eq!(new_ppu.ly, 0x0f);
+        assert_eq!(new_ppu.lyc, 0x10);
+        assert_eq!(new_ppu.mode, PpuMode::OamRead);
+        assert_eq!(new_ppu.mode_clock, 0x12);
+        assert!(new_ppu.switch_bg);
+        assert!(new_ppu.switch_obj);
+        assert!(new_ppu.obj_size);
+        assert!(new_ppu.bg_map);
+        assert!(new_ppu.bg_tile);
+        assert!(new_ppu.switch_window);
+        assert!(new_ppu.window_map);
+        assert!(new_ppu.switch_lcd);
+        assert_eq!(new_ppu.window_counter, 0x13);
+        assert!(new_ppu.auto_increment_bg);
+        assert_eq!(new_ppu.palette_address_bg, 0x14);
+        assert!(new_ppu.auto_increment_obj);
+        assert_eq!(new_ppu.palette_address_obj, 0x15);
+        assert!(new_ppu.first_frame);
+        assert_eq!(new_ppu.frame_index, 0x16);
+        assert_eq!(new_ppu.frame_buffer_index, 0x17);
+        assert!(new_ppu.stat_hblank);
+        assert!(new_ppu.stat_vblank);
+        assert!(new_ppu.stat_oam);
+        assert!(new_ppu.stat_lyc);
+        assert!(new_ppu.int_vblank);
+        assert!(new_ppu.int_stat);
+        assert!(new_ppu.dmg_compat);
+        assert_eq!(new_ppu.gb_mode, GameBoyMode::Dmg);
+    }
+
+    #[test]
+    fn test_state_and_set_state_minimal() {
+        let ppu = Ppu {
+            vram_bank: 0x07,
+            vram_offset: 0x08,
+            obj_priority: true,
+            scy: 0x0b,
+            scx: 0x0c,
+            wy: 0x0d,
+            wx: 0x0e,
+            ly: 0x0f,
+            lyc: 0x10,
+            mode: PpuMode::OamRead,
+            mode_clock: 0x12,
+            switch_bg: true,
+            switch_obj: true,
+            obj_size: true,
+            bg_map: true,
+            bg_tile: true,
+            switch_window: true,
+            window_map: true,
+            switch_lcd: true,
+            window_counter: 0x13,
+            auto_increment_bg: true,
+            palette_address_bg: 0x14,
+            auto_increment_obj: true,
+            palette_address_obj: 0x15,
+            first_frame: true,
+            frame_index: 0x16,
+            frame_buffer_index: 0x17,
+            stat_hblank: true,
+            stat_vblank: true,
+            stat_oam: true,
+            stat_lyc: true,
+            int_vblank: true,
+            int_stat: true,
+            dmg_compat: true,
+            gb_mode: GameBoyMode::Dmg,
+            ..Default::default()
+        };
+
+        let state = ppu.state(Some(StateFormat::Minimal)).unwrap();
+        assert_eq!(state.len(), 39);
+
+        let mut new_ppu = Ppu::default();
+        new_ppu
+            .set_state(&state, Some(StateFormat::Minimal))
+            .unwrap();
+
+        assert_eq!(new_ppu.vram_bank, 0x07);
+        assert_eq!(new_ppu.vram_offset, 0x08);
+        assert!(new_ppu.obj_priority);
+        assert_eq!(new_ppu.scy, 0x0b);
+        assert_eq!(new_ppu.scx, 0x0c);
+        assert_eq!(new_ppu.wy, 0x0d);
+        assert_eq!(new_ppu.wx, 0x0e);
+        assert_eq!(new_ppu.ly, 0x0f);
+        assert_eq!(new_ppu.lyc, 0x10);
+        assert_eq!(new_ppu.mode, PpuMode::OamRead);
+        assert_eq!(new_ppu.mode_clock, 0x12);
+        assert!(new_ppu.switch_bg);
+        assert!(new_ppu.switch_obj);
+        assert!(new_ppu.obj_size);
+        assert!(new_ppu.bg_map);
+        assert!(new_ppu.bg_tile);
+        assert!(new_ppu.switch_window);
+        assert!(new_ppu.window_map);
+        assert!(new_ppu.switch_lcd);
+        assert_eq!(new_ppu.window_counter, 0x13);
+        assert!(new_ppu.auto_increment_bg);
+        assert_eq!(new_ppu.palette_address_bg, 0x14);
+        assert!(new_ppu.auto_increment_obj);
+        assert_eq!(new_ppu.palette_address_obj, 0x15);
+        assert!(new_ppu.first_frame);
+        assert_eq!(new_ppu.frame_index, 0x16);
+        assert_eq!(new_ppu.frame_buffer_index, 0x17);
+        assert!(new_ppu.stat_hblank);
+        assert!(new_ppu.stat_vblank);
+        assert!(new_ppu.stat_oam);
+        assert!(new_ppu.stat_lyc);
+        assert!(new_ppu.int_vblank);
+        assert!(new_ppu.int_stat);
+        assert!(new_ppu.dmg_compat);
+        assert_eq!(new_ppu.gb_mode, GameBoyMode::Dmg);
     }
 }

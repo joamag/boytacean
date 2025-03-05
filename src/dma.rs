@@ -1,11 +1,24 @@
 //! DMA (Direct Memory Access) functions and structures.
+//!
+//! Contains implementation of both DMA (Direct Memory Access) and
+//! HDMA (HBlank Direct Memory Access).
 
-use std::fmt::{self, Display, Formatter};
+use std::{
+    fmt::{self, Display, Formatter},
+    io::Cursor,
+};
+
+use boytacean_common::{
+    data::{read_u16, read_u8, write_u16, write_u8},
+    error::Error,
+};
 
 use crate::{
     consts::{DMA_ADDR, HDMA1_ADDR, HDMA2_ADDR, HDMA3_ADDR, HDMA4_ADDR, HDMA5_ADDR},
     mmu::BusComponent,
-    panic_gb, warnln,
+    panic_gb,
+    state::{StateComponent, StateFormat},
+    warnln,
 };
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -29,6 +42,13 @@ impl DmaMode {
             _ => DmaMode::General,
         }
     }
+
+    pub fn into_u8(self) -> u8 {
+        match self {
+            DmaMode::General => 0x00,
+            DmaMode::HBlank => 0x01,
+        }
+    }
 }
 
 impl Display for DmaMode {
@@ -40,6 +60,12 @@ impl Display for DmaMode {
 impl From<u8> for DmaMode {
     fn from(value: u8) -> Self {
         Self::from_u8(value)
+    }
+}
+
+impl From<DmaMode> for u8 {
+    fn from(value: DmaMode) -> Self {
+        value.into_u8()
     }
 }
 
@@ -253,6 +279,36 @@ impl BusComponent for Dma {
     }
 }
 
+impl StateComponent for Dma {
+    fn state(&self, _format: Option<StateFormat>) -> Result<Vec<u8>, Error> {
+        let mut cursor = Cursor::new(vec![]);
+        write_u16(&mut cursor, self.source)?;
+        write_u16(&mut cursor, self.destination)?;
+        write_u16(&mut cursor, self.length)?;
+        write_u16(&mut cursor, self.pending)?;
+        write_u8(&mut cursor, self.mode.into())?;
+        write_u8(&mut cursor, self.value_dma)?;
+        write_u16(&mut cursor, self.cycles_dma)?;
+        write_u8(&mut cursor, self.active_dma as u8)?;
+        write_u8(&mut cursor, self.active_hdma as u8)?;
+        Ok(cursor.into_inner())
+    }
+
+    fn set_state(&mut self, data: &[u8], _format: Option<StateFormat>) -> Result<(), Error> {
+        let mut cursor = Cursor::new(data);
+        self.source = read_u16(&mut cursor)?;
+        self.destination = read_u16(&mut cursor)?;
+        self.length = read_u16(&mut cursor)?;
+        self.pending = read_u16(&mut cursor)?;
+        self.mode = read_u8(&mut cursor)?.into();
+        self.value_dma = read_u8(&mut cursor)?;
+        self.cycles_dma = read_u16(&mut cursor)?;
+        self.active_dma = read_u8(&mut cursor)? != 0;
+        self.active_hdma = read_u8(&mut cursor)? != 0;
+        Ok(())
+    }
+}
+
 impl Default for Dma {
     fn default() -> Self {
         Self::new()
@@ -268,6 +324,8 @@ impl Display for Dma {
 #[cfg(test)]
 mod tests {
     use super::{Dma, DmaMode};
+
+    use crate::state::StateComponent;
 
     #[test]
     fn test_dma_default() {
@@ -309,5 +367,36 @@ mod tests {
         dma.set_active_dma(true);
         assert!(dma.active_dma);
         assert!(dma.active());
+    }
+
+    #[test]
+    fn test_state_and_set_state() {
+        let dma = Dma {
+            source: 0x1234,
+            destination: 0x5678,
+            length: 0x9abc,
+            pending: 0xdef0,
+            mode: DmaMode::HBlank,
+            value_dma: 0xff,
+            cycles_dma: 0x0012,
+            active_dma: true,
+            active_hdma: true,
+        };
+
+        let state = dma.state(None).unwrap();
+        assert_eq!(state.len(), 14);
+
+        let mut new_dma = Dma::new();
+        new_dma.set_state(&state, None).unwrap();
+
+        assert_eq!(new_dma.source, 0x1234);
+        assert_eq!(new_dma.destination, 0x5678);
+        assert_eq!(new_dma.length, 0x9abc);
+        assert_eq!(new_dma.pending, 0xdef0);
+        assert_eq!(new_dma.mode, DmaMode::HBlank);
+        assert_eq!(new_dma.value_dma, 0xff);
+        assert_eq!(new_dma.cycles_dma, 0x0012);
+        assert!(new_dma.active_dma);
+        assert!(new_dma.active_hdma);
     }
 }

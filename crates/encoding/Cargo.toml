@@ -1,17 +1,18 @@
 [package]
 name = "boytacean-encoding"
 description = "Codecs library for Boytacen."
-version = "0.10.13"
+version = "0.11.0"
 authors = ["João Magalhães <joamag@gmail.com>"]
 license = "Apache-2.0"
 edition = "2021"
+rust-version = "1.81"
 
 [features]
 simd = ["boytacean-hashing/simd"]
 
 [dependencies]
-boytacean-common = { path = "../common", version = "0.10.13" }
-boytacean-hashing = { path = "../hashing", version = "0.10.13" }
+boytacean-common = { path = "../common", version = "0.11.0" }
+boytacean-hashing = { path = "../hashing", version = "0.11.0" }
 
 [[bin]]
 name = "zippy"

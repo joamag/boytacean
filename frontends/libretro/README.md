@@ -8,13 +8,13 @@ cargo build
 
 ### Cross Compilation
 
-#### Arm64 Linux
+#### Arm64 (aarch64) Linux
 
 Download the linux toolchain from [Arm GNU Toolchain Downloads](https://developer.arm.com/downloads/-/arm-gnu-toolchain-downloads).
 
-Set the env variable `ARM64_TOOLCHAIN` to the path of the toolchain directory.
+Set the env variable `ARM64_TOOLCHAIN` to the path of the toolchain directory, this is critical to make it easy to run console commands.
 
-Create a toolchain symbolic link using the following command in Unix:
+Create a toolchain symbolic link (at the root directory of the project) using the following command in Unix:
 
 ```bash
 ln -s $ARM64_TOOLCHAIN aarch64-linux-gnu

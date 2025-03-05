@@ -1,0 +1,41 @@
+.core-defs:
+  variables:
+    CORENAME: boytacean
+
+stages:
+  - build-prepare
+  - build-shared
+  - build-static
+
+libretro-build-windows-x64:
+  extends:
+    - .core-defs
+  tags:
+    - msvc2010
+  stage: build-shared
+  script:
+    - cd frontends/libretro
+    - cargo build --release
+    - mv ../../target/release/${CORENAME}_libretro.dll .
+  artifacts:
+    paths:
+    - ${CORENAME}_libretro.dll
+    expire_in: 10 min
+  rules:
+    - if: "$BUILD_WINDOWS"
+  dependencies: []
+
+libretro-build-linux-x64:
+  extends:
+    - .core-defs
+  stage: build-shared
+  script:
+    - cd frontends/libretro
+    - cargo build --release
+    - cd ../..
+    - mv target/release/lib${CORENAME}_libretro.so ${CORENAME}_libretro.so
+  artifacts:
+    paths:
+    - ${CORENAME}_libretro.so
+    expire_in: 10 min
+  dependencies: []

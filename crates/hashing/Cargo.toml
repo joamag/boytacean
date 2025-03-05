@@ -1,13 +1,14 @@
 [package]
 name = "boytacean-hashing"
 description = "Hashing library for Boytacen."
-version = "0.10.13"
+version = "0.11.0"
 authors = ["João Magalhães <joamag@gmail.com>"]
 license = "Apache-2.0"
 edition = "2021"
+rust-version = "1.81"
 
 [features]
 simd = []
 
 [dependencies]
-boytacean-common = { path = "../common", version = "0.10.13" }
+boytacean-common = { path = "../common", version = "0.11.0" }

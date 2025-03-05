@@ -1,15 +1,73 @@
 //! Gamepad related functions and structures.
 
-use crate::{mmu::BusComponent, warnln};
+use std::{
+    fmt::{self, Display, Formatter},
+    io::Cursor,
+};
 
+use crate::{
+    mmu::BusComponent,
+    state::{StateComponent, StateFormat},
+    warnln,
+};
+
+use boytacean_common::{
+    data::{read_u8, write_u8},
+    error::Error,
+};
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum PadSelection {
     None,
     Action,
     Direction,
+}
+
+impl PadSelection {
+    pub fn description(&self) -> &'static str {
+        match self {
+            PadSelection::None => "None",
+            PadSelection::Action => "Action",
+            PadSelection::Direction => "Direction",
+        }
+    }
+
+    pub fn from_u8(value: u8) -> Self {
+        match value {
+            0x00 => PadSelection::None,
+            0x01 => PadSelection::Action,
+            0x02 => PadSelection::Direction,
+            _ => panic!("Invalid pad selection value: {value}"),
+        }
+    }
+
+    pub fn into_u8(self) -> u8 {
+        match self {
+            PadSelection::None => 0x00,
+            PadSelection::Action => 0x01,
+            PadSelection::Direction => 0x02,
+        }
+    }
+}
+
+impl Display for PadSelection {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.description())
+    }
+}
+
+impl From<u8> for PadSelection {
+    fn from(value: u8) -> Self {
+        Self::from_u8(value)
+    }
+}
+
+impl From<PadSelection> for u8 {
+    fn from(value: PadSelection) -> Self {
+        value.into_u8()
+    }
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
@@ -184,8 +242,80 @@ impl BusComponent for Pad {
     }
 }
 
+impl StateComponent for Pad {
+    fn state(&self, _format: Option<StateFormat>) -> Result<Vec<u8>, Error> {
+        let mut cursor = Cursor::new(vec![]);
+        write_u8(&mut cursor, self.down as u8)?;
+        write_u8(&mut cursor, self.up as u8)?;
+        write_u8(&mut cursor, self.left as u8)?;
+        write_u8(&mut cursor, self.right as u8)?;
+        write_u8(&mut cursor, self.start as u8)?;
+        write_u8(&mut cursor, self.select as u8)?;
+        write_u8(&mut cursor, self.b as u8)?;
+        write_u8(&mut cursor, self.a as u8)?;
+        write_u8(&mut cursor, self.selection.into())?;
+        write_u8(&mut cursor, self.int_pad as u8)?;
+        Ok(cursor.into_inner())
+    }
+
+    fn set_state(&mut self, data: &[u8], _format: Option<StateFormat>) -> Result<(), Error> {
+        let mut cursor: Cursor<&[u8]> = Cursor::new(data);
+        self.down = read_u8(&mut cursor)? != 0;
+        self.up = read_u8(&mut cursor)? != 0;
+        self.left = read_u8(&mut cursor)? != 0;
+        self.right = read_u8(&mut cursor)? != 0;
+        self.start = read_u8(&mut cursor)? != 0;
+        self.select = read_u8(&mut cursor)? != 0;
+        self.b = read_u8(&mut cursor)? != 0;
+        self.a = read_u8(&mut cursor)? != 0;
+        self.selection = read_u8(&mut cursor)?.into();
+        self.int_pad = read_u8(&mut cursor)? != 0;
+        Ok(())
+    }
+}
+
 impl Default for Pad {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::state::StateComponent;
+
+    use super::{Pad, PadSelection};
+
+    #[test]
+    fn test_state_and_set_state() {
+        let pad = Pad {
+            down: true,
+            up: false,
+            left: true,
+            right: false,
+            start: true,
+            select: false,
+            b: true,
+            a: false,
+            selection: PadSelection::Action,
+            int_pad: true,
+        };
+
+        let state = pad.state(None).unwrap();
+        assert_eq!(state.len(), 10);
+
+        let mut new_pad = Pad::new();
+        new_pad.set_state(&state, None).unwrap();
+
+        assert!(new_pad.down);
+        assert!(!new_pad.up);
+        assert!(new_pad.left);
+        assert!(!new_pad.right);
+        assert!(new_pad.start);
+        assert!(!new_pad.select);
+        assert!(new_pad.b);
+        assert!(!new_pad.a);
+        assert_eq!(new_pad.selection, PadSelection::Action);
+        assert!(new_pad.int_pad);
     }
 }

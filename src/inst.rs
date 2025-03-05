@@ -603,7 +603,7 @@ fn ld_b_u8(cpu: &mut Cpu) {
 fn rlca(cpu: &mut Cpu) {
     let carry = cpu.a >> 7;
 
-    cpu.a = cpu.a << 1 | carry;
+    cpu.a = (cpu.a << 1) | carry;
 
     cpu.set_sub(false);
     cpu.set_zero(false);
@@ -717,7 +717,7 @@ fn rla(cpu: &mut Cpu) {
 
     cpu.set_carry(cpu.a & 0x80 == 0x80);
 
-    cpu.a = cpu.a << 1 | carry as u8;
+    cpu.a = (cpu.a << 1) | carry as u8;
 
     cpu.set_sub(false);
     cpu.set_zero(false);
@@ -775,7 +775,7 @@ fn rra(cpu: &mut Cpu) {
 
     cpu.set_carry((cpu.a & 0x1) == 0x1);
 
-    cpu.a = cpu.a >> 1 | ((carry as u8) << 7);
+    cpu.a = (cpu.a >> 1) | ((carry as u8) << 7);
 
     cpu.set_sub(false);
     cpu.set_zero(false);
@@ -3150,7 +3150,7 @@ fn rl(cpu: &mut Cpu, value: u8) -> u8 {
 fn rlc(cpu: &mut Cpu, value: u8) -> u8 {
     cpu.set_carry((value & 0x80) == 0x80);
 
-    let result = (value << 1) | (value >> 7);
+    let result = value.rotate_left(1);
 
     cpu.set_sub(false);
     cpu.set_zero(result == 0);
@@ -3179,7 +3179,7 @@ fn rr(cpu: &mut Cpu, value: u8) -> u8 {
 fn rrc(cpu: &mut Cpu, value: u8) -> u8 {
     cpu.set_carry((value & 0x1) == 0x1);
 
-    let result = (value >> 1) | (value << 7);
+    let result = value.rotate_right(1);
 
     cpu.set_sub(false);
     cpu.set_zero(result == 0);
@@ -3323,7 +3323,7 @@ fn swap(cpu: &mut Cpu, value: u8) -> u8 {
     cpu.set_half_carry(false);
     cpu.set_carry(false);
 
-    (value << 4) | (value >> 4)
+    value.rotate_right(4)
 }
 
 /// Helper function to shift an `u8` to the left and update CPU

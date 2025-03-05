@@ -10,9 +10,11 @@ jobs:
     strategy:
       matrix:
         rust-version: [
-          "1.74.0",
-          "1.75.0",
-          "1.76.0",
+          "1.81.0",
+          "1.82.0",
+          "1.83.0",
+          "1.84.0",
+          "1.85.0",
           "latest"
         ]
     runs-on: ubuntu-latest
@@ -44,16 +46,11 @@ jobs:
     strategy:
       matrix:
         rust-version: [
-          "1.67.0",
-          "1.68.0",
-          "1.69.0",
-          "1.70.0",
-          "1.71.0",
-          "1.72.0",
-          "1.73.0",
-          "1.74.0",
-          "1.75.0",
-          "1.76.0",
+          "1.81.0",
+          "1.82.0",
+          "1.83.0",
+          "1.84.0",
+          "1.85.0",
           "latest"
         ]
     runs-on: ubuntu-latest
@@ -81,12 +78,14 @@ jobs:
     strategy:
       matrix:
         rust-version: [
-          "1.74.0",
-          "1.75.0",
-          "1.76.0",
+          "1.81.0",
+          "1.82.0",
+          "1.83.0",
+          "1.84.0",
+          "1.85.0",
           "latest"
         ]
-        node-version: ["16"]
+        node-version: ["18"]
     runs-on: ubuntu-latest
     container: rust:${{ matrix.rust-version }}
     steps:
@@ -124,9 +123,11 @@ jobs:
     strategy:
       matrix:
         rust-version: [
-          "1.74.0",
-          "1.75.0",
-          "1.76.0",
+          "1.81.0",
+          "1.82.0",
+          "1.83.0",
+          "1.84.0",
+          "1.85.0",
           "latest"
         ]
     runs-on: ubuntu-latest
@@ -137,7 +138,7 @@ jobs:
       - name: Install Dependencies
         run: |
           apt-get update
-          apt-get install -y -q zip
+          apt-get install -y -q zip python3-jinja2
       - name: Install Rust components
         run: |
           rustup component add rustfmt
@@ -170,10 +171,11 @@ jobs:
     strategy:
       matrix:
         rust-version: [
-          "1.70.0",
-          "1.71.0",
-          "1.72.0",
-          "1.73.0",
+          "1.81.0",
+          "1.82.0",
+          "1.83.0",
+          "1.84.0",
+          "1.85.0",
           "latest"
         ]
     runs-on: ubuntu-latest
@@ -207,9 +209,11 @@ jobs:
     strategy:
       matrix:
         rust-version: [
-          "1.71.0",
-          "1.72.0",
-          "1.73.0",
+          "1.81.0",
+          "1.82.0",
+          "1.83.0",
+          "1.84.0",
+          "1.85.0",
           "latest"
         ]
     runs-on: ubuntu-latest

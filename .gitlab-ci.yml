@@ -1,3 +1,6 @@
+include:
+  - local: .gitlab/libretro.yml
+
 image: hivesolutions/ubuntu_dev
 
 variables:
@@ -11,6 +14,9 @@ stages:
   - build
   - test
   - deploy
+  - build-prepare
+  - build-shared
+  - build-static
 
 before_script:
   - source ./.gitlab/common.sh
@@ -27,7 +33,7 @@ build-rust:
   stage: build
   parallel:
     matrix:
-      - RUST_VERSION: ["1.67.0", "1.68.0", "stable", "nightly"]
+      - RUST_VERSION: ["1.81.0", "1.82.0", "stable", "nightly"]
   script:
     - rustup toolchain install $RUST_VERSION
     - rustup override set $RUST_VERSION
@@ -36,14 +42,14 @@ build-rust:
     - rustc --version
     - cargo fmt --all -- --check
     - if [[ $RUST_VERSION != nightly ]]; then cargo clippy -- -D warnings -A unknown-lints; fi
-    - cargo build
-    - cargo build --release
+    - cargo build --features gen-mock
+    - cargo build --release --features gen-mock
 
 build-wasm:
   stage: build
   parallel:
     matrix:
-      - RUST_VERSION: ["1.74.0"]
+      - RUST_VERSION: ["1.81.0"]
   script:
     - rustup toolchain install $RUST_VERSION
     - rustup override set $RUST_VERSION
@@ -61,7 +67,7 @@ build-pyo3:
   stage: build
   parallel:
     matrix:
-      - RUST_VERSION: ["1.74.0"]
+      - RUST_VERSION: ["1.81.0"]
   script:
     - rustup toolchain install $RUST_VERSION
     - rustup override set $RUST_VERSION
@@ -80,20 +86,20 @@ test-rust:
   stage: test
   parallel:
     matrix:
-      - RUST_VERSION: ["1.74.0", "1.75.0", "stable", "nightly"]
+      - RUST_VERSION: ["1.81.0", "1.82.0", "stable", "nightly"]
   script:
     - rustup toolchain install $RUST_VERSION
     - rustup override set $RUST_VERSION
     - rustc --version
-    - cargo test
-    - if [[ $RUST_VERSION != nightly ]]; then cargo bench; fi
-    - if [[ $RUST_VERSION == nightly ]]; then cargo bench --features simd; fi
+    - if [[ $RUST_VERSION != nightly ]]; then cargo test; fi
+    - if [[ $RUST_VERSION != nightly ]]; then cargo bench --features gen-mock; fi
+    - if [[ $RUST_VERSION == nightly ]]; then cargo bench --features gen-mock,simd; fi
 
 test-pyo3:
   stage: test
   parallel:
     matrix:
-      - RUST_VERSION: ["1.74.0"]
+      - RUST_VERSION: ["1.81.0"]
   script:
     - rustup toolchain install $RUST_VERSION
     - rustup override set $RUST_VERSION

@@ -287,6 +287,10 @@ impl Emulator {
         ));
     }
 
+    pub fn stop(&mut self) {
+        self.system.unset_diag();
+    }
+
     pub fn load_rom(&mut self, path: Option<&str>) -> Result<(), Error> {
         let rom_path: &str = path.unwrap_or(&self.rom_path);
         let ram_path = replace_ext(rom_path, "sav").unwrap_or_else(|| "invalid".to_string());
@@ -1076,6 +1080,8 @@ fn main() {
     emulator.toggle_palette();
 
     run(args, &mut emulator);
+
+    emulator.stop();
 }
 
 fn build_device(device: &str) -> Result<Box<dyn SerialDevice>, Error> {

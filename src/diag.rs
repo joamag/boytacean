@@ -1,3 +1,9 @@
+//! Low-level diagnostic utilities for debugging purposes.
+//!
+//! Some of the implementations make use of unsafe code to store
+//! a global instance of the emulator, which is going to be used
+//! in panic diagnostics
+
 use std::ptr::null;
 
 use crate::gb::GameBoy;
@@ -6,11 +12,21 @@ use crate::gb::GameBoy;
 /// Game Boy emulator, going to be used for global diagnostics.
 static mut GLOBAL_INSTANCE: *const GameBoy = null();
 
+// Static mutable flag to enable or disable pedantic diagnostics.
+#[cfg(feature = "pedantic")]
+pub static mut PEDANTIC: bool = true;
+
 impl GameBoy {
     /// Sets the current instance as the one going to be used
     /// in panic diagnostics.
     pub fn set_diag(&self) {
         self.set_global();
+    }
+
+    /// Unsets the current instance as the one going to be used
+    /// in panic diagnostics.
+    pub fn unset_diag(&self) {
+        self.unset_global();
     }
 
     /// Dumps the diagnostics for the global instance of the
@@ -43,10 +59,48 @@ impl GameBoy {
         }
     }
 
+    fn unset_global(&self) {
+        unsafe {
+            GLOBAL_INSTANCE = null();
+        }
+    }
+
     fn dump_diagnostics_s(&self) {
         println!("Dumping Boytacean diagnostics:");
         println!("{}", self.description_debug());
     }
+}
+
+#[cfg(feature = "pedantic")]
+#[macro_export]
+macro_rules! enable_pedantic {
+    () => {
+        unsafe {
+            $crate::diag::PEDANTIC = true;
+        }
+    };
+}
+
+#[cfg(not(feature = "pedantic"))]
+#[macro_export]
+macro_rules! enable_pedantic {
+    () => {};
+}
+
+#[cfg(feature = "pedantic")]
+#[macro_export]
+macro_rules! disable_pedantic {
+    () => {
+        unsafe {
+            $crate::diag::PEDANTIC = false;
+        }
+    };
+}
+
+#[cfg(not(feature = "pedantic"))]
+#[macro_export]
+macro_rules! disable_pedantic {
+    () => {};
 }
 
 #[macro_export]
@@ -84,10 +138,14 @@ macro_rules! assert_gb {
 #[macro_export]
 macro_rules! assert_pedantic_gb {
     ($cond:expr, $fmt:expr, $($arg:tt)*) => {
-        $crate::assert_gb!($cond, $fmt, $($arg)*);
+        if unsafe { $crate::diag::PEDANTIC } {
+            $crate::assert_gb!($cond, $fmt, $($arg)*);
+        }
     };
     ($cond:expr) => {
-        $crate::assert_gb!($cond);
+        if unsafe { $crate::diag::PEDANTIC } {
+            $crate::assert_gb!($cond);
+        }
     };
 }
 
