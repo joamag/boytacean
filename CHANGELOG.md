@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+*
+
+### Changed
+
+*
+
+### Fixed
+
+*
+
+## [0.11.0] - 2025-03-05
+
+### Added
+
 * State management support for: `pad`, `ppu` and `cpu`
 
 ### Changed
@@ -26,7 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Greatly improved state management in BOS
 * Support for MBC2
 
-## [0.10.14] - 2024-09-02
+## [0.10.13] - 2024-09-02
 
 ### Changed
 
