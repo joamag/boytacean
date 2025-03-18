@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-* BOSC decompressor utility documentation and usage
+*
 
 ### Changed
 
@@ -18,6 +18,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 *
+
+## [0.11.4] - 2025-03-18
+
+### Added
+
+* BOSC decompressor utility documentation and usage
+
+### Changed
+
+* Bumped some packages
 
 ## [0.11.3] - 2025-03-05
 
