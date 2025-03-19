@@ -19,7 +19,7 @@
 
 use boytacean_common::{
     error::Error,
-    util::{read_file, SharedThread},
+    util::{SharedThread, read_file},
 };
 use std::{
     collections::VecDeque,
@@ -42,8 +42,8 @@ use crate::{
     mmu::Mmu,
     pad::{Pad, PadKey},
     ppu::{
-        Ppu, PpuMode, Tile, DISPLAY_HEIGHT, DISPLAY_WIDTH, FRAME_BUFFER_RGB1555_SIZE,
-        FRAME_BUFFER_RGB565_SIZE, FRAME_BUFFER_SIZE, FRAME_BUFFER_XRGB8888_SIZE,
+        DISPLAY_HEIGHT, DISPLAY_WIDTH, FRAME_BUFFER_RGB565_SIZE, FRAME_BUFFER_RGB1555_SIZE,
+        FRAME_BUFFER_SIZE, FRAME_BUFFER_XRGB8888_SIZE, Ppu, PpuMode, Tile,
     },
     rom::{Cartridge, RamSize},
     serial::{NullDevice, Serial, SerialDevice},
@@ -59,7 +59,7 @@ use crate::{color::Pixel, ppu::Palette};
 #[cfg(feature = "wasm")]
 use std::{
     convert::TryInto,
-    panic::{set_hook, take_hook, PanicInfo},
+    panic::{PanicInfo, set_hook, take_hook},
 };
 
 /// Enumeration that describes the multiple running

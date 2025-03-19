@@ -6,7 +6,7 @@
 //! Most of the core CPU logic is implemented in the [`Cpu::clock`] method.
 
 use boytacean_common::{
-    data::{read_u16, read_u8, write_u16, write_u8},
+    data::{read_u8, read_u16, write_u8, write_u16},
     error::Error,
     util::SharedThread,
 };
@@ -655,8 +655,10 @@ impl Cpu {
         let (_, inst_time, inst_str) = inst;
         let title_str: String = format!("[0x{inst_pc:04x}] {inst_str}");
         let inst_time_str = format!("({inst_time} cycles)");
-        let registers_str = format!("[PC=0x{:04x} SP=0x{:04x}] [A=0x{:02x} B=0x{:02x} C=0x{:02x} D=0x{:02x} E=0x{:02x} H=0x{:02x} L=0x{:02x}]",
-        self.pc, self.sp, self.a, self.b, self.c, self.d, self.e, self.h, self.l);
+        let registers_str = format!(
+            "[PC=0x{:04x} SP=0x{:04x}] [A=0x{:02x} B=0x{:02x} C=0x{:02x} D=0x{:02x} E=0x{:02x} H=0x{:02x} L=0x{:02x}]",
+            self.pc, self.sp, self.a, self.b, self.c, self.d, self.e, self.h, self.l
+        );
         format!("{title_str: <24} {inst_time_str: <11} {registers_str: <10}")
     }
 
