@@ -1,0 +1,19 @@
+[package]
+name = "boytacean-console"
+version = "0.11.5"
+authors = ["João Magalhães <joamag@gmail.com>"]
+description = "A Console frontend for Boytacen"
+license = "Apache-2.0"
+keywords = ["gameboy", "emulator", "rust", "console", "terminal"]
+edition = "2021"
+rust-version = "1.81"
+readme = "README.md"
+
+[features]
+slow = []
+debug = ["boytacean/debug"]
+pedantic = ["boytacean/pedantic"]
+cpulog = ["boytacean/cpulog"]
+
+[dependencies]
+boytacean = { path = "../..", version = "0.11.5" }

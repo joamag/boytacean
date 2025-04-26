@@ -62,6 +62,7 @@ codegen-units = 1
 [workspace]
 members = [
     ".",
+    "frontends/console",
     "frontends/libretro",
     "frontends/sdl",
     "crates/common",
