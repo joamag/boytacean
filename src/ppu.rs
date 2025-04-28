@@ -5,7 +5,7 @@
 //! backgrounds using tile-based graphics.
 
 use boytacean_common::{
-    data::{read_into, read_u16, read_u8, write_bytes, write_u16, write_u8},
+    data::{read_into, read_u8, read_u16, write_bytes, write_u8, write_u16},
     error::Error,
     util::SharedThread,
 };
@@ -22,12 +22,12 @@ use std::{
 use crate::{
     assert_pedantic_gb,
     color::{
-        rgb555_to_rgb888, rgb888_to_rgb1555_array, rgb888_to_rgb1555_u16, rgb888_to_rgb565,
-        rgb888_to_rgb565_u16, Pixel, PixelAlpha, RGB1555_SIZE, RGB565_SIZE, RGB888_SIZE, RGB_SIZE,
-        XRGB8888_SIZE,
+        Pixel, PixelAlpha, RGB_SIZE, RGB565_SIZE, RGB888_SIZE, RGB1555_SIZE, XRGB8888_SIZE,
+        rgb555_to_rgb888, rgb888_to_rgb565, rgb888_to_rgb565_u16, rgb888_to_rgb1555_array,
+        rgb888_to_rgb1555_u16,
     },
     consts::{
-        BGP_ADDR, LCDC_ADDR, LYC_ADDR, LY_ADDR, OBP0_ADDR, OBP1_ADDR, SCX_ADDR, SCY_ADDR,
+        BGP_ADDR, LCDC_ADDR, LY_ADDR, LYC_ADDR, OBP0_ADDR, OBP1_ADDR, SCX_ADDR, SCY_ADDR,
         STAT_ADDR, WX_ADDR, WY_ADDR,
     },
     gb::{GameBoyConfig, GameBoyMode},
@@ -2407,8 +2407,8 @@ mod tests {
     };
 
     use super::{
-        ObjectData, Ppu, PpuMode, Tile, COLOR_BUFFER_SIZE, FRAME_BUFFER_SIZE, HRAM_SIZE, OAM_SIZE,
-        OBJ_COUNT, SHADE_BUFFER_SIZE, TILE_COUNT, VRAM_SIZE,
+        COLOR_BUFFER_SIZE, FRAME_BUFFER_SIZE, HRAM_SIZE, OAM_SIZE, OBJ_COUNT, ObjectData, Ppu,
+        PpuMode, SHADE_BUFFER_SIZE, TILE_COUNT, Tile, VRAM_SIZE,
     };
 
     #[test]
