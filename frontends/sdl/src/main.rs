@@ -302,10 +302,7 @@ impl Emulator {
                 None
             },
         )?;
-        println!(
-            "========= Cartridge =========\n{}\n=============================",
-            rom
-        );
+        println!("========= Cartridge =========\n{rom}\n=============================");
         if let Some(ref mut sdl) = self.sdl {
             sdl.window_mut()
                 .set_title(format!("{} [{}]", self.title, rom.title()).as_str())
@@ -361,24 +358,23 @@ impl Emulator {
         let framerate = speedup * GameBoy::VISUAL_FREQ as f64;
 
         println!(
-            "Took {:.2} seconds to run {} ticks ({} cycles) ({:.2} Mhz, {:.2} speedup, {:.2} FPS)!",
-            delta, count, cycles, frequency_mhz, speedup, framerate
+            "Took {delta:.2} seconds to run {count} ticks ({cycles} cycles) ({frequency_mhz:.2} Mhz, {speedup:.2} speedup, {framerate:.2} FPS)!"
         );
     }
 
     fn save_state(&mut self, file_path: &str) {
         if let Err(message) = StateManager::save_file(file_path, &mut self.system, None, None) {
-            println!("Error saving state: {}", message)
+            println!("Error saving state: {message}")
         } else {
-            println!("Saved state into: {}", file_path)
+            println!("Saved state into: {file_path}")
         }
     }
 
     fn load_state(&mut self, file_path: &str) {
         if let Err(message) = StateManager::load_file(file_path, &mut self.system, None, None) {
-            println!("Error loading state: {}", message)
+            println!("Error loading state: {message}")
         } else {
-            println!("Loaded state from: {}", file_path)
+            println!("Loaded state from: {file_path}")
         }
     }
 
@@ -756,8 +752,7 @@ impl Emulator {
         let frequency_mhz = cycles as f64 / delta / 1000.0 / 1000.0;
 
         println!(
-            "Took {:.2} seconds to run {} ticks ({} cycles) ({:.2} Mhz)!",
-            delta, count, cycles, frequency_mhz
+            "Took {delta:.2} seconds to run {count} ticks ({cycles} cycles) ({frequency_mhz:.2} Mhz)!"
         );
     }
 

@@ -39,7 +39,7 @@ impl Codec for Rle {
         let mut iter = data.iter();
         while let Some(&byte) = iter.next() {
             if let Some(&count) = iter.next() {
-                decoded.extend(std::iter::repeat(byte).take(count as usize));
+                decoded.extend(std::iter::repeat_n(byte, count as usize));
             }
         }
 
