@@ -5,5 +5,5 @@ fn main() {
     game_boy.load(true).unwrap();
     game_boy.load_rom_empty().unwrap();
     let cycles = game_boy.step_to(0x0100);
-    println!("Ran {} cycles", cycles);
+    println!("Ran {cycles} cycles");
 }
