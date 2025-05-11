@@ -10,7 +10,6 @@ jobs:
     strategy:
       matrix:
         rust-version: [
-          "1.81.0",
           "1.82.0",
           "1.83.0",
           "1.84.0",
@@ -46,7 +45,6 @@ jobs:
     strategy:
       matrix:
         rust-version: [
-          "1.81.0",
           "1.82.0",
           "1.83.0",
           "1.84.0",
@@ -78,7 +76,6 @@ jobs:
     strategy:
       matrix:
         rust-version: [
-          "1.81.0",
           "1.82.0",
           "1.83.0",
           "1.84.0",
@@ -123,7 +120,6 @@ jobs:
     strategy:
       matrix:
         rust-version: [
-          "1.81.0",
           "1.82.0",
           "1.83.0",
           "1.84.0",
@@ -171,7 +167,6 @@ jobs:
     strategy:
       matrix:
         rust-version: [
-          "1.81.0",
           "1.82.0",
           "1.83.0",
           "1.84.0",
@@ -209,7 +204,6 @@ jobs:
     strategy:
       matrix:
         rust-version: [
-          "1.81.0",
           "1.82.0",
           "1.83.0",
           "1.84.0",
