@@ -1147,23 +1147,6 @@ impl Ppu {
     }
 
     pub fn frame_buffer(&mut self) -> &[u8; FRAME_BUFFER_SIZE] {
-        if self.gb_mode != GameBoyMode::Dmg {
-            return &self.frame_buffer;
-        }
-
-        if self.frame_index == self.frame_buffer_index {
-            return &self.frame_buffer;
-        }
-
-        for (index, pixel) in self.frame_buffer.chunks_mut(RGB_SIZE).enumerate() {
-            let shade_index = self.shade_buffer[index];
-            let color = &self.palette_colors[shade_index as usize];
-            pixel[0] = color[0];
-            pixel[1] = color[1];
-            pixel[2] = color[2];
-        }
-
-        self.frame_buffer_index = self.frame_index;
         &self.frame_buffer
     }
 
@@ -1426,14 +1409,43 @@ impl Ppu {
     /// this method should represent the fastest way of achieving
     /// the fill background with color operation.
     pub fn fill_frame_buffer(&mut self, shade_index: u8) {
-        let color = &self.palette_colors[shade_index as usize];
+        let color_val = &self.palette_colors[shade_index as usize];
         self.color_buffer.fill(0);
         self.shade_buffer.fill(shade_index);
         self.frame_buffer_index = u16::MAX;
-        for pixel in self.frame_buffer.chunks_mut(RGB_SIZE) {
-            pixel[0] = color[0];
-            pixel[1] = color[1];
-            pixel[2] = color[2];
+
+        #[cfg(feature = "simd")]
+        {
+            const PATTERN_PIXELS: usize = 5; // How many RGB triplets in our pattern
+            const PATTERN_SIZE: usize = PATTERN_PIXELS * RGB_SIZE;
+            let mut pattern = [0u8; PATTERN_SIZE];
+            for i in 0..PATTERN_PIXELS {
+                pattern[i * RGB_SIZE] = color_val[0];
+                pattern[i * RGB_SIZE + 1] = color_val[1];
+                pattern[i * RGB_SIZE + 2] = color_val[2];
+            }
+
+            let mut chunks = self.frame_buffer.chunks_exact_mut(PATTERN_SIZE);
+            for chunk in &mut chunks {
+                unsafe {
+                    std::ptr::copy_nonoverlapping(pattern.as_ptr(), chunk.as_mut_ptr(), PATTERN_SIZE);
+                }
+            }
+
+            let remainder = chunks.into_remainder();
+            for pixel_chunk in remainder.chunks_mut(RGB_SIZE) {
+                pixel_chunk[0] = color_val[0];
+                pixel_chunk[1] = color_val[1];
+                pixel_chunk[2] = color_val[2];
+            }
+        }
+        #[cfg(not(feature = "simd"))]
+        {
+            for pixel_chunk in self.frame_buffer.chunks_mut(RGB_SIZE) {
+                pixel_chunk[0] = color_val[0];
+                pixel_chunk[1] = color_val[1];
+                pixel_chunk[2] = color_val[2];
+            }
         }
     }
 
@@ -1854,7 +1866,15 @@ impl Ppu {
             // the raw pixel color information (unmapped) and then
             // updates the shade buffer with the shade index
             self.color_buffer[color_offset] = pixel;
-            self.shade_buffer[color_offset] = (palette_v >> (pixel * 2)) & 3;
+            let shade_index = (palette_v >> (pixel * 2)) & 3;
+            self.shade_buffer[color_offset] = shade_index;
+
+            // directly update the frame_buffer for DMG mode (eager computation)
+            let actual_color = &self.palette_colors[shade_index as usize];
+            let frame_buffer_pixel_start_index = color_offset * RGB_SIZE;
+            self.frame_buffer[frame_buffer_pixel_start_index] = actual_color[0];
+            self.frame_buffer[frame_buffer_pixel_start_index + 1] = actual_color[1];
+            self.frame_buffer[frame_buffer_pixel_start_index + 2] = actual_color[2];
 
             // increments the current tile X position in drawing
             x += 1;
