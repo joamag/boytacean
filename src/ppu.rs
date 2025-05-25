@@ -1428,7 +1428,11 @@ impl Ppu {
             let mut chunks = self.frame_buffer.chunks_exact_mut(PATTERN_SIZE);
             for chunk in &mut chunks {
                 unsafe {
-                    std::ptr::copy_nonoverlapping(pattern.as_ptr(), chunk.as_mut_ptr(), PATTERN_SIZE);
+                    std::ptr::copy_nonoverlapping(
+                        pattern.as_ptr(),
+                        chunk.as_mut_ptr(),
+                        PATTERN_SIZE,
+                    );
                 }
             }
 
