@@ -330,6 +330,15 @@ impl Mmu {
                 DmaMode::HBlank
                     if self.dma.mode() == DmaMode::HBlank && self.ppu.mode() == PpuMode::HBlank =>
                 {
+                    println!("HDMA transfer in HBlank mode, cycles: {}", cycles);
+                    // in case the cycles value is 0xffff, it means that the
+                    // HDMA transfer is just getting started, so we set the
+                    // cycles to the `HDMA_CYCLES_PER_BLOCK`` value, this is done
+                    if self.dma.cycles_hdma() == 0xffff {
+                        self.dma
+                            .set_cycles_dma(HDMA_CYCLES_PER_BLOCK * self.speed.multiplier() as u16);
+                    }
+
                     let cycles_dma = self.dma.cycles_hdma().saturating_sub(cycles);
                     if cycles_dma == 0x0 {
                         let count = 0x10.min(self.dma.pending());
@@ -345,7 +354,9 @@ impl Mmu {
                         if self.dma.pending() == 0x0 {
                             self.dma.set_active_hdma(false);
                         } else {
-                            self.dma.set_cycles_dma(HDMA_CYCLES_PER_BLOCK);
+                            self.dma.set_cycles_dma(
+                                HDMA_CYCLES_PER_BLOCK * self.speed.multiplier() as u16,
+                            );
                         }
                     } else {
                         self.dma.set_cycles_dma(cycles_dma);

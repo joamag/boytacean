@@ -107,7 +107,11 @@ pub struct Dma {
     /// DMA operation.
     value_dma: u8,
 
+    /// Number of CPU cycles remaining for the OAM DMA operation.
     cycles_dma: u16,
+
+    /// Number of CPU cycles remaining for the HDMA operation.
+    /// Only used in the HDMA operation.
     cycles_hdma: u16,
 
     /// Indicates whether the (OAM) DMA operation is currently active.
@@ -194,7 +198,7 @@ impl Dma {
                     self.length = (((value & 0x7f) + 0x1) as u16) << 4;
                     self.mode = ((value & 0x80) >> 7).into();
                     self.pending = self.length;
-                    self.cycles_hdma = HDMA_CYCLES_PER_BLOCK;
+                    self.cycles_hdma = 0xffff;
                     self.active_hdma = true;
                 }
             }
