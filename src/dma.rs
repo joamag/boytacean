@@ -13,10 +13,13 @@ use boytacean_common::{
     error::Error,
 };
 
+/// Number of CPU cycles required to transfer one 16-byte block during
+/// HBlank DMA operations.
+pub const HDMA_CYCLES_PER_BLOCK: u16 = 32;
+
 use crate::{
     consts::{DMA_ADDR, HDMA1_ADDR, HDMA2_ADDR, HDMA3_ADDR, HDMA4_ADDR, HDMA5_ADDR},
     mmu::BusComponent,
-    panic_gb,
     state::{StateComponent, StateFormat},
     warnln,
 };
@@ -69,15 +72,52 @@ impl From<DmaMode> for u8 {
     }
 }
 
+/// DMA (Direct Memory Access) structure that handles both general-purpose
+/// (OAM) DMA and HBlank DMA (HDMA) operations.
+///
+/// Some of the values are shared between the two modes, such as
+/// `source`, `destination`, and `length`. The `mode` field indicates
+/// whether the DMA operation is general-purpose or HBlank.
+///
+/// They can be shared because the the OAM DMA and the HDMA operations
+/// are mutually exclusive in the Game Boy hardware.
 pub struct Dma {
+    /// Source memory address for the HDMA transfer, only
+    /// used in the HDMA operation.
     source: u16,
+
+    /// Destination address for the HDMA transfer, only
+    /// used in the HDMA operation.
     destination: u16,
+
+    /// Length of the HDMA transfer in bytes, only used
+    /// in the HDMA operation.
     length: u16,
+
+    /// Number of bytes remaining to be transferred in the
+    /// HDMA operation, only used in the HDMA operation.
     pending: u16,
+
+    /// Transfer mode to be used in the HDMA operation, can
+    /// be either General-Purpose HDMA or HBlank HDMA.
     mode: DmaMode,
+
+    /// Value to be written to the OAM memory area during the
+    /// DMA transfer, only used in the general-purpose (OAM)
+    /// DMA operation.
     value_dma: u8,
+
+    /// Number of CPU cycles remaining for the OAM DMA operation.
     cycles_dma: u16,
+
+    /// Number of CPU cycles remaining for the HDMA operation.
+    /// Only used in the HDMA operation.
+    cycles_hdma: u16,
+
+    /// Indicates whether the (OAM) DMA operation is currently active.
     active_dma: bool,
+
+    /// Indicates whether the HDMA operation is currently active.
     active_hdma: bool,
 }
 
@@ -91,6 +131,7 @@ impl Dma {
             mode: DmaMode::General,
             value_dma: 0x0,
             cycles_dma: 0x0,
+            cycles_hdma: 0x0,
             active_dma: false,
             active_hdma: false,
         }
@@ -104,6 +145,7 @@ impl Dma {
         self.mode = DmaMode::General;
         self.value_dma = 0x0;
         self.cycles_dma = 0x0;
+        self.cycles_hdma = 0x0;
         self.active_dma = false;
         self.active_hdma = false;
     }
@@ -154,16 +196,10 @@ impl Dma {
                     // required for compatibility with some games (know bug)
                     self.destination = 0x8000 | (self.destination & 0x1fff);
                     self.length = (((value & 0x7f) + 0x1) as u16) << 4;
-                    self.mode = ((value & 80) >> 7).into();
+                    self.mode = ((value & 0x80) >> 7).into();
                     self.pending = self.length;
+                    self.cycles_hdma = 0xffff;
                     self.active_hdma = true;
-
-                    // @TODO: implement HBlank DMA using the proper timing
-                    // and during the HBlank period as described in the
-                    // https://gbdev.io/pandocs/CGB_Registers.html#lcd-vram-dma-transfers
-                    if self.mode == DmaMode::HBlank {
-                        panic_gb!("HBlank DMA not implemented");
-                    }
                 }
             }
             _ => warnln!("Writing to unknown DMA location 0x{:04x}", addr),
@@ -226,6 +262,14 @@ impl Dma {
         self.cycles_dma = value;
     }
 
+    pub fn cycles_hdma(&self) -> u16 {
+        self.cycles_hdma
+    }
+
+    pub fn set_cycles_hdma(&mut self, value: u16) {
+        self.cycles_hdma = value;
+    }
+
     pub fn active_dma(&self) -> bool {
         self.active_dma
     }
@@ -263,8 +307,8 @@ impl Dma {
 
     pub fn description_hdma(&self) -> String {
         format!(
-            "active: {}, length: 0x{:04x}, mode: {}, source: 0x{:04x}, destination: 0x{:04x}",
-            self.active_hdma, self.length, self.mode, self.source, self.destination
+            "active: {}, cycles: {}, length: 0x{:04x}, mode: {}, source: 0x{:04x}, destination: 0x{:04x}",
+            self.active_hdma, self.cycles_hdma, self.length, self.mode, self.source, self.destination
         )
     }
 }
@@ -289,6 +333,7 @@ impl StateComponent for Dma {
         write_u8(&mut cursor, self.mode.into())?;
         write_u8(&mut cursor, self.value_dma)?;
         write_u16(&mut cursor, self.cycles_dma)?;
+        write_u16(&mut cursor, self.cycles_hdma)?;
         write_u8(&mut cursor, self.active_dma as u8)?;
         write_u8(&mut cursor, self.active_hdma as u8)?;
         Ok(cursor.into_inner())
@@ -303,6 +348,7 @@ impl StateComponent for Dma {
         self.mode = read_u8(&mut cursor)?.into();
         self.value_dma = read_u8(&mut cursor)?;
         self.cycles_dma = read_u16(&mut cursor)?;
+        self.cycles_hdma = read_u16(&mut cursor)?;
         self.active_dma = read_u8(&mut cursor)? != 0;
         self.active_hdma = read_u8(&mut cursor)? != 0;
         Ok(())
@@ -357,6 +403,7 @@ mod tests {
         assert_eq!(dma.mode, DmaMode::General);
         assert_eq!(dma.value_dma, 0x0);
         assert_eq!(dma.cycles_dma, 0x0);
+        assert_eq!(dma.cycles_hdma, 0x0);
         assert!(!dma.active_dma);
         assert!(!dma.active_hdma);
     }
@@ -379,12 +426,13 @@ mod tests {
             mode: DmaMode::HBlank,
             value_dma: 0xff,
             cycles_dma: 0x0012,
+            cycles_hdma: 0x0034,
             active_dma: true,
             active_hdma: true,
         };
 
         let state = dma.state(None).unwrap();
-        assert_eq!(state.len(), 14);
+        assert_eq!(state.len(), 16);
 
         let mut new_dma = Dma::new();
         new_dma.set_state(&state, None).unwrap();
@@ -396,6 +444,7 @@ mod tests {
         assert_eq!(new_dma.mode, DmaMode::HBlank);
         assert_eq!(new_dma.value_dma, 0xff);
         assert_eq!(new_dma.cycles_dma, 0x0012);
+        assert_eq!(new_dma.cycles_hdma, 0x0034);
         assert!(new_dma.active_dma);
         assert!(new_dma.active_hdma);
     }

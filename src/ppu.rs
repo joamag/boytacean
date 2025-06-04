@@ -823,6 +823,11 @@ impl Ppu {
         self.dmg_compat = false;
     }
 
+    /// Clears the screen and resets the PPU's mode, mode clock, LY registers
+    /// and VBlank interrupt flag.
+    ///
+    /// The optional `hard` parameter is used to clear the internal frame
+    /// buffer, considered to be an expensive operation.
     pub fn clear_screen(&mut self, hard: bool) {
         self.mode = PpuMode::HBlank;
         self.mode_clock = 0;
