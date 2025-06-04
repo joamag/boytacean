@@ -327,28 +327,28 @@ impl Mmu {
                     self.dma.set_pending(0);
                     self.dma.set_active_hdma(false);
                 }
-                DmaMode::HBlank => {
-                    if self.dma.mode() == DmaMode::HBlank && self.ppu.mode() == PpuMode::HBlank {
-                        let cycles_dma = self.dma.cycles_hdma().saturating_sub(cycles);
-                        if cycles_dma == 0x0 {
-                            let count = 0x10.min(self.dma.pending());
-                            if self.mode == GameBoyMode::Cgb {
-                                let data = self.read_many(self.dma.source(), count);
-                                self.write_many(self.dma.destination(), &data);
-                            }
-                            self.dma.set_source(self.dma.source().wrapping_add(count));
-                            self.dma
-                                .set_destination(self.dma.destination().wrapping_add(count));
-                            self.dma
-                                .set_pending(self.dma.pending().saturating_sub(count));
-                            if self.dma.pending() == 0x0 {
-                                self.dma.set_active_hdma(false);
-                            } else {
-                                self.dma.set_cycles_dma(HDMA_CYCLES_PER_BLOCK);
-                            }
-                        } else {
-                            self.dma.set_cycles_dma(cycles_dma);
+                DmaMode::HBlank
+                    if self.dma.mode() == DmaMode::HBlank && self.ppu.mode() == PpuMode::HBlank =>
+                {
+                    let cycles_dma = self.dma.cycles_hdma().saturating_sub(cycles);
+                    if cycles_dma == 0x0 {
+                        let count = 0x10.min(self.dma.pending());
+                        if self.mode == GameBoyMode::Cgb {
+                            let data = self.read_many(self.dma.source(), count);
+                            self.write_many(self.dma.destination(), &data);
                         }
+                        self.dma.set_source(self.dma.source().wrapping_add(count));
+                        self.dma
+                            .set_destination(self.dma.destination().wrapping_add(count));
+                        self.dma
+                            .set_pending(self.dma.pending().saturating_sub(count));
+                        if self.dma.pending() == 0x0 {
+                            self.dma.set_active_hdma(false);
+                        } else {
+                            self.dma.set_cycles_dma(HDMA_CYCLES_PER_BLOCK);
+                        }
+                    } else {
+                        self.dma.set_cycles_dma(cycles_dma);
                     }
                 }
             }
