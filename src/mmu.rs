@@ -315,28 +315,41 @@ impl Mmu {
                 self.dma.destination()
             );
 
-            if self.dma.mode() == DmaMode::General
-                || (self.dma.mode() == DmaMode::HBlank && self.ppu.mode() == PpuMode::HBlank)
-            {
-                let cycles_dma = self.dma.cycles_hdma().saturating_sub(cycles);
-                if cycles_dma == 0x0 {
-                    let count = 0x10.min(self.dma.pending());
+            match self.dma.mode() {
+                DmaMode::General => {
+                    // only runs the DMA transfer if the system is in CGB mode
+                    // this avoids issues when writing to DMG unmapped registers
+                    // that would otherwise cause the system to crash
                     if self.mode == GameBoyMode::Cgb {
-                        let data = self.read_many(self.dma.source(), count);
+                        let data = self.read_many(self.dma.source(), self.dma.pending());
                         self.write_many(self.dma.destination(), &data);
                     }
-                    self.dma.set_source(self.dma.source().wrapping_add(count));
-                    self.dma
-                        .set_destination(self.dma.destination().wrapping_add(count));
-                    self.dma
-                        .set_pending(self.dma.pending().saturating_sub(count));
-                    if self.dma.pending() == 0x0 {
-                        self.dma.set_active_hdma(false);
-                    } else {
-                        self.dma.set_cycles_dma(HDMA_CYCLES_PER_BLOCK);
+                    self.dma.set_pending(0);
+                    self.dma.set_active_hdma(false);
+                }
+                DmaMode::HBlank => {
+                    if self.dma.mode() == DmaMode::HBlank && self.ppu.mode() == PpuMode::HBlank {
+                        let cycles_dma = self.dma.cycles_hdma().saturating_sub(cycles);
+                        if cycles_dma == 0x0 {
+                            let count = 0x10.min(self.dma.pending());
+                            if self.mode == GameBoyMode::Cgb {
+                                let data = self.read_many(self.dma.source(), count);
+                                self.write_many(self.dma.destination(), &data);
+                            }
+                            self.dma.set_source(self.dma.source().wrapping_add(count));
+                            self.dma
+                                .set_destination(self.dma.destination().wrapping_add(count));
+                            self.dma
+                                .set_pending(self.dma.pending().saturating_sub(count));
+                            if self.dma.pending() == 0x0 {
+                                self.dma.set_active_hdma(false);
+                            } else {
+                                self.dma.set_cycles_dma(HDMA_CYCLES_PER_BLOCK);
+                            }
+                        } else {
+                            self.dma.set_cycles_dma(cycles_dma);
+                        }
                     }
-                } else {
-                    self.dma.set_cycles_dma(cycles_dma);
                 }
             }
         }
@@ -683,6 +696,39 @@ mod tests {
     };
 
     #[test]
+    fn test_hdma_general_transfer_timing() {
+        let mut mmu = Mmu::default();
+        mmu.allocate_cgb();
+        mmu.set_mode(GameBoyMode::Cgb);
+        mmu.ppu.set_gb_mode(GameBoyMode::Cgb);
+
+        // fills the RAM with data to be transferred (32 bytes)
+        for index in 0..0x20 {
+            mmu.write(0xc000 + index, index as u8);
+        }
+
+        mmu.dma.set_source(0xc000);
+        mmu.dma.set_destination(0x8000);
+        mmu.dma.set_length(0x20);
+        mmu.dma.set_pending(0x20);
+        mmu.dma.set_mode(DmaMode::General);
+        mmu.dma.set_active_hdma(true);
+
+        // initializes the PPU in HBlank mode
+        mmu.ppu.write(LCDC_ADDR, 0x80);
+        mmu.ppu.clear_screen(false);
+        assert!(mmu.ppu.vram()[0x0000..0x0020].iter().all(|&b| b == 0x0));
+
+        // clocks the DMA to transfer all 32 bytes at once
+        mmu.clock_dma(HDMA_CYCLES_PER_BLOCK);
+        assert_eq!(mmu.dma.pending(), 0x00);
+        for i in 0..0x10 {
+            assert_eq!(mmu.ppu.vram()[i as usize], i as u8);
+        }
+        assert!(!mmu.dma.active_hdma());
+    }
+
+    #[test]
     fn test_hdma_hblank_transfer_timing() {
         let mut mmu = Mmu::default();
         mmu.allocate_cgb();
@@ -724,51 +770,6 @@ mod tests {
         // to transfer the next 16 bytes, making sure that all of
         // 32 bytes have been transferred
         mmu.ppu.clear_screen(false);
-        mmu.clock_dma(HDMA_CYCLES_PER_BLOCK);
-        assert_eq!(mmu.dma.pending(), 0x00);
-        for i in 0..0x20 {
-            assert_eq!(mmu.ppu.vram()[i as usize], i as u8);
-        }
-        assert!(!mmu.dma.active_hdma());
-    }
-
-    #[test]
-    fn test_hdma_general_transfer_timing() {
-        let mut mmu = Mmu::default();
-        mmu.allocate_cgb();
-        mmu.set_mode(GameBoyMode::Cgb);
-        mmu.ppu.set_gb_mode(GameBoyMode::Cgb);
-
-        // fills the RAM with data to be transferred (32 bytes)
-        for index in 0..0x20 {
-            mmu.write(0xc000 + index, index as u8);
-        }
-
-        mmu.dma.set_source(0xc000);
-        mmu.dma.set_destination(0x8000);
-        mmu.dma.set_length(0x20);
-        mmu.dma.set_pending(0x20);
-        mmu.dma.set_mode(DmaMode::General);
-        mmu.dma.set_active_hdma(true);
-
-        // initializes the PPU in HBlank mode
-        mmu.ppu.write(LCDC_ADDR, 0x80);
-        mmu.ppu.clear_screen(false);
-        assert!(mmu.ppu.vram()[0x0000..0x0020].iter().all(|&b| b == 0x0));
-
-        // clocks the DMA to transfer all 32 bytes at once
-        mmu.clock_dma(HDMA_CYCLES_PER_BLOCK);
-        assert_eq!(mmu.dma.pending(), 0x10);
-        for i in 0..0x10 {
-            assert_eq!(mmu.ppu.vram()[i as usize], i as u8);
-        }
-        assert!(mmu.dma.active_hdma());
-
-        // moves the PPU out of HBlank mode and clocks the DMA
-        // to transfer the next 16 bytes, making sure that all of
-        // 32 bytes have been transferred, for a general transfer
-        // it's irrelevant if the PPU is in HBlank mode or not
-        mmu.ppu.clock(204);
         mmu.clock_dma(HDMA_CYCLES_PER_BLOCK);
         assert_eq!(mmu.dma.pending(), 0x00);
         for i in 0..0x20 {
