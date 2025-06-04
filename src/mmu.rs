@@ -288,6 +288,11 @@ impl Mmu {
         if self.dma.active_dma() {
             let cycles_dma = self.dma.cycles_dma().saturating_sub(cycles);
             if cycles_dma == 0x0 {
+                assert_pedantic_gb!(
+                    (0x0000..=0xdfff).contains(&((self.dma.value_dma() as u16) << 8)),
+                    "Invalid DMA source address 0x{:04x}",
+                    (self.dma.value_dma() as u16) << 8
+                );
                 let data = self.read_many((self.dma.value_dma() as u16) << 8, 160);
                 self.write_many(0xfe00, &data);
                 self.dma.set_active_dma(false);
@@ -313,8 +318,7 @@ impl Mmu {
             match self.dma.mode() {
                 DmaMode::General => {
                     if self.mode == GameBoyMode::Cgb {
-                        let data =
-                            self.read_many(self.dma.source(), self.dma.pending());
+                        let data = self.read_many(self.dma.source(), self.dma.pending());
                         self.write_many(self.dma.destination(), &data);
                     }
                     self.dma.set_pending(0);
@@ -334,11 +338,11 @@ impl Mmu {
                                 let data = self.read_many(self.dma.source(), count);
                                 self.write_many(self.dma.destination(), &data);
                             }
-                            self.dma
-                                .set_source(self.dma.source().wrapping_add(count));
+                            self.dma.set_source(self.dma.source().wrapping_add(count));
                             self.dma
                                 .set_destination(self.dma.destination().wrapping_add(count));
-                            self.dma.set_pending(self.dma.pending().saturating_sub(count));
+                            self.dma
+                                .set_pending(self.dma.pending().saturating_sub(count));
                             if self.dma.pending() == 0 {
                                 self.dma.set_active_hdma(false);
                             }
@@ -682,18 +686,22 @@ impl Default for Mmu {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::consts::LCDC_ADDR;
+    use super::Mmu;
+    use crate::{
+        consts::LCDC_ADDR,
+        dma::{DmaMode, HDMA_CYCLES_PER_BLOCK},
+        gb::GameBoyMode,
+    };
 
     #[test]
-    fn test_hblank_dma_transfer_timing() {
+    fn test_hblank_hdma_transfer_timing() {
         let mut mmu = Mmu::default();
         mmu.allocate_cgb();
         mmu.set_mode(GameBoyMode::Cgb);
         mmu.ppu.set_gb_mode(GameBoyMode::Cgb);
 
-        for i in 0..0x20u16 {
-            mmu.write(0xc000 + i, i as u8);
+        for index in 0..0x20u16 {
+            mmu.write(0xc000 + index, index as u8);
         }
 
         mmu.dma.set_source(0xc000);
@@ -709,8 +717,8 @@ mod tests {
         assert!(mmu.ppu.vram()[0x0000..0x20].iter().all(|&b| b == 0));
         mmu.clock_dma(HDMA_CYCLES_PER_BLOCK);
         assert_eq!(mmu.dma.pending(), 0x10);
-        for i in 0..0x10u16 {
-            assert_eq!(mmu.ppu.vram()[i as usize], i as u8);
+        for index in 0..0x10 {
+            assert_eq!(mmu.ppu.vram()[index as usize], index as u8);
         }
 
         mmu.ppu.clock(204); // leave HBlank
@@ -720,7 +728,7 @@ mod tests {
         mmu.ppu.clear_screen(false);
         mmu.clock_dma(HDMA_CYCLES_PER_BLOCK);
         assert_eq!(mmu.dma.pending(), 0x00);
-        for i in 0..0x20u16 {
+        for i in 0..0x20 {
             assert_eq!(mmu.ppu.vram()[i as usize], i as u8);
         }
         assert!(!mmu.dma.active_hdma());
