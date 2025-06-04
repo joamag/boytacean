@@ -338,6 +338,10 @@ impl Mmu {
                             .set_cycles_dma(HDMA_CYCLES_PER_BLOCK * self.speed.multiplier() as u16);
                     }
 
+                    // runs the HDMA transfer, this is done in blocks of 0x10 bytes
+                    // and the transfer is done in HBlank mode, so we can
+                    // transfer the data in blocks of 0x10 bytes, this is done
+                    // until the pending value is 0x0, at which point we stop
                     let cycles_dma = self.dma.cycles_hdma().saturating_sub(cycles);
                     if cycles_dma == 0x0 {
                         let count = 0x10.min(self.dma.pending());
