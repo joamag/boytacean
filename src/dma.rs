@@ -258,6 +258,14 @@ impl Dma {
         self.cycles_dma = value;
     }
 
+    pub fn cycles_hdma(&self) -> u16 {
+        self.cycles_hdma
+    }
+
+    pub fn set_cycles_hdma(&mut self, value: u16) {
+        self.cycles_hdma = value;
+    }
+
     pub fn active_dma(&self) -> bool {
         self.active_dma
     }
