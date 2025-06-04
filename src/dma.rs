@@ -13,10 +13,13 @@ use boytacean_common::{
     error::Error,
 };
 
+/// Number of CPU cycles required to transfer one 16-byte block during
+/// HBlank DMA operations.
+pub const HDMA_CYCLES_PER_BLOCK: u16 = 32;
+
 use crate::{
     consts::{DMA_ADDR, HDMA1_ADDR, HDMA2_ADDR, HDMA3_ADDR, HDMA4_ADDR, HDMA5_ADDR},
     mmu::BusComponent,
-    panic_gb,
     state::{StateComponent, StateFormat},
     warnln,
 };
@@ -154,16 +157,10 @@ impl Dma {
                     // required for compatibility with some games (know bug)
                     self.destination = 0x8000 | (self.destination & 0x1fff);
                     self.length = (((value & 0x7f) + 0x1) as u16) << 4;
-                    self.mode = ((value & 80) >> 7).into();
+                    self.mode = ((value & 0x80) >> 7).into();
                     self.pending = self.length;
+                    self.cycles_dma = 0;
                     self.active_hdma = true;
-
-                    // @TODO: implement HBlank DMA using the proper timing
-                    // and during the HBlank period as described in the
-                    // https://gbdev.io/pandocs/CGB_Registers.html#lcd-vram-dma-transfers
-                    if self.mode == DmaMode::HBlank {
-                        panic_gb!("HBlank DMA not implemented");
-                    }
                 }
             }
             _ => warnln!("Writing to unknown DMA location 0x{:04x}", addr),
