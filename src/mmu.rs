@@ -351,6 +351,7 @@ impl Mmu {
                         self.dma.set_cycles_dma(cycles_dma);
                     }
                 }
+                _ => (),
             }
         }
     }

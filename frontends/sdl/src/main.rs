@@ -584,7 +584,7 @@ impl Emulator {
                                     self.load_state(&file_path);
                                 }
                             }
-                            _ => {}
+                            _ => (),
                         }
                         if let Some(key) = key_to_pad(keycode) {
                             self.system.key_press(key)
