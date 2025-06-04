@@ -432,7 +432,7 @@ mod tests {
         };
 
         let state = dma.state(None).unwrap();
-        assert_eq!(state.len(), 14);
+        assert_eq!(state.len(), 16);
 
         let mut new_dma = Dma::new();
         new_dma.set_state(&state, None).unwrap();
