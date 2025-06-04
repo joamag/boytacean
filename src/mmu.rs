@@ -700,7 +700,8 @@ mod tests {
         mmu.set_mode(GameBoyMode::Cgb);
         mmu.ppu.set_gb_mode(GameBoyMode::Cgb);
 
-        for index in 0..0x20u16 {
+        // fills the RAM with data to be transferred (32 bytes)
+        for index in 0..0x20 {
             mmu.write(0xc000 + index, index as u8);
         }
 
@@ -711,20 +712,27 @@ mod tests {
         mmu.dma.set_mode(DmaMode::HBlank);
         mmu.dma.set_active_hdma(true);
 
-        mmu.ppu.write(LCDC_ADDR, 0x80); // enable LCD
+        // initializes the PPU in HBlank mode
+        mmu.ppu.write(LCDC_ADDR, 0x80);
+        mmu.ppu.clear_screen(false);
+        assert!(mmu.ppu.vram()[0x0000..0x0020].iter().all(|&b| b == 0x0));
 
-        mmu.ppu.clear_screen(false); // start in HBlank
-        assert!(mmu.ppu.vram()[0x0000..0x20].iter().all(|&b| b == 0));
+        // clocks the DMA to transfer the first 16 (0x10) bytes
+        // and checks that the data has been transferred correctly
         mmu.clock_dma(HDMA_CYCLES_PER_BLOCK);
         assert_eq!(mmu.dma.pending(), 0x10);
         for index in 0..0x10 {
             assert_eq!(mmu.ppu.vram()[index as usize], index as u8);
         }
 
-        mmu.ppu.clock(204); // leave HBlank
+        // leaves HBlank mode and clocks the DMA to transfer the next 16 bytes
+        mmu.ppu.clock(204);
         mmu.clock_dma(HDMA_CYCLES_PER_BLOCK);
         assert_eq!(mmu.dma.pending(), 0x10);
 
+        // moves the PPU back to HBlank mode and clocks the DMA
+        // to transfer the next 16 bytes, making sure that all of
+        // 32 bytes have been transferred
         mmu.ppu.clear_screen(false);
         mmu.clock_dma(HDMA_CYCLES_PER_BLOCK);
         assert_eq!(mmu.dma.pending(), 0x00);
