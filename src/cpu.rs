@@ -19,7 +19,7 @@ use std::{
 use crate::{
     apu::Apu,
     assert_pedantic_gb,
-    consts::LCDC_ADDR,
+    consts::{IF_ADDR, LCDC_ADDR},
     debugln,
     dma::Dma,
     gb::GameBoyConfig,
@@ -162,22 +162,16 @@ impl Cpu {
             pc
         );
 
-        // @TODO this is so bad, need to improve this by an order
-        // of magnitude, to be able to have better performance
-        // in case the CPU execution halted and there's an interrupt
-        // to be handled, releases the CPU from the halted state
-        // this verification is only done in case the IME (interrupt
-        // master enable) is disabled, otherwise the CPU halt disabled
-        // is going to be handled ahead
-        if self.halted
-            && !self.ime
-            && self.mmu.ie != 0x00
-            && (((self.mmu.ie & 0x01 == 0x01) && self.mmu.ppu().int_vblank())
-                || ((self.mmu.ie & 0x02 == 0x02) && self.mmu.ppu().int_stat())
-                || ((self.mmu.ie & 0x04 == 0x04) && self.mmu.timer().int_tima())
-                || ((self.mmu.ie & 0x08 == 0x08) && self.mmu.serial().int_serial())
-                || ((self.mmu.ie & 0x10 == 0x10) && self.mmu.pad().int_pad()))
-        {
+        // prefetch the pending interrupt flags so we can quickly check
+        // if any enabled interrupt is waiting to be served. This is used
+        // both to release the CPU from a halted state and to execute the
+        // correct handler when IME is enabled.
+        let pending = self.mmu.read(IF_ADDR) & self.mmu.ie;
+
+        // in case the CPU execution halted and there's a pending interrupt
+        // while IME is disabled, release the CPU from the halted state so
+        // execution can continue until the interrupt is serviced
+        if self.halted && !self.ime && pending != 0 {
             self.halted = false;
         }
 
@@ -186,8 +180,8 @@ impl Cpu {
         // to check which one should be handled and then handles it
         // this code assumes that the're no more that one interrupt triggered
         // per clock cycle, this is a limitation of the current implementation
-        if self.ime && self.mmu.ie != 0x00 {
-            if (self.mmu.ie & 0x01 == 0x01) && self.mmu.ppu().int_vblank() {
+        if self.ime && pending != 0 {
+            if pending & 0x01 == 0x01 {
                 debugln!("Going to run V-Blank interrupt handler (0x40)");
 
                 self.disable_int();
@@ -209,7 +203,7 @@ impl Cpu {
                 }
 
                 return 20;
-            } else if (self.mmu.ie & 0x02 == 0x02) && self.mmu.ppu().int_stat() {
+            } else if pending & 0x02 == 0x02 {
                 debugln!("Going to run LCD STAT interrupt handler (0x48)");
 
                 self.disable_int();
@@ -227,7 +221,7 @@ impl Cpu {
                 }
 
                 return 20;
-            } else if (self.mmu.ie & 0x04 == 0x04) && self.mmu.timer().int_tima() {
+            } else if pending & 0x04 == 0x04 {
                 debugln!("Going to run Timer interrupt handler (0x50)");
 
                 self.disable_int();
@@ -245,7 +239,7 @@ impl Cpu {
                 }
 
                 return 20;
-            } else if (self.mmu.ie & 0x08 == 0x08) && self.mmu.serial().int_serial() {
+            } else if pending & 0x08 == 0x08 {
                 debugln!("Going to run Serial interrupt handler (0x58)");
 
                 self.disable_int();
@@ -263,7 +257,7 @@ impl Cpu {
                 }
 
                 return 20;
-            } else if (self.mmu.ie & 0x10 == 0x10) && self.mmu.pad().int_pad() {
+            } else if pending & 0x10 == 0x10 {
                 debugln!("Going to run JoyPad interrupt handler (0x60)");
 
                 self.disable_int();
