@@ -19,7 +19,7 @@ use std::{
 use crate::{
     apu::Apu,
     assert_pedantic_gb,
-    consts::{IF_ADDR, LCDC_ADDR},
+    consts::LCDC_ADDR,
     debugln,
     dma::Dma,
     gb::GameBoyConfig,
@@ -162,11 +162,15 @@ impl Cpu {
             pc
         );
 
-        // prefetch the pending interrupt flags so we can quickly check
-        // if any enabled interrupt is waiting to be served. This is used
-        // both to release the CPU from a halted state and to execute the
-        // correct handler when IME is enabled.
-        let pending = self.mmu.read(IF_ADDR) & self.mmu.ie;
+        // Fetch the current interrupt request flags with the enabled mask
+        // applied. Each interrupt flag is fetched once so that both the
+        // halt release check and the handler dispatch reuse the value.
+        let flags = (self.mmu.ppu().int_vblank() as u8)
+            | ((self.mmu.ppu().int_stat() as u8) << 1)
+            | ((self.mmu.timer().int_tima() as u8) << 2)
+            | ((self.mmu.serial().int_serial() as u8) << 3)
+            | ((self.mmu.pad().int_pad() as u8) << 4);
+        let pending = flags & self.mmu.ie;
 
         // in case the CPU execution halted and there's a pending interrupt
         // while IME is disabled, release the CPU from the halted state so
