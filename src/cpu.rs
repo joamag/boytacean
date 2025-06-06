@@ -912,4 +912,68 @@ mod tests {
         assert_eq!(new_cpu.cycles, 0x78);
         assert_eq!(new_cpu.ppc, 0x9abc);
     }
+
+    #[test]
+    fn test_interrupt_ignored_when_ime_disabled() {
+        let mut cpu = Cpu::default();
+        cpu.boot();
+        cpu.mmu.allocate_default();
+
+        cpu.pc = 0xc000;
+        cpu.sp = 0xfffe;
+        cpu.mmu.write(0xc000, 0x00); // NOP
+        cpu.mmu.ie = 0x01;
+        cpu.mmu.ppu().set_int_vblank(true);
+        cpu.disable_int();
+
+        let cycles = cpu.clock();
+        assert_eq!(cycles, 4);
+        assert_eq!(cpu.pc, 0xc001);
+        assert_eq!(cpu.sp, 0xfffe);
+        assert!(cpu.mmu.ppu().int_vblank());
+    }
+
+    #[test]
+    fn test_interrupt_handled_when_ime_enabled() {
+        let mut cpu = Cpu::default();
+        cpu.boot();
+        cpu.mmu.allocate_default();
+
+        cpu.pc = 0xc000;
+        cpu.sp = 0xfffe;
+        cpu.mmu.write(0xc000, 0x00); // NOP
+        cpu.mmu.ie = 0x01;
+        cpu.mmu.ppu().set_int_vblank(true);
+        cpu.enable_int();
+
+        let cycles = cpu.clock();
+        assert_eq!(cycles, 20);
+        assert_eq!(cpu.pc, 0x40);
+        assert_eq!(cpu.sp, 0xfffc);
+        assert!(!cpu.mmu.ppu().int_vblank());
+        assert!(!cpu.ime());
+        assert_eq!(cpu.mmu.read(0xfffc), 0x00);
+        assert_eq!(cpu.mmu.read(0xfffd), 0xc0);
+    }
+
+    #[test]
+    fn test_halt_released_on_pending_interrupt() {
+        let mut cpu = Cpu::default();
+        cpu.boot();
+        cpu.mmu.allocate_default();
+
+        cpu.pc = 0xc000;
+        cpu.sp = 0xfffe;
+        cpu.mmu.write(0xc000, 0x00); // NOP
+        cpu.mmu.ie = 0x01;
+        cpu.mmu.ppu().set_int_vblank(true);
+        cpu.disable_int();
+        cpu.halted = true;
+
+        let cycles = cpu.clock();
+        assert_eq!(cycles, 4);
+        assert_eq!(cpu.pc, 0xc001);
+        assert!(!cpu.halted);
+        assert!(cpu.mmu.ppu().int_vblank());
+    }
 }
