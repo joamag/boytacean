@@ -150,8 +150,6 @@ jobs:
             ~/vcpkg
             ${{ env.GITHUB_WORKSPACE }}/target/vcpkg
           key: vcpkg-${{ runner.os }}-${{ hashFiles('frontends/sdl/Cargo.toml') }}
-          restore-keys: |
-            vcpkg-${{ runner.os }}-
       - name: Install SDL dependencies
         run: cd frontends/sdl && cargo install cargo-vcpkg && cargo vcpkg -v build
       - name: Verify Rust code format
@@ -309,8 +307,6 @@ jobs:
             ~/vcpkg
             ${{ env.GITHUB_WORKSPACE }}/target/vcpkg
           key: vcpkg-${{ runner.os }}-${{ hashFiles('frontends/sdl/Cargo.toml') }}
-          restore-keys: |
-            vcpkg-${{ runner.os }}-
       - name: Install SDL dependencies
         run: cd frontends/sdl && cargo install cargo-vcpkg && cargo vcpkg -v build
       - name: Verify Rust code format
