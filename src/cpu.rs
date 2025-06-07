@@ -168,9 +168,9 @@ impl Cpu {
             pc
         );
 
-        // fetch the current interrupt request flags with the enabled mask
-        // applied, each interrupt flag is fetched once so that both the
-        // halt release check and the handler dispatch reuse the value
+        // fetches the current interrupt request flags (IF) with the enabled
+        // mask (IE) applied, each interrupt flag is fetched once so that both
+        // the halt release check and the handler dispatch reuse the same value
         let flags = (self.mmu.ppu().int_vblank() as u8)
             | ((self.mmu.ppu().int_stat() as u8) << 1)
             | ((self.mmu.timer().int_tima() as u8) << 2)
