@@ -79,7 +79,10 @@ pub fn save_bmp(path: &str, pixels: &[u8], width: u32, height: u32) -> Result<()
     let mut writer = BufWriter::new(file);
 
     // writes the BMP file header
-    let file_size = 54 + (width * height * 3);
+    // each row in a BMP is padded to a 4 byte boundary
+    let row_bytes = (width * 3 + 3) & !3;
+    let image_size = row_bytes * height;
+    let file_size = 54 + image_size;
     writer.write_all(&[0x42, 0x4d]).unwrap(); // "BM" magic number
     writer.write_all(&file_size.to_le_bytes()).unwrap(); // file size
     writer.write_all(&[0x00, 0x00]).unwrap(); // reserved
@@ -92,7 +95,7 @@ pub fn save_bmp(path: &str, pixels: &[u8], width: u32, height: u32) -> Result<()
     writer.write_all(&[0x18, 0x00]).unwrap(); // bits per pixel
     writer.write_all(&[0x00, 0x00, 0x00, 0x00]).unwrap(); // compression method
     writer
-        .write_all(&[(width * height * 3) as u8, 0x00, 0x00, 0x00])
+        .write_all(&image_size.to_le_bytes())
         .unwrap(); // image size
     writer.write_all(&[0x13, 0x0b, 0x00, 0x00]).unwrap(); // horizontal resolution (72 DPI)
     writer.write_all(&[0x13, 0x0b, 0x00, 0x00]).unwrap(); // vertical resolution (72 DPI)
@@ -227,5 +230,49 @@ mod tests {
     fn test_capitalize_multiple_characters() {
         let result = capitalize("hello, world!");
         assert_eq!(result, "Hello, world!");
+    }
+
+    #[test]
+    fn test_bmp_le_bytes() {
+        // According to the BMP file format specification, both the file size
+        // and the image size fields are stored using little-endian encoding.
+        let path = std::env::temp_dir().join("boytacean_le_test.bmp");
+        let _ = save_bmp(path.to_str().unwrap(), &[255, 0, 0], 1, 1);
+        let data = std::fs::read(&path).unwrap();
+        assert_eq!(&data[2..6], &(58u32).to_le_bytes());
+        assert_eq!(&data[34..38], &(4u32).to_le_bytes());
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn test_bmp_file_structure() {
+        // Creates a 2x2 image and verifies that the BMP header follows the
+        // expected structure as defined in the specification.
+        let path = std::env::temp_dir().join("boytacean_spec_test.bmp");
+        let pixels = [
+            // red
+            255u8, 0, 0,
+            // green
+            0, 255, 0,
+            // blue
+            0, 0, 255,
+            // yellow
+            255, 255, 0,
+        ];
+        let _ = save_bmp(path.to_str().unwrap(), &pixels, 2, 2);
+        let data = std::fs::read(&path).unwrap();
+
+        // header checks
+        assert_eq!(&data[0..2], b"BM");
+        assert_eq!(&data[2..6], &(70u32).to_le_bytes());
+        assert_eq!(&data[10..14], &(54u32).to_le_bytes());
+        assert_eq!(&data[14..18], &(40u32).to_le_bytes());
+        assert_eq!(&data[18..22], &(2i32).to_le_bytes());
+        assert_eq!(&data[22..26], &(2i32).to_le_bytes());
+        assert_eq!(&data[26..28], &(1u16).to_le_bytes());
+        assert_eq!(&data[28..30], &(24u16).to_le_bytes());
+        assert_eq!(&data[34..38], &(16u32).to_le_bytes());
+
+        std::fs::remove_file(path).unwrap();
     }
 }
