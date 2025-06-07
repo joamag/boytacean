@@ -47,11 +47,17 @@ pub struct Cpu {
     pub h: u8,
     pub l: u8,
 
+    /// Interrupt Master Enable (IME) flag, indicates if the CPU is
+    /// currently allowing interrupts to be serviced.
     ime: bool,
+
     zero: bool,
     sub: bool,
     half_carry: bool,
     carry: bool,
+
+    /// Indicates if the CPU is currently halted, waiting for an
+    /// interrupt to be serviced.
     halted: bool,
 
     /// Reference to the MMU (Memory Management Unit) to be used
@@ -162,22 +168,21 @@ impl Cpu {
             pc
         );
 
-        // @TODO this is so bad, need to improve this by an order
-        // of magnitude, to be able to have better performance
-        // in case the CPU execution halted and there's an interrupt
-        // to be handled, releases the CPU from the halted state
-        // this verification is only done in case the IME (interrupt
-        // master enable) is disabled, otherwise the CPU halt disabled
-        // is going to be handled ahead
-        if self.halted
-            && !self.ime
-            && self.mmu.ie != 0x00
-            && (((self.mmu.ie & 0x01 == 0x01) && self.mmu.ppu().int_vblank())
-                || ((self.mmu.ie & 0x02 == 0x02) && self.mmu.ppu().int_stat())
-                || ((self.mmu.ie & 0x04 == 0x04) && self.mmu.timer().int_tima())
-                || ((self.mmu.ie & 0x08 == 0x08) && self.mmu.serial().int_serial())
-                || ((self.mmu.ie & 0x10 == 0x10) && self.mmu.pad().int_pad()))
-        {
+        // fetch the current interrupt request flags with the enabled mask
+        // applied, each interrupt flag is fetched once so that both the
+        // halt release check and the handler dispatch reuse the value
+        let flags = (self.mmu.ppu().int_vblank() as u8)
+            | ((self.mmu.ppu().int_stat() as u8) << 1)
+            | ((self.mmu.timer().int_tima() as u8) << 2)
+            | ((self.mmu.serial().int_serial() as u8) << 3)
+            | ((self.mmu.pad().int_pad() as u8) << 4);
+        let pending = flags & self.mmu.ie;
+
+        // in case the CPU execution is halted and there's a pending interrupt
+        // while IME is disabled, releases the CPU from the halted state so that
+        // execution can continue until the interrupt is serviced, this prevents
+        // the CPU from getting stuck in the halted state
+        if self.halted && !self.ime && pending != 0 {
             self.halted = false;
         }
 
@@ -186,8 +191,8 @@ impl Cpu {
         // to check which one should be handled and then handles it
         // this code assumes that the're no more that one interrupt triggered
         // per clock cycle, this is a limitation of the current implementation
-        if self.ime && self.mmu.ie != 0x00 {
-            if (self.mmu.ie & 0x01 == 0x01) && self.mmu.ppu().int_vblank() {
+        if self.ime && pending != 0 {
+            if pending & 0x01 == 0x01 {
                 debugln!("Going to run V-Blank interrupt handler (0x40)");
 
                 self.disable_int();
@@ -209,7 +214,7 @@ impl Cpu {
                 }
 
                 return 20;
-            } else if (self.mmu.ie & 0x02 == 0x02) && self.mmu.ppu().int_stat() {
+            } else if pending & 0x02 == 0x02 {
                 debugln!("Going to run LCD STAT interrupt handler (0x48)");
 
                 self.disable_int();
@@ -227,7 +232,7 @@ impl Cpu {
                 }
 
                 return 20;
-            } else if (self.mmu.ie & 0x04 == 0x04) && self.mmu.timer().int_tima() {
+            } else if pending & 0x04 == 0x04 {
                 debugln!("Going to run Timer interrupt handler (0x50)");
 
                 self.disable_int();
@@ -245,7 +250,7 @@ impl Cpu {
                 }
 
                 return 20;
-            } else if (self.mmu.ie & 0x08 == 0x08) && self.mmu.serial().int_serial() {
+            } else if pending & 0x08 == 0x08 {
                 debugln!("Going to run Serial interrupt handler (0x58)");
 
                 self.disable_int();
@@ -263,7 +268,7 @@ impl Cpu {
                 }
 
                 return 20;
-            } else if (self.mmu.ie & 0x10 == 0x10) && self.mmu.pad().int_pad() {
+            } else if pending & 0x10 == 0x10 {
                 debugln!("Going to run JoyPad interrupt handler (0x60)");
 
                 self.disable_int();
@@ -295,7 +300,10 @@ impl Cpu {
         // (Program Counter) according to the final value returned
         // by the fetch operation (we may need to fetch instruction
         // more than one byte of length)
-        let (inst, pc) = self.fetch(self.pc);
+        #[cfg(feature = "cpulog")]
+        let (inst, pc, opcode, is_prefix) = self.fetch(self.pc);
+        #[cfg(not(feature = "cpulog"))]
+        let (inst, pc, _, _) = self.fetch(self.pc);
         self.ppc = self.pc;
         self.pc = pc;
 
@@ -334,7 +342,7 @@ impl Cpu {
     }
 
     #[inline(always)]
-    fn fetch(&self, pc: u16) -> (Instruction, u16) {
+    fn fetch(&self, pc: u16) -> (Instruction, u16, u8, bool) {
         let mut pc = pc;
 
         // fetches the current instruction and increments
@@ -355,9 +363,11 @@ impl Cpu {
             inst = &INSTRUCTIONS[opcode as usize];
         }
 
-        // returns both the fetched instruction and the
-        // updated PC (Program Counter) value
-        (inst, pc)
+        // returns both the fetched instruction, the updated
+        // PC (Program Counter) value, the resolved opcode
+        // and the flag that indicates if the instruction is
+        //a prefix instruction
+        (inst, pc, opcode, is_prefix)
     }
 
     #[inline(always)]
@@ -661,7 +671,7 @@ impl Cpu {
     }
 
     pub fn description_default(&self) -> String {
-        let (inst, _) = self.fetch(self.ppc);
+        let (inst, _, _, _) = self.fetch(self.ppc);
         self.description(inst, self.ppc)
     }
 }
@@ -735,6 +745,8 @@ mod tests {
 
     use super::Cpu;
 
+    /// Tests that the CPU is able to execute instructions and
+    /// that the state is updated correctly.
     #[test]
     fn test_cpu_clock() {
         let mut cpu = Cpu::default();
@@ -866,6 +878,7 @@ mod tests {
         assert_eq!(cpu.a, 0x0a ^ 0x0f);
     }
 
+    /// Tests that the CPU is able to save and restore its state.
     #[test]
     fn test_state_and_set_state() {
         let cpu = Cpu {
@@ -913,5 +926,74 @@ mod tests {
         assert!(new_cpu.halted);
         assert_eq!(new_cpu.cycles, 0x78);
         assert_eq!(new_cpu.ppc, 0x9abc);
+    }
+
+    /// Tests that the CPU ignores interrupts when IME is disabled.
+    #[test]
+    fn test_int_ignored_ime_disabled() {
+        let mut cpu = Cpu::default();
+        cpu.boot();
+        cpu.mmu.allocate_default();
+
+        cpu.pc = 0xc000;
+        cpu.sp = 0xfffe;
+        cpu.mmu.write(0xc000, 0x00);
+        cpu.mmu.ie = 0x01;
+        cpu.mmu.ppu().set_int_vblank(true);
+        cpu.disable_int();
+
+        let cycles = cpu.clock();
+        assert_eq!(cycles, 4);
+        assert_eq!(cpu.pc, 0xc001);
+        assert_eq!(cpu.sp, 0xfffe);
+        assert!(cpu.mmu.ppu().int_vblank());
+    }
+
+    /// Tests that the CPU is able to handle interrupts
+    /// when IME is enabled.
+    #[test]
+    fn test_int_handled_ime_enabled() {
+        let mut cpu = Cpu::default();
+        cpu.boot();
+        cpu.mmu.allocate_default();
+
+        cpu.pc = 0xc000;
+        cpu.sp = 0xfffe;
+        cpu.mmu.write(0xc000, 0x00);
+        cpu.mmu.ie = 0x01;
+        cpu.mmu.ppu().set_int_vblank(true);
+        cpu.enable_int();
+
+        let cycles = cpu.clock();
+        assert_eq!(cycles, 20);
+        assert_eq!(cpu.pc, 0x40);
+        assert_eq!(cpu.sp, 0xfffc);
+        assert!(!cpu.mmu.ppu().int_vblank());
+        assert!(!cpu.ime());
+        assert_eq!(cpu.mmu.read(0xfffc), 0x00);
+        assert_eq!(cpu.mmu.read(0xfffd), 0xc0);
+    }
+
+    /// Tests that the CPU is released from the halted state when an
+    /// interrupt is pending, even when IME is disabled.
+    #[test]
+    fn test_halt_released_on_pending_int() {
+        let mut cpu = Cpu::default();
+        cpu.boot();
+        cpu.mmu.allocate_default();
+
+        cpu.pc = 0xc000;
+        cpu.sp = 0xfffe;
+        cpu.mmu.write(0xc000, 0x00);
+        cpu.mmu.ie = 0x01;
+        cpu.mmu.ppu().set_int_vblank(true);
+        cpu.disable_int();
+        cpu.halted = true;
+
+        let cycles = cpu.clock();
+        assert_eq!(cycles, 4);
+        assert_eq!(cpu.pc, 0xc001);
+        assert!(!cpu.halted);
+        assert!(cpu.mmu.ppu().int_vblank());
     }
 }
