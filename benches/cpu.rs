@@ -13,7 +13,7 @@ fn benchmark_cpu_clock(c: &mut Criterion) {
 
     c.bench_function("cpu_cycles", |b| {
         b.iter(|| {
-            gb.clocks_cycles(1_000_000);
+            gb.clocks_cycles(1000000);
         })
     });
 }
