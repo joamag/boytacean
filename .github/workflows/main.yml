@@ -145,12 +145,11 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            ${{ env.HOME }}/.vcpkg-root
-            ${{ env.HOME }}/.cache/vcpkg
-            ${{ env.HOME }}/vcpkg
+            ~/.vcpkg-root
+            ~/.cache/vcpkg
+            ~/vcpkg
+            target/vcpkg
           key: vcpkg-${{ runner.os }}-${{ hashFiles('frontends/sdl/Cargo.toml') }}
-          restore-keys: |
-            vcpkg-${{ runner.os }}-
       - name: Install SDL dependencies
         run: cd frontends/sdl && cargo install cargo-vcpkg && cargo vcpkg -v build
       - name: Verify Rust code format
@@ -303,12 +302,11 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            ${{ env.HOME }}/.vcpkg-root
-            ${{ env.HOME }}/.cache/vcpkg
-            ${{ env.HOME }}/vcpkg
+            ~/.vcpkg-root
+            ~/.cache/vcpkg
+            ~/vcpkg
+            target/vcpkg
           key: vcpkg-${{ runner.os }}-${{ hashFiles('frontends/sdl/Cargo.toml') }}
-          restore-keys: |
-            vcpkg-${{ runner.os }}-
       - name: Install SDL dependencies
         run: cd frontends/sdl && cargo install cargo-vcpkg && cargo vcpkg -v build
       - name: Verify Rust code format
