@@ -148,6 +148,7 @@ jobs:
             ~/.vcpkg-root
             ~/.cache/vcpkg
             ~/vcpkg
+            ${{ env.GITHUB_WORKSPACE }}/target/vcpkg
           key: vcpkg-${{ runner.os }}-${{ hashFiles('frontends/sdl/Cargo.toml') }}
           restore-keys: |
             vcpkg-${{ runner.os }}-
@@ -306,6 +307,7 @@ jobs:
             ~/.vcpkg-root
             ~/.cache/vcpkg
             ~/vcpkg
+            ${{ env.GITHUB_WORKSPACE }}/target/vcpkg
           key: vcpkg-${{ runner.os }}-${{ hashFiles('frontends/sdl/Cargo.toml') }}
           restore-keys: |
             vcpkg-${{ runner.os }}-
