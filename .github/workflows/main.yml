@@ -148,7 +148,7 @@ jobs:
             ~/.vcpkg-root
             ~/.cache/vcpkg
             ~/vcpkg
-            $GITHUB_WORKSPACE/target/vcpkg
+            target/vcpkg
           key: vcpkg-${{ runner.os }}-${{ hashFiles('frontends/sdl/Cargo.toml') }}
       - name: Install SDL dependencies
         run: cd frontends/sdl && cargo install cargo-vcpkg && cargo vcpkg -v build
@@ -305,7 +305,7 @@ jobs:
             ~/.vcpkg-root
             ~/.cache/vcpkg
             ~/vcpkg
-            $GITHUB_WORKSPACE/target/vcpkg
+            target/vcpkg
           key: vcpkg-${{ runner.os }}-${{ hashFiles('frontends/sdl/Cargo.toml') }}
       - name: Install SDL dependencies
         run: cd frontends/sdl && cargo install cargo-vcpkg && cargo vcpkg -v build
