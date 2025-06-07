@@ -1483,12 +1483,10 @@ impl BessInfo {
                 break;
             }
         }
-        String::from(
-            String::from_utf8(Vec::from(&self.title[..final_index]))
-                .unwrap()
-                .trim_matches(char::from(0))
-                .trim(),
-        )
+        String::from_utf8_lossy(&self.title[..final_index])
+            .trim_matches('\0')
+            .trim()
+            .to_string()
     }
 }
 

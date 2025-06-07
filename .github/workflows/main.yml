@@ -141,6 +141,16 @@ jobs:
           rustup component add clippy
       - name: Print Rust information
         run: rustc --version
+      - name: Cache SDL build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.HOME }}/.vcpkg-root
+            ${{ env.HOME }}/.cache/vcpkg
+            ${{ env.HOME }}/vcpkg
+          key: vcpkg-${{ runner.os }}-${{ hashFiles('frontends/sdl/Cargo.toml') }}
+          restore-keys: |
+            vcpkg-${{ runner.os }}-
       - name: Install SDL dependencies
         run: cd frontends/sdl && cargo install cargo-vcpkg && cargo vcpkg -v build
       - name: Verify Rust code format
@@ -289,6 +299,16 @@ jobs:
           rustup component add clippy
       - name: Print Rust information
         run: rustc --version
+      - name: Cache SDL build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.HOME }}/.vcpkg-root
+            ${{ env.HOME }}/.cache/vcpkg
+            ${{ env.HOME }}/vcpkg
+          key: vcpkg-${{ runner.os }}-${{ hashFiles('frontends/sdl/Cargo.toml') }}
+          restore-keys: |
+            vcpkg-${{ runner.os }}-
       - name: Install SDL dependencies
         run: cd frontends/sdl && cargo install cargo-vcpkg && cargo vcpkg -v build
       - name: Verify Rust code format
