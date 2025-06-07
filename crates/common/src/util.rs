@@ -76,16 +76,25 @@ pub fn capitalize(string: &str) -> String {
     }
 }
 
+/// Saves the pixel data as a BMP file at the specified path.
+/// The pixel data should be in RGB format, with each pixel
+/// represented by three bytes (red, green, blue).
+///
+/// This is a raw implementation of BMP file saving, not using any
+/// external libraries. It writes the BMP file header and pixel data
+/// directly to the file in the correct format.
 pub fn save_bmp(path: &str, pixels: &[u8], width: u32, height: u32) -> Result<(), Error> {
     let file = File::create(path)
         .map_err(|_| Error::CustomError(format!("Failed to create file: {path}")))?;
     let mut writer = BufWriter::new(file);
 
-    // writes the BMP file header
-    // each row in a BMP is padded to a 4 byte boundary
+    // calculates the size of the BMP file header and the pixel data
+    // according to the BMP file format specification
     let row_bytes = (width * 3 + 3) & !3;
     let image_size = row_bytes * height;
     let file_size = BMP_HEADER_SIZE + image_size;
+
+    // writes the BMP file header into the writer
     writer.write_all(&[0x42, 0x4d]).unwrap(); // "BM" magic number
     writer.write_all(&file_size.to_le_bytes()).unwrap(); // file size
     writer.write_all(&[0x00, 0x00]).unwrap(); // reserved
