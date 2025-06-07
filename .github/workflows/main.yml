@@ -145,9 +145,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            ~/.vcpkg-root
-            ~/.cache/vcpkg
-            ~/vcpkg
+            ${{ env.HOME }}/.vcpkg-root
+            ${{ env.HOME }}/.cache/vcpkg
+            ${{ env.HOME }}/vcpkg
           key: vcpkg-${{ runner.os }}-${{ hashFiles('frontends/sdl/Cargo.toml') }}
           restore-keys: |
             vcpkg-${{ runner.os }}-
