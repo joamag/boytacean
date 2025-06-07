@@ -16,6 +16,15 @@ jobs:
           rustup install 1.82.0
           rustup override set 1.82.0
           rustup default stable-msvc
+      - name: Cache SDL build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.vcpkg-root
+            ~/.cache/vcpkg
+            ~/vcpkg
+            target/vcpkg
+          key: vcpkg-${{ runner.os }}-${{ hashFiles('frontends/sdl/Cargo.toml') }}
       - name: Setup SDL
         run: |
           cd frontends/sdl
@@ -49,6 +58,15 @@ jobs:
         run: |
           rustup install 1.82.0
           rustup override set 1.82.0
+      - name: Cache SDL build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.vcpkg-root
+            ~/.cache/vcpkg
+            ~/vcpkg
+            target/vcpkg
+          key: vcpkg-${{ runner.os }}-${{ hashFiles('frontends/sdl/Cargo.toml') }}
       - name: Setup SDL
         run: |
           cd frontends/sdl

@@ -1,17 +1,18 @@
-//! Decompression utility for BOSC files
+//! Thumbnail extractor for BOSC files
 //!
-//! This utility reads a compressed BOSC file and decompresses it into the BOS format.
-//! It can be used to convert BOSC files back to their original BOS format for further processing.
+//! This utility reads a compressed BOSC file and extracts the thumbnail image,
+//! saving it as a BMP file. If no output file is specified, it will use the input file's
+//! name with a `.bmp` extension.
 //!
 //! # Usage
-//! bosc-decompress <input_file> [output_file]
+//! bosc-thumbnail <bosc_file> [thumbnail_file]
 
-use boytacean::state::{SaveStateFormat, Serialize, StateManager};
+use boytacean::state::{SaveStateFormat, StateManager};
 use std::{env::args, error::Error, fs::File, io::Read, path::Path};
 
 fn print_usage() {
-    println!("Usage: bosc-decompress <input_file> [output_file]");
-    println!("If output_file is not specified, it will use input_file with .bos extension");
+    println!("Usage: bosc-thumbnail <bosc_file> [thumbnail_file]");
+    println!("If thumbnail_file is not specified, it will use bosc_file with .bmp extension");
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -27,14 +28,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         Path::new(&args[2]).to_path_buf()
     } else {
         let mut output = input_path.to_path_buf();
-        output.set_extension("bos");
+        output.set_extension("bmp");
         output
     };
 
-    println!(
-        "Decompressing BOSC file to BOS format {}",
-        output_path.display()
-    );
+    println!("Extracting BOSC thumbnail {}", output_path.display());
 
     // read input file with the compressed values
     let mut input_file = File::open(input_path)?;
@@ -47,12 +45,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         return Err("Input file is not in BOSC format".into());
     }
 
-    // reads as BOSC and convert to BOS
+    // reads as BOSC and saves the thumbnail as BMP
     let mut bosc_state = StateManager::read_bosc(&input_data)?;
-    let mut output_file = File::create(output_path)?;
-    bosc_state.bos().write(&mut output_file)?;
+    bosc_state
+        .bos()
+        .save_image_bmp(output_path.to_str().ok_or("Invalid output path")?)?;
 
-    println!("Successfully decompressed BOSC file to BOS format");
+    println!("Successfully extracted thumbnail from BOSC file");
 
     Ok(())
 }
