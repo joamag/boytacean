@@ -290,6 +290,12 @@ jobs:
           rustup component add clippy
       - name: Print Rust information
         run: rustc --version
+      - name: Install SDL dependencies
+        run: cd frontends/sdl && cargo install cargo-vcpkg && cargo vcpkg -v build
+      - name: Verify Rust code format
+        run: cd frontends/sdl && cargo fmt --all -- --check
+      - name: Verify Rust code linting
+        run: cd frontends/sdl && cargo update -p half --precise 2.2.1 && cargo clippy -- -D warnings -A unknown-lints
       - name: Build documentation
         run: cargo doc --all
       - name: Build all documentation
