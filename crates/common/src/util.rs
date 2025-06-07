@@ -94,9 +94,7 @@ pub fn save_bmp(path: &str, pixels: &[u8], width: u32, height: u32) -> Result<()
     writer.write_all(&[0x01, 0x00]).unwrap(); // color planes
     writer.write_all(&[0x18, 0x00]).unwrap(); // bits per pixel
     writer.write_all(&[0x00, 0x00, 0x00, 0x00]).unwrap(); // compression method
-    writer
-        .write_all(&image_size.to_le_bytes())
-        .unwrap(); // image size
+    writer.write_all(&image_size.to_le_bytes()).unwrap(); // image size
     writer.write_all(&[0x13, 0x0b, 0x00, 0x00]).unwrap(); // horizontal resolution (72 DPI)
     writer.write_all(&[0x13, 0x0b, 0x00, 0x00]).unwrap(); // vertical resolution (72 DPI)
     writer.write_all(&[0x00, 0x00, 0x00, 0x00]).unwrap(); // color palette
@@ -182,7 +180,7 @@ pub fn timestamp() -> u64 {
 mod tests {
     use std::path::Path;
 
-    use super::{capitalize, replace_ext};
+    use super::{capitalize, replace_ext, save_bmp};
 
     #[test]
     fn test_change_extension() {
@@ -234,11 +232,11 @@ mod tests {
 
     #[test]
     fn test_bmp_le_bytes() {
-        // According to the BMP file format specification, both the file size
+        // according to the BMP file format specification, both the file size
         // and the image size fields are stored using little-endian encoding.
         let path = std::env::temp_dir().join("boytacean_le_test.bmp");
         let _ = save_bmp(path.to_str().unwrap(), &[255, 0, 0], 1, 1);
-        let data = std::fs::read(&path).unwrap();
+        let data: Vec<u8> = std::fs::read(&path).unwrap();
         assert_eq!(&data[2..6], &(58u32).to_le_bytes());
         assert_eq!(&data[34..38], &(4u32).to_le_bytes());
         std::fs::remove_file(path).unwrap();
@@ -250,14 +248,10 @@ mod tests {
         // expected structure as defined in the specification.
         let path = std::env::temp_dir().join("boytacean_spec_test.bmp");
         let pixels = [
-            // red
-            255u8, 0, 0,
-            // green
-            0, 255, 0,
-            // blue
-            0, 0, 255,
-            // yellow
-            255, 255, 0,
+            255, 0, 0, // red
+            0, 255, 0, // green
+            0, 0, 255, // blue
+            255, 255, 0, // yellow
         ];
         let _ = save_bmp(path.to_str().unwrap(), &pixels, 2, 2);
         let data = std::fs::read(&path).unwrap();
