@@ -318,4 +318,3 @@ jobs:
       - name: Build all documentation
         run: cargo doc --all --all-features
         if: matrix.rust-image == 'rustlang/rust:nightly'
-
