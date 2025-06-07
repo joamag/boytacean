@@ -87,7 +87,7 @@ impl SdlSystem {
 
 /// Creates an SDL2 Surface structure from the provided
 /// bytes that represent an image (eg: a PNG image buffer).
-pub fn surface_from_bytes(bytes: &[u8]) -> Surface {
+pub fn surface_from_bytes(bytes: &[u8]) -> Surface<'_> {
     unsafe {
         let rw_ops = RWops::from_bytes(bytes).unwrap();
         let raw_surface = image::IMG_Load_RW(rw_ops.raw(), 0);

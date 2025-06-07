@@ -151,8 +151,6 @@ jobs:
         run: cd frontends/sdl && cargo test
       - name: Run all unit tests
         run: cargo test --all
-      - name: Build all documentation
-        run: cargo doc --all --all-features
       - name: Build development version
         run: cd frontends/sdl && cargo build
       - name: Build release version
@@ -263,3 +261,42 @@ jobs:
           cargo build --target=aarch64-linux-android --release
           cargo build --target=armv7-linux-androideabi --release
           cargo build --target=i686-linux-android --release
+  build-docs:
+    name: Build Documentation
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        rust-image: [
+          "rust:1.82.0",
+          "rust:1.83.0",
+          "rust:1.84.0",
+          "rust:1.85.0",
+          "rust:latest",
+          "rustlang/rust:nightly"
+        ]
+    runs-on: ubuntu-latest
+    container: ${{ matrix.rust-image }}
+    steps:
+      - name: Checkout code from repository
+        uses: actions/checkout@v4
+      - name: Install Dependencies
+        run: |
+          apt-get update
+          apt-get install -y -q zip python3-jinja2
+      - name: Install Rust components
+        run: |
+          rustup component add rustfmt
+          rustup component add clippy
+      - name: Print Rust information
+        run: rustc --version
+      - name: Install SDL dependencies
+        run: cd frontends/sdl && cargo install cargo-vcpkg && cargo vcpkg -v build
+      - name: Verify Rust code format
+        run: cd frontends/sdl && cargo fmt --all -- --check
+      - name: Verify Rust code linting
+        run: cd frontends/sdl && cargo update -p half --precise 2.2.1 && cargo clippy -- -D warnings -A unknown-lints
+      - name: Build documentation
+        run: cargo doc --all
+      - name: Build all documentation
+        run: cargo doc --all --all-features
+        if: matrix.rust-image == 'rustlang/rust:nightly'
