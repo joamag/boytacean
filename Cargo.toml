@@ -78,6 +78,10 @@ features = ["wasm", "gen-mock"]
 name = "bosc-decompress"
 path = "src/bin/bosc-decompress.rs"
 
+[[bin]]
+name = "bosc-thumbnail"
+path = "src/bin/bosc-thumbnail.rs"
+
 [[bench]]
 name = "color"
 harness = false
