@@ -124,7 +124,8 @@ jobs:
           "1.83.0",
           "1.84.0",
           "1.85.0",
-          "latest"
+          "latest",
+          "nightly"
         ]
     runs-on: ubuntu-latest
     container: rust:${{ matrix.rust-version }}
@@ -153,6 +154,7 @@ jobs:
         run: cargo test --all
       - name: Build all documentation
         run: cargo doc --all --all-features
+        if: matrix.rust-version == 'nightly'
       - name: Build development version
         run: cd frontends/sdl && cargo build
       - name: Build release version
