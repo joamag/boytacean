@@ -740,6 +740,8 @@ mod tests {
 
     use super::Cpu;
 
+    /// Tests that the CPU is able to execute instructions and
+    /// that the state is updated correctly.
     #[test]
     fn test_cpu_clock() {
         let mut cpu = Cpu::default();
@@ -871,6 +873,7 @@ mod tests {
         assert_eq!(cpu.a, 0x0a ^ 0x0f);
     }
 
+    /// Tests that the CPU is able to save and restore its state.
     #[test]
     fn test_state_and_set_state() {
         let cpu = Cpu {
@@ -920,15 +923,16 @@ mod tests {
         assert_eq!(new_cpu.ppc, 0x9abc);
     }
 
+    /// Tests that the CPU ignores interrupts when IME is disabled.
     #[test]
-    fn test_interrupt_ignored_when_ime_disabled() {
+    fn test_int_ignored_ime_disabled() {
         let mut cpu = Cpu::default();
         cpu.boot();
         cpu.mmu.allocate_default();
 
         cpu.pc = 0xc000;
         cpu.sp = 0xfffe;
-        cpu.mmu.write(0xc000, 0x00); // NOP
+        cpu.mmu.write(0xc000, 0x00);
         cpu.mmu.ie = 0x01;
         cpu.mmu.ppu().set_int_vblank(true);
         cpu.disable_int();
@@ -940,15 +944,17 @@ mod tests {
         assert!(cpu.mmu.ppu().int_vblank());
     }
 
+    /// Tests that the CPU is able to handle interrupts
+    /// when IME is enabled.
     #[test]
-    fn test_interrupt_handled_when_ime_enabled() {
+    fn test_int_handled_ime_enabled() {
         let mut cpu = Cpu::default();
         cpu.boot();
         cpu.mmu.allocate_default();
 
         cpu.pc = 0xc000;
         cpu.sp = 0xfffe;
-        cpu.mmu.write(0xc000, 0x00); // NOP
+        cpu.mmu.write(0xc000, 0x00);
         cpu.mmu.ie = 0x01;
         cpu.mmu.ppu().set_int_vblank(true);
         cpu.enable_int();
@@ -963,15 +969,17 @@ mod tests {
         assert_eq!(cpu.mmu.read(0xfffd), 0xc0);
     }
 
+    /// Tests that the CPU is released from the halted state when an
+    /// interrupt is pending, even when IME is disabled.
     #[test]
-    fn test_halt_released_on_pending_interrupt() {
+    fn test_halt_released_on_pending_int() {
         let mut cpu = Cpu::default();
         cpu.boot();
         cpu.mmu.allocate_default();
 
         cpu.pc = 0xc000;
         cpu.sp = 0xfffe;
-        cpu.mmu.write(0xc000, 0x00); // NOP
+        cpu.mmu.write(0xc000, 0x00);
         cpu.mmu.ie = 0x01;
         cpu.mmu.ppu().set_int_vblank(true);
         cpu.disable_int();
