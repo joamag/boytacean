@@ -25,6 +25,9 @@ pub type SharedMut<T> = Rc<RefCell<T>>;
 /// Significant performance overhead compared to `SharedMut`.
 pub type SharedThread<T> = Arc<Mutex<T>>;
 
+/// The size of a BMP file header in bytes.
+const BMP_HEADER_SIZE: u32 = 54;
+
 /// Reads the contents of the file at the given path into
 /// a vector of bytes.
 pub fn read_file(path: &str) -> Result<Vec<u8>, Error> {
@@ -82,7 +85,7 @@ pub fn save_bmp(path: &str, pixels: &[u8], width: u32, height: u32) -> Result<()
     // each row in a BMP is padded to a 4 byte boundary
     let row_bytes = (width * 3 + 3) & !3;
     let image_size = row_bytes * height;
-    let file_size = 54 + image_size;
+    let file_size = BMP_HEADER_SIZE + image_size;
     writer.write_all(&[0x42, 0x4d]).unwrap(); // "BM" magic number
     writer.write_all(&file_size.to_le_bytes()).unwrap(); // file size
     writer.write_all(&[0x00, 0x00]).unwrap(); // reserved
@@ -178,7 +181,11 @@ pub fn timestamp() -> u64 {
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
+    use std::{
+        env::temp_dir,
+        fs::{read, remove_file},
+        path::Path,
+    };
 
     use super::{capitalize, replace_ext, save_bmp};
 
@@ -234,27 +241,27 @@ mod tests {
     fn test_bmp_le_bytes() {
         // according to the BMP file format specification, both the file size
         // and the image size fields are stored using little-endian encoding.
-        let path = std::env::temp_dir().join("boytacean_le_test.bmp");
-        let _ = save_bmp(path.to_str().unwrap(), &[255, 0, 0], 1, 1);
-        let data: Vec<u8> = std::fs::read(&path).unwrap();
+        let path = temp_dir().join("boytacean_le_test.bmp");
+        save_bmp(path.to_str().unwrap(), &[255, 0, 0], 1, 1).expect("Failed to save BMP file");
+        let data: Vec<u8> = read(&path).unwrap();
         assert_eq!(&data[2..6], &(58u32).to_le_bytes());
         assert_eq!(&data[34..38], &(4u32).to_le_bytes());
-        std::fs::remove_file(path).unwrap();
+        remove_file(path).unwrap();
     }
 
     #[test]
     fn test_bmp_file_structure() {
         // Creates a 2x2 image and verifies that the BMP header follows the
         // expected structure as defined in the specification.
-        let path = std::env::temp_dir().join("boytacean_spec_test.bmp");
+        let path = temp_dir().join("boytacean_spec_test.bmp");
         let pixels = [
             255, 0, 0, // red
             0, 255, 0, // green
             0, 0, 255, // blue
             255, 255, 0, // yellow
         ];
-        let _ = save_bmp(path.to_str().unwrap(), &pixels, 2, 2);
-        let data = std::fs::read(&path).unwrap();
+        save_bmp(path.to_str().unwrap(), &pixels, 2, 2).expect("Failed to save BMP file");
+        let data = read(&path).unwrap();
 
         // header checks
         assert_eq!(&data[0..2], b"BM");
@@ -267,6 +274,6 @@ mod tests {
         assert_eq!(&data[28..30], &(24u16).to_le_bytes());
         assert_eq!(&data[34..38], &(16u32).to_le_bytes());
 
-        std::fs::remove_file(path).unwrap();
+        remove_file(path).unwrap();
     }
 }
