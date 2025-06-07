@@ -124,8 +124,7 @@ jobs:
           "1.83.0",
           "1.84.0",
           "1.85.0",
-          "latest",
-          "nightly"
+          "latest"
         ]
     runs-on: ubuntu-latest
     container: rust:${{ matrix.rust-version }}
