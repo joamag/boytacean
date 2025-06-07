@@ -47,7 +47,9 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // reads as BOSC and saves the thumbnail as BMP
     let mut bosc_state = StateManager::read_bosc(&input_data)?;
-    bosc_state.bos().save_image_bmp(output_path.to_str()?)?;
+    bosc_state
+        .bos()
+        .save_image_bmp(output_path.to_str().ok_or("Invalid output path")?)?;
 
     println!("Successfully extracted thumbnail from BOSC file");
 
