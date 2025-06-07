@@ -151,6 +151,8 @@ jobs:
         run: cd frontends/sdl && cargo test
       - name: Run all unit tests
         run: cargo test --all
+      - name: Build all documentation
+        run: cargo doc --all --all-features
       - name: Build development version
         run: cd frontends/sdl && cargo build
       - name: Build release version
