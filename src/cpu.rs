@@ -47,11 +47,17 @@ pub struct Cpu {
     pub h: u8,
     pub l: u8,
 
+    /// Interrupt Master Enable (IME) flag, indicates if the CPU is
+    /// currently allowing interrupts to be serviced.
     ime: bool,
+
     zero: bool,
     sub: bool,
     half_carry: bool,
     carry: bool,
+
+    /// Indicates if the CPU is currently halted, waiting for an
+    /// interrupt to be serviced.
     halted: bool,
 
     /// Reference to the MMU (Memory Management Unit) to be used
@@ -172,9 +178,10 @@ impl Cpu {
             | ((self.mmu.pad().int_pad() as u8) << 4);
         let pending = flags & self.mmu.ie;
 
-        // in case the CPU execution halted and there's a pending interrupt
-        // while IME is disabled, release the CPU from the halted state so
-        // execution can continue until the interrupt is serviced
+        // in case the CPU execution is halted and there's a pending interrupt
+        // while IME is disabled, releases the CPU from the halted state so that
+        // execution can continue until the interrupt is serviced, this prevents
+        // the CPU from getting stuck in the halted state
         if self.halted && !self.ime && pending != 0 {
             self.halted = false;
         }
