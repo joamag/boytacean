@@ -300,7 +300,10 @@ impl Cpu {
         // (Program Counter) according to the final value returned
         // by the fetch operation (we may need to fetch instruction
         // more than one byte of length)
-        let (inst, pc) = self.fetch(self.pc);
+        #[cfg(feature = "cpulog")]
+        let (inst, pc, opcode, is_prefix) = self.fetch(self.pc);
+        #[cfg(not(feature = "cpulog"))]
+        let (inst, pc, _, _) = self.fetch(self.pc);
         self.ppc = self.pc;
         self.pc = pc;
 
@@ -339,7 +342,7 @@ impl Cpu {
     }
 
     #[inline(always)]
-    fn fetch(&self, pc: u16) -> (Instruction, u16) {
+    fn fetch(&self, pc: u16) -> (Instruction, u16, u8, bool) {
         let mut pc = pc;
 
         // fetches the current instruction and increments
@@ -360,9 +363,11 @@ impl Cpu {
             inst = &INSTRUCTIONS[opcode as usize];
         }
 
-        // returns both the fetched instruction and the
-        // updated PC (Program Counter) value
-        (inst, pc)
+        // returns both the fetched instruction, the updated
+        // PC (Program Counter) value, the resolved opcode
+        // and the flag that indicates if the instruction is
+        //a prefix instruction
+        (inst, pc, opcode, is_prefix)
     }
 
     #[inline(always)]
@@ -666,7 +671,7 @@ impl Cpu {
     }
 
     pub fn description_default(&self) -> String {
-        let (inst, _) = self.fetch(self.ppc);
+        let (inst, _, _, _) = self.fetch(self.ppc);
         self.description(inst, self.ppc)
     }
 }
