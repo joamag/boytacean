@@ -141,7 +141,7 @@ jobs:
           rustup component add clippy
       - name: Print Rust information
         run: rustc --version
-      - name: Cache SDL
+      - name: Cache SDL build
         uses: actions/cache@v4
         with:
           path: |
@@ -298,7 +298,7 @@ jobs:
           rustup component add clippy
       - name: Print Rust information
         run: rustc --version
-      - name: Cache SDL
+      - name: Cache SDL build
         uses: actions/cache@v4
         with:
           path: |
