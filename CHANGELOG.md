@@ -9,11 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-*
+* Support for HBlank DMA transfer
 
 ### Changed
 
-*
+* Added priority based handling of interrupts in the CPU
+* Improved performance of the interrupt handling
 
 ### Fixed
 

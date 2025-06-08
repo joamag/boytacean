@@ -186,105 +186,55 @@ impl Cpu {
             self.halted = false;
         }
 
-        // checks the IME (interrupt master enable) is enabled and then checks
-        // if there's any interrupt to be handled, in case there's one, tries
-        // to check which one should be handled and then handles it
-        // this code assumes that the're no more that one interrupt triggered
-        // per clock cycle, this is a limitation of the current implementation
+        // checks if the IME (interrupt master enable) is enabled and then
+        // checks if there's any interrupt to be handled, if that's the
+        // case handles the highest priority interrupt when multiple are pending
+        // as defined in Game Boy technical documentation
         if self.ime && pending != 0 {
-            if pending & 0x01 == 0x01 {
-                debugln!("Going to run V-Blank interrupt handler (0x40)");
+            // extracts the lowest set bit from the `pending` variable,
+            // this identifies the highest-priority interrupt to handle
+            let mask = pending & (!pending + 1);
 
-                self.disable_int();
-                self.push_word(pc);
-                self.pc = 0x40;
+            // disables the IME (interrupt master enable) flag because
+            // the CPU is going to handle the interrupt and it should not
+            // be re-enabled until the interrupt handler is finished
+            self.disable_int();
+            self.push_word(pc);
 
-                // notifies the MMU about the V-Blank interrupt,
-                // this may trigger some additional operations
-                self.mmu.vblank();
-
-                // acknowledges that the V-Blank interrupt has been
-                // properly handled
-                self.mmu.ppu().ack_vblank();
-
-                // in case the CPU is currently halted waiting
-                // for an interrupt, releases it
+            let addr = match mask {
+                0x01 => {
+                    debugln!("Going to run V-Blank interrupt handler (0x40)");
+                    self.mmu.vblank();
+                    self.mmu.ppu().ack_vblank();
+                    0x40
+                }
+                0x02 => {
+                    debugln!("Going to run LCD STAT interrupt handler (0x48)");
+                    self.mmu.ppu().ack_stat();
+                    0x48
+                }
+                0x04 => {
+                    debugln!("Going to run Timer interrupt handler (0x50)");
+                    self.mmu.timer().ack_tima();
+                    0x50
+                }
+                0x08 => {
+                    debugln!("Going to run Serial interrupt handler (0x58)");
+                    self.mmu.serial().ack_serial();
+                    0x58
+                }
+                0x10 => {
+                    debugln!("Going to run JoyPad interrupt handler (0x60)");
+                    self.mmu.pad().ack_pad();
+                    0x60
+                }
+                _ => 0x00,
+            };
+            if addr != 0x00 {
+                self.pc = addr;
                 if self.halted {
                     self.halted = false;
                 }
-
-                return 20;
-            } else if pending & 0x02 == 0x02 {
-                debugln!("Going to run LCD STAT interrupt handler (0x48)");
-
-                self.disable_int();
-                self.push_word(pc);
-                self.pc = 0x48;
-
-                // acknowledges that the STAT interrupt has been
-                // properly handled
-                self.mmu.ppu().ack_stat();
-
-                // in case the CPU is currently halted waiting
-                // for an interrupt, releases it
-                if self.halted {
-                    self.halted = false;
-                }
-
-                return 20;
-            } else if pending & 0x04 == 0x04 {
-                debugln!("Going to run Timer interrupt handler (0x50)");
-
-                self.disable_int();
-                self.push_word(pc);
-                self.pc = 0x50;
-
-                // acknowledges that the timer interrupt has been
-                // properly handled
-                self.mmu.timer().ack_tima();
-
-                // in case the CPU is currently halted waiting
-                // for an interrupt, releases it
-                if self.halted {
-                    self.halted = false;
-                }
-
-                return 20;
-            } else if pending & 0x08 == 0x08 {
-                debugln!("Going to run Serial interrupt handler (0x58)");
-
-                self.disable_int();
-                self.push_word(pc);
-                self.pc = 0x58;
-
-                // acknowledges that the serial interrupt has been
-                // properly handled
-                self.mmu.serial().ack_serial();
-
-                // in case the CPU is currently halted waiting
-                // for an interrupt, releases it
-                if self.halted {
-                    self.halted = false;
-                }
-
-                return 20;
-            } else if pending & 0x10 == 0x10 {
-                debugln!("Going to run JoyPad interrupt handler (0x60)");
-
-                self.disable_int();
-                self.push_word(pc);
-                self.pc = 0x60;
-
-                // acknowledges that the pad interrupt has been
-                // properly handled
-                self.mmu.pad().ack_pad();
-
-                // in case the CPU is currently halted waiting
-                // for an interrupt, releases it
-                if self.halted {
-                    self.halted = false;
-                }
-
                 return 20;
             }
         }
@@ -995,5 +945,50 @@ mod tests {
         assert_eq!(cpu.pc, 0xc001);
         assert!(!cpu.halted);
         assert!(cpu.mmu.ppu().int_vblank());
+    }
+
+    /// Tests that the CPU handles multiple simultaneous interrupts
+    /// correctly, in the order of their priority.
+    ///
+    /// The VBlank interrupt has a higher priority than the JoyPad
+    /// interrupt, so it should be handled first.
+    #[test]
+    fn test_multiple_interrupts_priority() {
+        let mut cycles;
+
+        let mut cpu = Cpu::default();
+        cpu.boot();
+        cpu.mmu.allocate_default();
+
+        // sets both the VBlank and JoyPad interrupts
+        // and enables them in the IE register, the
+        // VBlank interrupt should be handled first
+        // because it has a higher priority
+        cpu.pc = 0xc000;
+        cpu.sp = 0xfffe;
+        cpu.mmu.write(0xc000, 0x00);
+        cpu.mmu.ie = 0x13;
+        cpu.mmu.ppu().set_int_vblank(true);
+        cpu.mmu.pad().set_int_pad(true);
+        cpu.enable_int();
+
+        // first clock: VBlank interrupt should be handled
+        cycles = cpu.clock();
+        assert_eq!(cycles, 20);
+        assert_eq!(cpu.pc, 0x40);
+        assert!(!cpu.mmu.ppu().int_vblank());
+        assert!(cpu.mmu.pad().int_pad());
+        assert!(!cpu.ime());
+
+        // re-enables IME to allow next interrupt to be handled
+        cpu.enable_int();
+
+        // second clock: Pad interrupt should be handled
+        cycles = cpu.clock();
+        assert_eq!(cycles, 20);
+        assert_eq!(cpu.pc, 0x60);
+        assert!(!cpu.mmu.ppu().int_vblank());
+        assert!(!cpu.mmu.pad().int_pad());
+        assert!(!cpu.ime());
     }
 }

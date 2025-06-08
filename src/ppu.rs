@@ -863,28 +863,28 @@ impl Ppu {
         // of CPU cycles (probably coming from a previous CPU clock)
         self.mode_clock += cycles;
 
-        match self.mode {
-            PpuMode::OamRead => {
-                if self.mode_clock >= 80 {
-                    self.mode = PpuMode::VramRead;
+        loop {
+            match self.mode {
+                PpuMode::OamRead => {
+                    if self.mode_clock < 80 {
+                        break;
+                    }
                     self.mode_clock -= 80;
+                    self.mode = PpuMode::VramRead;
                 }
-            }
-            PpuMode::VramRead => {
-                if self.mode_clock >= 172 {
-                    self.render_line();
-
-                    self.mode = PpuMode::HBlank;
+                PpuMode::VramRead => {
+                    if self.mode_clock < 172 {
+                        break;
+                    }
                     self.mode_clock -= 172;
-                    self.update_stat()
+                    self.render_line();
+                    self.mode = PpuMode::HBlank;
+                    self.update_stat();
                 }
-            }
-            PpuMode::HBlank => {
-                if self.mode_clock >= 204 {
-                    // increments the window counter making sure that the
-                    // valid is only incremented when both the WX and WY
-                    // registers make sense (are within range), the window
-                    // switch is on and the line in drawing is above WY
+                PpuMode::HBlank => {
+                    if self.mode_clock < 204 {
+                        break;
+                    }
                     if self.switch_window
                         && self.wx as i16 - 7 < DISPLAY_WIDTH as i16
                         && self.wy < DISPLAY_HEIGHT as u8
@@ -892,44 +892,30 @@ impl Ppu {
                     {
                         self.window_counter += 1;
                     }
-
-                    // increments the register that holds the
-                    // information about the current line in drawing
                     self.ly += 1;
-
-                    // in case we've reached the end of the
-                    // screen we're now entering the V-Blank
                     if self.ly == 144 {
                         self.int_vblank = true;
                         self.mode = PpuMode::VBlank;
                     } else {
                         self.mode = PpuMode::OamRead;
                     }
-
                     self.mode_clock -= 204;
-                    self.update_stat()
+                    self.update_stat();
                 }
-            }
-            PpuMode::VBlank => {
-                if self.mode_clock >= 456 {
-                    // increments the register that controls the line count,
-                    // notice that these represent the extra 10 horizontal
-                    // scanlines that are virtual and not real (off-screen)
+                PpuMode::VBlank => {
+                    if self.mode_clock < 456 {
+                        break;
+                    }
+                    self.mode_clock -= 456;
                     self.ly += 1;
-
-                    // in case the end of V-Blank has been reached then
-                    // we must jump again to the OAM read mode and reset
-                    // the scan line counter to the zero value
                     if self.ly == 154 {
                         self.mode = PpuMode::OamRead;
                         self.ly = 0;
                         self.window_counter = 0;
                         self.first_frame = false;
                         self.frame_index = self.frame_index.wrapping_add(1);
-                        self.update_stat()
+                        self.update_stat();
                     }
-
-                    self.mode_clock -= 456;
                 }
             }
         }
@@ -2634,5 +2620,15 @@ mod tests {
         assert!(new_ppu.int_stat);
         assert!(new_ppu.dmg_compat);
         assert_eq!(new_ppu.gb_mode, GameBoyMode::Dmg);
+    }
+
+    #[test]
+    fn test_clock_large_cycles() {
+        let mut ppu = Ppu::default();
+        ppu.switch_lcd = true;
+
+        ppu.clock(912);
+        assert_eq!(ppu.ly, 2);
+        assert_eq!(ppu.mode, PpuMode::OamRead);
     }
 }
