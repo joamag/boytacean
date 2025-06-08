@@ -978,7 +978,7 @@ mod tests {
         assert!(cpu.mmu.pad().int_pad());
         assert!(!cpu.ime());
 
-        // re-enable IME to allow next interrupt to be handled
+        // re-enables IME to allow next interrupt to be handled
         cpu.enable_int();
 
         // second clock: Pad interrupt should be handled
