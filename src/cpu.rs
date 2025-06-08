@@ -186,13 +186,21 @@ impl Cpu {
             self.halted = false;
         }
 
-        // checks the IME (interrupt master enable) is enabled and then checks
-        // if there's any interrupt to be handled. Handles the highest
-        // priority interrupt when multiple are pending.
+        // checks if the IME (interrupt master enable) is enabled and then
+        // checks if there's any interrupt to be handled, if that's the
+        // case handles the highest priority interrupt when multiple are pending
+        // as defined in Game Boy technical documentation
         if self.ime && pending != 0 {
+            // extracts the lowest set bit from the `pending` variable,
+            // this identifies the highest-priority interrupt to handle
             let mask = pending & (!pending + 1);
+
+            // disables the IME (interrupt master enable) flag because
+            // the CPU is going to handle the interrupt and it should not
+            // be re-enabled until the interrupt handler is finished
             self.disable_int();
             self.push_word(pc);
+
             let addr = match mask {
                 0x01 => {
                     debugln!("Going to run V-Blank interrupt handler (0x40)");
@@ -220,9 +228,9 @@ impl Cpu {
                     self.mmu.pad().ack_pad();
                     0x60
                 }
-                _ => 0,
+                _ => 0x00,
             };
-            if addr != 0 {
+            if addr != 0x00 {
                 self.pc = addr;
                 if self.halted {
                     self.halted = false;
@@ -939,16 +947,25 @@ mod tests {
         assert!(cpu.mmu.ppu().int_vblank());
     }
 
+    /// Tests that the CPU handles multiple simultaneous interrupts
+    /// correctly, in the order of their priority.
+    ///
+    /// The VBlank interrupt has a higher priority than the JoyPad
+    /// interrupt, so it should be handled first.
     #[test]
     fn test_multiple_interrupts_priority() {
         let mut cpu = Cpu::default();
         cpu.boot();
         cpu.mmu.allocate_default();
 
+        // sets both the VBlank and JoyPad interrupts
+        // and enables them in the IE register, the
+        // VBlank interrupt should be handled first
+        // because it has a higher priority
         cpu.pc = 0xc000;
         cpu.sp = 0xfffe;
         cpu.mmu.write(0xc000, 0x00);
-        cpu.mmu.ie = 0x13; // VBlank and JoyPad enabled
+        cpu.mmu.ie = 0x13;
         cpu.mmu.ppu().set_int_vblank(true);
         cpu.mmu.pad().set_int_pad(true);
         cpu.enable_int();
