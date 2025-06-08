@@ -954,6 +954,8 @@ mod tests {
     /// interrupt, so it should be handled first.
     #[test]
     fn test_multiple_interrupts_priority() {
+        let mut cycles;
+
         let mut cpu = Cpu::default();
         cpu.boot();
         cpu.mmu.allocate_default();
@@ -971,7 +973,7 @@ mod tests {
         cpu.enable_int();
 
         // first clock: VBlank interrupt should be handled
-        let cycles = cpu.clock();
+        cycles = cpu.clock();
         assert_eq!(cycles, 20);
         assert_eq!(cpu.pc, 0x40);
         assert!(!cpu.mmu.ppu().int_vblank());
@@ -982,8 +984,8 @@ mod tests {
         cpu.enable_int();
 
         // second clock: Pad interrupt should be handled
-        let cycles2 = cpu.clock();
-        assert_eq!(cycles2, 20);
+        cycles = cpu.clock();
+        assert_eq!(cycles, 20);
         assert_eq!(cpu.pc, 0x60);
         assert!(!cpu.mmu.ppu().int_vblank());
         assert!(!cpu.mmu.pad().int_pad());
