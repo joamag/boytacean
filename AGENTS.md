@@ -9,6 +9,8 @@ Install Python packages and the Rust toolchain:
 ```bash
 pip install -r requirements.txt
 rustup default stable
+rustup component add rustfmt
+rustup component add clippy
 ```
 
 ## Formatting
@@ -17,6 +19,7 @@ Format all code before committing:
 
 ```bash
 cargo fmt --all
+cargo clippy --fix --allow-dirty --allow-staged --all-features --all-targets
 black .
 ```
 
@@ -25,7 +28,7 @@ black .
 Run the full test suite:
 
 ```bash
-cargo test --all
+cargo test --all-features
 ```
 
 ## Style Guide
