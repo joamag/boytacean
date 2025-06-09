@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 *
 
+## [0.11.6] - 2025-03-20
+
+### Added
+
+* Experimental network serial device for basic netplay
+
 ### Changed
 
 * Added support for HBlank HDMA transfers

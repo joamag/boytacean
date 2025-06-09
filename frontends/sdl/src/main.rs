@@ -5,7 +5,7 @@ pub mod test;
 
 use audio::Audio;
 use boytacean::{
-    devices::{printer::PrinterDevice, stdout::StdoutDevice},
+    devices::{network::NetworkDevice, printer::PrinterDevice, stdout::StdoutDevice},
     gb::{AudioProvider, GameBoy, GameBoyMode},
     info::Info,
     pad::PadKey,
@@ -1097,6 +1097,14 @@ fn build_device(device: &str) -> Result<Box<dyn SerialDevice>, Error> {
                 .unwrap();
             });
             Ok(printer)
+        }
+        device if device.starts_with("net-listen:") => {
+            let addr = &device[11..];
+            Ok(Box::new(NetworkDevice::listen(addr)?))
+        }
+        device if device.starts_with("net:") => {
+            let addr = &device[4..];
+            Ok(Box::new(NetworkDevice::connect(addr)?))
         }
         _ => Err(Error::InvalidParameter(format!(
             "Unsupported device: {device}"

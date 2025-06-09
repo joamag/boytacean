@@ -99,6 +99,15 @@ It's possible to run the emulator in headless mode using the `--headless` parame
 cargo run -- --rom-path ../../res/roms/test/blargg/cpu/cpu_instrs.gb --cycles 100000000 --headless --device stdout --unlimited
 ```
 
+### Network play
+
+Two emulator instances can be connected through a TCP socket to emulate the link cable:
+
+```bash
+cargo run -- --rom-path game.gb --device net-listen:127.0.0.1:6000
+cargo run -- --rom-path game.gb --device net:127.0.0.1:6000
+```
+
 ## Features
 
 | Provider   | Description                                                                                                                                |

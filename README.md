@@ -13,6 +13,7 @@ A Game Boy emulator that is written in Rust 🦀.
 * Web, [SDL](https://www.libsdl.org) and [Libretro](https://www.libretro.com) front-ends
 * Audio, with a pretty accurate APU
 * Serial Data Transfer ([Link Cable](https://en.wikipedia.org/wiki/Game_Link_Cable)) support
+* Experimental network link cable for basic netplay
 * [Game Boy Printer](https://en.wikipedia.org/wiki/Game_Boy_Printer) emulation
 * Support for multiple MBCs: MBC1, MBC2, MBC3, and MBC5
 * Save state support using the [BESS Specification](https://github.com/LIJI32/SameBoy/blob/master/BESS.md) for cross-compatibility with other emulators
