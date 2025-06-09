@@ -704,7 +704,7 @@ impl Default for Mmu {
 mod tests {
     use super::Mmu;
     use crate::{
-        consts::LCDC_ADDR,
+        consts::{HDMA1_ADDR, HDMA2_ADDR, HDMA3_ADDR, HDMA4_ADDR, HDMA5_ADDR, LCDC_ADDR},
         dma::{DmaMode, HDMA_CYCLES_PER_BLOCK},
         gb::GameBoyMode,
     };
@@ -789,6 +789,70 @@ mod tests {
         for i in 0..0x20 {
             assert_eq!(mmu.ppu.vram()[i as usize], i as u8);
         }
+        assert!(!mmu.dma.active_hdma());
+    }
+
+    #[test]
+    fn test_hdma_hblank_stop_resets_cycles() {
+        let mut mmu = Mmu::default();
+        mmu.allocate_cgb();
+        mmu.set_mode(GameBoyMode::Cgb);
+        mmu.ppu.set_gb_mode(GameBoyMode::Cgb);
+
+        for index in 0..0x20 {
+            mmu.write(0xc000 + index, index as u8);
+        }
+
+        mmu.write(HDMA1_ADDR, 0xc0);
+        mmu.write(HDMA2_ADDR, 0x00);
+        mmu.write(HDMA3_ADDR, 0x80);
+        mmu.write(HDMA4_ADDR, 0x00);
+        mmu.write(HDMA5_ADDR, 0x81);
+
+        mmu.ppu.write(LCDC_ADDR, 0x80);
+        mmu.ppu.clear_screen(false);
+
+        mmu.clock_dma(HDMA_CYCLES_PER_BLOCK);
+        assert_eq!(mmu.dma.pending(), 0x10);
+        assert_ne!(mmu.dma.cycles_hdma(), 0);
+
+        mmu.write(HDMA5_ADDR, 0x00);
+
+        assert_eq!(mmu.dma.cycles_hdma(), 0);
+        assert_eq!(mmu.dma.pending(), 0);
+        assert!(!mmu.dma.active_hdma());
+    }
+
+    #[test]
+    fn test_hdma_hblank_stop_mid_block() {
+        let mut mmu = Mmu::default();
+        mmu.allocate_cgb();
+        mmu.set_mode(GameBoyMode::Cgb);
+        mmu.ppu.set_gb_mode(GameBoyMode::Cgb);
+
+        for index in 0..0x20 {
+            mmu.write(0xc000 + index, index as u8);
+        }
+
+        mmu.write(HDMA1_ADDR, 0xc0);
+        mmu.write(HDMA2_ADDR, 0x00);
+        mmu.write(HDMA3_ADDR, 0x80);
+        mmu.write(HDMA4_ADDR, 0x00);
+        mmu.write(HDMA5_ADDR, 0x81);
+
+        mmu.ppu.write(LCDC_ADDR, 0x80);
+        mmu.ppu.clear_screen(false);
+
+        mmu.clock_dma(HDMA_CYCLES_PER_BLOCK);
+        assert_eq!(mmu.dma.pending(), 0x10);
+
+        mmu.clock_dma(HDMA_CYCLES_PER_BLOCK / 2);
+        assert_eq!(mmu.dma.cycles_hdma(), HDMA_CYCLES_PER_BLOCK / 2);
+
+        mmu.write(HDMA5_ADDR, 0x00);
+
+        assert_eq!(mmu.dma.cycles_hdma(), 0);
+        assert_eq!(mmu.dma.pending(), 0);
         assert!(!mmu.dma.active_hdma());
     }
 }
