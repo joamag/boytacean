@@ -33,8 +33,10 @@ cargo test --all-features
 
 ## Style Guide
 
-- Always update `CHANGELOG.md` according to semantic versioning, mentioning your changes.
+- Always update `CHANGELOG.md` according to semantic versioning, mentioning your changes in the unreleased section.
 - Write commit messages using [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
+- Never bump the internal package version in `Cargo.toml` or `setup.py`. This is handled automatically by the release process.
+- Rust files use LF line endings, while Python files use CRLF.
 
 ## License
 
