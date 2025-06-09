@@ -812,14 +812,17 @@ mod tests {
         mmu.ppu.write(LCDC_ADDR, 0x80);
         mmu.ppu.clear_screen(false);
 
+        assert_eq!(mmu.dma.pending(), 0x20);
+        assert_eq!(mmu.dma.cycles_hdma(), 0xffff);
+
         mmu.clock_dma(HDMA_CYCLES_PER_BLOCK);
         assert_eq!(mmu.dma.pending(), 0x10);
-        assert_ne!(mmu.dma.cycles_hdma(), 0);
+        assert_eq!(mmu.dma.cycles_hdma(), HDMA_CYCLES_PER_BLOCK);
 
         mmu.write(HDMA5_ADDR, 0x00);
 
-        assert_eq!(mmu.dma.cycles_hdma(), 0);
-        assert_eq!(mmu.dma.pending(), 0);
+        assert_eq!(mmu.dma.cycles_hdma(), 0x00);
+        assert_eq!(mmu.dma.pending(), 0x00);
         assert!(!mmu.dma.active_hdma());
     }
 
@@ -843,16 +846,21 @@ mod tests {
         mmu.ppu.write(LCDC_ADDR, 0x80);
         mmu.ppu.clear_screen(false);
 
+        assert_eq!(mmu.dma.pending(), 0x20);
+        assert_eq!(mmu.dma.cycles_hdma(), 0xffff);
+
         mmu.clock_dma(HDMA_CYCLES_PER_BLOCK);
         assert_eq!(mmu.dma.pending(), 0x10);
+        assert_eq!(mmu.dma.cycles_hdma(), HDMA_CYCLES_PER_BLOCK);
 
         mmu.clock_dma(HDMA_CYCLES_PER_BLOCK / 2);
+        assert_eq!(mmu.dma.pending(), 0x10);
         assert_eq!(mmu.dma.cycles_hdma(), HDMA_CYCLES_PER_BLOCK / 2);
 
         mmu.write(HDMA5_ADDR, 0x00);
 
-        assert_eq!(mmu.dma.cycles_hdma(), 0);
-        assert_eq!(mmu.dma.pending(), 0);
+        assert_eq!(mmu.dma.cycles_hdma(), 0x00);
+        assert_eq!(mmu.dma.pending(), 0x00);
         assert!(!mmu.dma.active_hdma());
     }
 }
