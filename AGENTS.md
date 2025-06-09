@@ -30,7 +30,7 @@ cargo test --all
 
 ## Style Guide
 
-- Update `CHANGELOG.md` according to semantic versioning.
+- Always update `CHANGELOG.md` according to semantic versioning, mentioning your changes.
 - Write commit messages using [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
 
 ## License
