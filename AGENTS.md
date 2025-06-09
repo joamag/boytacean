@@ -8,9 +8,10 @@ Install Python packages and the Rust toolchain:
 
 ```bash
 pip install -r requirements.txt
-rustup default stable
+rustup default nightly
 rustup component add rustfmt
 rustup component add clippy
+cargo install cargo-vcpkg
 ```
 
 ## Formatting
