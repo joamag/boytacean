@@ -2,6 +2,19 @@
 
 This document serves as the main reference for the agent's configuration, usage, and development notes. Please refer to the sections below for detailed instructions and guidelines.
 
+## Configuration
+
+### Rust Configuration
+
+Use the nightly version of Rust for development. This will ensure that all features are compilable.
+
+```bash
+rustup default nightly
+rustup add component rustfmt
+rustup add component clippy
+cargo install cargo-vcpkg
+```
+
 ## Formatting
 
 Always format the code before commiting using, making sure that the Rust code is properly formatted using:
