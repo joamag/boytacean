@@ -332,16 +332,17 @@ impl Mmu {
                     // HDMA transfer is just getting started, so we set the
                     // cycles to the `HDMA_CYCLES_PER_BLOCK`` value, this is done
                     if self.dma.cycles_hdma() == 0xffff {
-                        self.dma
-                            .set_cycles_dma(HDMA_CYCLES_PER_BLOCK * self.speed.multiplier() as u16);
+                        self.dma.set_cycles_hdma(
+                            HDMA_CYCLES_PER_BLOCK * self.speed.multiplier() as u16,
+                        );
                     }
 
                     // runs the HDMA transfer, this is done in blocks of 0x10 bytes
                     // and the transfer is done in HBlank mode, so we can
                     // transfer the data in blocks of 0x10 bytes, this is done
                     // until the pending value is 0x0, at which point we stop
-                    let cycles_dma = self.dma.cycles_hdma().saturating_sub(cycles);
-                    if cycles_dma == 0x0 {
+                    let cycles_hdma = self.dma.cycles_hdma().saturating_sub(cycles);
+                    if cycles_hdma == 0x0 {
                         let count = 0x10.min(self.dma.pending());
                         if self.mode == GameBoyMode::Cgb {
                             let data = self.read_many(self.dma.source(), count);
@@ -355,12 +356,12 @@ impl Mmu {
                         if self.dma.pending() == 0x0 {
                             self.dma.set_active_hdma(false);
                         } else {
-                            self.dma.set_cycles_dma(
+                            self.dma.set_cycles_hdma(
                                 HDMA_CYCLES_PER_BLOCK * self.speed.multiplier() as u16,
                             );
                         }
                     } else {
-                        self.dma.set_cycles_dma(cycles_dma);
+                        self.dma.set_cycles_hdma(cycles_hdma);
                     }
                 }
                 _ => (),

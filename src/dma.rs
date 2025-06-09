@@ -190,6 +190,7 @@ impl Dma {
                 // bit 7 is set to 0, the transfer is stopped
                 if value & 0x80 == 0x00 && self.active_hdma && self.mode == DmaMode::HBlank {
                     self.pending = 0;
+                    self.cycles_hdma = 0;
                     self.active_hdma = false;
                 } else {
                     // ensures destination is set within VRAM range
