@@ -1,4 +1,13 @@
-STATIC vec4 scale(sampler2D image, vec2 position, vec2 input_resolution, vec2 output_resolution)
+#version 330 core
+
+in vec2 v_texCoord;          // From vertex shader
+out vec4 FragColor;          // Final pixel color
+
+uniform sampler2D u_image;
+uniform vec2 u_input_resolution;
+uniform vec2 u_output_resolution;
+
+vec4 scale(sampler2D image, vec2 position, vec2 input_resolution, vec2 output_resolution)
 {
     vec2 pixel = position * input_resolution - vec2(0.5, 0.5);
 
@@ -10,5 +19,10 @@ STATIC vec4 scale(sampler2D image, vec2 position, vec2 input_resolution, vec2 ou
     vec4 r1 = mix(q11, q21, fract(pixel.x));
     vec4 r2 = mix(q12, q22, fract(pixel.x));
 
-    return mix (r1, r2, fract(pixel.y));
+    return mix(r1, r2, fract(pixel.y));
+}
+
+void main()
+{
+    FragColor = scale(u_image, v_texCoord, u_input_resolution, u_output_resolution);
 }

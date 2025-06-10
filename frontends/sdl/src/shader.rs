@@ -1,8 +1,5 @@
 use gl::types::*;
-use std::{
-    ffi::{CStr, CString},
-    fs,
-};
+use std::{ffi::CString, fs};
 
 pub fn load_fragment_shader(path: &str) -> Result<u32, String> {
     let source = fs::read_to_string(path).map_err(|e| e.to_string())?;
@@ -10,6 +7,12 @@ pub fn load_fragment_shader(path: &str) -> Result<u32, String> {
 }
 
 unsafe fn compile_shader(kind: GLenum, source: &str) -> Result<u32, String> {
+    let vertex_shader = gl::CreateShader(gl::VERTEX_SHADER);
+    let vertex_source = fs::read_to_string("res/shaders/base.vsh").map_err(|e| e.to_string())?;
+    let c_str = CString::new(vertex_source).unwrap();
+    gl::ShaderSource(vertex_shader, 1, &c_str.as_ptr(), std::ptr::null());
+    gl::CompileShader(vertex_shader);
+
     let shader = gl::CreateShader(kind);
     let c_str = CString::new(source).unwrap();
     gl::ShaderSource(shader, 1, &c_str.as_ptr(), std::ptr::null());
@@ -32,6 +35,7 @@ unsafe fn compile_shader(kind: GLenum, source: &str) -> Result<u32, String> {
         return Err(String::from_utf8_lossy(&buf).into_owned());
     }
     let program = gl::CreateProgram();
+    gl::AttachShader(program, vertex_shader);
     gl::AttachShader(program, shader);
     gl::LinkProgram(program);
     gl::DeleteShader(shader);
