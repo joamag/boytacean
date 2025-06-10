@@ -151,8 +151,8 @@ pub struct Apu {
     audio_buffer_max: usize,
 
     filter_mode: HighPassFilter,
-    filter_prev_in: [f32; 2],
-    filter_prev_out: [f32; 2],
+    filter_rate: f32,
+    filter_diff: [f32; 2],
 
     clock_freq: u32,
 }
@@ -245,8 +245,8 @@ impl Apu {
             ),
             audio_buffer_max: (sampling_rate as f32 * buffer_size) as usize * channels as usize,
             filter_mode: HighPassFilter::Disable,
-            filter_prev_in: [0.0; 2],
-            filter_prev_out: [0.0; 2],
+            filter_rate: (0.999_958_f64.powf(clock_freq as f64 / sampling_rate as f64)) as f32,
+            filter_diff: [0.0; 2],
             clock_freq,
         }
     }
@@ -323,8 +323,7 @@ impl Apu {
         self.sequencer_step = 0;
         self.output_timer = 0;
 
-        self.filter_prev_in = [0.0; 2];
-        self.filter_prev_out = [0.0; 2];
+        self.filter_diff = [0.0; 2];
 
         self.clear_audio_buffer()
     }
@@ -781,19 +780,28 @@ impl Apu {
     }
 
     fn filter_sample(&mut self, sample: u8, channel: usize) -> u8 {
+        let input = sample as f32;
         match self.filter_mode {
-            HighPassFilter::Disable => sample,
-            HighPassFilter::Preserve | HighPassFilter::Accurate => {
-                let coef = if self.filter_mode == HighPassFilter::Preserve {
-                    0.996
+            HighPassFilter::Disable => {
+                self.filter_diff[channel] = 0.0;
+                sample
+            }
+            HighPassFilter::Accurate => {
+                let output = input - self.filter_diff[channel];
+                self.filter_diff[channel] =
+                    input - (input - self.filter_diff[channel]) * self.filter_rate;
+                output.clamp(0.0, 255.0) as u8
+            }
+            HighPassFilter::Preserve => {
+                let output = input - self.filter_diff[channel];
+                let volume_bits = if channel == 0 {
+                    (self.master & 0x07) as f32
                 } else {
-                    0.999_958
+                    ((self.master >> 4) & 0x07) as f32
                 };
-                let input = sample as f32;
-                let output =
-                    input - self.filter_prev_in[channel] + coef * self.filter_prev_out[channel];
-                self.filter_prev_in[channel] = input;
-                self.filter_prev_out[channel] = output;
+                let volume = (volume_bits + 1.0) * 15.0;
+                self.filter_diff[channel] = volume * (1.0 - self.filter_rate)
+                    + self.filter_diff[channel] * self.filter_rate;
                 output.clamp(0.0, 255.0) as u8
             }
         }
@@ -881,8 +889,7 @@ impl Apu {
 
     pub fn set_filter_mode(&mut self, mode: HighPassFilter) {
         self.filter_mode = mode;
-        self.filter_prev_in = [0.0; 2];
-        self.filter_prev_out = [0.0; 2];
+        self.filter_diff = [0.0; 2];
     }
 
     pub fn audio_buffer(&self) -> &VecDeque<u8> {
