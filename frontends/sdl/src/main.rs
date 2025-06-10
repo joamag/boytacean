@@ -1,6 +1,7 @@
 pub mod audio;
 pub mod data;
 pub mod sdl;
+pub mod shader;
 pub mod test;
 
 use audio::Audio;
@@ -317,6 +318,14 @@ impl Emulator {
             .unwrap()
             .to_string();
         Ok(())
+    }
+
+    pub fn load_shader(&mut self, path: &str) -> Result<(), String> {
+        if let Some(ref mut sdl) = self.sdl {
+            sdl.load_fragment_shader(path)
+        } else {
+            Err(String::from("SDL system not started"))
+        }
     }
 
     pub fn reset(&mut self) -> Result<(), Error> {
@@ -1016,6 +1025,9 @@ struct Args {
 
     #[arg(default_value_t = String::from(DEFAULT_ROM_PATH), help = "Path to the ROM file to be loaded")]
     rom_path: String,
+
+    #[arg(long, default_value_t = String::from(""), help = "Path to fragment shader file")]
+    shader_path: String,
 }
 
 fn run(args: Args, emulator: &mut Emulator) {
@@ -1101,6 +1113,11 @@ fn main() {
     let mut emulator = Emulator::new(game_boy, options);
     emulator.start(SCREEN_SCALE);
     emulator.load_rom(Some(&args.rom_path)).unwrap();
+    if !args.shader_path.is_empty() {
+        if let Err(err) = emulator.load_shader(&args.shader_path) {
+            println!("Failed to load shader: {err}");
+        }
+    }
     emulator.apply_cheats(&args.cheats);
     emulator.toggle_palette();
 

@@ -1,7 +1,15 @@
 use sdl2::{
-    render::Canvas, rwops::RWops, surface::Surface, sys::image, ttf::Sdl2TtfContext, video::Window,
+    render::Canvas,
+    rwops::RWops,
+    surface::Surface,
+    sys::image,
+    ttf::Sdl2TtfContext,
+    video::{GLContext, GLProfile, Window},
     AudioSubsystem, EventPump, Sdl, TimerSubsystem, VideoSubsystem,
 };
+use std::path::Path;
+
+use crate::shader;
 
 /// Structure that provides the complete set of SDL Graphics
 /// and Sound syb-system ready to be used by the overall
@@ -13,6 +21,8 @@ pub struct SdlSystem {
     pub audio_subsystem: AudioSubsystem,
     pub event_pump: EventPump,
     pub ttf_context: Sdl2TtfContext,
+    pub gl_context: GLContext,
+    pub shader_program: Option<u32>,
 }
 
 impl SdlSystem {
@@ -41,6 +51,11 @@ impl SdlSystem {
 
         // creates the system window that is going to be used to
         // show the emulator and sets it to the central are o screen
+        video_subsystem
+            .gl_attr()
+            .set_context_profile(GLProfile::Core);
+        video_subsystem.gl_attr().set_context_version(3, 0);
+
         let window = video_subsystem
             .window(
                 title,
@@ -52,6 +67,9 @@ impl SdlSystem {
             .opengl()
             .build()
             .unwrap();
+
+        let gl_context = window.gl_create_context().unwrap();
+        gl::load_with(|s| video_subsystem.gl_get_proc_address(s) as *const _);
 
         // creates a canvas (according to spec) to be used in the drawing
         // then clears it so that is can be presented empty initially
@@ -73,6 +91,8 @@ impl SdlSystem {
             audio_subsystem,
             event_pump,
             ttf_context,
+            gl_context,
+            shader_program: None,
         }
     }
 
@@ -82,6 +102,12 @@ impl SdlSystem {
 
     pub fn window_mut(&mut self) -> &mut Window {
         self.canvas.window_mut()
+    }
+
+    pub fn load_fragment_shader<P: AsRef<Path>>(&mut self, path: P) -> Result<(), String> {
+        let program = shader::load_fragment_shader(path.as_ref().to_str().unwrap())?;
+        self.shader_program = Some(program);
+        Ok(())
     }
 }
 
