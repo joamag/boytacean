@@ -1412,7 +1412,7 @@ impl Default for Apu {
 
 #[cfg(test)]
 mod tests {
-    use super::Apu;
+    use super::{Apu, HighPassFilter};
 
     use crate::state::StateComponent;
 
@@ -1631,5 +1631,34 @@ mod tests {
         assert_eq!(new_apu.sequencer_step, 6);
         assert_eq!(new_apu.output_timer, 789);
         assert_eq!(new_apu.filter_mode as u8, 2);
+    }
+
+    #[test]
+    fn test_filter_sample_disable() {
+        let mut apu = Apu::default();
+        let sample = 128;
+        let value = apu.filter_sample(sample, 0);
+        assert_eq!(value, sample);
+    }
+
+    #[test]
+    fn test_filter_sample_preserve() {
+        let mut apu = Apu::default();
+        apu.set_filter_mode(HighPassFilter::Preserve);
+        let sample = 128;
+        let first = apu.filter_sample(sample, 0);
+        let second = apu.filter_sample(sample, 0);
+        assert_eq!(first, 128);
+        assert_eq!(second, 127);
+    }
+
+    #[test]
+    fn test_set_filter_mode_resets_history() {
+        let mut apu = Apu::default();
+        apu.set_filter_mode(HighPassFilter::Preserve);
+        let _ = apu.filter_sample(100, 0);
+        apu.set_filter_mode(HighPassFilter::Accurate);
+        let value = apu.filter_sample(100, 0);
+        assert_eq!(value, 100);
     }
 }
