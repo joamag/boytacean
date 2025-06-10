@@ -38,6 +38,23 @@ pub enum Channel {
     Ch4,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum HighPassFilter {
+    Preserve,
+    Accurate,
+    Disable,
+}
+
+impl HighPassFilter {
+    pub fn from_u8(value: u8) -> Self {
+        match value {
+            0 => HighPassFilter::Preserve,
+            1 => HighPassFilter::Accurate,
+            _ => HighPassFilter::Disable,
+        }
+    }
+}
+
 pub struct Apu {
     ch1_timer: i16,
     ch1_sequence: u8,
@@ -133,6 +150,10 @@ pub struct Apu {
     audio_buffer: VecDeque<u8>,
     audio_buffer_max: usize,
 
+    filter_mode: HighPassFilter,
+    filter_prev_in: [f32; 2],
+    filter_prev_out: [f32; 2],
+
     clock_freq: u32,
 }
 
@@ -223,6 +244,9 @@ impl Apu {
                 (sampling_rate as f32 * buffer_size) as usize * channels as usize,
             ),
             audio_buffer_max: (sampling_rate as f32 * buffer_size) as usize * channels as usize,
+            filter_mode: HighPassFilter::Disable,
+            filter_prev_in: [0.0; 2],
+            filter_prev_out: [0.0; 2],
             clock_freq,
         }
     }
@@ -299,6 +323,9 @@ impl Apu {
         self.sequencer_step = 0;
         self.output_timer = 0;
 
+        self.filter_prev_in = [0.0; 2];
+        self.filter_prev_out = [0.0; 2];
+
         self.clear_audio_buffer()
     }
 
@@ -352,11 +379,14 @@ impl Apu {
                     self.audio_buffer.pop_front();
                 }
             }
+            let sample = self.output();
             if self.left_enabled {
-                self.audio_buffer.push_back(self.output());
+                let value = self.filter_sample(sample, 0);
+                self.audio_buffer.push_back(value);
             }
             if self.right_enabled && self.channels > 1 {
-                self.audio_buffer.push_back(self.output());
+                let value = self.filter_sample(sample, 1);
+                self.audio_buffer.push_back(value);
             }
 
             // calculates the rate at which a new audio sample should be
@@ -750,6 +780,25 @@ impl Apu {
         self.ch1_output() + self.ch2_output() + self.ch3_output() + self.ch4_output()
     }
 
+    fn filter_sample(&mut self, sample: u8, channel: usize) -> u8 {
+        match self.filter_mode {
+            HighPassFilter::Disable => sample,
+            HighPassFilter::Preserve | HighPassFilter::Accurate => {
+                let coef = if self.filter_mode == HighPassFilter::Preserve {
+                    0.996
+                } else {
+                    0.999_958
+                };
+                let input = sample as f32;
+                let output =
+                    input - self.filter_prev_in[channel] + coef * self.filter_prev_out[channel];
+                self.filter_prev_in[channel] = input;
+                self.filter_prev_out[channel] = output;
+                output.clamp(0.0, 255.0) as u8
+            }
+        }
+    }
+
     #[inline(always)]
     pub fn ch1_output(&self) -> u8 {
         if self.ch1_out_enabled {
@@ -824,6 +873,16 @@ impl Apu {
 
     pub fn channels(&self) -> u8 {
         self.channels
+    }
+
+    pub fn filter_mode(&self) -> HighPassFilter {
+        self.filter_mode
+    }
+
+    pub fn set_filter_mode(&mut self, mode: HighPassFilter) {
+        self.filter_mode = mode;
+        self.filter_prev_in = [0.0; 2];
+        self.filter_prev_out = [0.0; 2];
     }
 
     pub fn audio_buffer(&self) -> &VecDeque<u8> {
@@ -1251,6 +1310,7 @@ impl StateComponent for Apu {
         write_u16(&mut cursor, self.sequencer)?;
         write_u8(&mut cursor, self.sequencer_step)?;
         write_i16(&mut cursor, self.output_timer)?;
+        write_u8(&mut cursor, self.filter_mode as u8)?;
 
         Ok(cursor.into_inner())
     }
@@ -1338,6 +1398,7 @@ impl StateComponent for Apu {
         self.sequencer = read_u16(&mut cursor)?;
         self.sequencer_step = read_u8(&mut cursor)?;
         self.output_timer = read_i16(&mut cursor)?;
+        self.filter_mode = HighPassFilter::from_u8(read_u8(&mut cursor)?);
 
         Ok(())
     }
@@ -1484,7 +1545,7 @@ mod tests {
         };
 
         let state = apu.state(None).unwrap();
-        assert_eq!(state.len(), 100);
+        assert_eq!(state.len(), 101);
 
         let mut new_apu = Apu::default();
         new_apu.set_state(&state, None).unwrap();
@@ -1569,5 +1630,6 @@ mod tests {
         assert_eq!(new_apu.sequencer, 12345);
         assert_eq!(new_apu.sequencer_step, 6);
         assert_eq!(new_apu.output_timer, 789);
+        assert_eq!(new_apu.filter_mode as u8, 2);
     }
 }

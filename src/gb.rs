@@ -29,7 +29,7 @@ use std::{
 };
 
 use crate::{
-    apu::Apu,
+    apu::{Apu, HighPassFilter},
     cheats::{
         genie::{GameGenie, GameGenieCode},
         shark::{GameShark, GameSharkCode},
@@ -1497,6 +1497,14 @@ impl GameBoy {
         if rom.game_shark().is_some() {
             rom.game_shark_mut().as_mut().unwrap().reset();
         }
+    }
+
+    pub fn audio_filter_mode(&self) -> HighPassFilter {
+        self.apu_i().filter_mode()
+    }
+
+    pub fn set_audio_filter_mode(&mut self, mode: HighPassFilter) {
+        self.apu().set_filter_mode(mode);
     }
 }
 
