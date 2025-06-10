@@ -48,9 +48,9 @@ pub enum Channel {
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum HighPassFilter {
-    Disable,
-    Preserve,
-    Accurate,
+    Disable = 1,
+    Accurate = 2,
+    Preserve = 3,
 }
 
 impl HighPassFilter {
@@ -61,16 +61,16 @@ impl HighPassFilter {
     pub fn description(&self) -> &'static str {
         match self {
             HighPassFilter::Disable => "Disable",
-            HighPassFilter::Preserve => "Preserve",
             HighPassFilter::Accurate => "Accurate",
+            HighPassFilter::Preserve => "Preserve",
         }
     }
 
     pub fn from_u8(value: u8) -> Self {
         match value {
             1 => HighPassFilter::Disable,
-            2 => HighPassFilter::Preserve,
-            3 => HighPassFilter::Accurate,
+            2 => HighPassFilter::Accurate,
+            3 => HighPassFilter::Preserve,
             _ => HighPassFilter::Disable,
         }
     }
@@ -92,8 +92,8 @@ impl From<HighPassFilter> for u8 {
     fn from(val: HighPassFilter) -> Self {
         match val {
             HighPassFilter::Disable => 1,
-            HighPassFilter::Preserve => 2,
-            HighPassFilter::Accurate => 3,
+            HighPassFilter::Accurate => 2,
+            HighPassFilter::Preserve => 3,
         }
     }
 }
@@ -1727,7 +1727,8 @@ mod tests {
         assert_eq!(new_apu.sequencer, 12345);
         assert_eq!(new_apu.sequencer_step, 6);
         assert_eq!(new_apu.output_timer, 789);
-        assert_eq!(new_apu.filter_mode as u8, 1);
+        assert_eq!(new_apu.filter_mode as u8, 2);
+        assert_eq!(Into::<u8>::into(new_apu.filter_mode), 2);
     }
 
     #[test]
