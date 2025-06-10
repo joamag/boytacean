@@ -58,7 +58,7 @@ impl SdlSystem {
         video_subsystem
             .gl_attr()
             .set_context_profile(GLProfile::Core);
-        video_subsystem.gl_attr().set_context_version(3, 0);
+        video_subsystem.gl_attr().set_context_version(3, 3);
 
         let window = video_subsystem
             .window(
