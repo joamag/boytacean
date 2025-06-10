@@ -340,7 +340,7 @@ pub extern "C" fn retro_run() {
         let audio_buffer = emulator
             .audio_buffer()
             .iter()
-            .map(|v| *v as i16 * 256)
+            .copied()
             .collect::<Vec<i16>>();
         sample_batch_cb(audio_buffer.as_ptr(), audio_buffer.len() / 2_usize);
         emulator.clear_audio_buffer();
