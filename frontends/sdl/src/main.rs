@@ -42,7 +42,7 @@ const SCREEN_SCALE: f32 = 3.0;
 
 /// Base audio volume to be used as the basis of the
 /// amplification level of the volume
-const VOLUME: f32 = 64.0;
+const VOLUME: f32 = 32768.0;
 
 /// The rate (in seconds) at which the current battery
 /// backed RAM is going to be stored into the file system.
