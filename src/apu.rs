@@ -42,7 +42,7 @@ pub enum Channel {
     Ch4,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum HighPassFilter {
     Preserve,
     Accurate,
@@ -63,6 +63,16 @@ impl HighPassFilter {
 impl From<u8> for HighPassFilter {
     fn from(value: u8) -> Self {
         Self::from_u8(value)
+    }
+}
+
+impl Into<u8> for HighPassFilter {
+    fn into(self) -> u8 {
+        match self {
+            HighPassFilter::Disable => 1,
+            HighPassFilter::Preserve => 2,
+            HighPassFilter::Accurate => 3,
+        }
     }
 }
 
@@ -805,20 +815,19 @@ impl Apu {
             + self.ch4_output() as u16
     }
 
+    #[inline(always)]
     fn filter_sample(&mut self, sample: u16, channel: usize) -> i16 {
-        let input = sample as f32;
         match self.filter_mode {
-            HighPassFilter::Disable => {
-                self.filter_diff[channel] = 0.0;
-                sample as i16
-            }
+            HighPassFilter::Disable => sample as i16,
             HighPassFilter::Accurate => {
+                let input = sample as f32;
                 let output = input - self.filter_diff[channel];
                 self.filter_diff[channel] =
                     input - (input - self.filter_diff[channel]) * self.filter_rate;
                 output as i16
             }
             HighPassFilter::Preserve => {
+                let input = sample as f32;
                 let output = input - self.filter_diff[channel];
                 let volume_bits = if channel == 0 {
                     ((self.master >> 4) & 0x07) as f32
@@ -1346,7 +1355,7 @@ impl StateComponent for Apu {
         write_u16(&mut cursor, self.sequencer)?;
         write_u8(&mut cursor, self.sequencer_step)?;
         write_i16(&mut cursor, self.output_timer)?;
-        write_u8(&mut cursor, self.filter_mode as u8)?;
+        write_u8(&mut cursor, self.filter_mode.into())?;
         write_f32(&mut cursor, self.filter_diff[0])?;
         write_f32(&mut cursor, self.filter_diff[1])?;
 
@@ -1715,7 +1724,7 @@ mod tests {
         let mut other = Apu::default();
         other.set_state(&state, None).unwrap();
 
-        assert!(matches!(other.filter_mode, HighPassFilter::Accurate));
+        assert_eq!(other.filter_mode, HighPassFilter::Accurate);
         assert!((other.filter_diff[0] - 2.5).abs() < f32::EPSILON);
         assert!((other.filter_diff[1] - 3.5).abs() < f32::EPSILON);
     }
