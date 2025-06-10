@@ -1,6 +1,10 @@
 //! APU (Audio Processing Unit) functions and structures.
 
-use std::{collections::VecDeque, io::Cursor};
+use std::{
+    collections::VecDeque,
+    fmt::{Display, Formatter},
+    io::Cursor,
+};
 
 use boytacean_common::{
     data::{
@@ -44,12 +48,24 @@ pub enum Channel {
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum HighPassFilter {
+    Disable,
     Preserve,
     Accurate,
-    Disable,
 }
 
 impl HighPassFilter {
+    pub fn next(self) -> Self {
+        (((self as u8 + 1) % 3) + 1).into()
+    }
+
+    pub fn description(&self) -> &'static str {
+        match self {
+            HighPassFilter::Disable => "Disable",
+            HighPassFilter::Preserve => "Preserve",
+            HighPassFilter::Accurate => "Accurate",
+        }
+    }
+
     pub fn from_u8(value: u8) -> Self {
         match value {
             1 => HighPassFilter::Disable,
@@ -57,6 +73,12 @@ impl HighPassFilter {
             3 => HighPassFilter::Accurate,
             _ => HighPassFilter::Disable,
         }
+    }
+}
+
+impl Display for HighPassFilter {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.description())
     }
 }
 
@@ -1272,6 +1294,15 @@ impl Apu {
                 self.tick_length(Channel::Ch4);
             }
         }
+    }
+
+    pub fn description(&self) -> String {
+        format!(
+            "filter: {}, filter diff: {}, filter rate: {}",
+            self.filter_mode.description(),
+            self.filter_diff[0],
+            self.filter_rate
+        )
     }
 }
 

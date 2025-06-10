@@ -1115,10 +1115,11 @@ impl GameBoy {
 
     pub fn description_debug(&self) -> String {
         format!(
-            "{}\nCPU:\n{}\nDMA:\n{}",
+            "{}\nCPU:\n{}\nDMA:\n{}\nAPU:\n{}",
             self.description(12),
             self.cpu_i().description_default(),
-            self.dma_i().description()
+            self.dma_i().description(),
+            self.apu_i().description()
         )
     }
 }

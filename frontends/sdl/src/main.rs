@@ -489,6 +489,30 @@ impl Emulator {
                         ..
                     } => break 'main,
                     Event::KeyDown {
+                        keycode: Some(Keycode::H),
+                        ..
+                    } => {
+                        println!(
+                            "=== Boytacean SDL Controls ===\n\
+Escape or Close Window: Quit the emulator\n\
+H: Show this help message\n\
+I: Save a screenshot as PNG in the current directory\n\
+R: Reset the system (soft reset)\n\
+B: Run a benchmark of the emulator\n\
+T: Toggle audio on/off\n\
+P: Cycle through color palettes\n\
+M: Cycle through audio filter modes\n\
+C: Print debug information\n\
+Ctrl + E: Temporarily increase emulation speed (hold to speed up)\n\
+Ctrl + F: Toggle fullscreen mode\n\
++ / -: Increase / decrease emulation speed\n\
+0-9: Load state from slot (0-9)\n\
+Ctrl + 0-9: Save state to slot (0-9)\n\
+Arrow keys, Enter, Z, X, Backspace, etc.: Game Boy controls\n\
+Drag & drop ROM file: Load new ROM and reset system\n==============================="
+                        );
+                    }
+                    Event::KeyDown {
                         keycode: Some(Keycode::R),
                         ..
                     } => self.reset().unwrap(),
@@ -508,6 +532,12 @@ impl Emulator {
                         keycode: Some(Keycode::P),
                         ..
                     } => self.toggle_palette(),
+                    Event::KeyDown {
+                        keycode: Some(Keycode::M),
+                        ..
+                    } => self
+                        .system
+                        .set_audio_filter_mode(self.system.audio_filter_mode().next()),
                     Event::KeyDown {
                         keycode: Some(Keycode::C),
                         ..
