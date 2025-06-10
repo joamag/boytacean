@@ -1696,7 +1696,7 @@ mod tests {
         assert_eq!(new_apu.sequencer, 12345);
         assert_eq!(new_apu.sequencer_step, 6);
         assert_eq!(new_apu.output_timer, 789);
-        assert_eq!(new_apu.filter_mode as u8, 2);
+        assert_eq!(new_apu.filter_mode as u8, 1);
     }
 
     #[test]
@@ -1705,6 +1705,17 @@ mod tests {
         let sample = 128;
         let value = apu.filter_sample(sample, 0);
         assert_eq!(value, sample as i16);
+    }
+
+    #[test]
+    fn test_filter_sample_accurate() {
+        let mut apu = Apu::default();
+        apu.set_filter_mode(HighPassFilter::Accurate);
+        let sample = 128;
+        let first = apu.filter_sample(sample, 0);
+        let second = apu.filter_sample(sample, 0);
+        assert_eq!(first, 128);
+        assert_eq!(second, 127);
     }
 
     #[test]
@@ -1719,7 +1730,7 @@ mod tests {
     }
 
     #[test]
-    fn test_set_filter_mode_resets_history() {
+    fn test_set_filter_mode_resets_diff() {
         let mut apu = Apu::default();
         apu.set_filter_mode(HighPassFilter::Preserve);
         let _ = apu.filter_sample(100, 0);
@@ -1729,7 +1740,7 @@ mod tests {
     }
 
     #[test]
-    fn test_state_preserves_filter_history() {
+    fn test_state_preserves_filter() {
         let mut apu = Apu::default();
         apu.set_filter_mode(HighPassFilter::Accurate);
         apu.filter_diff = [2.5, 3.5];
