@@ -50,15 +50,13 @@ pub enum Channel {
 pub enum HighPassFilter {
     Disable = 1,
     Accurate = 2,
-    Preserve = 3,
 }
 
 impl HighPassFilter {
     pub fn next(self) -> Self {
         match self {
             HighPassFilter::Disable => HighPassFilter::Accurate,
-            HighPassFilter::Accurate => HighPassFilter::Preserve,
-            HighPassFilter::Preserve => HighPassFilter::Disable,
+            HighPassFilter::Accurate => HighPassFilter::Disable,
         }
     }
 
@@ -66,7 +64,6 @@ impl HighPassFilter {
         match self {
             HighPassFilter::Disable => "Disable",
             HighPassFilter::Accurate => "Accurate",
-            HighPassFilter::Preserve => "Preserve",
         }
     }
 
@@ -74,7 +71,6 @@ impl HighPassFilter {
         match value {
             1 => HighPassFilter::Disable,
             2 => HighPassFilter::Accurate,
-            3 => HighPassFilter::Preserve,
             _ => HighPassFilter::Disable,
         }
     }
@@ -97,7 +93,6 @@ impl From<HighPassFilter> for u8 {
         match val {
             HighPassFilter::Disable => 1,
             HighPassFilter::Accurate => 2,
-            HighPassFilter::Preserve => 3,
         }
     }
 }
@@ -864,19 +859,6 @@ impl Apu {
                 let output = input - self.filter_diff[channel];
                 self.filter_diff[channel] =
                     input - (input - self.filter_diff[channel]) * self.filter_rate;
-                output as i16
-            }
-            HighPassFilter::Preserve => {
-                let input = sample as f32;
-                let output = input - self.filter_diff[channel];
-                let volume_bits = if channel == 0 {
-                    ((self.master >> 4) & 0x07) as f32
-                } else {
-                    (self.master & 0x07) as f32
-                };
-                let volume = (volume_bits + 1.0) * 15.0;
-                self.filter_diff[channel] = volume * (1.0 - self.filter_rate)
-                    + self.filter_diff[channel] * self.filter_rate;
                 output as i16
             }
         }
@@ -1755,20 +1737,9 @@ mod tests {
     }
 
     #[test]
-    fn test_filter_sample_preserve() {
-        let mut apu = Apu::default();
-        apu.set_filter_mode(HighPassFilter::Preserve);
-        let sample = 128;
-        let first = apu.filter_sample(sample, 0);
-        let second = apu.filter_sample(sample, 0);
-        assert_eq!(first, 128);
-        assert_eq!(second, 127);
-    }
-
-    #[test]
     fn test_set_filter_mode_resets_diff() {
         let mut apu = Apu::default();
-        apu.set_filter_mode(HighPassFilter::Preserve);
+        apu.set_filter_mode(HighPassFilter::Disable);
         let _ = apu.filter_sample(100, 0);
         apu.set_filter_mode(HighPassFilter::Accurate);
         let value = apu.filter_sample(100, 0);
@@ -1793,7 +1764,6 @@ mod tests {
     #[test]
     fn test_high_pass_filter_next() {
         assert_eq!(HighPassFilter::Disable.next(), HighPassFilter::Accurate);
-        assert_eq!(HighPassFilter::Accurate.next(), HighPassFilter::Preserve);
-        assert_eq!(HighPassFilter::Preserve.next(), HighPassFilter::Disable);
+        assert_eq!(HighPassFilter::Accurate.next(), HighPassFilter::Disable);
     }
 }
