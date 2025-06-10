@@ -423,8 +423,8 @@ pub struct Registers {
 }
 
 pub trait AudioProvider {
-    fn audio_output(&self) -> u8;
-    fn audio_buffer(&self) -> &VecDeque<u8>;
+    fn audio_output(&self) -> u16;
+    fn audio_buffer(&self) -> &VecDeque<i16>;
     fn clear_audio_buffer(&mut self);
 }
 
@@ -814,7 +814,7 @@ impl GameBoy {
         self.frame_buffer_raw().to_vec()
     }
 
-    pub fn audio_buffer_eager(&mut self, clear: bool) -> Vec<u8> {
+    pub fn audio_buffer_eager(&mut self, clear: bool) -> Vec<i16> {
         let buffer = Vec::from(self.audio_buffer().clone());
         if clear {
             self.clear_audio_buffer();
@@ -822,17 +822,17 @@ impl GameBoy {
         buffer
     }
 
-    pub fn audio_output(&self) -> u8 {
+    pub fn audio_output(&self) -> u16 {
         self.apu_i().output()
     }
 
-    pub fn audio_all_output(&self) -> Vec<u8> {
+    pub fn audio_all_output(&self) -> Vec<u16> {
         vec![
             self.audio_output(),
-            self.audio_ch1_output(),
-            self.audio_ch2_output(),
-            self.audio_ch3_output(),
-            self.audio_ch4_output(),
+            self.audio_ch1_output() as u16,
+            self.audio_ch2_output() as u16,
+            self.audio_ch3_output() as u16,
+            self.audio_ch4_output() as u16,
         ]
     }
 
@@ -1242,7 +1242,7 @@ impl GameBoy {
         self.ppu().frame_buffer_raw()
     }
 
-    pub fn audio_buffer(&mut self) -> &VecDeque<u8> {
+    pub fn audio_buffer(&mut self) -> &VecDeque<i16> {
         self.apu().audio_buffer()
     }
 
@@ -1622,11 +1622,11 @@ pub fn hook_impl(info: &PanicInfo) {
 }
 
 impl AudioProvider for GameBoy {
-    fn audio_output(&self) -> u8 {
+    fn audio_output(&self) -> u16 {
         self.apu_i().output()
     }
 
-    fn audio_buffer(&self) -> &VecDeque<u8> {
+    fn audio_buffer(&self) -> &VecDeque<i16> {
         self.apu_i().audio_buffer()
     }
 
