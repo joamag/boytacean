@@ -4,6 +4,7 @@ use std::{
     collections::VecDeque,
     fmt::{Display, Formatter},
     io::Cursor,
+    sync::OnceLock,
 };
 
 use boytacean_common::{
@@ -35,6 +36,72 @@ const DUTY_TABLE: [[u8; 8]; 4] = [
 
 const CH4_DIVISORS: [u8; 8] = [8, 16, 32, 48, 64, 80, 96, 112];
 
+const BAND_LIMITED_WIDTH: usize = 16;
+const BAND_LIMITED_PHASES: usize = 512;
+const BAND_LIMITED_ONE: i32 = 0x10000;
+
+static BAND_LIMITED_STEPS: OnceLock<[[i32; BAND_LIMITED_WIDTH]; BAND_LIMITED_PHASES]> =
+    OnceLock::new();
+
+fn band_limited_steps() -> &'static [[i32; BAND_LIMITED_WIDTH]; BAND_LIMITED_PHASES] {
+    BAND_LIMITED_STEPS.get_or_init(|| {
+        let master_size = BAND_LIMITED_WIDTH * BAND_LIMITED_PHASES;
+        let mut master = vec![0.0f64; master_size];
+        let sine_size = 256 * BAND_LIMITED_PHASES + 2;
+        let max_harmonic = sine_size / 2 / BAND_LIMITED_PHASES;
+        for harmonic in (1..=max_harmonic).step_by(2) {
+            let amplitude = 1.0 / harmonic as f64 / 2.0;
+            let to_angle = std::f64::consts::PI * 2.0 / sine_size as f64 * harmonic as f64;
+            for (i, slot) in master.iter_mut().enumerate() {
+                let x = (i as isize + 1 - master_size as isize / 2) as f64;
+                *slot += (x * to_angle).sin() * amplitude;
+            }
+        }
+
+        for i in 0..master_size - 1 {
+            master[i] += master[master_size - 1];
+            master[i] /= master[master_size - 1] * 2.0;
+        }
+        master[master_size - 1] = 1.0;
+
+        let mut steps = [[0i32; BAND_LIMITED_WIDTH]; BAND_LIMITED_PHASES];
+        for phase in 0..BAND_LIMITED_PHASES {
+            let mut error = BAND_LIMITED_ONE;
+            let mut prev = 0;
+            for i in 0..BAND_LIMITED_WIDTH {
+                let cur = (master[(BAND_LIMITED_PHASES - 1 - phase) + i * BAND_LIMITED_PHASES]
+                    * BAND_LIMITED_ONE as f64) as i32;
+                let delta = cur - prev;
+                error -= delta;
+                prev = cur;
+                steps[phase][i] = delta;
+            }
+            steps[phase][BAND_LIMITED_WIDTH / 2 - 1] += error / 2;
+            steps[phase][0] += error - (error / 2);
+        }
+        steps
+    })
+}
+
+fn band_limited_update(bl: &mut BandLimited, input: &BlSample, phase: u32) {
+    if input.left == bl.input.left && input.right == bl.input.right {
+        return;
+    }
+    let delay = (phase as usize) / BAND_LIMITED_PHASES;
+    let phase = (phase as usize) & (BAND_LIMITED_PHASES - 1);
+
+    let delta_left = input.left - bl.input.left;
+    let delta_right = input.right - bl.input.right;
+    bl.input = *input;
+
+    let steps = band_limited_steps();
+    for i in 0..BAND_LIMITED_WIDTH {
+        let offset = (i + bl.pos as usize + delay) & (bl.buffer.len() - 1);
+        bl.buffer[offset].left += delta_left * steps[phase][i];
+        bl.buffer[offset].right += delta_right * steps[phase][i];
+    }
+}
+
 /// The base rate for the filter, this is used to calculate the
 /// filter rate based on the clock frequency and the sampling rate.
 const FILTER_RATE_BASE: f64 = 0.999958;
@@ -50,6 +117,50 @@ pub enum Channel {
 pub enum HighPassFilter {
     Disable = 1,
     Accurate = 2,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum UpdateMode {
+    Direct = 1,
+    BandLimited = 2,
+}
+
+impl UpdateMode {
+    pub fn description(&self) -> &'static str {
+        match self {
+            UpdateMode::Direct => "Direct",
+            UpdateMode::BandLimited => "Band Limited",
+        }
+    }
+
+    pub fn from_u8(value: u8) -> Self {
+        match value {
+            1 => UpdateMode::Direct,
+            2 => UpdateMode::BandLimited,
+            _ => UpdateMode::Direct,
+        }
+    }
+}
+
+impl std::fmt::Display for UpdateMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.description())
+    }
+}
+
+impl From<u8> for UpdateMode {
+    fn from(value: u8) -> Self {
+        Self::from_u8(value)
+    }
+}
+
+impl From<UpdateMode> for u8 {
+    fn from(val: UpdateMode) -> Self {
+        match val {
+            UpdateMode::Direct => 1,
+            UpdateMode::BandLimited => 2,
+        }
+    }
 }
 
 impl HighPassFilter {
@@ -95,6 +206,20 @@ impl From<HighPassFilter> for u8 {
             HighPassFilter::Accurate => 2,
         }
     }
+}
+
+#[derive(Clone, Copy, Default)]
+struct BlSample {
+    left: i32,
+    right: i32,
+}
+
+#[derive(Default)]
+struct BandLimited {
+    buffer: [BlSample; BAND_LIMITED_WIDTH * 2],
+    output: BlSample,
+    pos: u8,
+    input: BlSample,
 }
 
 pub struct Apu {
@@ -202,6 +327,7 @@ pub struct Apu {
     audio_buffer_max: usize,
 
     filter_mode: HighPassFilter,
+    update_mode: UpdateMode,
     filter_rate: f32,
     filter_diff: [f32; 2],
 
@@ -297,6 +423,7 @@ impl Apu {
             ),
             audio_buffer_max: (sampling_rate as f32 * buffer_size) as usize * channels as usize,
             filter_mode: HighPassFilter::Accurate,
+            update_mode: UpdateMode::Direct,
             filter_rate: FILTER_RATE_BASE.powf(clock_freq as f64 / sampling_rate as f64) as f32,
             filter_diff: [0.0; 2],
             clock_freq,
@@ -376,6 +503,7 @@ impl Apu {
         self.output_timer = 0;
 
         self.filter_diff = [0.0; 2];
+        self.update_mode = UpdateMode::Direct;
 
         self.clear_audio_buffer()
     }
@@ -949,6 +1077,14 @@ impl Apu {
         self.filter_diff = [0.0; 2];
     }
 
+    pub fn update_mode(&self) -> UpdateMode {
+        self.update_mode
+    }
+
+    pub fn set_update_mode(&mut self, mode: UpdateMode) {
+        self.update_mode = mode;
+    }
+
     pub fn audio_buffer(&self) -> &VecDeque<i16> {
         &self.audio_buffer
     }
@@ -1389,6 +1525,7 @@ impl StateComponent for Apu {
         write_u8(&mut cursor, self.filter_mode.into())?;
         write_f32(&mut cursor, self.filter_diff[0])?;
         write_f32(&mut cursor, self.filter_diff[1])?;
+        write_u8(&mut cursor, self.update_mode.into())?;
 
         Ok(cursor.into_inner())
     }
@@ -1480,6 +1617,7 @@ impl StateComponent for Apu {
         self.filter_mode = read_u8(&mut cursor)?.into();
         self.filter_diff[0] = read_f32(&mut cursor)?;
         self.filter_diff[1] = read_f32(&mut cursor)?;
+        self.update_mode = read_u8(&mut cursor)?.into();
         self.filter_rate =
             FILTER_RATE_BASE.powf(self.clock_freq as f64 / self.sampling_rate as f64) as f32;
 
@@ -1495,7 +1633,7 @@ impl Default for Apu {
 
 #[cfg(test)]
 mod tests {
-    use super::{Apu, HighPassFilter};
+    use super::{Apu, HighPassFilter, UpdateMode};
 
     use crate::state::StateComponent;
 
@@ -1628,7 +1766,7 @@ mod tests {
         };
 
         let state = apu.state(None).unwrap();
-        assert_eq!(state.len(), 109);
+        assert_eq!(state.len(), 110);
 
         let mut new_apu = Apu::default();
         new_apu.set_state(&state, None).unwrap();
@@ -1765,5 +1903,17 @@ mod tests {
     fn test_high_pass_filter_next() {
         assert_eq!(HighPassFilter::Disable.next(), HighPassFilter::Accurate);
         assert_eq!(HighPassFilter::Accurate.next(), HighPassFilter::Disable);
+    }
+
+    #[test]
+    fn test_update_mode_state() {
+        let mut apu = Apu::default();
+        apu.set_update_mode(UpdateMode::BandLimited);
+
+        let state = apu.state(None).unwrap();
+        let mut other = Apu::default();
+        other.set_state(&state, None).unwrap();
+
+        assert_eq!(other.update_mode, UpdateMode::BandLimited);
     }
 }
