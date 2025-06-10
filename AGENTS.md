@@ -1,6 +1,18 @@
-# Agents.md file
+# Development Guide
 
-This document serves as the main reference for the agent's configuration, usage, and development notes. Please refer to the sections below for detailed instructions and guidelines.
+This document describes how to work with the project. Follow these notes when writing code or submitting pull requests.
+
+## Setup
+
+Install Python packages and the Rust toolchain:
+
+```bash
+pip install -r requirements.txt
+rustup default nightly
+rustup component add rustfmt
+rustup component add clippy
+cargo install cargo-vcpkg
+```
 
 ## Configuration
 
@@ -17,37 +29,28 @@ cargo install cargo-vcpkg
 
 ## Formatting
 
-Always format the code before commiting using, making sure that the Rust code is properly formatted using:
+Format all code before committing:
 
 ```bash
 cargo fmt --all
-```
-
-For the Python code, use:
-
-```bash
+cargo clippy --fix --allow-dirty --allow-staged --all-features --all-targets
 black .
 ```
 
 ## Testing
 
-Always run the tests before committing changes to ensure that everything is working as expected. Use the following commands:
+Run the full test suite:
 
 ```bash
-cargo test --all
+cargo test --all-features
 ```
 
 ## Style Guide
 
-### Changelog
-
-It's important to keep track of changes made to the codebase. Use proper semantic versioning and document changes in the `CHANGELOG.md` file.
-
-### Commit Messages
-
-When committing changes, use clear and descriptive commit messages that explain the purpose of the changes. The commit messages should be concise yet informative, providing context for future reference.
-
-Also the commit messages should follow the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) standard to ensure clarity and consistency.
+- Always update `CHANGELOG.md` according to semantic versioning, mentioning your changes in the unreleased section.
+- Write commit messages using [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
+- Never bump the internal package version in `Cargo.toml` or `setup.py`. This is handled automatically by the release process.
+- Rust files use LF line endings, while Python files use CRLF.
 
 ## License
 

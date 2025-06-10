@@ -64,9 +64,9 @@ impl Info {
         if !dependencies.contains_key("wasm-bindgen") {
             return None;
         }
-        Some(String::from(format!(
+        Some(format!(
             "wasm-bindgen/{}",
             *dependencies.get("wasm-bindgen").unwrap()
-        )))
+        ))
     }
 }
