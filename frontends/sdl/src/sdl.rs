@@ -105,6 +105,7 @@ impl SdlSystem {
     }
 
     pub fn load_fragment_shader<P: AsRef<Path>>(&mut self, path: P) -> Result<(), String> {
+        self.canvas.window().gl_make_current(&self.gl_context)?;
         let program = shader::load_fragment_shader(path.as_ref().to_str().unwrap())?;
         self.shader_program = Some(program);
         Ok(())
