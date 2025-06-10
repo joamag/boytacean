@@ -4,8 +4,8 @@ use std::{collections::VecDeque, io::Cursor};
 
 use boytacean_common::{
     data::{
-        read_i16, read_i32, read_into, read_u16, read_u8, write_bytes, write_i16, write_i32,
-        write_u16, write_u8,
+        read_f32, read_i16, read_i32, read_into, read_u16, read_u8, write_bytes, write_f32,
+        write_i16, write_i32, write_u16, write_u8,
     },
     error::Error,
 };
@@ -31,11 +31,49 @@ const DUTY_TABLE: [[u8; 8]; 4] = [
 
 const CH4_DIVISORS: [u8; 8] = [8, 16, 32, 48, 64, 80, 96, 112];
 
+/// The base rate for the filter, this is used to calculate the
+/// filter rate based on the clock frequency and the sampling rate.
+const FILTER_RATE_BASE: f64 = 0.999958;
+
 pub enum Channel {
     Ch1,
     Ch2,
     Ch3,
     Ch4,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum HighPassFilter {
+    Preserve,
+    Accurate,
+    Disable,
+}
+
+impl HighPassFilter {
+    pub fn from_u8(value: u8) -> Self {
+        match value {
+            1 => HighPassFilter::Disable,
+            2 => HighPassFilter::Preserve,
+            3 => HighPassFilter::Accurate,
+            _ => HighPassFilter::Disable,
+        }
+    }
+}
+
+impl From<u8> for HighPassFilter {
+    fn from(value: u8) -> Self {
+        Self::from_u8(value)
+    }
+}
+
+impl From<HighPassFilter> for u8 {
+    fn from(val: HighPassFilter) -> Self {
+        match val {
+            HighPassFilter::Disable => 1,
+            HighPassFilter::Preserve => 2,
+            HighPassFilter::Accurate => 3,
+        }
+    }
 }
 
 pub struct Apu {
@@ -130,8 +168,21 @@ pub struct Apu {
     sequencer: u16,
     sequencer_step: u8,
     output_timer: i16,
-    audio_buffer: VecDeque<u8>,
+
+    /// The delta value that is used to calculate the
+    /// output timer, this is the amount of cycles that
+    /// should be used to create a new audio sample.
+    output_timer_delta: i16,
+
+    /// The audio buffer that is used to store the audio
+    /// samples that are going to be outputted, uses an
+    /// integer (i16) deque to store the audio samples.
+    audio_buffer: VecDeque<i16>,
     audio_buffer_max: usize,
+
+    filter_mode: HighPassFilter,
+    filter_rate: f32,
+    filter_diff: [f32; 2],
 
     clock_freq: u32,
 }
@@ -219,10 +270,14 @@ impl Apu {
             sequencer: 0,
             sequencer_step: 0,
             output_timer: 0,
+            output_timer_delta: (clock_freq as f32 / sampling_rate as f32) as i16,
             audio_buffer: VecDeque::with_capacity(
                 (sampling_rate as f32 * buffer_size) as usize * channels as usize,
             ),
             audio_buffer_max: (sampling_rate as f32 * buffer_size) as usize * channels as usize,
+            filter_mode: HighPassFilter::Accurate,
+            filter_rate: FILTER_RATE_BASE.powf(clock_freq as f64 / sampling_rate as f64) as f32,
+            filter_diff: [0.0; 2],
             clock_freq,
         }
     }
@@ -299,6 +354,8 @@ impl Apu {
         self.sequencer_step = 0;
         self.output_timer = 0;
 
+        self.filter_diff = [0.0; 2];
+
         self.clear_audio_buffer()
     }
 
@@ -345,25 +402,30 @@ impl Apu {
         if self.output_timer <= 0 {
             // verifies if we've reached the maximum allowed size for the
             // audio buffer and if that's the case an item is removed from
-            // the buffer (avoiding overflow) and then then the new audio
-            // volume item is added to the queue
+            // the buffer (avoiding overflow)
             if self.audio_buffer.len() >= self.audio_buffer_max {
                 for _ in 0..self.channels {
                     self.audio_buffer.pop_front();
                 }
             }
+
+            // obtains the output sample (uses the same for both channels)
+            // and filters it based on the channel configuration
+            let sample = self.output();
             if self.left_enabled {
-                self.audio_buffer.push_back(self.output());
+                let value = self.filter_sample(sample, 0);
+                self.audio_buffer.push_back(value);
             }
             if self.right_enabled && self.channels > 1 {
-                self.audio_buffer.push_back(self.output());
+                let value = self.filter_sample(sample, 1);
+                self.audio_buffer.push_back(value);
             }
 
             // calculates the rate at which a new audio sample should be
             // created based on the (base/CPU) clock frequency and the
             // sampling rate, this is basically the amount of APU clock
             // calls that should be performed until an audio sample is created
-            self.output_timer += (self.clock_freq as f32 / self.sampling_rate as f32) as i16;
+            self.output_timer += self.output_timer_delta;
         }
     }
 
@@ -745,9 +807,53 @@ impl Apu {
         }
     }
 
+    /// Returns the current output of the APU, this is the sum
+    /// of the outputs of all channels, this is used to
+    /// calculate the final audio output that is going to be
+    /// sent to the audio buffer.
+    ///
+    /// This value is not filtered, it is the raw output
+    /// of the channels, the filtering is done in the `filter_sample`
+    /// method, which is called when the audio sample is created.
     #[inline(always)]
-    pub fn output(&self) -> u8 {
-        self.ch1_output() + self.ch2_output() + self.ch3_output() + self.ch4_output()
+    pub fn output(&self) -> u16 {
+        self.ch1_output() as u16
+            + self.ch2_output() as u16
+            + self.ch3_output() as u16
+            + self.ch4_output() as u16
+    }
+
+    /// Filters the given sample based on the current filter mode
+    /// and returns the filtered sample as an i16 value.
+    ///
+    /// The `channel` parameter is used to determine which channel
+    /// the sample belongs to, this is used to apply the correct
+    /// filtering based on the channel's configuration.
+    #[inline(always)]
+    fn filter_sample(&mut self, sample: u16, channel: usize) -> i16 {
+        match self.filter_mode {
+            HighPassFilter::Disable => sample as i16,
+            HighPassFilter::Accurate => {
+                let input = sample as f32;
+                let output = input - self.filter_diff[channel];
+                self.filter_diff[channel] =
+                    input - (input - self.filter_diff[channel]) * self.filter_rate;
+                output as i16
+            }
+            HighPassFilter::Preserve => {
+                let input = sample as f32;
+                let output = input - self.filter_diff[channel];
+                let volume_bits = if channel == 0 {
+                    ((self.master >> 4) & 0x07) as f32
+                } else {
+                    (self.master & 0x07) as f32
+                };
+                let volume = (volume_bits + 1.0) * 15.0;
+                self.filter_diff[channel] = volume * (1.0 - self.filter_rate)
+                    + self.filter_diff[channel] * self.filter_rate;
+                output as i16
+            }
+        }
     }
 
     #[inline(always)]
@@ -826,11 +932,20 @@ impl Apu {
         self.channels
     }
 
-    pub fn audio_buffer(&self) -> &VecDeque<u8> {
+    pub fn filter_mode(&self) -> HighPassFilter {
+        self.filter_mode
+    }
+
+    pub fn set_filter_mode(&mut self, mode: HighPassFilter) {
+        self.filter_mode = mode;
+        self.filter_diff = [0.0; 2];
+    }
+
+    pub fn audio_buffer(&self) -> &VecDeque<i16> {
         &self.audio_buffer
     }
 
-    pub fn audio_buffer_mut(&mut self) -> &mut VecDeque<u8> {
+    pub fn audio_buffer_mut(&mut self) -> &mut VecDeque<i16> {
         &mut self.audio_buffer
     }
 
@@ -848,6 +963,9 @@ impl Apu {
 
     pub fn set_clock_freq(&mut self, value: u32) {
         self.clock_freq = value;
+        self.filter_rate =
+            FILTER_RATE_BASE.powf(self.clock_freq as f64 / self.sampling_rate as f64) as f32;
+        self.output_timer_delta = (self.clock_freq as f32 / self.sampling_rate as f32) as i16;
     }
 
     #[inline(always)]
@@ -1251,6 +1369,9 @@ impl StateComponent for Apu {
         write_u16(&mut cursor, self.sequencer)?;
         write_u8(&mut cursor, self.sequencer_step)?;
         write_i16(&mut cursor, self.output_timer)?;
+        write_u8(&mut cursor, self.filter_mode.into())?;
+        write_f32(&mut cursor, self.filter_diff[0])?;
+        write_f32(&mut cursor, self.filter_diff[1])?;
 
         Ok(cursor.into_inner())
     }
@@ -1338,6 +1459,12 @@ impl StateComponent for Apu {
         self.sequencer = read_u16(&mut cursor)?;
         self.sequencer_step = read_u8(&mut cursor)?;
         self.output_timer = read_i16(&mut cursor)?;
+        self.output_timer_delta = (self.clock_freq as f32 / self.sampling_rate as f32) as i16;
+        self.filter_mode = read_u8(&mut cursor)?.into();
+        self.filter_diff[0] = read_f32(&mut cursor)?;
+        self.filter_diff[1] = read_f32(&mut cursor)?;
+        self.filter_rate =
+            FILTER_RATE_BASE.powf(self.clock_freq as f64 / self.sampling_rate as f64) as f32;
 
         Ok(())
     }
@@ -1351,7 +1478,7 @@ impl Default for Apu {
 
 #[cfg(test)]
 mod tests {
-    use super::Apu;
+    use super::{Apu, HighPassFilter};
 
     use crate::state::StateComponent;
 
@@ -1484,7 +1611,7 @@ mod tests {
         };
 
         let state = apu.state(None).unwrap();
-        assert_eq!(state.len(), 100);
+        assert_eq!(state.len(), 109);
 
         let mut new_apu = Apu::default();
         new_apu.set_state(&state, None).unwrap();
@@ -1569,5 +1696,61 @@ mod tests {
         assert_eq!(new_apu.sequencer, 12345);
         assert_eq!(new_apu.sequencer_step, 6);
         assert_eq!(new_apu.output_timer, 789);
+        assert_eq!(new_apu.filter_mode as u8, 1);
+    }
+
+    #[test]
+    fn test_filter_sample_disable() {
+        let mut apu = Apu::default();
+        let sample = 128;
+        let value = apu.filter_sample(sample, 0);
+        assert_eq!(value, sample as i16);
+    }
+
+    #[test]
+    fn test_filter_sample_accurate() {
+        let mut apu = Apu::default();
+        apu.set_filter_mode(HighPassFilter::Accurate);
+        let sample = 128;
+        let first = apu.filter_sample(sample, 0);
+        let second = apu.filter_sample(sample, 0);
+        assert_eq!(first, 128);
+        assert_eq!(second, 127);
+    }
+
+    #[test]
+    fn test_filter_sample_preserve() {
+        let mut apu = Apu::default();
+        apu.set_filter_mode(HighPassFilter::Preserve);
+        let sample = 128;
+        let first = apu.filter_sample(sample, 0);
+        let second = apu.filter_sample(sample, 0);
+        assert_eq!(first, 128);
+        assert_eq!(second, 127);
+    }
+
+    #[test]
+    fn test_set_filter_mode_resets_diff() {
+        let mut apu = Apu::default();
+        apu.set_filter_mode(HighPassFilter::Preserve);
+        let _ = apu.filter_sample(100, 0);
+        apu.set_filter_mode(HighPassFilter::Accurate);
+        let value = apu.filter_sample(100, 0);
+        assert_eq!(value, 100);
+    }
+
+    #[test]
+    fn test_state_preserves_filter() {
+        let mut apu = Apu::default();
+        apu.set_filter_mode(HighPassFilter::Accurate);
+        apu.filter_diff = [2.5, 3.5];
+
+        let state = apu.state(None).unwrap();
+        let mut other = Apu::default();
+        other.set_state(&state, None).unwrap();
+
+        assert_eq!(other.filter_mode, HighPassFilter::Accurate);
+        assert!((other.filter_diff[0] - 2.5).abs() < f32::EPSILON);
+        assert!((other.filter_diff[1] - 3.5).abs() < f32::EPSILON);
     }
 }

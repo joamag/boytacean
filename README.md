@@ -12,6 +12,7 @@ A Game Boy emulator that is written in Rust 🦀.
 * Simple navigable source-code
 * Web, [SDL](https://www.libsdl.org) and [Libretro](https://www.libretro.com) front-ends
 * Audio, with a pretty accurate APU
+* Optional high-pass audio filter (Preserve, Accurate or Disabled)
 * Serial Data Transfer ([Link Cable](https://en.wikipedia.org/wiki/Game_Link_Cable)) support
 * [Game Boy Printer](https://en.wikipedia.org/wiki/Game_Boy_Printer) emulation
 * Support for multiple MBCs: MBC1, MBC2, MBC3, and MBC5
