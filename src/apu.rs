@@ -122,7 +122,7 @@ pub struct Apu {
     ch4_volume: u8,
     ch4_divisor: u8,
     ch4_width_mode: bool,
-    audio_buffer: VecDeque<i16>,
+    ch4_clock_shift: u8,
     ch4_lfsr: u16,
     ch4_length_enabled: bool,
     ch4_enabled: bool,
@@ -751,13 +751,12 @@ impl Apu {
                     | 0x38
             }
 
-    pub fn output(&self) -> i16 {
-        let sample = self.ch1_output() + self.ch2_output() + self.ch3_output() + self.ch4_output();
-        ((sample as i16) - 128) << 8
-    fn filter_sample(&mut self, sample: i16, channel: usize) -> i16 {
-                output.clamp(i16::MIN as f32, i16::MAX as f32) as i16
-                let volume = ((volume_bits + 1.0) * 15.0 - 128.0) * 256.0;
-                output.clamp(i16::MIN as f32, i16::MAX as f32) as i16
+            // 0xFF1B — NR31: Channel 3 length timer
+            NR31_ADDR => (255 - self.ch3_length_timer as u8).saturating_add(1),
+            // 0xFF1E — NR34: Channel 3 wavelength high & control
+            NR34_ADDR => {
+                (if self.ch3_length_enabled { 0x40 } else { 0x00 })
+                    | (if self.ch3_enabled { 0x80 } else { 0x00 })
                     | (((self.ch3_wave_length & (0x0700 >> 8)) as u8) << 3)
                     | 0x38
             }
@@ -870,8 +869,8 @@ impl Apu {
         }
     }
 
-    pub fn audio_buffer(&self) -> &VecDeque<i16> {
-    pub fn audio_buffer_mut(&mut self) -> &mut VecDeque<i16> {
+    pub fn ch1_out_enabled(&self) -> bool {
+        self.ch1_out_enabled
     }
 
     pub fn set_ch1_out_enabled(&mut self, enabled: bool) {
@@ -1625,10 +1624,10 @@ mod tests {
         assert_eq!(new_apu.ch2_direction, 0);
         assert_eq!(new_apu.ch2_volume, 10);
         assert_eq!(new_apu.ch2_wave_length, 1024);
-        let sample = 0i16;
-        let sample = 0i16;
-        assert_eq!(first, 0);
-        assert!(second.abs() <= 256);
+        assert!(new_apu.ch2_length_enabled);
+        assert!(new_apu.ch2_enabled);
+
+        assert_eq!(new_apu.ch3_timer, 9111);
         assert_eq!(new_apu.ch3_position, 7);
         assert_eq!(new_apu.ch3_output, 30);
         assert!(new_apu.ch3_dac);

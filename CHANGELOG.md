@@ -14,7 +14,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 * Added support for HBlank HDMA transfers
-* Audio samples are now exported as signed 16-bit values
 
 ### Fixed
 
