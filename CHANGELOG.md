@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-*
+* Fixed `audio_ch1_enabled` returning the wrong channel status
 
 ## [0.11.5] - 2025-03-18
 
