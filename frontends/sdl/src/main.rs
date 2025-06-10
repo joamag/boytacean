@@ -1,6 +1,7 @@
 pub mod audio;
 pub mod data;
 pub mod sdl;
+pub mod shader;
 pub mod test;
 
 use audio::Audio;
@@ -317,6 +318,14 @@ impl Emulator {
             .unwrap()
             .to_string();
         Ok(())
+    }
+
+    pub fn load_shader(&mut self, path: &str) -> Result<(), String> {
+        if let Some(ref mut sdl) = self.sdl {
+            sdl.load_fragment_shader(path)
+        } else {
+            Err(String::from("SDL system not started"))
+        }
     }
 
     pub fn reset(&mut self) -> Result<(), Error> {
@@ -660,6 +669,7 @@ Drag & drop ROM file: Load new ROM and reset system\n===========================
                     / self.visual_frequency)
                     .round() as u32;
 
+                let mut frame_data: Option<&[u8]> = None;
                 loop {
                     // limits the number of ticks to the typical number
                     // of cycles expected for the current logic cycle
@@ -680,7 +690,11 @@ Drag & drop ROM file: Load new ROM and reset system\n===========================
                         // to update the stream texture, that will latter be copied
                         // to the canvas
                         let frame_buffer = self.system.frame_buffer().as_ref();
-                        texture.update(None, frame_buffer, width * 3).unwrap();
+                        if self.sdl.as_ref().unwrap().shader_program.is_none() {
+                            texture.update(None, frame_buffer, width * 3).unwrap();
+                        } else {
+                            frame_data = Some(frame_buffer);
+                        }
 
                         // obtains the index of the current PPU frame, this value
                         // is going to be used to detect for new frame presence
@@ -710,23 +724,22 @@ Drag & drop ROM file: Load new ROM and reset system\n===========================
                 // resources from being over-used in situations where multiple frames
                 // are generated during the same tick cycle
                 if frame_dirty {
-                    // clears the graphics canvas, making sure that no garbage
-                    // pixel data remaining in the pixel buffer, not doing this would
-                    // create visual glitches in OSs like Mac OS X
-                    self.sdl.as_mut().unwrap().canvas.clear();
-
-                    // copies the texture that was created for the frame (during
-                    // the loop part of the tick) to the canvas
-                    self.sdl
-                        .as_mut()
-                        .unwrap()
-                        .canvas
-                        .copy(&texture, None, None)
-                        .unwrap();
-
-                    // presents the canvas effectively updating the screen
-                    // information presented to the user
-                    self.sdl.as_mut().unwrap().canvas.present();
+                    if self.sdl.as_ref().unwrap().shader_program.is_some() {
+                        self.sdl.as_mut().unwrap().render_frame_with_shader(
+                            frame_data.unwrap(),
+                            width as u32,
+                            height as u32,
+                        );
+                    } else {
+                        self.sdl.as_mut().unwrap().canvas.clear();
+                        self.sdl
+                            .as_mut()
+                            .unwrap()
+                            .canvas
+                            .copy(&texture, None, None)
+                            .unwrap();
+                        self.sdl.as_mut().unwrap().canvas.present();
+                    }
                 }
 
                 // calculates the number of ticks that have elapsed since the
@@ -1016,6 +1029,9 @@ struct Args {
 
     #[arg(default_value_t = String::from(DEFAULT_ROM_PATH), help = "Path to the ROM file to be loaded")]
     rom_path: String,
+
+    #[arg(long, default_value_t = String::from(""), help = "Path to fragment shader file")]
+    shader_path: String,
 }
 
 fn run(args: Args, emulator: &mut Emulator) {
@@ -1101,6 +1117,11 @@ fn main() {
     let mut emulator = Emulator::new(game_boy, options);
     emulator.start(SCREEN_SCALE);
     emulator.load_rom(Some(&args.rom_path)).unwrap();
+    if !args.shader_path.is_empty() {
+        if let Err(err) = emulator.load_shader(&args.shader_path) {
+            println!("Failed to load shader: {err}");
+        }
+    }
     emulator.apply_cheats(&args.cheats);
     emulator.toggle_palette();
 
