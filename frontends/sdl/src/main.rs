@@ -669,7 +669,7 @@ Drag & drop ROM file: Load new ROM and reset system\n===========================
                     / self.visual_frequency)
                     .round() as u32;
 
-                let mut frame_data: Option<&[u8]> = None;
+                let mut frame_data: Option<Vec<u8>> = None;
                 loop {
                     // limits the number of ticks to the typical number
                     // of cycles expected for the current logic cycle
@@ -689,11 +689,11 @@ Drag & drop ROM file: Load new ROM and reset system\n===========================
                         // obtains the frame buffer of the Game Boy PPU and uses it
                         // to update the stream texture, that will latter be copied
                         // to the canvas
-                        let frame_buffer = self.system.frame_buffer().as_ref();
+                        let frame_buffer = self.system.frame_buffer_raw();
                         if self.sdl.as_ref().unwrap().shader_program.is_none() {
-                            texture.update(None, frame_buffer, width * 3).unwrap();
+                            texture.update(None, &frame_buffer, width * 3).unwrap();
                         } else {
-                            frame_data = Some(frame_buffer);
+                            frame_data = Some(frame_buffer.to_vec());
                         }
 
                         // obtains the index of the current PPU frame, this value
@@ -726,7 +726,7 @@ Drag & drop ROM file: Load new ROM and reset system\n===========================
                 if frame_dirty {
                     if self.sdl.as_ref().unwrap().shader_program.is_some() {
                         self.sdl.as_mut().unwrap().render_frame_with_shader(
-                            frame_data.unwrap(),
+                            frame_data.as_ref().unwrap(),
                             width as u32,
                             height as u32,
                         );
