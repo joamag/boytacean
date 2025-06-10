@@ -55,7 +55,11 @@ pub enum HighPassFilter {
 
 impl HighPassFilter {
     pub fn next(self) -> Self {
-        (((self as u8 + 1) % 3) + 1).into()
+        match self {
+            HighPassFilter::Disable => HighPassFilter::Accurate,
+            HighPassFilter::Accurate => HighPassFilter::Preserve,
+            HighPassFilter::Preserve => HighPassFilter::Disable,
+        }
     }
 
     pub fn description(&self) -> &'static str {
@@ -1784,5 +1788,12 @@ mod tests {
         assert_eq!(other.filter_mode, HighPassFilter::Accurate);
         assert!((other.filter_diff[0] - 2.5).abs() < f32::EPSILON);
         assert!((other.filter_diff[1] - 3.5).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_high_pass_filter_next() {
+        assert_eq!(HighPassFilter::Disable.next(), HighPassFilter::Accurate);
+        assert_eq!(HighPassFilter::Accurate.next(), HighPassFilter::Preserve);
+        assert_eq!(HighPassFilter::Preserve.next(), HighPassFilter::Disable);
     }
 }
