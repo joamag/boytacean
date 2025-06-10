@@ -38,8 +38,12 @@ unsafe fn compile_shader(kind: GLenum, source: &str) -> Result<u32, String> {
     gl::AttachShader(program, vertex_shader);
     gl::AttachShader(program, shader);
     gl::LinkProgram(program);
+    
     gl::DeleteShader(shader);
+    gl::DeleteShader(vertex_shader);
 
+    // checks if the program linked successfully and if not
+    // returns the error message
     gl::GetProgramiv(program, gl::LINK_STATUS, &mut status);
     if status == 0 {
         let mut len = 0;
@@ -55,5 +59,8 @@ unsafe fn compile_shader(kind: GLenum, source: &str) -> Result<u32, String> {
         gl::DeleteProgram(program);
         return Err(String::from_utf8_lossy(&buf).into_owned());
     }
+
+    gl::UseProgram(program);
+
     Ok(program)
 }
