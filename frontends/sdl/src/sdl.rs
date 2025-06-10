@@ -1,3 +1,4 @@
+use gl;
 use sdl2::{
     render::Canvas,
     rwops::RWops,
@@ -23,6 +24,9 @@ pub struct SdlSystem {
     pub ttf_context: Sdl2TtfContext,
     pub gl_context: GLContext,
     pub shader_program: Option<u32>,
+    pub gl_texture: Option<u32>,
+    pub gl_vao: Option<u32>,
+    pub gl_vbo: Option<u32>,
 }
 
 impl SdlSystem {
@@ -93,6 +97,9 @@ impl SdlSystem {
             ttf_context,
             gl_context,
             shader_program: None,
+            gl_texture: None,
+            gl_vao: None,
+            gl_vbo: None,
         }
     }
 
@@ -105,7 +112,98 @@ impl SdlSystem {
     }
 
     pub fn load_fragment_shader<P: AsRef<Path>>(&mut self, path: P) -> Result<(), String> {
-        self.canvas.window().gl_make_current(&self.gl_context)?;
+        let program = shader::load_shader_program(path.as_ref().to_str().unwrap())?;
+        unsafe {
+            let mut vao = 0;
+            let mut vbo = 0;
+            let mut texture = 0;
+            let vertices: [f32; 16] = [
+                -1.0, -1.0, 0.0, 0.0, 1.0, -1.0, 1.0, 0.0, -1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+            ];
+
+            gl::GenVertexArrays(1, &mut vao);
+            gl::GenBuffers(1, &mut vbo);
+            gl::BindVertexArray(vao);
+            gl::BindBuffer(gl::ARRAY_BUFFER, vbo);
+            gl::BufferData(
+                gl::ARRAY_BUFFER,
+                (std::mem::size_of_val(&vertices)) as isize,
+                vertices.as_ptr() as *const _,
+                gl::STATIC_DRAW,
+            );
+            let stride = 4 * std::mem::size_of::<f32>() as i32;
+            gl::VertexAttribPointer(0, 2, gl::FLOAT, gl::FALSE, stride, std::ptr::null());
+            gl::EnableVertexAttribArray(0);
+            gl::VertexAttribPointer(
+                1,
+                2,
+                gl::FLOAT,
+                gl::FALSE,
+                stride,
+                (2 * std::mem::size_of::<f32>()) as *const _,
+            );
+            gl::EnableVertexAttribArray(1);
+
+            gl::GenTextures(1, &mut texture);
+            gl::BindTexture(gl::TEXTURE_2D, texture);
+            gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::NEAREST as i32);
+            gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::NEAREST as i32);
+
+            gl::BindBuffer(gl::ARRAY_BUFFER, 0);
+            gl::BindVertexArray(0);
+
+            self.gl_texture = Some(texture);
+            self.gl_vao = Some(vao);
+            self.gl_vbo = Some(vbo);
+        }
+
+    pub fn render_frame_with_shader(&mut self, pixels: &[u8], width: u32, height: u32) {
+        if self.shader_program.is_none() {
+            return;
+        }
+        unsafe {
+            let (dw, dh) = self.canvas.window().drawable_size();
+            gl::Viewport(0, 0, dw as i32, dh as i32);
+            gl::Clear(gl::COLOR_BUFFER_BIT);
+            gl::UseProgram(self.shader_program.unwrap());
+
+            let texture = self.gl_texture.unwrap();
+            gl::ActiveTexture(gl::TEXTURE0);
+            gl::BindTexture(gl::TEXTURE_2D, texture);
+            gl::TexImage2D(
+                gl::TEXTURE_2D,
+                0,
+                gl::RGB as i32,
+                width as i32,
+                height as i32,
+                0,
+                gl::RGB,
+                gl::UNSIGNED_BYTE,
+                pixels.as_ptr() as *const _,
+            );
+
+            let loc_image = gl::GetUniformLocation(
+                self.shader_program.unwrap(),
+                b"image\0".as_ptr() as *const _,
+            );
+            let loc_in = gl::GetUniformLocation(
+                self.shader_program.unwrap(),
+                b"input_resolution\0".as_ptr() as *const _,
+            );
+            let loc_out = gl::GetUniformLocation(
+                self.shader_program.unwrap(),
+                b"output_resolution\0".as_ptr() as *const _,
+            );
+            gl::Uniform1i(loc_image, 0);
+            gl::Uniform2f(loc_in, width as f32, height as f32);
+            gl::Uniform2f(loc_out, dw as f32, dh as f32);
+
+            gl::BindVertexArray(self.gl_vao.unwrap());
+            gl::DrawArrays(gl::TRIANGLE_STRIP, 0, 4);
+            gl::BindVertexArray(0);
+        }
+        self.canvas.window().gl_swap_window();
+    }
         let program = shader::load_fragment_shader(path.as_ref().to_str().unwrap())?;
         self.shader_program = Some(program);
         Ok(())
