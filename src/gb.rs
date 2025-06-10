@@ -888,16 +888,16 @@ impl GameBoy {
         self.apu_i().sampling_rate()
     }
 
+    pub fn audio_channels(&self) -> u8 {
+        self.apu_i().channels()
+    }
+
     pub fn audio_filter_mode(&self) -> HighPassFilter {
         self.apu_i().filter_mode()
     }
 
     pub fn set_audio_filter_mode(&mut self, mode: HighPassFilter) {
         self.apu().set_filter_mode(mode);
-    }
-
-    pub fn audio_channels(&self) -> u8 {
-        self.apu_i().channels()
     }
 
     pub fn cartridge_eager(&mut self) -> Cartridge {

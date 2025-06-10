@@ -176,7 +176,7 @@ pub struct Apu {
 
     /// The audio buffer that is used to store the audio
     /// samples that are going to be outputted, uses an
-    /// integer deque to store the audio samples.
+    /// integer (i16) deque to store the audio samples.
     audio_buffer: VecDeque<i16>,
     audio_buffer_max: usize,
 
