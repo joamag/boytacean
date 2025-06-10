@@ -892,14 +892,6 @@ impl GameBoy {
         self.apu_i().channels()
     }
 
-    pub fn audio_filter_mode(&self) -> HighPassFilter {
-        self.apu_i().filter_mode()
-    }
-
-    pub fn set_audio_filter_mode(&mut self, mode: HighPassFilter) {
-        self.apu().set_filter_mode(mode);
-    }
-
     pub fn cartridge_eager(&mut self) -> Cartridge {
         self.mmu().rom().clone()
     }
@@ -1461,6 +1453,14 @@ impl GameBoy {
         self.mmu().set_speed_callback(callback);
     }
 
+    pub fn audio_filter_mode(&self) -> HighPassFilter {
+        self.apu_i().filter_mode()
+    }
+
+    pub fn set_audio_filter_mode(&mut self, mode: HighPassFilter) {
+        self.apu().set_filter_mode(mode);
+    }
+
     pub fn add_cheat_code(&mut self, code: &str) -> Result<bool, Error> {
         if GameGenie::is_code(code) {
             return self.add_game_genie_code(code).map(|_| true);
@@ -1579,6 +1579,14 @@ impl GameBoy {
             .try_into()
             .unwrap();
         self.ppu().set_palette_colors(&palette);
+    }
+
+    pub fn audio_filter_mode_wa(&self) -> u8 {
+        self.apu_i().filter_mode().into()
+    }
+
+    pub fn set_audio_filter_mode_wa(&mut self, mode: u8) {
+        self.apu().set_filter_mode(mode.into());
     }
 
     fn js_to_pixel(value: &JsValue) -> Pixel {

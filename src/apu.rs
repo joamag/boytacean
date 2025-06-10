@@ -66,9 +66,9 @@ impl From<u8> for HighPassFilter {
     }
 }
 
-impl Into<u8> for HighPassFilter {
-    fn into(self) -> u8 {
-        match self {
+impl From<HighPassFilter> for u8 {
+    fn from(val: HighPassFilter) -> Self {
+        match val {
             HighPassFilter::Disable => 1,
             HighPassFilter::Preserve => 2,
             HighPassFilter::Accurate => 3,
