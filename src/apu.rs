@@ -4,8 +4,8 @@ use std::{collections::VecDeque, io::Cursor};
 
 use boytacean_common::{
     data::{
-        read_i16, read_i32, read_into, read_u16, read_u8, write_bytes, write_i16, write_i32,
-        write_u16, write_u8,
+        read_f32, read_i16, read_i32, read_into, read_u16, read_u8, write_bytes, write_f32,
+        write_i16, write_i32, write_u16, write_u8,
     },
     error::Error,
 };
@@ -1318,6 +1318,8 @@ impl StateComponent for Apu {
         write_u8(&mut cursor, self.sequencer_step)?;
         write_i16(&mut cursor, self.output_timer)?;
         write_u8(&mut cursor, self.filter_mode as u8)?;
+        write_f32(&mut cursor, self.filter_diff[0])?;
+        write_f32(&mut cursor, self.filter_diff[1])?;
 
         Ok(cursor.into_inner())
     }
@@ -1406,6 +1408,10 @@ impl StateComponent for Apu {
         self.sequencer_step = read_u8(&mut cursor)?;
         self.output_timer = read_i16(&mut cursor)?;
         self.filter_mode = HighPassFilter::from_u8(read_u8(&mut cursor)?);
+        self.filter_diff[0] = read_f32(&mut cursor)?;
+        self.filter_diff[1] = read_f32(&mut cursor)?;
+        self.filter_rate =
+            (0.999_958_f64.powf(self.clock_freq as f64 / self.sampling_rate as f64)) as f32;
 
         Ok(())
     }
@@ -1552,7 +1558,7 @@ mod tests {
         };
 
         let state = apu.state(None).unwrap();
-        assert_eq!(state.len(), 101);
+        assert_eq!(state.len(), 109);
 
         let mut new_apu = Apu::default();
         new_apu.set_state(&state, None).unwrap();
@@ -1667,5 +1673,20 @@ mod tests {
         apu.set_filter_mode(HighPassFilter::Accurate);
         let value = apu.filter_sample(100, 0);
         assert_eq!(value, 100);
+    }
+
+    #[test]
+    fn test_state_preserves_filter_history() {
+        let mut apu = Apu::default();
+        apu.set_filter_mode(HighPassFilter::Accurate);
+        apu.filter_diff = [2.5, 3.5];
+
+        let state = apu.state(None).unwrap();
+        let mut other = Apu::default();
+        other.set_state(&state, None).unwrap();
+
+        assert!(matches!(other.filter_mode, HighPassFilter::Accurate));
+        assert!((other.filter_diff[0] - 2.5).abs() < f32::EPSILON);
+        assert!((other.filter_diff[1] - 3.5).abs() < f32::EPSILON);
     }
 }

@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-* High-pass audio filter options (Preserve, Accurate, Disable)
+* High-pass audio filter options (Preserve, Accurate, Disable) with save-state support
 
 ### Changed
 
