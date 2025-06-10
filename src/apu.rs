@@ -795,9 +795,9 @@ impl Apu {
             HighPassFilter::Preserve => {
                 let output = input - self.filter_diff[channel];
                 let volume_bits = if channel == 0 {
-                    (self.master & 0x07) as f32
-                } else {
                     ((self.master >> 4) & 0x07) as f32
+                } else {
+                    (self.master & 0x07) as f32
                 };
                 let volume = (volume_bits + 1.0) * 15.0;
                 self.filter_diff[channel] = volume * (1.0 - self.filter_rate)
