@@ -811,7 +811,7 @@ impl Apu {
     /// of the outputs of all channels, this is used to
     /// calculate the final audio output that is going to be
     /// sent to the audio buffer.
-    /// 
+    ///
     /// This value is not filtered, it is the raw output
     /// of the channels, the filtering is done in the `filter_sample`
     /// method, which is called when the audio sample is created.
@@ -825,7 +825,7 @@ impl Apu {
 
     /// Filters the given sample based on the current filter mode
     /// and returns the filtered sample as an i16 value.
-    /// 
+    ///
     /// The `channel` parameter is used to determine which channel
     /// the sample belongs to, this is used to apply the correct
     /// filtering based on the channel's configuration.
