@@ -29,7 +29,7 @@ black .
 Run the full test suite:
 
 ```bash
-cargo test --all-features
+cargo test --all-targets --features simd,debug,python
 ```
 
 ## Style Guide
