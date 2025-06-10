@@ -102,6 +102,18 @@ fn band_limited_update(bl: &mut BandLimited, input: &BlSample, phase: u32) {
     }
 }
 
+fn band_limited_read(bl: &mut BandLimited) -> BlSample {
+    bl.output.left += bl.buffer[bl.pos as usize].left;
+    bl.output.right += bl.buffer[bl.pos as usize].right;
+    bl.buffer[bl.pos as usize] = BlSample::default();
+    bl.pos = (bl.pos + 1) & (bl.buffer.len() as u8 - 1);
+
+    BlSample {
+        left: bl.output.left / BAND_LIMITED_ONE,
+        right: bl.output.right / BAND_LIMITED_ONE,
+    }
+}
+
 /// The base rate for the filter, this is used to calculate the
 /// filter rate based on the clock frequency and the sampling rate.
 const FILTER_RATE_BASE: f64 = 0.999958;
@@ -325,6 +337,7 @@ pub struct Apu {
     /// integer (i16) deque to store the audio samples.
     audio_buffer: VecDeque<i16>,
     audio_buffer_max: usize,
+    band_limited: BandLimited,
 
     filter_mode: HighPassFilter,
     update_mode: UpdateMode,
@@ -422,6 +435,7 @@ impl Apu {
                 (sampling_rate as f32 * buffer_size) as usize * channels as usize,
             ),
             audio_buffer_max: (sampling_rate as f32 * buffer_size) as usize * channels as usize,
+            band_limited: BandLimited::default(),
             filter_mode: HighPassFilter::Accurate,
             update_mode: UpdateMode::Direct,
             filter_rate: FILTER_RATE_BASE.powf(clock_freq as f64 / sampling_rate as f64) as f32,
@@ -504,6 +518,7 @@ impl Apu {
 
         self.filter_diff = [0.0; 2];
         self.update_mode = UpdateMode::Direct;
+        self.band_limited = BandLimited::default();
 
         self.clear_audio_buffer()
     }
@@ -561,13 +576,30 @@ impl Apu {
             // obtains the output sample (uses the same for both channels)
             // and filters it based on the channel configuration
             let sample = self.output();
-            if self.left_enabled {
-                let value = self.filter_sample(sample, 0);
-                self.audio_buffer.push_back(value);
-            }
-            if self.right_enabled && self.channels > 1 {
-                let value = self.filter_sample(sample, 1);
-                self.audio_buffer.push_back(value);
+            if self.update_mode == UpdateMode::BandLimited {
+                let input = BlSample {
+                    left: sample as i32,
+                    right: sample as i32,
+                };
+                band_limited_update(&mut self.band_limited, &input, 0);
+                let out = band_limited_read(&mut self.band_limited);
+                if self.left_enabled {
+                    let value = self.filter_sample(out.left.clamp(0, u16::MAX as i32) as u16, 0);
+                    self.audio_buffer.push_back(value);
+                }
+                if self.right_enabled && self.channels > 1 {
+                    let value = self.filter_sample(out.right.clamp(0, u16::MAX as i32) as u16, 1);
+                    self.audio_buffer.push_back(value);
+                }
+            } else {
+                if self.left_enabled {
+                    let value = self.filter_sample(sample, 0);
+                    self.audio_buffer.push_back(value);
+                }
+                if self.right_enabled && self.channels > 1 {
+                    let value = self.filter_sample(sample, 1);
+                    self.audio_buffer.push_back(value);
+                }
             }
 
             // calculates the rate at which a new audio sample should be
