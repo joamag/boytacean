@@ -16,7 +16,8 @@ use crate::shader;
 /// and Sound syb-system ready to be used by the overall
 /// emulator infrastructure.
 pub struct SdlSystem {
-    pub canvas: Canvas<Window>,
+    pub canvas: Option<Canvas<Window>>,
+    pub window: Option<Window>,
     pub video_subsystem: VideoSubsystem,
     pub timer_subsystem: TimerSubsystem,
     pub audio_subsystem: AudioSubsystem,
@@ -72,12 +73,9 @@ impl SdlSystem {
             .build()
             .unwrap();
 
-        let gl_context = window.gl_create_context().unwrap();
-        gl::load_with(|s| video_subsystem.gl_get_proc_address(s) as *const _);
-
         // creates a canvas (according to spec) to be used in the drawing
         // then clears it so that is can be presented empty initially
-        let mut canvas_builder = window.into_canvas();
+        /*let mut canvas_builder = window.into_canvas();
         if accelerated {
             canvas_builder = canvas_builder.accelerated();
         }
@@ -86,10 +84,14 @@ impl SdlSystem {
         }
         let mut canvas = canvas_builder.build().unwrap();
         canvas.set_logical_size(width, height).unwrap();
-        canvas.clear();
+        canvas.clear();*/
+
+        let gl_context = window.gl_create_context().unwrap();
+        gl::load_with(|s| video_subsystem.gl_get_proc_address(s) as *const _);
 
         Self {
-            canvas,
+            canvas: None,
+            window: Some(window),
             video_subsystem,
             timer_subsystem,
             audio_subsystem,
@@ -104,11 +106,19 @@ impl SdlSystem {
     }
 
     pub fn window(&self) -> &Window {
-        self.canvas.window()
+        if let Some(canvas) = &self.canvas {
+            canvas.window()
+        } else {
+            self.window.as_ref().unwrap()
+        }
     }
 
     pub fn window_mut(&mut self) -> &mut Window {
-        self.canvas.window_mut()
+        if let Some(canvas) = &mut self.canvas {
+            canvas.window_mut()
+        } else {
+            self.window.as_mut().unwrap()
+        }
     }
 
     pub fn load_fragment_shader<P: AsRef<Path>>(&mut self, path: P) -> Result<(), String> {
@@ -165,7 +175,7 @@ impl SdlSystem {
             return;
         }
         unsafe {
-            let (dw, dh) = self.canvas.window().drawable_size();
+            let (dw, dh) = self.window.as_ref().unwrap().drawable_size();
             gl::Viewport(0, 0, dw as i32, dh as i32);
             gl::Clear(gl::COLOR_BUFFER_BIT);
             gl::UseProgram(self.shader_program.unwrap());
@@ -173,6 +183,7 @@ impl SdlSystem {
             let texture = self.gl_texture.unwrap();
             gl::ActiveTexture(gl::TEXTURE0);
             gl::BindTexture(gl::TEXTURE_2D, texture);
+            let flipped_pixels = flip_vertical(pixels, width as usize, height as usize, 3);
             gl::TexImage2D(
                 gl::TEXTURE_2D,
                 0,
@@ -182,7 +193,7 @@ impl SdlSystem {
                 0,
                 gl::RGB,
                 gl::UNSIGNED_BYTE,
-                pixels.as_ptr() as *const _,
+                flipped_pixels.as_ptr() as *const _,
             );
 
             let loc_image = gl::GetUniformLocation(
@@ -205,7 +216,12 @@ impl SdlSystem {
             gl::DrawArrays(gl::TRIANGLE_STRIP, 0, 4);
             gl::BindVertexArray(0);
         }
-        self.canvas.window().gl_swap_window();
+        self.window().gl_make_current(&self.gl_context).unwrap();
+        /*unsafe {
+            gl::ClearColor(0.0, 1.0, 0.0, 1.0); // green
+            gl::Clear(gl::COLOR_BUFFER_BIT);
+        }*/
+        self.window().gl_swap_window();
     }
 }
 
@@ -217,4 +233,15 @@ pub fn surface_from_bytes(bytes: &[u8]) -> Surface<'_> {
         let raw_surface = image::IMG_Load_RW(rw_ops.raw(), 0);
         Surface::from_ll(raw_surface)
     }
+}
+
+fn flip_vertical(pixels: &[u8], width: usize, height: usize, channels: usize) -> Vec<u8> {
+    let row_len = width * channels;
+    let mut flipped = vec![0u8; pixels.len()];
+    for y in 0..height {
+        let src = &pixels[y * row_len..(y + 1) * row_len];
+        let dst = &mut flipped[(height - 1 - y) * row_len..(height - y) * row_len];
+        dst.copy_from_slice(src);
+    }
+    flipped
 }

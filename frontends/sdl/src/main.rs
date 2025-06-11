@@ -449,17 +449,17 @@ impl Emulator {
 
         // creates an accelerated canvas to be used in the drawing
         // then clears it and presents it
-        self.sdl.as_mut().unwrap().canvas.present();
+        // self.sdl.as_mut().unwrap().canvas.present();
 
         // creates a texture creator for the current canvas, required
         // for the creation of dynamic and static textures
-        let texture_creator = self.sdl.as_mut().unwrap().canvas.texture_creator();
+        //let texture_creator = self.sdl.as_mut().unwrap().canvas.texture_creator();
 
         // creates the texture streaming that is going to be used
         // as the target for the pixel buffer
-        let mut texture = texture_creator
-            .create_texture_streaming(PixelFormatEnum::RGB24, width as u32, height as u32)
-            .unwrap();
+        //let mut texture = texture_creator
+        //    .create_texture_streaming(PixelFormatEnum::RGB24, width as u32, height as u32)
+        //    .unwrap();
 
         // calculates the rate as visual cycles that will take from
         // the current visual frequency to re-save the battery backed RAM
@@ -503,7 +503,7 @@ impl Emulator {
                     } => {
                         println!(
                             "=== Boytacean SDL Controls ===\n\
-Escape or Close Window: Quit the emulator\n\
+Escape: Quit the emulator\n\
 H: Show this help message\n\
 I: Save a screenshot as PNG in the current directory\n\
 R: Reset the system (soft reset)\n\
@@ -689,9 +689,9 @@ Drag & drop ROM file: Load new ROM and reset system\n===========================
                         // obtains the frame buffer of the Game Boy PPU and uses it
                         // to update the stream texture, that will latter be copied
                         // to the canvas
-                        let frame_buffer = self.system.frame_buffer_raw();
+                        let frame_buffer = self.system.frame_buffer();
                         if self.sdl.as_ref().unwrap().shader_program.is_none() {
-                            texture.update(None, &frame_buffer, width * 3).unwrap();
+                            //    texture.update(None, &frame_buffer, width * 3).unwrap();
                         } else {
                             frame_data = Some(frame_buffer.to_vec());
                         }
@@ -726,19 +726,20 @@ Drag & drop ROM file: Load new ROM and reset system\n===========================
                 if frame_dirty {
                     if self.sdl.as_ref().unwrap().shader_program.is_some() {
                         self.sdl.as_mut().unwrap().render_frame_with_shader(
-                            frame_data.as_ref().unwrap(),
+                            &frame_data.unwrap(),
                             width as u32,
                             height as u32,
                         );
                     } else {
-                        self.sdl.as_mut().unwrap().canvas.clear();
-                        self.sdl
-                            .as_mut()
+                        //self.sdl.as_mut().unwrap().canvas.clear();
+                        //self.sdl
+                        /*    .as_mut()
                             .unwrap()
                             .canvas
                             .copy(&texture, None, None)
                             .unwrap();
-                        self.sdl.as_mut().unwrap().canvas.present();
+                        */
+                        //self.sdl.as_mut().unwrap().canvas.present();
                     }
                 }
 
