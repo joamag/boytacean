@@ -17,8 +17,6 @@ vec4 texture_relative(sampler2D t, vec2 pos, vec2 offset)
     return _texture(t, (floor(pos * input_resolution) + offset + vec2(0.5, 0.5)) / input_resolution);
 }
 
-
-
 STATIC vec4 scale(sampler2D image, vec2 position, vec2 input_resolution, vec2 output_resolution)
 {
     /* Curve and pixel ratio */
@@ -28,14 +26,14 @@ STATIC vec4 scale(sampler2D image, vec2 position, vec2 input_resolution, vec2 ou
     position.y -= (y_multiplier - 1.0) / 2.0;
     if (position.y < 0.0) return vec4(0,0,0,0);
     if (position.y > 1.0) return vec4(0,0,0,0);
-    
+
     float x_curve = cos(position.y - 0.5) * CURVENESS + (1.0 - CURVENESS);
     float x_multiplier = 1.0/x_curve;
     position.x *= x_multiplier;
     position.x -= (x_multiplier - 1.0) / 2.0;
     if (position.x < 0.0) return vec4(0,0,0,0);
     if (position.x > 1.0) return vec4(0,0,0,0);
-  
+
     /* Setting up common vars */
     vec2 pos = fract(position * input_resolution);
     vec2 sub_pos = pos * 6.0;
@@ -43,7 +41,7 @@ STATIC vec4 scale(sampler2D image, vec2 position, vec2 input_resolution, vec2 ou
     vec4 center = texture_relative(image, position, vec2(0, 0));
     vec4 left = texture_relative(image, position, vec2(-1, 0));
     vec4 right = texture_relative(image, position, vec2(1, 0));
-    
+
     /* Vertical blurring */
     if (sub_pos.y < 1.0) {
         center = mix(center, texture_relative(image, position, vec2( 0, -1)), 0.5 - sub_pos.y / 2.0);
@@ -55,7 +53,7 @@ STATIC vec4 scale(sampler2D image, vec2 position, vec2 input_resolution, vec2 ou
         left =   mix(left,   texture_relative(image, position, vec2(-1, 1)), (sub_pos.y - 5.0) / 2.0);
         right =  mix(right,  texture_relative(image, position, vec2( 1, 1)), (sub_pos.y - 5.0) / 2.0);
     }
-    
+
     /* Scanlines */
     float scanline_multiplier;
     if (pos.y < 0.5) {
@@ -64,7 +62,7 @@ STATIC vec4 scale(sampler2D image, vec2 position, vec2 input_resolution, vec2 ou
     else  {
         scanline_multiplier = ((1.0 - pos.y) * 2.0) * SCANLINE_DEPTH + (1.0 - SCANLINE_DEPTH);
     }
-    
+
     center *= scanline_multiplier;
     left *= scanline_multiplier;
     right *= scanline_multiplier;
@@ -75,7 +73,7 @@ STATIC vec4 scale(sampler2D image, vec2 position, vec2 input_resolution, vec2 ou
         pos.y += 0.5;
         pos.y = fract(pos.y);
     }
-    
+
     if (pos.y < 1.0 / 3.0) {
         float gradient_position = pos.y * 3.0;
         center *= gradient_position * VERTICAL_BORDER_DEPTH + (1.0 - VERTICAL_BORDER_DEPTH);
@@ -93,7 +91,7 @@ STATIC vec4 scale(sampler2D image, vec2 position, vec2 input_resolution, vec2 ou
     if (sub_pos.x < 1.0 || sub_pos.x > 5.0) {
         pos.y += 0.5;
         pos.y = fract(pos.y);
-        
+
         if (pos.y < 1.0 / 3.0) {
             float gradient_position = pos.y * 3.0;
             if (pos.x < 0.5) {
@@ -120,12 +118,11 @@ STATIC vec4 scale(sampler2D image, vec2 position, vec2 input_resolution, vec2 ou
         }
     }
 
-    
     /* Subpixel blurring, like LCD filter*/
-    
+
     vec4 midleft = mix(left, center, 0.5);
     vec4 midright = mix(right, center, 0.5);
-    
+
     vec4 ret;
     if (sub_pos.x < 1.0) {
         ret = mix(vec4(COLOR_HIGH * center.r, COLOR_LOW * center.g, COLOR_HIGH * left.b, 1),
@@ -157,7 +154,7 @@ STATIC vec4 scale(sampler2D image, vec2 position, vec2 input_resolution, vec2 ou
                   vec4(COLOR_HIGH * right.r, COLOR_LOW * right.g  ,  COLOR_HIGH * center.b, 1),
                   sub_pos.x - 5.0);
     }
-    
+
     /* Anti alias the curve */
     vec2 pixel_position = position * output_resolution;
     if (pixel_position.x < 1.0) {
@@ -172,6 +169,6 @@ STATIC vec4 scale(sampler2D image, vec2 position, vec2 input_resolution, vec2 ou
     else if (pixel_position.y > output_resolution.y - 1.0) {
         ret *= output_resolution.y - pixel_position.y;
     }
-    
+
     return ret;
 }
