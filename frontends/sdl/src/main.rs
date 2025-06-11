@@ -1031,8 +1031,8 @@ struct Args {
     #[arg(default_value_t = String::from(DEFAULT_ROM_PATH), help = "Path to the ROM file to be loaded")]
     rom_path: String,
 
-    #[arg(long, default_value_t = String::from(""), help = "Path to fragment shader file")]
-    shader_path: String,
+    #[arg(long, default_value_t = String::from(""), help = "Fragment shader to use")]
+    shader: String,
 }
 
 fn run(args: Args, emulator: &mut Emulator) {
@@ -1118,8 +1118,8 @@ fn main() {
     let mut emulator = Emulator::new(game_boy, options);
     emulator.start(SCREEN_SCALE);
     emulator.load_rom(Some(&args.rom_path)).unwrap();
-    if !args.shader_path.is_empty() {
-        if let Err(err) = emulator.load_shader(&args.shader_path) {
+    if !args.shader.is_empty() {
+        if let Err(err) = emulator.load_shader(&args.shader) {
             println!("Failed to load shader: {err}");
         }
     }

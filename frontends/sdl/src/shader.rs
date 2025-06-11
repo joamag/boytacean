@@ -1,14 +1,22 @@
 use gl::types::*;
-use std::{ffi::CString, fs};
+use std::ffi::CString;
 
-const VERTEX_SHADER: &str = "#version 330 core\nlayout(location = 0) in vec2 pos;\nlayout(location = 1) in vec2 tex;\nout vec2 v_tex;\nvoid main(){v_tex = tex;gl_Position = vec4(pos,0.0,1.0);}";
+const VERTEX_SHADER: &str = include_str!("../res/shaders/master.vert");
 
-pub fn load_shader_program(path: &str) -> Result<u32, String> {
-    let fragment = fs::read_to_string(path).map_err(|e| e.to_string())?;
-    let fragment_source = format!(
-        "#version 330 core\n#define STATIC\nin vec2 v_tex;\nout vec4 color;\nuniform sampler2D image;\nuniform vec2 input_resolution;\nuniform vec2 output_resolution;\n{}\nvoid main(){{color = scale(image, v_tex, input_resolution, output_resolution);}}",
-        fragment
-    );
+const BILINEAR_FRAGMENT: &str = include_str!("../res/shaders/bilinear.frag");
+const SMOOTH_BILINEAR_FRAGMENT: &str = include_str!("../res/shaders/smooth_bilinear.frag");
+const CRT_FRAGMENT: &str = include_str!("../res/shaders/crt.frag");
+const MASTER_FRAGMENT: &str = include_str!("../res/shaders/master.frag");
+
+pub fn load_shader_program(name: &str) -> Result<u32, String> {
+    let fragment_partial = match name {
+        "bilinear" => BILINEAR_FRAGMENT,
+        "smooth_bilinear" => SMOOTH_BILINEAR_FRAGMENT,
+        "crt" => CRT_FRAGMENT,
+        "master" => MASTER_FRAGMENT,
+        _ => return Err(format!("Shader {} not found", name)),
+    };
+    let fragment_source = MASTER_FRAGMENT.replace("{filter}", fragment_partial);
     unsafe { compile_program(VERTEX_SHADER, &fragment_source) }
 }
 

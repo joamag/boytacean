@@ -4,19 +4,6 @@
 #define SCANLINE_DEPTH 0.55
 #define CURVENESS 0.3
 
-#define GAMMA (2.2)
-
-vec4 _texture(sampler2D t, vec2 pos)
-{
-    return pow(texture(t, pos), vec4(GAMMA));
-}
-
-vec4 texture_relative(sampler2D t, vec2 pos, vec2 offset)
-{
-    vec2 input_resolution = textureSize(t, 0);
-    return _texture(t, (floor(pos * input_resolution) + offset + vec2(0.5, 0.5)) / input_resolution);
-}
-
 STATIC vec4 scale(sampler2D image, vec2 position, vec2 input_resolution, vec2 output_resolution)
 {
     /* Curve and pixel ratio */

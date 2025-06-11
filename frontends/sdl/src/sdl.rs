@@ -183,7 +183,6 @@ impl SdlSystem {
             let texture = self.gl_texture.unwrap();
             gl::ActiveTexture(gl::TEXTURE0);
             gl::BindTexture(gl::TEXTURE_2D, texture);
-            let flipped_pixels = flip_vertical(pixels, width as usize, height as usize, 3);
             gl::TexImage2D(
                 gl::TEXTURE_2D,
                 0,
@@ -193,7 +192,7 @@ impl SdlSystem {
                 0,
                 gl::RGB,
                 gl::UNSIGNED_BYTE,
-                flipped_pixels.as_ptr() as *const _,
+                pixels.as_ptr() as *const _,
             );
 
             let loc_image = gl::GetUniformLocation(
@@ -233,15 +232,4 @@ pub fn surface_from_bytes(bytes: &[u8]) -> Surface<'_> {
         let raw_surface = image::IMG_Load_RW(rw_ops.raw(), 0);
         Surface::from_ll(raw_surface)
     }
-}
-
-fn flip_vertical(pixels: &[u8], width: usize, height: usize, channels: usize) -> Vec<u8> {
-    let row_len = width * channels;
-    let mut flipped = vec![0u8; pixels.len()];
-    for y in 0..height {
-        let src = &pixels[y * row_len..(y + 1) * row_len];
-        let dst = &mut flipped[(height - 1 - y) * row_len..(height - y) * row_len];
-        dst.copy_from_slice(src);
-    }
-    flipped
 }
