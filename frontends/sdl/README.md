@@ -110,8 +110,8 @@ cargo run -- --rom-path ../../res/roms/test/blargg/cpu/cpu_instrs.gb --cycles 10
 
 ### Shaders
 
-Use `--shader-path <FILE>` to load a fragment shader. Example:
-```bash
-cargo run -- --rom-path path/to/game.gb --shader-path res/shaders/scale.fsh
-```
+Use `--shader <SHADER>` to load a fragment shader. Example:
 
+```bash
+cargo run -- --rom-path path/to/game.gb --shader crt
+```

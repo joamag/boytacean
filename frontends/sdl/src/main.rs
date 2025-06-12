@@ -320,9 +320,13 @@ impl Emulator {
         Ok(())
     }
 
-    pub fn load_shader(&mut self, path: &str) -> Result<(), String> {
+    /// Loads a (fragment) shader into the SDL system.
+    ///
+    /// This function is used to load a shader into the SDL system,
+    /// this is useful to apply effects to the graphics of the emulator.
+    pub fn load_shader(&mut self, name: &str) -> Result<(), String> {
         if let Some(ref mut sdl) = self.sdl {
-            sdl.load_fragment_shader(path)
+            sdl.load_shader(name)
         } else {
             Err(String::from("SDL system not started"))
         }
@@ -1119,9 +1123,7 @@ fn main() {
     emulator.start(SCREEN_SCALE);
     emulator.load_rom(Some(&args.rom_path)).unwrap();
     if !args.shader.is_empty() {
-        if let Err(err) = emulator.load_shader(&args.shader) {
-            println!("Failed to load shader: {err}");
-        }
+        emulator.load_shader(&args.shader).unwrap();
     }
     emulator.apply_cheats(&args.cheats);
     emulator.toggle_palette();

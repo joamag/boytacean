@@ -121,8 +121,21 @@ impl SdlSystem {
         }
     }
 
-    pub fn load_fragment_shader<P: AsRef<Path>>(&mut self, path: P) -> Result<(), String> {
-        let program = shader::load_shader_program(path.as_ref().to_str().unwrap())?;
+    /// Loads a (fragment) shader into the SDL system.
+    ///
+    /// This function creates all the needed OpenGL objects to
+    /// render the shader, this function is used to apply effects
+    /// to the graphics of the emulator.
+    ///
+    /// # Arguments
+    /// * `name` - The name of the shader to load.
+    ///
+    /// # Returns
+    /// * `Ok(())` - If the shader was loaded successfully.
+    /// * `Err(String)` - If the shader was not loaded successfully.
+    pub fn load_shader(&mut self, name: &str) -> Result<(), String> {
+        let program = shader::load_shader_program(name)?;
+
         unsafe {
             let mut vao = 0;
             let mut vbo = 0;
@@ -166,7 +179,9 @@ impl SdlSystem {
             self.gl_vao = Some(vao);
             self.gl_vbo = Some(vbo);
         }
+
         self.shader_program = Some(program);
+
         Ok(())
     }
 
