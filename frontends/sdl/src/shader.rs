@@ -3,6 +3,7 @@ use std::ffi::CString;
 
 const VERTEX_SHADER: &str = include_str!("../res/shaders/master.vert");
 
+const PASSTHROUGH_FRAGMENT: &str = include_str!("../res/shaders/passthrough.frag");
 const BILINEAR_FRAGMENT: &str = include_str!("../res/shaders/bilinear.frag");
 const SMOOTH_BILINEAR_FRAGMENT: &str = include_str!("../res/shaders/smooth_bilinear.frag");
 const CRT_FRAGMENT: &str = include_str!("../res/shaders/crt.frag");
@@ -10,7 +11,10 @@ const MASTER_FRAGMENT: &str = include_str!("../res/shaders/master.frag");
 
 pub fn load_shader_program(name: &str) -> Result<u32, String> {
     let fragment_partial = match name {
+        "pass" => PASSTHROUGH_FRAGMENT,
+        "passthrough" => PASSTHROUGH_FRAGMENT,
         "bilinear" => BILINEAR_FRAGMENT,
+        "smooth" => SMOOTH_BILINEAR_FRAGMENT,
         "smooth_bilinear" => SMOOTH_BILINEAR_FRAGMENT,
         "crt" => CRT_FRAGMENT,
         "master" => MASTER_FRAGMENT,

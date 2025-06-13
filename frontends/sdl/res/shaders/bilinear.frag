@@ -10,5 +10,5 @@ STATIC vec4 scale(sampler2D image, vec2 position, vec2 input_resolution, vec2 ou
     vec4 r1 = mix(q11, q21, fract(pixel.x));
     vec4 r2 = mix(q12, q22, fract(pixel.x));
 
-    return mix (r1, r2, fract(pixel.y));
+    return mix(r1, r2, fract(pixel.y));
 }
