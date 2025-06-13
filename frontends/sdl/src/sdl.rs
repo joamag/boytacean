@@ -233,13 +233,7 @@ impl SdlSystem {
             gl::DrawArrays(gl::TRIANGLE_STRIP, 0, 4);
             gl::BindVertexArray(0);
         }
-        self.window()
-            .gl_make_current(self.gl_context.as_ref().unwrap())
-            .unwrap();
-        /*unsafe {
-            gl::ClearColor(0.0, 1.0, 0.0, 1.0); // green
-            gl::Clear(gl::COLOR_BUFFER_BIT);
-        }*/
+
         self.window().gl_swap_window();
     }
 }

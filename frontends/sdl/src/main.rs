@@ -722,8 +722,8 @@ Drag & drop ROM file: Load new ROM and reset system\n===========================
                         // obtains the frame buffer of the Game Boy PPU and uses it
                         // to update the stream texture, that will latter be copied
                         // to the canvas
-                        let frame_buffer = self.system.frame_buffer().as_ref();
                         if !self.opengl {
+                            let frame_buffer = self.system.frame_buffer().as_ref();
                             texture
                                 .as_mut()
                                 .unwrap()
