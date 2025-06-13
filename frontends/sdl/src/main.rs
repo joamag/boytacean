@@ -1,6 +1,7 @@
 pub mod audio;
 pub mod data;
 pub mod sdl;
+pub mod shader;
 pub mod test;
 
 use audio::Audio;
@@ -72,6 +73,7 @@ impl Default for Benchmark {
 pub struct EmulatorOptions {
     auto_mode: Option<bool>,
     unlimited: Option<bool>,
+    opengl: Option<bool>,
     features: Option<Vec<&'static str>>,
 }
 
@@ -144,6 +146,9 @@ pub struct Emulator {
     /// speed.
     fast: bool,
 
+    /// Flag that controls if the emulator is running using OpenGL.
+    opengl: bool,
+
     /// Set of features that are going to be enabled in the emulator, this
     /// value is going to be used to control the behavior of the emulator.
     features: Vec<&'static str>,
@@ -173,6 +178,7 @@ impl Emulator {
             next_tick_time: 0.0,
             next_tick_time_i: 0,
             fast: false,
+            opengl: options.opengl.unwrap_or(false),
             features: options
                 .features
                 .unwrap_or_else(|| vec!["video", "audio", "no-vsync"]),
@@ -251,7 +257,7 @@ impl Emulator {
         let sdl = sdl2::init().unwrap();
 
         if self.features.contains(&"video") {
-            self.start_graphics(&sdl, screen_scale);
+            self.start_graphics(&sdl, screen_scale, self.opengl);
         }
         if self.features.contains(&"audio") {
             self.start_audio(&sdl);
@@ -266,13 +272,14 @@ impl Emulator {
         }
     }
 
-    pub fn start_graphics(&mut self, sdl: &Sdl, screen_scale: f32) {
+    pub fn start_graphics(&mut self, sdl: &Sdl, screen_scale: f32, opengl: bool) {
         self.sdl = Some(SdlSystem::new(
             sdl,
             &self.title,
             self.system.display_width() as u32,
             self.system.display_height() as u32,
             screen_scale,
+            opengl,
             !self.features.contains(&"no-accelerated"),
             !self.features.contains(&"no-vsync"),
         ));
@@ -317,6 +324,18 @@ impl Emulator {
             .unwrap()
             .to_string();
         Ok(())
+    }
+
+    /// Loads a (fragment) shader into the SDL system.
+    ///
+    /// This function is used to load a shader into the SDL system,
+    /// this is useful to apply effects to the graphics of the emulator.
+    pub fn load_shader(&mut self, name: &str) -> Result<(), String> {
+        if let Some(ref mut sdl) = self.sdl {
+            sdl.load_shader(name)
+        } else {
+            Err(String::from("SDL system not started"))
+        }
     }
 
     pub fn reset(&mut self) -> Result<(), Error> {
@@ -438,19 +457,43 @@ impl Emulator {
         let surface = surface_from_bytes(&data::ICON);
         self.sdl.as_mut().unwrap().window_mut().set_icon(&surface);
 
-        // creates an accelerated canvas to be used in the drawing
-        // then clears it and presents it
-        self.sdl.as_mut().unwrap().canvas.present();
+        let texture_creator = if self.opengl {
+            None
+        } else {
+            Some(
+                self.sdl
+                    .as_mut()
+                    .unwrap()
+                    .canvas
+                    .as_ref()
+                    .unwrap()
+                    .texture_creator(),
+            )
+        };
 
-        // creates a texture creator for the current canvas, required
-        // for the creation of dynamic and static textures
-        let texture_creator = self.sdl.as_mut().unwrap().canvas.texture_creator();
+        let mut texture = if self.opengl {
+            None
+        } else {
+            // creates an accelerated canvas to be used in the drawing
+            // then clears it and presents it
+            self.sdl
+                .as_mut()
+                .unwrap()
+                .canvas
+                .as_mut()
+                .unwrap()
+                .present();
 
-        // creates the texture streaming that is going to be used
-        // as the target for the pixel buffer
-        let mut texture = texture_creator
-            .create_texture_streaming(PixelFormatEnum::RGB24, width as u32, height as u32)
-            .unwrap();
+            // creates the texture streaming that is going to be used
+            // as the target for the pixel buffer
+            let texture = texture_creator
+                .as_ref()
+                .unwrap()
+                .create_texture_streaming(PixelFormatEnum::RGB24, width as u32, height as u32)
+                .unwrap();
+
+            Some(texture)
+        };
 
         // calculates the rate as visual cycles that will take from
         // the current visual frequency to re-save the battery backed RAM
@@ -467,6 +510,18 @@ impl Emulator {
         // the main loop to execute the multiple machine clocks, in
         // theory the emulator should keep an infinite loop here
         'main: loop {
+            // obtains the dimensions of the window to be used in the
+            // aspect ratio calculation, making sure the aspect ratio
+            // is maintained when the window is resized
+            let (window_width, window_height) = self
+                .sdl
+                .as_ref()
+                .unwrap()
+                .window
+                .as_ref()
+                .unwrap()
+                .drawable_size();
+
             // increments the counter that will keep track
             // on the number of visual ticks since beginning
             counter = counter.wrapping_add(1);
@@ -494,7 +549,7 @@ impl Emulator {
                     } => {
                         println!(
                             "=== Boytacean SDL Controls ===\n\
-Escape or Close Window: Quit the emulator\n\
+Escape: Quit the emulator\n\
 H: Show this help message\n\
 I: Save a screenshot as PNG in the current directory\n\
 R: Reset the system (soft reset)\n\
@@ -679,8 +734,14 @@ Drag & drop ROM file: Load new ROM and reset system\n===========================
                         // obtains the frame buffer of the Game Boy PPU and uses it
                         // to update the stream texture, that will latter be copied
                         // to the canvas
-                        let frame_buffer = self.system.frame_buffer().as_ref();
-                        texture.update(None, frame_buffer, width * 3).unwrap();
+                        if !self.opengl {
+                            let frame_buffer = self.system.frame_buffer().as_ref();
+                            texture
+                                .as_mut()
+                                .unwrap()
+                                .update(None, frame_buffer, width * 3)
+                                .unwrap();
+                        }
 
                         // obtains the index of the current PPU frame, this value
                         // is going to be used to detect for new frame presence
@@ -710,23 +771,32 @@ Drag & drop ROM file: Load new ROM and reset system\n===========================
                 // resources from being over-used in situations where multiple frames
                 // are generated during the same tick cycle
                 if frame_dirty {
-                    // clears the graphics canvas, making sure that no garbage
-                    // pixel data remaining in the pixel buffer, not doing this would
-                    // create visual glitches in OSs like Mac OS X
-                    self.sdl.as_mut().unwrap().canvas.clear();
-
-                    // copies the texture that was created for the frame (during
-                    // the loop part of the tick) to the canvas
-                    self.sdl
-                        .as_mut()
-                        .unwrap()
-                        .canvas
-                        .copy(&texture, None, None)
-                        .unwrap();
-
-                    // presents the canvas effectively updating the screen
-                    // information presented to the user
-                    self.sdl.as_mut().unwrap().canvas.present();
+                    if self.opengl {
+                        self.sdl.as_mut().unwrap().render_frame_with_shader(
+                            self.system.frame_buffer().as_ref(),
+                            width as u32,
+                            height as u32,
+                            window_width,
+                            window_height,
+                        );
+                    } else {
+                        self.sdl.as_mut().unwrap().canvas.as_mut().unwrap().clear();
+                        self.sdl
+                            .as_mut()
+                            .unwrap()
+                            .canvas
+                            .as_mut()
+                            .unwrap()
+                            .copy(texture.as_ref().unwrap(), None, None)
+                            .unwrap();
+                        self.sdl
+                            .as_mut()
+                            .unwrap()
+                            .canvas
+                            .as_mut()
+                            .unwrap()
+                            .present();
+                    }
                 }
 
                 // calculates the number of ticks that have elapsed since the
@@ -1016,6 +1086,9 @@ struct Args {
 
     #[arg(default_value_t = String::from(DEFAULT_ROM_PATH), help = "Path to the ROM file to be loaded")]
     rom_path: String,
+
+    #[arg(long, default_value_t = String::from(""), help = "Fragment shader to use")]
+    shader: String,
 }
 
 fn run(args: Args, emulator: &mut Emulator) {
@@ -1092,6 +1165,7 @@ fn main() {
     let options = EmulatorOptions {
         auto_mode: Some(auto_mode),
         unlimited: Some(args.unlimited),
+        opengl: Some(!args.shader.is_empty()),
         features: if args.headless || args.benchmark {
             Some(vec![])
         } else {
@@ -1103,6 +1177,9 @@ fn main() {
     emulator.load_rom(Some(&args.rom_path)).unwrap();
     emulator.apply_cheats(&args.cheats);
     emulator.toggle_palette();
+    if !args.shader.is_empty() {
+        emulator.load_shader(&args.shader).unwrap();
+    }
 
     run(args, &mut emulator);
 

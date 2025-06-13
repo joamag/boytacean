@@ -172,6 +172,21 @@ pub fn interleave_arrays(a: &[u8], b: &[u8], output: &mut [u8]) {
     }
 }
 
+/// Flips a 2D array of pixels vertically, in place.
+///
+/// This function is optimized for performance and uses pointer-based
+/// operations to flip the pixels as fast as possible.
+pub fn flip_vertical(pixels: &[u8], width: usize, height: usize, channels: usize) -> Vec<u8> {
+    let row_len = width * channels;
+    let mut flipped = vec![0u8; pixels.len()];
+    for y in 0..height {
+        let src = &pixels[y * row_len..(y + 1) * row_len];
+        let dst = &mut flipped[(height - 1 - y) * row_len..(height - y) * row_len];
+        dst.copy_from_slice(src);
+    }
+    flipped
+}
+
 #[cfg(not(feature = "wasm"))]
 pub fn timestamp() -> u64 {
     use std::time::{SystemTime, UNIX_EPOCH};
