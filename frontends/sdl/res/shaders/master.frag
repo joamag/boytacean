@@ -73,5 +73,5 @@ void main()
     }
 
     frag_color = pow(mix(scale(image, position, input_resolution, output_resolution),
-                         scale(previous_image, position, input_resolution, output_resolution), ratio), vec4(1.0 / GAMMA));
+        scale(previous_image, position, input_resolution, output_resolution), ratio), vec4(1.0 / GAMMA));
 }

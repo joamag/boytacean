@@ -8,7 +8,6 @@ use sdl2::{
     video::{GLContext, GLProfile, Window},
     AudioSubsystem, EventPump, Sdl, TimerSubsystem, VideoSubsystem,
 };
-use std::path::Path;
 
 use crate::shader;
 
@@ -23,7 +22,7 @@ pub struct SdlSystem {
     pub audio_subsystem: AudioSubsystem,
     pub event_pump: EventPump,
     pub ttf_context: Sdl2TtfContext,
-    pub gl_context: GLContext,
+    pub gl_context: Option<GLContext>,
     pub shader_program: Option<u32>,
     pub gl_texture: Option<u32>,
     pub gl_vao: Option<u32>,
@@ -34,12 +33,14 @@ impl SdlSystem {
     /// Start the SDL sub-system and all of its structure and returns
     /// a structure with all the needed stuff to handle SDL graphics
     /// and sound.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         sdl: &Sdl,
         title: &str,
         width: u32,
         height: u32,
         scale: f32,
+        opengl: bool,
         accelerated: bool,
         vsync: bool,
     ) -> Self {
@@ -73,25 +74,29 @@ impl SdlSystem {
             .build()
             .unwrap();
 
-        // creates a canvas (according to spec) to be used in the drawing
-        // then clears it so that is can be presented empty initially
-        /*let mut canvas_builder = window.into_canvas();
-        if accelerated {
-            canvas_builder = canvas_builder.accelerated();
-        }
-        if vsync {
-            canvas_builder = canvas_builder.present_vsync();
-        }
-        let mut canvas = canvas_builder.build().unwrap();
-        canvas.set_logical_size(width, height).unwrap();
-        canvas.clear();*/
-
-        let gl_context = window.gl_create_context().unwrap();
-        gl::load_with(|s| video_subsystem.gl_get_proc_address(s) as *const _);
+        let (canvas, gl_context, window) = if opengl {
+            let gl_context = window.gl_create_context().unwrap();
+            gl::load_with(|s| video_subsystem.gl_get_proc_address(s) as *const _);
+            (None, Some(gl_context), Some(window))
+        } else {
+            // creates a canvas (according to spec) to be used in the drawing
+            // then clears it so that is can be presented empty initially
+            let mut canvas_builder = window.into_canvas();
+            if accelerated {
+                canvas_builder = canvas_builder.accelerated();
+            }
+            if vsync {
+                canvas_builder = canvas_builder.present_vsync();
+            }
+            let mut canvas = canvas_builder.build().unwrap();
+            canvas.set_logical_size(width, height).unwrap();
+            canvas.clear();
+            (Some(canvas), None, None)
+        };
 
         Self {
-            canvas: None,
-            window: Some(window),
+            canvas,
+            window,
             video_subsystem,
             timer_subsystem,
             audio_subsystem,
@@ -210,17 +215,15 @@ impl SdlSystem {
                 pixels.as_ptr() as *const _,
             );
 
-            let loc_image = gl::GetUniformLocation(
-                self.shader_program.unwrap(),
-                b"image\0".as_ptr() as *const _,
-            );
+            let loc_image =
+                gl::GetUniformLocation(self.shader_program.unwrap(), c"image".as_ptr() as *const _);
             let loc_in = gl::GetUniformLocation(
                 self.shader_program.unwrap(),
-                b"input_resolution\0".as_ptr() as *const _,
+                c"input_resolution".as_ptr() as *const _,
             );
             let loc_out = gl::GetUniformLocation(
                 self.shader_program.unwrap(),
-                b"output_resolution\0".as_ptr() as *const _,
+                c"output_resolution".as_ptr() as *const _,
             );
             gl::Uniform1i(loc_image, 0);
             gl::Uniform2f(loc_in, width as f32, height as f32);
@@ -230,7 +233,9 @@ impl SdlSystem {
             gl::DrawArrays(gl::TRIANGLE_STRIP, 0, 4);
             gl::BindVertexArray(0);
         }
-        self.window().gl_make_current(&self.gl_context).unwrap();
+        self.window()
+            .gl_make_current(self.gl_context.as_ref().unwrap())
+            .unwrap();
         /*unsafe {
             gl::ClearColor(0.0, 1.0, 0.0, 1.0); // green
             gl::Clear(gl::COLOR_BUFFER_BIT);

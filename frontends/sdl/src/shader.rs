@@ -14,7 +14,7 @@ pub fn load_shader_program(name: &str) -> Result<u32, String> {
         "smooth_bilinear" => SMOOTH_BILINEAR_FRAGMENT,
         "crt" => CRT_FRAGMENT,
         "master" => MASTER_FRAGMENT,
-        _ => return Err(format!("Shader {} not found", name)),
+        _ => return Err(format!("Shader {name} not found")),
     };
     let fragment_source = MASTER_FRAGMENT.replace("{filter}", fragment_partial);
     unsafe { compile_program(VERTEX_SHADER, &fragment_source) }
@@ -34,8 +34,7 @@ unsafe fn compile_program(vertex_src: &str, fragment_src: &str) -> Result<u32, S
     if status == 0 {
         let mut len = 0;
         gl::GetProgramiv(program, gl::INFO_LOG_LENGTH, &mut len);
-        let mut buf = Vec::with_capacity(len as usize);
-        buf.set_len((len as usize) - 1);
+        let mut buf = vec![0u8; (len as usize) - 1];
         gl::GetProgramInfoLog(
             program,
             len,
@@ -58,8 +57,7 @@ unsafe fn compile_shader(kind: GLenum, source: &str) -> Result<u32, String> {
     if status == 0 {
         let mut len = 0;
         gl::GetShaderiv(shader, gl::INFO_LOG_LENGTH, &mut len);
-        let mut buf = Vec::with_capacity(len as usize);
-        buf.set_len((len as usize) - 1);
+        let mut buf = vec![0u8; (len as usize) - 1];
         gl::GetShaderInfoLog(
             shader,
             len,

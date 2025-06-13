@@ -73,6 +73,7 @@ impl Default for Benchmark {
 pub struct EmulatorOptions {
     auto_mode: Option<bool>,
     unlimited: Option<bool>,
+    opengl: Option<bool>,
     features: Option<Vec<&'static str>>,
 }
 
@@ -145,6 +146,9 @@ pub struct Emulator {
     /// speed.
     fast: bool,
 
+    /// Flag that controls if the emulator is running using OpenGL.
+    opengl: bool,
+
     /// Set of features that are going to be enabled in the emulator, this
     /// value is going to be used to control the behavior of the emulator.
     features: Vec<&'static str>,
@@ -174,6 +178,7 @@ impl Emulator {
             next_tick_time: 0.0,
             next_tick_time_i: 0,
             fast: false,
+            opengl: options.opengl.unwrap_or(false),
             features: options
                 .features
                 .unwrap_or_else(|| vec!["video", "audio", "no-vsync"]),
@@ -252,7 +257,7 @@ impl Emulator {
         let sdl = sdl2::init().unwrap();
 
         if self.features.contains(&"video") {
-            self.start_graphics(&sdl, screen_scale);
+            self.start_graphics(&sdl, screen_scale, self.opengl);
         }
         if self.features.contains(&"audio") {
             self.start_audio(&sdl);
@@ -267,13 +272,14 @@ impl Emulator {
         }
     }
 
-    pub fn start_graphics(&mut self, sdl: &Sdl, screen_scale: f32) {
+    pub fn start_graphics(&mut self, sdl: &Sdl, screen_scale: f32, opengl: bool) {
         self.sdl = Some(SdlSystem::new(
             sdl,
             &self.title,
             self.system.display_width() as u32,
             self.system.display_height() as u32,
             screen_scale,
+            opengl,
             !self.features.contains(&"no-accelerated"),
             !self.features.contains(&"no-vsync"),
         ));
@@ -451,19 +457,43 @@ impl Emulator {
         let surface = surface_from_bytes(&data::ICON);
         self.sdl.as_mut().unwrap().window_mut().set_icon(&surface);
 
-        // creates an accelerated canvas to be used in the drawing
-        // then clears it and presents it
-        // self.sdl.as_mut().unwrap().canvas.present();
+        let texture_creator = if self.opengl {
+            None
+        } else {
+            Some(
+                self.sdl
+                    .as_mut()
+                    .unwrap()
+                    .canvas
+                    .as_ref()
+                    .unwrap()
+                    .texture_creator(),
+            )
+        };
 
-        // creates a texture creator for the current canvas, required
-        // for the creation of dynamic and static textures
-        //let texture_creator = self.sdl.as_mut().unwrap().canvas.texture_creator();
+        let mut texture = if self.opengl {
+            None
+        } else {
+            // creates an accelerated canvas to be used in the drawing
+            // then clears it and presents it
+            self.sdl
+                .as_mut()
+                .unwrap()
+                .canvas
+                .as_mut()
+                .unwrap()
+                .present();
 
-        // creates the texture streaming that is going to be used
-        // as the target for the pixel buffer
-        //let mut texture = texture_creator
-        //    .create_texture_streaming(PixelFormatEnum::RGB24, width as u32, height as u32)
-        //    .unwrap();
+            // creates the texture streaming that is going to be used
+            // as the target for the pixel buffer
+            let texture = texture_creator
+                .as_ref()
+                .unwrap()
+                .create_texture_streaming(PixelFormatEnum::RGB24, width as u32, height as u32)
+                .unwrap();
+
+            Some(texture)
+        };
 
         // calculates the rate as visual cycles that will take from
         // the current visual frequency to re-save the battery backed RAM
@@ -673,7 +703,6 @@ Drag & drop ROM file: Load new ROM and reset system\n===========================
                     / self.visual_frequency)
                     .round() as u32;
 
-                let mut frame_data: Option<Vec<u8>> = None;
                 loop {
                     // limits the number of ticks to the typical number
                     // of cycles expected for the current logic cycle
@@ -693,11 +722,13 @@ Drag & drop ROM file: Load new ROM and reset system\n===========================
                         // obtains the frame buffer of the Game Boy PPU and uses it
                         // to update the stream texture, that will latter be copied
                         // to the canvas
-                        let frame_buffer = self.system.frame_buffer();
-                        if self.sdl.as_ref().unwrap().shader_program.is_none() {
-                            //    texture.update(None, &frame_buffer, width * 3).unwrap();
-                        } else {
-                            frame_data = Some(frame_buffer.to_vec());
+                        let frame_buffer = self.system.frame_buffer().as_ref();
+                        if !self.opengl {
+                            texture
+                                .as_mut()
+                                .unwrap()
+                                .update(None, frame_buffer, width * 3)
+                                .unwrap();
                         }
 
                         // obtains the index of the current PPU frame, this value
@@ -728,22 +759,29 @@ Drag & drop ROM file: Load new ROM and reset system\n===========================
                 // resources from being over-used in situations where multiple frames
                 // are generated during the same tick cycle
                 if frame_dirty {
-                    if self.sdl.as_ref().unwrap().shader_program.is_some() {
+                    if self.opengl {
                         self.sdl.as_mut().unwrap().render_frame_with_shader(
-                            &frame_data.unwrap(),
+                            self.system.frame_buffer().as_ref(),
                             width as u32,
                             height as u32,
                         );
                     } else {
-                        //self.sdl.as_mut().unwrap().canvas.clear();
-                        //self.sdl
-                        /*    .as_mut()
+                        self.sdl.as_mut().unwrap().canvas.as_mut().unwrap().clear();
+                        self.sdl
+                            .as_mut()
                             .unwrap()
                             .canvas
-                            .copy(&texture, None, None)
+                            .as_mut()
+                            .unwrap()
+                            .copy(texture.as_ref().unwrap(), None, None)
                             .unwrap();
-                        */
-                        //self.sdl.as_mut().unwrap().canvas.present();
+                        self.sdl
+                            .as_mut()
+                            .unwrap()
+                            .canvas
+                            .as_mut()
+                            .unwrap()
+                            .present();
                     }
                 }
 
@@ -1113,6 +1151,7 @@ fn main() {
     let options = EmulatorOptions {
         auto_mode: Some(auto_mode),
         unlimited: Some(args.unlimited),
+        opengl: Some(!args.shader.is_empty()),
         features: if args.headless || args.benchmark {
             Some(vec![])
         } else {
@@ -1122,11 +1161,11 @@ fn main() {
     let mut emulator = Emulator::new(game_boy, options);
     emulator.start(SCREEN_SCALE);
     emulator.load_rom(Some(&args.rom_path)).unwrap();
+    emulator.apply_cheats(&args.cheats);
+    emulator.toggle_palette();
     if !args.shader.is_empty() {
         emulator.load_shader(&args.shader).unwrap();
     }
-    emulator.apply_cheats(&args.cheats);
-    emulator.toggle_palette();
 
     run(args, &mut emulator);
 
