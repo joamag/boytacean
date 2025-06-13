@@ -510,7 +510,17 @@ impl Emulator {
         // the main loop to execute the multiple machine clocks, in
         // theory the emulator should keep an infinite loop here
         'main: loop {
-            let (window_width, window_height) = self.sdl.as_ref().unwrap().window.as_ref().unwrap().drawable_size();
+            // obtains the dimensions of the window to be used in the
+            // aspect ratio calculation, making sure the aspect ratio
+            // is maintained when the window is resized
+            let (window_width, window_height) = self
+                .sdl
+                .as_ref()
+                .unwrap()
+                .window
+                .as_ref()
+                .unwrap()
+                .drawable_size();
 
             // increments the counter that will keep track
             // on the number of visual ticks since beginning

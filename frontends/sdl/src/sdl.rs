@@ -29,7 +29,7 @@ pub struct SdlSystem {
     pub gl_vao: Option<u32>,
     pub gl_vbo: Option<u32>,
 
-    pub uniform_locations: Option<(i32, i32, i32)>,
+    pub uniform_locations: Option<(i32, i32, i32, i32)>,
     pub last_viewport_size: Option<(u32, u32)>,
     pub vao_bound: bool,
     pub texture_size: Option<(u32, u32)>,
@@ -210,7 +210,14 @@ impl SdlSystem {
     /// * `pixels` - The buffer of pixels to render.
     /// * `width` - The width of the frame.
     /// * `height` - The height of the frame.
-    pub fn render_frame_with_shader(&mut self, pixels: &[u8], width: u32, height: u32, window_width: u32, window_height: u32) {
+    pub fn render_frame_with_shader(
+        &mut self,
+        pixels: &[u8],
+        width: u32,
+        height: u32,
+        window_width: u32,
+        window_height: u32,
+    ) {
         if self.shader_program.is_none() {
             return;
         }
@@ -258,10 +265,34 @@ impl SdlSystem {
                 );
             }
 
-            let (loc_image, loc_in, loc_out) = self.uniform_locations.unwrap();
+            // calculate the viewport dimensions to maintain the aspect ratio
+            // this is going to be used to maintain the aspect ratio of the game
+            // and the window, this is going to be used to avoid distortion of the
+            // game graphics when the window is resized
+            let game_aspect = width as f32 / height as f32;
+            let window_aspect = window_width as f32 / window_height as f32;
+            let (vp_width, vp_height, vp_x, vp_y) = if window_aspect > game_aspect {
+                let vp_height = window_height;
+                let vp_width = ((vp_height as f32 * game_aspect).round()) as u32;
+                let vp_x = (window_width - vp_width) / 2;
+                let vp_y = 0;
+                (vp_width, vp_height, vp_x, vp_y)
+            } else {
+                let vp_width = window_width;
+                let vp_height = ((vp_width as f32 / game_aspect).round()) as u32;
+                let vp_x = 0;
+                let vp_y = (window_height - vp_height) / 2;
+                (vp_width, vp_height, vp_x, vp_y)
+            };
+
+            // sets the viewport to maintain aspect ratio
+            gl::Viewport(vp_x as i32, vp_y as i32, vp_width as i32, vp_height as i32);
+
+            let (loc_image, loc_in, loc_out, origin) = self.uniform_locations.unwrap();
             gl::Uniform1i(loc_image, 0);
             gl::Uniform2f(loc_in, width as f32, height as f32);
-            gl::Uniform2f(loc_out, dw as f32, dh as f32);
+            gl::Uniform2f(loc_out, vp_width as f32, vp_height as f32);
+            gl::Uniform2f(origin, vp_x as f32, vp_y as f32);
 
             // keeps the VAO bound throughout the frame
             if !self.vao_bound {
@@ -313,7 +344,8 @@ impl SdlSystem {
             let loc_in = gl::GetUniformLocation(program, c"input_resolution".as_ptr() as *const _);
             let loc_out =
                 gl::GetUniformLocation(program, c"output_resolution".as_ptr() as *const _);
-            self.uniform_locations = Some((loc_image, loc_in, loc_out));
+            let origin = gl::GetUniformLocation(program, c"origin".as_ptr() as *const _);
+            self.uniform_locations = Some((loc_image, loc_in, loc_out, origin));
         }
 
         // initializes the viewport and clears the color, this is going
