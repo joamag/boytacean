@@ -22,11 +22,17 @@ pub struct SdlSystem {
     pub audio_subsystem: AudioSubsystem,
     pub event_pump: EventPump,
     pub ttf_context: Sdl2TtfContext,
+
     pub gl_context: Option<GLContext>,
     pub shader_program: Option<u32>,
     pub gl_texture: Option<u32>,
     pub gl_vao: Option<u32>,
     pub gl_vbo: Option<u32>,
+
+    pub uniform_locations: Option<(i32, i32, i32)>,
+    pub last_viewport_size: Option<(u32, u32)>,
+    pub vao_bound: bool,
+    pub texture_size: Option<(u32, u32)>,
 }
 
 impl SdlSystem {
@@ -107,6 +113,10 @@ impl SdlSystem {
             gl_texture: None,
             gl_vao: None,
             gl_vbo: None,
+            uniform_locations: None,
+            last_viewport_size: None,
+            vao_bound: false,
+            texture_size: None,
         }
     }
 
@@ -187,54 +197,141 @@ impl SdlSystem {
 
         self.shader_program = Some(program);
 
+        self.init_shader_variables()?;
+
         Ok(())
     }
 
+    /// Renders a frame using the currently loaded shader program.
+    ///
+    /// Arguments:
+    /// * `pixels` - The buffer of pixels to render.
+    /// * `width` - The width of the frame.
+    /// * `height` - The height of the frame.
     pub fn render_frame_with_shader(&mut self, pixels: &[u8], width: u32, height: u32) {
         if self.shader_program.is_none() {
             return;
         }
         unsafe {
             let (dw, dh) = self.window.as_ref().unwrap().drawable_size();
-            gl::Viewport(0, 0, dw as i32, dh as i32);
+            if self.last_viewport_size != Some((dw, dh)) {
+                gl::Viewport(0, 0, dw as i32, dh as i32);
+                self.last_viewport_size = Some((dw, dh));
+            }
+
             gl::Clear(gl::COLOR_BUFFER_BIT);
             gl::UseProgram(self.shader_program.unwrap());
 
             let texture = self.gl_texture.unwrap();
             gl::ActiveTexture(gl::TEXTURE0);
             gl::BindTexture(gl::TEXTURE_2D, texture);
-            gl::TexImage2D(
-                gl::TEXTURE_2D,
-                0,
-                gl::RGB as i32,
-                width as i32,
-                height as i32,
-                0,
-                gl::RGB,
-                gl::UNSIGNED_BYTE,
-                pixels.as_ptr() as *const _,
-            );
 
-            let loc_image =
-                gl::GetUniformLocation(self.shader_program.unwrap(), c"image".as_ptr() as *const _);
-            let loc_in = gl::GetUniformLocation(
-                self.shader_program.unwrap(),
-                c"input_resolution".as_ptr() as *const _,
-            );
-            let loc_out = gl::GetUniformLocation(
-                self.shader_program.unwrap(),
-                c"output_resolution".as_ptr() as *const _,
-            );
+            // checks if we need to resize the texture, this is going to be used
+            // to avoid unnecessary texture updates
+            if self.texture_size != Some((width, height)) {
+                gl::TexImage2D(
+                    gl::TEXTURE_2D,
+                    0,
+                    gl::RGB as i32,
+                    width as i32,
+                    height as i32,
+                    0,
+                    gl::RGB,
+                    gl::UNSIGNED_BYTE,
+                    pixels.as_ptr() as *const _,
+                );
+                self.texture_size = Some((width, height));
+            } else {
+                gl::TexSubImage2D(
+                    gl::TEXTURE_2D,
+                    0,
+                    0,
+                    0,
+                    width as i32,
+                    height as i32,
+                    gl::RGB,
+                    gl::UNSIGNED_BYTE,
+                    pixels.as_ptr() as *const _,
+                );
+            }
+
+            let (loc_image, loc_in, loc_out) = self.uniform_locations.unwrap();
             gl::Uniform1i(loc_image, 0);
             gl::Uniform2f(loc_in, width as f32, height as f32);
             gl::Uniform2f(loc_out, dw as f32, dh as f32);
 
-            gl::BindVertexArray(self.gl_vao.unwrap());
+            // keeps the VAO bound throughout the frame
+            if !self.vao_bound {
+                gl::BindVertexArray(self.gl_vao.unwrap());
+                self.vao_bound = true;
+            }
+
             gl::DrawArrays(gl::TRIANGLE_STRIP, 0, 4);
-            gl::BindVertexArray(0);
         }
 
         self.window().gl_swap_window();
+    }
+
+    fn init_shader_variables(&mut self) -> Result<(), String> {
+        // initializes the texture, making sure that we have a valid texture
+        // to be used in the shader program
+        unsafe {
+            let mut texture = 0;
+            gl::GenTextures(1, &mut texture);
+            gl::BindTexture(gl::TEXTURE_2D, texture);
+
+            gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as i32);
+            gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::LINEAR as i32);
+            gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, gl::CLAMP_TO_EDGE as i32);
+            gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_T, gl::CLAMP_TO_EDGE as i32);
+
+            // initializes texture with null data, actual size will be set on first frame
+            gl::TexImage2D(
+                gl::TEXTURE_2D,
+                0,
+                gl::RGB as i32,
+                1,
+                1,
+                0,
+                gl::RGB,
+                gl::UNSIGNED_BYTE,
+                std::ptr::null(),
+            );
+
+            self.gl_texture = Some(texture);
+            self.texture_size = None; // Will be set on first frame
+        }
+
+        // caches the uniform locations, this is going to be used to
+        // update the shader program with the correct values
+        unsafe {
+            let program = self.shader_program.unwrap();
+            let loc_image = gl::GetUniformLocation(program, c"image".as_ptr() as *const _);
+            let loc_in = gl::GetUniformLocation(program, c"input_resolution".as_ptr() as *const _);
+            let loc_out =
+                gl::GetUniformLocation(program, c"output_resolution".as_ptr() as *const _);
+            self.uniform_locations = Some((loc_image, loc_in, loc_out));
+        }
+
+        // initializes the viewport and clears the color, this is going
+        // to be used to clear the screen before rendering the frame
+        unsafe {
+            let (dw, dh) = self.window.as_ref().unwrap().drawable_size();
+            gl::Viewport(0, 0, dw as i32, dh as i32);
+            gl::ClearColor(0.0, 0.0, 0.0, 1.0);
+        }
+
+        Ok(())
+    }
+
+    pub fn cleanup(&mut self) {
+        unsafe {
+            if self.vao_bound {
+                gl::BindVertexArray(0);
+                self.vao_bound = false;
+            }
+            // ... rest of cleanup code ...
+        }
     }
 }
 
