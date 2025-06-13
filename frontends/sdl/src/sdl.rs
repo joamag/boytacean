@@ -210,10 +210,11 @@ impl SdlSystem {
     /// * `pixels` - The buffer of pixels to render.
     /// * `width` - The width of the frame.
     /// * `height` - The height of the frame.
-    pub fn render_frame_with_shader(&mut self, pixels: &[u8], width: u32, height: u32) {
+    pub fn render_frame_with_shader(&mut self, pixels: &[u8], width: u32, height: u32, window_width: u32, window_height: u32) {
         if self.shader_program.is_none() {
             return;
         }
+
         unsafe {
             let (dw, dh) = self.window.as_ref().unwrap().drawable_size();
             if self.last_viewport_size != Some((dw, dh)) {

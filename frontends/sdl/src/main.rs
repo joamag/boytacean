@@ -510,6 +510,8 @@ impl Emulator {
         // the main loop to execute the multiple machine clocks, in
         // theory the emulator should keep an infinite loop here
         'main: loop {
+            let (window_width, window_height) = self.sdl.as_ref().unwrap().window.as_ref().unwrap().drawable_size();
+
             // increments the counter that will keep track
             // on the number of visual ticks since beginning
             counter = counter.wrapping_add(1);
@@ -764,6 +766,8 @@ Drag & drop ROM file: Load new ROM and reset system\n===========================
                             self.system.frame_buffer().as_ref(),
                             width as u32,
                             height as u32,
+                            window_width,
+                            window_height,
                         );
                     } else {
                         self.sdl.as_mut().unwrap().canvas.as_mut().unwrap().clear();
