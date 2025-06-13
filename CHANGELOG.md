@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-*
+* Fixed `audio_ch1_enabled` returning the wrong channel status
 * Shader program was not applied to SDL output
 * SDL shader rendering failed due to lifetime issues
 * SDL shader context version mismatch caused blank output

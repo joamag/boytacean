@@ -32,6 +32,14 @@ Run the full test suite:
 cargo test --all-targets --features simd,debug,python
 ```
 
+## SDL Frontend
+
+To build the SDL frontend (if required) use:
+
+```bash
+cd frontends/sdl && cargo build
+```
+
 ## Style Guide
 
 - Always update `CHANGELOG.md` according to semantic versioning, mentioning your changes in the unreleased section.

@@ -853,7 +853,7 @@ impl GameBoy {
     }
 
     pub fn audio_ch1_enabled(&self) -> bool {
-        self.apu_i().ch2_out_enabled()
+        self.apu_i().ch1_out_enabled()
     }
 
     pub fn set_audio_ch1_enabled(&mut self, enabled: bool) {
