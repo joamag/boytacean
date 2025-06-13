@@ -210,6 +210,8 @@ impl SdlSystem {
     /// * `pixels` - The buffer of pixels to render.
     /// * `width` - The width of the frame.
     /// * `height` - The height of the frame.
+    /// * `window_width` - The width of the window (viewport).
+    /// * `window_height` - The height of the window (viewport).
     pub fn render_frame_with_shader(
         &mut self,
         pixels: &[u8],
