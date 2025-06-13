@@ -1,4 +1,4 @@
-use gl::types::*;
+use gl::types::GLenum;
 use std::ffi::CString;
 
 const VERTEX_SHADER: &str = include_str!("../res/shaders/master.vert");
