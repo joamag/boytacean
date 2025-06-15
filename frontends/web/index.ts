@@ -28,7 +28,7 @@ const BACKGROUNDS = [
     const fullscreen = ["1", "true", "True"].includes(
         params.get("fullscreen") ?? params.get("fs") ?? ""
     );
-    const shader = params.get("shader") ?? undefined;
+    const shader = params.get("shader") ?? "crt";
     const debug = ["1", "true", "True"].includes(params.get("debug") ?? "");
     const verbose = ["1", "true", "True"].includes(params.get("verbose") ?? "");
     const keyboard = ["1", "true", "True"].includes(
@@ -59,9 +59,11 @@ const BACKGROUNDS = [
         backgrounds: BACKGROUNDS
     });
 
-    if (shader) {
-        await setupWebGL(emulator, shader);
-    }
+    //if (shader) {
+    setTimeout(async () => {
+        await setupWebGL(emulator, "crt");
+    }, 3000);
+    //}
 
     // sets the emulator in the global scope this is useful
     // to be able to access the emulator from global functions

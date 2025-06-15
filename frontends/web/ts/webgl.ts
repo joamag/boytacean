@@ -1,12 +1,23 @@
-export async function setupWebGL(emulator: any, shader: string) {
-    const canvas = document.querySelector<HTMLCanvasElement>(".display-canvas");
-    if (!canvas) return;
-    const gl = canvas.getContext("webgl2");
-    if (!gl) return;
+import { Emulator } from "emukit";
 
-    const vertexSrc = await fetchShader("../res/shaders/master.vert");
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+declare const require: any;
+
+export async function setupWebGL(emulator: Emulator, shader: string) {
+    const canvas = document.querySelector<HTMLCanvasElement>(".display-canvas");
+    if (!canvas) {
+        console.error("No canvas found");
+        return;
+    }
+    const gl = canvas.getContext("webgl2");
+    if (!gl) {
+        console.error("No WebGL context found");
+        return;
+    }
+
+    const vertexSrc = await fetchShader(require("../res/shaders/master.vert"));
     const fragPartial = await fetchShader(getShaderPath(shader));
-    const masterFrag = await fetchShader("../res/shaders/master.frag");
+    const masterFrag = await fetchShader(require("../res/shaders/master.frag"));
     const fragmentSrc = masterFrag.replace("{filter}", fragPartial);
 
     const vertex = compileShader(gl, gl.VERTEX_SHADER, vertexSrc);
@@ -19,10 +30,7 @@ export async function setupWebGL(emulator: any, shader: string) {
     const vao = gl.createVertexArray();
     const vbo = gl.createBuffer();
     const vertices = new Float32Array([
-        -1, -1, 0, 0,
-        1, -1, 1, 0,
-        -1, 1, 0, 1,
-        1, 1, 1, 1
+        -1, -1, 0, 0, 1, -1, 1, 0, -1, 1, 0, 1, 1, 1, 1, 1
     ]);
 
     gl.bindVertexArray(vao);
@@ -74,19 +82,21 @@ export async function setupWebGL(emulator: any, shader: string) {
     };
 
     emulator.bind("frame", draw);
-};
+}
 
 function getShaderPath(name: string): string {
     switch (name) {
         case "bilinear":
-            return "../res/shaders/bilinear.frag";
+            return require("../res/shaders/bilinear.frag");
         case "smooth":
         case "smooth_bilinear":
-            return "../res/shaders/smooth_bilinear.frag";
+            return require("../res/shaders/smooth_bilinear.frag");
         case "crt":
-            return "../res/shaders/crt.frag";
+            return require("../res/shaders/crt.frag");
+        case "pass":    
+        case "passthrough":
         default:
-            return "../res/shaders/passthrough.frag";
+            return require("../res/shaders/passthrough.frag");
     }
 }
 
@@ -95,7 +105,11 @@ async function fetchShader(path: string): Promise<string> {
     return await response.text();
 }
 
-function compileShader(gl: WebGL2RenderingContext, type: number, source: string) {
+function compileShader(
+    gl: WebGL2RenderingContext,
+    type: number,
+    source: string
+) {
     const shader = gl.createShader(type);
     if (!shader) return null;
     gl.shaderSource(shader, source);
@@ -107,7 +121,11 @@ function compileShader(gl: WebGL2RenderingContext, type: number, source: string)
     return shader;
 }
 
-function createProgram(gl: WebGL2RenderingContext, vs: WebGLShader, fs: WebGLShader) {
+function createProgram(
+    gl: WebGL2RenderingContext,
+    vs: WebGLShader,
+    fs: WebGLShader
+) {
     const program = gl.createProgram();
     if (!program) return null;
     gl.attachShader(program, vs);

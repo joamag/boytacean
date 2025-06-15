@@ -18,6 +18,7 @@
     },
     "source": "index.ts",
     "devDependencies": {
+        "@parcel/transformer-glsl": "2.15.2",
         "@parcel/transformer-typescript-tsc": "^2.14.0",
         "@types/react": "^18.3.18",
         "@types/react-dom": "^18.3.5",
@@ -44,6 +45,8 @@
     "alias": {
         "process": {
             "global": "process"
-        }
+        },
+        "react": "./node_modules/emukit/node_modules/react",
+        "react-dom": "./node_modules/emukit/node_modules/react-dom"
     }
 }

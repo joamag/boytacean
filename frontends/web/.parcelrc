@@ -3,6 +3,7 @@
     "transformers": {
         "*.{ts,tsx}": ["@parcel/transformer-typescript-tsc"],
         "*.{jpg,png,svg}": ["@parcel/transformer-raw"],
+        "*.{frag,vert}": ["@parcel/transformer-raw"],
         "*.{gb,gbc,wasm}": ["@parcel/transformer-raw"]
     }
 }
