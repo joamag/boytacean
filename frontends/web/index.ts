@@ -1,6 +1,7 @@
 import { startApp } from "emukit";
 
 import { GameboyEmulator } from "./ts";
+import { setupWebGL } from "./ts/webgl";
 
 const BACKGROUNDS = [
     "264653",
@@ -27,6 +28,7 @@ const BACKGROUNDS = [
     const fullscreen = ["1", "true", "True"].includes(
         params.get("fullscreen") ?? params.get("fs") ?? ""
     );
+    const shader = params.get("shader") ?? undefined;
     const debug = ["1", "true", "True"].includes(params.get("debug") ?? "");
     const verbose = ["1", "true", "True"].includes(params.get("verbose") ?? "");
     const keyboard = ["1", "true", "True"].includes(
@@ -56,6 +58,10 @@ const BACKGROUNDS = [
         background: background,
         backgrounds: BACKGROUNDS
     });
+
+    if (shader) {
+        await setupWebGL(emulator, shader);
+    }
 
     // sets the emulator in the global scope this is useful
     // to be able to access the emulator from global functions
