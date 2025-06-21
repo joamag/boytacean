@@ -1,4 +1,4 @@
-# Agents.md file
+# AGENTS.md file
 
 This document describes how to work with the project. Follow these notes when writing code or submitting pull requests.
 
