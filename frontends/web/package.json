@@ -45,8 +45,6 @@
     "alias": {
         "process": {
             "global": "process"
-        },
-        "react": "./node_modules/emukit/node_modules/react",
-        "react-dom": "./node_modules/emukit/node_modules/react-dom"
+        }
     }
 }
