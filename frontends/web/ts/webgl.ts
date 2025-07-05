@@ -105,6 +105,15 @@ async function fetchShader(path: string): Promise<string> {
     return await response.text();
 }
 
+/**
+ * Compiles a WebGL shader from source code, and returns the shader object.
+ * If compilation fails, logs the error message to the console and returns null.
+ *
+ * @param gl The WebGL2 rendering context.
+ * @param type The type of shader to compile (gl.VERTEX_SHADER or gl.FRAGMENT_SHADER).
+ * @param source The GLSL source code for the shader.
+ * @returns The compiled WebGL shader object, or null if compilation failed.
+ */
 function compileShader(
     gl: WebGL2RenderingContext,
     type: number,
