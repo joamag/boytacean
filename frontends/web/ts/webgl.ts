@@ -93,7 +93,7 @@ function getShaderPath(name: string): string {
             return require("../res/shaders/smooth_bilinear.frag");
         case "crt":
             return require("../res/shaders/crt.frag");
-        case "pass":    
+        case "pass":
         case "passthrough":
         default:
             return require("../res/shaders/passthrough.frag");
