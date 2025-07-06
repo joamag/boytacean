@@ -1,9 +1,10 @@
 use boytacean::{
+    color::RGB_SIZE,
     gb::{GameBoy, GameBoyMode},
     ppu::{DISPLAY_HEIGHT, DISPLAY_WIDTH, FRAME_BUFFER_SIZE},
 };
 use clap::Parser;
-use std::time::Instant;
+use std::{env::current_dir, time::Instant};
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
@@ -13,19 +14,15 @@ struct Args {
 
     #[clap(short, long, default_value_t = 10000000)]
     cycles: u64,
+
+    #[clap(short, long, default_value_t = 1)]
+    scale: u32,
 }
 
 fn main() {
     let parsed_args = Args::parse();
 
-    // Construct an absolute path to the ROM file.
-    // Assumes that when run with `cargo run --package boytacean-console`,
-    // the current directory is `<workspace_root>/frontends/console`.
-    // The ROM path is relative to the workspace root.
-    let mut base_path = std::env::current_dir().unwrap(); // Should be /app/frontends/console
-    base_path.pop(); // Now /app/frontends
-    base_path.pop(); // Now /app (workspace root)
-    let rom_path = base_path.join(&parsed_args.rom_path);
+    let rom_path = current_dir().unwrap().join(&parsed_args.rom_path);
 
     let mut game_boy = GameBoy::new(Some(GameBoyMode::Dmg));
     game_boy.load(true).unwrap();
@@ -51,19 +48,66 @@ fn main() {
         current_cycles, elapsed, frequency_mhz
     );
 
-    print_framebuffer(&game_boy.frame_buffer_raw());
+    print_framebuffer(&game_boy.frame_buffer_raw(), parsed_args.scale);
 }
 
-fn print_framebuffer(frame_buffer: &[u8; FRAME_BUFFER_SIZE]) {
-    println!("Framebuffer output (ASCII):");
-    for y in 0..DISPLAY_HEIGHT {
-        for x in 0..DISPLAY_WIDTH {
-            let base_idx = (y * DISPLAY_WIDTH + x) * 3; // 3 bytes per pixel (RGB)
-            let r = frame_buffer[base_idx];
-            let g = frame_buffer[base_idx + 1];
-            let b = frame_buffer[base_idx + 2];
+/// Prints the framebuffer contents as ASCII characters to the console.
+///
+/// This function converts the raw RGB framebuffer data into a human-readable
+/// ASCII representation. Each pixel is converted to a character based on its
+/// luminance value using the standard luminance formula:
+/// `0.299 * R + 0.587 * G + 0.114 * B`
+///
+/// The ASCII characters used for different luminance levels are:
+/// - `#` for very dark pixels (luminance 0-50)
+/// - `@` for dark pixels (luminance 51-100)
+/// - `%` for medium pixels (luminance 101-150)
+/// - `.` for light pixels (luminance 151-200)
+/// - ` ` (space) for very light pixels (luminance 201-255)
+///
+/// The output is formatted as a grid with dimensions `DISPLAY_WIDTH` x `DISPLAY_HEIGHT`,
+/// where each character represents one pixel from the Game Boy's display.
+///
+/// # Arguments
+///
+/// * `frame_buffer` - The raw RGB framebuffer data
+/// * `scale` - Scale factor for the output (1 = original size, 2 = half size, etc.)
+fn print_framebuffer(frame_buffer: &[u8; FRAME_BUFFER_SIZE], scale: u32) {
+    let scale = scale.max(1);
+    let scaled_width = DISPLAY_WIDTH / scale as usize;
+    let scaled_height = DISPLAY_HEIGHT / scale as usize;
 
-            // Simple ASCII representation based on luminance
+    println!("Framebuffer output (ASCII) - Scale 1:{}", scale);
+    for y in 0..scaled_height {
+        for x in 0..scaled_width {
+            // calculates the average color for the scaled pixel
+            let mut total_r = 0u32;
+            let mut total_g = 0u32;
+            let mut total_b = 0u32;
+            let mut pixel_count = 0u32;
+
+            // samples pixels in the scale x scale block
+            for dy in 0..scale {
+                for dx in 0..scale {
+                    let src_x = x * scale as usize + dx as usize;
+                    let src_y = y * scale as usize + dy as usize;
+
+                    if src_x < DISPLAY_WIDTH && src_y < DISPLAY_HEIGHT {
+                        let base_idx = (src_y * DISPLAY_WIDTH + src_x) * RGB_SIZE;
+                        total_r += frame_buffer[base_idx] as u32;
+                        total_g += frame_buffer[base_idx + 1] as u32;
+                        total_b += frame_buffer[base_idx + 2] as u32;
+                        pixel_count += 1;
+                    }
+                }
+            }
+
+            // calculates average color
+            let r = (total_r / pixel_count) as u8;
+            let g = (total_g / pixel_count) as u8;
+            let b = (total_b / pixel_count) as u8;
+
+            // implements a simple ASCII representation based on luminance
             let luminance = (0.299 * r as f32 + 0.587 * g as f32 + 0.114 * b as f32) as u8;
             let char_to_print = match luminance {
                 0..=50 => '#',
