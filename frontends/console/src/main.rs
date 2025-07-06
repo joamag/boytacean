@@ -1,6 +1,6 @@
 use boytacean::{
     gb::{GameBoy, GameBoyMode},
-    ppu::{FRAME_BUFFER_SIZE, DISPLAY_WIDTH, DISPLAY_HEIGHT},
+    ppu::{DISPLAY_HEIGHT, DISPLAY_WIDTH, FRAME_BUFFER_SIZE},
 };
 use clap::Parser;
 use std::time::Instant;
@@ -29,7 +29,9 @@ fn main() {
 
     let mut game_boy = GameBoy::new(Some(GameBoyMode::Dmg));
     game_boy.load(true).unwrap();
-    game_boy.load_rom_file(rom_path.to_str().unwrap(), None).unwrap();
+    game_boy
+        .load_rom_file(rom_path.to_str().unwrap(), None)
+        .unwrap();
     game_boy.attach_stdout_serial();
 
     println!("Running ROM: {}", rom_path.display());
