@@ -24,9 +24,7 @@ struct Args {
 
 fn main() {
     let parsed_args = Args::parse();
-
     let rom_path = current_dir().unwrap().join(&parsed_args.rom_path);
-
     let mut game_boy = GameBoy::new(Some(GameBoyMode::Dmg));
 
     let start = Instant::now();
@@ -58,7 +56,6 @@ fn main() {
     let elapsed = start.elapsed();
     let elapsed_s = elapsed.as_secs_f64();
     let frequency_mhz = cycles as f64 / elapsed_s / 1000.0 / 1000.0;
-
     println!(
         "Ran {} cycles in {:?} ({:.2} Mhz)",
         cycles, elapsed, frequency_mhz
