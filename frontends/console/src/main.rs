@@ -17,6 +17,9 @@ struct Args {
 
     #[clap(short, long, default_value_t = 1)]
     scale: u32,
+
+    #[clap(short, long, default_value_t = 0)]
+    reboots: u32,
 }
 
 fn main() {
@@ -25,27 +28,40 @@ fn main() {
     let rom_path = current_dir().unwrap().join(&parsed_args.rom_path);
 
     let mut game_boy = GameBoy::new(Some(GameBoyMode::Dmg));
-    game_boy.load(true).unwrap();
-    game_boy
-        .load_rom_file(rom_path.to_str().unwrap(), None)
-        .unwrap();
-    game_boy.attach_stdout_serial();
-
-    println!("Running ROM: {}", rom_path.display());
-    println!("Running for {} cycles...", parsed_args.cycles);
 
     let start = Instant::now();
-    let mut current_cycles = 0;
-    while current_cycles < parsed_args.cycles {
-        current_cycles += game_boy.clock() as u64;
+    let mut cycles = 0;
+
+    if parsed_args.reboots > 0 {
+        println!("Running {} reboots...", parsed_args.reboots);
+        for _ in 0..parsed_args.reboots {
+            game_boy.reset();
+            game_boy.load(true).unwrap();
+            game_boy.load_rom_empty().unwrap();
+            cycles += game_boy.step_to(0x0100) as u64;
+        }
+    } else {
+        game_boy.load(true).unwrap();
+        game_boy
+            .load_rom_file(rom_path.to_str().unwrap(), None)
+            .unwrap();
+        game_boy.attach_stdout_serial();
+
+        println!("Running ROM: {}", rom_path.display());
+        println!("Running for {} cycles...", parsed_args.cycles);
+
+        while cycles < parsed_args.cycles {
+            cycles += game_boy.clock() as u64;
+        }
     }
+
     let elapsed = start.elapsed();
     let elapsed_s = elapsed.as_secs_f64();
-    let frequency_mhz = current_cycles as f64 / elapsed_s / 1000.0 / 1000.0;
+    let frequency_mhz = cycles as f64 / elapsed_s / 1000.0 / 1000.0;
 
     println!(
         "Ran {} cycles in {:?} ({:.2} Mhz)",
-        current_cycles, elapsed, frequency_mhz
+        cycles, elapsed, frequency_mhz
     );
 
     print_framebuffer(&game_boy.frame_buffer_raw(), parsed_args.scale);
@@ -67,11 +83,6 @@ fn main() {
 ///
 /// The output is formatted as a grid with dimensions `DISPLAY_WIDTH` x `DISPLAY_HEIGHT`,
 /// where each character represents one pixel from the Game Boy's display.
-///
-/// # Arguments
-///
-/// * `frame_buffer` - The raw RGB framebuffer data
-/// * `scale` - Scale factor for the output (1 = original size, 2 = half size, etc.)
 fn print_framebuffer(frame_buffer: &[u8; FRAME_BUFFER_SIZE], scale: u32) {
     let scale = scale.max(1);
     let scaled_width = DISPLAY_WIDTH / scale as usize;
