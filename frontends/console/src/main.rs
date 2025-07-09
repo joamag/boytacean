@@ -9,7 +9,7 @@ use std::{env::current_dir, time::Instant};
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
-    #[clap(short, long)]
+    #[clap(short = 'p', long)]
     rom_path: String,
 
     #[clap(short, long, default_value_t = 10000000)]
