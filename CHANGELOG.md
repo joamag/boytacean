@@ -12,6 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * High-pass audio filter options (Preserve, Accurate, Disable) with save-state support
 * SDL frontend shader loading support via `--shader-path`
 
+## [0.11.6] - 2025-03-20
+
+### Added
+
+* Experimental network serial device for basic netplay
+
 ### Changed
 
 * Added support for HBlank HDMA transfers

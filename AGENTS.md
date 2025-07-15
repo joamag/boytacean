@@ -14,6 +14,19 @@ rustup component add clippy
 cargo install cargo-vcpkg
 ```
 
+## Configuration
+
+### Rust Configuration
+
+Use the nightly version of Rust for development. This will ensure that all features are compilable.
+
+```bash
+rustup default nightly
+rustup add component rustfmt
+rustup add component clippy
+cargo install cargo-vcpkg
+```
+
 ## Formatting
 
 Format all code before committing:
