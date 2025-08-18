@@ -16,7 +16,14 @@ use crate::shader;
 /// emulator infrastructure.
 pub struct SdlSystem {
     pub canvas: Option<Canvas<Window>>,
+
+    /// The window that is going to be used to display
+    /// the graphics of the emulator.
+    ///
+    /// This value will be `None` in case the emulator is not running
+    /// in OpenGL mode.
     pub window: Option<Window>,
+
     pub video_subsystem: VideoSubsystem,
     pub timer_subsystem: TimerSubsystem,
     pub audio_subsystem: AudioSubsystem,
@@ -63,11 +70,16 @@ impl SdlSystem {
 
         // creates the system window that is going to be used to
         // show the emulator and sets it to the central are o screen
-        video_subsystem
-            .gl_attr()
-            .set_context_profile(GLProfile::Core);
-        video_subsystem.gl_attr().set_context_version(3, 3);
+        if opengl {
+            video_subsystem
+                .gl_attr()
+                .set_context_profile(GLProfile::Core);
+            video_subsystem.gl_attr().set_context_version(3, 3);
+        }
 
+        // creates the window that is going to be used to display
+        // the graphics of the emulator, this is going to be used
+        // to display the graphics of the emulator
         let window = video_subsystem
             .window(
                 title,
@@ -120,6 +132,8 @@ impl SdlSystem {
         }
     }
 
+    /// Returns the window that is going to be used to display
+    /// the graphics of the emulator.
     pub fn window(&self) -> &Window {
         if let Some(canvas) = &self.canvas {
             canvas.window()
@@ -128,6 +142,8 @@ impl SdlSystem {
         }
     }
 
+    /// Returns a mutable reference to the window that is going to be used
+    /// to display the graphics of the emulator.
     pub fn window_mut(&mut self) -> &mut Window {
         if let Some(canvas) = &mut self.canvas {
             canvas.window_mut()
