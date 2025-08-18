@@ -522,9 +522,6 @@ pub struct GameBoy {
     /// the values should be cloned and stored locally.
     gbc: SharedThread<GameBoyConfig>,
 
-    /// Pre-allocated buffer for frame buffer operations to reduce allocations
-    frame_buffer_cache: Vec<u8>,
-
     /// Pre-allocated buffer for audio operations to reduce allocations  
     audio_buffer_cache: Vec<i16>,
 }
@@ -566,7 +563,6 @@ impl GameBoy {
             clock_freq: GameBoy::CPU_FREQ,
             cpu,
             gbc,
-            frame_buffer_cache: Vec::with_capacity(FRAME_BUFFER_SIZE),
             audio_buffer_cache: Vec::with_capacity(4096),
         }
     }
