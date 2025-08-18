@@ -190,12 +190,12 @@ impl Cpu {
         if self.ime && pending != 0 {
             // use trailing_zeros to find the highest priority interrupt
             let interrupt_bit = pending.trailing_zeros() as u8;
-            
+
             // common interrupt setup
             self.disable_int();
             self.push_word(pc);
             self.halted = false;
-            
+
             // dispatch to specific interrupt handler
             match interrupt_bit {
                 0 => {
@@ -203,30 +203,30 @@ impl Cpu {
                     self.pc = 0x40;
                     self.mmu.vblank();
                     self.mmu.ppu().ack_vblank();
-                },
+                }
                 1 => {
                     debugln!("Going to run LCD STAT interrupt handler (0x48)");
                     self.pc = 0x48;
                     self.mmu.ppu().ack_stat();
-                },
+                }
                 2 => {
                     debugln!("Going to run Timer interrupt handler (0x50)");
                     self.pc = 0x50;
                     self.mmu.timer().ack_tima();
-                },
+                }
                 3 => {
                     debugln!("Going to run Serial interrupt handler (0x58)");
                     self.pc = 0x58;
                     self.mmu.serial().ack_serial();
-                },
+                }
                 4 => {
                     debugln!("Going to run JoyPad interrupt handler (0x60)");
                     self.pc = 0x60;
                     self.mmu.pad().ack_pad();
-                },
+                }
                 _ => unreachable!("Invalid interrupt bit"),
             }
-            
+
             return 20;
         }
 
@@ -287,7 +287,7 @@ impl Cpu {
     #[inline]
     pub fn clock_batch(&mut self, target_cycles: u16) -> u16 {
         let mut total_cycles = 0u16;
-        
+
         while total_cycles < target_cycles {
             // fast path for non-interrupt cases
             if !self.ime || self.mmu.ie == 0 {
@@ -295,35 +295,35 @@ impl Cpu {
             } else {
                 total_cycles += self.clock() as u16;
             }
-            
+
             if total_cycles.saturating_add(20) > target_cycles {
                 break;
             }
         }
-        
+
         total_cycles
     }
-    
+
     /// Fast path clock without interrupt checking for better performance
     #[inline(always)]
     fn clock_fast(&mut self) -> u8 {
         if self.halted {
             return 4;
         }
-        
+
         let pc = self.pc;
-        
+
         // simplified fetch for common cases
         let (inst, new_pc, _, _) = self.fetch(pc);
         self.ppc = self.pc;
         self.pc = new_pc;
-        
+
         let (inst_fn, inst_time, _) = inst;
-        
+
         self.cycles = 0;
         inst_fn(self);
         self.cycles = self.cycles.wrapping_add(*inst_time);
-        
+
         self.cycles
     }
 

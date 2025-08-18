@@ -294,7 +294,10 @@ impl Apu {
             output_timer: 0,
             output_timer_delta: (clock_freq as f32 / sampling_rate as f32) as i16,
             audio_buffer_max: (sampling_rate as f32 * buffer_size) as usize * channels as usize,
-            audio_buffer: vec![0i16; (sampling_rate as f32 * buffer_size) as usize * channels as usize],
+            audio_buffer: vec![
+                0i16;
+                (sampling_rate as f32 * buffer_size) as usize * channels as usize
+            ],
             audio_buffer_head: 0,
             audio_buffer_tail: 0,
             audio_buffer_size: 0,
@@ -426,7 +429,7 @@ impl Apu {
             // obtains the output sample (uses the same for both channels)
             // and filters it based on the channel configuration
             let sample = self.output();
-            
+
             // optimized circular buffer operations
             if self.left_enabled {
                 let value = self.filter_sample(sample, 0);
@@ -978,7 +981,7 @@ impl Apu {
         } else {
             self.audio_buffer_size += 1;
         }
-        
+
         self.audio_buffer[self.audio_buffer_head] = sample;
         self.audio_buffer_head = (self.audio_buffer_head + 1) % self.audio_buffer_max;
     }

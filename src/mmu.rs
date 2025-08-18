@@ -373,7 +373,7 @@ impl Mmu {
     pub fn read(&self, addr: u16) -> u8 {
         // optimized memory access using branch prediction hints
         // most common access patterns are handled first
-        
+
         // fast path for RAM access (most common)
         if addr >= 0xc000 && addr <= 0xfdff {
             return match addr {
@@ -383,7 +383,7 @@ impl Mmu {
                 _ => unreachable!(),
             };
         }
-        
+
         // fast path for ROM access (second most common)
         if addr <= 0x7fff {
             if addr <= 0x0fff {
@@ -400,7 +400,7 @@ impl Mmu {
             }
             return self.rom.read(addr);
         }
-        
+
         // slower path for I/O and special regions
         match addr {
             // 0x8000-0x9FFF - Graphics: VRAM (8 KB)
@@ -489,7 +489,7 @@ impl Mmu {
     pub fn write(&mut self, addr: u16, value: u8) {
         // optimized memory write access using branch prediction hints
         // most common access patterns are handled first
-        
+
         // fast path for RAM writes (most common)
         if addr >= 0xc000 && addr <= 0xfdff {
             match addr {
@@ -500,13 +500,13 @@ impl Mmu {
             }
             return;
         }
-        
+
         // fast path for ROM writes (cartridge control)
         if addr <= 0x7fff || (addr >= 0xa000 && addr <= 0xbfff) {
             self.rom.write(addr, value);
             return;
         }
-        
+
         // slower path for I/O and special regions
         match addr {
             // 0x8000-0x9FFF - Graphics: VRAM (8 KB)
