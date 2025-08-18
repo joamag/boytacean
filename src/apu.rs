@@ -1,7 +1,6 @@
 //! APU (Audio Processing Unit) functions and structures.
 
 use std::{
-    collections::VecDeque,
     fmt::{Display, Formatter},
     io::Cursor,
 };
@@ -195,10 +194,12 @@ pub struct Apu {
     /// should be used to create a new audio sample.
     output_timer_delta: i16,
 
-    /// The audio buffer that is used to store the audio
-    /// samples that are going to be outputted, uses an
-    /// integer (i16) deque to store the audio samples.
-    audio_buffer: VecDeque<i16>,
+    /// Optimized circular audio buffer to reduce allocations
+    /// and improve performance over VecDeque
+    audio_buffer: Vec<i16>,
+    audio_buffer_head: usize,
+    audio_buffer_tail: usize,
+    audio_buffer_size: usize,
     audio_buffer_max: usize,
 
     filter_mode: HighPassFilter,
@@ -292,10 +293,11 @@ impl Apu {
             sequencer_step: 0,
             output_timer: 0,
             output_timer_delta: (clock_freq as f32 / sampling_rate as f32) as i16,
-            audio_buffer: VecDeque::with_capacity(
-                (sampling_rate as f32 * buffer_size) as usize * channels as usize,
-            ),
             audio_buffer_max: (sampling_rate as f32 * buffer_size) as usize * channels as usize,
+            audio_buffer: vec![0i16; (sampling_rate as f32 * buffer_size) as usize * channels as usize],
+            audio_buffer_head: 0,
+            audio_buffer_tail: 0,
+            audio_buffer_size: 0,
             filter_mode: HighPassFilter::Accurate,
             filter_rate: FILTER_RATE_BASE.powf(clock_freq as f64 / sampling_rate as f64) as f32,
             filter_diff: [0.0; 2],
@@ -421,25 +423,18 @@ impl Apu {
 
         self.output_timer = self.output_timer.saturating_sub(cycles as i16);
         if self.output_timer <= 0 {
-            // verifies if we've reached the maximum allowed size for the
-            // audio buffer and if that's the case an item is removed from
-            // the buffer (avoiding overflow)
-            if self.audio_buffer.len() >= self.audio_buffer_max {
-                for _ in 0..self.channels {
-                    self.audio_buffer.pop_front();
-                }
-            }
-
             // obtains the output sample (uses the same for both channels)
             // and filters it based on the channel configuration
             let sample = self.output();
+            
+            // optimized circular buffer operations
             if self.left_enabled {
                 let value = self.filter_sample(sample, 0);
-                self.audio_buffer.push_back(value);
+                self.push_audio_sample(value);
             }
             if self.right_enabled && self.channels > 1 {
                 let value = self.filter_sample(sample, 1);
-                self.audio_buffer.push_back(value);
+                self.push_audio_sample(value);
             }
 
             // calculates the rate at which a new audio sample should be
@@ -949,16 +944,43 @@ impl Apu {
         self.filter_diff = [0.0; 2];
     }
 
-    pub fn audio_buffer(&self) -> &VecDeque<i16> {
-        &self.audio_buffer
+    /// Returns a temporary VecDeque for compatibility with existing API
+    /// This creates a copy but is only called when explicitly requested
+    pub fn audio_buffer(&self) -> std::collections::VecDeque<i16> {
+        let mut deque = std::collections::VecDeque::with_capacity(self.audio_buffer_size);
+        let mut i = self.audio_buffer_tail;
+        for _ in 0..self.audio_buffer_size {
+            deque.push_back(self.audio_buffer[i]);
+            i = (i + 1) % self.audio_buffer_max;
+        }
+        deque
     }
 
-    pub fn audio_buffer_mut(&mut self) -> &mut VecDeque<i16> {
-        &mut self.audio_buffer
+    /// Optimized method to iterate over audio samples without allocation
+    pub fn audio_buffer_iter(&self) -> impl Iterator<Item = i16> + '_ {
+        (0..self.audio_buffer_size).map(move |offset| {
+            self.audio_buffer[(self.audio_buffer_tail + offset) % self.audio_buffer_max]
+        })
     }
 
     pub fn clear_audio_buffer(&mut self) {
-        self.audio_buffer.clear();
+        self.audio_buffer_head = 0;
+        self.audio_buffer_tail = 0;
+        self.audio_buffer_size = 0;
+    }
+
+    /// Optimized circular buffer push operation
+    #[inline(always)]
+    fn push_audio_sample(&mut self, sample: i16) {
+        if self.audio_buffer_size >= self.audio_buffer_max {
+            // Buffer is full, advance tail (overwrite oldest)
+            self.audio_buffer_tail = (self.audio_buffer_tail + 1) % self.audio_buffer_max;
+        } else {
+            self.audio_buffer_size += 1;
+        }
+        
+        self.audio_buffer[self.audio_buffer_head] = sample;
+        self.audio_buffer_head = (self.audio_buffer_head + 1) % self.audio_buffer_max;
     }
 
     pub fn audio_buffer_max(&self) -> usize {

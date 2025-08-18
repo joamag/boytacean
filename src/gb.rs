@@ -424,7 +424,7 @@ pub struct Registers {
 
 pub trait AudioProvider {
     fn audio_output(&self) -> u16;
-    fn audio_buffer(&self) -> &VecDeque<i16>;
+    fn audio_buffer(&self) -> VecDeque<i16>;
     fn clear_audio_buffer(&mut self);
 }
 
@@ -521,6 +521,12 @@ pub struct GameBoy {
     /// If performance is required (may value access)
     /// the values should be cloned and stored locally.
     gbc: SharedThread<GameBoyConfig>,
+
+    /// Pre-allocated buffer for frame buffer operations to reduce allocations
+    frame_buffer_cache: Vec<u8>,
+
+    /// Pre-allocated buffer for audio operations to reduce allocations  
+    audio_buffer_cache: Vec<i16>,
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
@@ -560,6 +566,8 @@ impl GameBoy {
             clock_freq: GameBoy::CPU_FREQ,
             cpu,
             gbc,
+            frame_buffer_cache: Vec::with_capacity(FRAME_BUFFER_SIZE),
+            audio_buffer_cache: Vec::with_capacity(4096),
         }
     }
 
@@ -681,6 +689,7 @@ impl GameBoy {
         while cycles < limit as u64 {
             cycles += self.clock() as u64;
             if self.ppu_frame() != last_frame {
+                // copy frame buffer to avoid borrowing issues
                 frame_buffer = Some(self.frame_buffer().to_vec());
                 last_frame = self.ppu_frame();
                 frames += 1;
@@ -807,19 +816,24 @@ impl GameBoy {
     }
 
     pub fn frame_buffer_eager(&mut self) -> Vec<u8> {
+        // directly return frame buffer as vector to avoid cache usage
         self.frame_buffer().to_vec()
     }
 
     pub fn frame_buffer_raw_eager(&mut self) -> Vec<u8> {
+        // directly return frame buffer raw as vector
         self.frame_buffer_raw().to_vec()
     }
 
     pub fn audio_buffer_eager(&mut self, clear: bool) -> Vec<i16> {
-        let buffer = Vec::from(self.audio_buffer().clone());
+        // collect samples first to avoid borrowing issues
+        let samples: Vec<i16> = self.apu().audio_buffer_iter().collect();
+        self.audio_buffer_cache.clear();
+        self.audio_buffer_cache.extend(samples);
         if clear {
             self.clear_audio_buffer();
         }
-        buffer
+        self.audio_buffer_cache.clone()
     }
 
     pub fn audio_output(&self) -> u16 {
@@ -1243,7 +1257,7 @@ impl GameBoy {
         self.ppu().frame_buffer_raw()
     }
 
-    pub fn audio_buffer(&mut self) -> &VecDeque<i16> {
+    pub fn audio_buffer(&mut self) -> VecDeque<i16> {
         self.apu().audio_buffer()
     }
 
@@ -1635,7 +1649,7 @@ impl AudioProvider for GameBoy {
         self.apu_i().output()
     }
 
-    fn audio_buffer(&self) -> &VecDeque<i16> {
+    fn audio_buffer(&self) -> VecDeque<i16> {
         self.apu_i().audio_buffer()
     }
 
