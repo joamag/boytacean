@@ -375,7 +375,7 @@ impl Mmu {
         // most common access patterns are handled first
 
         // fast path for RAM access (most common)
-        if addr >= 0xc000 && addr <= 0xfdff {
+        if (0xc000..=0xfdff).contains(&addr) {
             return match addr {
                 0xc000..=0xcfff => self.ram[(addr & 0x0fff) as usize],
                 0xd000..=0xdfff => self.ram[(self.ram_offset + (addr & 0x0fff)) as usize],
@@ -491,7 +491,7 @@ impl Mmu {
         // most common access patterns are handled first
 
         // fast path for RAM writes (most common)
-        if addr >= 0xc000 && addr <= 0xfdff {
+        if (0xc000..=0xfdff).contains(&addr) {
             match addr {
                 0xc000..=0xcfff => self.ram[(addr & 0x0fff) as usize] = value,
                 0xd000..=0xdfff => self.ram[(self.ram_offset + (addr & 0x0fff)) as usize] = value,
@@ -502,7 +502,7 @@ impl Mmu {
         }
 
         // fast path for ROM writes (cartridge control)
-        if addr <= 0x7fff || (addr >= 0xa000 && addr <= 0xbfff) {
+        if addr <= 0x7fff || (0xa000..=0xbfff).contains(&addr) {
             self.rom.write(addr, value);
             return;
         }
