@@ -1,4 +1,4 @@
-# Boytacean - Game Boy Emulator
+# CLAUDE.md
 
 ## Project Overview
 
