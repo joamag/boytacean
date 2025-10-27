@@ -49,7 +49,7 @@ build-wasm:
   stage: build
   parallel:
     matrix:
-      - RUST_VERSION: ["1.82.0"]
+      - RUST_VERSION: ["1.88.0"]
   script:
     - rustup toolchain install $RUST_VERSION
     - rustup override set $RUST_VERSION

@@ -76,10 +76,9 @@ jobs:
     strategy:
       matrix:
         rust-version: [
-          "1.82.0",
-          "1.83.0",
-          "1.84.0",
-          "1.85.0",
+          "1.88.0",
+          "1.89.0",
+          "1.90.0",
           "latest"
         ]
         node-version: ["18"]
