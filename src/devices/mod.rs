@@ -5,5 +5,6 @@
 //! to the Game Boy (eg: [`printer`]).
 
 pub mod buffer;
+pub mod network;
 pub mod printer;
 pub mod stdout;
