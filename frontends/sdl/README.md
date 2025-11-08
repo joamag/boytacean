@@ -89,6 +89,12 @@ If you're still facing issues try to remove the `installed` directory in the `vc
 rm -rf ~/vcpkg/installed
 ```
 
+If by the end there are still issues, you can release the "atomic bomb" by removing the whole `.vcpkg` directory:
+
+```bash
+rm -rf ~/.vcpkg
+```
+
 ## Execution
 
 ### Headless
