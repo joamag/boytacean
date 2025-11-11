@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * High-pass audio filter options (Preserve, Accurate, Disable) with save-state support
 * SDL frontend shader loading support via `--shader-path`
+* Web frontend shader support using WebGL
 
 ### Changed
 
