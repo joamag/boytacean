@@ -2,6 +2,10 @@ import { startApp } from "emukit";
 
 import { GameboyEmulator } from "./ts";
 
+/**
+ * List of available background theme colors that can be used
+ * to style the main emulator area.
+ */
 const BACKGROUNDS = [
     "264653",
     "1b1a17",
