@@ -1133,7 +1133,7 @@ fn main() -> Result<(), Box<dyn StdError>> {
     // and the initial game ROM to "start the engine"
     let mut game_boy = GameBoy::new(Some(mode));
     if auto_mode {
-        let mode = Cartridge::from_file(&args.rom_path).unwrap().gb_mode();
+        let mode = Cartridge::from_file(&args.rom_path)?.gb_mode();
         game_boy.set_mode(mode);
     }
     let device: Box<dyn SerialDevice> = build_device(&args.device)?;
