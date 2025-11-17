@@ -772,10 +772,10 @@ impl Ppu {
     }
 
     pub fn reset(&mut self) {
-        self.color_buffer = Box::new([0u8; COLOR_BUFFER_SIZE]);
-        self.shade_buffer = Box::new([0u8; SHADE_BUFFER_SIZE]);
-        self.frame_buffer = Box::new([0u8; FRAME_BUFFER_SIZE]);
-        self.priority_buffer = Box::new([false; COLOR_BUFFER_SIZE]);
+        *self.color_buffer = [0u8; COLOR_BUFFER_SIZE];
+        *self.shade_buffer = [0u8; SHADE_BUFFER_SIZE];
+        *self.frame_buffer = [0u8; FRAME_BUFFER_SIZE];
+        *self.priority_buffer = [false; COLOR_BUFFER_SIZE];
         self.vram = [0u8; VRAM_SIZE_CGB];
         self.hram = [0u8; HRAM_SIZE];
         self.vram_bank = 0x0;

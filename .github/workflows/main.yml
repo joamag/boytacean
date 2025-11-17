@@ -10,10 +10,10 @@ jobs:
     strategy:
       matrix:
         rust-version: [
-          "1.82.0",
           "1.83.0",
           "1.84.0",
           "1.85.0",
+          "1.86.0",
           "latest"
         ]
     runs-on: ubuntu-latest
@@ -45,10 +45,10 @@ jobs:
     strategy:
       matrix:
         rust-version: [
-          "1.82.0",
           "1.83.0",
           "1.84.0",
           "1.85.0",
+          "1.86.0",
           "latest"
         ]
     runs-on: ubuntu-latest
@@ -76,10 +76,9 @@ jobs:
     strategy:
       matrix:
         rust-version: [
-          "1.82.0",
-          "1.83.0",
-          "1.84.0",
-          "1.85.0",
+          "1.88.0",
+          "1.89.0",
+          "1.90.0",
           "latest"
         ]
         node-version: ["18"]
@@ -120,10 +119,10 @@ jobs:
     strategy:
       matrix:
         rust-version: [
-          "1.82.0",
           "1.83.0",
           "1.84.0",
           "1.85.0",
+          "1.86.0",
           "latest"
         ]
     runs-on: ubuntu-latest
@@ -176,10 +175,10 @@ jobs:
     strategy:
       matrix:
         rust-version: [
-          "1.82.0",
           "1.83.0",
           "1.84.0",
           "1.85.0",
+          "1.86.0",
           "latest"
         ]
     runs-on: ubuntu-latest
@@ -213,10 +212,10 @@ jobs:
     strategy:
       matrix:
         rust-version: [
-          "1.82.0",
           "1.83.0",
           "1.84.0",
           "1.85.0",
+          "1.86.0",
           "latest"
         ]
     runs-on: ubuntu-latest
@@ -276,10 +275,10 @@ jobs:
     strategy:
       matrix:
         rust-image: [
-          "rust:1.82.0",
           "rust:1.83.0",
           "rust:1.84.0",
           "rust:1.85.0",
+          "rust:1.86.0",
           "rust:latest",
           "rustlang/rust:nightly"
         ]
@@ -317,4 +316,6 @@ jobs:
         run: cargo doc --all
       - name: Build all documentation
         run: cargo doc --all --all-features
+        env:
+          PYO3_USE_ABI3_FORWARD_COMPATIBILITY: 1 
         if: matrix.rust-image == 'rustlang/rust:nightly'
