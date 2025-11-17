@@ -1136,20 +1136,18 @@ fn main() -> Result<(), Box<dyn StdError>> {
         let mode = Cartridge::from_file(&args.rom_path).unwrap().gb_mode();
         game_boy.set_mode(mode);
     }
-    let device: Box<dyn SerialDevice> = build_device(&args.device).unwrap();
+    let device: Box<dyn SerialDevice> = build_device(&args.device)?;
     game_boy.set_ppu_enabled(!args.no_ppu);
     game_boy.set_apu_enabled(!args.no_apu);
     game_boy.set_dma_enabled(!args.no_dma);
     game_boy.set_timer_enabled(!args.no_timer);
     game_boy.attach_serial(device);
-    game_boy
-        .load(!args.no_boot && args.boot_rom_path.is_empty())
-        .unwrap();
+    game_boy.load(!args.no_boot && args.boot_rom_path.is_empty())?;
     if args.no_boot {
         game_boy.load_boot_state();
     }
     if !args.boot_rom_path.is_empty() {
-        game_boy.load_boot_path(&args.boot_rom_path).unwrap();
+        game_boy.load_boot_path(&args.boot_rom_path)?;
     }
 
     // prints the current version of the emulator (informational message)
@@ -1170,11 +1168,11 @@ fn main() -> Result<(), Box<dyn StdError>> {
     };
     let mut emulator = Emulator::new(game_boy, options);
     emulator.start(SCREEN_SCALE);
-    emulator.load_rom(Some(&args.rom_path)).unwrap();
+    emulator.load_rom(Some(&args.rom_path))?;
     emulator.apply_cheats(&args.cheats);
     emulator.toggle_palette();
     if !args.shader.is_empty() {
-        emulator.load_shader(&args.shader).unwrap();
+        emulator.load_shader(&args.shader)?;
     }
 
     run(args, &mut emulator);
