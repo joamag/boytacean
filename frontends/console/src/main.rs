@@ -4,7 +4,7 @@ use boytacean::{
     ppu::{DISPLAY_HEIGHT, DISPLAY_WIDTH, FRAME_BUFFER_SIZE},
 };
 use clap::Parser;
-use std::{env::current_dir, time::Instant};
+use std::{env::current_dir, error::Error, time::Instant};
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
@@ -20,9 +20,12 @@ struct Args {
 
     #[clap(short, long, default_value_t = 0)]
     reboots: u32,
+
+    #[clap(short, long, default_value_t = true)]
+    frame_buffer: bool,
 }
 
-fn main() {
+fn main() -> Result<(), Box<dyn Error>> {
     let parsed_args = Args::parse();
     let rom_path = current_dir().unwrap().join(&parsed_args.rom_path);
     let mut game_boy = GameBoy::new(Some(GameBoyMode::Dmg));
@@ -61,7 +64,11 @@ fn main() {
         cycles, elapsed, frequency_mhz
     );
 
-    print_framebuffer(&game_boy.frame_buffer_raw(), parsed_args.scale);
+    if parsed_args.frame_buffer {
+        print_framebuffer(&game_boy.frame_buffer_raw(), parsed_args.scale);
+    }
+
+    Ok(())
 }
 
 /// Prints the framebuffer contents as ASCII characters to the console.
