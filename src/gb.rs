@@ -1490,6 +1490,8 @@ impl GameBoy {
     ///
     /// This is useful for testing the CPU and other Game Boy
     /// components without a ROM.
+    ///
+    /// All the ROM data will be set to 0x00 (NOP instruction).
     pub fn load_rom_empty(&mut self) -> Result<&mut Cartridge, Error> {
         let data = [0u8; 32 * 1024];
         self.load_rom(&data, None)
