@@ -564,7 +564,7 @@ impl GameBoy {
         }
     }
 
-    /// Verifies if the provided data is a valid ROM.
+    /// Verifies if the provided data represents a valid Game Boy ROM.
     ///
     /// It is used to verify if the provided data is a valid ROM
     /// before loading it into the Game Boy.
