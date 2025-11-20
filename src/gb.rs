@@ -698,9 +698,6 @@ impl GameBoy {
     /// This function is used to clock the system until the next frame
     /// is reached and returns the amount of cycles that have been
     /// clocked.
-    ///
-    /// # Returns
-    /// * The amount of cycles that have been clocked.
     pub fn next_frame(&mut self) -> u32 {
         let mut cycles = 0u32;
         let current_frame = self.ppu_frame();
@@ -717,12 +714,6 @@ impl GameBoy {
     /// This advances the emulation step by step, accumulating the number of
     /// cycles spent until the CPU's PC matches `addr`. Useful for precise
     /// debugging or driving the emulator to a known execution point.
-    ///
-    /// # Arguments
-    /// * `addr` - The memory address to step to (Program Counter to reach).
-    ///
-    /// # Returns
-    /// * The amount of cycles that have been clocked.
     pub fn step_to(&mut self, addr: u16) -> u32 {
         let mut cycles = 0u32;
         while self.cpu_i().pc() != addr {
@@ -740,10 +731,6 @@ impl GameBoy {
     /// This distinction allows for correct timing of devices that
     /// operate at different rates relative to the CPU in Double
     /// Speed mode (CGB).
-    ///
-    /// # Arguments
-    /// * `cycles` - The raw CPU cycles executed.
-    /// * `cycles_n` - The normalized cycles (adjusted for the current speed multiplier).
     ///
     /// # Notes
     /// This function is inline and should be optimized by the compiler.
@@ -1298,10 +1285,6 @@ impl GameBoy {
     /// This effectively restarts the emulation from the beginning,
     /// while keeping the same cartridge loaded.
     ///
-    /// # Returns
-    /// * `Ok(())` - If the system was reloaded successfully.
-    /// * `Err(Error)` - If the system was not able to be reloaded.
-    ///
     /// # Notes
     /// This function is inline and should be optimized by the compiler.
     #[inline(always)]
@@ -1525,13 +1508,6 @@ impl GameBoy {
     /// The code can be either a Game Genie or a Game Shark code.
     /// The function will detect the type of the code and add it
     /// to the respective cheat manager.
-    ///
-    /// # Arguments
-    /// * `code` - The cheat code to be added.
-    ///
-    /// # Returns
-    /// * `Ok(bool)` - If the cheat code was successfully added.
-    /// * `Err(Error)` - If the cheat code is invalid or could not be added.
     pub fn add_cheat_code(&mut self, code: &str) -> Result<bool, Error> {
         if GameGenie::is_code(code) {
             return self.add_game_genie_code(code).map(|_| true);

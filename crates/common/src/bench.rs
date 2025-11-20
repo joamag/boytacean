@@ -7,12 +7,6 @@
 ///
 /// The generated data consists of repeating sequences of specific byte patterns
 /// to simulate realistic data for compression benchmarks.
-///
-/// # Arguments
-/// * `size` - The total size of the generated data in bytes.
-///
-/// # Returns
-/// A `Vec<u8>` containing the generated data.
 pub fn generate_data(size: usize) -> Vec<u8> {
     let patterns: [&[u8]; 6] = [
         b"aaaaa",
@@ -44,15 +38,8 @@ pub fn generate_data(size: usize) -> Vec<u8> {
 
 /// Multiplies the size of an array by a given multiplier.
 ///
-/// Returns a new array with repeated elements.
-///
-/// # Arguments
-/// * `arr` - The input array to be multiplied.
-/// * `multiplier` - The factor by which to multiply the size of the array.
-///
-/// # Returns
-/// A new `Vec<T>` containing the elements of the original array repeated
-/// according to the specified multiplier.
+/// Returns a new array by repeating the original array the
+/// specified number of times.
 pub fn multiply_array_size<T: Clone>(arr: &[T], multiplier: usize) -> Vec<T> {
     let mut new_arr = Vec::with_capacity(arr.len() * multiplier);
     for _ in 0..multiplier {
