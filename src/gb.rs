@@ -564,6 +564,16 @@ impl GameBoy {
         }
     }
 
+    /// Verifies if the provided data is a valid ROM.
+    ///
+    /// It is used to verify if the provided data is a valid ROM
+    /// before loading it into the Game Boy.
+    ///
+    /// This method is useful to avoid loading invalid ROMs into
+    /// the Game Boy which would cause the emulator to crash.
+    ///
+    /// This approach is not guaranteed to be 100% accurate, but it
+    /// is a good way to verify if the provided data is a valid ROM.
     pub fn verify_rom(data: &[u8]) -> bool {
         Cartridge::from_data(data).is_ok()
     }
