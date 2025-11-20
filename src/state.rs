@@ -2279,7 +2279,7 @@ impl StateManager {
         // reload the Game Boy machine to make sure we're in
         // a clean state before loading the state
         if options.reload {
-            gb.reload();
+            gb.reload()?;
         }
 
         state.to_gb(gb, options)?;

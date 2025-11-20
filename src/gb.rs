@@ -568,6 +568,11 @@ impl GameBoy {
         Cartridge::from_data(data).is_ok()
     }
 
+    /// Resets the entire state of the Game Boy system,
+    /// including all its components and the CPU.
+    ///
+    /// This method ensures that the PPU, APU, Timer,
+    /// Serial, MMU, and CPU are all reset to their initial states.
     pub fn reset(&mut self) {
         self.ppu().reset();
         self.apu().reset();
@@ -581,13 +586,6 @@ impl GameBoy {
     pub fn reset_cheats(&mut self) {
         self.reset_game_genie();
         self.reset_game_shark();
-    }
-
-    pub fn reload(&mut self) {
-        let rom = self.rom().clone();
-        self.reset();
-        self.load(true).unwrap();
-        self.load_cartridge(rom).unwrap();
     }
 
     /// Advance the clock of the system by one tick, this will
@@ -1300,6 +1298,27 @@ impl GameBoy {
 
     pub fn cartridge_i(&self) -> &Cartridge {
         self.mmu_i().rom_i()
+    }
+
+    /// Reloads the system by resetting the state and reloading the
+    /// current ROM (cartridge).
+    ///
+    /// This effectively restarts the emulation from the beginning,
+    /// while keeping the same cartridge loaded.
+    ///
+    /// # Returns
+    /// * `Ok(())` - If the system was reloaded successfully.
+    /// * `Err(Error)` - If the system was not able to be reloaded.
+    ///
+    /// # Notes
+    /// This function is inline and should be optimized by the compiler.
+    #[inline(always)]
+    pub fn reload(&mut self) -> Result<(), Error> {
+        let rom = self.rom().clone();
+        self.reset();
+        self.load(true)?;
+        self.load_cartridge(rom)?;
+        Ok(())
     }
 
     pub fn load(&mut self, boot: bool) -> Result<(), Error> {

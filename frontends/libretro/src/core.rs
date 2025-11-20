@@ -195,7 +195,7 @@ pub extern "C" fn retro_deinit() {
 pub extern "C" fn retro_reset() {
     debugln!("retro_reset()");
     let emulator = unsafe { EMULATOR.as_mut().unwrap() };
-    emulator.reload();
+    emulator.reload().unwrap();
 }
 
 /// # Safety
