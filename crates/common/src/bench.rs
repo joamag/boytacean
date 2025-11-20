@@ -3,7 +3,7 @@
 //! Most of the these functions are used to generate data for benchmarking
 //! and used in Criterion benchmarks.
 
-/// Generate data with repeating patterns for benchmarking.
+/// Generates data with repeating patterns for benchmarking.
 ///
 /// The generated data consists of repeating sequences of specific byte patterns
 /// to simulate realistic data for compression benchmarks.
@@ -42,7 +42,7 @@ pub fn generate_data(size: usize) -> Vec<u8> {
     data
 }
 
-/// Multiply the size of an array by a given multiplier.
+/// Multiplies the size of an array by a given multiplier.
 ///
 /// Returns a new array with repeated elements.
 ///
