@@ -595,7 +595,7 @@ impl GameBoy {
 
     /// Resets all the cheats currently registered in the system.
     ///
-    /// It clears both Game Genie and Game Shark cheats from the
+    /// It clears both Game Genie and GameShark cheats from the
     /// respective cheat managers.
     pub fn reset_cheats(&mut self) {
         self.reset_game_genie();
@@ -1521,7 +1521,7 @@ impl GameBoy {
 
     /// Adds a cheat code to the Game Boy system.
     ///
-    /// The code can be either a Game Genie or a Game Shark code.
+    /// The code can be either a Game Genie or a GameShark code.
     /// The function will detect the type of the code and add it
     /// to the respective cheat manager.
     pub fn add_cheat_code(&mut self, code: &str) -> Result<bool, Error> {
