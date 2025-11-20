@@ -711,6 +711,22 @@ impl GameBoy {
         cycles
     }
 
+    /// Clocks the peripheral devices (PPU, APU, DMA, Timer, Serial)
+    /// according to the provided cycle counts.
+    ///
+    /// The `cycles` parameter represents the raw CPU cycles executed,
+    /// while `cycles_n` represents the normalized cycles (adjusted
+    /// for the current speed multiplier).
+    /// This distinction allows for correct timing of devices that
+    /// operate at different rates relative to the CPU in Double
+    /// Speed mode (CGB).
+    ///
+    /// # Arguments
+    /// * `cycles` - The raw CPU cycles executed.
+    /// * `cycles_n` - The normalized cycles (adjusted for the current speed multiplier).
+    ///
+    /// # Notes
+    /// This function is inline and should be optimized by the compiler.
     #[inline(always)]
     fn clock_devices(&mut self, cycles: u16, cycles_n: u16) {
         if self.ppu_enabled {
