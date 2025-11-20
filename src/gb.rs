@@ -568,12 +568,12 @@ impl GameBoy {
     ///
     /// It is used to verify if the provided data is a valid ROM
     /// before loading it into the Game Boy.
-    ///
-    /// This method is useful to avoid loading invalid ROMs into
-    /// the Game Boy which would cause the emulator to crash.
+    /// Preventing the loading of invalid ROMs into the Game Boy which
+    /// would cause the emulator to crash at runtime.
     ///
     /// This approach is not guaranteed to be 100% accurate, but it
-    /// is a good way to verify if the provided data is a valid ROM.
+    /// is a good (enough) way to verify if the provided data is
+    /// a valid ROM.
     pub fn verify_rom(data: &[u8]) -> bool {
         Cartridge::from_data(data).is_ok()
     }
@@ -640,7 +640,7 @@ impl GameBoy {
         cycles
     }
 
-    /// Function equivalent to `clock()` but that allows pre-emptive
+    /// Function equivalent to [`clock()`][GameBoy::clock()] but that allows pre-emptive
     /// breaking of the clock cycle loop if the PC (Program Counter)
     /// reaches the provided address, making sure that in such a situation
     /// the devices are not clocked.
@@ -654,7 +654,7 @@ impl GameBoy {
         cycles
     }
 
-    /// Equivalent to `clock()` but allows the execution of multiple
+    /// Equivalent to [`clock()`][GameBoy::clock()] but allows the execution of multiple
     /// clock operations in a single call.
     pub fn clocks(&mut self, count: usize) -> u64 {
         let mut cycles = 0_u64;
