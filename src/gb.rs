@@ -571,8 +571,8 @@ impl GameBoy {
     /// Resets the entire state of the Game Boy system,
     /// including all its components and the CPU.
     ///
-    /// This method ensures that the PPU, APU, Timer,
-    /// Serial, MMU, and CPU are all reset to their initial states.
+    /// This method ensures that the [`Ppu`], [`Apu`], [`Timer`],
+    /// [`Serial`], [`Mmu`], and [`Cpu`] are all reset to their initial states.
     pub fn reset(&mut self) {
         self.ppu().reset();
         self.apu().reset();
@@ -583,6 +583,10 @@ impl GameBoy {
         self.reset_cheats();
     }
 
+    /// Resets all the cheats currently registered in the system.
+    ///
+    /// It clears both Game Genie and Game Shark cheats from the
+    /// respective cheat managers.
     pub fn reset_cheats(&mut self) {
         self.reset_game_genie();
         self.reset_game_shark();
@@ -1472,8 +1476,10 @@ impl GameBoy {
         }
     }
 
-    /// Loads an empty ROM into the Game Boy, this is useful for
-    /// testing the CPU and other Game Boy components without a ROM.
+    /// Loads an empty ROM into the Game Boy.
+    ///
+    /// This is useful for testing the CPU and other Game Boy
+    /// components without a ROM.
     pub fn load_rom_empty(&mut self) -> Result<&mut Cartridge, Error> {
         let data = [0u8; 32 * 1024];
         self.load_rom(&data, None)
