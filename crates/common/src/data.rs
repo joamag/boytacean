@@ -1,5 +1,5 @@
 //! Data manipulation utilities for reading and writing primitive types.
-//! 
+//!
 //! This module provides functions to read and write various primitive data types
 //! (such as u8, i8, u16, i16, u32, i32, u64, i64, f32) from and to byte streams.
 //! It also includes functions to read and write byte arrays and strings.
