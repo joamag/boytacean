@@ -701,10 +701,6 @@ impl GameBoy {
     ///
     /// # Returns
     /// * The amount of cycles that have been clocked.
-    ///
-    /// # Notes
-    /// This function is inline and should be optimized by the compiler.
-    #[inline(always)]
     pub fn next_frame(&mut self) -> u32 {
         let mut cycles = 0u32;
         let current_frame = self.ppu_frame();
@@ -727,10 +723,6 @@ impl GameBoy {
     ///
     /// # Returns
     /// * The amount of cycles that have been clocked.
-    ///
-    /// # Notes
-    /// This function is inline and should be optimized by the compiler.
-    #[inline(always)]
     pub fn step_to(&mut self, addr: u16) -> u32 {
         let mut cycles = 0u32;
         while self.cpu_i().pc() != addr {
