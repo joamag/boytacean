@@ -694,6 +694,19 @@ impl GameBoy {
         }
     }
 
+    /// Clocks the system until the next frame is reached and returns
+    /// the amount of cycles that have been clocked.
+    ///
+    /// This function is used to clock the system until the next frame
+    /// is reached and returns the amount of cycles that have been
+    /// clocked.
+    ///
+    /// # Returns
+    /// * The amount of cycles that have been clocked.
+    ///
+    /// # Notes
+    /// This function is inline and should be optimized by the compiler.
+    #[inline(always)]
     pub fn next_frame(&mut self) -> u32 {
         let mut cycles = 0u32;
         let current_frame = self.ppu_frame();
@@ -703,6 +716,23 @@ impl GameBoy {
         cycles
     }
 
+    /// Clocks the system until the Program Counter (PC) reaches the
+    /// provided address and returns the amount of cycles that have been
+    /// clocked.
+    ///
+    /// This advances the emulation step by step, accumulating the number of
+    /// cycles spent until the CPU's PC matches `addr`. Useful for precise
+    /// debugging or driving the emulator to a known execution point.
+    ///
+    /// # Arguments
+    /// * `addr` - The memory address to step to (Program Counter to reach).
+    ///
+    /// # Returns
+    /// * The amount of cycles that have been clocked.
+    ///
+    /// # Notes
+    /// This function is inline and should be optimized by the compiler.
+    #[inline(always)]
     pub fn step_to(&mut self, addr: u16) -> u32 {
         let mut cycles = 0u32;
         while self.cpu_i().pc() != addr {
