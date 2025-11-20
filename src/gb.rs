@@ -1586,6 +1586,11 @@ impl GameBoy {
         }));
     }
 
+    pub fn reload_wa(&mut self) -> Result<(), String> {
+        self.reload()?;
+        Ok(())
+    }
+
     pub fn load_rom_wa(&mut self, data: &[u8]) -> Result<Cartridge, String> {
         let rom = self.load_rom(data, None)?;
         rom.set_rumble_cb(|active| {
