@@ -63,10 +63,11 @@ use std::{
 };
 
 /// Enumeration that describes the multiple running
-// modes of the Game Boy emulator.
-// DMG = Original Game Boy
-// CGB = Game Boy Color
-// SGB = Super Game Boy
+/// modes of the Game Boy emulator.
+///
+/// DMG = Original Game Boy
+/// CGB = Game Boy Color
+/// SGB = Super Game Boy
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum GameBoyMode {

@@ -149,8 +149,8 @@ pub fn copy_fast(src: &[u8], dst: &mut [u8], count: usize) {
     }
 }
 
-// Interleaves two arrays of bytes into a single array using
-// a pointer-based approach for performance reasons.
+/// Interleaves two arrays of bytes into a single array using
+/// a pointer-based approach for performance reasons.
 pub fn interleave_arrays(a: &[u8], b: &[u8], output: &mut [u8]) {
     assert_eq!(a.len(), b.len());
     assert_eq!(output.len(), a.len() + b.len());
@@ -189,6 +189,10 @@ pub fn flip_vertical(pixels: &[u8], width: usize, height: usize, channels: usize
     flipped
 }
 
+/// Returns the current timestamp in seconds since the UNIX epoch.
+///
+/// This function has different implementations depending on whether
+/// the `wasm` feature is enabled or not.
 #[cfg(not(feature = "wasm"))]
 pub fn timestamp() -> u64 {
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -197,6 +201,12 @@ pub fn timestamp() -> u64 {
     now.duration_since(UNIX_EPOCH).unwrap().as_secs()
 }
 
+/// Returns the current timestamp in seconds since the UNIX epoch.
+///
+/// This function has different implementations depending on whether
+/// the `wasm` feature is enabled or not.
+///
+/// WASM implementation is a static one using `js_sys::Date`.
 #[cfg(feature = "wasm")]
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 pub fn timestamp() -> u64 {
