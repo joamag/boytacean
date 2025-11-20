@@ -22,6 +22,7 @@ use wasm_bindgen::prelude::*;
 pub type SharedMut<T> = Rc<RefCell<T>>;
 
 /// Shared thread type able to be passed between threads.
+///
 /// Significant performance overhead compared to `SharedMut`.
 pub type SharedThread<T> = Arc<Mutex<T>>;
 
@@ -53,6 +54,7 @@ pub fn write_file(path: &str, data: &[u8], flush: Option<bool>) -> Result<(), Er
 }
 
 /// Replaces the extension in the given path with the provided extension.
+///
 /// This function allows for simple associated file discovery.
 pub fn replace_ext(path: &str, new_extension: &str) -> Option<String> {
     let file_path = Path::new(path);
