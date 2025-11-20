@@ -1,6 +1,6 @@
 //! Benchmark related functions to be shared and used.
 //!
-//! Most of the these function are used to generate data for benchmarking
+//! Most of the these functions are used to generate data for benchmarking
 //! and used in Criterion benchmarks.
 
 pub fn generate_data(size: usize) -> Vec<u8> {
