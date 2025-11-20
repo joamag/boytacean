@@ -1520,6 +1520,18 @@ impl GameBoy {
         self.apu().set_filter_mode(mode);
     }
 
+    /// Adds a cheat code to the Game Boy system.
+    ///
+    /// The code can be either a Game Genie or a Game Shark code.
+    /// The function will detect the type of the code and add it
+    /// to the respective cheat manager.
+    ///
+    /// # Arguments
+    /// * `code` - The cheat code to be added.
+    ///
+    /// # Returns
+    /// * `Ok(bool)` - If the cheat code was successfully added.
+    /// * `Err(Error)` - If the cheat code is invalid or could not be added.
     pub fn add_cheat_code(&mut self, code: &str) -> Result<bool, Error> {
         if GameGenie::is_code(code) {
             return self.add_game_genie_code(code).map(|_| true);
