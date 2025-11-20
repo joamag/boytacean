@@ -42,8 +42,9 @@ pub fn generate_data(size: usize) -> Vec<u8> {
     data
 }
 
-/// Multiply the size of an array by a given multiplier, returning
-/// a new array with repeated elements.
+/// Multiply the size of an array by a given multiplier.
+///
+/// Returns a new array with repeated elements.
 ///
 /// # Arguments
 /// * `arr` - The input array to be multiplied.
