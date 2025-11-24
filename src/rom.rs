@@ -324,9 +324,10 @@ impl Display for CgbMode {
 }
 
 /// Structure that defines the ROM and ROM contents
-/// of a Game Boy cartridge. Should correctly address
-/// the specifics of all the major MBCs (Memory Bank
-/// Controllers).
+/// of a Game Boy cartridge.
+///
+/// Should correctly address the specifics of all the
+/// major MBCs (Memory Bank Controllers).
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 #[derive(Clone)]
 pub struct Cartridge {
@@ -954,6 +955,14 @@ impl Display for Cartridge {
     }
 }
 
+/// Definition of a Memory Bank Controller (MBC) that
+/// handles the ROM and RAM access for a given cartridge.
+///
+/// Each MBC defines functions for reading and writing
+/// both ROM and RAM areas of the cartridge.
+///
+/// This strategy allows dynamic dispatch of the memory
+/// access functions based on the MBC type of the cartridge.
 pub struct Mbc {
     pub name: &'static str,
     pub read_rom: fn(rom: &Cartridge, addr: u16) -> u8,
