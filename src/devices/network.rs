@@ -16,8 +16,10 @@ pub type NetworkCallback = fn(NetworkEvent);
 pub enum NetworkEvent {
     /// A byte was sent to the remote.
     ByteSent(u8),
+
     /// A byte was received from the remote.
     ByteReceived(u8),
+
     /// The receive buffer is empty when trying to read.
     BufferEmpty,
 }
@@ -46,11 +48,16 @@ pub enum NetworkEvent {
 /// let sent = device.pop_pending(); // Returns Some(0xCD)
 /// ```
 pub struct NetworkDevice {
-    /// Bytes received from the network, ready to be read by the Game Boy.
-    receive_buffer: VecDeque<u8>,
+    /// The value of the SB register (0xFF01) on the other/peer device.
+    ///
+    /// Useful for master devices to handle incoming bytes from the peer.
+    peer_sp: u8,
 
     /// Bytes sent by the Game Boy, pending to be sent over network.
-    pending_buffer: VecDeque<u8>,
+    send_buffer: VecDeque<u8>,
+
+    /// Bytes received from the network, ready to be read by the Game Boy.
+    receive_buffer: VecDeque<u8>,
 
     /// Callback for device events.
     callback: Option<NetworkCallback>,
@@ -60,68 +67,18 @@ pub struct NetworkDevice {
 
     /// Whether this device is connected.
     connected: bool,
-
-    /// Whether this device acts as master (internal clock).
-    /// When true, this side drives the serial clock.
-    /// When false, this side acts as slave (external clock from remote).
-    is_master: bool,
-
-    /// Optional byte transformation function for protocol-specific handling.
-    /// Used for game-specific responses (e.g., Tetris player 2 handshake).
-    byte_transform: Option<fn(u8, bool) -> u8>,
-
-    /// Statistics: bytes sent.
-    bytes_sent: u64,
-
-    /// Statistics: bytes received.
-    bytes_received: u64,
 }
 
 impl NetworkDevice {
     pub fn new() -> Self {
         Self {
+            peer_sp: 0xff,
+            send_buffer: VecDeque::new(),
             receive_buffer: VecDeque::new(),
-            pending_buffer: VecDeque::new(),
             callback: None,
             default_byte: 0xff,
             connected: false,
-            is_master: true,
-            byte_transform: None,
-            bytes_sent: 0,
-            bytes_received: 0,
         }
-    }
-
-    /// Sets whether this device acts as master (drives the clock).
-    pub fn set_master(&mut self, is_master: bool) {
-        self.is_master = is_master;
-    }
-
-    /// Checks if this device acts as master (drives the clock).
-    pub fn is_master(&self) -> bool {
-        self.is_master
-    }
-
-    /// Sets a byte transformation function for protocol-specific handling.
-    ///
-    /// The function receives the byte being sent and whether this device
-    /// is master, returning the transformed byte.
-    ///
-    /// # Example
-    ///
-    /// ```ignore
-    /// // Tetris player 2 handshake: transform 0x55 poll to 0x29 response
-    /// device.set_byte_transform(|byte, is_master| {
-    ///     if !is_master && byte == 0x55 { 0x29 } else { byte }
-    /// });
-    /// ```
-    pub fn set_byte_transform(&mut self, transform: fn(u8, bool) -> u8) {
-        self.byte_transform = Some(transform);
-    }
-
-    /// Clears the byte transformation function.
-    pub fn clear_byte_transform(&mut self) {
-        self.byte_transform = None;
     }
 
     /// Sets the callback for device events.
@@ -153,7 +110,6 @@ impl NetworkDevice {
     pub fn queue_received(&mut self, byte: u8) {
         infoln!("[NETWORK] Queued received byte: 0x{:02x}", byte);
         self.receive_buffer.push_back(byte);
-        self.bytes_received += 1;
         if let Some(callback) = self.callback {
             callback(NetworkEvent::ByteReceived(byte));
         }
@@ -163,12 +119,12 @@ impl NetworkDevice {
     ///
     /// Returns the next byte that the Game Boy has sent and needs to be
     /// transmitted over the network.
-    pub fn pop_pending(&mut self) -> Option<u8> {
-        self.pending_buffer.pop_front()
+    pub fn pop_send(&mut self) -> Option<u8> {
+        self.send_buffer.pop_front()
     }
 
-    pub fn drain_pending(&mut self) -> Vec<u8> {
-        self.pending_buffer.drain(..).collect()
+    pub fn drain_send(&mut self) -> Vec<u8> {
+        self.send_buffer.drain(..).collect()
     }
 
     pub fn has_received(&self) -> bool {
@@ -176,33 +132,20 @@ impl NetworkDevice {
     }
 
     pub fn has_pending(&self) -> bool {
-        !self.pending_buffer.is_empty()
+        !self.send_buffer.is_empty()
     }
 
     pub fn receive_buffer_len(&self) -> usize {
         self.receive_buffer.len()
     }
 
-    pub fn pending_buffer_len(&self) -> usize {
-        self.pending_buffer.len()
+    pub fn send_buffer_len(&self) -> usize {
+        self.send_buffer.len()
     }
 
     pub fn clear(&mut self) {
         self.receive_buffer.clear();
-        self.pending_buffer.clear();
-    }
-
-    pub fn bytes_sent(&self) -> u64 {
-        self.bytes_sent
-    }
-
-    pub fn bytes_received(&self) -> u64 {
-        self.bytes_received
-    }
-
-    pub fn reset_stats(&mut self) {
-        self.bytes_sent = 0;
-        self.bytes_received = 0;
+        self.send_buffer.clear();
     }
 }
 
@@ -234,14 +177,9 @@ impl SerialDevice for NetworkDevice {
             "[NETWORK] [receive()] Queued byte to be sent out: 0x{:02x}",
             byte
         );
-        let actual_byte = match self.byte_transform {
-            Some(transform) => transform(byte, self.is_master),
-            None => byte,
-        };
-        self.pending_buffer.push_back(actual_byte);
-        self.bytes_sent += 1;
+        self.send_buffer.push_back(byte);
         if let Some(callback) = self.callback {
-            callback(NetworkEvent::ByteSent(actual_byte));
+            callback(NetworkEvent::ByteSent(byte));
         }
     }
 
@@ -249,29 +187,20 @@ impl SerialDevice for NetworkDevice {
         !self.receive_buffer.is_empty()
     }
 
-    fn force_clock(&self) -> Option<bool> {
-        // Force clock mode based on master/slave designation
-        // In Tetris, both Game Boys default to external clock (slave mode)
-        // waiting for the other to drive. We need one to be master.
-        // The host acts as master (internal clock), client as slave (external clock).
-        Some(self.is_master)
-    }
-
     fn description(&self) -> String {
         format!(
-            "Network(connected={}, recv={}, pend={})",
+            "Network [connected={}, recv={}, pend={}]",
             self.connected,
             self.receive_buffer.len(),
-            self.pending_buffer.len()
+            self.send_buffer.len()
         )
     }
 
     fn state(&self) -> String {
         format!(
-            "sent={}, recv={}, pending={}",
-            self.bytes_sent,
-            self.bytes_received,
-            self.pending_buffer.len()
+            "send_buffer={}, receive_buffer={}",
+            self.send_buffer.len(),
+            self.receive_buffer.len()
         )
     }
 
@@ -325,13 +254,13 @@ mod tests {
         device.receive(0x33);
 
         assert!(device.has_pending());
-        assert_eq!(device.pending_buffer_len(), 3);
+        assert_eq!(device.send_buffer_len(), 3);
 
         // Pop them for network transmission
-        assert_eq!(device.pop_pending(), Some(0x11));
-        assert_eq!(device.pop_pending(), Some(0x22));
-        assert_eq!(device.pop_pending(), Some(0x33));
-        assert_eq!(device.pop_pending(), None);
+        assert_eq!(device.pop_send(), Some(0x11));
+        assert_eq!(device.pop_send(), Some(0x22));
+        assert_eq!(device.pop_send(), Some(0x33));
+        assert_eq!(device.pop_send(), None);
     }
 
     #[test]
@@ -342,27 +271,9 @@ mod tests {
         device.receive(0xbb);
         device.receive(0xcc);
 
-        let drained = device.drain_pending();
+        let drained = device.drain_send();
         assert_eq!(drained, vec![0xaa, 0xbb, 0xcc]);
         assert!(!device.has_pending());
-    }
-
-    #[test]
-    fn test_network_device_statistics() {
-        let mut device = NetworkDevice::new();
-
-        device.queue_received(0x01);
-        device.queue_received(0x02);
-        device.receive(0x03);
-        device.receive(0x04);
-        device.receive(0x05);
-
-        assert_eq!(device.bytes_received(), 2);
-        assert_eq!(device.bytes_sent(), 3);
-
-        device.reset_stats();
-        assert_eq!(device.bytes_received(), 0);
-        assert_eq!(device.bytes_sent(), 0);
     }
 
     #[test]

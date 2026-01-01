@@ -758,7 +758,7 @@ Drag & drop ROM file: Load new ROM and reset system\n===========================
                         // send any pending serial bytes to the remote
                         let device = self.system.serial().device_mut().as_any_mut();
                         if let Some(net_dev) = device.downcast_mut::<NetworkDevice>() {
-                            while let Some(byte) = net_dev.pop_pending() {
+                            while let Some(byte) = net_dev.pop_send() {
                                 infoln!("[SDL-LOOP] Serial byte sent: 0x{:02x}", byte);
                                 let _ = session.send_serial_byte(byte);
                             }
@@ -1346,8 +1346,7 @@ fn setup_netplay(
             .start_handshake()
             .map_err(|e| Error::CustomError(format!("Handshake error: {}", e)))?;
 
-        let mut device = Box::new(NetworkDevice::new());
-        device.set_master(false);
+        let device = Box::new(NetworkDevice::new());
 
         Ok(Some((session, NetplayRole::Client, device)))
     } else {

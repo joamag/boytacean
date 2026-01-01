@@ -30,6 +30,13 @@ pub trait SerialDevice {
     /// meaning that a byte is moved from the Game Boy to the device.
     fn receive(&mut self, byte: u8);
 
+    /// Synchronizes the serial device with the other device.
+    ///
+    /// This operation is especially useful for network devices to
+    /// ensure that the devices are in sync and that the transfer
+    /// is happening correctly.
+    fn sync(&mut self) {}
+
     /// Whether the device has data ready to be read.
     ///
     /// For network devices, this indicates if a byte has been
