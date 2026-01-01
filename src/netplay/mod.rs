@@ -24,7 +24,11 @@
 //! ## Hosting a Session
 //!
 //! ```ignore
-//! use boytacean::netplay::{NetplayConfig, NetplaySession, TcpServer, NetplayRole};
+//! use boytacean::netplay::{
+//!     connection::TcpServer,
+//!     protocol::NetplayRole,
+//!     session::{NetplayConfig, NetplaySession},
+//! };
 //!
 //! let server = TcpServer::bind("0.0.0.0:12345")?;
 //! let connection = server.accept_timeout(Duration::from_secs(30))?
@@ -40,7 +44,11 @@
 //! ## Joining a Session
 //!
 //! ```ignore
-//! use boytacean::netplay::{NetplayConfig, NetplaySession, TcpConnection, NetplayRole};
+//! use boytacean::netplay::{
+//!     connection::TcpConnection,
+//!     protocol::NetplayRole,
+//!     session::{NetplayConfig, NetplaySession},
+//! };
 //!
 //! let connection = TcpConnection::connect("192.168.1.100:12345")?;
 //!
