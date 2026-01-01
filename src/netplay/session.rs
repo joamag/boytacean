@@ -236,7 +236,7 @@ impl NetplaySession {
             NetplayMessage::SyncByte { byte } => {
                 infoln!("[SESSION] Sync byte received: 0x{:02x}", byte);
                 self.sync_recv_queue.push_back(byte);
-                events.push(NetplayEvent::SerialReceived { byte });
+                events.push(NetplayEvent::SyncDataReceived { byte });
             }
 
             NetplayMessage::Ping { timestamp } => {

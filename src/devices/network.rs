@@ -85,28 +85,6 @@ impl NetworkDevice {
         }
     }
 
-    /// Sets the callback for device events.
-    pub fn set_callback(&mut self, callback: NetworkCallback) {
-        self.callback = Some(callback);
-    }
-
-    pub fn clear_callback(&mut self) {
-        self.callback = None;
-    }
-
-    pub fn set_connected(&mut self, connected: bool) {
-        self.connected = connected;
-    }
-
-    pub fn is_connected(&self) -> bool {
-        self.connected
-    }
-
-    /// Sets the default byte returned when the receive buffer is empty.
-    pub fn set_default_byte(&mut self, byte: u8) {
-        self.default_byte = byte;
-    }
-
     /// Queues a byte received from the network.
     ///
     /// This byte will be returned the next time the Game Boy reads from
@@ -128,6 +106,17 @@ impl NetworkDevice {
         if let Some(callback) = self.callback {
             callback(NetworkEvent::SyncData(byte));
         }
+    }
+
+    /// Queues a sync byte to be sent out.
+    ///
+    /// This byte will be sent over the network to the remote peer.
+    pub fn send_sync(&mut self, byte: u8) {
+        infoln!(
+            "[NETWORK] [send_sync()]  Queued sync byte to be sent out: 0x{:02x}",
+            byte
+        );
+        self.send_sync_buffer.push_back(byte);
     }
 
     /// Pops a byte from the pending send buffer.
@@ -170,6 +159,28 @@ impl NetworkDevice {
         self.send_buffer.clear();
         self.send_sync_buffer.clear();
         self.receive_buffer.clear();
+    }
+
+    /// Sets the callback for device events.
+    pub fn set_callback(&mut self, callback: NetworkCallback) {
+        self.callback = Some(callback);
+    }
+
+    pub fn clear_callback(&mut self) {
+        self.callback = None;
+    }
+
+    /// Sets the default byte returned when the receive buffer is empty.
+    pub fn set_default_byte(&mut self, byte: u8) {
+        self.default_byte = byte;
+    }
+
+    pub fn set_connected(&mut self, connected: bool) {
+        self.connected = connected;
+    }
+
+    pub fn is_connected(&self) -> bool {
+        self.connected
     }
 }
 
@@ -216,7 +227,7 @@ impl SerialDevice for NetworkDevice {
     fn sync(&mut self, clock_mode: bool, data: u8) {
         if clock_mode {
         } else {
-            self.queue_sync_received(data);
+            self.send_sync(data);
         }
     }
 

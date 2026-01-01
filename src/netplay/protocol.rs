@@ -196,6 +196,10 @@ impl NetplayMessage {
                 let byte = read_u8(&mut cursor)?;
                 Ok(NetplayMessage::SerialByte { byte })
             }
+            0x08 => {
+                let byte = read_u8(&mut cursor)?;
+                Ok(NetplayMessage::SyncByte { byte })
+            }
             0x0b => {
                 let timestamp = read_u64(&mut cursor)?;
                 Ok(NetplayMessage::Ping { timestamp })
