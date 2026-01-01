@@ -299,7 +299,7 @@ impl Serial {
 
     /// Ticks the transfer operation, incrementing the bit count
     /// and handling the transfer completion.
-    /// 
+    ///
     /// This operation is only valid in the master mode (`shift_clock`` is true).
     fn tick_transfer(&mut self) {
         self.bit_count += 1;
