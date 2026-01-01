@@ -45,6 +45,14 @@ pub trait SerialDevice {
         false
     }
 
+    /// Returns the transfer delay in cycles.
+    ///
+    /// This is the delay in cycles that the device will wait before
+    /// starting the transfer.
+    fn transfer_delay(&self) -> u16 {
+        0
+    }
+
     /// Returns a short description of the serial device.
     ///
     /// Should be a short string describing the device, useful
@@ -230,9 +238,9 @@ impl Serial {
                     self.bit_count = 0;
                     self.timer = self.length as i16;
 
-                    // delay the transfer by 0 cycles to provide some
+                    // delays the transfer by N cycles (from the device) to provide some
                     // time for the slave SB value to sync
-                    self.delay = 0;
+                    self.delay = self.device.transfer_delay() as i16;
 
                     // executes the send and receive operation immediately
                     // this is considered an operational optimization with
