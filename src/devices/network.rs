@@ -6,7 +6,7 @@
 
 use std::{any::Any, collections::VecDeque};
 
-use crate::serial::SerialDevice;
+use crate::{infoln, serial::SerialDevice};
 
 /// Callback type for network events.
 pub type NetworkCallback = fn(NetworkEvent);
@@ -66,12 +66,6 @@ pub struct NetworkDevice {
     /// When false, this side acts as slave (external clock from remote).
     is_master: bool,
 
-    /// Number of initial receives to delay (for desync on client).
-    delay_count: u32,
-
-    /// Buffer to hold delayed bytes.
-    delay_buffer: VecDeque<u8>,
-
     /// Optional byte transformation function for protocol-specific handling.
     /// Used for game-specific responses (e.g., Tetris player 2 handshake).
     byte_transform: Option<fn(u8, bool) -> u8>,
@@ -92,8 +86,6 @@ impl NetworkDevice {
             default_byte: 0xff,
             connected: false,
             is_master: true,
-            delay_count: 0,
-            delay_buffer: VecDeque::new(),
             byte_transform: None,
             bytes_sent: 0,
             bytes_received: 0,
@@ -108,12 +100,6 @@ impl NetworkDevice {
     /// Checks if this device acts as master.
     pub fn is_master(&self) -> bool {
         self.is_master
-    }
-
-    /// Set number of bytes to delay before delivering to game.
-    /// This causes the client to be "behind" the server in the handshake.
-    pub fn set_delay_count(&mut self, count: u32) {
-        self.delay_count = count;
     }
 
     /// Set a byte transformation function for protocol-specific handling.
@@ -165,25 +151,11 @@ impl NetworkDevice {
     /// This byte will be returned the next time the Game Boy reads from
     /// the serial port.
     pub fn queue_received(&mut self, byte: u8) {
-        // if delay is active, buffer the byte
-        if self.delay_count > 0 {
-            self.delay_buffer.push_back(byte);
-            if self.delay_buffer.len() > self.delay_count as usize {
-                // release oldest byte from delay buffer
-                if let Some(delayed_byte) = self.delay_buffer.pop_front() {
-                    self.receive_buffer.push_back(delayed_byte);
-                    self.bytes_received += 1;
-                    if let Some(callback) = self.callback {
-                        callback(NetworkEvent::ByteReceived(delayed_byte));
-                    }
-                }
-            }
-        } else {
-            self.receive_buffer.push_back(byte);
-            self.bytes_received += 1;
-            if let Some(callback) = self.callback {
-                callback(NetworkEvent::ByteReceived(byte));
-            }
+        infoln!("[NETWORK] Queued received byte: 0x{:02x}", byte);
+        self.receive_buffer.push_back(byte);
+        self.bytes_received += 1;
+        if let Some(callback) = self.callback {
+            callback(NetworkEvent::ByteReceived(byte));
         }
     }
 
@@ -244,8 +216,18 @@ impl NetworkDevice {
 impl SerialDevice for NetworkDevice {
     fn send(&mut self) -> u8 {
         match self.receive_buffer.pop_front() {
-            Some(byte) => byte,
+            Some(byte) => {
+                infoln!(
+                    "[NETWORK] [send()] Handles a received byte internally: 0x{:02x}",
+                    byte
+                );
+                byte
+            }
             None => {
+                infoln!(
+                    "[NETWORK] [send()] No byte to be sent out, returning default byte: 0x{:02x}",
+                    self.default_byte
+                );
                 if let Some(callback) = self.callback {
                     callback(NetworkEvent::BufferEmpty);
                 }
@@ -255,6 +237,10 @@ impl SerialDevice for NetworkDevice {
     }
 
     fn receive(&mut self, byte: u8) {
+        infoln!(
+            "[NETWORK] [receive()] Queued byte to be sent out: 0x{:02x}",
+            byte
+        );
         let actual_byte = match self.byte_transform {
             Some(transform) => transform(byte, self.is_master),
             None => byte,
@@ -266,11 +252,7 @@ impl SerialDevice for NetworkDevice {
         }
     }
 
-    fn allow_slave(&self) -> bool {
-        true
-    }
-
-    fn ready(&self) -> bool {
+    fn is_ready(&self) -> bool {
         !self.receive_buffer.is_empty()
     }
 

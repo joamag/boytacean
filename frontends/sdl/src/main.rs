@@ -9,6 +9,7 @@ use boytacean::{
     devices::{network::NetworkDevice, printer::PrinterDevice, stdout::StdoutDevice},
     gb::{AudioProvider, GameBoy, GameBoyMode},
     info::Info,
+    infoln,
     netplay::{
         connection::{TcpConnection, TcpServer},
         protocol::{NetplayEvent, NetplayRole},
@@ -745,6 +746,7 @@ Drag & drop ROM file: Load new ROM and reset system\n===========================
                         if let Ok(events) = session.poll() {
                             for event in events {
                                 if let NetplayEvent::SerialReceived { byte } = event {
+                                    infoln!("[SDL-LOOP] Serial byte received: 0x{:02x}", byte);
                                     let device = self.system.serial().device_mut().as_any_mut();
                                     if let Some(net_dev) = device.downcast_mut::<NetworkDevice>() {
                                         net_dev.queue_received(byte);
@@ -757,6 +759,7 @@ Drag & drop ROM file: Load new ROM and reset system\n===========================
                         let device = self.system.serial().device_mut().as_any_mut();
                         if let Some(net_dev) = device.downcast_mut::<NetworkDevice>() {
                             while let Some(byte) = net_dev.pop_pending() {
+                                infoln!("[SDL-LOOP] Serial byte sent: 0x{:02x}", byte);
                                 let _ = session.send_serial_byte(byte);
                             }
                         }

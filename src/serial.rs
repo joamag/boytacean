@@ -9,6 +9,7 @@ use boytacean_common::{
 
 use crate::{
     consts::{SB_ADDR, SC_ADDR},
+    infoln,
     mmu::BusComponent,
     state::{StateComponent, StateFormat},
     warnln,
@@ -42,8 +43,8 @@ pub trait SerialDevice {
     ///
     /// For network devices, this indicates if a byte has been
     /// received from the remote end.
-    fn ready(&self) -> bool {
-        true
+    fn is_ready(&self) -> bool {
+        false
     }
 
     /// Whether this device should force the serial controller into
@@ -77,6 +78,7 @@ pub struct Serial {
     control: u8,
     shift_clock: bool,
     clock_speed: bool,
+    transfer_enabled: bool,
     transferring: bool,
     timer: i16,
     length: u16,
@@ -94,6 +96,7 @@ impl Serial {
             control: 0x0,
             shift_clock: false,
             clock_speed: false,
+            transfer_enabled: false,
             transferring: false,
             timer: 0,
             length: 512,
@@ -120,6 +123,26 @@ impl Serial {
     }
 
     pub fn clock(&mut self, cycles: u16) {
+        if !self.transfer_enabled {
+            return;
+        }
+
+        // if there's data ready in the slave device, we need to read it
+        // and set the interrupt flag, this will make the Game Boy aware
+        // that there's a new byte to be read from the serial device.
+        // TODO: this is a hack to get the serial working, we need to find
+        // a better way to do this, we cannot run this on every clock cycle,
+        if self.is_slave() && self.device.is_ready() {
+            self.byte_receive = self.device.send();
+            self.data = self.byte_receive;
+            self.transfer_enabled = false;
+            self.int_serial = true;
+            infoln!("[SERIAL] Byte received: 0x{:02x}", self.byte_receive);
+        }
+
+        // in case the transferring flag is not set, meaning
+        // that no transfer is happening (not master or not
+        // transfer enabled), then we can return early
         if !self.transferring {
             return;
         }
@@ -145,7 +168,7 @@ impl Serial {
                 #[allow(clippy::bool_to_int_with_if)]
                 (if self.shift_clock { 0x01 } else { 0x00 }
                     | if self.clock_speed { 0x02 } else { 0x00 }
-                    | if self.transferring { 0x80 } else { 0x00 })
+                    | if self.transfer_enabled { 0x80 } else { 0x00 })
             }
             _ => {
                 warnln!("Reding from unknown Serial location 0x{:04x}", addr);
@@ -163,7 +186,11 @@ impl Serial {
             SC_ADDR => {
                 self.shift_clock = value & 0x01 == 0x01;
                 self.clock_speed = value & 0x02 == 0x02;
-                self.transferring = value & 0x80 == 0x80;
+                self.transfer_enabled = value & 0x80 == 0x80;
+
+                // by the default a transfer is considered to be happening
+                // in case the transfer enabled flag is set
+                self.transferring = true;
 
                 // in case the clock is meant to be set by the attached device
                 // and the current Game Boy is meant to be running in slave mode
@@ -227,6 +254,14 @@ impl Serial {
         self.set_int_serial(false);
     }
 
+    pub fn shift_clock(&self) -> bool {
+        self.shift_clock
+    }
+
+    pub fn set_shift_clock(&mut self, value: bool) {
+        self.shift_clock = value;
+    }
+
     pub fn transferring(&self) -> bool {
         self.transferring
     }
@@ -247,10 +282,24 @@ impl Serial {
         self.device = device;
     }
 
+    #[inline(always)]
+    pub fn is_master(&self) -> bool {
+        self.shift_clock
+    }
+
+    #[inline(always)]
+    pub fn is_slave(&self) -> bool {
+        !self.shift_clock
+    }
+
     fn tick_transfer(&mut self) {
         self.bit_count += 1;
         if self.bit_count == 8 {
+            // resets the transfer related values effectively
+            // disabling the transfer
+            self.transfer_enabled = false;
             self.transferring = false;
+
             self.length = 0;
             self.bit_count = 0;
 

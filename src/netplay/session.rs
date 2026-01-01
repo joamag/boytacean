@@ -7,9 +7,12 @@ use std::{collections::VecDeque, time::Instant};
 
 use boytacean_common::error::Error;
 
-use crate::netplay::{
-    connection::NetplayConnection,
-    protocol::{NetplayEvent, NetplayMessage, NetplayRole, NetplayState, PROTOCOL_VERSION},
+use crate::{
+    infoln,
+    netplay::{
+        connection::NetplayConnection,
+        protocol::{NetplayEvent, NetplayMessage, NetplayRole, NetplayState, PROTOCOL_VERSION},
+    },
 };
 
 /// Configuration for a netplay session.
@@ -125,7 +128,9 @@ impl NetplaySession {
         self.avg_latency_ms
     }
 
-    /// Start the handshake process.
+    /// Starts the handshake process.
+    ///
+    /// Sends the Hello message to the remote player.
     pub fn start_handshake(&mut self) -> Result<(), Error> {
         match self.config.role {
             NetplayRole::Client => {
@@ -134,9 +139,7 @@ impl NetplaySession {
                     rom_hash: self.config.rom_hash,
                 })?;
             }
-            NetplayRole::Host => {
-                // Host waits for client Hello
-            }
+            NetplayRole::Host => {}
         }
         Ok(())
     }
@@ -145,7 +148,7 @@ impl NetplaySession {
     pub fn poll(&mut self) -> Result<Vec<NetplayEvent>, Error> {
         let mut events = Vec::new();
 
-        // Process all pending messages
+        // processes all pending messages
         while let Some(msg) = self.connection.recv()? {
             self.handle_message(msg, &mut events)?;
         }
@@ -166,7 +169,10 @@ impl NetplaySession {
         Ok(events)
     }
 
-    /// Handle a received message.
+    /// Handle a received message from the remote player.
+    ///
+    /// Updates the session state and emits events based on
+    /// the received message.
     fn handle_message(
         &mut self,
         msg: NetplayMessage,
@@ -219,6 +225,7 @@ impl NetplaySession {
             }
 
             NetplayMessage::SerialByte { byte } => {
+                infoln!("[SESSION] Serial byte received: 0x{:02x}", byte);
                 self.serial_recv_queue.push_back(byte);
                 events.push(NetplayEvent::SerialReceived { byte });
             }
@@ -250,7 +257,7 @@ impl NetplaySession {
         Ok(())
     }
 
-    /// Update latency estimate with a new sample.
+    /// Updates latency estimate with a new sample.
     fn update_latency(&mut self, sample: u32) {
         self.ping_history.push_back(sample);
         if self.ping_history.len() > 10 {
@@ -263,6 +270,7 @@ impl NetplaySession {
 
     /// Queue a serial byte to send to the remote.
     pub fn send_serial_byte(&mut self, byte: u8) -> Result<(), Error> {
+        infoln!("[SESSION] Serial byte sent: 0x{:02x}", byte);
         self.connection.send(&NetplayMessage::SerialByte { byte })?;
         Ok(())
     }
