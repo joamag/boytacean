@@ -13,8 +13,8 @@ use boytacean_common::{
 /// Protocol version for compatibility checking.
 pub const PROTOCOL_VERSION: u16 = 1;
 
-/// Magic bytes for message framing.
-pub const PROTOCOL_MAGIC: [u8; 4] = [0x42, 0x4f, 0x59, 0x4e]; // "BOYN"
+/// Magic bytes for message framing ("BOYN").
+pub const PROTOCOL_MAGIC: [u8; 4] = [0x42, 0x4f, 0x59, 0x4e];
 
 /// Maximum message size in bytes (64KB).
 pub const MAX_MESSAGE_SIZE: usize = 65536;
@@ -64,6 +64,12 @@ pub enum NetplayMessage {
         byte: u8,
     },
 
+    /// Sync byte for link cable emulation.
+    SyncByte {
+        /// The byte being transferred.
+        byte: u8,
+    },
+
     /// Latency measurement ping.
     Ping {
         /// Timestamp when ping was sent.
@@ -80,6 +86,21 @@ pub enum NetplayMessage {
     Disconnect,
 }
 
+/// Events emitted by the netplay system.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum NetplayEvent {
+    /// Connection established.
+    Connected { player_id: u8 },
+    /// Connection lost or terminated.
+    Disconnected { reason: String },
+    /// Serial byte received from remote.
+    SerialReceived { byte: u8 },
+    /// Sync data received from remote.
+    SyncDataReceived { byte: u8 },
+    /// Latency measurement updated.
+    LatencyUpdate { latency_ms: u32 },
+}
+
 impl NetplayMessage {
     /// Message type identifier for serialization.
     pub fn message_type(&self) -> u8 {
@@ -87,6 +108,7 @@ impl NetplayMessage {
             NetplayMessage::Hello { .. } => 0x01,
             NetplayMessage::HelloAck { .. } => 0x02,
             NetplayMessage::SerialByte { .. } => 0x07,
+            NetplayMessage::SyncByte { .. } => 0x08,
             NetplayMessage::Ping { .. } => 0x0b,
             NetplayMessage::Pong { .. } => 0x0c,
             NetplayMessage::Disconnect => 0x0d,
@@ -117,6 +139,9 @@ impl NetplayMessage {
                 write_u8(&mut cursor, *player_id)?;
             }
             NetplayMessage::SerialByte { byte } => {
+                write_u8(&mut cursor, *byte)?;
+            }
+            NetplayMessage::SyncByte { byte } => {
                 write_u8(&mut cursor, *byte)?;
             }
             NetplayMessage::Ping { timestamp } => {
@@ -185,19 +210,6 @@ impl NetplayMessage {
     }
 }
 
-/// Events emitted by the netplay system.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum NetplayEvent {
-    /// Connection established.
-    Connected { player_id: u8 },
-    /// Connection lost or terminated.
-    Disconnected { reason: String },
-    /// Serial byte received from remote.
-    SerialReceived { byte: u8 },
-    /// Latency measurement updated.
-    LatencyUpdate { latency_ms: u32 },
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -219,6 +231,7 @@ mod tests {
     fn test_serialize_deserialize_all_simple() {
         let messages = vec![
             NetplayMessage::SerialByte { byte: 0xab },
+            NetplayMessage::SyncByte { byte: 0xcd },
             NetplayMessage::Ping {
                 timestamp: 123456789,
             },

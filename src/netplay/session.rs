@@ -74,6 +74,9 @@ pub struct NetplaySession {
 
     /// Serial byte receive queue.
     serial_recv_queue: VecDeque<u8>,
+
+    /// Sync data receive queue.
+    sync_recv_queue: VecDeque<u8>,
 }
 
 impl NetplaySession {
@@ -105,6 +108,7 @@ impl NetplaySession {
             last_ping_time: None,
             last_ping_timestamp: 0,
             serial_recv_queue: VecDeque::new(),
+            sync_recv_queue: VecDeque::new(),
         }
     }
 
@@ -229,6 +233,12 @@ impl NetplaySession {
                 events.push(NetplayEvent::SerialReceived { byte });
             }
 
+            NetplayMessage::SyncByte { byte } => {
+                infoln!("[SESSION] Sync byte received: 0x{:02x}", byte);
+                self.sync_recv_queue.push_back(byte);
+                events.push(NetplayEvent::SerialReceived { byte });
+            }
+
             NetplayMessage::Ping { timestamp } => {
                 self.connection.send(&NetplayMessage::Pong { timestamp })?;
             }
@@ -271,6 +281,13 @@ impl NetplaySession {
     pub fn send_serial_byte(&mut self, byte: u8) -> Result<(), Error> {
         infoln!("[SESSION] Serial byte sent: 0x{:02x}", byte);
         self.connection.send(&NetplayMessage::SerialByte { byte })?;
+        Ok(())
+    }
+
+    /// Queue a sync byte to send to the remote.
+    pub fn send_sync_byte(&mut self, byte: u8) -> Result<(), Error> {
+        infoln!("[SESSION] Sync byte sent: 0x{:02x}", byte);
+        self.connection.send(&NetplayMessage::SyncByte { byte })?;
         Ok(())
     }
 

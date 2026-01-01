@@ -35,7 +35,7 @@ pub trait SerialDevice {
     /// This operation is especially useful for network devices to
     /// ensure that the devices are in sync and that the transfer
     /// is happening correctly.
-    fn sync(&mut self) {}
+    fn sync(&mut self, _clock_mode: bool, _data: u8) {}
 
     /// Whether the device has data ready to be read.
     ///
@@ -65,7 +65,11 @@ pub trait SerialDevice {
 pub struct Serial {
     data: u8,
     control: u8,
-    shift_clock: bool,
+
+    /// Whether the clock is controlled by this device or the attached
+    /// (or peer) device (true = this device / master, false = peer device / slave).
+    clock_mode: bool,
+
     clock_speed: bool,
     transfer_enabled: bool,
     transferring: bool,
@@ -83,7 +87,7 @@ impl Serial {
         Self {
             data: 0x0,
             control: 0x0,
-            shift_clock: false,
+            clock_mode: false,
             clock_speed: false,
             transfer_enabled: false,
             transferring: false,
@@ -100,7 +104,7 @@ impl Serial {
     pub fn reset(&mut self) {
         self.data = 0x0;
         self.control = 0x0;
-        self.shift_clock = false;
+        self.clock_mode = false;
         self.clock_speed = false;
         self.transferring = false;
         self.timer = 0;
@@ -155,7 +159,7 @@ impl Serial {
             SC_ADDR =>
             {
                 #[allow(clippy::bool_to_int_with_if)]
-                (if self.shift_clock { 0x01 } else { 0x00 }
+                (if self.clock_mode { 0x01 } else { 0x00 }
                     | if self.clock_speed { 0x02 } else { 0x00 }
                     | if self.transfer_enabled { 0x80 } else { 0x00 })
             }
@@ -173,15 +177,15 @@ impl Serial {
             SB_ADDR => self.data = value,
             // 0xFF02 — SC: Serial transfer control
             SC_ADDR => {
-                self.shift_clock = value & 0x01 == 0x01;
+                self.clock_mode = value & 0x01 == 0x01;
                 self.clock_speed = value & 0x02 == 0x02;
                 self.transfer_enabled = value & 0x80 == 0x80;
 
                 infoln!(
-                    "[SERIAL] Transfer enabled: {}, Clock speed: {}, Shift clock: {}",
+                    "[SERIAL] Transfer enabled: {}, Clock speed: {}, Clock mode: {}",
                     self.transfer_enabled,
                     self.clock_speed,
-                    self.shift_clock
+                    self.clock_mode
                 );
 
                 // by the default a transfer is considered to be happening
@@ -191,8 +195,9 @@ impl Serial {
                 // in case the clock is meant to be set by the attached/other device
                 // then the coordination of the transferring is going to be handled
                 // by the other device, so we need to disable the transferring flag
-                if !self.shift_clock {
+                if !self.clock_mode {
                     self.transferring = false;
+                    self.device.sync(self.clock_mode, self.data);
                 }
 
                 // in case a transfer of byte has been requested and
@@ -233,12 +238,12 @@ impl Serial {
         self.set_int_serial(false);
     }
 
-    pub fn shift_clock(&self) -> bool {
-        self.shift_clock
+    pub fn clock_mode(&self) -> bool {
+        self.clock_mode
     }
 
-    pub fn set_shift_clock(&mut self, value: bool) {
-        self.shift_clock = value;
+    pub fn set_clock_mode(&mut self, value: bool) {
+        self.clock_mode = value;
     }
 
     pub fn transferring(&self) -> bool {
@@ -263,18 +268,18 @@ impl Serial {
 
     #[inline(always)]
     pub fn is_master(&self) -> bool {
-        self.shift_clock
+        self.clock_mode
     }
 
     #[inline(always)]
     pub fn is_slave(&self) -> bool {
-        !self.shift_clock
+        !self.clock_mode
     }
 
     /// Ticks the transfer operation, incrementing the bit count
     /// and handling the transfer completion.
     ///
-    /// This operation is only valid in the master mode (`shift_clock` is true).
+    /// This operation is only valid in the master mode (`clock_mode` is true).
     fn tick_transfer(&mut self) {
         self.bit_count += 1;
         if self.bit_count == 8 {
@@ -319,7 +324,7 @@ impl StateComponent for Serial {
         let mut cursor = Cursor::new(vec![]);
         write_u8(&mut cursor, self.data)?;
         write_u8(&mut cursor, self.control)?;
-        write_u8(&mut cursor, self.shift_clock as u8)?;
+        write_u8(&mut cursor, self.clock_mode as u8)?;
         write_u8(&mut cursor, self.clock_speed as u8)?;
         write_u8(&mut cursor, self.transferring as u8)?;
         write_u16(&mut cursor, self.timer as u16)?;
@@ -335,7 +340,7 @@ impl StateComponent for Serial {
         let mut cursor = Cursor::new(data);
         self.data = read_u8(&mut cursor)?;
         self.control = read_u8(&mut cursor)?;
-        self.shift_clock = read_u8(&mut cursor)? != 0;
+        self.clock_mode = read_u8(&mut cursor)? != 0;
         self.clock_speed = read_u8(&mut cursor)? != 0;
         self.transferring = read_u8(&mut cursor)? != 0;
         self.timer = read_u16(&mut cursor)? as i16;

@@ -14,12 +14,12 @@ pub type NetworkCallback = fn(NetworkEvent);
 /// Events emitted by the network device.
 #[derive(Debug, Clone)]
 pub enum NetworkEvent {
-    /// A byte was sent to the remote.
+    /// A byte was sent to the remote peer.
     ByteSent(u8),
-
-    /// A byte was received from the remote.
+    /// A byte was received from the remote peer.
     ByteReceived(u8),
-
+    /// A sync payload request was received from the remote peer.
+    SyncData(u8),
     /// The receive buffer is empty when trying to read.
     BufferEmpty,
 }
@@ -51,10 +51,13 @@ pub struct NetworkDevice {
     /// The value of the SB register (0xFF01) on the other/peer device.
     ///
     /// Useful for master devices to handle incoming bytes from the peer.
-    peer_sp: u8,
+    peer_sp: Option<u8>,
 
     /// Bytes sent by the Game Boy, pending to be sent over network.
     send_buffer: VecDeque<u8>,
+
+    /// Bytes sent by the Game Boy, pending to be sent over network.
+    send_sync_buffer: VecDeque<u8>,
 
     /// Bytes received from the network, ready to be read by the Game Boy.
     receive_buffer: VecDeque<u8>,
@@ -72,8 +75,9 @@ pub struct NetworkDevice {
 impl NetworkDevice {
     pub fn new() -> Self {
         Self {
-            peer_sp: 0xff,
+            peer_sp: None,
             send_buffer: VecDeque::new(),
+            send_sync_buffer: VecDeque::new(),
             receive_buffer: VecDeque::new(),
             callback: None,
             default_byte: 0xff,
@@ -115,6 +119,17 @@ impl NetworkDevice {
         }
     }
 
+    /// Queues a sync byte received from the network.
+    ///
+    /// This byte will be used to set the peer SP register value.
+    pub fn queue_sync_received(&mut self, byte: u8) {
+        infoln!("[NETWORK] Set peer SP with received byte: 0x{:02x}", byte);
+        self.peer_sp = Some(byte);
+        if let Some(callback) = self.callback {
+            callback(NetworkEvent::SyncData(byte));
+        }
+    }
+
     /// Pops a byte from the pending send buffer.
     ///
     /// Returns the next byte that the Game Boy has sent and needs to be
@@ -123,34 +138,49 @@ impl NetworkDevice {
         self.send_buffer.pop_front()
     }
 
-    pub fn drain_send(&mut self) -> Vec<u8> {
-        self.send_buffer.drain(..).collect()
-    }
-
-    pub fn has_received(&self) -> bool {
-        !self.receive_buffer.is_empty()
-    }
-
     pub fn has_pending(&self) -> bool {
         !self.send_buffer.is_empty()
-    }
-
-    pub fn receive_buffer_len(&self) -> usize {
-        self.receive_buffer.len()
     }
 
     pub fn send_buffer_len(&self) -> usize {
         self.send_buffer.len()
     }
 
+    pub fn pop_sync(&mut self) -> Option<u8> {
+        self.send_sync_buffer.pop_front()
+    }
+
+    pub fn has_pending_sync(&self) -> bool {
+        !self.send_sync_buffer.is_empty()
+    }
+
+    pub fn send_sync_buffer_len(&self) -> usize {
+        self.send_sync_buffer.len()
+    }
+
+    pub fn receive_buffer_len(&self) -> usize {
+        self.receive_buffer.len()
+    }
+
+    pub fn has_received(&self) -> bool {
+        !self.receive_buffer.is_empty()
+    }
+
     pub fn clear(&mut self) {
-        self.receive_buffer.clear();
         self.send_buffer.clear();
+        self.send_sync_buffer.clear();
+        self.receive_buffer.clear();
     }
 }
 
 impl SerialDevice for NetworkDevice {
     fn send(&mut self) -> u8 {
+        // TODO: this sounds like a hack we need to better define the
+        // way we're going to handle the sync data.
+        if let Some(byte) = self.peer_sp {
+            return byte;
+        }
+
         match self.receive_buffer.pop_front() {
             Some(byte) => {
                 infoln!(
@@ -180,6 +210,13 @@ impl SerialDevice for NetworkDevice {
         self.send_buffer.push_back(byte);
         if let Some(callback) = self.callback {
             callback(NetworkEvent::ByteSent(byte));
+        }
+    }
+
+    fn sync(&mut self, clock_mode: bool, data: u8) {
+        if clock_mode {
+        } else {
+            self.queue_sync_received(data);
         }
     }
 
@@ -261,19 +298,6 @@ mod tests {
         assert_eq!(device.pop_send(), Some(0x22));
         assert_eq!(device.pop_send(), Some(0x33));
         assert_eq!(device.pop_send(), None);
-    }
-
-    #[test]
-    fn test_network_device_drain() {
-        let mut device = NetworkDevice::new();
-
-        device.receive(0xaa);
-        device.receive(0xbb);
-        device.receive(0xcc);
-
-        let drained = device.drain_send();
-        assert_eq!(drained, vec![0xaa, 0xbb, 0xcc]);
-        assert!(!device.has_pending());
     }
 
     #[test]
