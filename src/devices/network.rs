@@ -159,13 +159,6 @@ impl NetworkDevice {
         }
     }
 
-    /// Queues multiple bytes received from the network.
-    pub fn queue_received_bytes(&mut self, bytes: &[u8]) {
-        for &byte in bytes {
-            self.queue_received(byte);
-        }
-    }
-
     /// Pops a byte from the pending send buffer.
     ///
     /// Returns the next byte that the Game Boy has sent and needs to be
@@ -253,7 +246,7 @@ impl SerialDevice for NetworkDevice {
     }
 
     fn allow_slave(&self) -> bool {
-        true
+        false
     }
 
     fn is_ready(&self) -> bool {
@@ -387,7 +380,7 @@ mod tests {
     #[test]
     fn test_network_device_allow_slave() {
         let device = NetworkDevice::new();
-        assert!(device.allow_slave());
+        assert!(!device.allow_slave());
     }
 
     #[test]
