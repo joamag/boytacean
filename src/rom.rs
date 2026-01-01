@@ -855,33 +855,6 @@ impl Cartridge {
         self.ram_data = vec![0u8; self.ram_data.len()];
     }
 
-    pub fn attach_genie(&mut self, game_genie: GameGenie) -> Result<(), Error> {
-        self.game_genie = Some(game_genie);
-        self.handler = &GAME_GENIE;
-        Ok(())
-    }
-
-    pub fn detach_genie(&mut self) -> Result<(), Error> {
-        self.game_genie = None;
-        self.handler = self.mbc;
-        Ok(())
-    }
-
-    pub fn attach_shark(&mut self, game_shark: GameShark) -> Result<(), Error> {
-        let rom_type = self.rom_type();
-        self.game_shark = Some(game_shark);
-        self.game_shark
-            .as_mut()
-            .ok_or(Error::CustomError(String::from("GameShark not attached")))?
-            .set_rom_type(rom_type);
-        Ok(())
-    }
-
-    pub fn detach_shark(&mut self) -> Result<(), Error> {
-        self.game_shark = None;
-        Ok(())
-    }
-
     pub fn checksum(&self) -> u8 {
         let mut sum: u8 = 0;
         for i in 0x0134..=0x014c {
@@ -923,6 +896,33 @@ impl Cartridge {
 }
 
 impl Cartridge {
+    pub fn attach_genie(&mut self, game_genie: GameGenie) -> Result<(), Error> {
+        self.game_genie = Some(game_genie);
+        self.handler = &GAME_GENIE;
+        Ok(())
+    }
+
+    pub fn detach_genie(&mut self) -> Result<(), Error> {
+        self.game_genie = None;
+        self.handler = self.mbc;
+        Ok(())
+    }
+
+    pub fn attach_shark(&mut self, game_shark: GameShark) -> Result<(), Error> {
+        let rom_type = self.rom_type();
+        self.game_shark = Some(game_shark);
+        self.game_shark
+            .as_mut()
+            .ok_or(Error::CustomError(String::from("GameShark not attached")))?
+            .set_rom_type(rom_type);
+        Ok(())
+    }
+
+    pub fn detach_shark(&mut self) -> Result<(), Error> {
+        self.game_shark = None;
+        Ok(())
+    }
+
     pub fn rom_data(&self) -> &Vec<u8> {
         &self.rom_data
     }
