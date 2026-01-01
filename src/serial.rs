@@ -188,6 +188,13 @@ impl Serial {
                 self.clock_speed = value & 0x02 == 0x02;
                 self.transfer_enabled = value & 0x80 == 0x80;
 
+                infoln!(
+                    "[SERIAL] Transfer enabled: {}, Clock speed: {}, Shift clock: {}",
+                    self.transfer_enabled,
+                    self.clock_speed,
+                    self.shift_clock
+                );
+
                 // by the default a transfer is considered to be happening
                 // in case the transfer enabled flag is set
                 self.transferring = true;
@@ -221,26 +228,6 @@ impl Serial {
                 }
             }
             _ => warnln!("Writing to unknown Serial location 0x{:04x}", addr),
-        }
-    }
-
-    pub fn send(&self) -> bool {
-        if self.shift_clock {
-            true
-        } else {
-            self.data & 0x80 == 0x80
-        }
-    }
-
-    /// Receives a bit from the serial connection,
-    /// can be either another device or the host.
-    ///
-    /// WARNING: This operation is not being used and
-    /// instead immediate receive is being used.
-    pub fn receive(&mut self, bit: bool) {
-        if !self.shift_clock {
-            self.data = (self.data << 1) | bit as u8;
-            self.tick_transfer();
         }
     }
 
