@@ -187,8 +187,7 @@ impl NetplaySession {
                 if version != PROTOCOL_VERSION {
                     self.connection.send(&NetplayMessage::Disconnect)?;
                     return Err(Error::CustomError(format!(
-                        "Version mismatch: {} vs {}",
-                        version, PROTOCOL_VERSION
+                        "Version mismatch: {version} vs {PROTOCOL_VERSION}"
                     )));
                 }
 
