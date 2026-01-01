@@ -218,7 +218,7 @@ mod tests {
     #[test]
     fn test_serialize_deserialize_all_simple() {
         let messages = vec![
-            NetplayMessage::SerialByte { byte: 0xAB },
+            NetplayMessage::SerialByte { byte: 0xab },
             NetplayMessage::Ping {
                 timestamp: 123456789,
             },

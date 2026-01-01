@@ -232,6 +232,11 @@ impl Serial {
         }
     }
 
+    /// Receives a bit from the serial connection,
+    /// can be either another device or the host.
+    ///
+    /// WARNING: This operation is not being used and
+    /// instead immediate receive is being used.
     pub fn receive(&mut self, bit: bool) {
         if !self.shift_clock {
             self.data = (self.data << 1) | bit as u8;
@@ -292,6 +297,10 @@ impl Serial {
         !self.shift_clock
     }
 
+    /// Ticks the transfer operation, incrementing the bit count
+    /// and handling the transfer completion.
+    /// 
+    /// This operation is only valid in the master mode (`shift_clock`` is true).
     fn tick_transfer(&mut self) {
         self.bit_count += 1;
         if self.bit_count == 8 {

@@ -307,16 +307,16 @@ mod tests {
         assert!(!device.has_pending());
 
         // Queue some received bytes
-        device.queue_received(0xAB);
-        device.queue_received(0xCD);
+        device.queue_received(0xab);
+        device.queue_received(0xcd);
 
         assert!(device.has_received());
         assert_eq!(device.receive_buffer_len(), 2);
 
         // Read them back
-        assert_eq!(device.send(), 0xAB);
-        assert_eq!(device.send(), 0xCD);
-        assert_eq!(device.send(), 0xFF); // Default when empty
+        assert_eq!(device.send(), 0xab);
+        assert_eq!(device.send(), 0xcd);
+        assert_eq!(device.send(), 0xff);
     }
 
     #[test]
@@ -342,12 +342,12 @@ mod tests {
     fn test_network_device_drain() {
         let mut device = NetworkDevice::new();
 
-        device.receive(0xAA);
-        device.receive(0xBB);
-        device.receive(0xCC);
+        device.receive(0xaa);
+        device.receive(0xbb);
+        device.receive(0xcc);
 
         let drained = device.drain_pending();
-        assert_eq!(drained, vec![0xAA, 0xBB, 0xCC]);
+        assert_eq!(drained, vec![0xaa, 0xbb, 0xcc]);
         assert!(!device.has_pending());
     }
 

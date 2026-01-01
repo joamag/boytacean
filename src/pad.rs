@@ -430,7 +430,7 @@ mod tests {
         pad.b = true;
 
         let packed = pad.pack_input();
-        assert_eq!(packed, 0xFF);
+        assert_eq!(packed, 0xff);
 
         let empty_pad = Pad::new();
         assert_eq!(empty_pad.pack_input(), 0x00);
