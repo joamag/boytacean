@@ -74,6 +74,7 @@ pub struct Serial {
     transfer_enabled: bool,
     transferring: bool,
     timer: i16,
+    delay: i16,
     length: u16,
     bit_count: u8,
     byte_send: u8,
@@ -92,6 +93,7 @@ impl Serial {
             transfer_enabled: false,
             transferring: false,
             timer: 0,
+            delay: 0,
             length: 512,
             bit_count: 0,
             byte_send: 0x0,
@@ -140,6 +142,11 @@ impl Serial {
             return;
         }
 
+        if self.delay > 0 {
+            self.delay = self.delay.saturating_sub(cycles as i16);
+            return;
+        }
+
         self.timer = self.timer.saturating_sub(cycles as i16);
         if self.timer <= 0 {
             let bit = (self.byte_receive >> (7 - self.bit_count)) & 0x01;
@@ -174,7 +181,15 @@ impl Serial {
     pub fn write(&mut self, addr: u16, value: u8) {
         match addr {
             // 0xFF01 — SB: Serial transfer data
-            SB_ADDR => self.data = value,
+            SB_ADDR => {
+                self.data = value;
+
+                // if a transfer is enabled, then we need to synchronize the state
+                // (SP register) device with the peer device (master)
+                if self.transfer_enabled {
+                    self.device.sync(self.clock_mode, self.data);
+                }
+            }
             // 0xFF02 — SC: Serial transfer control
             SC_ADDR => {
                 self.clock_mode = value & 0x01 == 0x01;
@@ -197,6 +212,11 @@ impl Serial {
                 // by the other device, so we need to disable the transferring flag
                 if !self.clock_mode {
                     self.transferring = false;
+                }
+
+                // if a transfer is enabled, then we need to synchronize the state
+                // (SP register) device with the peer device (master)
+                if self.transfer_enabled {
                     self.device.sync(self.clock_mode, self.data);
                 }
 
@@ -209,6 +229,10 @@ impl Serial {
                     self.length = 512;
                     self.bit_count = 0;
                     self.timer = self.length as i16;
+
+                    // delay the transfer by 0 cycles to provide some
+                    // time for the slave SB value to sync
+                    self.delay = 0;
 
                     // executes the send and receive operation immediately
                     // this is considered an operational optimization with

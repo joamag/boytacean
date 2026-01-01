@@ -91,7 +91,13 @@ impl NetworkDevice {
     /// the serial port.
     pub fn queue_received(&mut self, byte: u8) {
         infoln!("[NETWORK] Queued received byte: 0x{:02x}", byte);
+
         self.receive_buffer.push_back(byte);
+
+        // unsets the peer SP since we're receiving a new byte from
+        // the master device, no longer needed to keep peer state
+        self.peer_sp = None;
+
         if let Some(callback) = self.callback {
             callback(NetworkEvent::ByteReceived(byte));
         }
@@ -189,6 +195,10 @@ impl SerialDevice for NetworkDevice {
         // TODO: this sounds like a hack we need to better define the
         // way we're going to handle the sync data.
         if let Some(byte) = self.peer_sp {
+            infoln!(
+                "[NETWORK] [send()] Handles a peer SP byte internally: 0x{:02x}",
+                byte
+            );
             return byte;
         }
 
@@ -198,6 +208,7 @@ impl SerialDevice for NetworkDevice {
                     "[NETWORK] [send()] Handles a received byte internally: 0x{:02x}",
                     byte
                 );
+                self.receive_buffer.clear(); // TODO: this also sounds like a hack, but makes sense only use the last byte
                 byte
             }
             None => {
