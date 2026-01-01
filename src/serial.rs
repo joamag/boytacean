@@ -38,15 +38,6 @@ pub trait SerialDevice {
         false
     }
 
-    /// Whether this device should force the serial controller into
-    /// a specific clock mode
-    ///
-    /// Returns Some(true) to force master mode, Some(false) to force
-    /// slave mode, or None to use the game's setting.
-    fn force_clock(&self) -> Option<bool> {
-        None
-    }
-
     /// Returns a short description of the serial device.
     ///
     /// Should be a short string describing the device, useful
