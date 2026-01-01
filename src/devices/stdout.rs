@@ -42,10 +42,6 @@ impl SerialDevice for StdoutDevice {
         (self.callback)(&data);
     }
 
-    fn allow_slave(&self) -> bool {
-        false
-    }
-
     fn description(&self) -> String {
         String::from("Stdout")
     }

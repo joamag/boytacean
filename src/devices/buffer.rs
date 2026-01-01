@@ -38,10 +38,6 @@ impl SerialDevice for BufferDevice {
         (self.callback)(&data);
     }
 
-    fn allow_slave(&self) -> bool {
-        false
-    }
-
     fn description(&self) -> String {
         String::from("Buffer")
     }
