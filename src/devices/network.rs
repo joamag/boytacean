@@ -196,10 +196,7 @@ impl SerialDevice for NetworkDevice {
         // Keep the value (don't consume it) so repeated reads return the same
         // value until a new sync byte arrives from the slave.
         if let Some(byte) = self.peer_sp {
-            infoln!(
-                "[NETWORK] [send()] Using peer SP value: 0x{:02x}",
-                byte
-            );
+            infoln!("[NETWORK] [send()] Using peer SP value: 0x{:02x}", byte);
             return byte;
         }
 
