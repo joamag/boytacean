@@ -245,10 +245,6 @@ impl SerialDevice for NetworkDevice {
         }
     }
 
-    fn allow_slave(&self) -> bool {
-        false
-    }
-
     fn is_ready(&self) -> bool {
         !self.receive_buffer.is_empty()
     }
@@ -375,12 +371,6 @@ mod tests {
         device.set_default_byte(0x00);
 
         assert_eq!(device.send(), 0x00); // Custom default
-    }
-
-    #[test]
-    fn test_network_device_allow_slave() {
-        let device = NetworkDevice::new();
-        assert!(!device.allow_slave());
     }
 
     #[test]
