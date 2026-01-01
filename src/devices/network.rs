@@ -194,7 +194,7 @@ impl SerialDevice for NetworkDevice {
     fn send(&mut self) -> u8 {
         // TODO: this sounds like a hack we need to better define the
         // way we're going to handle the sync data.
-        if let Some(byte) = self.peer_sp {
+        if let Some(byte) = self.peer_sp.take() {
             infoln!(
                 "[NETWORK] [send()] Handles a peer SP byte internally: 0x{:02x}",
                 byte
