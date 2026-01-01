@@ -698,6 +698,8 @@ impl Cartridge {
         self.game_shark = game_shark;
     }
 
+    /// Allocates the RAM data for the cartridge based on the
+    /// the number of RAM banks (of 8KB) that are defined in the ROM.
     fn allocate_ram(&mut self) {
         let ram_banks = max(self.ram_size().ram_banks(), 1);
         self.ram_data = vec![0u8; ram_banks as usize * RAM_BANK_SIZE];
