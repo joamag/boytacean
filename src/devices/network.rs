@@ -192,23 +192,24 @@ impl NetworkDevice {
 
 impl SerialDevice for NetworkDevice {
     fn send(&mut self) -> u8 {
-        // TODO: this sounds like a hack we need to better define the
-        // way we're going to handle the sync data.
-        if let Some(byte) = self.peer_sp.take() {
+        // for master mode: use peer_sp (slave's SB register value) if available.
+        // Keep the value (don't consume it) so repeated reads return the same
+        // value until a new sync byte arrives from the slave.
+        if let Some(byte) = self.peer_sp {
             infoln!(
-                "[NETWORK] [send()] Handles a peer SP byte internally: 0x{:02x}",
+                "[NETWORK] [send()] Using peer SP value: 0x{:02x}",
                 byte
             );
             return byte;
         }
 
+        // for slave mode: read from receive_buffer (bytes sent by master)
         match self.receive_buffer.pop_front() {
             Some(byte) => {
                 infoln!(
                     "[NETWORK] [send()] Handles a received byte internally: 0x{:02x}",
                     byte
                 );
-                self.receive_buffer.clear(); // TODO: this also sounds like a hack, but makes sense only use the last byte
                 byte
             }
             None => {
