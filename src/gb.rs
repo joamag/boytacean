@@ -1489,10 +1489,10 @@ impl GameBoy {
     /// Loads an empty ROM into the Game Boy.
     ///
     /// This is useful for testing the CPU and other Game Boy
-    /// components without a ROM. 
+    /// components without a ROM.
     ///
     /// All the ROM data will be set to 0x00 (NOP instruction),
-    /// and no MBC will be applied.
+    /// and no MBC (ROM only) will be applied.
     pub fn load_rom_empty(&mut self) -> Result<&mut Cartridge, Error> {
         let data = [0u8; 32 * 1024];
         self.load_rom(&data, None)
@@ -1543,7 +1543,7 @@ impl GameBoy {
         let rom = self.mmu().rom();
         if rom.game_genie().is_none() {
             let game_genie = GameGenie::default();
-            rom.attach_genie(game_genie);
+            rom.attach_genie(game_genie)?;
         }
         let game_genie = rom.game_genie_mut().as_mut().unwrap();
         game_genie.add_code(code)
@@ -1553,7 +1553,7 @@ impl GameBoy {
         let rom = self.rom();
         if rom.game_shark().is_none() {
             let game_shark = GameShark::default();
-            rom.attach_shark(game_shark);
+            rom.attach_shark(game_shark)?;
         }
         let game_shark = rom.game_shark_mut().as_mut().unwrap();
         game_shark.add_code(code)
