@@ -230,6 +230,73 @@ impl Pad {
     pub fn ack_pad(&mut self) {
         self.set_int_pad(false);
     }
+
+    /// Packs all 8 buttons into a single byte for network transmission.
+    ///
+    /// Bit layout:
+    /// - Bit 0: Up
+    /// - Bit 1: Down
+    /// - Bit 2: Left
+    /// - Bit 3: Right
+    /// - Bit 4: Start
+    /// - Bit 5: Select
+    /// - Bit 6: A
+    /// - Bit 7: B
+    pub fn pack_input(&self) -> u8 {
+        let mut packed = 0u8;
+        if self.up {
+            packed |= 0x01;
+        }
+        if self.down {
+            packed |= 0x02;
+        }
+        if self.left {
+            packed |= 0x04;
+        }
+        if self.right {
+            packed |= 0x08;
+        }
+        if self.start {
+            packed |= 0x10;
+        }
+        if self.select {
+            packed |= 0x20;
+        }
+        if self.a {
+            packed |= 0x40;
+        }
+        if self.b {
+            packed |= 0x80;
+        }
+        packed
+    }
+
+    /// Unpacks a byte into button states.
+    ///
+    /// This sets all button states according to the packed byte,
+    /// useful for applying remote player inputs in netplay.
+    pub fn unpack_input(&mut self, packed: u8) {
+        self.up = packed & 0x01 != 0;
+        self.down = packed & 0x02 != 0;
+        self.left = packed & 0x04 != 0;
+        self.right = packed & 0x08 != 0;
+        self.start = packed & 0x10 != 0;
+        self.select = packed & 0x20 != 0;
+        self.a = packed & 0x40 != 0;
+        self.b = packed & 0x80 != 0;
+    }
+
+    /// Apply packed input and trigger interrupt if any button is pressed.
+    pub fn apply_packed_input(&mut self, packed: u8) {
+        let had_buttons = self.pack_input() != 0;
+        self.unpack_input(packed);
+        let has_buttons = packed != 0;
+
+        // Trigger interrupt on new button press
+        if has_buttons && !had_buttons {
+            self.int_pad = true;
+        }
+    }
 }
 
 impl BusComponent for Pad {
@@ -317,5 +384,74 @@ mod tests {
         assert!(!new_pad.a);
         assert_eq!(new_pad.selection, PadSelection::Action);
         assert!(new_pad.int_pad);
+    }
+
+    #[test]
+    fn test_pack_unpack_input() {
+        let mut pad = Pad::new();
+
+        pad.up = true;
+        pad.down = false;
+        pad.left = true;
+        pad.right = false;
+        pad.start = true;
+        pad.select = false;
+        pad.a = true;
+        pad.b = false;
+
+        let packed = pad.pack_input();
+        assert_eq!(packed, 0b01010101); // A, Start, Left, Up
+
+        // Create new pad and unpack
+        let mut new_pad = Pad::new();
+        new_pad.unpack_input(packed);
+
+        assert!(new_pad.up);
+        assert!(!new_pad.down);
+        assert!(new_pad.left);
+        assert!(!new_pad.right);
+        assert!(new_pad.start);
+        assert!(!new_pad.select);
+        assert!(new_pad.a);
+        assert!(!new_pad.b);
+    }
+
+    #[test]
+    fn test_pack_all_buttons() {
+        let mut pad = Pad::new();
+
+        pad.up = true;
+        pad.down = true;
+        pad.left = true;
+        pad.right = true;
+        pad.start = true;
+        pad.select = true;
+        pad.a = true;
+        pad.b = true;
+
+        let packed = pad.pack_input();
+        assert_eq!(packed, 0xFF);
+
+        let empty_pad = Pad::new();
+        assert_eq!(empty_pad.pack_input(), 0x00);
+    }
+
+    #[test]
+    fn test_apply_packed_input() {
+        let mut pad = Pad::new();
+
+        pad.apply_packed_input(0x40);
+        assert!(pad.a);
+        assert!(pad.int_pad);
+
+        pad.ack_pad();
+
+        pad.apply_packed_input(0x40);
+        assert!(!pad.int_pad);
+
+        pad.apply_packed_input(0x00);
+        pad.apply_packed_input(0x80); // B button
+        assert!(pad.b);
+        assert!(pad.int_pad);
     }
 }

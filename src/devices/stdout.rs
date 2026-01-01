@@ -1,4 +1,5 @@
 use std::{
+    any::Any,
     fmt::{self, Display, Formatter},
     io::{stdout, Write},
 };
@@ -6,7 +7,11 @@ use std::{
 use crate::serial::SerialDevice;
 
 pub struct StdoutDevice {
+    /// Whether to flush the stdout after each write.
     flush: bool,
+
+    /// Callback to call when a byte is received, useful
+    /// to attach to external output devices.
     callback: fn(buffer: &Vec<u8>),
 }
 
@@ -47,6 +52,14 @@ impl SerialDevice for StdoutDevice {
 
     fn state(&self) -> String {
         String::from("")
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
     }
 }
 
