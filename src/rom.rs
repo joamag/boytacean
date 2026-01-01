@@ -550,6 +550,49 @@ impl Cartridge {
         )
     }
 
+    pub fn attach_genie(&mut self, game_genie: GameGenie) -> Result<(), Error> {
+        self.game_genie = Some(game_genie);
+        self.handler = &GAME_GENIE;
+        Ok(())
+    }
+
+    pub fn detach_genie(&mut self) -> Result<(), Error> {
+        self.game_genie = None;
+        self.handler = self.mbc;
+        Ok(())
+    }
+
+    pub fn attach_shark(&mut self, game_shark: GameShark) -> Result<(), Error> {
+        let rom_type = self.rom_type();
+        self.game_shark = Some(game_shark);
+        self.game_shark
+            .as_mut()
+            .ok_or(Error::CustomError(String::from("GameShark not attached")))?
+            .set_rom_type(rom_type);
+        Ok(())
+    }
+
+    pub fn detach_shark(&mut self) -> Result<(), Error> {
+        self.game_shark = None;
+        Ok(())
+    }
+
+    pub fn rom_data(&self) -> &Vec<u8> {
+        &self.rom_data
+    }
+
+    pub fn rom_data_mut(&mut self) -> &mut Vec<u8> {
+        &mut self.rom_data
+    }
+
+    pub fn ram_data(&self) -> &Vec<u8> {
+        &self.ram_data
+    }
+
+    pub fn ram_data_mut(&mut self) -> &mut Vec<u8> {
+        &mut self.ram_data
+    }
+
     pub fn ram_enabled(&self) -> bool {
         self.ram_enabled
     }
@@ -892,51 +935,6 @@ impl Cartridge {
             cgb_l,
             self.cgb_flag()
         )
-    }
-}
-
-impl Cartridge {
-    pub fn attach_genie(&mut self, game_genie: GameGenie) -> Result<(), Error> {
-        self.game_genie = Some(game_genie);
-        self.handler = &GAME_GENIE;
-        Ok(())
-    }
-
-    pub fn detach_genie(&mut self) -> Result<(), Error> {
-        self.game_genie = None;
-        self.handler = self.mbc;
-        Ok(())
-    }
-
-    pub fn attach_shark(&mut self, game_shark: GameShark) -> Result<(), Error> {
-        let rom_type = self.rom_type();
-        self.game_shark = Some(game_shark);
-        self.game_shark
-            .as_mut()
-            .ok_or(Error::CustomError(String::from("GameShark not attached")))?
-            .set_rom_type(rom_type);
-        Ok(())
-    }
-
-    pub fn detach_shark(&mut self) -> Result<(), Error> {
-        self.game_shark = None;
-        Ok(())
-    }
-
-    pub fn rom_data(&self) -> &Vec<u8> {
-        &self.rom_data
-    }
-
-    pub fn rom_data_mut(&mut self) -> &mut Vec<u8> {
-        &mut self.rom_data
-    }
-
-    pub fn ram_data(&self) -> &Vec<u8> {
-        &self.ram_data
-    }
-
-    pub fn ram_data_mut(&mut self) -> &mut Vec<u8> {
-        &mut self.ram_data
     }
 }
 
