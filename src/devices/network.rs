@@ -92,17 +92,17 @@ impl NetworkDevice {
         }
     }
 
-    /// Set whether this device acts as master (drives the clock).
+    /// Sets whether this device acts as master (drives the clock).
     pub fn set_master(&mut self, is_master: bool) {
         self.is_master = is_master;
     }
 
-    /// Checks if this device acts as master.
+    /// Checks if this device acts as master (drives the clock).
     pub fn is_master(&self) -> bool {
         self.is_master
     }
 
-    /// Set a byte transformation function for protocol-specific handling.
+    /// Sets a byte transformation function for protocol-specific handling.
     ///
     /// The function receives the byte being sent and whether this device
     /// is master, returning the transformed byte.
@@ -119,12 +119,12 @@ impl NetworkDevice {
         self.byte_transform = Some(transform);
     }
 
-    /// Clear the byte transformation function.
+    /// Clears the byte transformation function.
     pub fn clear_byte_transform(&mut self) {
         self.byte_transform = None;
     }
 
-    /// Set the callback for device events.
+    /// Sets the callback for device events.
     pub fn set_callback(&mut self, callback: NetworkCallback) {
         self.callback = Some(callback);
     }
@@ -146,7 +146,7 @@ impl NetworkDevice {
         self.default_byte = byte;
     }
 
-    /// Queue a byte received from the network.
+    /// Queues a byte received from the network.
     ///
     /// This byte will be returned the next time the Game Boy reads from
     /// the serial port.
@@ -159,7 +159,7 @@ impl NetworkDevice {
         }
     }
 
-    /// Queue multiple bytes received from the network.
+    /// Queues multiple bytes received from the network.
     pub fn queue_received_bytes(&mut self, bytes: &[u8]) {
         for &byte in bytes {
             self.queue_received(byte);
@@ -250,6 +250,10 @@ impl SerialDevice for NetworkDevice {
         if let Some(callback) = self.callback {
             callback(NetworkEvent::ByteSent(actual_byte));
         }
+    }
+
+    fn allow_slave(&self) -> bool {
+        true
     }
 
     fn is_ready(&self) -> bool {
