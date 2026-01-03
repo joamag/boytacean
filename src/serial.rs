@@ -53,6 +53,15 @@ pub trait SerialDevice {
         0
     }
 
+    /// Whether the device is awaiting sync data before
+    /// a master transfer.
+    ///
+    /// For network devices, this indicates the master is waiting for
+    /// the slave's SB value before starting the transfer.
+    fn awaiting_sync(&self) -> bool {
+        false
+    }
+
     /// Returns a short description of the serial device.
     ///
     /// Should be a short string describing the device, useful
@@ -155,6 +164,22 @@ impl Serial {
             return;
         }
 
+        // if the device is awaiting sync (master waiting for slave's SB value),
+        // returns early and keeps waiting until sync arrives
+        if self.device.awaiting_sync() {
+            return;
+        }
+
+        // if byte_receive hasn't been set yet (was awaiting sync when transfer started),
+        // gets it now that sync has arrived
+        if self.bit_count == 0 && self.byte_receive == 0x00 && self.timer == self.length as i16 {
+            self.byte_receive = self.device.send();
+            infoln!(
+                "[SERIAL] Sync arrived, got byte_receive: 0x{:02x}",
+                self.byte_receive
+            );
+        }
+
         self.timer = self.timer.saturating_sub(cycles as i16);
         if self.timer <= 0 {
             let bit = (self.byte_receive >> (7 - self.bit_count)) & 0x01;
@@ -192,7 +217,7 @@ impl Serial {
             SB_ADDR => {
                 self.data = value;
 
-                // if a transfer is enabled, then we need to synchronize the state
+                // if a transfer is enabled, synchronizes the state
                 // (SP register) device with the peer device (master)
                 if self.transfer_enabled {
                     self.device.sync(self.clock_mode, self.data);
@@ -222,7 +247,7 @@ impl Serial {
                     self.transferring = false;
                 }
 
-                // if a transfer is enabled, then we need to synchronize the state
+                // if a transfer is enabled, synchronizes the state
                 // (SP register) device with the peer device (master)
                 if self.transfer_enabled {
                     self.device.sync(self.clock_mode, self.data);
@@ -242,12 +267,19 @@ impl Serial {
                     // time for the slave SB value to sync
                     self.delay = self.device.transfer_delay() as i16;
 
-                    // executes the send and receive operation immediately
-                    // this is considered an operational optimization with
-                    // no real effect on the emulation (ex: no timing issues)
-                    // then stores the byte to be sent to the device so that
-                    // it's sent by the end of the send cycle
-                    self.byte_receive = self.device.send();
+                    // if the device is awaiting sync (waiting for slave's SB value),
+                    // doesn't get byte_receive yet, it will be fetched in clock() when sync arrives
+                    if self.device.awaiting_sync() {
+                        infoln!("[SERIAL] Awaiting sync, delaying byte_receive fetch");
+                        self.byte_receive = 0x00;
+                    } else {
+                        // executes the send and receive operation immediately
+                        // this is considered an operational optimization with
+                        // no real effect on the emulation (ex: no timing issues)
+                        // then stores the byte to be sent to the device so that
+                        // it's sent by the end of the send cycle
+                        self.byte_receive = self.device.send();
+                    }
                     self.byte_send = self.data;
                 }
             }

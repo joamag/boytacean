@@ -239,6 +239,11 @@ impl NetplaySession {
                 events.push(NetplayEvent::SyncDataReceived { byte });
             }
 
+            NetplayMessage::SyncRequest => {
+                infoln!("[SESSION] Sync request received from master");
+                events.push(NetplayEvent::SyncRequested);
+            }
+
             NetplayMessage::Ping { timestamp } => {
                 self.connection.send(&NetplayMessage::Pong { timestamp })?;
             }
@@ -288,6 +293,13 @@ impl NetplaySession {
     pub fn send_sync_byte(&mut self, byte: u8) -> Result<(), Error> {
         infoln!("[SESSION] Sync byte sent: 0x{:02x}", byte);
         self.connection.send(&NetplayMessage::SyncByte { byte })?;
+        Ok(())
+    }
+
+    /// Send a sync request to the remote (master requests slave's SB value).
+    pub fn send_sync_request(&mut self) -> Result<(), Error> {
+        infoln!("[SESSION] Sync request sent");
+        self.connection.send(&NetplayMessage::SyncRequest)?;
         Ok(())
     }
 

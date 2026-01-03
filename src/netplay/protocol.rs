@@ -70,6 +70,9 @@ pub enum NetplayMessage {
         byte: u8,
     },
 
+    /// Request for sync byte from peer (master requests slave's SB value).
+    SyncRequest,
+
     /// Latency measurement ping.
     Ping {
         /// Timestamp when ping was sent.
@@ -97,6 +100,8 @@ pub enum NetplayEvent {
     SerialReceived { byte: u8 },
     /// Sync data received from remote.
     SyncDataReceived { byte: u8 },
+    /// Sync request received from remote (master wants our SB value).
+    SyncRequested,
     /// Latency measurement updated.
     LatencyUpdate { latency_ms: u32 },
 }
@@ -109,6 +114,7 @@ impl NetplayMessage {
             NetplayMessage::HelloAck { .. } => 0x02,
             NetplayMessage::SerialByte { .. } => 0x07,
             NetplayMessage::SyncByte { .. } => 0x08,
+            NetplayMessage::SyncRequest => 0x09,
             NetplayMessage::Ping { .. } => 0x0b,
             NetplayMessage::Pong { .. } => 0x0c,
             NetplayMessage::Disconnect => 0x0d,
@@ -144,15 +150,14 @@ impl NetplayMessage {
             NetplayMessage::SyncByte { byte } => {
                 write_u8(&mut cursor, *byte)?;
             }
+            NetplayMessage::SyncRequest => {}
             NetplayMessage::Ping { timestamp } => {
                 write_u64(&mut cursor, *timestamp)?;
             }
             NetplayMessage::Pong { timestamp } => {
                 write_u64(&mut cursor, *timestamp)?;
             }
-            NetplayMessage::Disconnect => {
-                // No payload
-            }
+            NetplayMessage::Disconnect => {}
         }
 
         Ok(cursor.into_inner())
@@ -200,6 +205,7 @@ impl NetplayMessage {
                 let byte = read_u8(&mut cursor)?;
                 Ok(NetplayMessage::SyncByte { byte })
             }
+            0x09 => Ok(NetplayMessage::SyncRequest),
             0x0b => {
                 let timestamp = read_u64(&mut cursor)?;
                 Ok(NetplayMessage::Ping { timestamp })
@@ -236,6 +242,7 @@ mod tests {
         let messages = vec![
             NetplayMessage::SerialByte { byte: 0xab },
             NetplayMessage::SyncByte { byte: 0xcd },
+            NetplayMessage::SyncRequest,
             NetplayMessage::Ping {
                 timestamp: 123456789,
             },

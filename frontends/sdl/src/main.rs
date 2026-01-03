@@ -764,12 +764,31 @@ Drag & drop ROM file: Load new ROM and reset system\n===========================
                                             net_dev.queue_sync_received(byte);
                                         }
                                     }
+                                    NetplayEvent::SyncRequested => {
+                                        // master is requesting our SB value, uses saved value if available
+                                        infoln!("[SDL-LOOP] Sync requested by master");
+                                        let device = self.system.serial().device_mut().as_any_mut();
+                                        let sb_value = if let Some(net_dev) =
+                                            device.downcast_mut::<NetworkDevice>()
+                                        {
+                                            // uses saved SB value captured when we wrote to SC,
+                                            // this ensures we send the correct value even if
+                                            // SB was overwritten by processing received bytes
+                                            net_dev.take_saved_sb().unwrap_or_else(|| {
+                                                self.system.serial().read(0xFF01)
+                                            })
+                                        } else {
+                                            self.system.serial().read(0xFF01)
+                                        };
+                                        infoln!("[SDL-LOOP] Sending SB value: 0x{:02x}", sb_value);
+                                        let _ = session.send_sync_byte(sb_value);
+                                    }
                                     _ => (),
                                 }
                             }
                         }
 
-                        // send any pending serial bytes to the remote
+                        // sends any pending serial bytes to the remote
                         let device = self.system.serial().device_mut().as_any_mut();
                         if let Some(net_dev) = device.downcast_mut::<NetworkDevice>() {
                             while let Some(byte) = net_dev.pop_send() {
@@ -779,6 +798,11 @@ Drag & drop ROM file: Load new ROM and reset system\n===========================
                             while let Some(byte) = net_dev.pop_sync() {
                                 infoln!("[SDL-LOOP] Sync byte sent: 0x{:02x}", byte);
                                 let _ = session.send_sync_byte(byte);
+                            }
+                            // sends sync request if master needs slave's SB value
+                            if net_dev.pop_sync_request() {
+                                infoln!("[SDL-LOOP] Sending sync request to slave");
+                                let _ = session.send_sync_request();
                             }
                         }
                     }

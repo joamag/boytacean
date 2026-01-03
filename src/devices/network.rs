@@ -22,6 +22,9 @@ pub enum NetworkEvent {
     SyncData(u8),
     /// The receive buffer is empty when trying to read.
     BufferEmpty,
+    /// A sync request needs to be sent to the peer
+    /// (master requests slave's SB).
+    SyncRequestNeeded,
 }
 
 /// Network-based serial device for link cable emulation.
@@ -70,6 +73,17 @@ pub struct NetworkDevice {
 
     /// Whether this device is connected.
     connected: bool,
+
+    /// Whether a sync request is pending (master waiting for slave's SB value).
+    sync_pending: bool,
+
+    /// Whether a sync request needs to be sent over the network.
+    sync_request_queued: bool,
+
+    /// Saved SB value for slave mode, captured when SC is written.
+    /// Used to respond to SyncRequests with the correct value even if
+    /// the SB register has been overwritten by a received byte.
+    saved_sb: Option<u8>,
 }
 
 impl NetworkDevice {
@@ -82,6 +96,9 @@ impl NetworkDevice {
             callback: None,
             default_byte: 0xff,
             connected: false,
+            sync_pending: false,
+            sync_request_queued: false,
+            saved_sb: None,
         }
     }
 
@@ -106,9 +123,11 @@ impl NetworkDevice {
     /// Queues a sync byte received from the network.
     ///
     /// This byte will be used to set the peer SP register value.
+    /// Also clears the sync_pending flag since we received the requested sync.
     pub fn queue_sync_received(&mut self, byte: u8) {
         infoln!("[NETWORK] Set peer SP with received byte: 0x{:02x}", byte);
         self.peer_sp = Some(byte);
+        self.sync_pending = false;
         if let Some(callback) = self.callback {
             callback(NetworkEvent::SyncData(byte));
         }
@@ -165,6 +184,9 @@ impl NetworkDevice {
         self.send_buffer.clear();
         self.send_sync_buffer.clear();
         self.receive_buffer.clear();
+        self.sync_pending = false;
+        self.sync_request_queued = false;
+        self.saved_sb = None;
     }
 
     /// Sets the callback for device events.
@@ -187,6 +209,65 @@ impl NetworkDevice {
 
     pub fn is_connected(&self) -> bool {
         self.connected
+    }
+
+    /// Returns whether a sync request is pending.
+    pub fn is_sync_pending(&self) -> bool {
+        self.sync_pending
+    }
+
+    /// Sets the sync pending flag.
+    pub fn set_sync_pending(&mut self, pending: bool) {
+        self.sync_pending = pending;
+    }
+
+    /// Requests a sync from the peer by emitting a SyncRequestNeeded event.
+    /// Sets sync_pending to true to block further transfers until sync arrives.
+    pub fn request_sync(&mut self) {
+        if self.sync_pending {
+            return; // already waiting for sync
+        }
+        infoln!("[NETWORK] Requesting sync from peer");
+        self.sync_pending = true;
+        self.sync_request_queued = true;
+        if let Some(callback) = self.callback {
+            callback(NetworkEvent::SyncRequestNeeded);
+        }
+    }
+
+    /// Returns and clears the sync request flag.
+    /// Used by the main loop to send sync requests over the network.
+    pub fn pop_sync_request(&mut self) -> bool {
+        let was_queued = self.sync_request_queued;
+        self.sync_request_queued = false;
+        was_queued
+    }
+
+    /// Returns whether a sync request is queued to be sent.
+    pub fn has_sync_request(&self) -> bool {
+        self.sync_request_queued
+    }
+
+    /// Returns whether peer_sp has a value (sync data available).
+    pub fn has_peer_sp(&self) -> bool {
+        self.peer_sp.is_some()
+    }
+
+    /// Returns whether the device is ready for a master transfer.
+    /// For master mode, we need to have peer_sp available and no pending sync request.
+    pub fn is_master_ready(&self) -> bool {
+        self.peer_sp.is_some() && !self.sync_pending
+    }
+
+    /// Gets the saved SB value (for slave mode sync responses).
+    /// Returns the saved value and clears it.
+    pub fn take_saved_sb(&mut self) -> Option<u8> {
+        self.saved_sb.take()
+    }
+
+    /// Gets the saved SB value without clearing it.
+    pub fn saved_sb(&self) -> Option<u8> {
+        self.saved_sb
     }
 }
 
@@ -228,6 +309,12 @@ impl SerialDevice for NetworkDevice {
             byte
         );
         self.send_buffer.push_back(byte);
+
+        // clears peer_sp after transfer completes so the next transfer
+        // requires a fresh sync byte from the slave, this prevents the
+        // master from racing ahead using stale data
+        self.peer_sp = None;
+
         if let Some(callback) = self.callback {
             callback(NetworkEvent::ByteSent(byte));
         }
@@ -235,13 +322,30 @@ impl SerialDevice for NetworkDevice {
 
     fn sync(&mut self, clock_mode: bool, data: u8) {
         if clock_mode {
+            // master mode: requests sync from slave if peer_sp is not available
+            if self.peer_sp.is_none() && !self.sync_pending {
+                self.request_sync();
+            }
         } else {
+            // slave mode: saves the SB value so it can be sent when master requests sync,
+            // this captures the value at the moment of SC write (ready for transfer),
+            // before it gets overwritten by processing received bytes
+            infoln!("[NETWORK] [sync()] Slave saving SB value: 0x{:02x}", data);
+            self.saved_sb = Some(data);
+
+            // proactively sends sync byte to master so it often arrives before
+            // the master needs it, reducing round-trip latency, the SyncRequest
+            // mechanism remains as a fallback if this doesn't arrive in time
             self.send_sync(data);
         }
     }
 
     fn is_ready(&self) -> bool {
         !self.receive_buffer.is_empty()
+    }
+
+    fn awaiting_sync(&self) -> bool {
+        self.sync_pending
     }
 
     fn description(&self) -> String {
