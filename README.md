@@ -56,6 +56,32 @@ What's still missing...
 cargo build
 ```
 
+### Build Features
+
+The following compile-time features can be enabled when building the library:
+
+| Feature    | Description                                                                 |
+| ---------- | --------------------------------------------------------------------------- |
+| `wasm`     | Enables WebAssembly support via `wasm-bindgen`.                             |
+| `python`   | Enables Python bindings via PyO3.                                           |
+| `simd`     | Enables SIMD optimizations for encoding and hashing operations.             |
+| `debug`    | Enables debug logging output (prints `[DEBUG]` prefixed messages).          |
+| `silent`   | Suppresses informational logging output (`[INFO]` messages are disabled).   |
+| `pedantic` | Enables stricter warning handling (can panic on warnings if enabled).       |
+| `cpulog`   | Enables CPU instruction logging for debugging purposes.                     |
+
+To enable a feature during build:
+
+```bash
+cargo build --features silent
+```
+
+Multiple features can be combined:
+
+```bash
+cargo build --features "simd,silent"
+```
+
 ### Python Library
 
 ```bash

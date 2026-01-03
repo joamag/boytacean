@@ -11,10 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * High-pass audio filter options (Preserve, Accurate, Disable) with save-state support
 * SDL frontend shader loading support via `--shader-path`
+* `silent` build feature to suppress informational logging output
 
 ### Changed
 
 * Added support for HBlank HDMA transfers
+* Refactored `NetworkDevice` to use configurable byte transform instead of hardcoded game-specific logic
 
 ### Fixed
 

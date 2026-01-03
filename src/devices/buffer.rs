@@ -1,6 +1,9 @@
 use crate::serial::SerialDevice;
 
-use std::fmt::{self, Display, Formatter};
+use std::{
+    any::Any,
+    fmt::{self, Display, Formatter},
+};
 
 pub struct BufferDevice {
     buffer: Vec<u8>,
@@ -35,10 +38,6 @@ impl SerialDevice for BufferDevice {
         (self.callback)(&data);
     }
 
-    fn allow_slave(&self) -> bool {
-        false
-    }
-
     fn description(&self) -> String {
         String::from("Buffer")
     }
@@ -46,6 +45,14 @@ impl SerialDevice for BufferDevice {
     fn state(&self) -> String {
         let buffer = self.buffer.clone();
         String::from_utf8(buffer).unwrap()
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
     }
 }
 

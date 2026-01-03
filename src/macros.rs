@@ -19,6 +19,7 @@ macro_rules! debugln {
     };
 }
 
+#[cfg(not(feature = "silent"))]
 #[macro_export]
 macro_rules! infoln {
     ($($rest:tt)*) => {
@@ -27,6 +28,14 @@ macro_rules! infoln {
             std::println!($($rest)*);
         }
     }
+}
+
+#[cfg(feature = "silent")]
+#[macro_export]
+macro_rules! infoln {
+    ($($rest:tt)*) => {
+        ()
+    };
 }
 
 #[cfg(feature = "pedantic")]

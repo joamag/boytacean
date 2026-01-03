@@ -16,6 +16,7 @@ pub mod inst;
 pub mod licensee;
 pub mod macros;
 pub mod mmu;
+pub mod netplay;
 pub mod pad;
 pub mod ppu;
 pub mod rom;

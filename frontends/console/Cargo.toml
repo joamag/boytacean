@@ -12,6 +12,7 @@ readme = "README.md"
 [features]
 slow = []
 debug = ["boytacean/debug"]
+silent = ["boytacean/silent"]
 pedantic = ["boytacean/pedantic"]
 cpulog = ["boytacean/cpulog"]
 

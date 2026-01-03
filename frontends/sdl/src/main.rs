@@ -6,9 +6,15 @@ pub mod test;
 
 use audio::Audio;
 use boytacean::{
-    devices::{printer::PrinterDevice, stdout::StdoutDevice},
+    devices::{network::NetworkDevice, printer::PrinterDevice, stdout::StdoutDevice},
     gb::{AudioProvider, GameBoy, GameBoyMode},
     info::Info,
+    infoln,
+    netplay::{
+        connection::{TcpConnection, TcpServer},
+        protocol::{NetplayEvent, NetplayRole},
+        session::{NetplayConfig, NetplaySession},
+    },
     pad::PadKey,
     ppu::PaletteInfo,
     rom::Cartridge,
@@ -160,6 +166,12 @@ pub struct Emulator {
 
     /// Index of the current palette controlling the palette being used.
     palette_index: usize,
+
+    /// Optional netplay session for multiplayer gaming.
+    netplay_session: Option<NetplaySession>,
+
+    /// Netplay role (Host/Client) to be used for window title display.
+    netplay_role: Option<NetplayRole>,
 }
 
 impl Emulator {
@@ -249,7 +261,15 @@ impl Emulator {
                 ),
             ],
             palette_index: 0,
+            netplay_session: None,
+            netplay_role: None,
         }
+    }
+
+    /// Set the netplay session for this emulator.
+    pub fn set_netplay_session(&mut self, session: NetplaySession, role: NetplayRole) {
+        self.netplay_session = Some(session);
+        self.netplay_role = Some(role);
     }
 
     pub fn start(&mut self, screen_scale: f32) {
@@ -312,9 +332,12 @@ impl Emulator {
         )?;
         println!("========= Cartridge =========\n{rom}\n=============================");
         if let Some(ref mut sdl) = self.sdl {
-            sdl.window_mut()
-                .set_title(format!("{} [{}]", self.title, rom.title()).as_str())
-                .unwrap();
+            let title = match self.netplay_role {
+                Some(NetplayRole::Host) => format!("[Server] {} [{}]", self.title, rom.title()),
+                Some(NetplayRole::Client) => format!("[Client] {} [{}]", self.title, rom.title()),
+                None => format!("{} [{}]", self.title, rom.title()),
+            };
+            sdl.window_mut().set_title(&title).unwrap();
         }
         self.rom_path = String::from(rom_path);
         self.ram_path = ram_path;
@@ -717,6 +740,73 @@ Drag & drop ROM file: Load new ROM and reset system\n===========================
                         break;
                     }
 
+                    // poll netplay for incoming serial bytes frequently during emulation
+                    // this ensures network data arrives before serial transfers complete
+                    if let Some(ref mut session) = self.netplay_session {
+                        if let Ok(events) = session.poll() {
+                            for event in events {
+                                match event {
+                                    NetplayEvent::SerialReceived { byte } => {
+                                        infoln!("[SDL-LOOP] Serial byte received: 0x{:02x}", byte);
+                                        let device = self.system.serial().device_mut().as_any_mut();
+                                        if let Some(net_dev) =
+                                            device.downcast_mut::<NetworkDevice>()
+                                        {
+                                            net_dev.queue_received(byte);
+                                        }
+                                    }
+                                    NetplayEvent::SyncDataReceived { byte } => {
+                                        infoln!("[SDL-LOOP] Sync byte received: 0x{:02x}", byte);
+                                        let device = self.system.serial().device_mut().as_any_mut();
+                                        if let Some(net_dev) =
+                                            device.downcast_mut::<NetworkDevice>()
+                                        {
+                                            net_dev.queue_sync_received(byte);
+                                        }
+                                    }
+                                    NetplayEvent::SyncRequested => {
+                                        // master is requesting our SB value, uses saved value if available
+                                        infoln!("[SDL-LOOP] Sync requested by master");
+                                        let device = self.system.serial().device_mut().as_any_mut();
+                                        let sb_value = if let Some(net_dev) =
+                                            device.downcast_mut::<NetworkDevice>()
+                                        {
+                                            // uses saved SB value captured when we wrote to SC,
+                                            // this ensures we send the correct value even if
+                                            // SB was overwritten by processing received bytes
+                                            net_dev.take_saved_sb().unwrap_or_else(|| {
+                                                self.system.serial().read(0xFF01)
+                                            })
+                                        } else {
+                                            self.system.serial().read(0xFF01)
+                                        };
+                                        infoln!("[SDL-LOOP] Sending SB value: 0x{:02x}", sb_value);
+                                        let _ = session.send_sync_byte(sb_value);
+                                    }
+                                    _ => (),
+                                }
+                            }
+                        }
+
+                        // sends any pending serial bytes to the remote
+                        let device = self.system.serial().device_mut().as_any_mut();
+                        if let Some(net_dev) = device.downcast_mut::<NetworkDevice>() {
+                            while let Some(byte) = net_dev.pop_send() {
+                                infoln!("[SDL-LOOP] Serial byte sent: 0x{:02x}", byte);
+                                let _ = session.send_serial_byte(byte);
+                            }
+                            while let Some(byte) = net_dev.pop_sync() {
+                                infoln!("[SDL-LOOP] Sync byte sent: 0x{:02x}", byte);
+                                let _ = session.send_sync_byte(byte);
+                            }
+                            // sends sync request if master needs slave's SB value
+                            if net_dev.pop_sync_request() {
+                                infoln!("[SDL-LOOP] Sending sync request to slave");
+                                let _ = session.send_sync_request();
+                            }
+                        }
+                    }
+
                     // runs the Game Boy clock, this operation should
                     // include the advance of both the CPU, PPU, APU
                     // and any other frequency based component of the system
@@ -1083,6 +1173,22 @@ struct Args {
 
     #[arg(long, default_value_t = String::from(""), help = "Fragment shader to use")]
     shader: String,
+
+    #[arg(long, help = "Host a netplay session on specified port (e.g., 12345)")]
+    netplay_host: Option<u16>,
+
+    #[arg(
+        long,
+        help = "Join a netplay session at specified address (e.g., 192.168.1.100:12345)"
+    )]
+    netplay_join: Option<String>,
+
+    #[arg(
+        long,
+        default_value_t = 2.0,
+        help = "Startup delay in seconds for netplay client (default: 2.0)"
+    )]
+    netplay_start_delay: f32,
 }
 
 fn run(args: Args, emulator: &mut Emulator) {
@@ -1136,12 +1242,31 @@ fn main() -> Result<(), Box<dyn StdError>> {
         let mode = Cartridge::from_file(&args.rom_path)?.gb_mode();
         game_boy.set_mode(mode);
     }
-    let device: Box<dyn SerialDevice> = build_device(&args.device)?;
+
+    // Check for netplay mode - use network device instead of normal serial device
+    let netplay_enabled = args.netplay_host.is_some() || args.netplay_join.is_some();
+    let netplay_session: Option<(NetplaySession, NetplayRole)>;
+
+    if netplay_enabled {
+        let rom_data = std::fs::read(&args.rom_path)?;
+        if let Some((session, role, device)) = setup_netplay(&args, &rom_data)? {
+            netplay_session = Some((session, role));
+            game_boy.attach_serial(device);
+        } else {
+            netplay_session = None;
+            let device: Box<dyn SerialDevice> = build_device(&args.device)?;
+            game_boy.attach_serial(device);
+        }
+    } else {
+        netplay_session = None;
+        let device: Box<dyn SerialDevice> = build_device(&args.device)?;
+        game_boy.attach_serial(device);
+    }
+
     game_boy.set_ppu_enabled(!args.no_ppu);
     game_boy.set_apu_enabled(!args.no_apu);
     game_boy.set_dma_enabled(!args.no_dma);
     game_boy.set_timer_enabled(!args.no_timer);
-    game_boy.attach_serial(device);
     game_boy.load(!args.no_boot && args.boot_rom_path.is_empty())?;
     if args.no_boot {
         game_boy.load_boot_state();
@@ -1167,8 +1292,22 @@ fn main() -> Result<(), Box<dyn StdError>> {
         },
     };
     let mut emulator = Emulator::new(game_boy, options);
+
+    let is_netplay_client = if let Some((session, role)) = netplay_session {
+        let is_client = matches!(role, NetplayRole::Client);
+        emulator.set_netplay_session(session, role);
+        is_client
+    } else {
+        false
+    };
+
     emulator.start(SCREEN_SCALE);
     emulator.load_rom(Some(&args.rom_path))?;
+
+    // add startup delay for netplay client to let server initialize first
+    if is_netplay_client && args.netplay_start_delay > 0.0 {
+        std::thread::sleep(std::time::Duration::from_secs_f32(args.netplay_start_delay));
+    }
     emulator.apply_cheats(&args.cheats);
     emulator.toggle_palette();
     if !args.shader.is_empty() {
@@ -1180,6 +1319,81 @@ fn main() -> Result<(), Box<dyn StdError>> {
     emulator.stop();
 
     Ok(())
+}
+
+/// Sets up a netplay session based on CLI arguments.
+///
+/// Returns the netplay session, role, and a network device for the serial port.
+fn setup_netplay(
+    args: &Args,
+    rom_data: &[u8],
+) -> Result<Option<(NetplaySession, NetplayRole, Box<NetworkDevice>)>, Error> {
+    // Simple FNV-1a hash for ROM verification
+    let mut hash: u64 = 0xcbf29ce484222325;
+    for &byte in rom_data {
+        hash ^= byte as u64;
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    let hash_bytes = hash.to_le_bytes();
+    let rom_hash: [u8; 16] = [
+        hash_bytes[0],
+        hash_bytes[1],
+        hash_bytes[2],
+        hash_bytes[3],
+        hash_bytes[4],
+        hash_bytes[5],
+        hash_bytes[6],
+        hash_bytes[7],
+        hash_bytes[0],
+        hash_bytes[1],
+        hash_bytes[2],
+        hash_bytes[3],
+        hash_bytes[4],
+        hash_bytes[5],
+        hash_bytes[6],
+        hash_bytes[7],
+    ];
+
+    if let Some(port) = args.netplay_host {
+        let server = TcpServer::bind(format!("0.0.0.0:{}", port))?;
+
+        let connection = server
+            .accept_timeout(std::time::Duration::from_secs(120))
+            .map_err(|e| Error::CustomError(format!("Accept error: {}", e)))?
+            .ok_or_else(|| Error::CustomError("Timeout waiting for connection".to_string()))?;
+
+        let config = NetplayConfig {
+            role: NetplayRole::Host,
+            rom_hash,
+            ..Default::default()
+        };
+
+        let session = NetplaySession::new(config, Box::new(connection));
+        let device = Box::new(NetworkDevice::new());
+
+        Ok(Some((session, NetplayRole::Host, device)))
+    } else if let Some(addr) = &args.netplay_join {
+        let connection =
+            TcpConnection::connect_timeout(addr.as_str(), std::time::Duration::from_secs(30))
+                .map_err(|e| Error::CustomError(format!("Connection error: {}", e)))?;
+
+        let config = NetplayConfig {
+            role: NetplayRole::Client,
+            rom_hash,
+            ..Default::default()
+        };
+
+        let mut session = NetplaySession::new(config, Box::new(connection));
+        session
+            .start_handshake()
+            .map_err(|e| Error::CustomError(format!("Handshake error: {}", e)))?;
+
+        let device = Box::new(NetworkDevice::new());
+
+        Ok(Some((session, NetplayRole::Client, device)))
+    } else {
+        Ok(None)
+    }
 }
 
 fn build_device(device: &str) -> Result<Box<dyn SerialDevice>, Error> {

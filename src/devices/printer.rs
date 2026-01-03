@@ -1,4 +1,7 @@
-use std::fmt::{self, Display, Formatter};
+use std::{
+    any::Any,
+    fmt::{self, Display, Formatter},
+};
 
 use crate::{ppu::PaletteAlpha, serial::SerialDevice, warnln};
 
@@ -330,16 +333,20 @@ impl SerialDevice for PrinterDevice {
         }
     }
 
-    fn allow_slave(&self) -> bool {
-        false
-    }
-
     fn description(&self) -> String {
         format!("Printer [{}]", self.command)
     }
 
     fn state(&self) -> String {
         self.command.to_string()
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
     }
 }
 
