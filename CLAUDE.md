@@ -120,23 +120,25 @@ cargo build 2>&1 | grep -i warning
 - Use third-person descriptive style ("creates", "sends", "returns") not imperative ("create", "send", "return")
 - No period at end of inline comments
 - Examples:
-  ```rust
-  // sends sync request if master needs slave's SB value
-  // clears peer_sp after transfer completes so the next transfer
-  // requires a fresh sync byte from the slave
-  // master mode: requests sync from slave if peer_sp is not available
-  ```
+
+```rust
+// sends sync request if master needs slave's SB value
+// clears peer_sp after transfer completes so the next transfer
+// requires a fresh sync byte from the slave
+// master mode: requests sync from slave if peer_sp is not available
+```
 
 ### Doc Comments
 
 - Doc comments (`///`) use proper capitalization
 - First line should be a complete sentence describing what the function does
 - Example:
-  ```rust
-  /// Requests a sync from the peer by emitting a SyncRequestNeeded event.
-  /// Sets sync_pending to true to block further transfers until sync arrives.
-  pub fn request_sync(&mut self) {
-  ```
+
+```rust
+/// Requests a sync from the peer by emitting a SyncRequestNeeded event.
+/// Sets sync_pending to true to block further transfers until sync arrives.
+pub fn request_sync(&mut self) {
+```
 
 ### Other Style
 
