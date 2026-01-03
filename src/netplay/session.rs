@@ -352,8 +352,15 @@ impl Drop for NetplaySession {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use std::time::Duration;
+    use std::{collections::VecDeque, time::Duration};
+
+    use boytacean_common::error::Error;
+
+    use crate::netplay::{
+        connection::NetplayConnection,
+        protocol::{NetplayMessage, NetplayState},
+        session::{NetplayConfig, NetplaySession},
+    };
 
     struct MockConnection {
         sent: VecDeque<NetplayMessage>,

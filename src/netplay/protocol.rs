@@ -222,7 +222,7 @@ impl NetplayMessage {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::netplay::protocol::{NetplayMessage, PROTOCOL_VERSION};
 
     #[test]
     fn test_serialize_deserialize_hello() {

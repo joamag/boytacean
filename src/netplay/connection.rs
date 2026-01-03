@@ -334,8 +334,12 @@ impl MessageQueue {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use std::thread;
+    use std::{thread, time::Duration};
+
+    use crate::netplay::{
+        connection::{MessageQueue, NetplayConnection, TcpConnection, TcpServer},
+        protocol::NetplayMessage,
+    };
 
     #[test]
     fn test_tcp_server_client() {

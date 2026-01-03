@@ -388,7 +388,9 @@ impl Default for NetworkDevice {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::{devices::network::DEFAULT_BYTE, serial::SerialDevice};
+
+    use super::NetworkDevice;
 
     #[test]
     fn test_network_device_basic() {
