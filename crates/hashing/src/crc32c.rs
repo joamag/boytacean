@@ -10,15 +10,14 @@
 //! This implementation is optimized for modern CPUs by using hardware acceleration
 //! when available. Current support includes SSE4.2 for x86_64 and CRC for aarch64.
 
-use boytacean_common::error::Error;
-
-use crate::hash::Hash;
-
+#[cfg(all(feature = "simd", target_arch = "aarch64"))]
+use std::arch::is_aarch64_feature_detected;
 #[cfg(all(feature = "simd", target_arch = "x86_64"))]
 use std::arch::is_x86_feature_detected;
 
-#[cfg(all(feature = "simd", target_arch = "aarch64"))]
-use std::arch::is_aarch64_feature_detected;
+use boytacean_common::error::Error;
+
+use crate::hash::Hash;
 
 const CRC32C_TABLE: [u32; 256] = [
     0x00000000, 0xf26b8303, 0xe13b70f7, 0x1350f3f4, 0xc79a971f, 0x35f1141c, 0x26a1e7e8, 0xd4ca64eb,
@@ -181,9 +180,8 @@ pub fn crc32c(data: &[u8]) -> u32 {
 
 #[cfg(test)]
 mod tests {
-    use crate::hash::Hash;
-
     use super::{crc32c, Crc32C};
+    use crate::hash::Hash;
 
     #[test]
     fn test_crc32c_empty() {

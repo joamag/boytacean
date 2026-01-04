@@ -1496,7 +1496,6 @@ impl Default for Apu {
 #[cfg(test)]
 mod tests {
     use super::{Apu, HighPassFilter};
-
     use crate::state::StateComponent;
 
     #[test]

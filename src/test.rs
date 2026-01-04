@@ -108,6 +108,7 @@ pub fn run_image_test(
 
 #[cfg(test)]
 mod tests {
+    use super::{run_serial_test, run_step_test, TestOptions};
     use crate::{
         consts::{
             BGP_ADDR, DIV_ADDR, DMA_ADDR, IF_ADDR, LCDC_ADDR, LYC_ADDR, LY_ADDR, OBP0_ADDR,
@@ -119,8 +120,6 @@ mod tests {
         licensee::Licensee,
         rom::{RamSize, Region, RomSize},
     };
-
-    use super::{run_serial_test, run_step_test, TestOptions};
 
     #[test]
     fn test_boot_state() {

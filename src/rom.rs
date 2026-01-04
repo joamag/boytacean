@@ -3,13 +3,16 @@
 //! Includes the implementation of the Memory Bank Controllers (MBCs)
 //! that are used to handle the memory access for the cartridge.
 
-use boytacean_common::{error::Error, util::read_file};
 use core::fmt;
 use std::{
     cmp::max,
     fmt::{Display, Formatter},
     vec,
 };
+
+use boytacean_common::{error::Error, util::read_file};
+#[cfg(feature = "wasm")]
+use wasm_bindgen::prelude::*;
 
 use crate::{
     cheats::{genie::GameGenie, shark::GameShark},
@@ -19,9 +22,6 @@ use crate::{
     mmu::BusComponent,
     panic_gb, warnln,
 };
-
-#[cfg(feature = "wasm")]
-use wasm_bindgen::prelude::*;
 
 pub const ROM_BANK_SIZE: usize = 16384;
 pub const RAM_BANK_SIZE: usize = 8192;

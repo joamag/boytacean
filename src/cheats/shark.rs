@@ -1,13 +1,13 @@
-use boytacean_common::error::Error;
 use std::{
     collections::HashMap,
     fmt::{self, Display, Formatter},
 };
 
-use crate::rom::RomType;
-
+use boytacean_common::error::Error;
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
+
+use crate::rom::RomType;
 
 /// Implementation of the GameShark cheat code system
 /// that "patches" RAM entries, making use of the V-Blank

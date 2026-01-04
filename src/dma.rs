@@ -371,7 +371,6 @@ impl Display for Dma {
 #[cfg(test)]
 mod tests {
     use super::{Dma, DmaMode};
-
     use crate::state::StateComponent;
 
     #[test]

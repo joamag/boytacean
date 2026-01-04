@@ -4,6 +4,14 @@ pub mod sdl;
 pub mod shader;
 pub mod test;
 
+use std::{
+    cmp::max,
+    error::Error as StdError,
+    path::{Path, PathBuf},
+    thread,
+    time::{Duration, Instant, SystemTime},
+};
+
 use audio::Audio;
 use boytacean::{
     devices::{printer::PrinterDevice, stdout::StdoutDevice},
@@ -28,13 +36,6 @@ use sdl2::{
     keyboard::{Keycode, Mod},
     pixels::PixelFormatEnum,
     Sdl,
-};
-use std::{
-    cmp::max,
-    error::Error as StdError,
-    path::{Path, PathBuf},
-    thread,
-    time::{Duration, Instant, SystemTime},
 };
 
 /// The scale at which the screen is going to be drawn

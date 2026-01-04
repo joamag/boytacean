@@ -5,15 +5,16 @@
 //!
 //! Most of the core CPU logic is implemented in the [`Cpu::clock`] method.
 
-use boytacean_common::{
-    data::{read_u16, read_u8, write_u16, write_u8},
-    error::Error,
-    util::SharedThread,
-};
 use std::{
     fmt::{self, Display, Formatter},
     io::Cursor,
     sync::Mutex,
+};
+
+use boytacean_common::{
+    data::{read_u16, read_u8, write_u16, write_u8},
+    error::Error,
+    util::SharedThread,
 };
 
 use crate::{
@@ -741,9 +742,8 @@ mod tests {
 
     use boytacean_common::util::SharedThread;
 
-    use crate::{gb::GameBoyConfig, mmu::Mmu, state::StateComponent};
-
     use super::Cpu;
+    use crate::{gb::GameBoyConfig, mmu::Mmu, state::StateComponent};
 
     /// Tests that the CPU is able to execute instructions and
     /// that the state is updated correctly.

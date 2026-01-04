@@ -6,15 +6,6 @@
 //! The [BESS](https://github.com/LIJI32/SameBoy/blob/master/BESS.md) format is a format developed by the [SameBoy](https://sameboy.github.io/) emulator and is used to store the emulator state
 //! in agnostic and compatible way.
 
-use boytacean_common::{
-    data::{
-        read_bytes, read_into, read_u16, read_u32, read_u64, read_u8, write_bytes, write_u16,
-        write_u32, write_u64, write_u8,
-    },
-    error::Error,
-    util::{save_bmp, timestamp},
-};
-use boytacean_encoding::zippy::{decode_zippy, encode_zippy};
 use std::{
     convert::TryInto,
     fmt::{self, Display, Formatter},
@@ -24,6 +15,18 @@ use std::{
     vec,
 };
 
+use boytacean_common::{
+    data::{
+        read_bytes, read_into, read_u16, read_u32, read_u64, read_u8, write_bytes, write_u16,
+        write_u32, write_u64, write_u8,
+    },
+    error::Error,
+    util::{save_bmp, timestamp},
+};
+use boytacean_encoding::zippy::{decode_zippy, encode_zippy};
+#[cfg(feature = "wasm")]
+use wasm_bindgen::prelude::*;
+
 use crate::{
     disable_pedantic, enable_pedantic,
     gb::{GameBoy, GameBoyDevice, GameBoyMode, GameBoySpeed},
@@ -31,9 +34,6 @@ use crate::{
     ppu::{DISPLAY_HEIGHT, DISPLAY_WIDTH, FRAME_BUFFER_SIZE},
     rom::{CgbMode, MbcType},
 };
-
-#[cfg(feature = "wasm")]
-use wasm_bindgen::prelude::*;
 
 /// Magic string for the BOSC (Boytacean Save Compressed) format.
 pub const BOSC_MAGIC: &str = "BOSC";
@@ -2345,12 +2345,11 @@ impl StateManager {
 mod tests {
     use boytacean_encoding::zippy::{decode_zippy, encode_zippy};
 
+    use super::{BessCore, SaveStateFormat, StateManager};
     use crate::{
         gb::GameBoy,
         state::{FromGbOptions, State},
     };
-
-    use super::{BessCore, SaveStateFormat, StateManager};
 
     #[test]
     fn test_bess_core() {

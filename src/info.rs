@@ -1,14 +1,12 @@
 //! General information about the crate and the emulator.
 
 use boytacean_common::util::capitalize;
-
-use crate::gen::{COMPILATION_DATE, COMPILATION_TIME, COMPILER, COMPILER_VERSION, NAME, VERSION};
-
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
 
 #[cfg(feature = "wasm")]
 use crate::gen::dependencies_map;
+use crate::gen::{COMPILATION_DATE, COMPILATION_TIME, COMPILER, COMPILER_VERSION, NAME, VERSION};
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 pub struct Info;

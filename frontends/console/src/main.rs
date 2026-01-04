@@ -1,10 +1,11 @@
+use std::{env::current_dir, error::Error, time::Instant};
+
 use boytacean::{
     color::RGB_SIZE,
     gb::{GameBoy, GameBoyMode},
     ppu::{DISPLAY_HEIGHT, DISPLAY_WIDTH, FRAME_BUFFER_SIZE},
 };
 use clap::Parser;
-use std::{env::current_dir, error::Error, time::Instant};
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]

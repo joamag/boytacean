@@ -1,3 +1,25 @@
+use std::{
+    collections::HashMap,
+    ffi::CStr,
+    fmt::{self, Display, Formatter},
+    os::raw::{c_char, c_uint, c_void},
+    ptr::{self, addr_of},
+    slice::from_raw_parts,
+};
+
+use boytacean::{
+    color::XRGB8888_SIZE,
+    debugln,
+    gb::{AudioProvider, GameBoy},
+    info::Info,
+    infoln,
+    pad::PadKey,
+    ppu::{DISPLAY_HEIGHT, DISPLAY_WIDTH, FRAME_BUFFER_SIZE},
+    rom::Cartridge,
+    state::{SaveStateFormat, StateManager},
+    warnln,
+};
+
 use crate::{
     consts::{
         REGION_NTSC, RETRO_API_VERSION, RETRO_DEVICE_ID_JOYPAD_A, RETRO_DEVICE_ID_JOYPAD_B,
@@ -16,26 +38,6 @@ use crate::{
         RetroGameInfo, RetroGameInfoExt, RetroSystemAvInfo, RetroSystemContentInfoOverride,
         RetroSystemInfo, RetroVariable,
     },
-};
-use boytacean::{
-    color::XRGB8888_SIZE,
-    debugln,
-    gb::{AudioProvider, GameBoy},
-    info::Info,
-    infoln,
-    pad::PadKey,
-    ppu::{DISPLAY_HEIGHT, DISPLAY_WIDTH, FRAME_BUFFER_SIZE},
-    rom::Cartridge,
-    state::{SaveStateFormat, StateManager},
-    warnln,
-};
-use std::{
-    collections::HashMap,
-    ffi::CStr,
-    fmt::{self, Display, Formatter},
-    os::raw::{c_char, c_uint, c_void},
-    ptr::{self, addr_of},
-    slice::from_raw_parts,
 };
 
 /// Represents the information about the LibRetro extension

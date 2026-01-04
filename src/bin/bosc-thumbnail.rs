@@ -7,8 +7,9 @@
 //! # Usage
 //! bosc-thumbnail <bosc_file> \[thumbnail_file\]
 
-use boytacean::state::{SaveStateFormat, StateManager};
 use std::{env::args, error::Error, fs::File, io::Read, path::Path};
+
+use boytacean::state::{SaveStateFormat, StateManager};
 
 fn print_usage() {
     println!("Usage: bosc-thumbnail <bosc_file> [thumbnail_file]");

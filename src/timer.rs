@@ -209,7 +209,6 @@ impl Default for Timer {
 #[cfg(test)]
 mod tests {
     use super::Timer;
-
     use crate::state::StateComponent;
 
     #[test]

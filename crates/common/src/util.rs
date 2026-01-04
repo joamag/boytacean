@@ -12,10 +12,10 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use crate::error::Error;
-
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
+
+use crate::error::Error;
 
 /// Shared mutable type able to be passed between types
 /// allowing for circular referencing and interior mutability.

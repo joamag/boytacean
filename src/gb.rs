@@ -17,16 +17,24 @@
 //! println!("Ran {} cycles", cycles);
 //! ```
 
-use boytacean_common::{
-    error::Error,
-    util::{read_file, SharedThread},
-};
 use std::{
     collections::VecDeque,
     fmt::{self, Display, Formatter},
     io::Read,
     sync::{Arc, Mutex},
 };
+#[cfg(feature = "wasm")]
+use std::{
+    convert::TryInto,
+    panic::{set_hook, take_hook, PanicInfo},
+};
+
+use boytacean_common::{
+    error::Error,
+    util::{read_file, SharedThread},
+};
+#[cfg(feature = "wasm")]
+use wasm_bindgen::prelude::*;
 
 use crate::{
     apu::{Apu, HighPassFilter},
@@ -49,18 +57,8 @@ use crate::{
     serial::{NullDevice, Serial, SerialDevice},
     timer::Timer,
 };
-
-#[cfg(feature = "wasm")]
-use wasm_bindgen::prelude::*;
-
 #[cfg(feature = "wasm")]
 use crate::{color::Pixel, ppu::Palette};
-
-#[cfg(feature = "wasm")]
-use std::{
-    convert::TryInto,
-    panic::{set_hook, take_hook, PanicInfo},
-};
 
 /// Enumeration that describes the multiple running
 /// modes of the Game Boy emulator.

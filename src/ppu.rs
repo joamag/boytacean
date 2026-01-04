@@ -4,11 +4,6 @@
 //! graphics on the handheld's screen. It handles the drawing of sprites and
 //! backgrounds using tile-based graphics.
 
-use boytacean_common::{
-    data::{read_into, read_u16, read_u8, write_bytes, write_u16, write_u8},
-    error::Error,
-    util::SharedThread,
-};
 use core::fmt;
 use std::{
     borrow::BorrowMut,
@@ -18,6 +13,14 @@ use std::{
     io::Cursor,
     sync::{Arc, Mutex},
 };
+
+use boytacean_common::{
+    data::{read_into, read_u16, read_u8, write_bytes, write_u16, write_u8},
+    error::Error,
+    util::SharedThread,
+};
+#[cfg(feature = "wasm")]
+use wasm_bindgen::prelude::*;
 
 use crate::{
     assert_pedantic_gb,
@@ -36,9 +39,6 @@ use crate::{
     state::{StateComponent, StateFormat},
     warnln,
 };
-
-#[cfg(feature = "wasm")]
-use wasm_bindgen::prelude::*;
 
 pub const VRAM_SIZE_DMG: usize = 8192;
 pub const VRAM_SIZE_CGB: usize = 16384;
@@ -2406,14 +2406,13 @@ impl Default for Ppu {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        gb::GameBoyMode,
-        state::{StateComponent, StateFormat},
-    };
-
     use super::{
         ObjectData, Ppu, PpuMode, Tile, COLOR_BUFFER_SIZE, FRAME_BUFFER_SIZE, HRAM_SIZE, OAM_SIZE,
         OBJ_COUNT, SHADE_BUFFER_SIZE, TILE_COUNT, VRAM_SIZE,
+    };
+    use crate::{
+        gb::GameBoyMode,
+        state::{StateComponent, StateFormat},
     };
 
     #[test]

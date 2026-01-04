@@ -1,6 +1,7 @@
+use std::{env, error::Error, process};
+
 use boytacean_common::util::{read_file, write_file};
 use boytacean_encoding::zippy::encode_zippy;
-use std::{env, error::Error, process};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = env::args().collect();
