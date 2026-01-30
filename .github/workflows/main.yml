@@ -317,5 +317,5 @@ jobs:
       - name: Build all documentation
         run: cargo doc --all --all-features
         env:
-          PYO3_USE_ABI3_FORWARD_COMPATIBILITY: 1 
+          PYO3_USE_ABI3_FORWARD_COMPATIBILITY: 1
         if: matrix.rust-image == 'rustlang/rust:nightly'
