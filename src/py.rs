@@ -1,4 +1,9 @@
-use pyo3::{exceptions::PyException, prelude::*, types::PyBytes, types::PyModule, Bound};
+use pyo3::{
+    exceptions::PyException,
+    prelude::*,
+    types::{PyBytes, PyModule},
+    Bound,
+};
 
 use crate::{
     gb::{GameBoy as GameBoyBase, GameBoyMode},
