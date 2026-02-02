@@ -14,6 +14,7 @@ struct GameBoy {
     system: GameBoyBase,
 }
 
+#[allow(non_local_definitions)]
 #[pymethods]
 impl GameBoy {
     #[new]
