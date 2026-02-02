@@ -10,6 +10,7 @@ Cargo.lock
 /.eggs
 /.venv
 /.idea
+/.claude
 
 /ndk
 /dist

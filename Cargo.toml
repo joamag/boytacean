@@ -31,7 +31,7 @@ boytacean-encoding = { path = "crates/encoding", version = "0.11.5" }
 boytacean-hashing = { path = "crates/hashing", version = "0.11.5" }
 wasm-bindgen = { version = "0.2", optional = true }
 js-sys = { version = "0.3", optional = true }
-pyo3 = { version = "0.20", optional = true }
+pyo3 = { version = "0.23", optional = true }
 
 [dev-dependencies]
 criterion = "0.5"
