@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Shader program was not applied to SDL output
 * SDL shader rendering failed due to lifetime issues
 * SDL shader context version mismatch caused blank output
+* Major issue with the VBlank STAT, should fix many visual glitches in games
 
 ## [0.11.5] - 2025-03-18
 

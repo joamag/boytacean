@@ -926,10 +926,10 @@ impl Ppu {
                         self.window_counter = 0;
                         self.first_frame = false;
                         self.frame_index = self.frame_index.wrapping_add(1);
-                        self.update_stat()
                     }
 
                     self.mode_clock -= 456;
+                    self.update_stat()
                 }
             }
         }
