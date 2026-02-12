@@ -631,7 +631,7 @@ impl Cartridge {
         self.rom_offset = 0x4000;
         self.ram_offset = 0x0000;
         self.set_mbc()?;
-        self.set_computed();
+        self.set_computed(true);
         self.set_title_offset();
         self.allocate_ram();
         self.set_rom_bank(1);
@@ -645,8 +645,28 @@ impl Cartridge {
         Ok(())
     }
 
-    fn set_computed(&mut self) {
-        self.rom_bank_count = self.rom_size().rom_banks();
+    fn set_computed(&mut self, fix: bool) {
+        let mut rom_banks = self.rom_size().rom_banks();
+
+        // in case the fix flag is set we'll check the length of the ROM
+        // data to try to infer the number of ROM banks, this will allow
+        // us to circumvent some bugs in the header of ROMs, which is common
+        // especially in the Homebrew ROM scene
+        if fix {
+            let header_rom_banks = rom_banks;
+            let actual_rom_banks = (self.rom_data.len() / ROM_BANK_SIZE) as u16;
+            rom_banks = max(header_rom_banks, actual_rom_banks);
+            rom_banks = rom_banks.next_power_of_two();
+            if actual_rom_banks > header_rom_banks && header_rom_banks > 0 {
+                warnln!(
+                    "ROM header declares {} banks but file contains {} banks, using actual size",
+                    header_rom_banks,
+                    actual_rom_banks
+                );
+            }
+        }
+
+        self.rom_bank_count = rom_banks;
         self.ram_bank_count = self.ram_size().ram_banks();
     }
 
