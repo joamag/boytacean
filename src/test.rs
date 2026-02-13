@@ -156,8 +156,8 @@ mod tests {
         assert_eq!(result.ppu().read(BGP_ADDR), 0xfc);
         assert_eq!(result.ppu().read(OBP0_ADDR), 0x00);
         assert_eq!(result.ppu().read(OBP1_ADDR), 0x00);
-        assert_eq!(result.ppu().read(WX_ADDR), 0x00);
         assert_eq!(result.ppu().read(WY_ADDR), 0x00);
+        assert_eq!(result.ppu().read(WX_ADDR), 0x00);
 
         assert_eq!(result.ppu().read(DMA_ADDR), 0xff);
     }

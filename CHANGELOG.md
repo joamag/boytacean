@@ -23,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * SDL shader rendering failed due to lifetime issues
 * SDL shader context version mismatch caused blank output
 * Major issue with the VBlank STAT, should fix many visual glitches in games
+* Issues with the LCD STAT interrupt not triggering correctly due to incorrect handling of the internal STAT line state and edge detection
+* WX and WY constants address in the code
 
 ## [0.11.5] - 2025-03-18
 
