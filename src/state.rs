@@ -209,9 +209,28 @@ impl From<u8> for BosBlockKind {
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 pub struct FromGbOptions {
+    /// If true, the state will include a thumbnail of the
+    /// current frame buffer.
+    ///
+    /// This will increase the size of the state, but will
+    /// allow to have a preview of the state without having
+    /// to load it into the emulator.
     thumbnail: bool,
+
+    /// Defines the format to be used in the storage
+    /// of the state data (controls size of the state).
     state_format: Option<StateFormat>,
+
+    /// Name of the agent that is creating the state.
+    ///
+    /// If defined it's expected to have this value stored as
+    /// part of the state.
     agent: Option<String>,
+
+    /// Version of the agent that is creating the state.
+    ///
+    /// If defined it's expected to have this value stored as
+    /// part of the state.
     agent_version: Option<String>,
 }
 
@@ -245,18 +264,27 @@ impl Default for FromGbOptions {
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 pub struct ToGbOptions {
+    /// If set the emulator the Game Boy emulator is
+    /// going to be rebooted, before the state is set.
     reload: bool,
+
+    /// If set the device specific data will be loaded
+    /// into the current emuator machine.
+    devices: bool,
 }
 
 impl ToGbOptions {
-    pub fn new(reload: bool) -> Self {
-        Self { reload }
+    pub fn new(reload: bool, devices: bool) -> Self {
+        Self { reload, devices }
     }
 }
 
 impl Default for ToGbOptions {
     fn default() -> Self {
-        Self { reload: true }
+        Self {
+            reload: true,
+            devices: true,
+        }
     }
 }
 
@@ -613,8 +641,10 @@ impl StateBox for BosState {
     fn to_gb(&self, gb: &mut GameBoy, options: &ToGbOptions) -> Result<(), Error> {
         self.verify()?;
         self.bess.to_gb(gb, options)?;
-        for device_state in &self.device_states {
-            device_state.to_gb(gb, options)?;
+        if options.devices {
+            for device_state in &self.device_states {
+                device_state.to_gb(gb, options)?;
+            }
         }
         Ok(())
     }
