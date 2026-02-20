@@ -370,12 +370,40 @@ impl Mmu {
         }
     }
 
+    /// Reads a value from the memory at the given address.
+    ///
+    /// This function is optimized for speed by using branch
+    /// prediction hints and a switch statement to handle
+    /// the different memory regions.
+    ///
+    /// # Arguments
+    /// * `addr` - The address to read from.
+    ///
+    /// # Returns
+    /// The value read from the memory at the given address.
+    #[inline(always)]
     pub fn read(&self, addr: u16) -> u8 {
-        match addr {
-            // 0x0000-0x0FFF - BOOT (256 B) + ROM0 (4 KB/16 KB)
-            0x0000..=0x0fff => {
-                // in case the boot mode is active and the
-                // address is withing boot memory reads from it
+        // fast path for RAM access (most common)
+        if (0xc000..=0xfdff).contains(&addr) {
+            return match addr {
+                // 0xC000-0xCFFF - Work RAM (4 KB)
+                0xc000..=0xcfff => self.ram[(addr & 0x0fff) as usize],
+
+                // 0xD000-0xDFFF - Work RAM (4 KB)
+                0xd000..=0xdfff => self.ram[(self.ram_offset + (addr & 0x0fff)) as usize],
+
+                // 0xE000-0xFDFF - Echo RAM (4 KB)
+                0xe000..=0xfdff => self.ram[(addr & 0x1fff) as usize],
+
+                _ => unreachable!(),
+            };
+        }
+
+        // fast path for ROM access (second most common)
+        if addr <= 0x7fff {
+            // 0x0000-0x00FF - Boot ROM (256 bytes)
+            if addr <= 0x0fff {
+                // boot ROM handling for first 4KB
                 if self.boot_active && addr <= 0x00ff {
                     return self.boot[addr as usize];
                 }
@@ -385,27 +413,24 @@ impl Mmu {
                 {
                     return self.boot[addr as usize];
                 }
-                self.rom.read(addr)
             }
 
             // 0x1000-0x3FFF - ROM 0 (12 KB/16 KB)
             // 0x4000-0x7FFF - ROM 1 (Banked) (16 KB)
-            0x1000..=0x7fff => self.rom.read(addr),
+            return self.rom.read(addr);
+        }
 
+        // slower path for I/O and special regions, uses
+        // a switch statement to handle the different memory
+        // regions, this is done to avoid the use of if-else
+        // statements which are not optimized by the compiler
+        // for this kind of use case.
+        match addr {
             // 0x8000-0x9FFF - Graphics: VRAM (8 KB)
             0x8000..=0x9fff => self.ppu.read(addr),
 
             // 0xA000-0xBFFF - External RAM (8 KB)
             0xa000..=0xbfff => self.rom.read(addr),
-
-            // 0xC000-0xCFFF - Working RAM 0 (4 KB)
-            0xc000..=0xcfff => self.ram[(addr & 0x0fff) as usize],
-
-            // 0xD000..=0xDFFF - Working RAM 1 (Banked) (4KB)
-            0xd000..=0xdfff => self.ram[(self.ram_offset + (addr & 0x0fff)) as usize],
-
-            // 0xE000..=0xFDFF - Working RAM Shadow
-            0xe000..=0xfdff => self.ram[(addr & 0x1fff) as usize],
 
             // 0xFE00-0xFE9F - Object attribute memory (OAM)
             0xfe00..=0xfe9f => self.ppu.read(addr),
@@ -483,27 +508,52 @@ impl Mmu {
         }
     }
 
+    /// Writes a value to the memory at the given address.
+    ///
+    /// This function is optimized for speed by using branch
+    /// prediction hints and a switch statement to handle
+    /// the different memory regions.
+    ///
+    /// # Arguments
+    /// * `addr` - The address to write to.
+    /// * `value` - The value to write to the memory.
+    #[inline(always)]
     pub fn write(&mut self, addr: u16, value: u8) {
-        match addr {
-            // 0x0000-0x0FFF - BOOT (256 B) + ROM0 (4 KB/16 KB)
-            // 0x1000-0x3FFF - ROM 0 (12 KB/16 KB)
-            // 0x4000-0x7FFF - ROM 1 (Banked) (16 KB)
-            0x0000..=0x7fff => self.rom.write(addr, value),
+        // fast path for RAM writes (most common)
+        if (0xc000..=0xfdff).contains(&addr) {
+            match addr {
+                // 0xC000-0xCFFF - Work RAM (4 KB)
+                0xc000..=0xcfff => self.ram[(addr & 0x0fff) as usize] = value,
 
+                // 0xD000-0xDFFF - Work RAM (4 KB)
+                0xd000..=0xdfff => self.ram[(self.ram_offset + (addr & 0x0fff)) as usize] = value,
+
+                // 0xE000-0xFDFF - Echo RAM (4 KB)
+                0xe000..=0xfdff => self.ram[(addr & 0x1fff) as usize] = value,
+
+                _ => unreachable!(),
+            }
+            return;
+        }
+
+        // fast path for ROM writes (cartridge control)
+        // 0x0000-0x00FF - BOOT (256 B) + ROM0 (4 KB/16 KB)
+        // 0x1000-0x3FFF - ROM 0 (12 KB/16 KB)
+        // 0x4000-0x7FFF - ROM 1 (Banked) (16 KB)
+        // 0xA000-0xBFFF - External RAM (8 KB)
+        if addr <= 0x7fff || (0xa000..=0xbfff).contains(&addr) {
+            self.rom.write(addr, value);
+            return;
+        }
+
+        // slower path for I/O and special regions, uses
+        // a switch statement to handle the different memory
+        // regions, this is done to avoid the use of if-else
+        // statements which are not optimized by the compiler
+        // for this kind of use case.
+        match addr {
             // 0x8000-0x9FFF - Graphics: VRAM (8 KB)
             0x8000..=0x9fff => self.ppu.write(addr, value),
-
-            // 0xA000-0xBFFF - External RAM (8 KB)
-            0xa000..=0xbfff => self.rom.write(addr, value),
-
-            // 0xC000-0xCFFF - Working RAM 0 (4 KB)
-            0xc000..=0xcfff => self.ram[(addr & 0x0fff) as usize] = value,
-
-            // 0xD000..=0xDFFF - Working RAM 1 (Banked) (4KB)
-            0xd000..=0xdfff => self.ram[(self.ram_offset + (addr & 0x0fff)) as usize] = value,
-
-            // 0xE000..=0xFDFF - Working RAM Shadow
-            0xe000..=0xfdff => self.ram[(addr & 0x1fff) as usize] = value,
 
             // 0xFE00-0xFE9F - Object attribute memory (OAM)
             0xfe00..=0xfe9f => self.ppu.write(addr, value),
