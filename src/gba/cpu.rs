@@ -374,20 +374,12 @@ impl Arm7Tdmi {
         self.set_cpsr(spsr);
     }
 
-    /// swaps banked registers when changing CPU mode
-    fn swap_banked_registers(&mut self, old_mode: u32, new_mode: u32) {
-        // save current registers to old mode's bank
-        self.save_banked(old_mode);
-        // restore new mode's banked registers
-        self.restore_banked(new_mode);
-    }
-
     fn save_banked(&mut self, mode: u32) {
         match mode {
             MODE_FIQ => {
-                for i in 0..7 {
-                    self.banked.fiq[i] = self.regs[8 + i];
-                }
+                // R8-R12 handled by swap_banked_registers, only save R13-R14
+                self.banked.fiq[5] = self.regs[13];
+                self.banked.fiq[6] = self.regs[14];
             }
             MODE_IRQ => {
                 self.banked.irq[0] = self.regs[13];
@@ -408,9 +400,6 @@ impl Arm7Tdmi {
                 self.banked.und[1] = self.regs[14];
             }
             MODE_USR | MODE_SYS => {
-                for i in 0..5 {
-                    self.banked.usr[i] = self.regs[8 + i];
-                }
                 self.banked.usr[5] = self.regs[13];
                 self.banked.usr[6] = self.regs[14];
             }
@@ -421,15 +410,9 @@ impl Arm7Tdmi {
     fn restore_banked(&mut self, mode: u32) {
         match mode {
             MODE_FIQ => {
-                // save USR R8-R12 first
-                for i in 0..5 {
-                    self.banked.usr[i] = self.regs[8 + i];
-                }
-                self.banked.usr[5] = self.regs[13];
-                self.banked.usr[6] = self.regs[14];
-                for i in 0..7 {
-                    self.regs[8 + i] = self.banked.fiq[i];
-                }
+                // R8-R12 handled by swap_banked_registers, only restore R13-R14
+                self.regs[13] = self.banked.fiq[5];
+                self.regs[14] = self.banked.fiq[6];
             }
             MODE_IRQ => {
                 self.regs[13] = self.banked.irq[0];
@@ -448,14 +431,37 @@ impl Arm7Tdmi {
                 self.regs[14] = self.banked.und[1];
             }
             MODE_USR | MODE_SYS => {
-                for i in 0..5 {
-                    self.regs[8 + i] = self.banked.usr[i];
-                }
                 self.regs[13] = self.banked.usr[5];
                 self.regs[14] = self.banked.usr[6];
             }
             _ => {}
         }
+    }
+
+    /// handles R8-R12 banking when switching between FIQ and non-FIQ modes
+    fn swap_banked_registers(&mut self, old_mode: u32, new_mode: u32) {
+        let was_fiq = old_mode == MODE_FIQ;
+        let is_fiq = new_mode == MODE_FIQ;
+
+        // save R8-R12 only when leaving FIQ (to FIQ bank) or entering FIQ (to USR bank)
+        if was_fiq && !is_fiq {
+            // leaving FIQ: save FIQ R8-R12, restore USR R8-R12
+            for i in 0..5 {
+                self.banked.fiq[i] = self.regs[8 + i];
+                self.regs[8 + i] = self.banked.usr[i];
+            }
+        } else if !was_fiq && is_fiq {
+            // entering FIQ: save USR R8-R12, restore FIQ R8-R12
+            for i in 0..5 {
+                self.banked.usr[i] = self.regs[8 + i];
+                self.regs[8 + i] = self.banked.fiq[i];
+            }
+        }
+
+        // save R13-R14 to old mode's bank
+        self.save_banked(old_mode);
+        // restore R13-R14 from new mode's bank
+        self.restore_banked(new_mode);
     }
 
     // barrel shifter operations
