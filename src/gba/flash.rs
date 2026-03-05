@@ -257,9 +257,7 @@ fn detect_from_rom(rom: &[u8]) -> SaveType {
 
 /// simple byte pattern search
 fn find_bytes(haystack: &[u8], needle: &[u8]) -> Option<usize> {
-    haystack
-        .windows(needle.len())
-        .position(|w| w == needle)
+    haystack.windows(needle.len()).position(|w| w == needle)
 }
 
 #[cfg(test)]
@@ -542,7 +540,7 @@ mod tests {
         // start a command but send wrong second byte
         save.write8(0x0E00_5555, 0xAA);
         save.write8(0x0E00_0000, 0x55); // wrong address, should reset
-        // now try a normal write - should still require full command
+                                        // now try a normal write - should still require full command
         save.write8(0x0E00_5555, 0xAA);
         save.write8(0x0E00_2AAA, 0x55);
         save.write8(0x0E00_5555, 0xA0);
