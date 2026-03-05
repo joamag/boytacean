@@ -36,14 +36,14 @@ pub fn execute_arm(cpu: &mut Arm7Tdmi, instr: u32) {
             } else if bits_7_4 & 0x09 == 0x09 && bits_7_4 & 0x06 != 0x00 {
                 // halfword/signed data transfer
                 arm_halfword_transfer(cpu, instr);
-            } else if bits_27_20 & 0xFB == 0x10 && bits_7_4 == 0x01 {
-                // branch and exchange (BX)
+            } else if bits_27_20 == 0x12 && bits_7_4 == 0x01 {
+                // branch and exchange (BX): 0001 0010 ... 0001
                 arm_branch_exchange(cpu, instr);
-            } else if bits_27_20 & 0xFB == 0x10 && bits_7_4 == 0x00 {
-                // MRS (transfer PSR to register)
+            } else if (bits_27_20 == 0x10 || bits_27_20 == 0x14) && bits_7_4 == 0x00 {
+                // MRS: 0001 0x00 ... 0000
                 arm_mrs(cpu, instr);
-            } else if bits_27_20 & 0xFB == 0x12 && bits_7_4 == 0x00 {
-                // MSR (transfer register to PSR)
+            } else if (bits_27_20 == 0x12 || bits_27_20 == 0x16) && bits_7_4 == 0x00 {
+                // MSR (register): 0001 0x10 ... 0000
                 arm_msr_reg(cpu, instr);
             } else {
                 // data processing

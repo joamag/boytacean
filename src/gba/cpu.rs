@@ -253,13 +253,21 @@ impl Arm7Tdmi {
         self.pipeline_valid = true;
     }
 
-    /// fetches the next instruction from the pipeline
+    /// fetches the next instruction from the pipeline without advancing PC.
+    /// The PC advance happens after instruction execution in `step()`.
     fn fetch(&mut self) -> u32 {
         if !self.pipeline_valid {
             self.fill_pipeline();
         }
 
-        let instr = self.pipeline[0];
+        // return the current instruction from the pipeline
+        // at this point regs[15] = instruction_address + 8 (ARM) or + 4 (Thumb)
+        // which is the correct value for reading R15 during execution
+        self.pipeline[0]
+    }
+
+    /// advances the pipeline after instruction execution
+    fn advance_pipeline(&mut self) {
         self.pipeline[0] = self.pipeline[1];
 
         if self.in_thumb_mode() {
@@ -269,8 +277,6 @@ impl Arm7Tdmi {
             self.pipeline[1] = self.bus.read32(self.regs[15]);
             self.regs[15] = self.regs[15].wrapping_add(4);
         }
-
-        instr
     }
 
     /// executes a single CPU instruction and returns the number of cycles consumed
@@ -293,6 +299,11 @@ impl Arm7Tdmi {
             execute_thumb(self, instr as u16);
         } else {
             execute_arm(self, instr);
+        }
+
+        // advance the pipeline only if it wasn't flushed (branch/exception)
+        if self.pipeline_valid {
+            self.advance_pipeline();
         }
 
         if self.cycles == 0 {
