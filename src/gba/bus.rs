@@ -973,10 +973,7 @@ mod tests {
         let mut rom = vec![0u8; 512];
         rom[0x100..0x106].copy_from_slice(b"SRAM_V");
         bus.load_rom(&rom);
-        assert_eq!(
-            bus.save.save_type(),
-            crate::gba::flash::SaveType::Sram
-        );
+        assert_eq!(bus.save.save_type(), crate::gba::flash::SaveType::Sram);
     }
 
     #[test]
