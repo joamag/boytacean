@@ -10,6 +10,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 * `README.md` for the `boytacean-react` package, documenting the components, props, hooks and keys, with a quick start, a complete emulation page example and copy and paste instructions to build one from scratch
+* Game Boy Advance (GBA) emulation with ARM7TDMI CPU (ARM and Thumb instruction sets)
+* GBA scanline-based PPU supporting video modes 0-5 with text and affine backgrounds
+* GBA APU with 4 legacy channels and 2 DirectSound PCM FIFO channels
+* GBA DMA controller with 4 channels and priority-based transfers
+* GBA timer hardware with prescaler and cascade support
+* GBA keypad input handling with interrupt control (KEYINPUT/KEYCNT)
+* GBA BIOS HLE for common SWI calls (Div, Sqrt, CpuSet, LZ77, RLUnComp, etc.)
+* GBA interrupt controller (IE, IF, IME) with per-source enable/acknowledge
+* GBA ROM header parsing, checksum validation, and auto-detection via fixed byte
+* `System` enum for unified frontend integration of Game Boy and GBA emulators
+* `PadKey::L` and `PadKey::R` shoulder button variants for GBA input
 
 ### Changed
 
