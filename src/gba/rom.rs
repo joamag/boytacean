@@ -5,12 +5,10 @@ use std::fmt::{self, Display, Formatter};
 use boytacean_common::error::Error;
 
 /// GBA ROM header offsets
-const HEADER_ENTRY_POINT: usize = 0x000;
 const HEADER_TITLE: usize = 0x0A0;
 const HEADER_GAME_CODE: usize = 0x0AC;
 const HEADER_MAKER_CODE: usize = 0x0B0;
 const HEADER_FIXED_VALUE: usize = 0x0B2;
-const HEADER_UNIT_CODE: usize = 0x0B3;
 const HEADER_SOFTWARE_VERSION: usize = 0x0BC;
 const HEADER_CHECKSUM: usize = 0x0BD;
 

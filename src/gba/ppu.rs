@@ -15,6 +15,7 @@ pub const OBJ_COUNT: usize = 128;
 pub const BG_COUNT: usize = 4;
 
 /// pixel type: index into the line buffer priority system
+#[allow(dead_code)]
 #[derive(Clone, Copy, Default)]
 struct PixelEntry {
     color: u16,
@@ -589,6 +590,7 @@ impl GbaPpu {
     }
 
     /// renders a text background layer into the line buffer
+    #[allow(clippy::too_many_arguments)]
     fn render_text_bg(
         &self,
         bg_index: usize,
@@ -887,7 +889,7 @@ impl GbaPpu {
                         obj_base + tile_offset * 32 + (pixel_y % 8) * 4 + (px % 8) / 2;
                     if byte_offset < vram.len() {
                         let byte = vram[byte_offset];
-                        if px % 8 & 1 == 0 {
+                        if (px % 8) & 1 == 0 {
                             (byte & 0x0F) as usize
                         } else {
                             ((byte >> 4) & 0x0F) as usize
