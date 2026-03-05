@@ -20,7 +20,6 @@ Cargo.lock
 /target
 /reports
 /aarch64-linux-gnu
-/res/roms.gba
 /res/roms.prop
 /res/roms.gba/prop
 /frontends/*/target
