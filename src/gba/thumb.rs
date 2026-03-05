@@ -670,7 +670,11 @@ fn thumb_ldm_stm(cpu: &mut Arm7Tdmi, instr: u16) {
 
     cpu.set_reg(rb, addr);
 
-    cpu.cycles = 2 + if empty_rlist { 16 } else { reg_list.count_ones() };
+    cpu.cycles = 2 + if empty_rlist {
+        16
+    } else {
+        reg_list.count_ones()
+    };
 }
 
 /// format 16: conditional branch
