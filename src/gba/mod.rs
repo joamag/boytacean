@@ -10,6 +10,7 @@ pub mod bios;
 pub mod bus;
 pub mod consts;
 pub mod cpu;
+pub mod diag;
 pub mod dma;
 pub mod irq;
 pub mod pad;
@@ -36,7 +37,7 @@ use crate::pad::PadKey;
 /// Should serve as the main entry-point API.
 pub struct GameBoyAdvance {
     /// the ARM7TDMI CPU (includes the memory bus)
-    cpu: Arm7Tdmi,
+    pub cpu: Arm7Tdmi,
 
     /// frame counter tracking completed frames
     frame: u64,
