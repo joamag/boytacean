@@ -17,9 +17,10 @@ use crate::gba::{
         REG_KEYINPUT, REG_MOSAIC, REG_POSTFLG, REG_SOUNDBIAS, REG_SOUNDCNT_H, REG_SOUNDCNT_L,
         REG_SOUNDCNT_X, REG_TM0CNT_H, REG_TM0CNT_L, REG_TM1CNT_H, REG_TM1CNT_L, REG_TM2CNT_H,
         REG_TM2CNT_L, REG_TM3CNT_H, REG_TM3CNT_L, REG_VCOUNT, REG_WAITCNT, REG_WAVE_RAM, REG_WIN0H,
-        REG_WIN0V, REG_WIN1H, REG_WIN1V, REG_WININ, REG_WINOUT, SRAM_SIZE, VRAM_SIZE,
+        REG_WIN0V, REG_WIN1H, REG_WIN1V, REG_WININ, REG_WINOUT, VRAM_SIZE,
     },
     dma::GbaDma,
+    flash::SaveMedia,
     irq::IrqController,
     pad::GbaPad,
     ppu::GbaPpu,
@@ -51,8 +52,8 @@ pub struct GbaBus {
     /// cartridge ROM data
     pub rom: Vec<u8>,
 
-    /// SRAM (64KB, optional)
-    pub sram: Vec<u8>,
+    /// cartridge save media (SRAM/Flash)
+    pub save: SaveMedia,
 
     /// PPU
     pub ppu: GbaPpu,
@@ -95,7 +96,7 @@ impl GbaBus {
             vram: vec![0u8; VRAM_SIZE],
             oam: vec![0u8; OAM_SIZE],
             rom: Vec::new(),
-            sram: vec![0xFFu8; SRAM_SIZE],
+            save: SaveMedia::new(),
             ppu: GbaPpu::new(),
             apu: GbaApu::new(),
             dma: GbaDma::new(),
@@ -166,6 +167,7 @@ impl GbaBus {
 
     pub fn load_rom(&mut self, data: &[u8]) {
         self.rom = data.to_vec();
+        self.save.detect_save_type(data);
     }
 
     // 8-bit read
@@ -196,14 +198,7 @@ impl GbaBus {
                     0
                 }
             }
-            0x0E..=0x0F => {
-                let offset = (addr & 0xFFFF) as usize;
-                if offset < self.sram.len() {
-                    self.sram[offset]
-                } else {
-                    0
-                }
-            }
+            0x0E..=0x0F => self.save.read8(addr),
             _ => 0,
         }
     }
@@ -250,14 +245,9 @@ impl GbaBus {
                 }
             }
             0x0E..=0x0F => {
-                // sram is 8-bit bus; 16-bit reads duplicate the byte
-                let offset = (addr & 0xFFFF) as usize;
-                if offset < self.sram.len() {
-                    let b = self.sram[offset] as u16;
-                    b | (b << 8)
-                } else {
-                    0
-                }
+                // 8-bit bus; 16-bit reads duplicate the byte
+                let b = self.save.read8(addr) as u16;
+                b | (b << 8)
             }
             _ => 0,
         }
@@ -344,14 +334,9 @@ impl GbaBus {
                 }
             }
             0x0E..=0x0F => {
-                // sram is 8-bit bus; 32-bit reads duplicate the byte
-                let offset = (addr & 0xFFFF) as usize;
-                if offset < self.sram.len() {
-                    let b = self.sram[offset] as u32;
-                    b * 0x01010101
-                } else {
-                    0
-                }
+                // 8-bit bus; 32-bit reads duplicate the byte
+                let b = self.save.read8(addr) as u32;
+                b * 0x01010101
             }
             _ => 0,
         }
@@ -376,12 +361,7 @@ impl GbaBus {
                 self.vram[aligned] = value;
                 self.vram[aligned + 1] = value;
             }
-            0x0E..=0x0F => {
-                let offset = (addr & 0xFFFF) as usize;
-                if offset < self.sram.len() {
-                    self.sram[offset] = value;
-                }
-            }
+            0x0E..=0x0F => self.save.write8(addr, value),
             _ => {}
         }
     }
@@ -419,11 +399,8 @@ impl GbaBus {
                 self.oam[offset + 1] = bytes[1];
             }
             0x0E..=0x0F => {
-                // sram is 8-bit bus; byte lane selected by original addr bit 0
-                let offset = (raw_addr & 0xFFFF) as usize;
-                if offset < self.sram.len() {
-                    self.sram[offset] = bytes[(raw_addr & 1) as usize];
-                }
+                // 8-bit bus; byte lane selected by original addr bit 0
+                self.save.write8(raw_addr, bytes[(raw_addr & 1) as usize]);
             }
             _ => {}
         }
@@ -460,11 +437,8 @@ impl GbaBus {
                 self.oam[offset..offset + 4].copy_from_slice(&bytes);
             }
             0x0E..=0x0F => {
-                // sram is 8-bit bus; byte lane selected by original addr bits 0-1
-                let offset = (raw_addr & 0xFFFF) as usize;
-                if offset < self.sram.len() {
-                    self.sram[offset] = bytes[(raw_addr & 3) as usize];
-                }
+                // 8-bit bus; byte lane selected by original addr bits 0-1
+                self.save.write8(raw_addr, bytes[(raw_addr & 3) as usize]);
             }
             _ => {}
         }
@@ -751,7 +725,7 @@ impl GbaBus {
         self.palette.fill(0);
         self.vram.fill(0);
         self.oam.fill(0);
-        self.sram.fill(0xFF);
+        self.save.reset();
         self.ppu.reset();
         self.apu.reset();
         self.dma = GbaDma::new();
@@ -867,8 +841,142 @@ mod tests {
     #[test]
     fn test_sram_read_write() {
         let mut bus = GbaBus::new();
+        let mut rom = vec![0u8; 512];
+        rom[0x100..0x106].copy_from_slice(b"SRAM_V");
+        bus.load_rom(&rom);
         bus.write8(0x0E00_0000, 0x42);
         assert_eq!(bus.read8(0x0E00_0000), 0x42);
+    }
+
+    #[test]
+    fn test_sram_mirror() {
+        let mut bus = GbaBus::new();
+        let mut rom = vec![0u8; 512];
+        rom[0x100..0x106].copy_from_slice(b"SRAM_V");
+        bus.load_rom(&rom);
+        bus.write8(0x0E00_0000, 0x01);
+        // 0x0F region mirrors 0x0E (addr & 0xFFFF)
+        assert_eq!(bus.read8(0x0F00_0000), 0x01);
+    }
+
+    #[test]
+    fn test_sram_16bit_read_duplicates_byte() {
+        let mut bus = GbaBus::new();
+        let mut rom = vec![0u8; 512];
+        rom[0x100..0x106].copy_from_slice(b"SRAM_V");
+        bus.load_rom(&rom);
+        bus.write8(0x0E00_0000, 0x42);
+        assert_eq!(bus.read16(0x0E00_0000), 0x4242);
+    }
+
+    #[test]
+    fn test_sram_32bit_read_duplicates_byte() {
+        let mut bus = GbaBus::new();
+        let mut rom = vec![0u8; 512];
+        rom[0x100..0x106].copy_from_slice(b"SRAM_V");
+        bus.load_rom(&rom);
+        bus.write8(0x0E00_0000, 0xAB);
+        assert_eq!(bus.read32(0x0E00_0000), 0xABABABAB);
+    }
+
+    #[test]
+    fn test_sram_16bit_write_selects_byte_lane() {
+        let mut bus = GbaBus::new();
+        let mut rom = vec![0u8; 512];
+        rom[0x100..0x106].copy_from_slice(b"SRAM_V");
+        bus.load_rom(&rom);
+        bus.write16(0x0E00_0000, 0xAABB);
+        // byte lane 0 (even addr) -> low byte 0xBB
+        assert_eq!(bus.read8(0x0E00_0000), 0xBB);
+        // odd address -> high byte
+        bus.write16(0x0E00_0001, 0xAABB);
+        assert_eq!(bus.read8(0x0E00_0001), 0xAA);
+    }
+
+    #[test]
+    fn test_sram_32bit_write_selects_byte_lane() {
+        let mut bus = GbaBus::new();
+        let mut rom = vec![0u8; 512];
+        rom[0x100..0x106].copy_from_slice(b"SRAM_V");
+        bus.load_rom(&rom);
+        bus.write32(0x0E00_0000, 0xAABBCCDD);
+        assert_eq!(bus.read8(0x0E00_0000), 0xDD);
+        bus.write32(0x0E00_0001, 0xAABBCCDD);
+        assert_eq!(bus.read8(0x0E00_0001), 0xCC);
+        bus.write32(0x0E00_0002, 0xAABBCCDD);
+        assert_eq!(bus.read8(0x0E00_0002), 0xBB);
+        bus.write32(0x0E00_0003, 0xAABBCCDD);
+        assert_eq!(bus.read8(0x0E00_0003), 0xAA);
+    }
+
+    #[test]
+    fn test_flash64_via_bus() {
+        let mut bus = GbaBus::new();
+        let mut rom = vec![0u8; 512];
+        rom[0x100..0x107].copy_from_slice(b"FLASH_V");
+        bus.load_rom(&rom);
+        // raw write should not work
+        bus.write8(0x0E00_0000, 0x42);
+        assert_eq!(bus.read8(0x0E00_0000), 0xFF);
+        // command sequence should work
+        bus.write8(0x0E00_5555, 0xAA);
+        bus.write8(0x0E00_2AAA, 0x55);
+        bus.write8(0x0E00_5555, 0xA0);
+        bus.write8(0x0E00_0000, 0x42);
+        assert_eq!(bus.read8(0x0E00_0000), 0x42);
+    }
+
+    #[test]
+    fn test_flash64_chip_erase_via_bus() {
+        let mut bus = GbaBus::new();
+        let mut rom = vec![0u8; 512];
+        rom[0x100..0x107].copy_from_slice(b"FLASH_V");
+        bus.load_rom(&rom);
+        // write a byte
+        bus.write8(0x0E00_5555, 0xAA);
+        bus.write8(0x0E00_2AAA, 0x55);
+        bus.write8(0x0E00_5555, 0xA0);
+        bus.write8(0x0E00_0000, 0x00);
+        assert_eq!(bus.read8(0x0E00_0000), 0x00);
+        // chip erase
+        bus.write8(0x0E00_5555, 0xAA);
+        bus.write8(0x0E00_2AAA, 0x55);
+        bus.write8(0x0E00_5555, 0x80);
+        bus.write8(0x0E00_5555, 0xAA);
+        bus.write8(0x0E00_2AAA, 0x55);
+        bus.write8(0x0E00_5555, 0x10);
+        assert_eq!(bus.read8(0x0E00_0000), 0xFF);
+    }
+
+    #[test]
+    fn test_flash64_16bit_read_duplicates_byte() {
+        let mut bus = GbaBus::new();
+        let mut rom = vec![0u8; 512];
+        rom[0x100..0x107].copy_from_slice(b"FLASH_V");
+        bus.load_rom(&rom);
+        bus.write8(0x0E00_5555, 0xAA);
+        bus.write8(0x0E00_2AAA, 0x55);
+        bus.write8(0x0E00_5555, 0xA0);
+        bus.write8(0x0E00_0000, 0x42);
+        assert_eq!(bus.read16(0x0E00_0000), 0x4242);
+    }
+
+    #[test]
+    fn test_no_save_type_returns_ff() {
+        let bus = GbaBus::new();
+        assert_eq!(bus.read8(0x0E00_0000), 0xFF);
+    }
+
+    #[test]
+    fn test_load_rom_detects_save_type() {
+        let mut bus = GbaBus::new();
+        let mut rom = vec![0u8; 512];
+        rom[0x100..0x106].copy_from_slice(b"SRAM_V");
+        bus.load_rom(&rom);
+        assert_eq!(
+            bus.save.save_type(),
+            crate::gba::flash::SaveType::Sram
+        );
     }
 
     #[test]
