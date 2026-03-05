@@ -26,7 +26,13 @@ use crate::gba::{
     timer::GbaTimers,
 };
 
+/// Size of the BIOS stub (we only need a small region for HLE stubs)
+const BIOS_SIZE: usize = 0x4000;
+
 pub struct GbaBus {
+    /// BIOS memory (16KB, contains HLE stubs for IRQ handler etc.)
+    pub bios: Vec<u8>,
+
     /// external work RAM (256KB)
     pub ewram: Vec<u8>,
 
@@ -81,7 +87,8 @@ pub struct GbaBus {
 
 impl GbaBus {
     pub fn new() -> Self {
-        Self {
+        let mut bus = Self {
+            bios: vec![0u8; BIOS_SIZE],
             ewram: vec![0u8; EWRAM_SIZE],
             iwram: vec![0u8; IWRAM_SIZE],
             palette: vec![0u8; PALETTE_SIZE],
@@ -99,7 +106,62 @@ impl GbaBus {
             postflg: 0,
             halt_requested: false,
             bios_value: 0,
+        };
+        bus.init_bios_stubs();
+        bus
+    }
+
+    /// Writes ARM instruction word into BIOS memory at given address
+    fn bios_write32(&mut self, addr: u32, value: u32) {
+        let offset = addr as usize;
+        if offset + 3 < self.bios.len() {
+            self.bios[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
         }
+    }
+
+    /// Initializes BIOS memory with HLE stubs for exception vectors
+    /// and the IRQ handler that the real BIOS provides.
+    fn init_bios_stubs(&mut self) {
+        // IRQ vector at 0x18: branch to handler at 0x128
+        // offset = (0x128 - 0x18 - 8) / 4 = 0x42
+        self.bios_write32(0x18, 0xEA000042); // B #0x128
+
+        // BIOS IRQ handler at 0x128:
+        // Saves state, calls game handler, updates IntrCheck at 0x03007FF8,
+        // restores state, and returns from IRQ.
+        //
+        // 0x128: STMFD SP!, {R0-R3, R12, LR}
+        // 0x12C: MOV R0, #0x04000000        ; I/O base
+        // 0x130: ADD LR, PC, #0             ; LR = 0x138 (return point)
+        // 0x134: LDR PC, [R0, #-4]          ; PC = [0x03FFFFFC] (game handler)
+        // --- game handler returns here ---
+        // 0x138: MOV R0, #0x04000000        ; reload I/O base
+        // 0x13C: LDR R1, [R0, #0x200]       ; R1 = IE (low 16) | IF (high 16)
+        // 0x140: AND R1, R1, R1, LSR #16    ; R1 = IE & IF (acknowledged bits)
+        // 0x144: LDR R0, [PC, #16]          ; R0 = 0x03007FF8 (from literal pool at 0x15C)
+        // 0x148: LDRH R2, [R0]              ; R2 = current IntrCheck
+        // 0x14C: ORR R2, R2, R1             ; R2 |= acknowledged interrupts
+        // 0x150: STRH R2, [R0]              ; store updated IntrCheck
+        // 0x154: LDMFD SP!, {R0-R3, R12, LR}
+        // 0x158: SUBS PC, LR, #4            ; return from IRQ, restore CPSR
+        // 0x15C: .word 0x03007FF8            ; literal pool
+
+        self.bios_write32(0x128, 0xE92D500F); // STMFD SP!, {R0-R3, R12, LR}
+        self.bios_write32(0x12C, 0xE3A00301); // MOV R0, #0x04000000
+        self.bios_write32(0x130, 0xE28FE000); // ADD LR, PC, #0  (LR = 0x138)
+        self.bios_write32(0x134, 0xE510F004); // LDR PC, [R0, #-4]
+
+        // After game handler returns:
+        self.bios_write32(0x138, 0xE3A00301); // MOV R0, #0x04000000
+        self.bios_write32(0x13C, 0xE5901200); // LDR R1, [R0, #0x200]  (IE|IF as 32-bit)
+        self.bios_write32(0x140, 0xE0011821); // AND R1, R1, R1, LSR #16  (IE & IF)
+        self.bios_write32(0x144, 0xE59F0010); // LDR R0, [PC, #16]  (load 0x03007FF8 from 0x15C)
+        self.bios_write32(0x148, 0xE1D020B0); // LDRH R2, [R0, #0]
+        self.bios_write32(0x14C, 0xE1822001); // ORR R2, R2, R1
+        self.bios_write32(0x150, 0xE1C020B0); // STRH R2, [R0, #0]
+        self.bios_write32(0x154, 0xE8BD500F); // LDMFD SP!, {R0-R3, R12, LR}
+        self.bios_write32(0x158, 0xE25EF004); // SUBS PC, LR, #4
+        self.bios_write32(0x15C, 0x03007FF8); // literal: IntrCheck address
     }
 
     pub fn load_rom(&mut self, data: &[u8]) {
@@ -110,8 +172,12 @@ impl GbaBus {
     pub fn read8(&self, addr: u32) -> u8 {
         match addr >> 24 {
             0x00 => {
-                // BIOS - return open bus
-                (self.bios_value >> ((addr & 3) * 8)) as u8
+                let offset = (addr & 0x3FFF) as usize;
+                if offset < self.bios.len() {
+                    self.bios[offset]
+                } else {
+                    (self.bios_value >> ((addr & 3) * 8)) as u8
+                }
             }
             0x02 => self.ewram[(addr & 0x3FFFF) as usize],
             0x03 => self.iwram[(addr & 0x7FFF) as usize],
@@ -146,7 +212,14 @@ impl GbaBus {
     pub fn read16(&self, addr: u32) -> u16 {
         let addr = addr & !1;
         match addr >> 24 {
-            0x00 => (self.bios_value >> ((addr & 2) * 8)) as u16,
+            0x00 => {
+                let offset = (addr & 0x3FFF) as usize;
+                if offset + 1 < self.bios.len() {
+                    u16::from_le_bytes([self.bios[offset], self.bios[offset + 1]])
+                } else {
+                    (self.bios_value >> ((addr & 2) * 8)) as u16
+                }
+            }
             0x02 => {
                 let offset = (addr & 0x3FFFF) as usize;
                 u16::from_le_bytes([self.ewram[offset], self.ewram[offset + 1]])
@@ -192,7 +265,19 @@ impl GbaBus {
     pub fn read32(&self, addr: u32) -> u32 {
         let addr = addr & !3;
         match addr >> 24 {
-            0x00 => self.bios_value,
+            0x00 => {
+                let offset = (addr & 0x3FFF) as usize;
+                if offset + 3 < self.bios.len() {
+                    u32::from_le_bytes([
+                        self.bios[offset],
+                        self.bios[offset + 1],
+                        self.bios[offset + 2],
+                        self.bios[offset + 3],
+                    ])
+                } else {
+                    self.bios_value
+                }
+            }
             0x02 => {
                 let offset = (addr & 0x3FFFF) as usize;
                 u32::from_le_bytes([
@@ -527,7 +612,25 @@ impl GbaBus {
             REG_DMA3CNT_H => self.dma.channels[3].set_control(value, 3),
             REG_KEYCNT => self.pad.set_keycnt(value),
             REG_IE => self.irq.set_ie(value),
-            REG_IF => self.irq.ack_if(value),
+            REG_IF => {
+                // Before acknowledging, compute which interrupts were both
+                // enabled and pending — these are the ones being serviced.
+                // Update IntrCheck at 0x03007FF8 (IWRAM mirror) so that
+                // games using VBlankIntrWait / IntrWait can detect them.
+                let serviced = self.irq.ie() & self.irq.if_() & value;
+                if serviced != 0 {
+                    let offset = (0x03007FF8u32 & 0x7FFF) as usize;
+                    let old = u16::from_le_bytes([
+                        self.iwram[offset],
+                        self.iwram[offset + 1],
+                    ]);
+                    let new_val = old | serviced;
+                    let bytes = new_val.to_le_bytes();
+                    self.iwram[offset] = bytes[0];
+                    self.iwram[offset + 1] = bytes[1];
+                }
+                self.irq.ack_if(value);
+            }
             REG_IME => self.irq.set_ime(value & 1 != 0),
             REG_WAITCNT => self.waitcnt = value,
             REG_POSTFLG => self.postflg = value as u8,
@@ -631,36 +734,14 @@ impl GbaBus {
     /// handles 32-bit BG reference point register writes
     fn write_bg_ref(&mut self, addr: u32, value: u16) {
         match addr {
-            REG_BG2X => {
-                let current = 0u32;
-                let new_val = (current & 0xFFFF0000) | value as u32;
-                self.ppu.set_bg_ref_x(0, new_val);
-            }
-            a if a == REG_BG2X + 2 => {
-                let new_val = (value as u32) << 16;
-                // simplified: just set high bits
-                self.ppu.set_bg_ref_x(0, new_val);
-            }
-            REG_BG2Y => {
-                let new_val = value as u32;
-                self.ppu.set_bg_ref_y(0, new_val);
-            }
-            a if a == REG_BG2Y + 2 => {
-                let new_val = (value as u32) << 16;
-                self.ppu.set_bg_ref_y(0, new_val);
-            }
-            REG_BG3X => {
-                self.ppu.set_bg_ref_x(1, value as u32);
-            }
-            a if a == REG_BG3X + 2 => {
-                self.ppu.set_bg_ref_x(1, (value as u32) << 16);
-            }
-            REG_BG3Y => {
-                self.ppu.set_bg_ref_y(1, value as u32);
-            }
-            a if a == REG_BG3Y + 2 => {
-                self.ppu.set_bg_ref_y(1, (value as u32) << 16);
-            }
+            REG_BG2X => self.ppu.set_bg_ref_x_lo(0, value),
+            a if a == REG_BG2X + 2 => self.ppu.set_bg_ref_x_hi(0, value),
+            REG_BG2Y => self.ppu.set_bg_ref_y_lo(0, value),
+            a if a == REG_BG2Y + 2 => self.ppu.set_bg_ref_y_hi(0, value),
+            REG_BG3X => self.ppu.set_bg_ref_x_lo(1, value),
+            a if a == REG_BG3X + 2 => self.ppu.set_bg_ref_x_hi(1, value),
+            REG_BG3Y => self.ppu.set_bg_ref_y_lo(1, value),
+            a if a == REG_BG3Y + 2 => self.ppu.set_bg_ref_y_hi(1, value),
             _ => {}
         }
     }

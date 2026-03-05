@@ -182,9 +182,10 @@ impl GameBoyAdvance {
                 break;
             }
 
+            let word32 = channel.word_size();
             let (src, dst, complete) = channel.step();
 
-            if channel.word_size() {
+            if word32 {
                 let value = self.cpu.bus.read32(src);
                 self.cpu.bus.write32(dst, value);
             } else {

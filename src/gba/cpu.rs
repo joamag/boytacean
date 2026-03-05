@@ -135,6 +135,58 @@ impl Arm7Tdmi {
         }
     }
 
+    /// reads a register from the user/system bank (for STM with S bit)
+    pub fn reg_user(&self, index: u32) -> u32 {
+        let i = index as usize & 0xF;
+        let mode = self.cpsr & CPSR_MODE_MASK;
+        match i {
+            0..=7 | 15 => self.regs[i],
+            8..=12 => {
+                if mode == MODE_FIQ {
+                    self.banked.usr[i - 8]
+                } else {
+                    self.regs[i]
+                }
+            }
+            13..=14 => {
+                if mode == MODE_USR || mode == MODE_SYS {
+                    self.regs[i]
+                } else {
+                    self.banked.usr[i - 8]
+                }
+            }
+            _ => 0,
+        }
+    }
+
+    /// writes a register to the user/system bank (for LDM with S bit, no PC)
+    pub fn set_reg_user(&mut self, index: u32, value: u32) {
+        let i = index as usize & 0xF;
+        let mode = self.cpsr & CPSR_MODE_MASK;
+        match i {
+            0..=7 => self.regs[i] = value,
+            8..=12 => {
+                if mode == MODE_FIQ {
+                    self.banked.usr[i - 8] = value;
+                } else {
+                    self.regs[i] = value;
+                }
+            }
+            13..=14 => {
+                if mode == MODE_USR || mode == MODE_SYS {
+                    self.regs[i] = value;
+                } else {
+                    self.banked.usr[i - 8] = value;
+                }
+            }
+            15 => {
+                self.regs[15] = value;
+                self.flush_pipeline();
+            }
+            _ => {}
+        }
+    }
+
     #[inline(always)]
     pub fn pc(&self) -> u32 {
         self.regs[15]
@@ -283,7 +335,18 @@ impl Arm7Tdmi {
     pub fn step(&mut self) -> u32 {
         // check for pending interrupts
         if self.bus.irq.pending() && self.cpsr & CPSR_I == 0 {
+            let was_halted = self.halted;
             self.halted = false;
+
+            // When waking from halt, the pipeline hasn't been refilled,
+            // so regs[15] points directly at the next instruction without
+            // the pipeline prefetch offset. We need to add +4 so that
+            // the IRQ handler's SUBS PC, LR, #4 returns to the correct
+            // instruction (the one after the halt point).
+            if was_halted {
+                self.regs[15] = self.regs[15].wrapping_add(4);
+            }
+
             self.enter_exception(0x18, MODE_IRQ);
             return 3; // interrupt takes ~3 cycles
         }
@@ -341,8 +404,12 @@ impl Arm7Tdmi {
     /// enters an exception (interrupt, SWI, etc)
     pub fn enter_exception(&mut self, vector: u32, mode: u32) {
         let old_cpsr = self.cpsr;
+        // for IRQ: LR_irq = next_instruction + 4
+        // after advance_pipeline: ARM regs[15] = instr+12, Thumb regs[15] = instr+6
+        // ARM: LR = instr+12-4 = instr+8 = (instr+4)+4 ✓
+        // Thumb: LR = instr+6 = (instr+2)+4 ✓
         let return_addr = if self.in_thumb_mode() {
-            self.regs[15].wrapping_sub(2)
+            self.regs[15]
         } else {
             self.regs[15].wrapping_sub(4)
         };
@@ -352,19 +419,10 @@ impl Arm7Tdmi {
         self.set_spsr(old_cpsr);
         self.regs[14] = return_addr;
 
-        // for IRQ, use HLE dispatch: read handler address from
-        // 0x03FFFFFC (mirrored to 0x03007FFC in IWRAM) instead
-        // of jumping to the BIOS vector at 0x18
-        if vector == 0x18 {
-            let handler = self.bus.read32(0x03FF_FFFC);
-            if handler != 0 {
-                self.regs[15] = handler;
-            } else {
-                self.regs[15] = vector;
-            }
-        } else {
-            self.regs[15] = vector;
-        }
+        // jump to the exception vector — BIOS memory contains the
+        // appropriate handler stubs (e.g. IRQ handler at 0x18 branches
+        // to 0x128 which implements the standard BIOS IRQ wrapper)
+        self.regs[15] = vector;
         self.flush_pipeline();
     }
 

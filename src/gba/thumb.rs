@@ -413,13 +413,24 @@ fn thumb_load_store_reg(cpu: &mut Arm7Tdmi, instr: u16) {
             cpu.set_reg(rd, value);
         }
         0b100 => {
-            // LDR
-            let value = cpu.bus_read32(addr);
+            // LDR — misaligned addresses rotate
+            let rotate = (addr & 3) * 8;
+            let value = cpu.bus_read32(addr & !3);
+            let value = if rotate != 0 {
+                value.rotate_right(rotate)
+            } else {
+                value
+            };
             cpu.set_reg(rd, value);
         }
         0b101 => {
-            // LDRH
-            let value = cpu.bus_read16(addr) as u32;
+            // LDRH — misaligned addresses rotate
+            let aligned = cpu.bus_read16(addr & !1) as u32;
+            let value = if addr & 1 != 0 {
+                aligned.rotate_right(8)
+            } else {
+                aligned
+            };
             cpu.set_reg(rd, value);
         }
         0b110 => {
@@ -428,8 +439,12 @@ fn thumb_load_store_reg(cpu: &mut Arm7Tdmi, instr: u16) {
             cpu.set_reg(rd, value);
         }
         0b111 => {
-            // LDRSH
-            let value = cpu.bus_read16(addr) as i16 as i32 as u32;
+            // LDRSH — misaligned reads as LDRSB
+            let value = if addr & 1 != 0 {
+                cpu.bus_read8(addr) as i8 as i32 as u32
+            } else {
+                cpu.bus_read16(addr) as i16 as i32 as u32
+            };
             cpu.set_reg(rd, value);
         }
         _ => {}
@@ -459,7 +474,14 @@ fn thumb_load_store_imm(cpu: &mut Arm7Tdmi, instr: u16) {
     } else {
         let addr = base.wrapping_add(offset * 4);
         if is_load {
-            let value = cpu.bus_read32(addr);
+            // misaligned addresses rotate
+            let rotate = (addr & 3) * 8;
+            let value = cpu.bus_read32(addr & !3);
+            let value = if rotate != 0 {
+                value.rotate_right(rotate)
+            } else {
+                value
+            };
             cpu.set_reg(rd, value);
         } else {
             cpu.bus_write32(addr, cpu.reg(rd));
@@ -479,7 +501,13 @@ fn thumb_load_store_half(cpu: &mut Arm7Tdmi, instr: u16) {
     let addr = cpu.reg(rb).wrapping_add(offset);
 
     if is_load {
-        let value = cpu.bus_read16(addr) as u32;
+        // misaligned addresses rotate
+        let aligned = cpu.bus_read16(addr & !1) as u32;
+        let value = if addr & 1 != 0 {
+            aligned.rotate_right(8)
+        } else {
+            aligned
+        };
         cpu.set_reg(rd, value);
     } else {
         cpu.bus_write16(addr, cpu.reg(rd) as u16);
@@ -497,7 +525,14 @@ fn thumb_sp_load_store(cpu: &mut Arm7Tdmi, instr: u16) {
     let addr = cpu.reg(13).wrapping_add(offset);
 
     if is_load {
-        let value = cpu.bus_read32(addr);
+        // misaligned addresses rotate
+        let rotate = (addr & 3) * 8;
+        let value = cpu.bus_read32(addr & !3);
+        let value = if rotate != 0 {
+            value.rotate_right(rotate)
+        } else {
+            value
+        };
         cpu.set_reg(rd, value);
     } else {
         cpu.bus_write32(addr, cpu.reg(rd));
@@ -587,10 +622,22 @@ fn thumb_ldm_stm(cpu: &mut Arm7Tdmi, instr: u16) {
     let is_load = instr & (1 << 11) != 0;
     let rb = ((instr >> 8) & 0x07) as u32;
     let reg_list = instr & 0xFF;
+    let empty_rlist = reg_list == 0;
 
     let mut addr = cpu.reg(rb);
 
-    if is_load {
+    if empty_rlist {
+        // Empty register list: transfer PC, increment base by 0x40
+        if is_load {
+            let value = cpu.bus_read32(addr);
+            cpu.set_reg(15, value);
+        } else {
+            cpu.bus_write32(addr, cpu.pc().wrapping_add(2));
+        }
+        addr = addr.wrapping_add(0x40);
+    } else if is_load {
+        // LDM: writeback is skipped if Rb is in the register list
+        let skip_wb = reg_list & (1 << rb) != 0;
         for i in 0..8u32 {
             if reg_list & (1 << i) != 0 {
                 let value = cpu.bus_read32(addr);
@@ -598,19 +645,32 @@ fn thumb_ldm_stm(cpu: &mut Arm7Tdmi, instr: u16) {
                 addr = addr.wrapping_add(4);
             }
         }
+        if !skip_wb {
+            cpu.set_reg(rb, addr);
+        }
+        cpu.cycles = 2 + reg_list.count_ones();
+        return;
     } else {
+        // STM: base-not-first stores written-back value
+        let lowest_in_list = (0..8u32).find(|&i| reg_list & (1 << i) != 0);
+        let base_is_first = lowest_in_list == Some(rb);
+        let wb_base = addr.wrapping_add(reg_list.count_ones() * 4);
         for i in 0..8u32 {
             if reg_list & (1 << i) != 0 {
-                cpu.bus_write32(addr, cpu.reg(i));
+                let value = if i == rb && !base_is_first {
+                    wb_base
+                } else {
+                    cpu.reg(i)
+                };
+                cpu.bus_write32(addr, value);
                 addr = addr.wrapping_add(4);
             }
         }
     }
 
-    // always write back
     cpu.set_reg(rb, addr);
 
-    cpu.cycles = 2 + reg_list.count_ones();
+    cpu.cycles = 2 + if empty_rlist { 16 } else { reg_list.count_ones() };
 }
 
 /// format 16: conditional branch
@@ -700,6 +760,7 @@ fn thumb_long_branch(cpu: &mut Arm7Tdmi, instr: u16) {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::gba::{bus::GbaBus, cpu::Arm7Tdmi};
 
     fn make_thumb_cpu() -> Arm7Tdmi {
@@ -712,86 +773,80 @@ mod tests {
     #[test]
     fn test_thumb_mov_imm() {
         let mut cpu = make_thumb_cpu();
-        // MOV R0, #42 (0x202A)
-        super::execute_thumb(&mut cpu, 0x202A);
+        execute_thumb(&mut cpu, 0x202A);
         assert_eq!(cpu.reg(0), 42);
     }
 
     #[test]
     fn test_thumb_add_imm() {
         let mut cpu = make_thumb_cpu();
-        super::execute_thumb(&mut cpu, 0x200A); // MOV R0, #10
-        super::execute_thumb(&mut cpu, 0x3005); // ADD R0, #5
+        execute_thumb(&mut cpu, 0x200A);
+        execute_thumb(&mut cpu, 0x3005);
         assert_eq!(cpu.reg(0), 15);
     }
 
     #[test]
     fn test_thumb_sub_imm() {
         let mut cpu = make_thumb_cpu();
-        super::execute_thumb(&mut cpu, 0x2014); // MOV R0, #20
-        super::execute_thumb(&mut cpu, 0x3805); // SUB R0, #5
+        execute_thumb(&mut cpu, 0x2014);
+        execute_thumb(&mut cpu, 0x3805);
         assert_eq!(cpu.reg(0), 15);
     }
 
     #[test]
     fn test_thumb_cmp_imm() {
         let mut cpu = make_thumb_cpu();
-        super::execute_thumb(&mut cpu, 0x200A); // MOV R0, #10
-        super::execute_thumb(&mut cpu, 0x280A); // CMP R0, #10
+        execute_thumb(&mut cpu, 0x200A);
+        execute_thumb(&mut cpu, 0x280A);
         assert!(cpu.flag_z());
     }
 
     #[test]
     fn test_thumb_mov_zero_sets_z() {
         let mut cpu = make_thumb_cpu();
-        super::execute_thumb(&mut cpu, 0x2000); // MOV R0, #0
+        execute_thumb(&mut cpu, 0x2000);
         assert!(cpu.flag_z());
     }
 
     #[test]
     fn test_thumb_lsl() {
         let mut cpu = make_thumb_cpu();
-        super::execute_thumb(&mut cpu, 0x2001); // MOV R0, #1
-                                                // LSL R1, R0, #4 (0x0101)
-        super::execute_thumb(&mut cpu, 0x0101);
+        execute_thumb(&mut cpu, 0x2001);
+        execute_thumb(&mut cpu, 0x0101);
         assert_eq!(cpu.reg(1), 0x10);
     }
 
     #[test]
     fn test_thumb_lsr() {
         let mut cpu = make_thumb_cpu();
-        super::execute_thumb(&mut cpu, 0x2010); // MOV R0, #16
-                                                // LSR R1, R0, #4 (0x0901)
-        super::execute_thumb(&mut cpu, 0x0901);
+        execute_thumb(&mut cpu, 0x2010);
+        execute_thumb(&mut cpu, 0x0901);
         assert_eq!(cpu.reg(1), 1);
     }
 
     #[test]
     fn test_thumb_asr() {
         let mut cpu = make_thumb_cpu();
-        cpu.set_reg(0, 0x80000000u32); // large negative
-                                       // ASR R1, R0, #4 (0x1101)
-        super::execute_thumb(&mut cpu, 0x1101);
+        cpu.set_reg(0, 0x80000000u32);
+        execute_thumb(&mut cpu, 0x1101);
         assert_eq!(cpu.reg(1), 0xF8000000);
     }
 
     #[test]
     fn test_thumb_add_reg() {
         let mut cpu = make_thumb_cpu();
-        super::execute_thumb(&mut cpu, 0x200A); // MOV R0, #10
-        super::execute_thumb(&mut cpu, 0x2105); // MOV R1, #5
-                                                // ADD R2, R0, R1 (0x1842)
-        super::execute_thumb(&mut cpu, 0x1842);
+        execute_thumb(&mut cpu, 0x200A);
+        execute_thumb(&mut cpu, 0x2105);
+        execute_thumb(&mut cpu, 0x1842);
         assert_eq!(cpu.reg(2), 15);
     }
 
     #[test]
     fn test_thumb_sub_reg() {
         let mut cpu = make_thumb_cpu();
-        super::execute_thumb(&mut cpu, 0x200A); // MOV R0, #10
-        super::execute_thumb(&mut cpu, 0x2103); // MOV R1, #3
-                                                // SUB R2, R0, R1 (0x1A42)
-        super::execute_thumb(&mut cpu, 0x1A42);
+        execute_thumb(&mut cpu, 0x200A);
+        execute_thumb(&mut cpu, 0x2103);
+        execute_thumb(&mut cpu, 0x1A42);
         assert_eq!(cpu.reg(2), 7);
     }
 
@@ -799,31 +854,148 @@ mod tests {
     fn test_thumb_str_ldr() {
         let mut cpu = make_thumb_cpu();
         cpu.set_reg(0, 0xDEADBEEF);
-        cpu.set_reg(1, 0x0200_0000);
-        // STR R0, [R1, #0] (0x6008)
-        super::execute_thumb(&mut cpu, 0x6008);
-        assert_eq!(cpu.bus_read32(0x0200_0000), 0xDEADBEEF);
-
-        // LDR R2, [R1, #0] (0x680A)
-        super::execute_thumb(&mut cpu, 0x680A);
+        cpu.set_reg(1, 0x02000000);
+        execute_thumb(&mut cpu, 0x6008);
+        assert_eq!(cpu.bus_read32(0x02000000), 0xDEADBEEF);
+        execute_thumb(&mut cpu, 0x680A);
         assert_eq!(cpu.reg(2), 0xDEADBEEF);
     }
 
     #[test]
     fn test_thumb_add_imm3() {
         let mut cpu = make_thumb_cpu();
-        super::execute_thumb(&mut cpu, 0x200A); // MOV R0, #10
-                                                // ADD R1, R0, #3 (0x1CC1)
-        super::execute_thumb(&mut cpu, 0x1CC1);
+        execute_thumb(&mut cpu, 0x200A);
+        execute_thumb(&mut cpu, 0x1CC1);
         assert_eq!(cpu.reg(1), 13);
     }
 
     #[test]
     fn test_thumb_sub_imm3() {
         let mut cpu = make_thumb_cpu();
-        super::execute_thumb(&mut cpu, 0x200A); // MOV R0, #10
-                                                // SUB R1, R0, #3 (0x1EC1)
-        super::execute_thumb(&mut cpu, 0x1EC1);
+        execute_thumb(&mut cpu, 0x200A);
+        execute_thumb(&mut cpu, 0x1EC1);
         assert_eq!(cpu.reg(1), 7);
+    }
+
+    #[test]
+    fn test_thumb_ldr_reg_misaligned_rotates() {
+        let mut cpu = make_thumb_cpu();
+        let addr = 0x02000000u32;
+        cpu.bus_write32(addr, 0x04030201);
+        cpu.set_reg(0, addr + 1);
+        cpu.set_reg(1, 0);
+        execute_thumb(&mut cpu, 0x5842);
+        assert_eq!(cpu.reg(2), 0x04030201u32.rotate_right(8));
+    }
+
+    #[test]
+    fn test_thumb_ldrh_reg_misaligned_rotates() {
+        let mut cpu = make_thumb_cpu();
+        let addr = 0x02000000u32;
+        cpu.bus_write16(addr, 0xBEEF);
+        cpu.set_reg(0, addr);
+        cpu.set_reg(1, 1);
+        execute_thumb(&mut cpu, 0x5A42);
+        assert_eq!(cpu.reg(2), 0xBEEFu32.rotate_right(8));
+    }
+
+    #[test]
+    fn test_thumb_ldrsh_reg_misaligned_reads_byte() {
+        let mut cpu = make_thumb_cpu();
+        let addr = 0x02000000u32;
+        cpu.bus_write8(addr + 1, 0x80);
+        cpu.set_reg(0, addr);
+        cpu.set_reg(1, 1);
+        execute_thumb(&mut cpu, 0x5E42);
+        assert_eq!(cpu.reg(2), 0xFFFFFF80);
+    }
+
+    #[test]
+    fn test_thumb_ldr_imm_misaligned_rotates() {
+        let mut cpu = make_thumb_cpu();
+        let addr = 0x02000000u32;
+        cpu.bus_write32(addr, 0x04030201);
+        cpu.set_reg(0, addr + 1);
+        execute_thumb(&mut cpu, 0x6801);
+        assert_eq!(cpu.reg(1), 0x04030201u32.rotate_right(8));
+    }
+
+    #[test]
+    fn test_thumb_ldrh_imm_misaligned_rotates() {
+        let mut cpu = make_thumb_cpu();
+        let addr = 0x02000000u32;
+        cpu.bus_write16(addr, 0xCAFE);
+        cpu.set_reg(0, addr + 1);
+        execute_thumb(&mut cpu, 0x8801);
+        assert_eq!(cpu.reg(1), 0xCAFEu32.rotate_right(8));
+    }
+
+    #[test]
+    fn test_thumb_sp_ldr_misaligned_rotates() {
+        let mut cpu = make_thumb_cpu();
+        let addr = 0x02000000u32;
+        cpu.bus_write32(addr, 0x04030201);
+        cpu.set_reg(13, addr + 1);
+        execute_thumb(&mut cpu, 0x9800);
+        assert_eq!(cpu.reg(0), 0x04030201u32.rotate_right(8));
+    }
+
+    #[test]
+    fn test_thumb_ldm_stm_empty_rlist_stm() {
+        let mut cpu = make_thumb_cpu();
+        let base = 0x02000000u32;
+        let pc_val = 0x08000100u32;
+        cpu.set_reg(15, pc_val + 4);
+        cpu.set_reg(0, base);
+        execute_thumb(&mut cpu, 0xC000);
+        assert_eq!(cpu.bus_read32(base), pc_val + 6);
+        assert_eq!(cpu.reg(0), base + 0x40);
+    }
+
+    #[test]
+    fn test_thumb_ldm_stm_empty_rlist_ldm() {
+        let mut cpu = make_thumb_cpu();
+        let base = 0x02000000u32;
+        let target = 0x08000200u32;
+        cpu.bus_write32(base, target);
+        cpu.set_reg(0, base);
+        execute_thumb(&mut cpu, 0xC800);
+        assert_eq!(cpu.reg(15), target);
+        assert_eq!(cpu.reg(0), base + 0x40);
+    }
+
+    #[test]
+    fn test_thumb_ldm_writeback_skip_when_rb_in_rlist() {
+        let mut cpu = make_thumb_cpu();
+        let base = 0x02000000u32;
+        cpu.bus_write32(base, 0xAA);
+        cpu.bus_write32(base + 4, 0xBB);
+        cpu.set_reg(0, base);
+        execute_thumb(&mut cpu, 0xC803);
+        assert_eq!(cpu.reg(0), 0xAA);
+        assert_eq!(cpu.reg(1), 0xBB);
+    }
+
+    #[test]
+    fn test_thumb_stm_base_first_stores_original() {
+        let mut cpu = make_thumb_cpu();
+        let base = 0x02000000u32;
+        cpu.set_reg(0, base);
+        cpu.set_reg(1, 0xBB);
+        execute_thumb(&mut cpu, 0xC003);
+        assert_eq!(cpu.bus_read32(base), base);
+        assert_eq!(cpu.bus_read32(base + 4), 0xBB);
+    }
+
+    #[test]
+    fn test_thumb_stm_base_not_first_stores_writeback() {
+        let mut cpu = make_thumb_cpu();
+        let base = 0x02000010u32;
+        cpu.set_reg(0, 0xAA);
+        cpu.set_reg(1, base);
+        execute_thumb(&mut cpu, 0xC103);
+        let wb_base = base + 8;
+        assert_eq!(cpu.bus_read32(base), 0xAA);
+        assert_eq!(cpu.bus_read32(base + 4), wb_base);
     }
 }
