@@ -52,6 +52,9 @@ pub struct GameBoyAdvance {
 
     /// if timers are enabled, they will be clocked
     timer_enabled: bool,
+
+    /// ROM title extracted from the header
+    rom_title: String,
 }
 
 impl GameBoyAdvance {
@@ -77,12 +80,14 @@ impl GameBoyAdvance {
             apu_enabled: true,
             dma_enabled: true,
             timer_enabled: true,
+            rom_title: String::new(),
         }
     }
 
     /// loads a ROM from a byte slice
     pub fn load_rom(&mut self, data: &[u8]) -> Result<GbaRomInfo, Error> {
         let info = GbaRomInfo::from_data(data)?;
+        self.rom_title = info.title().to_string();
         self.cpu.bus.load_rom(data);
         self.cpu.bus.postflg = 1; // mark as post-boot
         Ok(info)
@@ -272,6 +277,22 @@ impl GameBoyAdvance {
 
     pub fn display_height(&self) -> usize {
         Self::DISPLAY_HEIGHT
+    }
+
+    pub fn rom_title(&self) -> &str {
+        &self.rom_title
+    }
+
+    pub fn apu_enabled(&self) -> bool {
+        self.apu_enabled
+    }
+
+    pub fn audio_sampling_rate(&self) -> u32 {
+        32768
+    }
+
+    pub fn audio_channels(&self) -> u8 {
+        2
     }
 
     pub fn reset(&mut self) {

@@ -131,6 +131,109 @@ impl System {
         }
     }
 
+    pub fn load_rom_file(&mut self, path: &str, ram_path: Option<&str>) -> Result<String, Error> {
+        match self {
+            System::Gb(gb) => {
+                let cart = gb.load_rom_file(path, ram_path)?;
+                Ok(cart.title().to_string())
+            }
+            System::Gba(gba) => {
+                let data = boytacean_common::util::read_file(path)?;
+                let info = gba.load_rom(&data)?;
+                Ok(info.title().to_string())
+            }
+        }
+    }
+
+    pub fn set_ppu_enabled(&mut self, value: bool) {
+        match self {
+            System::Gb(gb) => gb.set_ppu_enabled(value),
+            System::Gba(gba) => gba.set_ppu_enabled(value),
+        }
+    }
+
+    pub fn set_apu_enabled(&mut self, value: bool) {
+        match self {
+            System::Gb(gb) => gb.set_apu_enabled(value),
+            System::Gba(gba) => gba.set_apu_enabled(value),
+        }
+    }
+
+    pub fn apu_enabled(&self) -> bool {
+        match self {
+            System::Gb(gb) => gb.apu_enabled(),
+            System::Gba(gba) => gba.apu_enabled(),
+        }
+    }
+
+    pub fn set_dma_enabled(&mut self, value: bool) {
+        match self {
+            System::Gb(gb) => gb.set_dma_enabled(value),
+            System::Gba(gba) => gba.set_dma_enabled(value),
+        }
+    }
+
+    pub fn set_timer_enabled(&mut self, value: bool) {
+        match self {
+            System::Gb(gb) => gb.set_timer_enabled(value),
+            System::Gba(gba) => gba.set_timer_enabled(value),
+        }
+    }
+
+    pub fn set_all_enabled(&mut self, value: bool) {
+        match self {
+            System::Gb(gb) => gb.set_all_enabled(value),
+            System::Gba(gba) => {
+                gba.set_ppu_enabled(value);
+                gba.set_apu_enabled(value);
+                gba.set_dma_enabled(value);
+                gba.set_timer_enabled(value);
+            }
+        }
+    }
+
+    pub fn multiplier(&self) -> u32 {
+        match self {
+            System::Gb(gb) => gb.multiplier() as u32,
+            System::Gba(_) => 1,
+        }
+    }
+
+    pub fn audio_sampling_rate(&self) -> u32 {
+        match self {
+            System::Gb(gb) => gb.audio_sampling_rate() as u32,
+            System::Gba(gba) => gba.audio_sampling_rate(),
+        }
+    }
+
+    pub fn audio_channels(&self) -> u8 {
+        match self {
+            System::Gb(gb) => gb.audio_channels(),
+            System::Gba(gba) => gba.audio_channels(),
+        }
+    }
+
+    pub fn description_debug(&self) -> String {
+        match self {
+            System::Gb(gb) => gb.description_debug(),
+            System::Gba(gba) => {
+                format!(
+                    "GBA [{}] CPU: {} Hz, PPU: {:.2} Hz",
+                    gba.rom_title(),
+                    gba.cpu_freq(),
+                    gba.visual_freq()
+                )
+            }
+        }
+    }
+
+    pub fn rom_title(&self) -> String {
+        match self {
+            System::Gb(gb) => gb.rom_i().title().to_string(),
+            System::Gba(gba) => gba.rom_title().to_string(),
+        }
+    }
+
     pub fn reset(&mut self) {
         match self {
             System::Gb(gb) => gb.reset(),
