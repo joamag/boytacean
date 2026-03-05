@@ -393,6 +393,12 @@ fn lz77_decomp(cpu: &mut Arm7Tdmi, vram_mode: bool) {
             }
         }
     }
+
+    // flush any remaining byte in the buffer (odd-sized decomp)
+    if vram_mode && buffer.len() % 2 == 1 {
+        let value = *buffer.last().unwrap() as u16;
+        cpu.bus_write16(dst, value);
+    }
 }
 
 /// SWI 0x14: RLUnCompWram - run-length decompression to WRAM
@@ -473,6 +479,11 @@ fn rl_decomp(cpu: &mut Arm7Tdmi, vram_mode: bool) {
                 bytes_written += 1;
             }
         }
+    }
+
+    // flush any remaining byte in the buffer (odd-sized decomp)
+    if vram_mode && vram_count & 1 != 0 {
+        cpu.bus_write16(dst, vram_buffer);
     }
 }
 
