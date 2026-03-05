@@ -12,6 +12,7 @@ pub mod consts;
 pub mod cpu;
 pub mod diag;
 pub mod dma;
+pub mod flash;
 pub mod irq;
 pub mod pad;
 pub mod ppu;
