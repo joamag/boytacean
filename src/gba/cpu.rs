@@ -617,11 +617,11 @@ impl Arm7Tdmi {
     }
 
     pub fn bus_write16(&mut self, addr: u32, value: u16) {
-        self.bus.write16(addr & !1, value);
+        self.bus.write16(addr, value);
     }
 
     pub fn bus_write32(&mut self, addr: u32, value: u32) {
-        self.bus.write32(addr & !3, value);
+        self.bus.write32(addr, value);
     }
 
     pub fn reset(&mut self) {

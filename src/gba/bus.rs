@@ -95,7 +95,7 @@ impl GbaBus {
             vram: vec![0u8; VRAM_SIZE],
             oam: vec![0u8; OAM_SIZE],
             rom: Vec::new(),
-            sram: vec![0u8; SRAM_SIZE],
+            sram: vec![0xFFu8; SRAM_SIZE],
             ppu: GbaPpu::new(),
             apu: GbaApu::new(),
             dma: GbaDma::new(),
@@ -250,9 +250,11 @@ impl GbaBus {
                 }
             }
             0x0E..=0x0F => {
+                // sram is 8-bit bus; 16-bit reads duplicate the byte
                 let offset = (addr & 0xFFFF) as usize;
-                if offset + 1 < self.sram.len() {
-                    u16::from_le_bytes([self.sram[offset], self.sram[offset + 1]])
+                if offset < self.sram.len() {
+                    let b = self.sram[offset] as u16;
+                    b | (b << 8)
                 } else {
                     0
                 }
@@ -342,14 +344,11 @@ impl GbaBus {
                 }
             }
             0x0E..=0x0F => {
+                // sram is 8-bit bus; 32-bit reads duplicate the byte
                 let offset = (addr & 0xFFFF) as usize;
-                if offset + 3 < self.sram.len() {
-                    u32::from_le_bytes([
-                        self.sram[offset],
-                        self.sram[offset + 1],
-                        self.sram[offset + 2],
-                        self.sram[offset + 3],
-                    ])
+                if offset < self.sram.len() {
+                    let b = self.sram[offset] as u32;
+                    b * 0x01010101
                 } else {
                     0
                 }
@@ -389,6 +388,7 @@ impl GbaBus {
 
     // 16-bit write (aligned)
     pub fn write16(&mut self, addr: u32, value: u16) {
+        let raw_addr = addr;
         let addr = addr & !1;
         let bytes = value.to_le_bytes();
         match addr >> 24 {
@@ -419,10 +419,10 @@ impl GbaBus {
                 self.oam[offset + 1] = bytes[1];
             }
             0x0E..=0x0F => {
-                let offset = (addr & 0xFFFF) as usize;
-                if offset + 1 < self.sram.len() {
-                    self.sram[offset] = bytes[0];
-                    self.sram[offset + 1] = bytes[1];
+                // sram is 8-bit bus; byte lane selected by original addr bit 0
+                let offset = (raw_addr & 0xFFFF) as usize;
+                if offset < self.sram.len() {
+                    self.sram[offset] = bytes[(raw_addr & 1) as usize];
                 }
             }
             _ => {}
@@ -431,6 +431,7 @@ impl GbaBus {
 
     // 32-bit write (aligned)
     pub fn write32(&mut self, addr: u32, value: u32) {
+        let raw_addr = addr;
         let addr = addr & !3;
         let bytes = value.to_le_bytes();
         match addr >> 24 {
@@ -459,9 +460,10 @@ impl GbaBus {
                 self.oam[offset..offset + 4].copy_from_slice(&bytes);
             }
             0x0E..=0x0F => {
-                let offset = (addr & 0xFFFF) as usize;
-                if offset + 3 < self.sram.len() {
-                    self.sram[offset..offset + 4].copy_from_slice(&bytes);
+                // sram is 8-bit bus; byte lane selected by original addr bits 0-1
+                let offset = (raw_addr & 0xFFFF) as usize;
+                if offset < self.sram.len() {
+                    self.sram[offset] = bytes[(raw_addr & 3) as usize];
                 }
             }
             _ => {}
@@ -752,7 +754,7 @@ impl GbaBus {
         self.palette.fill(0);
         self.vram.fill(0);
         self.oam.fill(0);
-        self.sram.fill(0);
+        self.sram.fill(0xFF);
         self.ppu.reset();
         self.apu.reset();
         self.dma = GbaDma::new();
