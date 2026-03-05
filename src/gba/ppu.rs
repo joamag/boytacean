@@ -84,6 +84,10 @@ pub struct GbaPpu {
     bg_ref_x_write: [i32; 2],
     bg_ref_y_write: [i32; 2],
 
+    /// Raw 32-bit shadow registers for partial 16-bit writes to BG ref points
+    bg_ref_x_raw: [u32; 2],
+    bg_ref_y_raw: [u32; 2],
+
     /// window registers
     winh: [u16; 2],
     winv: [u16; 2],
@@ -128,6 +132,8 @@ impl GbaPpu {
             bg_ref_y: [0; 2],
             bg_ref_x_write: [0; 2],
             bg_ref_y_write: [0; 2],
+            bg_ref_x_raw: [0; 2],
+            bg_ref_y_raw: [0; 2],
             winh: [0; 2],
             winv: [0; 2],
             winin: 0,
@@ -195,6 +201,14 @@ impl GbaPpu {
         self.bgcnt[index] = value;
     }
 
+    pub fn bg_hofs(&self, index: usize) -> u16 {
+        self.bg_hofs[index]
+    }
+
+    pub fn bg_vofs(&self, index: usize) -> u16 {
+        self.bg_vofs[index]
+    }
+
     pub fn set_bg_hofs(&mut self, index: usize, value: u16) {
         self.bg_hofs[index] = value & 0x01FF;
     }
@@ -219,15 +233,35 @@ impl GbaPpu {
         self.bg_pd[index] = value as i16;
     }
 
-    pub fn set_bg_ref_x(&mut self, index: usize, value: u32) {
+    pub fn set_bg_ref_x_lo(&mut self, index: usize, value: u16) {
+        self.bg_ref_x_raw[index] = (self.bg_ref_x_raw[index] & 0xFFFF0000) | value as u32;
+        self.apply_bg_ref_x(index);
+    }
+
+    pub fn set_bg_ref_x_hi(&mut self, index: usize, value: u16) {
+        self.bg_ref_x_raw[index] = (self.bg_ref_x_raw[index] & 0x0000FFFF) | ((value as u32) << 16);
+        self.apply_bg_ref_x(index);
+    }
+
+    pub fn set_bg_ref_y_lo(&mut self, index: usize, value: u16) {
+        self.bg_ref_y_raw[index] = (self.bg_ref_y_raw[index] & 0xFFFF0000) | value as u32;
+        self.apply_bg_ref_y(index);
+    }
+
+    pub fn set_bg_ref_y_hi(&mut self, index: usize, value: u16) {
+        self.bg_ref_y_raw[index] = (self.bg_ref_y_raw[index] & 0x0000FFFF) | ((value as u32) << 16);
+        self.apply_bg_ref_y(index);
+    }
+
+    fn apply_bg_ref_x(&mut self, index: usize) {
         // 28-bit signed, sign-extend from bit 27
-        let signed = ((value as i32) << 4) >> 4;
+        let signed = ((self.bg_ref_x_raw[index] as i32) << 4) >> 4;
         self.bg_ref_x_write[index] = signed;
         self.bg_ref_x[index] = signed;
     }
 
-    pub fn set_bg_ref_y(&mut self, index: usize, value: u32) {
-        let signed = ((value as i32) << 4) >> 4;
+    fn apply_bg_ref_y(&mut self, index: usize) {
+        let signed = ((self.bg_ref_y_raw[index] as i32) << 4) >> 4;
         self.bg_ref_y_write[index] = signed;
         self.bg_ref_y[index] = signed;
     }
@@ -383,7 +417,8 @@ impl GbaPpu {
 
     /// mode 0: 4 text BG layers
     fn render_mode0(&mut self, line: usize, vram: &[u8], palette: &[u8], oam: &[u8]) {
-        let mut line_buffer = [0u16; DISPLAY_WIDTH];
+        let backdrop = self.read_palette_color(palette, 0);
+        let mut line_buffer = [backdrop; DISPLAY_WIDTH];
         let mut priority_buffer = [4u8; DISPLAY_WIDTH];
 
         // render BGs in reverse priority order (lowest priority first)
@@ -421,7 +456,8 @@ impl GbaPpu {
 
     /// mode 1: 2 text BGs + 1 affine BG (BG2)
     fn render_mode1(&mut self, line: usize, vram: &[u8], palette: &[u8], oam: &[u8]) {
-        let mut line_buffer = [0u16; DISPLAY_WIDTH];
+        let backdrop = self.read_palette_color(palette, 0);
+        let mut line_buffer = [backdrop; DISPLAY_WIDTH];
         let mut priority_buffer = [4u8; DISPLAY_WIDTH];
 
         // BG2 is affine
@@ -472,7 +508,8 @@ impl GbaPpu {
 
     /// mode 2: 2 affine BGs (BG2, BG3)
     fn render_mode2(&mut self, line: usize, vram: &[u8], palette: &[u8], oam: &[u8]) {
-        let mut line_buffer = [0u16; DISPLAY_WIDTH];
+        let backdrop = self.read_palette_color(palette, 0);
+        let mut line_buffer = [backdrop; DISPLAY_WIDTH];
         let mut priority_buffer = [4u8; DISPLAY_WIDTH];
 
         // BG3 (lower priority first)
@@ -964,6 +1001,8 @@ impl GbaPpu {
         self.bg_ref_y = [0; 2];
         self.bg_ref_x_write = [0; 2];
         self.bg_ref_y_write = [0; 2];
+        self.bg_ref_x_raw = [0; 2];
+        self.bg_ref_y_raw = [0; 2];
         self.int_vblank = false;
         self.int_hblank = false;
         self.int_vcount = false;
@@ -1105,8 +1144,10 @@ mod tests {
     #[test]
     fn test_bg_ref_point() {
         let mut ppu = GbaPpu::new();
-        ppu.set_bg_ref_x(0, 0x1000);
-        ppu.set_bg_ref_y(0, 0x2000);
+        ppu.set_bg_ref_x_lo(0, 0x1000);
+        ppu.set_bg_ref_x_hi(0, 0x0000);
+        ppu.set_bg_ref_y_lo(0, 0x2000);
+        ppu.set_bg_ref_y_hi(0, 0x0000);
         assert_eq!(ppu.bg_ref_x[0], 0x1000);
         assert_eq!(ppu.bg_ref_y[0], 0x2000);
     }

@@ -103,7 +103,15 @@ fn arm_data_processing(cpu: &mut Arm7Tdmi, instr: u32) {
     let rd = (instr >> 12) & 0xF;
     let is_immediate = instr & (1 << 25) != 0;
 
-    let op1 = cpu.reg(rn);
+    // When operand 2 uses a register-specified shift (bit 25=0, bit 4=1),
+    // reading PC (as Rn or Rm) returns PC+12 instead of the usual PC+8,
+    // due to the extra internal cycle for reading the shift register.
+    let reg_shift = !is_immediate && (instr & (1 << 4) != 0);
+    let op1 = if rn == 15 && reg_shift {
+        cpu.reg(rn).wrapping_add(4)
+    } else {
+        cpu.reg(rn)
+    };
 
     // compute operand 2 with barrel shifter
     let (op2, shifter_carry) = if is_immediate {
@@ -120,8 +128,8 @@ fn arm_data_processing(cpu: &mut Arm7Tdmi, instr: u32) {
         let shift_type = (instr >> 5) & 0x03;
         let shift_by_reg = instr & (1 << 4) != 0;
 
-        let rm_val = if rm == 15 {
-            cpu.reg(15) // PC already advanced by pipeline
+        let rm_val = if rm == 15 && reg_shift {
+            cpu.reg(15).wrapping_add(4)
         } else {
             cpu.reg(rm)
         };
@@ -299,6 +307,10 @@ fn arm_data_processing(cpu: &mut Arm7Tdmi, instr: u32) {
         } else {
             cpu.set_reg(rd, value);
         }
+    } else if rd == 15 {
+        // TST/TEQ/CMP/CMN with Rd=R15: restore CPSR from SPSR
+        // These opcodes don't write Rd, but Rd=R15 still triggers CPSR restore
+        cpu.restore_cpsr();
     }
 
     cpu.cycles = 1;
@@ -387,7 +399,14 @@ fn arm_swap(cpu: &mut Arm7Tdmi, instr: u32) {
         cpu.bus_write8(addr, cpu.reg(rm) as u8);
         cpu.set_reg(rd, old as u32);
     } else {
-        let old = cpu.bus_read32(addr);
+        // SWP word: misaligned address rotates the read value
+        let aligned = cpu.bus_read32(addr);
+        let rotate = (addr & 3) * 8;
+        let old = if rotate == 0 {
+            aligned
+        } else {
+            aligned.rotate_right(rotate)
+        };
         cpu.bus_write32(addr, cpu.reg(rm));
         cpu.set_reg(rd, old);
     }
@@ -428,9 +447,24 @@ fn arm_halfword_transfer(cpu: &mut Arm7Tdmi, instr: u32) {
 
     if is_load {
         let value = match sh {
-            1 => cpu.bus_read16(addr) as u32,               // LDRH
-            2 => cpu.bus_read8(addr) as i8 as i32 as u32,   // LDRSB
-            3 => cpu.bus_read16(addr) as i16 as i32 as u32, // LDRSH
+            1 => {
+                // LDRH: misaligned odd address rotates result by 8
+                let aligned = cpu.bus_read16(addr & !1) as u32;
+                if addr & 1 != 0 {
+                    aligned.rotate_right(8)
+                } else {
+                    aligned
+                }
+            }
+            2 => cpu.bus_read8(addr) as i8 as i32 as u32, // LDRSB
+            3 => {
+                // LDRSH: misaligned odd address reads as LDRSB
+                if addr & 1 != 0 {
+                    cpu.bus_read8(addr) as i8 as i32 as u32
+                } else {
+                    cpu.bus_read16(addr) as i16 as i32 as u32
+                }
+            }
             _ => 0,
         };
         cpu.set_reg(rd, value);
@@ -439,16 +473,19 @@ fn arm_halfword_transfer(cpu: &mut Arm7Tdmi, instr: u32) {
         cpu.bus_write16(addr, cpu.reg(rd) as u16);
     }
 
-    // post-index: write back the modified address
-    if !pre_index {
-        let new_addr = if add_offset {
-            base.wrapping_add(offset)
-        } else {
-            base.wrapping_sub(offset)
-        };
-        cpu.set_reg(rn, new_addr);
-    } else if write_back {
-        cpu.set_reg(rn, addr);
+    // writeback: skip if load overwrote the base register (Rd == Rn)
+    let skip_writeback = is_load && rd == rn;
+    if !skip_writeback {
+        if !pre_index {
+            let new_addr = if add_offset {
+                base.wrapping_add(offset)
+            } else {
+                base.wrapping_sub(offset)
+            };
+            cpu.set_reg(rn, new_addr);
+        } else if write_back {
+            cpu.set_reg(rn, addr);
+        }
     }
 
     cpu.cycles = if is_load { 3 } else { 2 };
@@ -501,7 +538,12 @@ fn arm_single_transfer(cpu: &mut Arm7Tdmi, instr: u32) {
         };
         cpu.set_reg(rd, value);
     } else {
-        let value = cpu.reg(rd);
+        // STR with Rd=PC stores PC+12 on ARM7TDMI
+        let value = if rd == 15 {
+            cpu.reg(rd).wrapping_add(4)
+        } else {
+            cpu.reg(rd)
+        };
         if is_byte {
             cpu.bus_write8(addr, value as u8);
         } else {
@@ -509,15 +551,19 @@ fn arm_single_transfer(cpu: &mut Arm7Tdmi, instr: u32) {
         }
     }
 
-    if !pre_index {
-        let new_addr = if add_offset {
-            base.wrapping_add(offset)
-        } else {
-            base.wrapping_sub(offset)
-        };
-        cpu.set_reg(rn, new_addr);
-    } else if write_back {
-        cpu.set_reg(rn, addr);
+    // writeback: skip if load overwrote the base register (Rd == Rn)
+    let skip_writeback = is_load && rd == rn;
+    if !skip_writeback {
+        if !pre_index {
+            let new_addr = if add_offset {
+                base.wrapping_add(offset)
+            } else {
+                base.wrapping_sub(offset)
+            };
+            cpu.set_reg(rn, new_addr);
+        } else if write_back {
+            cpu.set_reg(rn, addr);
+        }
     }
 
     cpu.cycles = if is_load { 3 } else { 2 };
@@ -533,8 +579,11 @@ fn arm_block_transfer(cpu: &mut Arm7Tdmi, instr: u32) {
     let rn = (instr >> 16) & 0xF;
     let reg_list = instr & 0xFFFF;
 
-    let count = reg_list.count_ones();
     let base = cpu.reg(rn);
+
+    // empty register list: transfer PC and use 0x40 as size
+    let empty_rlist = reg_list == 0;
+    let count = if empty_rlist { 16 } else { reg_list.count_ones() };
 
     // calculate starting address
     let start_addr = if add_offset {
@@ -551,11 +600,27 @@ fn arm_block_transfer(cpu: &mut Arm7Tdmi, instr: u32) {
 
     let mut addr = start_addr;
 
-    if is_load {
+    // S bit (load_psr): for LDM with PC, restore CPSR from SPSR;
+    // for LDM without PC or STM, access user-mode registers
+    let use_user_regs = load_psr && !(is_load && reg_list & (1 << 15) != 0);
+
+    if empty_rlist {
+        // empty list: load/store only PC
+        if is_load {
+            let value = cpu.bus_read32(addr);
+            cpu.set_reg(15, value);
+        } else {
+            cpu.bus_write32(addr, cpu.reg(15).wrapping_add(4));
+        }
+    } else if is_load {
         for i in 0..16u32 {
             if reg_list & (1 << i) != 0 {
                 let value = cpu.bus_read32(addr);
-                cpu.set_reg(i, value);
+                if use_user_regs {
+                    cpu.set_reg_user(i, value);
+                } else {
+                    cpu.set_reg(i, value);
+                }
                 addr = addr.wrapping_add(4);
             }
         }
@@ -563,15 +628,37 @@ fn arm_block_transfer(cpu: &mut Arm7Tdmi, instr: u32) {
             cpu.restore_cpsr();
         }
     } else {
+        // for STM with writeback and base in rlist: if base is not the
+        // lowest register, store the written-back value instead of original
+        let wb_base = if add_offset {
+            base.wrapping_add(count * 4)
+        } else {
+            base.wrapping_sub(count * 4)
+        };
+        let lowest_in_list = (0..16u32).find(|&i| reg_list & (1 << i) != 0);
+        let base_is_first = lowest_in_list == Some(rn);
+
         for i in 0..16u32 {
             if reg_list & (1 << i) != 0 {
-                cpu.bus_write32(addr, cpu.reg(i));
+                let value = if use_user_regs {
+                    cpu.reg_user(i)
+                } else if i == 15 {
+                    // STM with PC stores PC+12 on ARM7TDMI
+                    cpu.reg(i).wrapping_add(4)
+                } else if i == rn && write_back && !base_is_first {
+                    wb_base
+                } else {
+                    cpu.reg(i)
+                };
+                cpu.bus_write32(addr, value);
                 addr = addr.wrapping_add(4);
             }
         }
     }
 
-    if write_back {
+    // skip writeback if load overwrote the base register
+    let skip_wb = is_load && !empty_rlist && reg_list & (1 << rn) != 0;
+    if write_back && !skip_wb {
         let new_base = if add_offset {
             base.wrapping_add(count * 4)
         } else {
@@ -875,5 +962,232 @@ mod tests {
         assert_eq!(cpu.reg(1), 0);
         assert!(cpu.flag_z());
         assert!(cpu.flag_c());
+    }
+
+    #[test]
+    fn test_arm_data_processing_pc_plus_12_reg_shift() {
+        // When operand 2 uses a register-specified shift (bit 4=1),
+        // reading PC as Rm returns PC+12 instead of PC+8
+        let mut cpu = make_cpu();
+        // Place instruction at known address
+        let addr = 0x0200_0000u32;
+        cpu.set_reg(15, addr + 8); // pipeline: PC = addr + 8
+        cpu.set_reg(1, 0); // shift amount = 0
+
+        // MOV R0, R15, LSL R1 → E1A0011F (Rd=0, Rm=15, shift_type=LSL, Rs=R1)
+        // This has bit 4=1 (register shift), so PC should read as addr+12
+        super::execute_arm(&mut cpu, 0xE1A0011F);
+        assert_eq!(cpu.reg(0), addr + 12);
+    }
+
+    #[test]
+    fn test_arm_data_processing_pc_plus_12_rn_reg_shift() {
+        // PC as Rn with register-specified shift also returns PC+12
+        let mut cpu = make_cpu();
+        let addr = 0x0200_0000u32;
+        cpu.set_reg(15, addr + 8);
+        cpu.set_reg(0, 0);
+        cpu.set_reg(1, 0); // shift amount = 0
+
+        // ADD R2, R15, R0, LSL R1 → E08F2010... wait, need proper encoding
+        // ADD Rd=2, Rn=15, Rm=0, LSL Rs=1: E08F2110
+        super::execute_arm(&mut cpu, 0xE08F2110);
+        assert_eq!(cpu.reg(2), addr + 12);
+    }
+
+    #[test]
+    fn test_arm_cmp_rd15_restores_cpsr() {
+        // CMP/CMN/TST/TEQ with Rd=R15 should restore CPSR from SPSR
+        let mut cpu = make_cpu();
+        // Switch to FIQ mode
+        cpu.set_cpsr(0x00000011); // FIQ mode
+        // Set SPSR_fiq to SYS mode with N flag
+        cpu.set_spsr(0x8000001F);
+        cpu.set_reg(0, 0);
+
+        // CMP R15, R0 with Rd=R15: 0xE15FF000
+        super::execute_arm(&mut cpu, 0xE15FF000);
+
+        // CPSR should be restored from SPSR
+        assert_eq!(cpu.cpsr() & 0x1F, 0x1F); // SYS mode
+        assert!(cpu.flag_n());
+    }
+
+    #[test]
+    fn test_arm_str_pc_stores_plus_12() {
+        // STR with Rd=PC stores PC+12 on ARM7TDMI
+        let mut cpu = make_cpu();
+        let pc_addr = 0x0800_0100u32;
+        cpu.set_reg(15, pc_addr + 8);
+        cpu.set_reg(1, 0x0200_0000);
+
+        // STR PC, [R1] → E5810000 but with Rd=PC: E581F000
+        super::execute_arm(&mut cpu, 0xE581F000);
+        assert_eq!(cpu.bus_read32(0x0200_0000), pc_addr + 12);
+    }
+
+    #[test]
+    fn test_arm_ldr_misaligned_rotates() {
+        // LDR from misaligned address should rotate the value
+        let mut cpu = make_cpu();
+        let addr = 0x0200_0000u32;
+        cpu.bus_write32(addr, 0x04030201);
+        cpu.set_reg(1, addr + 1); // misaligned by 1
+
+        // LDR R0, [R1] → E5910000
+        super::execute_arm(&mut cpu, 0xE5910000);
+        assert_eq!(cpu.reg(0), 0x04030201u32.rotate_right(8));
+    }
+
+    #[test]
+    fn test_arm_ldr_writeback_rd_eq_rn() {
+        // LDR with writeback where Rd==Rn: loaded value wins over writeback
+        let mut cpu = make_cpu();
+        let base = 0x0200_0000u32;
+        cpu.bus_write32(base + 4, 42);
+        cpu.set_reg(0, base);
+
+        // LDR R0, [R0, #4]! → E5B00004
+        super::execute_arm(&mut cpu, 0xE5B00004);
+        assert_eq!(cpu.reg(0), 42); // loaded value, not base+4
+    }
+
+    #[test]
+    fn test_arm_ldrh_misaligned_rotates() {
+        // LDRH from odd address rotates result by 8
+        let mut cpu = make_cpu();
+        let addr = 0x0200_0000u32;
+        cpu.bus_write16(addr, 0x0020); // 32
+        cpu.set_reg(1, addr);
+
+        // LDRH R0, [R1, #1] → E1D100B1
+        super::execute_arm(&mut cpu, 0xE1D100B1);
+        assert_eq!(cpu.reg(0), 0x0020u32.rotate_right(8));
+    }
+
+    #[test]
+    fn test_arm_ldrsh_misaligned_reads_byte() {
+        // LDRSH from odd address reads as LDRSB
+        let mut cpu = make_cpu();
+        let addr = 0x0200_0000u32;
+        cpu.bus_write8(addr + 1, 0x80); // -128 as signed byte
+        cpu.set_reg(1, addr);
+
+        // LDRSH R0, [R1, #1] → E1D100F1
+        super::execute_arm(&mut cpu, 0xE1D100F1);
+        assert_eq!(cpu.reg(0), 0xFFFFFF80); // sign-extended byte
+    }
+
+    #[test]
+    fn test_arm_swp_misaligned_rotates() {
+        // SWP with misaligned address rotates the read value
+        let mut cpu = make_cpu();
+        let addr = 0x0200_0000u32;
+        cpu.bus_write32(addr, 0x04030201);
+        cpu.set_reg(0, addr + 1); // Rn = misaligned
+        cpu.set_reg(1, 0);        // Rm = value to store
+
+        // SWP R2, R1, [R0] → E1002091
+        super::execute_arm(&mut cpu, 0xE1002091);
+        assert_eq!(cpu.reg(2), 0x04030201u32.rotate_right(8));
+    }
+
+    #[test]
+    fn test_arm_stm_pc_stores_plus_12() {
+        // STM with PC in register list stores PC+12
+        let mut cpu = make_cpu();
+        let pc_addr = 0x0800_0100u32;
+        cpu.set_reg(15, pc_addr + 8);
+        cpu.set_reg(0, 0x0200_0000);
+
+        // STMIA R0, {PC} → E8808000 (reg_list bit 15)
+        super::execute_arm(&mut cpu, 0xE8808000);
+        assert_eq!(cpu.bus_read32(0x0200_0000), pc_addr + 12);
+    }
+
+    #[test]
+    fn test_arm_ldm_writeback_rn_in_rlist() {
+        // LDM with writeback: skip writeback if Rn is in register list
+        let mut cpu = make_cpu();
+        let base = 0x0200_0000u32;
+        cpu.bus_write32(base, 0xAA);     // will be loaded into R1
+        cpu.bus_write32(base + 4, 0xBB); // will be loaded into R2
+        cpu.set_reg(1, base);
+
+        // LDMIA R1!, {R1, R2} → E8B10006
+        super::execute_arm(&mut cpu, 0xE8B10006);
+        assert_eq!(cpu.reg(1), 0xAA); // loaded value, not writeback
+        assert_eq!(cpu.reg(2), 0xBB);
+    }
+
+    #[test]
+    fn test_arm_stm_base_not_first_stores_writeback() {
+        // STM with writeback: base not lowest in rlist stores written-back value
+        let mut cpu = make_cpu();
+        let base = 0x0200_0010u32;
+        cpu.set_reg(0, 0xAA);
+        cpu.set_reg(1, base);
+        cpu.set_reg(2, 0xCC);
+        cpu.set_reg(3, 0xDD);
+
+        // STMDB R1!, {R0-R3} → E921000F (pre-decrement, writeback)
+        super::execute_arm(&mut cpu, 0xE921000F);
+
+        // R1 is not the lowest (R0 is), so written-back value should be stored
+        let wb_base = base - 16;
+        let r1_stored = cpu.bus_read32(wb_base + 4);
+        assert_eq!(r1_stored, wb_base); // written-back value
+    }
+
+    #[test]
+    fn test_arm_stm_base_first_stores_original() {
+        // STM with writeback: base is lowest in rlist stores original value
+        let mut cpu = make_cpu();
+        let base = 0x0200_0010u32;
+        cpu.set_reg(0, base);
+        cpu.set_reg(1, 0xBB);
+
+        // STMDB R0!, {R0, R1} → E9200003
+        super::execute_arm(&mut cpu, 0xE9200003);
+
+        // R0 IS the lowest, so original base should be stored
+        let wb_base = base - 8;
+        let r0_stored = cpu.bus_read32(wb_base);
+        assert_eq!(r0_stored, base); // original value
+    }
+
+    #[test]
+    fn test_arm_ldm_stm_empty_rlist() {
+        // Empty register list: transfers PC and increments base by 0x40
+        let mut cpu = make_cpu();
+        let base = 0x0200_0000u32;
+        let pc_val = 0x0800_0100u32;
+        cpu.set_reg(15, pc_val + 8);
+        cpu.set_reg(0, base);
+
+        // STMIA R0!, {} → E8A00000
+        super::execute_arm(&mut cpu, 0xE8A00000);
+        assert_eq!(cpu.bus_read32(base), pc_val + 12); // stores PC+12
+        assert_eq!(cpu.reg(0), base + 0x40); // base incremented by 0x40
+    }
+
+    #[test]
+    fn test_arm_stm_ldm_user_regs() {
+        // STM with S bit stores user-mode registers from FIQ
+        let mut cpu = make_cpu();
+        cpu.set_reg(8, 32); // R8 in SYS/USR = 32
+
+        // Switch to FIQ mode
+        cpu.set_cpsr(0x00000011);
+        cpu.set_reg(8, 64); // R8_fiq = 64
+
+        let mem = 0x0200_0000u32;
+        cpu.set_reg(0, mem);
+
+        // STMIA R0, {R8}^ → E8C00100 (S bit set, no writeback)
+        super::execute_arm(&mut cpu, 0xE8C00100);
+
+        // Should store USR R8 = 32, not FIQ R8 = 64
+        assert_eq!(cpu.bus_read32(mem), 32);
     }
 }
