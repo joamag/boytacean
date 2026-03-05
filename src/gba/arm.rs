@@ -583,7 +583,11 @@ fn arm_block_transfer(cpu: &mut Arm7Tdmi, instr: u32) {
 
     // empty register list: transfer PC and use 0x40 as size
     let empty_rlist = reg_list == 0;
-    let count = if empty_rlist { 16 } else { reg_list.count_ones() };
+    let count = if empty_rlist {
+        16
+    } else {
+        reg_list.count_ones()
+    };
 
     // calculate starting address
     let start_addr = if add_offset {
@@ -1001,7 +1005,7 @@ mod tests {
         let mut cpu = make_cpu();
         // Switch to FIQ mode
         cpu.set_cpsr(0x00000011); // FIQ mode
-        // Set SPSR_fiq to SYS mode with N flag
+                                  // Set SPSR_fiq to SYS mode with N flag
         cpu.set_spsr(0x8000001F);
         cpu.set_reg(0, 0);
 
@@ -1085,7 +1089,7 @@ mod tests {
         let addr = 0x0200_0000u32;
         cpu.bus_write32(addr, 0x04030201);
         cpu.set_reg(0, addr + 1); // Rn = misaligned
-        cpu.set_reg(1, 0);        // Rm = value to store
+        cpu.set_reg(1, 0); // Rm = value to store
 
         // SWP R2, R1, [R0] → E1002091
         super::execute_arm(&mut cpu, 0xE1002091);
@@ -1110,7 +1114,7 @@ mod tests {
         // LDM with writeback: skip writeback if Rn is in register list
         let mut cpu = make_cpu();
         let base = 0x0200_0000u32;
-        cpu.bus_write32(base, 0xAA);     // will be loaded into R1
+        cpu.bus_write32(base, 0xAA); // will be loaded into R1
         cpu.bus_write32(base + 4, 0xBB); // will be loaded into R2
         cpu.set_reg(1, base);
 

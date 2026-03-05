@@ -38,7 +38,6 @@ pub fn run_diagnostics(gba: &mut GameBoyAdvance, num_frames: u32) {
         // Analyze BG rendering at frame 2000
         if frame == 2000 {
             analyze_bg_rendering(gba);
-
         }
     }
 }
@@ -116,17 +115,26 @@ fn analyze_bg_rendering(gba: &GameBoyAdvance) {
         let hofs = gba.cpu.bus.ppu.bg_hofs(bg);
         let vofs = gba.cpu.bus.ppu.bg_vofs(bg);
 
-        println!("\nBG{}: CNT={:#06x} char={:#06x} screen={:#06x} {}bpp size={} pri={} hofs={} vofs={}",
-            bg, cnt, char_base, screen_base,
-            if is_8bpp { 8 } else { 4 }, screen_size, priority, hofs, vofs);
+        println!(
+            "\nBG{}: CNT={:#06x} char={:#06x} screen={:#06x} {}bpp size={} pri={} hofs={} vofs={}",
+            bg,
+            cnt,
+            char_base,
+            screen_base,
+            if is_8bpp { 8 } else { 4 },
+            screen_size,
+            priority,
+            hofs,
+            vofs
+        );
 
         // Dump first 32 tile map entries (raw hex)
         println!("  First 32 map entries:");
         for i in 0..32 {
             let addr = screen_base + i * 2;
             if addr + 1 < gba.cpu.bus.vram.len() {
-                let entry = gba.cpu.bus.vram[addr] as u16
-                    | ((gba.cpu.bus.vram[addr + 1] as u16) << 8);
+                let entry =
+                    gba.cpu.bus.vram[addr] as u16 | ((gba.cpu.bus.vram[addr + 1] as u16) << 8);
                 print!("{:#06x} ", entry);
                 if (i + 1) % 8 == 0 {
                     println!();
@@ -159,8 +167,7 @@ fn analyze_bg_rendering(gba: &GameBoyAdvance) {
 }
 
 fn save_frame_buffer_ppm(gba: &GameBoyAdvance, path: &str) {
-    use std::fs::File;
-    use std::io::Write;
+    use std::{fs::File, io::Write};
 
     let fb = gba.frame_buffer();
     let mut f = File::create(path).expect("Failed to create PPM file");

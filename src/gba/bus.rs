@@ -622,10 +622,7 @@ impl GbaBus {
                 let serviced = self.irq.ie() & self.irq.if_() & value;
                 if serviced != 0 {
                     let offset = (0x03007FF8u32 & 0x7FFF) as usize;
-                    let old = u16::from_le_bytes([
-                        self.iwram[offset],
-                        self.iwram[offset + 1],
-                    ]);
+                    let old = u16::from_le_bytes([self.iwram[offset], self.iwram[offset + 1]]);
                     let new_val = old | serviced;
                     let bytes = new_val.to_le_bytes();
                     self.iwram[offset] = bytes[0];
