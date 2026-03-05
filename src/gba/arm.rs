@@ -543,12 +543,10 @@ fn arm_block_transfer(cpu: &mut Arm7Tdmi, instr: u32) {
         } else {
             base
         }
+    } else if pre_index {
+        base.wrapping_sub(count * 4)
     } else {
-        if pre_index {
-            base.wrapping_sub(count * 4)
-        } else {
-            base.wrapping_sub(count * 4).wrapping_add(4)
-        }
+        base.wrapping_sub(count * 4).wrapping_add(4)
     };
 
     let mut addr = start_addr;

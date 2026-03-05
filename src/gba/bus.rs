@@ -438,7 +438,7 @@ impl GbaBus {
             REG_POSTFLG => self.postflg as u16,
             _ => {
                 // wave RAM
-                if addr >= REG_WAVE_RAM && addr < REG_WAVE_RAM + 16 {
+                if (REG_WAVE_RAM..REG_WAVE_RAM + 16).contains(&addr) {
                     let offset = (addr - REG_WAVE_RAM) as usize;
                     let lo = self.apu.read_wave_ram(offset) as u16;
                     let hi = self.apu.read_wave_ram(offset + 1) as u16;
@@ -548,7 +548,7 @@ impl GbaBus {
                 }
 
                 // wave RAM
-                if addr >= REG_WAVE_RAM && addr < REG_WAVE_RAM + 16 {
+                if (REG_WAVE_RAM..REG_WAVE_RAM + 16).contains(&addr) {
                     let offset = (addr - REG_WAVE_RAM) as usize;
                     self.apu.write_wave_ram(offset, value as u8);
                     self.apu.write_wave_ram(offset + 1, (value >> 8) as u8);
