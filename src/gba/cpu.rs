@@ -340,7 +340,20 @@ impl Arm7Tdmi {
         self.set_cpsr((self.cpsr & !CPSR_MODE_MASK & !CPSR_T) | mode | CPSR_I);
         self.set_spsr(old_cpsr);
         self.regs[14] = return_addr;
-        self.regs[15] = vector;
+
+        // for IRQ, use HLE dispatch: read handler address from
+        // 0x03FFFFFC (mirrored to 0x03007FFC in IWRAM) instead
+        // of jumping to the BIOS vector at 0x18
+        if vector == 0x18 {
+            let handler = self.bus.read32(0x03FF_FFFC);
+            if handler != 0 {
+                self.regs[15] = handler;
+            } else {
+                self.regs[15] = vector;
+            }
+        } else {
+            self.regs[15] = vector;
+        }
         self.flush_pipeline();
     }
 
