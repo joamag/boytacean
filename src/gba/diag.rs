@@ -55,12 +55,70 @@ pub fn run_diagnostics(gba: &mut GameBoyAdvance, num_frames: u32) {
         }
     }
 
-    println!("\nRunning {} frames...", num_frames);
+    println!("\nRunning frames (will stop if CPU leaves valid memory)...");
+    let mut trace_buffer: Vec<String> = Vec::with_capacity(20);
 
     for frame in 0..num_frames {
-        let cycles = gba.next_frame();
+        // run individual clocks to catch the exact moment CPU goes off
+        let last_frame = gba.cpu.bus.ppu.frame();
+        let mut frame_cycles = 0u64;
+        let mut bad_pc = false;
+        while gba.cpu.bus.ppu.frame() == last_frame {
+            let pc = gba.cpu.pc();
+            let in_rom = (0x0800_0000..0x0A00_0000).contains(&pc);
+            let in_iwram = (0x0300_0000..0x0300_8000).contains(&pc);
+            let in_ewram = (0x0200_0000..0x0204_0000).contains(&pc);
+            let in_bios = pc < 0x4000;
+
+            if !in_rom && !in_iwram && !in_ewram && !in_bios && !bad_pc {
+                bad_pc = true;
+                println!("\n!!! CPU LEFT VALID MEMORY at frame {} !!!", frame);
+                println!("  PC = {:#010x}", pc);
+                println!("  CPSR = {:#010x}", gba.cpu.cpsr());
+                println!("  Mode = {:#04x}", gba.cpu.cpsr() & 0x1F);
+                println!("  R0={:#010x} R1={:#010x} R2={:#010x} R3={:#010x}",
+                    gba.cpu.reg(0), gba.cpu.reg(1), gba.cpu.reg(2), gba.cpu.reg(3));
+                println!("  R4={:#010x} R5={:#010x} R6={:#010x} R7={:#010x}",
+                    gba.cpu.reg(4), gba.cpu.reg(5), gba.cpu.reg(6), gba.cpu.reg(7));
+                println!("  R8={:#010x} R9={:#010x} R10={:#010x} R11={:#010x}",
+                    gba.cpu.reg(8), gba.cpu.reg(9), gba.cpu.reg(10), gba.cpu.reg(11));
+                println!("  R12={:#010x} SP={:#010x} LR={:#010x}",
+                    gba.cpu.reg(12), gba.cpu.reg(13), gba.cpu.reg(14));
+                println!("\n  Last 20 instructions from trace buffer:");
+                for (j, entry) in trace_buffer.iter().enumerate() {
+                    println!("    [{:2}] {}", j, entry);
+                }
+                break;
+            }
+
+            // record trace for debugging
+            let thumb = gba.cpu.in_thumb_mode();
+            let exec_addr = if thumb { pc.wrapping_sub(4) } else { pc.wrapping_sub(8) };
+            let cpsr_before = gba.cpu.cpsr();
+            let r12_before = gba.cpu.reg(12);
+            let cycles = gba.clock();
+            let cpsr_after = gba.cpu.cpsr();
+            let r12_after = gba.cpu.reg(12);
+            let pc_after = gba.cpu.pc();
+            let trace_entry = format!(
+                "{:#010x}(pc={:#010x}): cpsr={:#010x}->{:#010x} {} c={} r12={:#010x}->{:#010x} pc_after={:#010x}",
+                exec_addr, pc, cpsr_before, cpsr_after,
+                if thumb { "T" } else { "A" },
+                cycles, r12_before, r12_after, pc_after
+            );
+            if trace_buffer.len() >= 20 {
+                trace_buffer.remove(0);
+            }
+            trace_buffer.push(trace_entry);
+            frame_cycles += cycles as u64;
+        }
+
+        if bad_pc {
+            break;
+        }
+
         if frame < 5 || frame % 10 == 0 {
-            print_state(gba, frame, cycles);
+            print_state(gba, frame, frame_cycles);
         }
     }
 
@@ -277,7 +335,7 @@ fn print_memory_regions(gba: &GameBoyAdvance) {
     let handler = gba.cpu.bus.read32(0x03FF_FFFC);
     if handler != 0 && (0x0300_0000..0x0300_8000).contains(&handler) {
         println!("\n=== IRQ Handler Code @ {:#010x} ===", handler);
-        for i in 0..16 {
+        for i in 0..48 {
             let addr = handler + i * 4;
             let word = gba.cpu.bus.read32(addr);
             println!("  {:#010x}: {:#010x}", addr, word);
