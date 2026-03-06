@@ -360,23 +360,6 @@ impl Arm7Tdmi {
         self.pipeline[0]
     }
 
-    /// advances the pipeline after instruction execution
-    fn advance_pipeline(&mut self) {
-        self.pipeline[0] = self.pipeline[1];
-
-        self.bus.bios_readable = self.regs[15] < 0x4000;
-        if self.in_thumb_mode() {
-            self.pipeline[1] = self.bus.read16(self.regs[15]) as u32;
-            self.fetch_bios_guard(self.regs[15], self.pipeline[1]);
-            self.regs[15] = self.regs[15].wrapping_add(2);
-        } else {
-            self.pipeline[1] = self.bus.read32(self.regs[15]);
-            self.fetch_bios_guard(self.regs[15], self.pipeline[1]);
-            self.regs[15] = self.regs[15].wrapping_add(4);
-        }
-        self.bus.bios_readable = false;
-    }
-
     /// Executes a single CPU instruction and returns the
     /// number of cycles consumed.
     pub fn step(&mut self) -> u32 {
@@ -405,6 +388,26 @@ impl Arm7Tdmi {
         self.cycles = 0;
         let instr = self.fetch();
 
+        // Prefetch the next pipeline entry BEFORE executing the instruction.
+        // On real ARM7TDMI, fetch/decode/execute happen simultaneously:
+        // the fetch stage reads from PC at the same time as the execute
+        // stage runs the current instruction, so self-modifying code that
+        // writes to upcoming instruction addresses does not affect the
+        // already-fetched pipeline contents.
+        let prefetched = if self.pipeline_valid {
+            self.bus.bios_readable = self.regs[15] < 0x4000;
+            let value = if self.in_thumb_mode() {
+                self.bus.read16(self.regs[15]) as u32
+            } else {
+                self.bus.read32(self.regs[15])
+            };
+            self.fetch_bios_guard(self.regs[15], value);
+            self.bus.bios_readable = false;
+            Some(value)
+        } else {
+            None
+        };
+
         // allow BIOS data reads while executing BIOS code
         let in_bios = self.regs[15] < 0x4000 + 8;
         if in_bios {
@@ -421,9 +424,17 @@ impl Arm7Tdmi {
             self.bus.bios_readable = false;
         }
 
-        // advance the pipeline only if it wasn't flushed (branch/exception)
+        // Commit the prefetched value into the pipeline (if not flushed)
         if self.pipeline_valid {
-            self.advance_pipeline();
+            self.pipeline[0] = self.pipeline[1];
+            if let Some(value) = prefetched {
+                self.pipeline[1] = value;
+            }
+            if self.in_thumb_mode() {
+                self.regs[15] = self.regs[15].wrapping_add(2);
+            } else {
+                self.regs[15] = self.regs[15].wrapping_add(4);
+            }
         }
 
         if self.cycles == 0 {
@@ -462,7 +473,7 @@ impl Arm7Tdmi {
     pub fn enter_exception(&mut self, vector: u32, mode: u32) {
         let old_cpsr = self.cpsr;
         // for IRQ: LR_irq = next_instruction + 4
-        // after advance_pipeline: ARM regs[15] = instr+12, Thumb regs[15] = instr+6
+        // after pipeline advance: ARM regs[15] = instr+12, Thumb regs[15] = instr+6
         // ARM: LR = instr+12-4 = instr+8 = (instr+4)+4 ✓
         // Thumb: LR = instr+6 = (instr+2)+4 ✓
         let return_addr = if self.in_thumb_mode() {
@@ -981,7 +992,7 @@ mod tests {
         let mut cpu = make_cpu();
         // Place an instruction in BIOS at 0x00
         cpu.bus.bios_readable = true;
-        let val_at_0 = cpu.bus.read32(0x0000_0000);
+        let _val_at_0 = cpu.bus.read32(0x0000_0000);
         cpu.bus.bios_readable = false;
         // Set PC to BIOS address and fill pipeline
         cpu.set_reg(15, 0x0000_0000);

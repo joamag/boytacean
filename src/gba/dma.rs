@@ -430,7 +430,7 @@ mod tests {
         dma.channels[0].set_count_reg(16);
 
         // enable with immediate timing
-        dma.channels[0].set_control((1 << 15) | (0 << 12), 0);
+        dma.channels[0].set_control(1 << 15, 0);
         assert!(dma.channels[0].active());
         assert_eq!(dma.highest_active(), Some(0));
     }

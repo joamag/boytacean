@@ -369,17 +369,15 @@ impl GbaPpu {
             return 0x3F;
         }
 
-        if self.dispcnt & (1 << 13) != 0 {
-            if self.pixel_in_window(x, line, 0) {
+        if self.dispcnt & (1 << 13) != 0
+            && self.pixel_in_window(x, line, 0) {
                 return (self.winin & 0x3F) as u8;
             }
-        }
 
-        if self.dispcnt & (1 << 14) != 0 {
-            if self.pixel_in_window(x, line, 1) {
+        if self.dispcnt & (1 << 14) != 0
+            && self.pixel_in_window(x, line, 1) {
                 return ((self.winin >> 8) & 0x3F) as u8;
             }
-        }
 
         if self.dispcnt & (1 << 15) != 0 && obj_window {
             return ((self.winout >> 8) & 0x3F) as u8;
@@ -459,9 +457,9 @@ impl GbaPpu {
         let g = ((color >> 5) & 0x1F) as u32;
         let b = ((color >> 10) & 0x1F) as u32;
 
-        let r = r + ((31 - r) * evy >> 4);
-        let g = g + ((31 - g) * evy >> 4);
-        let b = b + ((31 - b) * evy >> 4);
+        let r = r + (((31 - r) * evy) >> 4);
+        let g = g + (((31 - g) * evy) >> 4);
+        let b = b + (((31 - b) * evy) >> 4);
 
         (r | (g << 5) | (b << 10)) as u16
     }
@@ -474,9 +472,9 @@ impl GbaPpu {
         let g = ((color >> 5) & 0x1F) as u32;
         let b = ((color >> 10) & 0x1F) as u32;
 
-        let r = r - (r * evy >> 4);
-        let g = g - (g * evy >> 4);
-        let b = b - (b * evy >> 4);
+        let r = r - ((r * evy) >> 4);
+        let g = g - ((g * evy) >> 4);
+        let b = b - ((b * evy) >> 4);
 
         (r | (g << 5) | (b << 10)) as u16
     }
@@ -1207,7 +1205,7 @@ impl GbaPpu {
 
                 let half_w = width as i32 / 2;
                 let half_h = height as i32 / 2;
-                let iy = rel_y as i32 - bound_h as i32 / 2;
+                let iy = rel_y - bound_h as i32 / 2;
 
                 for screen_dx in 0..bound_w {
                     let screen_x = x + screen_dx as i32;
@@ -1814,7 +1812,7 @@ mod tests {
         let mut ppu = GbaPpu::new();
         // wrapping window: x2 < x1
         ppu.set_winh(0, (200 << 8) | 50);
-        ppu.set_winv(0, (0 << 8) | 160);
+        ppu.set_winv(0, 160);
 
         assert!(ppu.pixel_in_window(210, 80, 0)); // past x1
         assert!(ppu.pixel_in_window(30, 80, 0)); // before x2
@@ -1833,7 +1831,7 @@ mod tests {
         let mut ppu = GbaPpu::new();
         ppu.set_dispcnt(1 << 13); // enable WIN0
         ppu.set_winh(0, (10 << 8) | 50);
-        ppu.set_winv(0, (0 << 8) | 160);
+        ppu.set_winv(0, 160);
         ppu.set_winin(0x0015); // WIN0: BG0 + BG2 + OBJ
         ppu.set_winout(0x003F);
 
@@ -1845,7 +1843,7 @@ mod tests {
         let mut ppu = GbaPpu::new();
         ppu.set_dispcnt(1 << 13); // enable WIN0
         ppu.set_winh(0, (10 << 8) | 50);
-        ppu.set_winv(0, (0 << 8) | 160);
+        ppu.set_winv(0, 160);
         ppu.set_winin(0x0015);
         ppu.set_winout(0x002A); // WINOUT: BG1 + BG3 + blend
 
@@ -1857,7 +1855,7 @@ mod tests {
         let mut ppu = GbaPpu::new();
         ppu.set_dispcnt((1 << 15) | (1 << 13)); // OBJ WIN + WIN0
         ppu.set_winh(0, (10 << 8) | 20);
-        ppu.set_winv(0, (0 << 8) | 160);
+        ppu.set_winv(0, 160);
         ppu.set_winin(0x001F);
         ppu.set_winout(0x0A00 | 0x0001); // OBJ WIN: bits 8-13, WINOUT: BG0 only
 

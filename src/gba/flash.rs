@@ -915,7 +915,7 @@ mod tests {
     /// creates a small-ROM EEPROM save (6-bit addressing, 512B)
     fn make_eeprom_save_6bit() -> SaveMedia {
         let mut save = SaveMedia::new();
-        let mut rom = vec![0u8; 1 * 1024 * 1024]; // 1MB ROM -> 6-bit
+        let mut rom = vec![0u8; 1024 * 1024]; // 1MB ROM -> 6-bit
         rom[0x100..0x108].copy_from_slice(b"EEPROM_V");
         save.detect_save_type(&rom);
         save

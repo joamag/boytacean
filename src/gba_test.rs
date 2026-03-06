@@ -106,4 +106,15 @@ mod tests {
         .unwrap();
         assert!(gba.ppu_frame() > 0);
     }
+
+    #[test]
+    fn test_jsmolka_nes() {
+        let gba = run_gba_test(
+            "res/roms.gba/test/jsmolka_gba-tests/nes.gba",
+            Some(100_000_000),
+            GbaTestOptions::default(),
+        )
+        .unwrap();
+        assert!(gba.ppu_frame() > 0);
+    }
 }
