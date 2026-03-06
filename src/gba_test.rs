@@ -152,9 +152,9 @@ mod tests {
     }
 
     #[test]
-    fn test_jsmolka_save_none() {
+    fn test_jsmolka_unsafe() {
         let gba = run_gba_test(
-            "res/roms.gba/test/jsmolka_gba-tests/save_none.gba",
+            "res/roms.gba/test/jsmolka_gba-tests/unsafe.gba",
             Some(100000000),
             GbaTestOptions::default(),
         )

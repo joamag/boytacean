@@ -111,9 +111,15 @@ impl SaveMedia {
     pub fn detect_save_type(&mut self, rom: &[u8]) {
         self.save_type = detect_from_rom(rom);
         self.rom_size = rom.len();
-        if self.save_type == SaveType::Eeprom {
-            // start with 512B; auto-detect 8KB on first access
-            self.data = vec![0xFFu8; EEPROM_SIZE_4K];
+        match self.save_type {
+            SaveType::Sram => {
+                self.data = vec![0xFFu8; 0x8000]; // 32KB SRAM
+            }
+            SaveType::Eeprom => {
+                // start with 512B; auto-detect 8KB on first access
+                self.data = vec![0xFFu8; EEPROM_SIZE_4K];
+            }
+            _ => {}
         }
     }
 
@@ -127,11 +133,8 @@ impl SaveMedia {
         match self.save_type {
             SaveType::None => 0xFF,
             SaveType::Sram => {
-                if offset < self.data.len() {
-                    self.data[offset]
-                } else {
-                    0
-                }
+                let sram_offset = offset % self.data.len();
+                self.data[sram_offset]
             }
             SaveType::Flash64 | SaveType::Flash128 => {
                 if self.state == FlashState::ChipId && offset < 2 {
@@ -155,9 +158,8 @@ impl SaveMedia {
         match self.save_type {
             SaveType::None => {}
             SaveType::Sram => {
-                if offset < self.data.len() {
-                    self.data[offset] = value;
-                }
+                let sram_offset = offset % self.data.len();
+                self.data[sram_offset] = value;
             }
             SaveType::Flash64 | SaveType::Flash128 => {
                 self.flash_write(offset, value);
