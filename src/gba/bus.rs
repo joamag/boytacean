@@ -855,8 +855,9 @@ mod tests {
     fn test_rom_out_of_bounds() {
         let mut bus = GbaBus::new();
         bus.load_rom(&[0x12, 0x34]);
-        assert_eq!(bus.read32(0x0800_0000), 0);
+        assert_eq!(bus.read32(0x0800_0000), 0x00010000);
         assert_eq!(bus.read8(0x0800_0000), 0x12);
+        assert_eq!(bus.read8(0x0800_0010), ((0x0800_0010 / 2) & 0xFF) as u8);
     }
 
     #[test]
