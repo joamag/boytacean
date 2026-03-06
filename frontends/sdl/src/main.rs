@@ -1147,8 +1147,7 @@ fn main() -> Result<(), Box<dyn StdError>> {
         gba.set_dma_enabled(!args.no_dma);
         gba.set_timer_enabled(!args.no_timer);
         if !args.boot_rom_path.is_empty() {
-            let bios_data =
-                read_file(&args.boot_rom_path).expect("Failed to read GBA BIOS file");
+            let bios_data = read_file(&args.boot_rom_path).expect("Failed to read GBA BIOS file");
             gba.load_bios(&bios_data);
         }
         println!("========= {} =========\nGBA Mode", Info::name());
