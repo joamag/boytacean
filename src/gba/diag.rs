@@ -30,11 +30,8 @@ pub fn run_diagnostics(gba: &mut GameBoyAdvance, num_frames: u32) {
             print_state(gba, frame, 0);
             let handler = gba.cpu.bus.read32(0x03FF_FFFC);
             let intrcheck = gba.cpu.bus.read16(0x0300_7FF8);
-            println!(
-                "         | handler={:#010x} IntrCheck={:#06x}",
-                handler, intrcheck
-            );
-            save_frame_buffer_ppm(gba, &format!("/tmp/gba_frame_{}.ppm", frame));
+            println!("         | handler={handler:#010x} IntrCheck={intrcheck:#06x}");
+            save_frame_buffer_ppm(gba, &format!("/tmp/gba_frame_{frame}.ppm"));
         }
 
         // Analyze BG rendering at frame 2000
@@ -123,7 +120,7 @@ fn print_state(gba: &GameBoyAdvance, frame: u32, cycles: u64) {
 fn analyze_bg_rendering(gba: &GameBoyAdvance) {
     let dispcnt = gba.cpu.bus.ppu.dispcnt();
     let mode = dispcnt & 0x07;
-    println!("\n=== BG Rendering Analysis (mode {}) ===", mode);
+    println!("\n=== BG Rendering Analysis (mode {mode}) ===");
 
     for bg in 0..4 {
         if dispcnt & (1 << (8 + bg)) == 0 {
@@ -158,7 +155,7 @@ fn analyze_bg_rendering(gba: &GameBoyAdvance) {
             if addr + 1 < gba.cpu.bus.vram.len() {
                 let entry =
                     gba.cpu.bus.vram[addr] as u16 | ((gba.cpu.bus.vram[addr + 1] as u16) << 8);
-                print!("{:#06x} ", entry);
+                print!("{entry:#06x} ");
                 if (i + 1) % 8 == 0 {
                     println!();
                 }
@@ -196,5 +193,5 @@ fn save_frame_buffer_ppm(gba: &GameBoyAdvance, path: &str) {
     let mut f = File::create(path).expect("Failed to create PPM file");
     write!(f, "P6\n240 160\n255\n").expect("Failed to write PPM header");
     f.write_all(fb).expect("Failed to write PPM data");
-    println!("Frame buffer saved to {}", path);
+    println!("Frame buffer saved to {path}");
 }

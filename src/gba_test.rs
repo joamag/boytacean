@@ -32,7 +32,7 @@ pub fn run_gba_test(
     let max_cycles = max_cycles.unwrap_or(u64::MAX);
     let mut gba = build_gba_test(options);
     let data = std::fs::read(rom_path)
-        .map_err(|e| Error::CustomError(format!("Failed to read ROM: {}", e)))?;
+        .map_err(|e| Error::CustomError(format!("Failed to read ROM: {e}")))?;
     gba.load_rom(&data)?;
     gba.clocks_cycles(max_cycles as usize);
     Ok(gba)
