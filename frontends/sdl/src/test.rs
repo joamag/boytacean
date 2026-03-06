@@ -228,6 +228,91 @@ mod tests {
     }
 
     #[test]
+    fn test_gba_jsmolka_thumb() {
+        let (result, _) = run_gba_image_test(
+            "../../res/roms.gba/test/jsmolka_gba-tests/thumb.gba",
+            Some(100000000),
+            GbaTestOptions::default(),
+        )
+        .unwrap();
+        let image_result = compare_images(&result, "res/test/gba/jsmolka_gba-tests/thumb.png");
+        assert!(image_result);
+    }
+
+    #[test]
+    fn test_gba_jsmolka_flash128() {
+        let (result, _) = run_gba_image_test(
+            "../../res/roms.gba/test/jsmolka_gba-tests/flash128.gba",
+            Some(100000000),
+            GbaTestOptions::default(),
+        )
+        .unwrap();
+        let image_result = compare_images(&result, "res/test/gba/jsmolka_gba-tests/flash128.png");
+        assert!(image_result);
+    }
+
+    #[test]
+    fn test_gba_jsmolka_none() {
+        let (result, _) = run_gba_image_test(
+            "../../res/roms.gba/test/jsmolka_gba-tests/none.gba",
+            Some(100000000),
+            GbaTestOptions::default(),
+        )
+        .unwrap();
+        let image_result = compare_images(&result, "res/test/gba/jsmolka_gba-tests/none.png");
+        assert!(image_result);
+    }
+
+    #[test]
+    fn test_gba_jsmolka_save_none() {
+        let (result, _) = run_gba_image_test(
+            "../../res/roms.gba/test/jsmolka_gba-tests/save_none.gba",
+            Some(100000000),
+            GbaTestOptions::default(),
+        )
+        .unwrap();
+        let image_result = compare_images(&result, "res/test/gba/jsmolka_gba-tests/save_none.png");
+        assert!(image_result);
+    }
+
+    #[test]
+    fn test_gba_jsmolka_ppu_hello() {
+        let (result, _) = run_gba_image_test(
+            "../../res/roms.gba/test/jsmolka_gba-tests/ppu_hello.gba",
+            Some(100000000),
+            GbaTestOptions::default(),
+        )
+        .unwrap();
+        let image_result = compare_images(&result, "res/test/gba/jsmolka_gba-tests/ppu_hello.png");
+        assert!(image_result);
+    }
+
+    #[test]
+    fn test_gba_jsmolka_ppu_shades() {
+        let (result, _) = run_gba_image_test(
+            "../../res/roms.gba/test/jsmolka_gba-tests/ppu_shades.gba",
+            Some(100000000),
+            GbaTestOptions::default(),
+        )
+        .unwrap();
+        let image_result = compare_images(&result, "res/test/gba/jsmolka_gba-tests/ppu_shades.png");
+        assert!(image_result);
+    }
+
+    #[test]
+    fn test_gba_jsmolka_ppu_stripes() {
+        let (result, _) = run_gba_image_test(
+            "../../res/roms.gba/test/jsmolka_gba-tests/ppu_stripes.gba",
+            Some(100000000),
+            GbaTestOptions::default(),
+        )
+        .unwrap();
+        let image_result =
+            compare_images(&result, "res/test/gba/jsmolka_gba-tests/ppu_stripes.png");
+        assert!(image_result);
+    }
+
+    #[test]
     #[ignore]
     fn generate_gba_reference_images() {
         let tests: &[(&str, &str)] = &[
@@ -254,6 +339,34 @@ mod tests {
             (
                 "../../res/roms.gba/test/jsmolka_gba-tests/nes.gba",
                 "res/test/gba/jsmolka_gba-tests/nes.png",
+            ),
+            (
+                "../../res/roms.gba/test/jsmolka_gba-tests/thumb.gba",
+                "res/test/gba/jsmolka_gba-tests/thumb.png",
+            ),
+            (
+                "../../res/roms.gba/test/jsmolka_gba-tests/flash128.gba",
+                "res/test/gba/jsmolka_gba-tests/flash128.png",
+            ),
+            (
+                "../../res/roms.gba/test/jsmolka_gba-tests/none.gba",
+                "res/test/gba/jsmolka_gba-tests/none.png",
+            ),
+            (
+                "../../res/roms.gba/test/jsmolka_gba-tests/save_none.gba",
+                "res/test/gba/jsmolka_gba-tests/save_none.png",
+            ),
+            (
+                "../../res/roms.gba/test/jsmolka_gba-tests/ppu_hello.gba",
+                "res/test/gba/jsmolka_gba-tests/ppu_hello.png",
+            ),
+            (
+                "../../res/roms.gba/test/jsmolka_gba-tests/ppu_shades.gba",
+                "res/test/gba/jsmolka_gba-tests/ppu_shades.png",
+            ),
+            (
+                "../../res/roms.gba/test/jsmolka_gba-tests/ppu_stripes.gba",
+                "res/test/gba/jsmolka_gba-tests/ppu_stripes.png",
             ),
         ];
         for (rom, out) in tests {
