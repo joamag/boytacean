@@ -86,12 +86,27 @@ impl GameBoyAdvance {
         }
     }
 
+    /// Loads a real BIOS ROM from a byte slice.
+    ///
+    /// When loaded, the CPU will boot from address 0x00000000 (BIOS entry)
+    /// and SWI instructions will execute through the real BIOS code.
+    pub fn load_bios(&mut self, data: &[u8]) {
+        self.cpu.bus.load_bios(data);
+
+        // resets CPU to boot from BIOS start (address 0x00000000)
+        // the BIOS will initialize registers, run checksums, and
+        // jump to the ROM entry point at 0x08000000.
+        self.cpu.reset_for_bios_boot();
+    }
+
     /// loads a ROM from a byte slice
     pub fn load_rom(&mut self, data: &[u8]) -> Result<GbaRomInfo, Error> {
         let info = GbaRomInfo::from_data(data)?;
         self.rom_title = info.title().to_string();
         self.cpu.bus.load_rom(data);
-        self.cpu.bus.postflg = 1; // mark as post-boot
+        if !self.cpu.bus.use_real_bios {
+            self.cpu.bus.postflg = 1; // mark as post-boot
+        }
         Ok(info)
     }
 
@@ -141,19 +156,25 @@ impl GameBoyAdvance {
             );
 
             if events & 1 != 0 {
-                // hblank
-                self.cpu.bus.irq.raise_hblank();
+                // hblank DMA trigger (always fires at hblank)
                 if self.dma_enabled {
                     self.cpu.bus.dma.trigger_hblank();
                 }
             }
+            if events & 4 != 0 {
+                // hblank IRQ (only when DISPSTAT enables it)
+                self.cpu.bus.irq.raise_hblank();
+            }
             if events & 2 != 0 {
-                // vblank
+                // vblank DMA trigger (always fires at vblank)
                 self.frame = self.cpu.bus.ppu.frame();
-                self.cpu.bus.irq.raise_vblank();
                 if self.dma_enabled {
                     self.cpu.bus.dma.trigger_vblank();
                 }
+            }
+            if events & 8 != 0 {
+                // vblank IRQ (only when DISPSTAT enables it)
+                self.cpu.bus.irq.raise_vblank();
             }
         }
 
@@ -300,8 +321,12 @@ impl GameBoyAdvance {
     }
 
     pub fn reset(&mut self) {
-        self.cpu.reset();
         self.cpu.bus.reset();
+        if self.cpu.bus.use_real_bios {
+            self.cpu.reset_for_bios_boot();
+        } else {
+            self.cpu.reset();
+        }
         self.frame = 0;
     }
 }
@@ -425,5 +450,30 @@ mod tests {
     fn test_default() {
         let gba = GameBoyAdvance::default();
         assert_eq!(gba.display_width(), 240);
+    }
+
+    #[test]
+    fn test_load_bios() {
+        let mut gba = GameBoyAdvance::new();
+        let bios = vec![0u8; 0x4000];
+        gba.load_bios(&bios);
+        assert!(gba.cpu.bus.use_real_bios);
+        // after loading BIOS, CPU boots from 0x00 in SVC mode
+        assert_eq!(gba.cpu.pc(), 0x0000_0000);
+        assert_eq!(gba.cpu.cpsr() & 0x1F, 0x13); // MODE_SVC
+    }
+
+    #[test]
+    fn test_load_bios_after_rom() {
+        let mut gba = GameBoyAdvance::new();
+        // load a minimal ROM first
+        let rom = vec![0u8; 256];
+        let _ = gba.load_rom(&rom);
+        assert_eq!(gba.cpu.pc(), 0x0800_0000);
+
+        // loading BIOS resets PC to 0x00
+        let bios = vec![0u8; 0x4000];
+        gba.load_bios(&bios);
+        assert_eq!(gba.cpu.pc(), 0x0000_0000);
     }
 }

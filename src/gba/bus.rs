@@ -87,6 +87,9 @@ pub struct GbaBus {
 
     /// Whether BIOS reads are currently allowed (true when CPU PC is in BIOS)
     pub bios_readable: bool,
+
+    /// Whether a real BIOS ROM is loaded (disables HLE SWI handling)
+    pub use_real_bios: bool,
 }
 
 impl GbaBus {
@@ -111,6 +114,7 @@ impl GbaBus {
             halt_requested: false,
             bios_value: 0,
             bios_readable: false,
+            use_real_bios: false,
         };
         bus.init_bios_stubs();
         bus
@@ -165,6 +169,16 @@ impl GbaBus {
 
         // After startup, set bios_value to what real BIOS leaves
         self.bios_value = 0xE129F000;
+    }
+
+    /// Loads a real BIOS ROM, replacing the HLE stubs.
+    /// When a real BIOS is loaded, SWI instructions will execute
+    /// through the actual BIOS code instead of HLE handlers.
+    pub fn load_bios(&mut self, data: &[u8]) {
+        let len = data.len().min(BIOS_SIZE);
+        self.bios[..len].copy_from_slice(&data[..len]);
+        self.use_real_bios = true;
+        self.postflg = 0;
     }
 
     pub fn load_rom(&mut self, data: &[u8]) {
@@ -538,6 +552,13 @@ impl GbaBus {
         let io_offset = addr & 0x3FF;
         if (0x60..=0x7D).contains(&io_offset) {
             self.apu.write_channel_reg(addr, value);
+            return;
+        }
+
+        // HALTCNT is a write-only 8-bit register at 0x04000301
+        // that shares the 16-bit address space with POSTFLG (0x04000300)
+        if addr == REG_HALTCNT {
+            self.halt_requested = true;
             return;
         }
 
@@ -1182,5 +1203,39 @@ mod tests {
         bus.load_rom(&rom);
         // 0x0D region for non-EEPROM games reads ROM (returns 0 past end)
         assert_eq!(bus.read16(0x0D00_0000), 0);
+    }
+
+    #[test]
+    fn test_load_bios() {
+        let mut bus = GbaBus::new();
+        assert!(!bus.use_real_bios);
+        let bios = vec![0x42u8; 0x4000];
+        bus.load_bios(&bios);
+        assert!(bus.use_real_bios);
+        bus.bios_readable = true;
+        assert_eq!(bus.read8(0x0000_0000), 0x42);
+    }
+
+    #[test]
+    fn test_load_bios_replaces_stubs() {
+        let mut bus = GbaBus::new();
+        bus.bios_readable = true;
+        // HLE stubs place IRQ vector at 0x18
+        assert_eq!(bus.read32(0x0000_0018), 0xEA000042);
+
+        // loading a real BIOS overwrites stubs
+        let mut bios = vec![0u8; 0x4000];
+        bios[0x18] = 0xAA;
+        bios[0x19] = 0xBB;
+        bios[0x1A] = 0xCC;
+        bios[0x1B] = 0xDD;
+        bus.load_bios(&bios);
+        assert_eq!(bus.read32(0x0000_0018), 0xDDCCBBAA);
+    }
+
+    #[test]
+    fn test_load_bios_use_real_bios_default_false() {
+        let bus = GbaBus::new();
+        assert!(!bus.use_real_bios);
     }
 }

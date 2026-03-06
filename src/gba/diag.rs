@@ -24,11 +24,16 @@ pub fn run_diagnostics(gba: &mut GameBoyAdvance, num_frames: u32) {
             gba.key_lift(PadKey::Start);
         }
 
-        // run a full frame
         gba.next_frame();
 
         if frame % 500 == 0 || frame == num_frames - 1 {
             print_state(gba, frame, 0);
+            let handler = gba.cpu.bus.read32(0x03FF_FFFC);
+            let intrcheck = gba.cpu.bus.read16(0x0300_7FF8);
+            println!(
+                "         | handler={:#010x} IntrCheck={:#06x}",
+                handler, intrcheck
+            );
             save_frame_buffer_ppm(gba, &format!("/tmp/gba_frame_{}.ppm", frame));
         }
 

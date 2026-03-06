@@ -721,15 +721,20 @@ fn thumb_swi(cpu: &mut Arm7Tdmi, instr: u16) {
     cpu.set_spsr(old_cpsr);
     cpu.set_reg(14, return_addr);
 
-    handle_swi(cpu, comment);
+    if cpu.bus.use_real_bios {
+        // real BIOS: jump to SWI exception vector
+        cpu.set_reg(15, 0x08);
+    } else {
+        handle_swi(cpu, comment);
 
-    // Update BIOS protection value to match what real BIOS leaves
-    // after SWI dispatch (instruction at real BIOS address 0x190)
-    cpu.bus.update_bios_value(0xE3A02004);
+        // Update BIOS protection value to match what real BIOS leaves
+        // after SWI dispatch (instruction at real BIOS address 0x190)
+        cpu.bus.update_bios_value(0xE3A02004);
 
-    let lr = cpu.reg(14);
-    cpu.restore_cpsr();
-    cpu.set_reg(15, lr);
+        let lr = cpu.reg(14);
+        cpu.restore_cpsr();
+        cpu.set_reg(15, lr);
+    }
 
     cpu.cycles = 3;
 }
@@ -1005,5 +1010,46 @@ mod tests {
         let wb_base = base + 8;
         assert_eq!(cpu.bus_read32(base), 0xAA);
         assert_eq!(cpu.bus_read32(base + 4), wb_base);
+    }
+
+    #[test]
+    fn test_thumb_swi_hle_returns_to_caller() {
+        let mut cpu = make_thumb_cpu();
+        let pc = 0x08000004u32;
+        cpu.set_reg(15, pc);
+        // SWI #0 = 0xDF00
+        execute_thumb(&mut cpu, 0xDF00);
+        // HLE: should return after SWI, back in SYS mode with THUMB
+        assert_eq!(cpu.cpsr() & 0x1F, 0x1F); // MODE_SYS
+    }
+
+    #[test]
+    fn test_thumb_swi_real_bios_jumps_to_vector() {
+        let mut cpu = make_thumb_cpu();
+        cpu.bus.use_real_bios = true;
+        let pc = 0x08000004u32;
+        cpu.set_reg(15, pc);
+        // SWI #0 = 0xDF00
+        execute_thumb(&mut cpu, 0xDF00);
+        // real BIOS: should jump to SWI vector 0x08 in SVC mode (ARM)
+        assert_eq!(cpu.pc(), 0x08);
+        assert_eq!(cpu.cpsr() & 0x1F, 0x13); // MODE_SVC
+        assert!(cpu.cpsr() & 0x80 != 0); // IRQs disabled
+        assert!(cpu.cpsr() & 0x20 == 0); // ARM mode (T bit cleared)
+    }
+
+    #[test]
+    fn test_thumb_swi_real_bios_saves_return_addr() {
+        let mut cpu = make_thumb_cpu();
+        cpu.bus.use_real_bios = true;
+        let pc = 0x08000004u32;
+        cpu.set_reg(15, pc);
+        let old_cpsr = cpu.cpsr();
+        // SWI #0 = 0xDF00
+        execute_thumb(&mut cpu, 0xDF00);
+        // LR_svc should be the return address (PC - 2)
+        assert_eq!(cpu.reg(14), pc.wrapping_sub(2));
+        // SPSR_svc should be the old CPSR (with THUMB bit set)
+        assert_eq!(cpu.spsr(), old_cpsr);
     }
 }

@@ -501,10 +501,13 @@ impl GbaPpu {
                 self.render_scanline(vram, palette, oam);
             }
 
-            // check hblank IRQ
+            // bit 0: hblank DMA trigger (always fires)
+            events |= 1;
+
+            // bit 2: hblank IRQ (only when DISPSTAT bit 4 is set)
             if self.dispstat & (1 << 4) != 0 {
                 self.int_hblank = true;
-                events |= 1;
+                events |= 4;
             }
         }
 
@@ -523,10 +526,14 @@ impl GbaPpu {
                 self.bg_ref_x[1] = self.bg_ref_x_write[1];
                 self.bg_ref_y[1] = self.bg_ref_y_write[1];
 
+                // bit 1: vblank DMA trigger (always fires)
+                events |= 2;
+
+                // bit 3: vblank IRQ (only when DISPSTAT bit 3 is set)
                 if self.dispstat & (1 << 3) != 0 {
                     self.int_vblank = true;
+                    events |= 8;
                 }
-                events |= 2;
             } else if self.vcount >= TOTAL_LINES as u16 {
                 self.vcount = 0;
             }
@@ -1639,10 +1646,30 @@ mod tests {
         let oam = vec![0u8; 0x400];
 
         // clock to vblank (line 160)
+        let mut last_events = 0u8;
         for _ in 0..DISPLAY_HEIGHT {
-            ppu.clock(CYCLES_PER_SCANLINE, &vram, &palette, &oam);
+            last_events = ppu.clock(CYCLES_PER_SCANLINE, &vram, &palette, &oam);
         }
+        assert!(last_events & 2 != 0); // vblank DMA event
+        assert!(last_events & 8 != 0); // vblank IRQ event
         assert!(ppu.int_vblank());
+    }
+
+    #[test]
+    fn test_clock_vblank_dma_without_irq() {
+        let mut ppu = GbaPpu::new();
+        // DISPSTAT bit 3 NOT set: vblank IRQ disabled
+        let vram = vec![0u8; 0x18000];
+        let palette = vec![0u8; 0x400];
+        let oam = vec![0u8; 0x400];
+
+        let mut last_events = 0u8;
+        for _ in 0..DISPLAY_HEIGHT {
+            last_events = ppu.clock(CYCLES_PER_SCANLINE, &vram, &palette, &oam);
+        }
+        assert!(last_events & 2 != 0); // vblank DMA event still fires
+        assert!(last_events & 8 == 0); // vblank IRQ does NOT fire
+        assert!(!ppu.int_vblank());
     }
 
     #[test]
@@ -1654,8 +1681,23 @@ mod tests {
         let oam = vec![0u8; 0x400];
 
         let events = ppu.clock(VISIBLE_DOTS, &vram, &palette, &oam);
-        assert!(events & 1 != 0); // hblank event
+        assert!(events & 1 != 0); // hblank DMA event
+        assert!(events & 4 != 0); // hblank IRQ event
         assert!(ppu.int_hblank());
+    }
+
+    #[test]
+    fn test_clock_hblank_dma_without_irq() {
+        let mut ppu = GbaPpu::new();
+        // DISPSTAT bit 4 NOT set: hblank IRQ disabled
+        let vram = vec![0u8; 0x18000];
+        let palette = vec![0u8; 0x400];
+        let oam = vec![0u8; 0x400];
+
+        let events = ppu.clock(VISIBLE_DOTS, &vram, &palette, &oam);
+        assert!(events & 1 != 0); // hblank DMA event still fires
+        assert!(events & 4 == 0); // hblank IRQ does NOT fire
+        assert!(!ppu.int_hblank());
     }
 
     #[test]
