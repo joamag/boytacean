@@ -264,14 +264,14 @@ mod tests {
     }
 
     #[test]
-    fn test_gba_jsmolka_save_none() {
+    fn test_gba_jsmolka_unsafe() {
         let (result, _) = run_gba_image_test(
-            "../../res/roms.gba/test/jsmolka_gba-tests/save_none.gba",
+            "../../res/roms.gba/test/jsmolka_gba-tests/unsafe.gba",
             Some(100000000),
             GbaTestOptions::default(),
         )
         .unwrap();
-        let image_result = compare_images(&result, "res/test/gba/jsmolka_gba-tests/save_none.png");
+        let image_result = compare_images(&result, "res/test/gba/jsmolka_gba-tests/unsafe.png");
         assert!(image_result);
     }
 
@@ -353,8 +353,8 @@ mod tests {
                 "res/test/gba/jsmolka_gba-tests/none.png",
             ),
             (
-                "../../res/roms.gba/test/jsmolka_gba-tests/save_none.gba",
-                "res/test/gba/jsmolka_gba-tests/save_none.png",
+                "../../res/roms.gba/test/jsmolka_gba-tests/unsafe.gba",
+                "res/test/gba/jsmolka_gba-tests/unsafe.png",
             ),
             (
                 "../../res/roms.gba/test/jsmolka_gba-tests/ppu_hello.gba",

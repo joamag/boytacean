@@ -37,7 +37,7 @@ fn main() {
     if let Some(path) = &bios_path {
         let bios_data = std::fs::read(path).expect("Failed to read BIOS file");
         gba.load_bios(&bios_data);
-        println!("BIOS loaded from {}", path);
+        println!("BIOS loaded from {path}");
     }
 
     run_diagnostics(&mut gba, num_frames);

@@ -214,7 +214,10 @@ impl GbaBus {
                     if offset < self.rom.len() {
                         self.rom[offset]
                     } else {
-                        0
+                        // open bus: 16-bit ROM bus returns halfword address
+                        let halfword = ((addr / 2) & 0xFFFF) as u16;
+                        let bytes = halfword.to_le_bytes();
+                        bytes[(addr & 1) as usize]
                     }
                 }
             }
@@ -264,7 +267,8 @@ impl GbaBus {
                     if offset + 1 < self.rom.len() {
                         u16::from_le_bytes([self.rom[offset], self.rom[offset + 1]])
                     } else {
-                        0
+                        // open bus: 16-bit ROM bus returns halfword address
+                        ((addr / 2) & 0xFFFF) as u16
                     }
                 }
             }
@@ -357,7 +361,10 @@ impl GbaBus {
                             self.rom[offset + 3],
                         ])
                     } else {
-                        0
+                        // open bus: two consecutive halfword addresses
+                        let hw0 = (addr / 2) & 0xFFFF;
+                        let hw1 = ((addr + 2) / 2) & 0xFFFF;
+                        hw0 | (hw1 << 16)
                     }
                 }
             }
@@ -426,10 +433,8 @@ impl GbaBus {
                 self.oam[offset] = bytes[0];
                 self.oam[offset + 1] = bytes[1];
             }
-            0x08..=0x0D => {
-                if self.save.is_eeprom_addr(raw_addr) {
-                    self.save.eeprom_write(value);
-                }
+            0x08..=0x0D if self.save.is_eeprom_addr(raw_addr) => {
+                self.save.eeprom_write(value);
             }
             0x0E..=0x0F => {
                 // 8-bit bus; byte lane selected by original addr bit 0
