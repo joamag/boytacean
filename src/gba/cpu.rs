@@ -120,6 +120,20 @@ impl Arm7Tdmi {
         cpu
     }
 
+    /// Resets the CPU to boot from the BIOS at address 0x00000000.
+    /// The real BIOS will initialize all registers and stack pointers,
+    /// then jump to the ROM entry point.
+    pub fn reset_for_bios_boot(&mut self) {
+        self.regs = [0; 16];
+        self.cpsr = MODE_SVC | CPSR_I; // ARM state, SVC mode, IRQs disabled
+        self.spsr = [0; 5];
+        self.banked = BankedRegisters::new();
+        self.halted = false;
+        self.pipeline_valid = false;
+        // PC = 0: start executing from BIOS entry point
+        self.regs[15] = 0x0000_0000;
+    }
+
     // register accessors
 
     #[inline(always)]
@@ -321,8 +335,8 @@ impl Arm7Tdmi {
         self.pipeline_valid = true;
     }
 
-    /// fetches the next instruction from the pipeline without advancing PC.
-    /// The PC advance happens after instruction execution in `step()`.
+    /// Fetches the next instruction from the pipeline without advancing PC.
+    /// The PC advance happens after instruction execution in [`Self::step()`].
     fn fetch(&mut self) -> u32 {
         if !self.pipeline_valid {
             self.fill_pipeline();
@@ -363,7 +377,8 @@ impl Arm7Tdmi {
         self.bus.bios_readable = false;
     }
 
-    /// executes a single CPU instruction and returns the number of cycles consumed
+    /// Executes a single CPU instruction and returns the
+    /// number of cycles consumed.
     pub fn step(&mut self) -> u32 {
         // check for pending interrupts
         if self.bus.irq.pending() && self.cpsr & CPSR_I == 0 {
@@ -390,10 +405,20 @@ impl Arm7Tdmi {
         self.cycles = 0;
         let instr = self.fetch();
 
+        // allow BIOS data reads while executing BIOS code
+        let in_bios = self.regs[15] < 0x4000 + 8;
+        if in_bios {
+            self.bus.bios_readable = true;
+        }
+
         if self.in_thumb_mode() {
             execute_thumb(self, instr as u16);
         } else {
             execute_arm(self, instr);
+        }
+
+        if in_bios {
+            self.bus.bios_readable = false;
         }
 
         // advance the pipeline only if it wasn't flushed (branch/exception)
@@ -908,6 +933,20 @@ mod tests {
         assert_eq!(cpu.pc(), 0x0800_0000);
         assert_eq!(cpu.reg(13), 0x0300_7F00); // SP_SYS
         assert_eq!(cpu.cpsr() & CPSR_MODE_MASK, MODE_SYS);
+    }
+
+    #[test]
+    fn test_reset_for_bios_boot() {
+        let mut cpu = make_cpu();
+        cpu.set_reg(0, 0x12345678);
+        cpu.set_halted(true);
+        cpu.reset_for_bios_boot();
+        assert_eq!(cpu.reg(0), 0);
+        assert!(!cpu.halted());
+        assert_eq!(cpu.pc(), 0x0000_0000);
+        assert_eq!(cpu.cpsr() & CPSR_MODE_MASK, MODE_SVC);
+        assert!(cpu.cpsr() & CPSR_I != 0); // IRQs disabled
+        assert!(cpu.cpsr() & CPSR_T == 0); // ARM mode
     }
 
     #[test]

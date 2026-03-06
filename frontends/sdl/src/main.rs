@@ -1033,7 +1033,7 @@ struct Args {
     #[arg(
         long,
         default_value_t = String::from(""),
-        help = "Path to Game Boy boot ROM file to be used in loading stage"
+        help = "Path to boot ROM file (Game Boy boot ROM or Game Boy Advance BIOS)"
     )]
     boot_rom_path: String,
 
@@ -1146,6 +1146,11 @@ fn main() -> Result<(), Box<dyn StdError>> {
         gba.set_apu_enabled(!args.no_apu);
         gba.set_dma_enabled(!args.no_dma);
         gba.set_timer_enabled(!args.no_timer);
+        if !args.boot_rom_path.is_empty() {
+            let bios_data =
+                read_file(&args.boot_rom_path).expect("Failed to read GBA BIOS file");
+            gba.load_bios(&bios_data);
+        }
         println!("========= {} =========\nGBA Mode", Info::name());
         System::Gba(gba)
     } else {
