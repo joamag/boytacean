@@ -163,8 +163,7 @@ mod tests {
             GbaTestOptions::default(),
         )
         .unwrap();
-        let image_result =
-            compare_images(&result, "res/test/gba/jsmolka_gba-tests/arm.png");
+        let image_result = compare_images(&result, "res/test/gba/jsmolka_gba-tests/arm.png");
         assert!(image_result);
     }
 
@@ -176,8 +175,7 @@ mod tests {
             GbaTestOptions::default(),
         )
         .unwrap();
-        let image_result =
-            compare_images(&result, "res/test/gba/jsmolka_gba-tests/memory.png");
+        let image_result = compare_images(&result, "res/test/gba/jsmolka_gba-tests/memory.png");
         assert!(image_result);
     }
 
@@ -189,8 +187,7 @@ mod tests {
             GbaTestOptions::default(),
         )
         .unwrap();
-        let image_result =
-            compare_images(&result, "res/test/gba/jsmolka_gba-tests/bios.png");
+        let image_result = compare_images(&result, "res/test/gba/jsmolka_gba-tests/bios.png");
         assert!(image_result);
     }
 
@@ -202,8 +199,7 @@ mod tests {
             GbaTestOptions::default(),
         )
         .unwrap();
-        let image_result =
-            compare_images(&result, "res/test/gba/jsmolka_gba-tests/sram.png");
+        let image_result = compare_images(&result, "res/test/gba/jsmolka_gba-tests/sram.png");
         assert!(image_result);
     }
 
@@ -215,8 +211,7 @@ mod tests {
             GbaTestOptions::default(),
         )
         .unwrap();
-        let image_result =
-            compare_images(&result, "res/test/gba/jsmolka_gba-tests/flash64.png");
+        let image_result = compare_images(&result, "res/test/gba/jsmolka_gba-tests/flash64.png");
         assert!(image_result);
     }
 
@@ -228,8 +223,7 @@ mod tests {
             GbaTestOptions::default(),
         )
         .unwrap();
-        let image_result =
-            compare_images(&result, "res/test/gba/jsmolka_gba-tests/nes.png");
+        let image_result = compare_images(&result, "res/test/gba/jsmolka_gba-tests/nes.png");
         assert!(image_result);
     }
 
