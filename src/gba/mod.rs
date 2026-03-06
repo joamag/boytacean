@@ -352,8 +352,9 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::assertions_on_constants)]
     fn test_constants() {
-        assert_eq!(GameBoyAdvance::CPU_FREQ, 16_777_216);
+        assert_eq!(GameBoyAdvance::CPU_FREQ, 16777216);
         assert_eq!(GameBoyAdvance::DISPLAY_WIDTH, 240);
         assert_eq!(GameBoyAdvance::DISPLAY_HEIGHT, 160);
         assert!(GameBoyAdvance::VISUAL_FREQ > 59.0);
