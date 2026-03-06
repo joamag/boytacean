@@ -11,6 +11,7 @@ pub mod diag;
 pub mod dma;
 pub mod gb;
 pub mod gba;
+pub mod gba_test;
 pub mod gen;
 pub mod info;
 pub mod inst;

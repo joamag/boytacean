@@ -40,10 +40,11 @@ pub fn save_image(pixels: &[u8], width: u32, height: u32, file_path: &str) {
 mod tests {
     use boytacean::{
         gb::GameBoyMode,
+        gba_test::{run_gba_image_test, GbaTestOptions},
         test::{run_image_test, TestOptions},
     };
 
-    use super::compare_images;
+    use super::{compare_images, save_image};
 
     #[test]
     fn test_blargg_cpu_instrs() {
@@ -152,5 +153,103 @@ mod tests {
         .unwrap();
         let image_result = compare_images(&result, "res/test/firstwhite.png");
         assert!(image_result);
+    }
+
+    #[test]
+    fn test_gba_jsmolka_arm() {
+        let (result, _) = run_gba_image_test(
+            "../../res/roms.gba/test/jsmolka_gba-tests/arm.gba",
+            Some(100000000),
+            GbaTestOptions::default(),
+        )
+        .unwrap();
+        let image_result =
+            compare_images(&result, "res/test/gba/jsmolka_gba-tests/arm.png");
+        assert!(image_result);
+    }
+
+    #[test]
+    fn test_gba_jsmolka_memory() {
+        let (result, _) = run_gba_image_test(
+            "../../res/roms.gba/test/jsmolka_gba-tests/memory.gba",
+            Some(100000000),
+            GbaTestOptions::default(),
+        )
+        .unwrap();
+        let image_result =
+            compare_images(&result, "res/test/gba/jsmolka_gba-tests/memory.png");
+        assert!(image_result);
+    }
+
+    #[test]
+    fn test_gba_jsmolka_bios() {
+        let (result, _) = run_gba_image_test(
+            "../../res/roms.gba/test/jsmolka_gba-tests/bios.gba",
+            Some(100000000),
+            GbaTestOptions::default(),
+        )
+        .unwrap();
+        let image_result =
+            compare_images(&result, "res/test/gba/jsmolka_gba-tests/bios.png");
+        assert!(image_result);
+    }
+
+    #[test]
+    fn test_gba_jsmolka_sram() {
+        let (result, _) = run_gba_image_test(
+            "../../res/roms.gba/test/jsmolka_gba-tests/sram.gba",
+            Some(100000000),
+            GbaTestOptions::default(),
+        )
+        .unwrap();
+        let image_result =
+            compare_images(&result, "res/test/gba/jsmolka_gba-tests/sram.png");
+        assert!(image_result);
+    }
+
+    #[test]
+    fn test_gba_jsmolka_flash64() {
+        let (result, _) = run_gba_image_test(
+            "../../res/roms.gba/test/jsmolka_gba-tests/flash64.gba",
+            Some(100000000),
+            GbaTestOptions::default(),
+        )
+        .unwrap();
+        let image_result =
+            compare_images(&result, "res/test/gba/jsmolka_gba-tests/flash64.png");
+        assert!(image_result);
+    }
+
+    #[test]
+    #[ignore]
+    fn generate_gba_reference_images() {
+        let tests: &[(&str, &str)] = &[
+            (
+                "../../res/roms.gba/test/jsmolka_gba-tests/arm.gba",
+                "res/test/gba/jsmolka_gba-tests/arm.png",
+            ),
+            (
+                "../../res/roms.gba/test/jsmolka_gba-tests/memory.gba",
+                "res/test/gba/jsmolka_gba-tests/memory.png",
+            ),
+            (
+                "../../res/roms.gba/test/jsmolka_gba-tests/bios.gba",
+                "res/test/gba/jsmolka_gba-tests/bios.png",
+            ),
+            (
+                "../../res/roms.gba/test/jsmolka_gba-tests/sram.gba",
+                "res/test/gba/jsmolka_gba-tests/sram.png",
+            ),
+            (
+                "../../res/roms.gba/test/jsmolka_gba-tests/flash64.gba",
+                "res/test/gba/jsmolka_gba-tests/flash64.png",
+            ),
+        ];
+        for (rom, out) in tests {
+            let (fb, _) =
+                run_gba_image_test(rom, Some(100000000), GbaTestOptions::default()).unwrap();
+            save_image(&fb, 240, 160, out);
+            println!("Generated {}", out);
+        }
     }
 }
