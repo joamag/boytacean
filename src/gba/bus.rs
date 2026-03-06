@@ -84,6 +84,9 @@ pub struct GbaBus {
 
     /// last BIOS read value (for open bus emulation)
     bios_value: u32,
+
+    /// Whether BIOS reads are currently allowed (true when CPU PC is in BIOS)
+    pub bios_readable: bool,
 }
 
 impl GbaBus {
@@ -107,6 +110,7 @@ impl GbaBus {
             postflg: 0,
             halt_requested: false,
             bios_value: 0,
+            bios_readable: false,
         };
         bus.init_bios_stubs();
         bus
@@ -127,42 +131,40 @@ impl GbaBus {
         // offset = (0x128 - 0x18 - 8) / 4 = 0x42
         self.bios_write32(0x18, 0xEA000042); // B #0x128
 
-        // BIOS IRQ handler at 0x128:
-        // Saves state, calls game handler, updates IntrCheck at 0x03007FF8,
-        // restores state, and returns from IRQ.
+        // BIOS IRQ handler at 0x128 (matches real GBA BIOS):
+        // Saves state, calls game handler via [0x03FFFFFC], restores
+        // state, and returns from IRQ. The IntrCheck update at
+        // 0x03007FF8 is the game's IRQ handler responsibility.
         //
         // 0x128: STMFD SP!, {R0-R3, R12, LR}
         // 0x12C: MOV R0, #0x04000000        ; I/O base
         // 0x130: ADD LR, PC, #0             ; LR = 0x138 (return point)
         // 0x134: LDR PC, [R0, #-4]          ; PC = [0x03FFFFFC] (game handler)
         // --- game handler returns here ---
-        // 0x138: MOV R0, #0x04000000        ; reload I/O base
-        // 0x13C: LDR R1, [R0, #0x200]       ; R1 = IE (low 16) | IF (high 16)
-        // 0x140: AND R1, R1, R1, LSR #16    ; R1 = IE & IF (acknowledged bits)
-        // 0x144: LDR R0, [PC, #16]          ; R0 = 0x03007FF8 (from literal pool at 0x15C)
-        // 0x148: LDRH R2, [R0]              ; R2 = current IntrCheck
-        // 0x14C: ORR R2, R2, R1             ; R2 |= acknowledged interrupts
-        // 0x150: STRH R2, [R0]              ; store updated IntrCheck
-        // 0x154: LDMFD SP!, {R0-R3, R12, LR}
-        // 0x158: SUBS PC, LR, #4            ; return from IRQ, restore CPSR
-        // 0x15C: .word 0x03007FF8            ; literal pool
+        // 0x138: LDMFD SP!, {R0-R3, R12, LR}
+        // 0x13C: SUBS PC, LR, #4            ; return from IRQ, restore CPSR
 
         self.bios_write32(0x128, 0xE92D500F); // STMFD SP!, {R0-R3, R12, LR}
         self.bios_write32(0x12C, 0xE3A00301); // MOV R0, #0x04000000
         self.bios_write32(0x130, 0xE28FE000); // ADD LR, PC, #0  (LR = 0x138)
         self.bios_write32(0x134, 0xE510F004); // LDR PC, [R0, #-4]
+        self.bios_write32(0x138, 0xE8BD500F); // LDMFD SP!, {R0-R3, R12, LR}
+        self.bios_write32(0x13C, 0xE25EF004); // SUBS PC, LR, #4
+        self.bios_write32(0x140, 0xE55EC002); // Real BIOS value at 0x140 (for BIOS protection after IRQ)
+        self.bios_write32(0x144, 0xE55EC002); // Real BIOS value at 0x144 (for BIOS protection after IRQ)
 
-        // After game handler returns:
-        self.bios_write32(0x138, 0xE3A00301); // MOV R0, #0x04000000
-        self.bios_write32(0x13C, 0xE5901200); // LDR R1, [R0, #0x200]  (IE|IF as 32-bit)
-        self.bios_write32(0x140, 0xE0011821); // AND R1, R1, R1, LSR #16  (IE & IF)
-        self.bios_write32(0x144, 0xE59F0010); // LDR R0, [PC, #16]  (load 0x03007FF8 from 0x15C)
-        self.bios_write32(0x148, 0xE1D020B0); // LDRH R2, [R0, #0]
-        self.bios_write32(0x14C, 0xE1822001); // ORR R2, R2, R1
-        self.bios_write32(0x150, 0xE1C020B0); // STRH R2, [R0, #0]
-        self.bios_write32(0x154, 0xE8BD500F); // LDMFD SP!, {R0-R3, R12, LR}
-        self.bios_write32(0x158, 0xE25EF004); // SUBS PC, LR, #4
-        self.bios_write32(0x15C, 0x03007FF8); // literal: IntrCheck address
+        // Write real BIOS values at addresses used by BIOS protection tests.
+        // SWI handler return area (real BIOS address 0x190)
+        self.bios_write32(0x190, 0xE3A02004);
+
+        // Write real BIOS values at addresses used for BIOS protection after startup.
+        // The real BIOS startup ends near 0xDC, where PC = 0xE4.
+        self.bios_write32(0xDC, 0xE129F000); // Real BIOS value at 0xDC
+        self.bios_write32(0xE0, 0xE129F000); // Real BIOS value at 0xE0
+        self.bios_write32(0xE4, 0xE129F000); // Real BIOS value at 0xE4
+
+        // After startup, set bios_value to what real BIOS leaves
+        self.bios_value = 0xE129F000;
     }
 
     pub fn load_rom(&mut self, data: &[u8]) {
@@ -171,11 +173,11 @@ impl GbaBus {
     }
 
     // 8-bit read
-    pub fn read8(&self, addr: u32) -> u8 {
+    pub fn read8(&mut self, addr: u32) -> u8 {
         match addr >> 24 {
             0x00 => {
                 let offset = (addr & 0x3FFF) as usize;
-                if offset < self.bios.len() {
+                if self.bios_readable && offset < self.bios.len() {
                     self.bios[offset]
                 } else {
                     (self.bios_value >> ((addr & 3) * 8)) as u8
@@ -191,11 +193,15 @@ impl GbaBus {
             }
             0x07 => self.oam[(addr & 0x3FF) as usize],
             0x08..=0x0D => {
-                let offset = (addr & 0x01FFFFFF) as usize;
-                if offset < self.rom.len() {
-                    self.rom[offset]
+                if self.save.is_eeprom_addr(addr) {
+                    self.save.eeprom_read() as u8
                 } else {
-                    0
+                    let offset = (addr & 0x01FFFFFF) as usize;
+                    if offset < self.rom.len() {
+                        self.rom[offset]
+                    } else {
+                        0
+                    }
                 }
             }
             0x0E..=0x0F => self.save.read8(addr),
@@ -204,12 +210,12 @@ impl GbaBus {
     }
 
     // 16-bit read (aligned)
-    pub fn read16(&self, addr: u32) -> u16 {
+    pub fn read16(&mut self, addr: u32) -> u16 {
         let addr = addr & !1;
         match addr >> 24 {
             0x00 => {
                 let offset = (addr & 0x3FFF) as usize;
-                if offset + 1 < self.bios.len() {
+                if self.bios_readable && offset + 1 < self.bios.len() {
                     u16::from_le_bytes([self.bios[offset], self.bios[offset + 1]])
                 } else {
                     (self.bios_value >> ((addr & 2) * 8)) as u16
@@ -237,11 +243,15 @@ impl GbaBus {
                 u16::from_le_bytes([self.oam[offset], self.oam[offset + 1]])
             }
             0x08..=0x0D => {
-                let offset = (addr & 0x01FFFFFF) as usize;
-                if offset + 1 < self.rom.len() {
-                    u16::from_le_bytes([self.rom[offset], self.rom[offset + 1]])
+                if self.save.is_eeprom_addr(addr) {
+                    self.save.eeprom_read()
                 } else {
-                    0
+                    let offset = (addr & 0x01FFFFFF) as usize;
+                    if offset + 1 < self.rom.len() {
+                        u16::from_le_bytes([self.rom[offset], self.rom[offset + 1]])
+                    } else {
+                        0
+                    }
                 }
             }
             0x0E..=0x0F => {
@@ -254,18 +264,19 @@ impl GbaBus {
     }
 
     // 32-bit read (aligned)
-    pub fn read32(&self, addr: u32) -> u32 {
+    pub fn read32(&mut self, addr: u32) -> u32 {
         let addr = addr & !3;
         match addr >> 24 {
             0x00 => {
                 let offset = (addr & 0x3FFF) as usize;
-                if offset + 3 < self.bios.len() {
-                    u32::from_le_bytes([
+                if self.bios_readable && offset + 3 < self.bios.len() {
+                    let val = u32::from_le_bytes([
                         self.bios[offset],
                         self.bios[offset + 1],
                         self.bios[offset + 2],
                         self.bios[offset + 3],
-                    ])
+                    ]);
+                    val
                 } else {
                     self.bios_value
                 }
@@ -321,16 +332,20 @@ impl GbaBus {
                 ])
             }
             0x08..=0x0D => {
-                let offset = (addr & 0x01FFFFFF) as usize;
-                if offset + 3 < self.rom.len() {
-                    u32::from_le_bytes([
-                        self.rom[offset],
-                        self.rom[offset + 1],
-                        self.rom[offset + 2],
-                        self.rom[offset + 3],
-                    ])
+                if self.save.is_eeprom_addr(addr) {
+                    self.save.eeprom_read() as u32
                 } else {
-                    0
+                    let offset = (addr & 0x01FFFFFF) as usize;
+                    if offset + 3 < self.rom.len() {
+                        u32::from_le_bytes([
+                            self.rom[offset],
+                            self.rom[offset + 1],
+                            self.rom[offset + 2],
+                            self.rom[offset + 3],
+                        ])
+                    } else {
+                        0
+                    }
                 }
             }
             0x0E..=0x0F => {
@@ -397,6 +412,11 @@ impl GbaBus {
                 let offset = (addr & 0x3FF) as usize;
                 self.oam[offset] = bytes[0];
                 self.oam[offset + 1] = bytes[1];
+            }
+            0x08..=0x0D => {
+                if self.save.is_eeprom_addr(raw_addr) {
+                    self.save.eeprom_write(value);
+                }
             }
             0x0E..=0x0F => {
                 // 8-bit bus; byte lane selected by original addr bit 0
@@ -736,6 +756,11 @@ impl GbaBus {
         self.postflg = 0;
         self.halt_requested = false;
         self.bios_value = 0;
+        self.bios_readable = false;
+    }
+
+    pub fn update_bios_value(&mut self, value: u32) {
+        self.bios_value = value;
     }
 }
 
@@ -963,7 +988,7 @@ mod tests {
 
     #[test]
     fn test_no_save_type_returns_ff() {
-        let bus = GbaBus::new();
+        let mut bus = GbaBus::new();
         assert_eq!(bus.read8(0x0E00_0000), 0xFF);
     }
 
@@ -995,7 +1020,7 @@ mod tests {
 
     #[test]
     fn test_io_keyinput() {
-        let bus = GbaBus::new();
+        let mut bus = GbaBus::new();
         assert_eq!(bus.read16(REG_KEYINPUT), 0x03FF);
     }
 
@@ -1017,7 +1042,7 @@ mod tests {
 
     #[test]
     fn test_unmapped_read() {
-        let bus = GbaBus::new();
+        let mut bus = GbaBus::new();
         assert_eq!(bus.read8(0x1000_0000), 0);
     }
 
@@ -1029,5 +1054,133 @@ mod tests {
         bus.reset();
         assert_eq!(bus.read32(0x0200_0000), 0);
         assert!(!bus.halt_requested);
+    }
+
+    #[test]
+    fn test_bios_protection_read32_returns_bios_value() {
+        let mut bus = GbaBus::new();
+        // bios_readable is false by default; reading BIOS should return bios_value
+        assert_eq!(bus.read32(0x0000_0000), 0xE129F000);
+    }
+
+    #[test]
+    fn test_bios_protection_read16_returns_bios_value() {
+        let mut bus = GbaBus::new();
+        // low halfword of bios_value (0xE129F000)
+        assert_eq!(bus.read16(0x0000_0000), 0xF000);
+        // high halfword (addr & 2 = 2, shift by 16)
+        assert_eq!(bus.read16(0x0000_0002), 0xE129);
+    }
+
+    #[test]
+    fn test_bios_protection_read8_returns_bios_value() {
+        let mut bus = GbaBus::new();
+        assert_eq!(bus.read8(0x0000_0000), 0x00); // byte 0 of 0xE129F000
+        assert_eq!(bus.read8(0x0000_0001), 0xF0); // byte 1
+        assert_eq!(bus.read8(0x0000_0002), 0x29); // byte 2
+        assert_eq!(bus.read8(0x0000_0003), 0xE1); // byte 3
+    }
+
+    #[test]
+    fn test_bios_readable_allows_direct_access() {
+        let mut bus = GbaBus::new();
+        bus.bios_readable = true;
+        // IRQ vector at 0x18 = 0xEA000042 (branch to 0x128)
+        assert_eq!(bus.read32(0x0000_0018), 0xEA000042);
+        bus.bios_readable = false;
+        // with protection, returns bios_value instead
+        assert_eq!(bus.read32(0x0000_0018), 0xE129F000);
+    }
+
+    #[test]
+    fn test_bios_init_startup_value() {
+        let mut bus = GbaBus::new();
+        // after init, bios_value matches real GBA post-boot value
+        assert_eq!(bus.read32(0x0000_0000), 0xE129F000);
+    }
+
+    #[test]
+    fn test_bios_update_bios_value() {
+        let mut bus = GbaBus::new();
+        bus.update_bios_value(0xDEADBEEF);
+        assert_eq!(bus.read32(0x0000_0000), 0xDEADBEEF);
+    }
+
+    #[test]
+    fn test_bios_irq_handler_stubs() {
+        let mut bus = GbaBus::new();
+        bus.bios_readable = true;
+        // verify IRQ handler stub at 0x128-0x13C
+        assert_eq!(bus.read32(0x0000_0128), 0xE92D500F); // STMFD SP!, {R0-R3, R12, LR}
+        assert_eq!(bus.read32(0x0000_012C), 0xE3A00301); // MOV R0, #0x04000000
+        assert_eq!(bus.read32(0x0000_0130), 0xE28FE000); // ADD LR, PC, #0
+        assert_eq!(bus.read32(0x0000_0134), 0xE510F004); // LDR PC, [R0, #-4]
+        assert_eq!(bus.read32(0x0000_0138), 0xE8BD500F); // LDMFD SP!, {R0-R3, R12, LR}
+        assert_eq!(bus.read32(0x0000_013C), 0xE25EF004); // SUBS PC, LR, #4
+    }
+
+    #[test]
+    fn test_bios_swi_protection_value() {
+        let mut bus = GbaBus::new();
+        bus.bios_readable = true;
+        // real BIOS value at SWI return area
+        assert_eq!(bus.read32(0x0000_0190), 0xE3A02004);
+    }
+
+    #[test]
+    fn test_iwram_mirror_0x03fffffc() {
+        let mut bus = GbaBus::new();
+        // write to 0x03007FFC, read from 0x03FFFFFC (IWRAM mirror)
+        bus.write32(0x0300_7FFC, 0x12345678);
+        assert_eq!(bus.read32(0x03FF_FFFC), 0x12345678);
+    }
+
+    #[test]
+    fn test_eeprom_detection_via_load_rom() {
+        let mut bus = GbaBus::new();
+        let mut rom = vec![0u8; 512];
+        rom[0x100..0x108].copy_from_slice(b"EEPROM_V");
+        bus.load_rom(&rom);
+        assert_eq!(bus.save.save_type(), crate::gba::flash::SaveType::Eeprom);
+    }
+
+    #[test]
+    fn test_eeprom_read16_at_0x0d_returns_eeprom() {
+        let mut bus = GbaBus::new();
+        let mut rom = vec![0u8; 4 * 1024 * 1024];
+        rom[0x100..0x108].copy_from_slice(b"EEPROM_V");
+        bus.load_rom(&rom);
+        // reading from 0x0D region should go through EEPROM (returns 1 when idle)
+        let val = bus.read16(0x0D00_0000);
+        assert_eq!(val & 1, 1);
+    }
+
+    #[test]
+    fn test_eeprom_write16_at_0x0d_reaches_eeprom() {
+        let mut bus = GbaBus::new();
+        let mut rom = vec![0u8; 4 * 1024 * 1024]; // 4MB -> 14-bit addressing
+        rom[0x100..0x108].copy_from_slice(b"EEPROM_V");
+        bus.load_rom(&rom);
+        // send read command: "11" + 14-bit addr (0) + 1 stop bit
+        bus.write16(0x0D00_0000, 1); // bit 1
+        bus.write16(0x0D00_0000, 1); // bit 1
+                                     // send 14 address bits (0) + 1 stop bit
+        for _ in 0..15 {
+            bus.write16(0x0D00_0000, 0);
+        }
+        // should now be in ReadingData state, reads return dummy/data bits
+        let val = bus.read16(0x0D00_0000);
+        // first read is dummy bit (0)
+        assert_eq!(val & 1, 0);
+    }
+
+    #[test]
+    fn test_non_eeprom_rom_read_at_0x0d() {
+        let mut bus = GbaBus::new();
+        let mut rom = vec![0u8; 512];
+        rom[0x100..0x106].copy_from_slice(b"SRAM_V");
+        bus.load_rom(&rom);
+        // 0x0D region for non-EEPROM games reads ROM (returns 0 past end)
+        assert_eq!(bus.read16(0x0D00_0000), 0);
     }
 }

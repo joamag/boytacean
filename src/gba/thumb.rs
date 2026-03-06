@@ -723,6 +723,10 @@ fn thumb_swi(cpu: &mut Arm7Tdmi, instr: u16) {
 
     handle_swi(cpu, comment);
 
+    // Update BIOS protection value to match what real BIOS leaves
+    // after SWI dispatch (instruction at real BIOS address 0x190)
+    cpu.bus.update_bios_value(0xE3A02004);
+
     let lr = cpu.reg(14);
     cpu.restore_cpsr();
     cpu.set_reg(15, lr);

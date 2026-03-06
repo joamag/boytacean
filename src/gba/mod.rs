@@ -109,6 +109,7 @@ impl GameBoyAdvance {
         // clock timers
         if self.timer_enabled {
             let overflows = self.cpu.bus.timers.clock(cycles);
+            // debug: no trace
             for i in 0..4 {
                 if overflows & (1 << i) != 0 {
                     if self.cpu.bus.timers.timers[i].irq_enable() {

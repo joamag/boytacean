@@ -1,1 +1,1 @@
-More info in https://github.com/jsmolka/gba-tests
+More info at https://github.com/jsmolka/gba-tests

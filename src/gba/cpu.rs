@@ -8,7 +8,7 @@ use crate::gba::{
     arm::execute_arm,
     bus::GbaBus,
     consts::{
-        CPSR_C, CPSR_F, CPSR_I, CPSR_MODE_MASK, CPSR_N, CPSR_T, CPSR_V, CPSR_Z, MODE_FIQ, MODE_IRQ,
+        CPSR_C, CPSR_I, CPSR_MODE_MASK, CPSR_N, CPSR_T, CPSR_V, CPSR_Z, MODE_FIQ, MODE_IRQ,
         MODE_SVC, MODE_SYS, MODE_USR,
     },
     thumb::execute_thumb,
@@ -98,7 +98,7 @@ impl Arm7Tdmi {
     pub fn new(bus: GbaBus) -> Self {
         let mut cpu = Self {
             regs: [0; 16],
-            cpsr: MODE_SVC | CPSR_I | CPSR_F, // start in SVC mode, IRQs disabled
+            cpsr: MODE_SYS, // after BIOS boot: SYS mode, IRQs enabled
             spsr: [0; 5],
             banked: BankedRegisters::new(),
             bus,
@@ -108,10 +108,11 @@ impl Arm7Tdmi {
             pipeline_valid: false,
         };
 
-        // set up initial stack pointers
-        cpu.regs[13] = 0x0300_7FE0; // SP_SVC
+        // set up initial stack pointers (matching post-BIOS state)
+        // SVC SP = 0x03007FE0, IRQ SP = 0x03007FA0, USR/SYS SP = 0x03007F00
+        cpu.banked.svc[0] = 0x0300_7FE0; // SP_SVC (banked, since we're in SYS)
         cpu.banked.irq[0] = 0x0300_7FA0; // SP_IRQ
-        cpu.banked.usr[5] = 0x0300_7F00; // SP_USR/SYS
+        cpu.regs[13] = 0x0300_7F00; // SP_SYS (current mode)
 
         // set PC to ROM entry point
         cpu.regs[15] = 0x0800_0000;
@@ -288,20 +289,35 @@ impl Arm7Tdmi {
         self.pipeline_valid = false;
     }
 
+    fn fetch_bios_guard(&mut self, addr: u32, value: u32) {
+        if addr < 0x4000 {
+            self.bus.update_bios_value(value);
+        }
+    }
+
     fn fill_pipeline(&mut self) {
         if self.in_thumb_mode() {
-            self.regs[15] &= !1; // align to halfword
+            self.regs[15] &= !1;
+            self.bus.bios_readable = self.regs[15] < 0x4000;
             self.pipeline[0] = self.bus.read16(self.regs[15]) as u32;
+            self.fetch_bios_guard(self.regs[15], self.pipeline[0]);
             self.regs[15] = self.regs[15].wrapping_add(2);
+            self.bus.bios_readable = self.regs[15] < 0x4000;
             self.pipeline[1] = self.bus.read16(self.regs[15]) as u32;
+            self.fetch_bios_guard(self.regs[15], self.pipeline[1]);
             self.regs[15] = self.regs[15].wrapping_add(2);
         } else {
-            self.regs[15] &= !3; // align to word
+            self.regs[15] &= !3;
+            self.bus.bios_readable = self.regs[15] < 0x4000;
             self.pipeline[0] = self.bus.read32(self.regs[15]);
+            self.fetch_bios_guard(self.regs[15], self.pipeline[0]);
             self.regs[15] = self.regs[15].wrapping_add(4);
+            self.bus.bios_readable = self.regs[15] < 0x4000;
             self.pipeline[1] = self.bus.read32(self.regs[15]);
+            self.fetch_bios_guard(self.regs[15], self.pipeline[1]);
             self.regs[15] = self.regs[15].wrapping_add(4);
         }
+        self.bus.bios_readable = false;
         self.pipeline_valid = true;
     }
 
@@ -310,6 +326,18 @@ impl Arm7Tdmi {
     fn fetch(&mut self) -> u32 {
         if !self.pipeline_valid {
             self.fill_pipeline();
+        }
+
+        // Simulate the 3rd pipeline stage (fetch): on real ARM7TDMI,
+        // the fetch stage reads from PC (= executing_addr + 8) before
+        // the instruction executes. This updates bios_value so that
+        // BIOS protection returns the correct last-fetched value even
+        // when a branch flushes the pipeline.
+        if self.regs[15] < 0x4000 {
+            self.bus.bios_readable = true;
+            let prefetch = self.bus.read32(self.regs[15]);
+            self.bus.update_bios_value(prefetch);
+            self.bus.bios_readable = false;
         }
 
         // return the current instruction from the pipeline
@@ -322,13 +350,17 @@ impl Arm7Tdmi {
     fn advance_pipeline(&mut self) {
         self.pipeline[0] = self.pipeline[1];
 
+        self.bus.bios_readable = self.regs[15] < 0x4000;
         if self.in_thumb_mode() {
             self.pipeline[1] = self.bus.read16(self.regs[15]) as u32;
+            self.fetch_bios_guard(self.regs[15], self.pipeline[1]);
             self.regs[15] = self.regs[15].wrapping_add(2);
         } else {
             self.pipeline[1] = self.bus.read32(self.regs[15]);
+            self.fetch_bios_guard(self.regs[15], self.pipeline[1]);
             self.regs[15] = self.regs[15].wrapping_add(4);
         }
+        self.bus.bios_readable = false;
     }
 
     /// executes a single CPU instruction and returns the number of cycles consumed
@@ -600,15 +632,15 @@ impl Arm7Tdmi {
 
     // bus access helpers (used by BIOS HLE and instruction handlers)
 
-    pub fn bus_read8(&self, addr: u32) -> u8 {
+    pub fn bus_read8(&mut self, addr: u32) -> u8 {
         self.bus.read8(addr)
     }
 
-    pub fn bus_read16(&self, addr: u32) -> u16 {
+    pub fn bus_read16(&mut self, addr: u32) -> u16 {
         self.bus.read16(addr & !1)
     }
 
-    pub fn bus_read32(&self, addr: u32) -> u32 {
+    pub fn bus_read32(&mut self, addr: u32) -> u32 {
         self.bus.read32(addr & !3)
     }
 
@@ -626,15 +658,15 @@ impl Arm7Tdmi {
 
     pub fn reset(&mut self) {
         self.regs = [0; 16];
-        self.cpsr = MODE_SVC | CPSR_I | CPSR_F;
+        self.cpsr = MODE_SYS;
         self.spsr = [0; 5];
         self.banked = BankedRegisters::new();
         self.halted = false;
         self.pipeline_valid = false;
 
-        self.regs[13] = 0x0300_7FE0;
+        self.banked.svc[0] = 0x0300_7FE0;
         self.banked.irq[0] = 0x0300_7FA0;
-        self.banked.usr[5] = 0x0300_7F00;
+        self.regs[13] = 0x0300_7F00;
         self.regs[15] = 0x0800_0000;
     }
 }
@@ -652,7 +684,8 @@ mod tests {
     fn test_new() {
         let cpu = make_cpu();
         assert_eq!(cpu.pc(), 0x0800_0000);
-        assert_eq!(cpu.reg(13), 0x0300_7FE0); // SP_SVC
+        assert_eq!(cpu.reg(13), 0x0300_7F00); // SP_SYS (post-BIOS state)
+        assert_eq!(cpu.cpsr() & CPSR_MODE_MASK, MODE_SYS);
         assert!(!cpu.halted());
         assert!(!cpu.in_thumb_mode());
     }
@@ -734,7 +767,8 @@ mod tests {
     #[test]
     fn test_spsr() {
         let mut cpu = make_cpu();
-        // in SVC mode, SPSR should be accessible
+        // switch to SVC mode so SPSR is accessible
+        cpu.set_cpsr(MODE_SVC);
         cpu.set_spsr(0x12345678);
         assert_eq!(cpu.spsr(), 0x12345678);
     }
@@ -872,6 +906,79 @@ mod tests {
         assert_eq!(cpu.reg(0), 0);
         assert!(!cpu.halted());
         assert_eq!(cpu.pc(), 0x0800_0000);
+        assert_eq!(cpu.reg(13), 0x0300_7F00); // SP_SYS
+        assert_eq!(cpu.cpsr() & CPSR_MODE_MASK, MODE_SYS);
+    }
+
+    #[test]
+    fn test_new_sys_mode_irqs_enabled() {
+        let cpu = make_cpu();
+        assert_eq!(cpu.cpsr() & CPSR_MODE_MASK, MODE_SYS);
+        assert_eq!(cpu.cpsr() & CPSR_I, 0); // IRQs enabled
+    }
+
+    #[test]
+    fn test_new_stack_pointers() {
+        let mut cpu = make_cpu();
+        // SYS mode SP
+        assert_eq!(cpu.reg(13), 0x0300_7F00);
+        // switch to IRQ mode and check SP
+        cpu.set_cpsr(MODE_IRQ);
+        assert_eq!(cpu.reg(13), 0x0300_7FA0);
+        // switch to SVC mode and check SP
+        cpu.set_cpsr(MODE_SVC);
         assert_eq!(cpu.reg(13), 0x0300_7FE0);
+    }
+
+    #[test]
+    fn test_bios_value_after_startup() {
+        let mut cpu = make_cpu();
+        // BIOS protection value after boot matches real GBA
+        assert_eq!(cpu.bus.read32(0x0000_0000), 0xE129F000);
+    }
+
+    #[test]
+    fn test_bios_protection_fetch_updates_value() {
+        let mut cpu = make_cpu();
+        // Place an instruction in BIOS at 0x00
+        cpu.bus.bios_readable = true;
+        let val_at_0 = cpu.bus.read32(0x0000_0000);
+        cpu.bus.bios_readable = false;
+        // Set PC to BIOS address and fill pipeline
+        cpu.set_reg(15, 0x0000_0000);
+        // The fetch should update bios_value
+        // PC=0, so fill_pipeline reads from 0x00, 0x04
+        // and the fetch() prefetch reads from 0x08
+        let _instr = cpu.fetch();
+        cpu.bus.bios_readable = true;
+        let val_at_8 = cpu.bus.read32(0x0000_0008);
+        cpu.bus.bios_readable = false;
+        // bios_value should be the value at PC (= addr + 8 = 0x08)
+        assert_eq!(cpu.bus.read32(0x0000_0000), val_at_8);
+    }
+
+    #[test]
+    fn test_enter_exception_irq_mode() {
+        let mut cpu = make_cpu();
+        let old_cpsr = cpu.cpsr();
+        cpu.enter_exception(0x18, MODE_IRQ);
+        assert_eq!(cpu.cpsr() & CPSR_MODE_MASK, MODE_IRQ);
+        assert!(cpu.cpsr() & CPSR_I != 0); // IRQs disabled in handler
+        assert!(cpu.cpsr() & CPSR_T == 0); // ARM mode
+        assert_eq!(cpu.spsr(), old_cpsr);
+        assert_eq!(cpu.pc(), 0x18);
+    }
+
+    #[test]
+    fn test_irq_entry_from_sys_mode() {
+        let mut cpu = make_cpu();
+        // enable VBlank IRQ
+        cpu.bus.irq.set_ime(true);
+        cpu.bus.irq.set_ie(0x0001); // VBlank
+        cpu.bus.irq.raise_vblank();
+        assert!(cpu.bus.irq.pending());
+        // step should enter IRQ exception
+        cpu.step();
+        assert_eq!(cpu.cpsr() & CPSR_MODE_MASK, MODE_IRQ);
     }
 }

@@ -793,6 +793,10 @@ fn arm_swi(cpu: &mut Arm7Tdmi, instr: u32) {
     // HLE: handle the SWI in Rust
     handle_swi(cpu, comment);
 
+    // Update BIOS protection value to match what real BIOS leaves
+    // after SWI dispatch (instruction at real BIOS address 0x190)
+    cpu.bus.update_bios_value(0xE3A02004);
+
     // return from SWI (restore CPSR and jump to LR)
     let lr = cpu.reg(14);
     cpu.restore_cpsr();
@@ -1193,5 +1197,21 @@ mod tests {
 
         // Should store USR R8 = 32, not FIQ R8 = 64
         assert_eq!(cpu.bus_read32(mem), 32);
+    }
+
+    #[test]
+    fn test_arm_swi_updates_bios_value() {
+        let mut cpu = make_cpu();
+        // place CPU at ROM entry with a valid pipeline
+        cpu.set_reg(15, 0x0800_0000);
+        // Write a SWI instruction to ROM (SWI 0x08 = sqrt)
+        // SWI #0x080000 = 0xEF080000
+        cpu.bus.rom = vec![0; 16];
+        cpu.bus.rom[0..4].copy_from_slice(&0xEF080000u32.to_le_bytes());
+        // fill pipeline from ROM
+        cpu.set_reg(0, 4); // sqrt(4) = 2
+        cpu.step();
+        // after SWI, bios_value should be 0xE3A02004 (real BIOS SWI return)
+        assert_eq!(cpu.bus.read32(0x0000_0000), 0xE3A02004);
     }
 }

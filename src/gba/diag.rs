@@ -25,10 +25,7 @@ pub fn run_diagnostics(gba: &mut GameBoyAdvance, num_frames: u32) {
         }
 
         // run a full frame
-        let start_frame = gba.ppu_frame();
-        while gba.ppu_frame() == start_frame {
-            gba.clock();
-        }
+        gba.next_frame();
 
         if frame % 500 == 0 || frame == num_frames - 1 {
             print_state(gba, frame, 0);
@@ -94,6 +91,27 @@ fn print_state(gba: &GameBoyAdvance, frame: u32, cycles: u64) {
         if_,
         cpu.halted()
     );
+
+    // print timer state
+    for i in 0..4 {
+        let t = &cpu.bus.timers.timers[i];
+        if t.enabled() {
+            println!(
+                "         | TM{}: cnt={:#06x} reload={:#06x} ctrl={:#06x} cascade={} irq={}",
+                i,
+                t.counter(),
+                t.reload(),
+                t.control(),
+                t.cascade(),
+                t.irq_enable()
+            );
+        }
+    }
+    // show CPSR I bit (IRQ disable)
+    let irq_disabled = cpu.cpsr() & 0x80 != 0;
+    if irq_disabled {
+        println!("         | ** CPSR I=1 (IRQs disabled) **");
+    }
 }
 
 /// Analyzes BG rendering to diagnose the vertical strip glitch.
