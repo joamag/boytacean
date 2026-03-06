@@ -56,7 +56,7 @@ mod tests {
     fn test_jsmolka_arm() {
         let gba = run_gba_test(
             "res/roms.gba/test/jsmolka_gba-tests/arm.gba",
-            Some(100_000_000),
+            Some(100000000),
             GbaTestOptions::default(),
         )
         .unwrap();
@@ -67,7 +67,7 @@ mod tests {
     fn test_jsmolka_memory() {
         let gba = run_gba_test(
             "res/roms.gba/test/jsmolka_gba-tests/memory.gba",
-            Some(100_000_000),
+            Some(100000000),
             GbaTestOptions::default(),
         )
         .unwrap();
@@ -78,7 +78,7 @@ mod tests {
     fn test_jsmolka_bios() {
         let gba = run_gba_test(
             "res/roms.gba/test/jsmolka_gba-tests/bios.gba",
-            Some(100_000_000),
+            Some(100000000),
             GbaTestOptions::default(),
         )
         .unwrap();
@@ -89,7 +89,7 @@ mod tests {
     fn test_jsmolka_sram() {
         let gba = run_gba_test(
             "res/roms.gba/test/jsmolka_gba-tests/sram.gba",
-            Some(100_000_000),
+            Some(100000000),
             GbaTestOptions::default(),
         )
         .unwrap();
@@ -100,7 +100,7 @@ mod tests {
     fn test_jsmolka_flash64() {
         let gba = run_gba_test(
             "res/roms.gba/test/jsmolka_gba-tests/flash64.gba",
-            Some(100_000_000),
+            Some(100000000),
             GbaTestOptions::default(),
         )
         .unwrap();
@@ -111,7 +111,84 @@ mod tests {
     fn test_jsmolka_nes() {
         let gba = run_gba_test(
             "res/roms.gba/test/jsmolka_gba-tests/nes.gba",
-            Some(100_000_000),
+            Some(100000000),
+            GbaTestOptions::default(),
+        )
+        .unwrap();
+        assert!(gba.ppu_frame() > 0);
+    }
+
+    #[test]
+    fn test_jsmolka_thumb() {
+        let gba = run_gba_test(
+            "res/roms.gba/test/jsmolka_gba-tests/thumb.gba",
+            Some(100000000),
+            GbaTestOptions::default(),
+        )
+        .unwrap();
+        assert!(gba.ppu_frame() > 0);
+    }
+
+    #[test]
+    fn test_jsmolka_flash128() {
+        let gba = run_gba_test(
+            "res/roms.gba/test/jsmolka_gba-tests/flash128.gba",
+            Some(100000000),
+            GbaTestOptions::default(),
+        )
+        .unwrap();
+        assert!(gba.ppu_frame() > 0);
+    }
+
+    #[test]
+    fn test_jsmolka_none() {
+        let gba = run_gba_test(
+            "res/roms.gba/test/jsmolka_gba-tests/none.gba",
+            Some(100000000),
+            GbaTestOptions::default(),
+        )
+        .unwrap();
+        assert!(gba.ppu_frame() > 0);
+    }
+
+    #[test]
+    fn test_jsmolka_save_none() {
+        let gba = run_gba_test(
+            "res/roms.gba/test/jsmolka_gba-tests/save_none.gba",
+            Some(100000000),
+            GbaTestOptions::default(),
+        )
+        .unwrap();
+        assert!(gba.ppu_frame() > 0);
+    }
+
+    #[test]
+    fn test_jsmolka_ppu_hello() {
+        let gba = run_gba_test(
+            "res/roms.gba/test/jsmolka_gba-tests/ppu_hello.gba",
+            Some(100000000),
+            GbaTestOptions::default(),
+        )
+        .unwrap();
+        assert!(gba.ppu_frame() > 0);
+    }
+
+    #[test]
+    fn test_jsmolka_ppu_shades() {
+        let gba = run_gba_test(
+            "res/roms.gba/test/jsmolka_gba-tests/ppu_shades.gba",
+            Some(100000000),
+            GbaTestOptions::default(),
+        )
+        .unwrap();
+        assert!(gba.ppu_frame() > 0);
+    }
+
+    #[test]
+    fn test_jsmolka_ppu_stripes() {
+        let gba = run_gba_test(
+            "res/roms.gba/test/jsmolka_gba-tests/ppu_stripes.gba",
+            Some(100000000),
             GbaTestOptions::default(),
         )
         .unwrap();
