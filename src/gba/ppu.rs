@@ -369,15 +369,13 @@ impl GbaPpu {
             return 0x3F;
         }
 
-        if self.dispcnt & (1 << 13) != 0
-            && self.pixel_in_window(x, line, 0) {
-                return (self.winin & 0x3F) as u8;
-            }
+        if self.dispcnt & (1 << 13) != 0 && self.pixel_in_window(x, line, 0) {
+            return (self.winin & 0x3F) as u8;
+        }
 
-        if self.dispcnt & (1 << 14) != 0
-            && self.pixel_in_window(x, line, 1) {
-                return ((self.winin >> 8) & 0x3F) as u8;
-            }
+        if self.dispcnt & (1 << 14) != 0 && self.pixel_in_window(x, line, 1) {
+            return ((self.winin >> 8) & 0x3F) as u8;
+        }
 
         if self.dispcnt & (1 << 15) != 0 && obj_window {
             return ((self.winout >> 8) & 0x3F) as u8;
