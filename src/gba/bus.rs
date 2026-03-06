@@ -284,13 +284,13 @@ impl GbaBus {
             0x00 => {
                 let offset = (addr & 0x3FFF) as usize;
                 if self.bios_readable && offset + 3 < self.bios.len() {
-                    let val = u32::from_le_bytes([
+                    
+                    u32::from_le_bytes([
                         self.bios[offset],
                         self.bios[offset + 1],
                         self.bios[offset + 2],
                         self.bios[offset + 3],
-                    ]);
-                    val
+                    ])
                 } else {
                     self.bios_value
                 }
