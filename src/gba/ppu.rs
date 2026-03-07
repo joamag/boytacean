@@ -1,7 +1,8 @@
 //! GBA PPU (Picture Processing Unit) with scanline-based rendering.
 //!
-//! Supports video modes 0-2 with text and affine background layers,
-//! sprite rendering, priority compositing, and alpha blending.
+//! Supports video modes 0-5 with text and affine background layers,
+//! bitmap backgrounds, sprite rendering, priority compositing,
+//! window masking, and alpha blending.
 
 use crate::gba::consts::{
     CYCLES_PER_SCANLINE, DISPLAY_HEIGHT, DISPLAY_WIDTH, FRAME_BUFFER_SIZE, TOTAL_LINES,
@@ -359,11 +360,13 @@ impl GbaPpu {
     }
 
     /// returns true if any window is enabled in DISPCNT (bits 13-15)
+    #[inline(always)]
     fn windows_enabled(&self) -> bool {
         self.dispcnt & 0xE000 != 0
     }
 
     /// evaluates window mask including OBJ window support
+    #[inline(always)]
     fn window_mask_with_obj(&self, x: usize, line: usize, obj_window: bool) -> u8 {
         if !self.windows_enabled() {
             return 0x3F;
@@ -385,6 +388,7 @@ impl GbaPpu {
     }
 
     /// checks if a pixel (x, line) is inside the given window (0 or 1)
+    #[inline(always)]
     fn pixel_in_window(&self, x: usize, line: usize, win: usize) -> bool {
         let h = self.winh[win];
         let v = self.winv[win];
@@ -407,6 +411,7 @@ impl GbaPpu {
     }
 
     /// returns the blend mode from BLDCNT
+    #[inline(always)]
     fn blend_mode(&self) -> BlendMode {
         match (self.bldcnt >> 6) & 0x03 {
             0 => BlendMode::None,
@@ -418,16 +423,19 @@ impl GbaPpu {
     }
 
     /// checks if a layer is a first target in BLDCNT (bits 0-5)
+    #[inline(always)]
     fn is_blend_target1(&self, layer: Layer) -> bool {
         self.bldcnt & (1 << layer as u16) != 0
     }
 
     /// checks if a layer is a second target in BLDCNT (bits 8-13)
+    #[inline(always)]
     fn is_blend_target2(&self, layer: Layer) -> bool {
         self.bldcnt & (1 << (8 + layer as u16)) != 0
     }
 
     /// applies alpha blending between two BGR555 colors
+    #[inline(always)]
     fn blend_alpha(&self, color1: u16, color2: u16) -> u16 {
         let eva = ((self.bldalpha & 0x1F) as u32).min(16);
         let evb = (((self.bldalpha >> 8) & 0x1F) as u32).min(16);
@@ -448,6 +456,7 @@ impl GbaPpu {
     }
 
     /// applies brightness increase to a BGR555 color
+    #[inline(always)]
     fn blend_brighten(&self, color: u16) -> u16 {
         let evy = ((self.bldy & 0x1F) as u32).min(16);
 
@@ -463,6 +472,7 @@ impl GbaPpu {
     }
 
     /// applies brightness decrease to a BGR555 color
+    #[inline(always)]
     fn blend_darken(&self, color: u16) -> u16 {
         let evy = ((self.bldy & 0x1F) as u32).min(16);
 
@@ -477,10 +487,15 @@ impl GbaPpu {
         (r | (g << 5) | (b << 10)) as u16
     }
 
-    /// applies mosaic effect to OBJ x coordinate
-    fn apply_obj_mosaic_x(&self, x: usize) -> usize {
-        let h_size = ((self.mosaic >> 8) & 0x0F) as usize + 1;
-        x / h_size * h_size
+    /// applies OBJ mosaic to a coordinate, snapping to the mosaic grid
+    #[inline(always)]
+    fn apply_obj_mosaic(&self, x: usize, horizontal: bool) -> usize {
+        let size = if horizontal {
+            ((self.mosaic >> 8) & 0x0F) as usize + 1
+        } else {
+            ((self.mosaic >> 12) & 0x0F) as usize + 1
+        };
+        x / size * size
     }
 
     /// clocks the PPU by the given number of CPU cycles.
@@ -573,18 +588,19 @@ impl GbaPpu {
             VideoMode::Mode0 => self.render_mode0(line, vram, palette, oam),
             VideoMode::Mode1 => self.render_mode1(line, vram, palette, oam),
             VideoMode::Mode2 => self.render_mode2(line, vram, palette, oam),
-            VideoMode::Mode3 => self.render_mode3(line, vram),
-            VideoMode::Mode4 => self.render_mode4(line, vram, palette),
-            VideoMode::Mode5 => self.render_mode5(line, vram),
+            VideoMode::Mode3 => self.render_mode3(line, vram, palette, oam),
+            VideoMode::Mode4 => self.render_mode4(line, vram, palette, oam),
+            VideoMode::Mode5 => self.render_mode5(line, vram, palette, oam),
         }
     }
 
     /// composites BG and OBJ layers with window masking and blending.
-    /// `bg_layers` contains (bg_index, is_affine, affine_index) for each enabled BG.
+    /// `bg_layers` contains (bg_index, bg_type, affine_index) for each enabled BG.
+    /// bg_type: 0=text, 1=affine, 3/4/5=bitmap mode
     fn render_composited(
         &mut self,
         line: usize,
-        bg_layers: &[(usize, bool, usize)],
+        bg_layers: &[(usize, u8, usize)],
         vram: &[u8],
         palette: &[u8],
         oam: &[u8],
@@ -595,20 +611,10 @@ impl GbaPpu {
         let mut bg_pixels: [[(u16, u8); DISPLAY_WIDTH]; 4] = [[(0, 255); DISPLAY_WIDTH]; 4];
         let mut bg_has_pixel: [[bool; DISPLAY_WIDTH]; 4] = [[false; DISPLAY_WIDTH]; 4];
 
-        for &(bg_index, is_affine, affine_index) in bg_layers {
+        for &(bg_index, bg_type, affine_index) in bg_layers {
             let bg_priority = (self.bgcnt[bg_index] & 0x03) as u8;
-            if is_affine {
-                self.collect_affine_bg(
-                    affine_index,
-                    bg_index,
-                    vram,
-                    palette,
-                    &mut bg_pixels[bg_index],
-                    &mut bg_has_pixel[bg_index],
-                    bg_priority,
-                );
-            } else {
-                self.collect_text_bg(
+            match bg_type {
+                0 => self.collect_text_bg(
                     bg_index,
                     line,
                     vram,
@@ -616,7 +622,26 @@ impl GbaPpu {
                     &mut bg_pixels[bg_index],
                     &mut bg_has_pixel[bg_index],
                     bg_priority,
-                );
+                ),
+                1 => self.collect_affine_bg(
+                    affine_index,
+                    bg_index,
+                    vram,
+                    palette,
+                    &mut bg_pixels[bg_index],
+                    &mut bg_has_pixel[bg_index],
+                    bg_priority,
+                ),
+                3 | 4 | 5 => self.collect_bitmap_bg(
+                    affine_index,
+                    vram,
+                    palette,
+                    &mut bg_pixels[bg_index],
+                    &mut bg_has_pixel[bg_index],
+                    bg_priority,
+                    bg_type,
+                ),
+                _ => {}
             }
         }
 
@@ -666,22 +691,8 @@ impl GbaPpu {
                 is_semi_transparent: false,
             };
 
-            // check OBJ (can interleave with BG by priority)
-            let obj_visible = obj_has_pixel[x] && (win_mask & 0x10 != 0);
-            let obj_entry = if obj_visible {
-                let (color, pri, semi) = obj_pixels[x];
-                Some(PixelEntry {
-                    color,
-                    priority: pri,
-                    layer: Layer::Obj,
-                    is_semi_transparent: semi,
-                })
-            } else {
-                None
-            };
-
-            // iterate BGs by priority (lower value = higher priority),
-            // then by BG index as tiebreaker (lower index = higher priority)
+            // insert visible layers sorted by priority (lower = higher priority),
+            // with BG index as tiebreaker (lower index wins), OBJ treated as index 4
             for bg_index in 0..4 {
                 if !bg_has_pixel[bg_index][x] {
                     continue;
@@ -696,41 +707,31 @@ impl GbaPpu {
                     layer: bg_layer_ids[bg_index],
                     is_semi_transparent: false,
                 };
-
-                // insert OBJ if it has higher priority than this BG
-                // and we haven't inserted it yet
-                if let Some(ref obj) = obj_entry {
-                    if obj.priority <= entry.priority && top.layer == Layer::Backdrop {
-                        // OBJ goes before this BG
-                        if top.layer == Layer::Backdrop {
-                            bot = top;
-                            top = *obj;
-                        }
-                    }
-                }
-
-                if (entry.priority < top.priority)
+                if entry.priority < top.priority
                     || (entry.priority == top.priority && top.layer == Layer::Backdrop)
                 {
                     bot = top;
                     top = entry;
-                } else if (entry.priority < bot.priority)
+                } else if entry.priority < bot.priority
                     || (entry.priority == bot.priority && bot.layer == Layer::Backdrop)
                 {
                     bot = entry;
                 }
             }
 
-            // insert OBJ if it hasn't been inserted yet
-            if let Some(obj) = obj_entry {
-                if (obj.priority < top.priority)
-                    || (obj.priority == top.priority && top.layer == Layer::Backdrop)
-                {
+            // insert OBJ pixel; on equal priority, OBJ wins over BGs
+            if obj_has_pixel[x] && (win_mask & 0x10 != 0) {
+                let (color, pri, semi) = obj_pixels[x];
+                let obj = PixelEntry {
+                    color,
+                    priority: pri,
+                    layer: Layer::Obj,
+                    is_semi_transparent: semi,
+                };
+                if obj.priority <= top.priority || top.layer == Layer::Backdrop {
                     bot = top;
                     top = obj;
-                } else if (obj.priority < bot.priority)
-                    || (obj.priority == bot.priority && bot.layer == Layer::Backdrop)
-                {
+                } else if obj.priority <= bot.priority || bot.layer == Layer::Backdrop {
                     bot = obj;
                 }
             }
@@ -779,109 +780,147 @@ impl GbaPpu {
 
     /// mode 0: 4 text BG layers
     fn render_mode0(&mut self, line: usize, vram: &[u8], palette: &[u8], oam: &[u8]) {
-        let mut layers = Vec::new();
+        let mut layers = [(0usize, 0u8, 0usize); 4];
+        let mut count = 0;
         for bg_index in 0..4 {
             if self.dispcnt & (1 << (8 + bg_index)) != 0 {
-                layers.push((bg_index, false, 0));
+                layers[count] = (bg_index, 0, 0);
+                count += 1;
             }
         }
-        self.render_composited(line, &layers, vram, palette, oam);
+        self.render_composited(line, &layers[..count], vram, palette, oam);
     }
 
     /// mode 1: 2 text BGs + 1 affine BG (BG2)
     fn render_mode1(&mut self, line: usize, vram: &[u8], palette: &[u8], oam: &[u8]) {
-        let mut layers = Vec::new();
+        let mut layers = [(0usize, 0u8, 0usize); 3];
+        let mut count = 0;
         if self.dispcnt & (1 << 8) != 0 {
-            layers.push((0, false, 0));
+            layers[count] = (0, 0, 0);
+            count += 1;
         }
         if self.dispcnt & (1 << 9) != 0 {
-            layers.push((1, false, 0));
+            layers[count] = (1, 0, 0);
+            count += 1;
         }
         if self.dispcnt & (1 << 10) != 0 {
-            layers.push((2, true, 0));
+            layers[count] = (2, 1, 0);
+            count += 1;
         }
-        self.render_composited(line, &layers, vram, palette, oam);
+        self.render_composited(line, &layers[..count], vram, palette, oam);
     }
 
     /// mode 2: 2 affine BGs (BG2, BG3)
     fn render_mode2(&mut self, line: usize, vram: &[u8], palette: &[u8], oam: &[u8]) {
-        let mut layers = Vec::new();
+        let mut layers = [(0usize, 0u8, 0usize); 2];
+        let mut count = 0;
         if self.dispcnt & (1 << 10) != 0 {
-            layers.push((2, true, 0));
+            layers[count] = (2, 1, 0);
+            count += 1;
         }
         if self.dispcnt & (1 << 11) != 0 {
-            layers.push((3, true, 1));
+            layers[count] = (3, 1, 1);
+            count += 1;
         }
+        self.render_composited(line, &layers[..count], vram, palette, oam);
+    }
+
+    /// mode 3: single 240x160 bitmap, 15-bit direct color (BG2 with affine)
+    fn render_mode3(&mut self, line: usize, vram: &[u8], palette: &[u8], oam: &[u8]) {
+        let layers: [(usize, u8, usize); 1] = [(2, 3, 0)];
         self.render_composited(line, &layers, vram, palette, oam);
     }
 
-    /// mode 3: single 240x160 bitmap, 15-bit direct color
-    fn render_mode3(&mut self, line: usize, vram: &[u8]) {
-        let offset = line * DISPLAY_WIDTH * 3;
-        for x in 0..DISPLAY_WIDTH {
-            let vram_offset = (line * DISPLAY_WIDTH + x) * 2;
-            if vram_offset + 1 < vram.len() {
-                let color = (vram[vram_offset] as u16) | ((vram[vram_offset + 1] as u16) << 8);
-                let (r, g, b) = bgr555_to_rgb888(color);
-                self.frame_buffer[offset + x * 3] = r;
-                self.frame_buffer[offset + x * 3 + 1] = g;
-                self.frame_buffer[offset + x * 3 + 2] = b;
-            }
-        }
+    /// mode 4: single 240x160 bitmap, 8-bit palette indexed, double buffered (BG2 with affine)
+    fn render_mode4(&mut self, line: usize, vram: &[u8], palette: &[u8], oam: &[u8]) {
+        let layers: [(usize, u8, usize); 1] = [(2, 4, 0)];
+        self.render_composited(line, &layers, vram, palette, oam);
     }
 
-    /// mode 4: single 240x160 bitmap, 8-bit palette indexed, double buffered
-    fn render_mode4(&mut self, line: usize, vram: &[u8], palette: &[u8]) {
-        let page_offset = if self.dispcnt & (1 << 4) != 0 {
-            0xA000
-        } else {
-            0
-        };
-        let offset = line * DISPLAY_WIDTH * 3;
-        for x in 0..DISPLAY_WIDTH {
-            let vram_offset = page_offset + line * DISPLAY_WIDTH + x;
-            if vram_offset < vram.len() {
-                let index = vram[vram_offset] as usize;
-                let color = self.read_palette_color(palette, index);
-                let (r, g, b) = bgr555_to_rgb888(color);
-                self.frame_buffer[offset + x * 3] = r;
-                self.frame_buffer[offset + x * 3 + 1] = g;
-                self.frame_buffer[offset + x * 3 + 2] = b;
-            }
-        }
+    /// mode 5: 160x128 bitmap, 15-bit direct color, double buffered (BG2 with affine)
+    fn render_mode5(&mut self, line: usize, vram: &[u8], palette: &[u8], oam: &[u8]) {
+        let layers: [(usize, u8, usize); 1] = [(2, 5, 0)];
+        self.render_composited(line, &layers, vram, palette, oam);
     }
 
-    /// mode 5: 160x128 bitmap, 15-bit direct color, double buffered
-    fn render_mode5(&mut self, line: usize, vram: &[u8]) {
+    /// collects bitmap background pixels with BG2 affine transform
+    #[allow(clippy::too_many_arguments)]
+    fn collect_bitmap_bg(
+        &self,
+        affine_index: usize,
+        vram: &[u8],
+        palette: &[u8],
+        pixels: &mut [(u16, u8); DISPLAY_WIDTH],
+        has_pixel: &mut [bool; DISPLAY_WIDTH],
+        bg_priority: u8,
+        mode: u8,
+    ) {
         let page_offset: usize = if self.dispcnt & (1 << 4) != 0 {
             0xA000
         } else {
             0
         };
-        let offset = line * DISPLAY_WIDTH * 3;
 
-        if line >= 128 {
-            for i in 0..DISPLAY_WIDTH * 3 {
-                self.frame_buffer[offset + i] = 0;
-            }
-            return;
-        }
+        let (bmp_width, bmp_height) = match mode {
+            3 => (240usize, 160usize),
+            4 => (240, 160),
+            5 => (160, 128),
+            _ => return,
+        };
 
-        for x in 0..DISPLAY_WIDTH {
-            if x >= 160 {
-                self.frame_buffer[offset + x * 3] = 0;
-                self.frame_buffer[offset + x * 3 + 1] = 0;
-                self.frame_buffer[offset + x * 3 + 2] = 0;
+        let mut ref_x = self.bg_ref_x[affine_index];
+        let mut ref_y = self.bg_ref_y[affine_index];
+        let pa = self.bg_pa[affine_index] as i32;
+        let pc = self.bg_pc[affine_index] as i32;
+
+        for x_screen in 0..DISPLAY_WIDTH {
+            let tex_x = ref_x >> 8;
+            let tex_y = ref_y >> 8;
+
+            ref_x += pa;
+            ref_y += pc;
+
+            if tex_x < 0 || tex_y < 0 || tex_x >= bmp_width as i32 || tex_y >= bmp_height as i32 {
                 continue;
             }
-            let vram_offset = page_offset + (line * 160 + x) * 2;
-            if vram_offset + 1 < vram.len() {
-                let color = (vram[vram_offset] as u16) | ((vram[vram_offset + 1] as u16) << 8);
-                let (r, g, b) = bgr555_to_rgb888(color);
-                self.frame_buffer[offset + x * 3] = r;
-                self.frame_buffer[offset + x * 3 + 1] = g;
-                self.frame_buffer[offset + x * 3 + 2] = b;
-            }
+
+            let tx = tex_x as usize;
+            let ty = tex_y as usize;
+
+            let color = match mode {
+                3 => {
+                    let vram_offset = (ty * bmp_width + tx) * 2;
+                    if vram_offset + 1 < vram.len() {
+                        (vram[vram_offset] as u16) | ((vram[vram_offset + 1] as u16) << 8)
+                    } else {
+                        continue;
+                    }
+                }
+                4 => {
+                    let vram_offset = page_offset + ty * bmp_width + tx;
+                    if vram_offset < vram.len() {
+                        let index = vram[vram_offset] as usize;
+                        if index == 0 {
+                            continue;
+                        }
+                        self.read_palette_color(palette, index)
+                    } else {
+                        continue;
+                    }
+                }
+                5 => {
+                    let vram_offset = page_offset + (ty * bmp_width + tx) * 2;
+                    if vram_offset + 1 < vram.len() {
+                        (vram[vram_offset] as u16) | ((vram[vram_offset + 1] as u16) << 8)
+                    } else {
+                        continue;
+                    }
+                }
+                _ => continue,
+            };
+
+            pixels[x_screen] = (color, bg_priority);
+            has_pixel[x_screen] = true;
         }
     }
 
@@ -1039,10 +1078,28 @@ impl GbaPpu {
         };
         let tiles_per_row = map_size / 8;
 
-        let mut ref_x = self.bg_ref_x[affine_index];
-        let mut ref_y = self.bg_ref_y[affine_index];
         let pa = self.bg_pa[affine_index] as i32;
         let pc = self.bg_pc[affine_index] as i32;
+
+        // apply vertical mosaic by using the reference point from the snapped line
+        let (mut ref_x, mut ref_y) = if cnt & (1 << 6) != 0 {
+            let mos_v = ((self.mosaic >> 4) & 0x0F) as i32 + 1;
+            if mos_v > 1 {
+                let vcount = self.vcount as i32;
+                let snapped = vcount / mos_v * mos_v;
+                let diff = vcount - snapped;
+                let pb = self.bg_pb[affine_index] as i32;
+                let pd = self.bg_pd[affine_index] as i32;
+                (
+                    self.bg_ref_x[affine_index] - pb * diff,
+                    self.bg_ref_y[affine_index] - pd * diff,
+                )
+            } else {
+                (self.bg_ref_x[affine_index], self.bg_ref_y[affine_index])
+            }
+        } else {
+            (self.bg_ref_x[affine_index], self.bg_ref_y[affine_index])
+        };
 
         for x_screen in 0..DISPLAY_WIDTH {
             // convert fixed-point (8.8) to pixel coordinates
@@ -1174,6 +1231,13 @@ impl GbaPpu {
             let is_obj_window = obj_mode == 2;
             let use_mosaic = attr0 & (1 << 12) != 0;
 
+            // apply vertical mosaic to the scanline offset within the sprite
+            let mos_rel_y = if use_mosaic {
+                self.apply_obj_mosaic(rel_y as usize, false) as i32
+            } else {
+                rel_y
+            };
+
             if is_affine {
                 // affine sprite rendering
                 let affine_index = ((attr1 >> 9) & 0x1F) as usize;
@@ -1203,7 +1267,7 @@ impl GbaPpu {
 
                 let half_w = width as i32 / 2;
                 let half_h = height as i32 / 2;
-                let iy = rel_y - bound_h as i32 / 2;
+                let iy = mos_rel_y - bound_h as i32 / 2;
 
                 for screen_dx in 0..bound_w {
                     let screen_x = x + screen_dx as i32;
@@ -1212,7 +1276,13 @@ impl GbaPpu {
                     }
                     let screen_x = screen_x as usize;
 
-                    let ix = screen_dx as i32 - bound_w as i32 / 2;
+                    // apply horizontal mosaic to the sprite-local x offset
+                    let mos_dx = if use_mosaic {
+                        self.apply_obj_mosaic(screen_dx, true)
+                    } else {
+                        screen_dx
+                    };
+                    let ix = mos_dx as i32 - bound_w as i32 / 2;
 
                     // inverse affine transform
                     let tex_x = ((pa as i32 * ix + pb as i32 * iy) >> 8) + half_w;
@@ -1240,13 +1310,6 @@ impl GbaPpu {
                         continue;
                     }
 
-                    let sx = if use_mosaic {
-                        self.apply_obj_mosaic_x(screen_x)
-                    } else {
-                        screen_x
-                    };
-                    let _ = sx; // mosaic would re-sample, but for now use screen_x
-
                     if is_obj_window {
                         obj_window_mask[screen_x] = true;
                         continue;
@@ -1268,9 +1331,9 @@ impl GbaPpu {
                 let v_flip = attr1 & (1 << 13) != 0;
 
                 let pixel_y = if v_flip {
-                    height - 1 - rel_y as usize
+                    height - 1 - mos_rel_y as usize
                 } else {
-                    rel_y as usize
+                    mos_rel_y as usize
                 };
 
                 for pixel_x_offset in 0..width {
@@ -1280,10 +1343,17 @@ impl GbaPpu {
                     }
                     let screen_x = screen_x as usize;
 
-                    let px = if h_flip {
-                        width - 1 - pixel_x_offset
+                    // apply horizontal mosaic to the sprite-local x offset
+                    let mos_px_offset = if use_mosaic {
+                        self.apply_obj_mosaic(pixel_x_offset, true)
                     } else {
                         pixel_x_offset
+                    };
+
+                    let px = if h_flip {
+                        width - 1 - mos_px_offset
+                    } else {
+                        mos_px_offset
                     };
 
                     let color_index = self.read_obj_pixel(
@@ -1321,6 +1391,7 @@ impl GbaPpu {
     }
 
     /// Reads a single pixel from an OBJ tile, returning the palette color index.
+    #[inline(always)]
     #[allow(clippy::too_many_arguments)]
     fn read_obj_pixel(
         &self,
@@ -1370,6 +1441,7 @@ impl GbaPpu {
     }
 
     /// Reads a 15-bit BGR555 color from BG palette RAM.
+    #[inline(always)]
     fn read_palette_color(&self, palette: &[u8], index: usize) -> u16 {
         let offset = index * 2;
         if offset + 1 < palette.len() {
@@ -1380,6 +1452,7 @@ impl GbaPpu {
     }
 
     /// Reads a 15-bit BGR555 color from OBJ palette RAM (starts at 0x200).
+    #[inline(always)]
     fn read_palette_color_obj(&self, palette: &[u8], index: usize) -> u16 {
         let offset = 0x200 + index * 2;
         if offset + 1 < palette.len() {
@@ -1433,6 +1506,7 @@ impl Default for GbaPpu {
 }
 
 /// returns (width, height) in pixels for a sprite given shape and size
+#[inline(always)]
 fn obj_dimensions(shape: u8, size: u8) -> (usize, usize) {
     match (shape, size) {
         // square
@@ -2103,12 +2177,263 @@ mod tests {
     }
 
     #[test]
-    fn test_obj_mosaic_x() {
+    fn test_obj_mosaic_horizontal() {
         let mut ppu = GbaPpu::new();
         ppu.set_mosaic(0x0300); // OBJ mosaic H=4 (bits 8-11 = 3 -> size 4)
-        assert_eq!(ppu.apply_obj_mosaic_x(0), 0);
-        assert_eq!(ppu.apply_obj_mosaic_x(3), 0);
-        assert_eq!(ppu.apply_obj_mosaic_x(4), 4);
-        assert_eq!(ppu.apply_obj_mosaic_x(7), 4);
+        assert_eq!(ppu.apply_obj_mosaic(0, true), 0);
+        assert_eq!(ppu.apply_obj_mosaic(3, true), 0);
+        assert_eq!(ppu.apply_obj_mosaic(4, true), 4);
+        assert_eq!(ppu.apply_obj_mosaic(7, true), 4);
+    }
+
+    #[test]
+    fn test_obj_mosaic_vertical() {
+        let mut ppu = GbaPpu::new();
+        ppu.set_mosaic(0x3000); // OBJ mosaic V=4 (bits 12-15 = 3 -> size 4)
+        assert_eq!(ppu.apply_obj_mosaic(0, false), 0);
+        assert_eq!(ppu.apply_obj_mosaic(3, false), 0);
+        assert_eq!(ppu.apply_obj_mosaic(4, false), 4);
+        assert_eq!(ppu.apply_obj_mosaic(7, false), 4);
+    }
+
+    #[test]
+    fn test_collect_sprites_mosaic_vertical() {
+        let mut ppu = GbaPpu::new();
+        ppu.set_dispcnt(1 << 6); // 1D mapping
+        ppu.set_mosaic(0x3000); // OBJ mosaic V=4
+
+        let mut vram = vec![0u8; 0x18000];
+        let mut palette = vec![0u8; 0x400];
+        let mut oam = vec![0u8; 0x400];
+
+        // sprite 0: 8x8, at (0, 0), 4bpp, mosaic enabled
+        let attr0: u16 = 1 << 12; // mosaic on
+        let attr1: u16 = 0;
+        let attr2: u16 = 0;
+        oam[0] = (attr0 & 0xFF) as u8;
+        oam[1] = ((attr0 >> 8) & 0xFF) as u8;
+        oam[2] = (attr1 & 0xFF) as u8;
+        oam[3] = ((attr1 >> 8) & 0xFF) as u8;
+        oam[4] = (attr2 & 0xFF) as u8;
+        oam[5] = ((attr2 >> 8) & 0xFF) as u8;
+
+        // line 0 pixel 0 = color 1, line 3 pixel 0 = color 2
+        let obj_base = 0x10000;
+        vram[obj_base] = 0x01; // line 0, pixel 0
+        vram[obj_base + 4 * 3] = 0x03; // line 3, pixel 0
+
+        palette[0x202] = 0x1F; // color 1: red
+        palette[0x203] = 0x00;
+        palette[0x206] = 0xE0; // color 3: green
+        palette[0x207] = 0x03;
+
+        // line 0: should use line 0 data (mosaic snaps 0 -> 0)
+        let mut obj_pixels = [(0u16, 255u8, false); DISPLAY_WIDTH];
+        let mut obj_has_pixel = [false; DISPLAY_WIDTH];
+        let mut obj_window_mask = [false; DISPLAY_WIDTH];
+
+        ppu.collect_sprites(
+            0,
+            &vram,
+            &palette,
+            &oam,
+            &mut obj_pixels,
+            &mut obj_has_pixel,
+            &mut obj_window_mask,
+        );
+        assert!(obj_has_pixel[0]);
+        assert_eq!(obj_pixels[0].0, 0x001F); // red from line 0
+
+        // line 3: vertical mosaic snaps 3 -> 0, should use line 0 data
+        let mut obj_pixels = [(0u16, 255u8, false); DISPLAY_WIDTH];
+        let mut obj_has_pixel = [false; DISPLAY_WIDTH];
+        let mut obj_window_mask = [false; DISPLAY_WIDTH];
+
+        ppu.collect_sprites(
+            3,
+            &vram,
+            &palette,
+            &oam,
+            &mut obj_pixels,
+            &mut obj_has_pixel,
+            &mut obj_window_mask,
+        );
+        assert!(obj_has_pixel[0]);
+        assert_eq!(obj_pixels[0].0, 0x001F); // still red (line 0 data via mosaic)
+    }
+
+    #[test]
+    fn test_render_mode3_bitmap_composited() {
+        let mut ppu = GbaPpu::new();
+        // mode 3, BG2 enabled, OBJ enabled, 1D mapping
+        ppu.set_dispcnt(0x0403 | (1 << 12) | (1 << 6));
+
+        let mut vram = vec![0u8; 0x18000];
+        let mut palette = vec![0u8; 0x400];
+        let oam = vec![0u8; 0x400];
+
+        // set backdrop to black
+        palette[0] = 0x00;
+        palette[1] = 0x00;
+
+        // place a red pixel at (0, 0) in mode 3 bitmap
+        let color: u16 = 0x001F; // red
+        vram[0] = (color & 0xFF) as u8;
+        vram[1] = ((color >> 8) & 0xFF) as u8;
+
+        // render line 0
+        ppu.clock(VISIBLE_DOTS, &vram, &palette, &oam);
+
+        // verify the pixel was rendered as red (RGB888)
+        let fb = ppu.frame_buffer();
+        assert_eq!(fb[0], 0xF8); // R
+        assert_eq!(fb[1], 0x00); // G
+        assert_eq!(fb[2], 0x00); // B
+    }
+
+    #[test]
+    fn test_render_mode4_bitmap_composited() {
+        let mut ppu = GbaPpu::new();
+        // mode 4, BG2 enabled
+        ppu.set_dispcnt(0x0404);
+
+        let mut vram = vec![0u8; 0x18000];
+        let mut palette = vec![0u8; 0x400];
+        let oam = vec![0u8; 0x400];
+
+        // palette index 5 = green
+        let green: u16 = 0x03E0;
+        palette[5 * 2] = (green & 0xFF) as u8;
+        palette[5 * 2 + 1] = ((green >> 8) & 0xFF) as u8;
+
+        // pixel at (0, 0) uses palette index 5
+        vram[0] = 5;
+
+        ppu.clock(VISIBLE_DOTS, &vram, &palette, &oam);
+
+        let fb = ppu.frame_buffer();
+        assert_eq!(fb[0], 0x00); // R
+        assert_eq!(fb[1], 0xF8); // G
+        assert_eq!(fb[2], 0x00); // B
+    }
+
+    #[test]
+    fn test_render_mode5_bitmap_composited() {
+        let mut ppu = GbaPpu::new();
+        // mode 5, BG2 enabled
+        ppu.set_dispcnt(0x0405);
+
+        let mut vram = vec![0u8; 0x18000];
+        let palette = vec![0u8; 0x400];
+        let oam = vec![0u8; 0x400];
+
+        // place blue pixel at (0, 0) in mode 5
+        let blue: u16 = 0x7C00;
+        vram[0] = (blue & 0xFF) as u8;
+        vram[1] = ((blue >> 8) & 0xFF) as u8;
+
+        ppu.clock(VISIBLE_DOTS, &vram, &palette, &oam);
+
+        let fb = ppu.frame_buffer();
+        assert_eq!(fb[0], 0x00); // R
+        assert_eq!(fb[1], 0x00); // G
+        assert_eq!(fb[2], 0xF8); // B
+    }
+
+    #[test]
+    fn test_bitmap_mode_with_sprite_overlay() {
+        let mut ppu = GbaPpu::new();
+        // mode 3, BG2 enabled, OBJ enabled, 1D mapping
+        ppu.set_dispcnt(0x0403 | (1 << 12) | (1 << 6));
+
+        let mut vram = vec![0u8; 0x18000];
+        let mut palette = vec![0u8; 0x400];
+        let mut oam = vec![0u8; 0x400];
+
+        // set backdrop to black
+        palette[0] = 0x00;
+        palette[1] = 0x00;
+
+        // bitmap BG at (5, 0) = red
+        let red: u16 = 0x001F;
+        vram[5 * 2] = (red & 0xFF) as u8;
+        vram[5 * 2 + 1] = ((red >> 8) & 0xFF) as u8;
+
+        // sprite 0: 8x8, at (5, 0), priority 0
+        let attr0: u16 = 0;
+        let attr1: u16 = 5;
+        let attr2: u16 = 0; // priority 0
+        oam[0] = (attr0 & 0xFF) as u8;
+        oam[1] = ((attr0 >> 8) & 0xFF) as u8;
+        oam[2] = (attr1 & 0xFF) as u8;
+        oam[3] = ((attr1 >> 8) & 0xFF) as u8;
+        oam[4] = (attr2 & 0xFF) as u8;
+        oam[5] = ((attr2 >> 8) & 0xFF) as u8;
+
+        // OBJ pixel at tile 0, px 0: color index 1
+        vram[0x10000] = 0x01;
+        // OBJ palette color 1 = blue
+        let blue: u16 = 0x7C00;
+        palette[0x202] = (blue & 0xFF) as u8;
+        palette[0x203] = ((blue >> 8) & 0xFF) as u8;
+
+        ppu.clock(VISIBLE_DOTS, &vram, &palette, &oam);
+
+        let fb = ppu.frame_buffer();
+        // at x=5: sprite (blue) should be on top of bitmap BG (red)
+        let offset = 5 * 3;
+        assert_eq!(fb[offset], 0x00); // R=0 (blue)
+        assert_eq!(fb[offset + 1], 0x00); // G=0
+        assert_eq!(fb[offset + 2], 0xF8); // B=0xF8
+    }
+
+    #[test]
+    fn test_priority_obj_wins_on_equal() {
+        let mut ppu = GbaPpu::new();
+        // mode 0, BG0 enabled, OBJ enabled, 1D mapping
+        ppu.set_dispcnt(0x0100 | (1 << 12) | (1 << 6));
+        ppu.set_bgcnt(0, 0x0000); // BG0 priority 0
+
+        let mut vram = vec![0u8; 0x18000];
+        let mut palette = vec![0u8; 0x400];
+        let mut oam = vec![0u8; 0x400];
+
+        // BG0 tile: palette index 1 at (0,0)
+        // char base 0, screen base 0, 4bpp
+        // tile 0 at screen base: tile number 1
+        vram[0] = 1; // map entry: tile 1
+        vram[1] = 0;
+        // tile 1 data at char_base + 1*32: pixel 0 = color 1
+        vram[32] = 0x01;
+        // BG palette color 1 = red
+        let red: u16 = 0x001F;
+        palette[2] = (red & 0xFF) as u8;
+        palette[3] = ((red >> 8) & 0xFF) as u8;
+
+        // sprite at (0, 0), priority 0
+        let attr0: u16 = 0;
+        let attr1: u16 = 0;
+        let attr2: u16 = 0; // priority 0
+        oam[0] = (attr0 & 0xFF) as u8;
+        oam[1] = ((attr0 >> 8) & 0xFF) as u8;
+        oam[2] = (attr1 & 0xFF) as u8;
+        oam[3] = ((attr1 >> 8) & 0xFF) as u8;
+        oam[4] = (attr2 & 0xFF) as u8;
+        oam[5] = ((attr2 >> 8) & 0xFF) as u8;
+
+        // OBJ pixel: color index 1
+        vram[0x10000] = 0x01;
+        // OBJ palette color 1 = blue
+        let blue: u16 = 0x7C00;
+        palette[0x202] = (blue & 0xFF) as u8;
+        palette[0x203] = ((blue >> 8) & 0xFF) as u8;
+
+        ppu.clock(VISIBLE_DOTS, &vram, &palette, &oam);
+
+        let fb = ppu.frame_buffer();
+        // OBJ should win on equal priority
+        assert_eq!(fb[0], 0x00); // R=0 (blue)
+        assert_eq!(fb[1], 0x00); // G=0
+        assert_eq!(fb[2], 0xF8); // B
     }
 }
