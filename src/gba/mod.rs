@@ -32,6 +32,7 @@ use self::{
     bus::GbaBus,
     consts::{DISPLAY_HEIGHT, DISPLAY_WIDTH},
     cpu::Arm7Tdmi,
+    flash::SaveType,
     rom::GbaRomInfo,
 };
 use crate::pad::PadKey;
@@ -386,6 +387,18 @@ impl GameBoyAdvance {
         buffer
     }
 
+    pub fn has_battery(&self) -> bool {
+        self.cpu.bus.save.save_type() != SaveType::None
+    }
+
+    pub fn ram_data_eager(&self) -> Vec<u8> {
+        self.cpu.bus.save.data.clone()
+    }
+
+    pub fn set_ram_data(&mut self, data: Vec<u8>) {
+        self.cpu.bus.save.data = data;
+    }
+
     pub fn ppu_enabled(&self) -> bool {
         self.ppu_enabled
     }
@@ -585,5 +598,46 @@ mod tests {
         let bios = vec![0u8; 0x4000];
         gba.load_bios(&bios);
         assert_eq!(gba.cpu.pc(), 0x0000_0000);
+    }
+
+    #[test]
+    fn test_has_battery_none() {
+        let gba = GameBoyAdvance::new();
+        assert!(!gba.has_battery());
+    }
+
+    #[test]
+    fn test_has_battery_sram() {
+        let mut gba = GameBoyAdvance::new();
+        let mut rom = vec![0u8; 512];
+        rom[0xB2] = 0x96;
+        rom[0x100..0x106].copy_from_slice(b"SRAM_V");
+        let _ = gba.load_rom(&rom);
+        assert!(gba.has_battery());
+    }
+
+    #[test]
+    fn test_ram_data_eager() {
+        let gba = GameBoyAdvance::new();
+        let ram = gba.ram_data_eager();
+        assert!(!ram.is_empty());
+    }
+
+    #[test]
+    fn test_set_ram_data() {
+        let mut gba = GameBoyAdvance::new();
+        let mut rom = vec![0u8; 512];
+        rom[0xB2] = 0x96;
+        rom[0x100..0x106].copy_from_slice(b"SRAM_V");
+        let _ = gba.load_rom(&rom);
+
+        let mut ram = gba.ram_data_eager();
+        ram[0] = 0x42;
+        ram[1] = 0xAB;
+        gba.set_ram_data(ram);
+
+        let restored = gba.ram_data_eager();
+        assert_eq!(restored[0], 0x42);
+        assert_eq!(restored[1], 0xAB);
     }
 }

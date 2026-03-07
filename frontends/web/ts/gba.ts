@@ -1,6 +1,8 @@
 import {
     AudioSpecs,
+    base64ToBuffer,
     BenchmarkResult,
+    bufferToBase64,
     Compilation,
     Compiler,
     DebugPanel,
@@ -50,6 +52,12 @@ const LOGIC_HZ = 16777216;
  */
 const VISUAL_HZ = 59.7275;
 
+/**
+ * The rate (in seconds) at which the battery backed RAM
+ * is going to be flushed to the `localStorage`.
+ */
+const STORE_RATE = 5;
+
 const DISPLAY_WIDTH = 240;
 const DISPLAY_HEIGHT = 160;
 const DISPLAY_SCALE = 2;
@@ -93,6 +101,12 @@ export class GbaEmulator extends EmulatorLogic implements Emulator {
      * This is used to keep track of the overflow cycles.
      */
     private pending = 0;
+
+    /**
+     * The frequency at which the battery backed RAM is going
+     * to be flushed to the `localStorage`.
+     */
+    private flushCycles: number = LOGIC_HZ * STORE_RATE;
 
     private romName: string | null = null;
     private romData: Uint8Array | null = null;
@@ -167,6 +181,17 @@ export class GbaEmulator extends EmulatorLogic implements Emulator {
         // processed for the current emulator, effectively emptying
         // the audio buffer that is pending processing
         this.trigger("audio");
+
+        // in case the current cartridge is battery backed
+        // then we need to check if a RAM flush to local
+        // storage operation is required
+        if (this.gba.has_battery()) {
+            this.flushCycles -= executedCycles;
+            if (this.flushCycles <= 0) {
+                this.saveRam();
+                this.flushCycles = this.logicFrequency * STORE_RATE;
+            }
+        }
 
         // triggers the tick event, indicating that a new tick
         // operation has been performed and providing some information
@@ -271,6 +296,12 @@ export class GbaEmulator extends EmulatorLogic implements Emulator {
         // updates the complete set of global information that
         // is going to be displayed
         this.setRom(romName, romData, romInfoResult);
+
+        // in case there's a battery involved tries to load the
+        // current RAM from the local storage
+        if (this.gba.has_battery()) {
+            this.loadRam();
+        }
 
         // in case the restore (state) flag is set
         // then resumes the machine execution
@@ -572,6 +603,32 @@ export class GbaEmulator extends EmulatorLogic implements Emulator {
     onBackground(background: string) {
         this.extraSettings.background = background;
         this.storeSettings();
+    }
+
+    /**
+     * Tries for save/flush the current machine RAM into the
+     * `localStorage`, so that it can be latter restored.
+     */
+    private saveRam() {
+        if (!this.gba || !window.localStorage) return;
+        if (!this.gba.has_battery()) return;
+        const title = this.gba.rom_title();
+        const ramData = this.gba.ram_data_eager();
+        const ramDataB64 = bufferToBase64(ramData);
+        localStorage.setItem(title, ramDataB64);
+    }
+
+    /**
+     * Tries to load game RAM from the `localStorage` using the
+     * current ROM title as the name of the item and
+     * decoding it using Base64.
+     */
+    private loadRam() {
+        if (!this.gba || !window.localStorage) return;
+        const ramDataB64 = localStorage.getItem(this.gba.rom_title());
+        if (!ramDataB64) return;
+        const ramData = base64ToBuffer(ramDataB64);
+        this.gba.set_ram_data(ramData);
     }
 
     private storeSettings() {
