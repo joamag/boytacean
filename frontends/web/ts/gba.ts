@@ -141,8 +141,6 @@ export class GbaEmulator extends EmulatorLogic implements Emulator {
      *
      * @params params The parameters to be used in the tick operation.
      */
-    private tickCount = 0;
-
     async tick(params: TickParams) {
         // in case the reference to the system is not set then
         // returns the control flow immediately (not possible to tick)
@@ -163,14 +161,6 @@ export class GbaEmulator extends EmulatorLogic implements Emulator {
         const executedCycles = Number(this.clockFrame.cycles);
         if (this.clockFrame.frames > 0) {
             this.trigger("frame", { count: this.clockFrame.frames });
-        }
-
-        // debug: log first few ticks to verify emulation is running
-        this.tickCount++;
-        if (this.tickCount <= 5 || this.tickCount % 600 === 0) {
-            this.logger.info(
-                `[tick #${this.tickCount}] cycles=${executedCycles}, frames=${this.clockFrame.frames}, target=${targetCycles}`
-            );
         }
 
         // triggers the audio event, meaning that the audio should be
@@ -268,15 +258,7 @@ export class GbaEmulator extends EmulatorLogic implements Emulator {
 
         // loads the ROM file into the system and retrieves
         // the ROM info instance associated with it
-        this.logger.info(`Loading ROM: ${romName} (${romData.length} bytes)`);
         const romInfoResult = this.gba.load_rom_wa(romData);
-
-        // prints some debug information about the ROM that
-        // has just been loaded, this should provide some insights
-        this.logger.info(`${romInfoResult.description(9)}`);
-        this.logger.info(
-            `Display: ${this.gba.display_width()}x${this.gba.display_height()}, PPU: ${this.gba.ppu_enabled()}`
-        );
 
         // updates the name of the currently selected engine
         // to the one that has been provided (logic change)
@@ -411,24 +393,12 @@ export class GbaEmulator extends EmulatorLogic implements Emulator {
      *
      * @returns The current pixel data for the emulator display.
      */
-    private imageBufferCount = 0;
-
     get imageBuffer(): Uint8Array {
-        const buffer =
+        return (
             this.clockFrame?.frame_buffer_eager() ??
             this.gba?.frame_buffer_eager() ??
-            new Uint8Array();
-
-        // debug: log first few imageBuffer calls
-        this.imageBufferCount++;
-        if (this.imageBufferCount <= 3) {
-            const nonZero = buffer.some((b: number) => b !== 0);
-            this.logger.info(
-                `[imageBuffer #${this.imageBufferCount}] length=${buffer.length}, hasData=${nonZero}`
-            );
-        }
-
-        return buffer;
+            new Uint8Array()
+        );
     }
 
     get audioSpecs(): AudioSpecs {
