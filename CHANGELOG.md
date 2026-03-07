@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * GBA interrupt controller (IE, IF, IME) with per-source enable/acknowledge
 * GBA ROM header parsing, checksum validation, and auto-detection via fixed byte
 * `System` enum for unified frontend integration of Game Boy and GBA emulators
+* GBA web frontend integration with WASM bindings and auto-detection via ROM URL
+* `GbaEmulator` TypeScript class for running GBA ROMs in the browser
 * `PadKey::L` and `PadKey::R` shoulder button variants for GBA input
 * High-pass audio filter options (Preserve, Accurate, Disable) with save-state support
 * SDL frontend shader loading support via `--shader-path`

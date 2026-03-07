@@ -1320,7 +1320,7 @@ impl GbaPpu {
         }
     }
 
-    /// reads a single pixel from an OBJ tile, returning the palette color index
+    /// Reads a single pixel from an OBJ tile, returning the palette color index.
     #[allow(clippy::too_many_arguments)]
     fn read_obj_pixel(
         &self,
@@ -1369,7 +1369,7 @@ impl GbaPpu {
         }
     }
 
-    /// reads a 15-bit BGR555 color from BG palette RAM
+    /// Reads a 15-bit BGR555 color from BG palette RAM.
     fn read_palette_color(&self, palette: &[u8], index: usize) -> u16 {
         let offset = index * 2;
         if offset + 1 < palette.len() {
@@ -1379,7 +1379,7 @@ impl GbaPpu {
         }
     }
 
-    /// reads a 15-bit BGR555 color from OBJ palette RAM (starts at 0x200)
+    /// Reads a 15-bit BGR555 color from OBJ palette RAM (starts at 0x200).
     fn read_palette_color_obj(&self, palette: &[u8], index: usize) -> u16 {
         let offset = 0x200 + index * 2;
         if offset + 1 < palette.len() {
