@@ -1,0 +1,524 @@
+//! GBA DMA controller (4 channels with priority and trigger modes).
+
+use crate::gba::consts::{
+    DMA_TIMING_HBLANK, DMA_TIMING_IMMEDIATE, DMA_TIMING_SPECIAL, DMA_TIMING_VBLANK,
+};
+
+/// address control mode for DMA source/destination
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum DmaAddrControl {
+    Increment = 0,
+    Decrement = 1,
+    Fixed = 2,
+    IncrementReload = 3,
+}
+
+impl DmaAddrControl {
+    pub fn from_u16(value: u16) -> Self {
+        match value & 0x03 {
+            0 => DmaAddrControl::Increment,
+            1 => DmaAddrControl::Decrement,
+            2 => DmaAddrControl::Fixed,
+            3 => DmaAddrControl::IncrementReload,
+            _ => unreachable!(),
+        }
+    }
+}
+
+pub struct DmaChannel {
+    /// source address register (written by CPU)
+    src_reg: u32,
+
+    /// destination address register (written by CPU)
+    dst_reg: u32,
+
+    /// word count register (written by CPU)
+    count_reg: u16,
+
+    /// control register (DMA*CNT_H)
+    control: u16,
+
+    /// internal latched source address
+    src: u32,
+
+    /// internal latched destination address
+    dst: u32,
+
+    /// internal latched word count
+    count: u32,
+
+    /// whether this channel is currently active/pending
+    active: bool,
+
+    /// set when an immediate DMA was triggered by a mode change
+    /// on an already-enabled channel (don't clear enable on completion)
+    mode_change: bool,
+}
+
+impl DmaChannel {
+    pub fn new() -> Self {
+        Self {
+            src_reg: 0,
+            dst_reg: 0,
+            count_reg: 0,
+            control: 0,
+            src: 0,
+            dst: 0,
+            count: 0,
+            active: false,
+            mode_change: false,
+        }
+    }
+
+    pub fn src_reg(&self) -> u32 {
+        self.src_reg
+    }
+
+    pub fn set_src_reg(&mut self, value: u32) {
+        self.src_reg = value;
+    }
+
+    pub fn dst_reg(&self) -> u32 {
+        self.dst_reg
+    }
+
+    pub fn set_dst_reg(&mut self, value: u32) {
+        self.dst_reg = value;
+    }
+
+    pub fn count_reg(&self) -> u16 {
+        self.count_reg
+    }
+
+    pub fn set_count_reg(&mut self, value: u16) {
+        self.count_reg = value;
+    }
+
+    pub fn control(&self) -> u16 {
+        self.control
+    }
+
+    pub fn set_control(&mut self, value: u16, channel_index: usize) {
+        let was_enabled = self.control & (1 << 15) != 0;
+        self.control = value;
+        let now_enabled = value & (1 << 15) != 0;
+
+        if now_enabled {
+            if !was_enabled {
+                // latch registers when transitioning from disabled to enabled
+                self.src = self.src_reg;
+                self.dst = self.dst_reg;
+                self.count = self.effective_count(channel_index);
+            }
+
+            // trigger immediately when timing mode is immediate
+            if self.timing() == DMA_TIMING_IMMEDIATE {
+                if was_enabled {
+                    // mode change while already enabled: re-latch count
+                    // but keep src/dst from original latch
+                    self.count = self.effective_count(channel_index);
+                    self.mode_change = true;
+                } else {
+                    self.mode_change = false;
+                }
+                self.active = true;
+            }
+        }
+    }
+
+    fn effective_count(&self, channel_index: usize) -> u32 {
+        if self.count_reg == 0 {
+            if channel_index == 3 {
+                0x10000
+            } else {
+                0x4000
+            }
+        } else {
+            self.count_reg as u32
+        }
+    }
+
+    pub fn active(&self) -> bool {
+        self.active
+    }
+
+    pub fn set_active(&mut self, value: bool) {
+        self.active = value;
+    }
+
+    pub fn enabled(&self) -> bool {
+        self.control & (1 << 15) != 0
+    }
+
+    pub fn timing(&self) -> u16 {
+        (self.control >> 12) & 0x03
+    }
+
+    pub fn word_size(&self) -> bool {
+        // false = 16-bit, true = 32-bit
+        self.control & (1 << 10) != 0
+    }
+
+    pub fn repeat(&self) -> bool {
+        self.control & (1 << 9) != 0
+    }
+
+    pub fn irq_enable(&self) -> bool {
+        self.control & (1 << 14) != 0
+    }
+
+    pub fn src_control(&self) -> DmaAddrControl {
+        DmaAddrControl::from_u16((self.control >> 7) & 0x03)
+    }
+
+    pub fn dst_control(&self) -> DmaAddrControl {
+        DmaAddrControl::from_u16((self.control >> 5) & 0x03)
+    }
+
+    /// returns the internal source address
+    pub fn src(&self) -> u32 {
+        self.src
+    }
+
+    /// returns the internal destination address
+    pub fn dst(&self) -> u32 {
+        self.dst
+    }
+
+    /// returns the remaining transfer count
+    pub fn remaining(&self) -> u32 {
+        self.count
+    }
+
+    /// advances the DMA transfer by one unit,
+    /// updating internal addresses and count.
+    /// returns (src_addr, dst_addr, is_complete)
+    pub fn step(&mut self) -> (u32, u32, bool) {
+        let src_addr = self.src;
+        let dst_addr = self.dst;
+        let step = if self.word_size() { 4 } else { 2 };
+
+        // update source address
+        match self.src_control() {
+            DmaAddrControl::Increment => self.src = self.src.wrapping_add(step),
+            DmaAddrControl::Decrement => self.src = self.src.wrapping_sub(step),
+            DmaAddrControl::Fixed => {}
+            DmaAddrControl::IncrementReload => self.src = self.src.wrapping_add(step),
+        }
+
+        // update destination address
+        match self.dst_control() {
+            DmaAddrControl::Increment => self.dst = self.dst.wrapping_add(step),
+            DmaAddrControl::Decrement => self.dst = self.dst.wrapping_sub(step),
+            DmaAddrControl::Fixed => {}
+            DmaAddrControl::IncrementReload => self.dst = self.dst.wrapping_add(step),
+        }
+
+        self.count -= 1;
+        let complete = self.count == 0;
+
+        if complete {
+            self.active = false;
+            if self.mode_change {
+                // mode-change trigger: keep enable bit, don't auto-disable
+                self.mode_change = false;
+            } else if self.repeat() && self.timing() != DMA_TIMING_IMMEDIATE {
+                // re-latch count (and dst if IncrementReload)
+                self.count = if self.count_reg == 0 {
+                    0x4000 // simplified; DMA3 would be 0x10000
+                } else {
+                    self.count_reg as u32
+                };
+                if self.dst_control() == DmaAddrControl::IncrementReload {
+                    self.dst = self.dst_reg;
+                }
+            } else {
+                // disable the channel
+                self.control &= !(1 << 15);
+            }
+        }
+
+        (src_addr, dst_addr, complete)
+    }
+}
+
+impl Default for DmaChannel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+pub struct GbaDma {
+    pub channels: [DmaChannel; 4],
+}
+
+impl GbaDma {
+    pub fn new() -> Self {
+        Self {
+            channels: [
+                DmaChannel::new(),
+                DmaChannel::new(),
+                DmaChannel::new(),
+                DmaChannel::new(),
+            ],
+        }
+    }
+
+    /// triggers DMA channels matching the given timing mode
+    pub fn trigger(&mut self, timing: u16) {
+        for channel in &mut self.channels {
+            if channel.enabled() && channel.timing() == timing {
+                channel.set_active(true);
+            }
+        }
+    }
+
+    /// triggers vblank DMA channels
+    pub fn trigger_vblank(&mut self) {
+        self.trigger(DMA_TIMING_VBLANK);
+    }
+
+    /// triggers hblank DMA channels
+    pub fn trigger_hblank(&mut self) {
+        self.trigger(DMA_TIMING_HBLANK);
+    }
+
+    /// triggers sound FIFO DMA (special timing, channels 1-2)
+    pub fn trigger_sound_fifo(&mut self, fifo_index: usize) {
+        let channel_index = fifo_index + 1;
+        if channel_index < 4 {
+            let channel = &mut self.channels[channel_index];
+            if channel.enabled() && channel.timing() == DMA_TIMING_SPECIAL {
+                channel.set_active(true);
+            }
+        }
+    }
+
+    /// returns the index of the highest priority active DMA channel,
+    /// or None if no channels are active
+    pub fn highest_active(&self) -> Option<usize> {
+        for (i, channel) in self.channels.iter().enumerate() {
+            if channel.active() {
+                return Some(i);
+            }
+        }
+        None
+    }
+}
+
+impl Default for GbaDma {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{DmaAddrControl, DmaChannel, GbaDma};
+
+    #[test]
+    fn test_dma_channel_new() {
+        let ch = DmaChannel::new();
+        assert_eq!(ch.src_reg(), 0);
+        assert_eq!(ch.dst_reg(), 0);
+        assert_eq!(ch.count_reg(), 0);
+        assert_eq!(ch.control(), 0);
+        assert!(!ch.active());
+        assert!(!ch.enabled());
+    }
+
+    #[test]
+    fn test_dma_channel_registers() {
+        let mut ch = DmaChannel::new();
+        ch.set_src_reg(0x0800_0000);
+        ch.set_dst_reg(0x0600_0000);
+        ch.set_count_reg(256);
+        assert_eq!(ch.src_reg(), 0x0800_0000);
+        assert_eq!(ch.dst_reg(), 0x0600_0000);
+        assert_eq!(ch.count_reg(), 256);
+    }
+
+    #[test]
+    fn test_dma_control_fields() {
+        let mut ch = DmaChannel::new();
+        ch.set_count_reg(1);
+        // enable(15), IRQ(14), 32bit(10), repeat(9), timing=vblank(12)
+        ch.set_control((1 << 15) | (1 << 14) | (1 << 10) | (1 << 9) | (1 << 12), 0);
+        assert!(ch.enabled());
+        assert!(ch.irq_enable());
+        assert!(ch.word_size()); // 32-bit
+        assert!(ch.repeat());
+        assert_eq!(ch.timing(), 1); // vblank
+    }
+
+    #[test]
+    fn test_dma_addr_control() {
+        assert_eq!(DmaAddrControl::from_u16(0), DmaAddrControl::Increment);
+        assert_eq!(DmaAddrControl::from_u16(1), DmaAddrControl::Decrement);
+        assert_eq!(DmaAddrControl::from_u16(2), DmaAddrControl::Fixed);
+        assert_eq!(DmaAddrControl::from_u16(3), DmaAddrControl::IncrementReload);
+    }
+
+    #[test]
+    fn test_dma_step_increment_16bit() {
+        let mut ch = DmaChannel::new();
+        ch.set_src_reg(0x0200_0000);
+        ch.set_dst_reg(0x0600_0000);
+        ch.set_count_reg(2);
+        // enable, immediate, 16-bit, src/dst increment
+        ch.set_control(1 << 15, 0);
+
+        let (src, dst, complete) = ch.step();
+        assert_eq!(src, 0x0200_0000);
+        assert_eq!(dst, 0x0600_0000);
+        assert!(!complete);
+
+        let (src, dst, complete) = ch.step();
+        assert_eq!(src, 0x0200_0002);
+        assert_eq!(dst, 0x0600_0002);
+        assert!(complete);
+    }
+
+    #[test]
+    fn test_dma_step_32bit() {
+        let mut ch = DmaChannel::new();
+        ch.set_src_reg(0x0200_0000);
+        ch.set_dst_reg(0x0600_0000);
+        ch.set_count_reg(1);
+        // enable, immediate, 32-bit
+        ch.set_control((1 << 15) | (1 << 10), 0);
+
+        let (src, dst, complete) = ch.step();
+        assert_eq!(src, 0x0200_0000);
+        assert_eq!(dst, 0x0600_0000);
+        assert!(complete);
+        // next addresses incremented by 4
+        assert_eq!(ch.src(), 0x0200_0004);
+        assert_eq!(ch.dst(), 0x0600_0004);
+    }
+
+    #[test]
+    fn test_dma_step_fixed_addr() {
+        let mut ch = DmaChannel::new();
+        ch.set_src_reg(0x0200_0000);
+        ch.set_dst_reg(0x0600_0000);
+        ch.set_count_reg(2);
+        // enable, immediate, 16-bit, dst fixed (bits 5-6 = 2)
+        ch.set_control((1 << 15) | (2 << 5), 0);
+
+        ch.step();
+        assert_eq!(ch.dst(), 0x0600_0000); // dst unchanged
+        assert_eq!(ch.src(), 0x0200_0002); // src incremented
+    }
+
+    #[test]
+    fn test_dma_zero_count_max() {
+        let mut ch = DmaChannel::new();
+        ch.set_src_reg(0x0200_0000);
+        ch.set_dst_reg(0x0600_0000);
+        ch.set_count_reg(0); // 0 = max count
+                             // enable, immediate
+        ch.set_control(1 << 15, 0);
+        assert_eq!(ch.remaining(), 0x4000); // channel 0
+
+        let mut ch3 = DmaChannel::new();
+        ch3.set_src_reg(0x0200_0000);
+        ch3.set_dst_reg(0x0600_0000);
+        ch3.set_count_reg(0);
+        ch3.set_control(1 << 15, 3); // channel 3
+        assert_eq!(ch3.remaining(), 0x10000);
+    }
+
+    #[test]
+    fn test_dma_disable_on_complete() {
+        let mut ch = DmaChannel::new();
+        ch.set_src_reg(0x0200_0000);
+        ch.set_dst_reg(0x0600_0000);
+        ch.set_count_reg(1);
+        ch.set_control(1 << 15, 0); // immediate, no repeat
+        assert!(ch.enabled());
+
+        ch.step();
+        assert!(!ch.active());
+        assert!(!ch.enabled()); // disabled after non-repeat completion
+    }
+
+    #[test]
+    fn test_dma_immediate_trigger() {
+        let mut dma = GbaDma::new();
+        dma.channels[0].set_src_reg(0x0800_0000);
+        dma.channels[0].set_dst_reg(0x0600_0000);
+        dma.channels[0].set_count_reg(16);
+
+        // enable with immediate timing
+        dma.channels[0].set_control(1 << 15, 0);
+        assert!(dma.channels[0].active());
+        assert_eq!(dma.highest_active(), Some(0));
+    }
+
+    #[test]
+    fn test_dma_vblank_trigger() {
+        let mut dma = GbaDma::new();
+        dma.channels[1].set_src_reg(0x0200_0000);
+        dma.channels[1].set_dst_reg(0x0600_0000);
+        dma.channels[1].set_count_reg(32);
+
+        // enable with vblank timing
+        dma.channels[1].set_control((1 << 15) | (1 << 12), 1);
+        assert!(!dma.channels[1].active()); // not active until vblank
+
+        dma.trigger_vblank();
+        assert!(dma.channels[1].active());
+    }
+
+    #[test]
+    fn test_dma_hblank_trigger() {
+        let mut dma = GbaDma::new();
+        dma.channels[2].set_src_reg(0x0200_0000);
+        dma.channels[2].set_dst_reg(0x0600_0000);
+        dma.channels[2].set_count_reg(16);
+
+        // enable with hblank timing (timing = 2)
+        dma.channels[2].set_control((1 << 15) | (2 << 12), 2);
+        assert!(!dma.channels[2].active());
+
+        dma.trigger_hblank();
+        assert!(dma.channels[2].active());
+    }
+
+    #[test]
+    fn test_dma_sound_fifo_trigger() {
+        let mut dma = GbaDma::new();
+        // channel 1 for FIFO A (fifo_index=0 -> channel 1)
+        dma.channels[1].set_src_reg(0x0200_0000);
+        dma.channels[1].set_dst_reg(0x0400_00A0);
+        dma.channels[1].set_count_reg(4);
+
+        // enable with special timing (timing = 3)
+        dma.channels[1].set_control((1 << 15) | (3 << 12), 1);
+        assert!(!dma.channels[1].active());
+
+        dma.trigger_sound_fifo(0);
+        assert!(dma.channels[1].active());
+    }
+
+    #[test]
+    fn test_dma_highest_active_priority() {
+        let mut dma = GbaDma::new();
+        // activate channels 1 and 2
+        for i in 1..=2 {
+            dma.channels[i].set_src_reg(0x0200_0000);
+            dma.channels[i].set_dst_reg(0x0600_0000);
+            dma.channels[i].set_count_reg(1);
+            dma.channels[i].set_control(1 << 15, i);
+        }
+        // channel 1 has higher priority than channel 2
+        assert_eq!(dma.highest_active(), Some(1));
+    }
+
+    #[test]
+    fn test_dma_highest_active_none() {
+        let dma = GbaDma::new();
+        assert_eq!(dma.highest_active(), None);
+    }
+}
