@@ -21,12 +21,10 @@ pub mod thumb;
 pub mod timer;
 
 use std::collections::VecDeque;
-
 #[cfg(feature = "wasm")]
 use std::panic::{set_hook, take_hook, PanicInfo};
 
 use boytacean_common::error::Error;
-
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
 

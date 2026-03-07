@@ -3,6 +3,8 @@
 
 use std::collections::VecDeque;
 
+use crate::warnln;
+
 /// sampling rate for audio output
 const SAMPLING_RATE: u32 = 32768;
 
@@ -544,7 +546,9 @@ impl GbaApu {
                     self.ch4_lfsr = 0x7FFF;
                 }
             }
-            _ => {}
+            _ => {
+                warnln!("Unhandled APU register write at offset 0x{:02X}", offset);
+            }
         }
     }
 
