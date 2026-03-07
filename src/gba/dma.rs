@@ -49,6 +49,10 @@ pub struct DmaChannel {
 
     /// whether this channel is currently active/pending
     active: bool,
+
+    /// set when an immediate DMA was triggered by a mode change
+    /// on an already-enabled channel (don't clear enable on completion)
+    mode_change: bool,
 }
 
 impl DmaChannel {
@@ -62,6 +66,7 @@ impl DmaChannel {
             dst: 0,
             count: 0,
             active: false,
+            mode_change: false,
         }
     }
 
@@ -98,25 +103,38 @@ impl DmaChannel {
         self.control = value;
         let now_enabled = value & (1 << 15) != 0;
 
-        // latch registers when transitioning from disabled to enabled
-        if !was_enabled && now_enabled {
-            self.src = self.src_reg;
-            self.dst = self.dst_reg;
-            self.count = if self.count_reg == 0 {
-                // 0 means max count (0x4000 for DMA0-2, 0x10000 for DMA3)
-                if channel_index == 3 {
-                    0x10000
-                } else {
-                    0x4000
-                }
-            } else {
-                self.count_reg as u32
-            };
+        if now_enabled {
+            if !was_enabled {
+                // latch registers when transitioning from disabled to enabled
+                self.src = self.src_reg;
+                self.dst = self.dst_reg;
+                self.count = self.effective_count(channel_index);
+            }
 
-            // start immediately if timing mode is immediate
+            // trigger immediately when timing mode is immediate
             if self.timing() == DMA_TIMING_IMMEDIATE {
+                if was_enabled {
+                    // mode change while already enabled: re-latch count
+                    // but keep src/dst from original latch
+                    self.count = self.effective_count(channel_index);
+                    self.mode_change = true;
+                } else {
+                    self.mode_change = false;
+                }
                 self.active = true;
             }
+        }
+    }
+
+    fn effective_count(&self, channel_index: usize) -> u32 {
+        if self.count_reg == 0 {
+            if channel_index == 3 {
+                0x10000
+            } else {
+                0x4000
+            }
+        } else {
+            self.count_reg as u32
         }
     }
 
@@ -201,7 +219,10 @@ impl DmaChannel {
 
         if complete {
             self.active = false;
-            if self.repeat() && self.timing() != DMA_TIMING_IMMEDIATE {
+            if self.mode_change {
+                // mode-change trigger: keep enable bit, don't auto-disable
+                self.mode_change = false;
+            } else if self.repeat() && self.timing() != DMA_TIMING_IMMEDIATE {
                 // re-latch count (and dst if IncrementReload)
                 self.count = if self.count_reg == 0 {
                     0x4000 // simplified; DMA3 would be 0x10000

@@ -194,4 +194,26 @@ mod tests {
         .unwrap();
         assert!(gba.ppu_frame() > 0);
     }
+
+    #[test]
+    fn test_alyosha_dma_rom_fixed() {
+        let gba = run_gba_test(
+            "res/roms.gba/test/alyosha-tas_gba-tests/DMA/DMA_ROM_Fixed.gba",
+            Some(100000000),
+            GbaTestOptions::default(),
+        )
+        .unwrap();
+        assert!(gba.ppu_frame() > 0);
+    }
+
+    #[test]
+    fn test_alyosha_dma_mode_change() {
+        let gba = run_gba_test(
+            "res/roms.gba/test/alyosha-tas_gba-tests/DMA/DMA_Mode_Change.gba",
+            Some(100000000),
+            GbaTestOptions::default(),
+        )
+        .unwrap();
+        assert!(gba.ppu_frame() > 0);
+    }
 }

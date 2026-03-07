@@ -183,9 +183,56 @@ impl GameBoyAdvance {
             self.cpu.bus.apu.clock(cycles);
         }
 
-        // process DMA transfers
+        // process DMA transfers; the entire block runs while the
+        // CPU is stalled, so we clock subsystems with the consumed
+        // cycles afterwards to keep PPU/timer/APU in sync.
         if self.dma_enabled {
-            self.process_dma();
+            let dma_cycles = self.process_dma();
+            if dma_cycles > 0 {
+                if self.timer_enabled {
+                    let overflows = self.cpu.bus.timers.clock(dma_cycles);
+                    for i in 0..4 {
+                        if overflows & (1 << i) != 0 {
+                            if self.cpu.bus.timers.timers[i].irq_enable() {
+                                self.cpu.bus.irq.raise_timer(i);
+                            }
+                            if self.apu_enabled {
+                                self.cpu.bus.apu.timer_overflow(i);
+                                for fifo in 0..2 {
+                                    if self.cpu.bus.apu.direct_sound[fifo].timer_id == i
+                                        && self.cpu.bus.apu.direct_sound[fifo].needs_refill()
+                                    {
+                                        self.cpu.bus.dma.trigger_sound_fifo(fifo);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                if self.ppu_enabled {
+                    let events = self.cpu.bus.ppu.clock(
+                        dma_cycles,
+                        &self.cpu.bus.vram,
+                        &self.cpu.bus.palette,
+                        &self.cpu.bus.oam,
+                    );
+                    if events & 2 != 0 {
+                        self.frame = self.cpu.bus.ppu.frame();
+                    }
+                    // note: hblank/vblank DMA triggers during an active
+                    // DMA transfer are deferred to the next clock() call
+                    if events & 4 != 0 {
+                        self.cpu.bus.irq.raise_hblank();
+                    }
+                    if events & 8 != 0 {
+                        self.cpu.bus.irq.raise_vblank();
+                    }
+                }
+                if self.apu_enabled {
+                    self.cpu.bus.apu.clock(dma_cycles);
+                }
+                return cycles + dma_cycles;
+            }
         }
 
         // check keypad interrupt
@@ -197,8 +244,13 @@ impl GameBoyAdvance {
         cycles
     }
 
-    /// processes pending DMA transfers
-    fn process_dma(&mut self) {
+    /// processes all pending DMA transfers in bulk and returns the
+    /// total number of cycles consumed. on real hardware the CPU is
+    /// stalled during DMA so the entire block completes atomically;
+    /// callers advance other subsystems with the returned count.
+    fn process_dma(&mut self) -> u32 {
+        let mut total_cycles: u32 = 0;
+
         while let Some(index) = self.cpu.bus.dma.highest_active() {
             let channel = &mut self.cpu.bus.dma.channels[index];
             if !channel.active() {
@@ -206,23 +258,60 @@ impl GameBoyAdvance {
             }
 
             let word32 = channel.word_size();
-            let (src, dst, complete) = channel.step();
+            let mut first = true;
+            // 1 internal cycle for bus acquisition
+            let mut dma_cycles: u32 = 1;
 
-            if word32 {
-                let value = self.cpu.bus.read32(src);
-                self.cpu.bus.write32(dst, value);
-            } else {
-                let value = self.cpu.bus.read16(src);
-                self.cpu.bus.write16(dst, value);
-            }
-
-            if complete {
-                if self.cpu.bus.dma.channels[index].irq_enable() {
-                    self.cpu.bus.irq.raise_dma(index);
+            loop {
+                let channel = &mut self.cpu.bus.dma.channels[index];
+                if !channel.active() {
+                    break;
                 }
-                break;
+
+                let (src, dst, complete) = channel.step();
+
+                if word32 {
+                    let value = self.cpu.bus.read32(src);
+                    self.cpu.bus.write32(dst, value);
+                } else {
+                    let value = self.cpu.bus.read16(src);
+                    self.cpu.bus.write16(dst, value);
+                }
+
+                if first {
+                    // first transfer: 1N src + 1N dst + 2I
+                    if word32 {
+                        dma_cycles += self.cpu.bus.access_cycles_32(src, false);
+                        dma_cycles += self.cpu.bus.access_cycles_32(dst, false);
+                    } else {
+                        dma_cycles += self.cpu.bus.access_cycles_16(src, false);
+                        dma_cycles += self.cpu.bus.access_cycles_16(dst, false);
+                    }
+                    dma_cycles += 2;
+                    first = false;
+                } else {
+                    // subsequent transfers: 1S src + 1S dst
+                    if word32 {
+                        dma_cycles += self.cpu.bus.access_cycles_32(src, true);
+                        dma_cycles += self.cpu.bus.access_cycles_32(dst, true);
+                    } else {
+                        dma_cycles += self.cpu.bus.access_cycles_16(src, true);
+                        dma_cycles += self.cpu.bus.access_cycles_16(dst, true);
+                    }
+                }
+
+                if complete {
+                    if self.cpu.bus.dma.channels[index].irq_enable() {
+                        self.cpu.bus.irq.raise_dma(index);
+                    }
+                    break;
+                }
             }
+
+            total_cycles += dma_cycles;
         }
+
+        total_cycles
     }
 
     /// clocks the emulator until a full frame is completed

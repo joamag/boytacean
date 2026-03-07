@@ -314,6 +314,38 @@ mod tests {
 
     #[test]
     #[ignore]
+    fn test_gba_alyosha_dma_rom_fixed() {
+        let (result, _) = run_gba_image_test(
+            "../../res/roms.gba/test/alyosha-tas_gba-tests/DMA/DMA_ROM_Fixed.gba",
+            Some(100000000),
+            GbaTestOptions::default(),
+        )
+        .unwrap();
+        let image_result = compare_images(
+            &result,
+            "res/test/gba/alyosha-tas_gba-tests/DMA/DMA_ROM_Fixed.png",
+        );
+        assert!(image_result);
+    }
+
+    #[test]
+    #[ignore]
+    fn test_gba_alyosha_dma_mode_change() {
+        let (result, _) = run_gba_image_test(
+            "../../res/roms.gba/test/alyosha-tas_gba-tests/DMA/DMA_Mode_Change.gba",
+            Some(100000000),
+            GbaTestOptions::default(),
+        )
+        .unwrap();
+        let image_result = compare_images(
+            &result,
+            "res/test/gba/alyosha-tas_gba-tests/DMA/DMA_Mode_Change.png",
+        );
+        assert!(image_result);
+    }
+
+    #[test]
+    #[ignore]
     fn generate_gba_reference_images() {
         let tests: &[(&str, &str)] = &[
             (
@@ -367,6 +399,14 @@ mod tests {
             (
                 "../../res/roms.gba/test/jsmolka_gba-tests/ppu_stripes.gba",
                 "res/test/gba/jsmolka_gba-tests/ppu_stripes.png",
+            ),
+            (
+                "../../res/roms.gba/test/alyosha-tas_gba-tests/DMA/DMA_ROM_Fixed.gba",
+                "res/test/gba/alyosha-tas_gba-tests/DMA/DMA_ROM_Fixed.png",
+            ),
+            (
+                "../../res/roms.gba/test/alyosha-tas_gba-tests/DMA/DMA_Mode_Change.gba",
+                "res/test/gba/alyosha-tas_gba-tests/DMA/DMA_Mode_Change.png",
             ),
         ];
         for (rom, out) in tests {
