@@ -22,7 +22,13 @@ pub mod timer;
 
 use std::collections::VecDeque;
 
+#[cfg(feature = "wasm")]
+use std::panic::{set_hook, take_hook, PanicInfo};
+
 use boytacean_common::error::Error;
+
+#[cfg(feature = "wasm")]
+use wasm_bindgen::prelude::*;
 
 use self::{
     bus::GbaBus,
@@ -32,12 +38,28 @@ use self::{
 };
 use crate::pad::PadKey;
 
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
+pub struct GbaClockFrame {
+    pub cycles: u64,
+    pub frames: u16,
+    frame_buffer: Option<Vec<u8>>,
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
+impl GbaClockFrame {
+    pub fn frame_buffer_eager(&mut self) -> Option<Vec<u8>> {
+        self.frame_buffer.take()
+    }
+}
+
 /// Top level structure that abstracts the usage of the
 /// Game Boy Advance system under the Boytacean emulator.
 ///
 /// Should serve as the main entry-point API.
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
 pub struct GameBoyAdvance {
     /// the ARM7TDMI CPU (includes the memory bus)
+    #[cfg_attr(feature = "wasm", wasm_bindgen(skip))]
     pub cpu: Arm7Tdmi,
 
     /// frame counter tracking completed frames
@@ -72,20 +94,6 @@ impl GameBoyAdvance {
     /// display height in pixels
     pub const DISPLAY_HEIGHT: usize = DISPLAY_HEIGHT;
 
-    pub fn new() -> Self {
-        let bus = GbaBus::new();
-        let cpu = Arm7Tdmi::new(bus);
-        Self {
-            cpu,
-            frame: 0,
-            ppu_enabled: true,
-            apu_enabled: true,
-            dma_enabled: true,
-            timer_enabled: true,
-            rom_title: String::new(),
-        }
-    }
-
     /// Loads a real BIOS ROM from a byte slice.
     ///
     /// When loaded, the CPU will boot from address 0x00000000 (BIOS entry)
@@ -102,12 +110,40 @@ impl GameBoyAdvance {
     /// loads a ROM from a byte slice
     pub fn load_rom(&mut self, data: &[u8]) -> Result<GbaRomInfo, Error> {
         let info = GbaRomInfo::from_data(data)?;
-        self.rom_title = info.title().to_string();
+        self.rom_title = info.title();
         self.cpu.bus.load_rom(data);
         if !self.cpu.bus.use_real_bios {
             self.cpu.bus.postflg = 1; // mark as post-boot
         }
         Ok(info)
+    }
+
+    /// returns the current frame buffer (RGB888)
+    pub fn frame_buffer(&self) -> &[u8] {
+        self.cpu.bus.ppu.frame_buffer()
+    }
+
+    /// returns a reference to the audio buffer
+    pub fn audio_buffer(&self) -> &VecDeque<i16> {
+        self.cpu.bus.apu.audio_buffer()
+    }
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
+impl GameBoyAdvance {
+    #[cfg_attr(feature = "wasm", wasm_bindgen(constructor))]
+    pub fn new() -> Self {
+        let bus = GbaBus::new();
+        let cpu = Arm7Tdmi::new(bus);
+        Self {
+            cpu,
+            frame: 0,
+            ppu_enabled: true,
+            apu_enabled: true,
+            dma_enabled: true,
+            timer_enabled: true,
+            rom_title: String::new(),
+        }
     }
 
     /// advance the clock by one CPU instruction, clocking all subsystems
@@ -333,19 +369,9 @@ impl GameBoyAdvance {
         cycles
     }
 
-    /// returns the current frame buffer (RGB888)
-    pub fn frame_buffer(&self) -> &[u8] {
-        self.cpu.bus.ppu.frame_buffer()
-    }
-
     /// returns the current frame number
     pub fn ppu_frame(&self) -> u64 {
         self.frame
-    }
-
-    /// returns a reference to the audio buffer
-    pub fn audio_buffer(&self) -> &VecDeque<i16> {
-        self.cpu.bus.apu.audio_buffer()
     }
 
     /// clears the audio buffer
@@ -393,8 +419,8 @@ impl GameBoyAdvance {
         Self::DISPLAY_HEIGHT
     }
 
-    pub fn rom_title(&self) -> &str {
-        &self.rom_title
+    pub fn rom_title(&self) -> String {
+        self.rom_title.clone()
     }
 
     pub fn apu_enabled(&self) -> bool {
@@ -418,6 +444,91 @@ impl GameBoyAdvance {
         }
         self.frame = 0;
     }
+
+    pub fn clocks_frame_buffer(&mut self, limit: usize) -> GbaClockFrame {
+        let mut cycles = 0_u64;
+        let mut frames = 0_u16;
+        let mut frame_buffer: Option<Vec<u8>> = None;
+        let mut last_frame = self.ppu_frame();
+        while cycles < limit as u64 {
+            cycles += self.clock() as u64;
+            if self.ppu_frame() != last_frame {
+                frame_buffer = Some(self.frame_buffer().to_vec());
+                last_frame = self.ppu_frame();
+                frames += 1;
+            }
+        }
+        GbaClockFrame {
+            cycles,
+            frames,
+            frame_buffer,
+        }
+    }
+
+    pub fn frame_buffer_eager(&self) -> Vec<u8> {
+        self.frame_buffer().to_vec()
+    }
+
+    pub fn audio_buffer_eager(&mut self, clear: bool) -> Vec<i16> {
+        let buffer = Vec::from(self.audio_buffer().clone());
+        if clear {
+            self.clear_audio_buffer();
+        }
+        buffer
+    }
+
+    pub fn ppu_enabled(&self) -> bool {
+        self.ppu_enabled
+    }
+
+    pub fn description(&self, column_length: usize) -> String {
+        let system_l = format!("{:width$}", "System", width = column_length);
+        let cpu_l = format!("{:width$}", "CPU", width = column_length);
+        let clock_l = format!("{:width$}", "Clock", width = column_length);
+        let rom_l = format!("{:width$}", "ROM", width = column_length);
+        format!(
+            "{}  Game Boy Advance\n{}  ARM7TDMI\n{}  {:.2} MHz\n{}  {}",
+            system_l,
+            cpu_l,
+            clock_l,
+            Self::CPU_FREQ as f64 / 1_000_000.0,
+            rom_l,
+            self.rom_title
+        )
+    }
+}
+
+#[cfg(feature = "wasm")]
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
+impl GameBoyAdvance {
+    pub fn set_panic_hook_wa() {
+        let prev = take_hook();
+        set_hook(Box::new(move |info| {
+            gba_hook_impl(info);
+            prev(info);
+        }));
+    }
+
+    pub fn load_rom_wa(&mut self, data: &[u8]) -> Result<GbaRomInfo, String> {
+        self.load_rom(data).map_err(|e| e.to_string())
+    }
+
+    pub fn verify_rom_wa(data: &[u8]) -> bool {
+        rom::is_gba_rom(data)
+    }
+}
+
+#[cfg(feature = "wasm")]
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(js_namespace = window, js_name = panic)]
+    fn gba_panic(message: &str);
+}
+
+#[cfg(feature = "wasm")]
+pub fn gba_hook_impl(info: &PanicInfo) {
+    let message = info.to_string();
+    gba_panic(message.as_str());
 }
 
 impl Default for GameBoyAdvance {

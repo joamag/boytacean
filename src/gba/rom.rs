@@ -4,6 +4,9 @@ use std::fmt::{self, Display, Formatter};
 
 use boytacean_common::error::Error;
 
+#[cfg(feature = "wasm")]
+use wasm_bindgen::prelude::*;
+
 /// GBA ROM header offsets
 const HEADER_TITLE: usize = 0x0A0;
 const HEADER_GAME_CODE: usize = 0x0AC;
@@ -15,6 +18,7 @@ const HEADER_CHECKSUM: usize = 0x0BD;
 /// minimum valid ROM size (must at least contain the header)
 const MIN_ROM_SIZE: usize = 0xC0;
 
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
 pub struct GbaRomInfo {
     title: String,
     game_code: String,
@@ -59,16 +63,24 @@ impl GbaRomInfo {
         })
     }
 
-    pub fn title(&self) -> &str {
-        &self.title
+    /// validates the header checksum against the computed value
+    pub fn validate_checksum(&self, data: &[u8]) -> bool {
+        compute_checksum(data) == self.header_checksum
+    }
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
+impl GbaRomInfo {
+    pub fn title(&self) -> String {
+        self.title.clone()
     }
 
-    pub fn game_code(&self) -> &str {
-        &self.game_code
+    pub fn game_code(&self) -> String {
+        self.game_code.clone()
     }
 
-    pub fn maker_code(&self) -> &str {
-        &self.maker_code
+    pub fn maker_code(&self) -> String {
+        self.maker_code.clone()
     }
 
     pub fn software_version(&self) -> u8 {
@@ -83,9 +95,22 @@ impl GbaRomInfo {
         self.rom_size
     }
 
-    /// validates the header checksum against the computed value
-    pub fn validate_checksum(&self, data: &[u8]) -> bool {
-        compute_checksum(data) == self.header_checksum
+    pub fn description(&self, column_length: usize) -> String {
+        let title_l = format!("{:width$}", "Title", width = column_length);
+        let code_l = format!("{:width$}", "Code", width = column_length);
+        let maker_l = format!("{:width$}", "Maker", width = column_length);
+        let size_l = format!("{:width$}", "Size", width = column_length);
+        format!(
+            "{}  {}\n{}  {}\n{}  {}\n{}  {}KB",
+            title_l,
+            self.title,
+            code_l,
+            self.game_code,
+            maker_l,
+            self.maker_code,
+            size_l,
+            self.rom_size / 1024
+        )
     }
 }
 
