@@ -386,7 +386,6 @@ impl Arm7Tdmi {
         }
 
         self.cycles = 0;
-
         let instr = self.fetch();
 
         // Prefetch the next pipeline entry BEFORE executing the instruction.
