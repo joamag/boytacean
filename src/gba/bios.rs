@@ -3,7 +3,7 @@
 //! Implements the most commonly used BIOS functions as native Rust code
 //! rather than requiring a real BIOS ROM dump.
 
-use crate::gba::cpu::Arm7Tdmi;
+use crate::{gba::cpu::Arm7Tdmi, warnln};
 
 /// handles a SWI call by dispatching to the appropriate HLE function.
 /// the comment field identifies which SWI is being called.
@@ -19,17 +19,25 @@ pub fn handle_swi(cpu: &mut Arm7Tdmi, comment: u8) {
         0x07 => swi_div_arm(cpu),
         0x08 => swi_sqrt(cpu),
         0x09 => swi_arctan(cpu),
-        0x0A => swi_arctan2(cpu),
-        0x0B => swi_cpu_set(cpu),
-        0x0C => swi_cpu_fast_set(cpu),
-        0x0E => swi_bg_affine_set(cpu),
-        0x0F => swi_obj_affine_set(cpu),
+        0x0a => swi_arctan2(cpu),
+        0x0b => swi_cpu_set(cpu),
+        0x0c => swi_cpu_fast_set(cpu),
+        0x0d => swi_get_bios_checksum(cpu),
+        0x0e => swi_bg_affine_set(cpu),
+        0x0f => swi_obj_affine_set(cpu),
+        0x10 => swi_bit_unpack(cpu),
         0x11 => swi_lz77_decomp_wram(cpu),
         0x12 => swi_lz77_decomp_vram(cpu),
+        0x13 => swi_huff_decomp(cpu),
         0x14 => swi_rl_decomp_wram(cpu),
         0x15 => swi_rl_decomp_vram(cpu),
+        0x16 => swi_diff_unfilt8_wram(cpu),
+        0x17 => swi_diff_unfilt8_vram(cpu),
+        0x18 => swi_diff_unfilt16(cpu),
+        0x19 => swi_sound_bias(cpu),
+        0x1f => swi_midi_key2freq(cpu),
         _ => {
-            // unsupported SWI - just return
+            warnln!("Unhandled SWI 0x{:02X}", comment);
         }
     }
 }
@@ -240,6 +248,11 @@ fn swi_cpu_fast_set(cpu: &mut Arm7Tdmi) {
     }
 }
 
+/// SWI 0x0D: GetBiosChecksum - returns the BIOS checksum
+fn swi_get_bios_checksum(cpu: &mut Arm7Tdmi) {
+    cpu.set_reg(0, 0xBAAE187F);
+}
+
 /// SWI 0x0E: BgAffineSet - calculates BG affine transformation parameters
 fn swi_bg_affine_set(cpu: &mut Arm7Tdmi) {
     let src = cpu.reg(0);
@@ -307,6 +320,64 @@ fn swi_obj_affine_set(cpu: &mut Arm7Tdmi) {
         cpu.bus_write16(base + stride, pb as u16);
         cpu.bus_write16(base + stride * 2, pc as u16);
         cpu.bus_write16(base + stride * 3, pd as u16);
+    }
+}
+
+/// SWI 0x10: BitUnPack - bit unpacking
+/// r0 = source, r1 = destination, r2 = pointer to unpack info
+fn swi_bit_unpack(cpu: &mut Arm7Tdmi) {
+    let src = cpu.reg(0);
+    let dst = cpu.reg(1);
+    let info = cpu.reg(2);
+
+    let length = cpu.bus_read16(info) as u32;
+    let src_width = cpu.bus_read8(info + 2) as u32;
+    let dst_width = cpu.bus_read8(info + 3) as u32;
+    let data_offset = cpu.bus_read32(info + 4);
+
+    let zero_flag = data_offset & (1 << 31) != 0;
+    let offset = data_offset & 0x7FFF_FFFF;
+
+    if src_width == 0 || dst_width == 0 || dst_width > 32 {
+        return;
+    }
+
+    let src_mask = (1u32 << src_width) - 1;
+    let mut src_offset = 0u32;
+    let mut dst_offset = 0u32;
+    let mut dst_buffer = 0u32;
+    let mut dst_bits = 0u32;
+
+    while src_offset < length {
+        let byte = cpu.bus_read8(src + src_offset);
+        src_offset += 1;
+
+        let mut bit_pos = 0u32;
+        while bit_pos < 8 {
+            let value = ((byte as u32) >> bit_pos) & src_mask;
+            bit_pos += src_width;
+
+            let unpacked = if zero_flag || value != 0 {
+                value + offset
+            } else {
+                0
+            };
+
+            dst_buffer |= (unpacked & ((1u32 << dst_width) - 1)) << dst_bits;
+            dst_bits += dst_width;
+
+            if dst_bits >= 32 {
+                cpu.bus_write32(dst + dst_offset, dst_buffer);
+                dst_offset += 4;
+                dst_buffer = 0;
+                dst_bits = 0;
+            }
+        }
+    }
+
+    // flush any remaining bits
+    if dst_bits > 0 {
+        cpu.bus_write32(dst + dst_offset, dst_buffer);
     }
 }
 
@@ -401,6 +472,86 @@ fn lz77_decomp(cpu: &mut Arm7Tdmi, vram_mode: bool) {
     }
 }
 
+/// SWI 0x13: HuffUnComp - huffman decompression
+/// r0 = source, r1 = destination
+fn swi_huff_decomp(cpu: &mut Arm7Tdmi) {
+    let src = cpu.reg(0);
+    let mut dst = cpu.reg(1);
+
+    let header = cpu.bus_read32(src);
+    let data_size = header >> 8;
+    let bit_size = (header >> 4) & 0x0F;
+
+    if bit_size != 4 && bit_size != 8 {
+        return;
+    }
+
+    let tree_size = cpu.bus_read8(src + 4) as u32;
+    let tree_start = src + 5;
+    let tree_bytes = (tree_size + 1) * 2;
+    let data_start = tree_start + tree_bytes;
+
+    let mut src_offset = data_start;
+    let mut bytes_written = 0u32;
+    let mut dst_buffer = 0u32;
+    let mut dst_bits = 0u32;
+    let mut bit_buffer = 0u32;
+    let mut bits_left = 0u32;
+
+    while bytes_written < data_size {
+        // refill bit buffer
+        if bits_left == 0 {
+            bit_buffer = cpu.bus_read32(src_offset);
+            src_offset += 4;
+            bits_left = 32;
+        }
+
+        // traverse the tree from root
+        let mut node_offset = 0u32;
+        loop {
+            let node = cpu.bus_read8(tree_start + node_offset);
+
+            if bits_left == 0 {
+                bit_buffer = cpu.bus_read32(src_offset);
+                src_offset += 4;
+                bits_left = 32;
+            }
+
+            // read one bit (MSB first)
+            let bit = (bit_buffer >> 31) & 1;
+            bit_buffer <<= 1;
+            bits_left -= 1;
+
+            let is_right = bit != 0;
+            let child_offset = (node & 0x3F) as u32;
+            let next = (node_offset & !1) + child_offset * 2 + 2;
+
+            let is_leaf = if is_right {
+                node & 0x80 != 0
+            } else {
+                node & 0x40 != 0
+            };
+
+            if is_leaf {
+                let leaf = cpu.bus_read8(tree_start + next + if is_right { 1 } else { 0 });
+                dst_buffer |= (leaf as u32) << dst_bits;
+                dst_bits += bit_size;
+
+                if dst_bits >= 32 {
+                    cpu.bus_write32(dst, dst_buffer);
+                    dst += 4;
+                    bytes_written += 4;
+                    dst_buffer = 0;
+                    dst_bits = 0;
+                }
+                break;
+            } else {
+                node_offset = next + if is_right { 1 } else { 0 };
+            }
+        }
+    }
+}
+
 /// SWI 0x14: RLUnCompWram - run-length decompression to WRAM
 fn swi_rl_decomp_wram(cpu: &mut Arm7Tdmi) {
     rl_decomp(cpu, false);
@@ -485,6 +636,100 @@ fn rl_decomp(cpu: &mut Arm7Tdmi, vram_mode: bool) {
     if vram_mode && vram_count & 1 != 0 {
         cpu.bus_write16(dst, vram_buffer);
     }
+}
+
+/// SWI 0x16: DiffUnFilter8 - 8-bit differential unfilter to WRAM
+fn swi_diff_unfilt8_wram(cpu: &mut Arm7Tdmi) {
+    diff_unfilt8(cpu, false);
+}
+
+/// SWI 0x17: DiffUnFilter8 - 8-bit differential unfilter to VRAM (16-bit writes)
+fn swi_diff_unfilt8_vram(cpu: &mut Arm7Tdmi) {
+    diff_unfilt8(cpu, true);
+}
+
+/// shared 8-bit differential unfilter logic
+fn diff_unfilt8(cpu: &mut Arm7Tdmi, vram_mode: bool) {
+    let src = cpu.reg(0);
+    let mut dst = cpu.reg(1);
+
+    let header = cpu.bus_read32(src);
+    let size = header >> 8;
+    let mut src_offset = 4u32;
+    let mut bytes_written = 0u32;
+    let mut accum = 0u8;
+    let mut vram_buffer: u16 = 0;
+    let mut vram_count: u32 = 0;
+
+    while bytes_written < size {
+        let byte = cpu.bus_read8(src + src_offset);
+        src_offset += 1;
+        accum = accum.wrapping_add(byte);
+
+        if vram_mode {
+            if vram_count & 1 == 0 {
+                vram_buffer = accum as u16;
+            } else {
+                vram_buffer |= (accum as u16) << 8;
+                cpu.bus_write16(dst, vram_buffer);
+                dst += 2;
+            }
+            vram_count += 1;
+        } else {
+            cpu.bus_write8(dst, accum);
+            dst += 1;
+        }
+        bytes_written += 1;
+    }
+
+    // flush any remaining byte in the buffer (odd-sized data)
+    if vram_mode && vram_count & 1 != 0 {
+        cpu.bus_write16(dst, vram_buffer);
+    }
+}
+
+/// SWI 0x18: DiffUnFilter16 - 16-bit differential unfilter
+fn swi_diff_unfilt16(cpu: &mut Arm7Tdmi) {
+    let src = cpu.reg(0);
+    let mut dst = cpu.reg(1);
+
+    let header = cpu.bus_read32(src);
+    let size = header >> 8;
+    let mut src_offset = 4u32;
+    let mut bytes_written = 0u32;
+    let mut accum = 0u16;
+
+    while bytes_written < size {
+        let value = cpu.bus_read16(src + src_offset);
+        src_offset += 2;
+        accum = accum.wrapping_add(value);
+        cpu.bus_write16(dst, accum);
+        dst += 2;
+        bytes_written += 2;
+    }
+}
+
+/// SWI 0x19: SoundBias - adjusts the sound bias
+fn swi_sound_bias(cpu: &mut Arm7Tdmi) {
+    let _bias = cpu.reg(0);
+    // simplified: sound bias is handled by the APU directly
+}
+
+/// SWI 0x1F: MidiKey2Freq - converts MIDI key to frequency
+/// r0 = wave data pointer, r1 = MIDI key, r2 = pitch adjust (fp)
+fn swi_midi_key2freq(cpu: &mut Arm7Tdmi) {
+    let wave = cpu.reg(0);
+    let mk = cpu.reg(1);
+    let fp = cpu.reg(2);
+
+    // read the frequency from the wave data header (at offset 4)
+    let freq = cpu.bus_read32(wave + 4);
+
+    // formula: freq * 2^((mk - 180) / 12 + fp / 2^16 / 12)
+    let exponent = ((mk as f64) - 180.0) / 12.0 + (fp as f64) / 65536.0 / 12.0;
+    let result = (freq as f64) * (2.0f64).powf(exponent);
+
+    cpu.set_reg(0, (result as u32) & 0x7FFF_FFFF);
 }
 
 #[cfg(test)]
@@ -606,6 +851,143 @@ mod tests {
         handle_swi(&mut cpu, 0x0C);
         assert_eq!(cpu.bus_read32(0x0200_1000), 1);
         assert_eq!(cpu.bus_read32(0x0200_101C), 8);
+    }
+
+    #[test]
+    fn test_swi_get_bios_checksum() {
+        let mut cpu = make_cpu();
+        handle_swi(&mut cpu, 0x0D);
+        assert_eq!(cpu.reg(0), 0xBAAE187F);
+    }
+
+    #[test]
+    fn test_swi_bit_unpack_1to8() {
+        let mut cpu = make_cpu();
+
+        // source: 2 bytes of 1-bit data
+        cpu.bus_write8(0x0200_0000, 0b10110001);
+        cpu.bus_write8(0x0200_0001, 0b00000001);
+
+        // unpack info: length=2, src_width=1, dst_width=8, offset=0 with zero flag
+        cpu.bus_write16(0x0200_0100, 2); // length
+        cpu.bus_write8(0x0200_0102, 1); // src_width
+        cpu.bus_write8(0x0200_0103, 8); // dst_width
+        cpu.bus_write32(0x0200_0104, 0); // data_offset (no zero flag)
+
+        cpu.set_reg(0, 0x0200_0000);
+        cpu.set_reg(1, 0x0200_1000);
+        cpu.set_reg(2, 0x0200_0100);
+        handle_swi(&mut cpu, 0x10);
+
+        // first 4 bytes: bits 0b10110001 -> [1, 0, 0, 0] (LSB first)
+        assert_eq!(cpu.bus_read32(0x0200_1000), 0x00000001);
+        // next 4 bytes: [1, 1, 0, 1]
+        assert_eq!(cpu.bus_read32(0x0200_1004), 0x01000101);
+    }
+
+    #[test]
+    fn test_swi_bit_unpack_4to8_with_offset() {
+        let mut cpu = make_cpu();
+
+        // source: 1 byte of 4-bit data (two nibbles: 0x3, 0x5)
+        cpu.bus_write8(0x0200_0000, 0x53);
+
+        // unpack info: length=1, src_width=4, dst_width=8, offset=1 with zero flag
+        cpu.bus_write16(0x0200_0100, 1);
+        cpu.bus_write8(0x0200_0102, 4);
+        cpu.bus_write8(0x0200_0103, 8);
+        cpu.bus_write32(0x0200_0104, 1 | (1 << 31)); // offset=1, zero_flag=true
+
+        cpu.set_reg(0, 0x0200_0000);
+        cpu.set_reg(1, 0x0200_1000);
+        cpu.set_reg(2, 0x0200_0100);
+        handle_swi(&mut cpu, 0x10);
+
+        // nibble 0x3 + offset 1 = 4, nibble 0x5 + offset 1 = 6
+        assert_eq!(cpu.bus_read32(0x0200_1000), 0x00000604);
+    }
+
+    #[test]
+    fn test_swi_diff_unfilt8_wram() {
+        let mut cpu = make_cpu();
+
+        // header: type=0x81 (8-bit diff), size=4
+        cpu.bus_write32(0x0200_0000, 0x00000481);
+        // deltas: 10, 5, 3, 2
+        cpu.bus_write8(0x0200_0004, 10);
+        cpu.bus_write8(0x0200_0005, 5);
+        cpu.bus_write8(0x0200_0006, 3);
+        cpu.bus_write8(0x0200_0007, 2);
+
+        cpu.set_reg(0, 0x0200_0000);
+        cpu.set_reg(1, 0x0200_1000);
+        handle_swi(&mut cpu, 0x16);
+
+        // accumulated: 10, 15, 18, 20
+        assert_eq!(cpu.bus_read8(0x0200_1000), 10);
+        assert_eq!(cpu.bus_read8(0x0200_1001), 15);
+        assert_eq!(cpu.bus_read8(0x0200_1002), 18);
+        assert_eq!(cpu.bus_read8(0x0200_1003), 20);
+    }
+
+    #[test]
+    fn test_swi_diff_unfilt16() {
+        let mut cpu = make_cpu();
+
+        // header: type=0x82 (16-bit diff), size=4 (2 halfwords = 4 bytes)
+        cpu.bus_write32(0x0200_0000, 0x00000482);
+        // deltas: 100, 50
+        cpu.bus_write16(0x0200_0004, 100);
+        cpu.bus_write16(0x0200_0006, 50);
+
+        cpu.set_reg(0, 0x0200_0000);
+        cpu.set_reg(1, 0x0200_1000);
+        handle_swi(&mut cpu, 0x18);
+
+        // accumulated: 100, 150
+        assert_eq!(cpu.bus_read16(0x0200_1000), 100);
+        assert_eq!(cpu.bus_read16(0x0200_1002), 150);
+    }
+
+    #[test]
+    fn test_swi_sound_bias() {
+        let mut cpu = make_cpu();
+        cpu.set_reg(0, 0x200);
+        handle_swi(&mut cpu, 0x19);
+        // should not crash; SWI 0x19 is a no-op in HLE
+    }
+
+    #[test]
+    fn test_swi_midi_key2freq() {
+        let mut cpu = make_cpu();
+
+        // write a wave data header with frequency at offset 4
+        cpu.bus_write32(0x0200_0000, 0); // dummy first word
+        cpu.bus_write32(0x0200_0004, 7040); // base frequency (A7 = 7040 Hz)
+
+        cpu.set_reg(0, 0x0200_0000);
+        cpu.set_reg(1, 180); // MIDI key 180 = no shift
+        cpu.set_reg(2, 0); // no pitch adjust
+        handle_swi(&mut cpu, 0x1F);
+
+        // at key 180 with no pitch adjust, result should be the base frequency
+        assert_eq!(cpu.reg(0), 7040);
+    }
+
+    #[test]
+    fn test_swi_midi_key2freq_octave_up() {
+        let mut cpu = make_cpu();
+
+        cpu.bus_write32(0x0200_0000, 0);
+        cpu.bus_write32(0x0200_0004, 7040);
+
+        cpu.set_reg(0, 0x0200_0000);
+        cpu.set_reg(1, 192); // 180 + 12 = one octave up
+        cpu.set_reg(2, 0);
+        handle_swi(&mut cpu, 0x1F);
+
+        // one octave up doubles the frequency
+        assert_eq!(cpu.reg(0), 14080);
     }
 
     #[test]

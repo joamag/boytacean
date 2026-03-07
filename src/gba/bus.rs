@@ -3,28 +3,32 @@
 //! Dispatches read/write operations to the appropriate memory
 //! region or I/O component based on the address.
 
-use crate::gba::{
-    apu::GbaApu,
-    consts::{
-        EWRAM_SIZE, IWRAM_SIZE, OAM_SIZE, PALETTE_SIZE, REG_BG0CNT, REG_BG0HOFS, REG_BG0VOFS,
-        REG_BG1CNT, REG_BG1HOFS, REG_BG1VOFS, REG_BG2CNT, REG_BG2HOFS, REG_BG2PA, REG_BG2PB,
-        REG_BG2PC, REG_BG2PD, REG_BG2VOFS, REG_BG2X, REG_BG2Y, REG_BG3CNT, REG_BG3HOFS, REG_BG3PA,
-        REG_BG3PB, REG_BG3PC, REG_BG3PD, REG_BG3VOFS, REG_BG3X, REG_BG3Y, REG_BLDALPHA, REG_BLDCNT,
-        REG_BLDY, REG_DISPCNT, REG_DISPSTAT, REG_DMA0CNT_H, REG_DMA0CNT_L, REG_DMA0DAD,
-        REG_DMA0SAD, REG_DMA1CNT_H, REG_DMA1CNT_L, REG_DMA1DAD, REG_DMA1SAD, REG_DMA2CNT_H,
-        REG_DMA2CNT_L, REG_DMA2DAD, REG_DMA2SAD, REG_DMA3CNT_H, REG_DMA3CNT_L, REG_DMA3DAD,
-        REG_DMA3SAD, REG_FIFO_A, REG_FIFO_B, REG_HALTCNT, REG_IE, REG_IF, REG_IME, REG_KEYCNT,
-        REG_KEYINPUT, REG_MOSAIC, REG_POSTFLG, REG_SOUNDBIAS, REG_SOUNDCNT_H, REG_SOUNDCNT_L,
-        REG_SOUNDCNT_X, REG_TM0CNT_H, REG_TM0CNT_L, REG_TM1CNT_H, REG_TM1CNT_L, REG_TM2CNT_H,
-        REG_TM2CNT_L, REG_TM3CNT_H, REG_TM3CNT_L, REG_VCOUNT, REG_WAITCNT, REG_WAVE_RAM, REG_WIN0H,
-        REG_WIN0V, REG_WIN1H, REG_WIN1V, REG_WININ, REG_WINOUT, VRAM_SIZE,
+use crate::{
+    debugln,
+    gba::{
+        apu::GbaApu,
+        consts::{
+            EWRAM_SIZE, IWRAM_SIZE, OAM_SIZE, PALETTE_SIZE, REG_BG0CNT, REG_BG0HOFS, REG_BG0VOFS,
+            REG_BG1CNT, REG_BG1HOFS, REG_BG1VOFS, REG_BG2CNT, REG_BG2HOFS, REG_BG2PA, REG_BG2PB,
+            REG_BG2PC, REG_BG2PD, REG_BG2VOFS, REG_BG2X, REG_BG2Y, REG_BG3CNT, REG_BG3HOFS,
+            REG_BG3PA, REG_BG3PB, REG_BG3PC, REG_BG3PD, REG_BG3VOFS, REG_BG3X, REG_BG3Y,
+            REG_BLDALPHA, REG_BLDCNT, REG_BLDY, REG_DISPCNT, REG_DISPSTAT, REG_DMA0CNT_H,
+            REG_DMA0CNT_L, REG_DMA0DAD, REG_DMA0SAD, REG_DMA1CNT_H, REG_DMA1CNT_L, REG_DMA1DAD,
+            REG_DMA1SAD, REG_DMA2CNT_H, REG_DMA2CNT_L, REG_DMA2DAD, REG_DMA2SAD, REG_DMA3CNT_H,
+            REG_DMA3CNT_L, REG_DMA3DAD, REG_DMA3SAD, REG_FIFO_A, REG_FIFO_B, REG_HALTCNT, REG_IE,
+            REG_IF, REG_IME, REG_KEYCNT, REG_KEYINPUT, REG_MOSAIC, REG_POSTFLG, REG_SOUNDBIAS,
+            REG_SOUNDCNT_H, REG_SOUNDCNT_L, REG_SOUNDCNT_X, REG_TM0CNT_H, REG_TM0CNT_L,
+            REG_TM1CNT_H, REG_TM1CNT_L, REG_TM2CNT_H, REG_TM2CNT_L, REG_TM3CNT_H, REG_TM3CNT_L,
+            REG_VCOUNT, REG_WAITCNT, REG_WAVE_RAM, REG_WIN0H, REG_WIN0V, REG_WIN1H, REG_WIN1V,
+            REG_WININ, REG_WINOUT, VRAM_SIZE,
+        },
+        dma::GbaDma,
+        flash::SaveMedia,
+        irq::IrqController,
+        pad::GbaPad,
+        ppu::GbaPpu,
+        timer::GbaTimers,
     },
-    dma::GbaDma,
-    flash::SaveMedia,
-    irq::IrqController,
-    pad::GbaPad,
-    ppu::GbaPpu,
-    timer::GbaTimers,
 };
 
 /// Size of the BIOS stub (we only need a small region for HLE stubs)
@@ -397,7 +401,9 @@ impl GbaBus {
                 self.vram[aligned + 1] = value;
             }
             0x0E..=0x0F => self.save.write8(addr, value),
-            _ => {}
+            _ => {
+                debugln!("Unmapped 8-bit write to 0x{:08X} = 0x{:02X}", addr, value);
+            }
         }
     }
 
@@ -440,7 +446,9 @@ impl GbaBus {
                 // 8-bit bus; byte lane selected by original addr bit 0
                 self.save.write8(raw_addr, bytes[(raw_addr & 1) as usize]);
             }
-            _ => {}
+            _ => {
+                debugln!("Unmapped 16-bit write to 0x{:08X} = 0x{:04X}", addr, value);
+            }
         }
     }
 
@@ -478,7 +486,9 @@ impl GbaBus {
                 // 8-bit bus; byte lane selected by original addr bits 0-1
                 self.save.write8(raw_addr, bytes[(raw_addr & 3) as usize]);
             }
-            _ => {}
+            _ => {
+                debugln!("Unmapped 32-bit write to 0x{:08X} = 0x{:08X}", addr, value);
+            }
         }
     }
 

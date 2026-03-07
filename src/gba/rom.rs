@@ -3,7 +3,6 @@
 use std::fmt::{self, Display, Formatter};
 
 use boytacean_common::error::Error;
-
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
 
