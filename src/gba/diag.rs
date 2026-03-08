@@ -173,7 +173,7 @@ pub fn run_audio_diagnostics(gba: &mut GameBoyAdvance, num_frames: u32) {
         let verbose = frame < 10 || frame % 60 == 0 || h_changed || x_changed;
 
         if verbose {
-            println!("--- Frame {} ---", frame);
+            println!("--- Frame {frame} ---");
             println!(
                 "  SOUNDCNT_L={:#06x} SOUNDCNT_H={:#06x} SOUNDCNT_X={:#06x}{}{}",
                 soundcnt_l,
@@ -218,8 +218,7 @@ pub fn run_audio_diagnostics(gba: &mut GameBoyAdvance, num_frames: u32) {
 
             let ds_a = &gba.cpu.bus.apu.direct_sound[0];
             println!(
-                "  FIFO-A: len={} (was {}) sample={} (was {}) out={} L={} R={}",
-                fifo_a, fifo_a_before, sample_a, sample_a_before, ds_a_out, ds_a_left, ds_a_right,
+                "  FIFO-A: len={fifo_a} (was {fifo_a_before}) sample={sample_a} (was {sample_a_before}) out={ds_a_out} L={ds_a_left} R={ds_a_right}",
             );
             println!(
                 "    pops={} underflows={} resets={} writes={}",
@@ -227,8 +226,7 @@ pub fn run_audio_diagnostics(gba: &mut GameBoyAdvance, num_frames: u32) {
             );
             let ds_b = &gba.cpu.bus.apu.direct_sound[1];
             println!(
-                "  FIFO-B: len={} (was {}) sample={} (was {}) out={} L={} R={}",
-                fifo_b, fifo_b_before, sample_b, sample_b_before, ds_b_out, ds_b_left, ds_b_right,
+                "  FIFO-B: len={fifo_b} (was {fifo_b_before}) sample={sample_b} (was {sample_b_before}) out={ds_b_out} L={ds_b_left} R={ds_b_right}",
             );
             println!(
                 "    pops={} underflows={} resets={} writes={}",
@@ -320,7 +318,7 @@ pub fn run_audio_diagnostics(gba: &mut GameBoyAdvance, num_frames: u32) {
                         if c.enabled() && c.timing() == 3 {
                             let d = c.dst_reg();
                             if d != 0x0400_00A0 && d != 0x0400_00A4 {
-                                println!("  !! DMA{} dst={:#010x} not FIFO addr", j, d);
+                                println!("  !! DMA{j} dst={d:#010x} not FIFO addr");
                             }
                         }
                     }
@@ -335,7 +333,7 @@ pub fn run_audio_diagnostics(gba: &mut GameBoyAdvance, num_frames: u32) {
         prev_soundcnt_x = soundcnt_x;
     }
 
-    println!("\n=== Audio Summary ({} frames) ===", num_frames);
+    println!("\n=== Audio Summary ({num_frames} frames) ===");
     let fmt = |o: Option<u32>| o.map(|f| format!("frame {f}")).unwrap_or("NEVER".into());
     println!(
         "  First SOUNDCNT_H write:   {}",
@@ -353,10 +351,7 @@ pub fn run_audio_diagnostics(gba: &mut GameBoyAdvance, num_frames: u32) {
 
     let soundcnt_h = gba.cpu.bus.apu.soundcnt_h();
     let soundcnt_x = gba.cpu.bus.apu.soundcnt_x();
-    println!(
-        "\n  Final SOUNDCNT_H={:#06x} SOUNDCNT_X={:#06x}",
-        soundcnt_h, soundcnt_x
-    );
+    println!("\n  Final SOUNDCNT_H={soundcnt_h:#06x} SOUNDCNT_X={soundcnt_x:#06x}");
     println!(
         "  Final FIFO-A={} FIFO-B={} sample-A={} sample-B={}",
         gba.cpu.bus.apu.direct_sound[0].fifo_len(),
