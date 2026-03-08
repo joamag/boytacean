@@ -384,11 +384,13 @@ impl Arm7Tdmi {
             let was_halted = self.halted;
             self.halted = false;
 
-            // when waking from halt, the pipeline hasn't been refilled,
-            // so regs[15] points directly at the next instruction without
+            // when waking from HLE halt, the pipeline was flushed so
+            // regs[15] points directly at the next instruction without
             // the pipeline prefetch offset. adds +4 so the IRQ handler's
             // SUBS PC, LR, #4 returns to the correct instruction.
-            if was_halted {
+            // when halt came from a real HALTCNT write, the pipeline is
+            // still valid and regs[15] already has the correct offset.
+            if was_halted && !self.pipeline_valid {
                 self.regs[15] = self.regs[15].wrapping_add(4);
             }
 
