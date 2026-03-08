@@ -1,3 +1,12 @@
+//! Diagnostic utility for GBA emulation
+//!
+//! Runs a GBA ROM for a given number of frames and dumps detailed
+//! emulator state including CPU registers, PPU configuration, IRQ
+//! status, timer state, and per-frame PPM snapshots.
+//!
+//! # Usage
+//! gba-diag <rom.gba> \[num_frames\] \[--bios <bios.bin>\]
+
 use std::env;
 
 use boytacean::gba::{diag::run_diagnostics, GameBoyAdvance};
