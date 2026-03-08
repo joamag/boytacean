@@ -1,7 +1,8 @@
 //! GBA DMA controller (4 channels with priority and trigger modes).
 
 use crate::gba::consts::{
-    DMA_TIMING_HBLANK, DMA_TIMING_IMMEDIATE, DMA_TIMING_SPECIAL, DMA_TIMING_VBLANK,
+    DMA_TIMING_HBLANK, DMA_TIMING_IMMEDIATE, DMA_TIMING_SPECIAL, DMA_TIMING_VBLANK, REG_FIFO_A,
+    REG_FIFO_B,
 };
 
 /// address control mode for DMA source/destination
@@ -172,15 +173,16 @@ impl DmaChannel {
         self.count
     }
 
-    /// advances the DMA transfer by one unit,
+    /// Advances the DMA transfer by one unit,
     /// updating internal addresses and count.
+    ///
     /// returns (src_addr, dst_addr, is_complete)
     pub fn step(&mut self) -> (u32, u32, bool) {
         let src_addr = self.src;
         let dst_addr = self.dst;
         let step = if self.word_size() { 4 } else { 2 };
 
-        // update source address
+        // updates source address
         match self.src_control() {
             DmaAddrControl::Increment => self.src = self.src.wrapping_add(step),
             DmaAddrControl::Decrement => self.src = self.src.wrapping_sub(step),
@@ -188,12 +190,15 @@ impl DmaChannel {
             DmaAddrControl::IncrementReload => self.src = self.src.wrapping_add(step),
         }
 
-        // update destination address
-        match self.dst_control() {
-            DmaAddrControl::Increment => self.dst = self.dst.wrapping_add(step),
-            DmaAddrControl::Decrement => self.dst = self.dst.wrapping_sub(step),
-            DmaAddrControl::Fixed => {}
-            DmaAddrControl::IncrementReload => self.dst = self.dst.wrapping_add(step),
+        // updates destination address (sound DMA forces Fixed destination)
+        let is_sound_dma = self.timing() == DMA_TIMING_SPECIAL;
+        if !is_sound_dma {
+            match self.dst_control() {
+                DmaAddrControl::Increment => self.dst = self.dst.wrapping_add(step),
+                DmaAddrControl::Decrement => self.dst = self.dst.wrapping_sub(step),
+                DmaAddrControl::Fixed => {}
+                DmaAddrControl::IncrementReload => self.dst = self.dst.wrapping_add(step),
+            }
         }
 
         self.count -= 1;
@@ -262,12 +267,27 @@ impl GbaDma {
         self.trigger(DMA_TIMING_HBLANK);
     }
 
-    /// triggers sound FIFO DMA (special timing, channels 1-2)
+    /// Triggers sound FIFO DMA (special timing, channels 1-2).
+    ///
+    /// On real hardware, sound DMA forces 4-word (32-bit) transfers
+    /// to the FIFO register. Only channels whose latched destination
+    /// matches the requested FIFO address are triggered.
     pub fn trigger_sound_fifo(&mut self, fifo_index: usize) {
-        let channel_index = fifo_index + 1;
-        if channel_index < 4 {
-            let channel = &mut self.channels[channel_index];
-            if channel.enabled() && channel.timing() == DMA_TIMING_SPECIAL {
+        let fifo_addr = if fifo_index == 0 {
+            REG_FIFO_A
+        } else {
+            REG_FIFO_B
+        };
+
+        // only DMA channels 1 and 2 support sound FIFO (SPECIAL timing)
+        for i in 1..=2 {
+            let channel = &mut self.channels[i];
+            if channel.enabled()
+                && channel.timing() == DMA_TIMING_SPECIAL
+                && channel.dst_reg == fifo_addr
+            {
+                // hardware forces 4-word transfer
+                channel.count = 4;
                 channel.set_active(true);
             }
         }

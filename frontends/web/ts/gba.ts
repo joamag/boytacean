@@ -448,8 +448,8 @@ export class GbaEmulator extends EmulatorLogic implements Emulator {
         const leftStream = new Float32Array(internalBuffer.length / 2);
         const rightStream = new Float32Array(internalBuffer.length / 2);
         for (let index = 0; index < internalBuffer.length; index += 2) {
-            leftStream[index / 2] = internalBuffer[index] / 100.0;
-            rightStream[index / 2] = internalBuffer[index + 1] / 100.0;
+            leftStream[index / 2] = internalBuffer[index] / 32768.0;
+            rightStream[index / 2] = internalBuffer[index + 1] / 32768.0;
         }
         return [leftStream, rightStream];
     }
