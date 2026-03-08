@@ -379,7 +379,7 @@ impl Arm7Tdmi {
     /// Executes a single CPU instruction and returns the
     /// number of cycles consumed.
     pub fn step(&mut self) -> u32 {
-        // check for pending interrupts
+        // checks for any pending interrupts
         if self.bus.irq.pending() && self.cpsr & CPSR_I == 0 {
             let was_halted = self.halted;
             self.halted = false;
@@ -393,7 +393,9 @@ impl Arm7Tdmi {
             }
 
             self.enter_exception(0x18, MODE_IRQ);
-            return 3; // interrupt takes ~3 cycles
+
+            // interrupt takes ~3 cycles
+            return 3;
         }
 
         // HLE IntrWait: emulates the BIOS IntrWait/VBlankIntrWait loop.
@@ -447,7 +449,7 @@ impl Arm7Tdmi {
 
         self.cycles = 0;
 
-        // warn if executing from unmapped or unusual memory regions
+        // warns if executing from unmapped or unusual memory regions
         let exec_pc = if self.in_thumb_mode() {
             self.regs[15].wrapping_sub(4)
         } else {
@@ -485,7 +487,7 @@ impl Arm7Tdmi {
 
         let instr = self.fetch();
 
-        // preftches the next pipeline entry BEFORE executing the instruction.
+        // prefetches the next pipeline entry BEFORE executing the instruction.
         // On real ARM7TDMI, fetch/decode/execute happen simultaneously:
         // the fetch stage reads from PC at the same time as the execute
         // stage runs the current instruction, so self-modifying code that
