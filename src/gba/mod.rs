@@ -169,21 +169,22 @@ impl GameBoyAdvance {
         // clock timers
         if self.timer_enabled {
             let overflows = self.cpu.bus.timers.clock(cycles);
-            // debug: no trace
-            for i in 0..4 {
-                if overflows & (1 << i) != 0 {
-                    if self.cpu.bus.timers.timers[i].irq_enable() {
-                        self.cpu.bus.irq.raise_timer(i);
-                    }
-                    // timer overflow triggers DirectSound FIFO
-                    if self.apu_enabled {
-                        self.cpu.bus.apu.timer_overflow(i);
-                        // trigger DMA FIFO refill if needed
-                        for fifo in 0..2 {
-                            if self.cpu.bus.apu.direct_sound[fifo].timer_id == i
-                                && self.cpu.bus.apu.direct_sound[fifo].needs_refill()
-                            {
-                                self.cpu.bus.dma.trigger_sound_fifo(fifo);
+            if overflows != 0 {
+                for i in 0..4 {
+                    if overflows & (1 << i) != 0 {
+                        if self.cpu.bus.timers.timers[i].irq_enable() {
+                            self.cpu.bus.irq.raise_timer(i);
+                        }
+                        // timer overflow triggers DirectSound FIFO
+                        if self.apu_enabled {
+                            self.cpu.bus.apu.timer_overflow(i);
+                            // trigger DMA FIFO refill if needed
+                            for fifo in 0..2 {
+                                if self.cpu.bus.apu.direct_sound[fifo].timer_id == i
+                                    && self.cpu.bus.apu.direct_sound[fifo].needs_refill()
+                                {
+                                    self.cpu.bus.dma.trigger_sound_fifo(fifo);
+                                }
                             }
                         }
                     }
@@ -191,7 +192,7 @@ impl GameBoyAdvance {
             }
         }
 
-        // clock PPU, retrieves the events that occurred during
+        // clocks PPU, retrieves the events that occurred during
         // this clock to trigger related behavior
         if self.ppu_enabled {
             let events = self.cpu.bus.ppu.clock(
@@ -201,46 +202,48 @@ impl GameBoyAdvance {
                 &self.cpu.bus.oam,
             );
 
-            if events & 1 != 0 {
-                // hblank DMA trigger (always fires at hblank)
-                if self.dma_enabled {
-                    self.cpu.bus.dma.trigger_hblank();
+            if events != 0 {
+                if events & 1 != 0 {
+                    // hblank DMA trigger (always fires at hblank)
+                    if self.dma_enabled {
+                        self.cpu.bus.dma.trigger_hblank();
+                    }
                 }
-            }
-            if events & 4 != 0 {
-                // hblank IRQ (only when DISPSTAT enables it)
-                self.cpu.bus.irq.raise_hblank();
-            }
-            if events & 2 != 0 {
-                // vblank DMA trigger (always fires at vblank)
-                self.frame = self.cpu.bus.ppu.frame();
-                if self.dma_enabled {
-                    self.cpu.bus.dma.trigger_vblank();
+                if events & 4 != 0 {
+                    // hblank IRQ (only when DISPSTAT enables it)
+                    self.cpu.bus.irq.raise_hblank();
                 }
-            }
-            if events & 8 != 0 {
-                // vblank IRQ (only when DISPSTAT enables it)
-                self.cpu.bus.irq.raise_vblank();
-            }
-            if events & 16 != 0 {
-                // delivers VCount match IRQ to the controller, relies on
-                // the IntrWait re-halt check in cpu.rs (gated on CPSR_I==0)
-                // to prevent premature unhalt of VBlankIntrWait callers.
-                self.cpu.bus.irq.raise_vcount();
+                if events & 2 != 0 {
+                    // vblank DMA trigger (always fires at vblank)
+                    self.frame = self.cpu.bus.ppu.frame();
+                    if self.dma_enabled {
+                        self.cpu.bus.dma.trigger_vblank();
+                    }
+                }
+                if events & 8 != 0 {
+                    // vblank IRQ (only when DISPSTAT enables it)
+                    self.cpu.bus.irq.raise_vblank();
+                }
+                if events & 16 != 0 {
+                    // delivers VCount match IRQ to the controller, relies on
+                    // the IntrWait re-halt check in cpu.rs (gated on CPSR_I==0)
+                    // to prevent premature unhalt of VBlankIntrWait callers.
+                    self.cpu.bus.irq.raise_vcount();
+                }
             }
         }
 
-        // clock APU
+        // clocks APU
         if self.apu_enabled {
             self.cpu.bus.apu.clock(cycles);
         }
 
-        // process DMA transfers
+        // processes DMA transfers
         if self.dma_enabled {
             self.process_dma();
         }
 
-        // check keypad interrupt
+        // checks keypad interrupt
         if self.cpu.bus.pad.int_keypad() {
             self.cpu.bus.irq.raise_keypad();
             self.cpu.bus.pad.ack_keypad();
