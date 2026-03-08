@@ -727,8 +727,7 @@ impl GbaPpu {
 
             // insert visible layers sorted by priority (lower = higher priority),
             // with BG index as tiebreaker (lower index wins), OBJ treated as index 4
-            for i in 0..active_bg_count {
-                let bg_index = active_bgs[i];
+            for &bg_index in active_bgs.iter().take(active_bg_count) {
                 if !bg_has_pixel[bg_index][x] {
                     continue;
                 }
