@@ -46,8 +46,12 @@ use sdl2::{
 const SCREEN_SCALE: f32 = 3.0;
 
 /// Base audio volume to be used as the basis of the
-/// amplification level of the volume
+/// amplification level of the volume for the Game Boy.
 const VOLUME: f32 = 64.0;
+
+/// Audio normalization factor for the GBA, scaled proportionally
+/// to the GB volume (web uses 100/32768, SDL uses 64/20972).
+const VOLUME_GBA: f32 = 20972.0;
 
 /// The rate (in seconds) at which the current battery
 /// backed RAM is going to be stored into the file system.
@@ -139,6 +143,12 @@ pub struct Emulator {
     /// speed of the visual part of the emulation (eg: 60 FPS).
     visual_frequency: f32,
 
+    /// The audio volume divisor for the current system backend.
+    ///
+    /// This value is used to normalize the audio output of the emulator,
+    /// it is set to a different value from system to system.
+    volume: f32,
+
     /// The time at which the next tick is going to be executed, this
     /// value is expressed in milliseconds.
     next_tick_time: f32,
@@ -169,6 +179,7 @@ impl Emulator {
     pub fn new(system: System, options: EmulatorOptions) -> Self {
         let logic_frequency = system.cpu_freq();
         let visual_frequency = system.visual_freq();
+        let volume = if system.is_gba() { VOLUME_GBA } else { VOLUME };
         Self {
             system,
             auto_mode: options.auto_mode.unwrap_or(true),
@@ -181,6 +192,7 @@ impl Emulator {
             dir_path: String::from("invalid"),
             logic_frequency,
             visual_frequency,
+            volume,
             next_tick_time: 0.0,
             next_tick_time_i: 0,
             fast: false,
@@ -767,7 +779,7 @@ Drag & drop ROM file: Load new ROM and reset system\n===========================
                             .system
                             .audio_buffer()
                             .iter()
-                            .map(|v| *v as f32 / VOLUME)
+                            .map(|v| *v as f32 / self.volume)
                             .collect::<Vec<f32>>();
                         audio.device.queue_audio(&audio_buffer).unwrap();
                     }
