@@ -1,4 +1,10 @@
-//! GBA diagnostic utilities for debugging rendering issues.
+//! GBA diagnostic utilities for debugging rendering and emulation issues.
+//!
+//! Provides tools to inspect the internal state of the GBA emulator during
+//! execution, including CPU registers, PPU configuration, timer state, IRQ
+//! status, and BG tilemap contents. The main entry point [`run_diagnostics`]
+//! runs a ROM for a given number of frames, printing detailed state at key
+//! frames and saving frame buffer snapshots as PPM images to `/tmp/`.
 
 use super::GameBoyAdvance;
 
@@ -53,7 +59,7 @@ pub fn run_diagnostics(gba: &mut GameBoyAdvance, num_frames: u32) {
                     let addr = pc.wrapping_sub(8).wrapping_add(i * 4);
                     let word = gba.cpu.bus.read32(addr);
                     if i % 4 == 0 {
-                        print!("\n         |   {:#010x}:", addr);
+                        print!("\n         |   {addr:#010x}:");
                     }
                     print!(" {word:08x}");
                 }
@@ -124,16 +130,16 @@ fn print_state(gba: &GameBoyAdvance, frame: u32, cycles: u64) {
 
     // print timer state
     for i in 0..4 {
-        let t = &cpu.bus.timers.timers[i];
-        if t.enabled() {
+        let timer = &cpu.bus.timers.timers[i];
+        if timer.enabled() {
             println!(
                 "         | TM{}: cnt={:#06x} reload={:#06x} ctrl={:#06x} cascade={} irq={}",
                 i,
-                t.counter(),
-                t.reload(),
-                t.control(),
-                t.cascade(),
-                t.irq_enable()
+                timer.counter(),
+                timer.reload(),
+                timer.control(),
+                timer.cascade(),
+                timer.irq_enable()
             );
         }
     }
