@@ -4,14 +4,17 @@
 //! 3-stage pipeline, banked registers for privileged modes,
 //! and interrupt handling.
 
-use crate::gba::{
-    arm::execute_arm,
-    bus::GbaBus,
-    consts::{
-        CPSR_C, CPSR_I, CPSR_MODE_MASK, CPSR_N, CPSR_T, CPSR_V, CPSR_Z, MODE_FIQ, MODE_IRQ,
-        MODE_SVC, MODE_SYS, MODE_USR,
+use crate::{
+    gba::{
+        arm::execute_arm,
+        bus::GbaBus,
+        consts::{
+            CPSR_C, CPSR_I, CPSR_MODE_MASK, CPSR_N, CPSR_T, CPSR_V, CPSR_Z, MODE_FIQ, MODE_IRQ,
+            MODE_SVC, MODE_SYS, MODE_USR,
+        },
+        thumb::execute_thumb,
     },
-    thumb::execute_thumb,
+    warnln,
 };
 
 /// index mapping for banked SPSR: FIQ=0, SVC=1, ABT=2, IRQ=3, UND=4
@@ -89,6 +92,13 @@ pub struct Arm7Tdmi {
     /// whether the CPU is halted (waiting for interrupt)
     halted: bool,
 
+    /// whether we already warned about halt deadlock (to avoid spam)
+    halt_deadlock_warned: bool,
+
+    /// infinite loop detection: previous PC and repeat count
+    prev_pc: u32,
+    same_pc_count: u32,
+
     /// pipeline state for prefetched instruction
     pipeline: [u32; 2],
     pipeline_valid: bool,
@@ -104,6 +114,9 @@ impl Arm7Tdmi {
             bus,
             cycles: 0,
             halted: false,
+            halt_deadlock_warned: false,
+            prev_pc: 0xFFFF_FFFF,
+            same_pc_count: 0,
             pipeline: [0; 2],
             pipeline_valid: false,
         };
@@ -129,6 +142,9 @@ impl Arm7Tdmi {
         self.spsr = [0; 5];
         self.banked = BankedRegisters::new();
         self.halted = false;
+        self.halt_deadlock_warned = false;
+        self.prev_pc = 0xFFFF_FFFF;
+        self.same_pc_count = 0;
         self.pipeline_valid = false;
         // PC = 0: start executing from BIOS entry point
         self.regs[15] = 0x0000_0000;
@@ -389,10 +405,8 @@ impl Arm7Tdmi {
             // skip re-halt check while inside the IRQ handler itself
             if self.cpsr & CPSR_I == 0 {
                 let offset = (0x0300_7FF8u32 & 0x7FFF) as usize;
-                let intr_check = u16::from_le_bytes([
-                    self.bus.iwram[offset],
-                    self.bus.iwram[offset + 1],
-                ]);
+                let intr_check =
+                    u16::from_le_bytes([self.bus.iwram[offset], self.bus.iwram[offset + 1]]);
                 if intr_check & self.bus.intr_wait_flags != 0 {
                     // waited interrupt was serviced — clear from IntrCheck
                     // and resume execution
@@ -419,10 +433,56 @@ impl Arm7Tdmi {
         }
 
         if self.halted {
+            // detect halt deadlock: if no interrupts are enabled in IE,
+            // nothing can ever wake the CPU from halt
+            if self.bus.irq.ie() == 0 && !self.halt_deadlock_warned {
+                self.halt_deadlock_warned = true;
+                warnln!(
+                    "GBA: halt deadlock detected — CPU halted with IE=0, nothing can wake it (PC={:#010x})",
+                    self.pc()
+                );
+            }
             return 1; // idle cycle while halted
         }
 
         self.cycles = 0;
+
+        // warn if executing from unmapped or unusual memory regions
+        let exec_pc = if self.in_thumb_mode() {
+            self.regs[15].wrapping_sub(4)
+        } else {
+            self.regs[15].wrapping_sub(8)
+        };
+        let exec_region = exec_pc >> 24;
+        match exec_region {
+            0x00 if exec_pc < 0x4000 => {}                // BIOS
+            0x02 => {}                                    // EWRAM
+            0x03 => {}                                    // IWRAM
+            0x08 | 0x09 | 0x0A | 0x0B | 0x0C | 0x0D => {} // ROM
+            _ => {
+                warnln!(
+                    "GBA: executing from unmapped memory region at PC={:#010x}",
+                    exec_pc
+                );
+            }
+        }
+
+        // infinite loop detection: same PC for many consecutive steps
+        // cost: one comparison + conditional increment per step (negligible)
+        if exec_pc == self.prev_pc {
+            self.same_pc_count = self.same_pc_count.saturating_add(1);
+            if self.same_pc_count == 64 {
+                warnln!(
+                    "GBA: infinite loop detected at PC={:#010x} (CPSR={:#010x})",
+                    exec_pc,
+                    self.cpsr
+                );
+            }
+        } else {
+            self.prev_pc = exec_pc;
+            self.same_pc_count = 0;
+        }
+
         let instr = self.fetch();
 
         // preftches the next pipeline entry BEFORE executing the instruction.
@@ -1151,7 +1211,7 @@ mod tests {
         // but VBlank is still in IF. the IF fallback should detect it.
         let mut cpu = make_cpu();
         cpu.bus.intr_wait_flags = 1; // wait for VBlank
-        // IE does NOT include VBlank — only VCount (bit 2)
+                                     // IE does NOT include VBlank — only VCount (bit 2)
         cpu.bus.irq.set_ie(0x04);
         // VBlank is pending in IF
         cpu.bus.irq.raise(0x01);
@@ -1175,7 +1235,7 @@ mod tests {
         let mut cpu = make_cpu();
         cpu.bus.intr_wait_flags = 1; // wait for VBlank
         cpu.bus.irq.raise(0x04); // only VCount in IF
-        // IntrCheck empty
+                                 // IntrCheck empty
         let offset = (0x0300_7FF8u32 & 0x7FFF) as usize;
         cpu.bus.iwram[offset] = 0x00;
         cpu.bus.iwram[offset + 1] = 0x00;
@@ -1193,7 +1253,7 @@ mod tests {
         // but waited interrupt not yet in IntrCheck — should re-halt
         let mut cpu = make_cpu();
         cpu.bus.intr_wait_flags = 1; // wait for VBlank
-        // CPU is NOT halted (handler just returned to user code)
+                                     // CPU is NOT halted (handler just returned to user code)
         assert!(!cpu.halted());
         // IntrCheck does NOT have VBlank
         let offset = (0x0300_7FF8u32 & 0x7FFF) as usize;
@@ -1235,7 +1295,7 @@ mod tests {
         // IntrCheck path should be taken (clears IntrCheck, not IF)
         let mut cpu = make_cpu();
         cpu.bus.intr_wait_flags = 1; // wait for VBlank
-        // IntrCheck has VBlank
+                                     // IntrCheck has VBlank
         let offset = (0x0300_7FF8u32 & 0x7FFF) as usize;
         let bytes = 0x01u16.to_le_bytes();
         cpu.bus.iwram[offset] = bytes[0];
@@ -1323,5 +1383,113 @@ mod tests {
 
         assert!(cpu.halted());
         assert_eq!(cycles, 1);
+    }
+
+    // -- crash detection tests --
+
+    #[test]
+    fn test_halt_deadlock_warned_flag_set_on_ie_zero() {
+        let mut cpu = make_cpu();
+        cpu.set_halted(true);
+        // IE = 0 means nothing can wake the CPU
+        cpu.bus.irq.set_ie(0);
+        assert!(!cpu.halt_deadlock_warned);
+
+        cpu.step();
+
+        // should have set the warning flag
+        assert!(cpu.halt_deadlock_warned);
+        // still halted (deadlock is a warning, not recovery)
+        assert!(cpu.halted());
+    }
+
+    #[test]
+    fn test_halt_deadlock_not_warned_when_ie_nonzero() {
+        let mut cpu = make_cpu();
+        cpu.set_halted(true);
+        cpu.bus.irq.set_ie(0x01); // VBlank enabled — can be woken
+
+        cpu.step();
+
+        assert!(!cpu.halt_deadlock_warned);
+    }
+
+    #[test]
+    fn test_halt_deadlock_warned_resets_on_unhalt() {
+        let mut cpu = make_cpu();
+        cpu.set_halted(true);
+        cpu.bus.irq.set_ie(0);
+        cpu.step(); // triggers warning
+        assert!(cpu.halt_deadlock_warned);
+
+        // unhalt via IRQ
+        cpu.bus.irq.set_ime(true);
+        cpu.bus.irq.set_ie(0x01);
+        cpu.bus.irq.raise_vblank();
+        cpu.step();
+
+        // should have unhalted and reset the flag
+        assert!(!cpu.halted());
+    }
+
+    #[test]
+    fn test_infinite_loop_counter_increments() {
+        let mut cpu = make_cpu();
+        // place a NOP (MOV R0, R0) at 0x08000000
+        cpu.bus.write32(0x0800_0000, 0xE1A00000); // MOV R0, R0
+                                                  // also need next instructions for pipeline
+        cpu.bus.write32(0x0800_0004, 0xE1A00000);
+        cpu.bus.write32(0x0800_0008, 0xE1A00000);
+
+        // PC starts at 0x08000000 by default (post-boot state)
+        // first step resets prev_pc
+        cpu.step();
+        assert_eq!(cpu.same_pc_count, 0);
+    }
+
+    #[test]
+    fn test_infinite_loop_counter_resets_on_different_pc() {
+        let mut cpu = make_cpu();
+        // place two different NOPs at sequential addresses
+        cpu.bus.write32(0x0800_0000, 0xE1A00000);
+        cpu.bus.write32(0x0800_0004, 0xE1A00000);
+        cpu.bus.write32(0x0800_0008, 0xE1A00000);
+        cpu.bus.write32(0x0800_000C, 0xE1A00000);
+
+        cpu.step(); // executes 0x08000000
+        cpu.step(); // executes 0x08000004 — different PC
+        assert_eq!(cpu.same_pc_count, 0);
+    }
+
+    #[test]
+    fn test_enter_exception_und_mode() {
+        let mut cpu = make_cpu();
+        let old_cpsr = cpu.cpsr();
+        cpu.enter_exception(0x04, 0x1B); // MODE_UND
+        assert_eq!(cpu.cpsr() & CPSR_MODE_MASK, 0x1B);
+        assert!(cpu.cpsr() & CPSR_I != 0); // IRQs disabled
+        assert!(cpu.cpsr() & CPSR_T == 0); // ARM mode
+        assert_eq!(cpu.spsr(), old_cpsr);
+        assert_eq!(cpu.pc(), 0x04);
+    }
+
+    #[test]
+    fn test_bios_und_vector_is_infinite_loop() {
+        let mut cpu = make_cpu();
+        cpu.bus.bios_readable = true;
+        let instr = cpu.bus.read32(0x0000_0004);
+        cpu.bus.bios_readable = false;
+        // B . = 0xEAFFFFFE (branch to self)
+        assert_eq!(instr, 0xEAFFFFFE);
+    }
+
+    #[test]
+    fn test_bios_swi_vector_is_infinite_loop() {
+        let mut cpu = make_cpu();
+        cpu.bus.bios_readable = true;
+        let instr = cpu.bus.read32(0x0000_0008);
+        cpu.bus.bios_readable = false;
+        // B . = 0xEAFFFFFE (branch to self)
+        assert_eq!(instr, 0xEAFFFFFE);
     }
 }
