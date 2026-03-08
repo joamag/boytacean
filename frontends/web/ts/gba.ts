@@ -36,9 +36,6 @@ import info from "../package.json";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 declare const require: any;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-declare const process: any;
-
 /**
  * The frequency at which the GBA emulator should
  * run "normally".
@@ -545,14 +542,17 @@ export class GbaEmulator extends EmulatorLogic implements Emulator {
         throw new Error("Save states not supported for GBA");
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     async unserializeState(_data: Uint8Array) {
         throw new Error("Save states not supported for GBA");
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     async buildState(_index: number, _data: Uint8Array): Promise<SaveState> {
         throw new Error("Save states not supported for GBA");
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     async validateState(_data: Uint8Array, _validation: Validation) {
         throw new Error("Save states not supported for GBA");
     }
