@@ -9,10 +9,10 @@ use crate::gba::consts::{
     VISIBLE_DOTS,
 };
 
-/// number of OBJ entries in OAM
+/// Number of OBJ entries in OAM.
 pub const OBJ_COUNT: usize = 128;
 
-/// maximum number of BG layers
+/// Maximum number of BG layers.
 pub const BG_COUNT: usize = 4;
 
 /// Layer ID for blending target identification
@@ -27,7 +27,7 @@ enum Layer {
     Backdrop = 5,
 }
 
-/// per-pixel compositing entry used during scanline rendering
+/// Per-pixel compositing entry used during scanline rendering.
 #[derive(Clone, Copy)]
 struct PixelEntry {
     color: u16,
@@ -47,7 +47,7 @@ impl Default for PixelEntry {
     }
 }
 
-/// blend mode from BLDCNT bits 6-7
+/// Blend mode from BLDCNT bits 6-7.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum BlendMode {
     None = 0,
@@ -82,66 +82,67 @@ impl VideoMode {
 }
 
 pub struct GbaPpu {
-    /// current scanline (VCOUNT, 0-227)
+    /// Current scanline (VCOUNT, 0-227).
     vcount: u16,
 
-    /// dot counter within the current scanline
+    /// Dot counter within the current scanline.
     dot: u32,
 
-    /// display control register (DISPCNT, 0x0400_0000)
+    /// Display control register (DISPCNT, 0x0400_0000).
     dispcnt: u16,
 
-    /// display status register (DISPSTAT, 0x0400_0004)
+    /// Display status register (DISPSTAT, 0x0400_0004).
     dispstat: u16,
 
-    /// BG control registers (BG0CNT-BG3CNT)
+    /// BG control registers (BG0CNT-BG3CNT).
     bgcnt: [u16; BG_COUNT],
 
-    /// BG horizontal scroll offsets
+    /// BG horizontal scroll offsets.
     bg_hofs: [u16; BG_COUNT],
 
-    /// BG vertical scroll offsets
+    /// BG vertical scroll offsets.
     bg_vofs: [u16; BG_COUNT],
 
-    /// BG2/BG3 affine parameters (PA, PB, PC, PD)
+    /// BG2/BG3 affine parameters (PA, PB, PC, PD).
     bg_pa: [i16; 2],
     bg_pb: [i16; 2],
     bg_pc: [i16; 2],
     bg_pd: [i16; 2],
 
-    /// BG2/BG3 reference point X (28-bit signed, internal latched)
+    /// BG2/BG3 reference point X (28-bit signed, internal latched).
     bg_ref_x: [i32; 2],
     bg_ref_y: [i32; 2],
 
-    /// BG2/BG3 reference point X (written values)
+    /// BG2/BG3 reference point X (written values).
     bg_ref_x_write: [i32; 2],
     bg_ref_y_write: [i32; 2],
 
-    /// Raw 32-bit shadow registers for partial 16-bit writes to BG ref points
+    /// Raw 32-bit shadow registers for partial 16-bit
+    /// writes to BG ref points.
     bg_ref_x_raw: [u32; 2],
     bg_ref_y_raw: [u32; 2],
 
-    /// window registers
+    /// Window registers.
     winh: [u16; 2],
     winv: [u16; 2],
     winin: u16,
     winout: u16,
 
-    /// blend control registers
+    /// Blend control registers.
     bldcnt: u16,
     bldalpha: u16,
     bldy: u16,
 
-    /// mosaic register
+    /// Mosaic register.
     mosaic: u16,
 
-    /// frame buffer (RGB888, 240x160x3 bytes)
+    /// Frame buffer (RGB888, 240x160x3 bytes).
     frame_buffer: Vec<u8>,
 
-    /// frame counter for tracking frame completion
+    /// Frame counter for tracking frame completion.
     frame: u64,
 
-    /// interrupt flags
+    /// Interrupt flags.
     int_vblank: bool,
     int_hblank: bool,
     int_vcount: bool,
@@ -375,13 +376,13 @@ impl GbaPpu {
         VideoMode::from_u16(self.dispcnt)
     }
 
-    /// returns true if any window is enabled in DISPCNT (bits 13-15)
+    /// Returns true if any window is enabled in DISPCNT (bits 13-15).
     #[inline(always)]
     fn windows_enabled(&self) -> bool {
         self.dispcnt & 0xE000 != 0
     }
 
-    /// evaluates window mask including OBJ window support
+    /// Evaluates window mask including OBJ window support.
     #[inline(always)]
     fn window_mask_with_obj(&self, x: usize, line: usize, obj_window: bool) -> u8 {
         if !self.windows_enabled() {
@@ -403,7 +404,7 @@ impl GbaPpu {
         (self.winout & 0x3F) as u8
     }
 
-    /// checks if a pixel (x, line) is inside the given window (0 or 1)
+    /// Checks if a pixel (x, line) is inside the given window (0 or 1).
     #[inline(always)]
     fn pixel_in_window(&self, x: usize, line: usize, win: usize) -> bool {
         let h = self.winh[win];
@@ -426,7 +427,7 @@ impl GbaPpu {
         in_h && in_v
     }
 
-    /// returns the blend mode from BLDCNT
+    /// Returns the blend mode from BLDCNT.
     #[inline(always)]
     fn blend_mode(&self) -> BlendMode {
         match (self.bldcnt >> 6) & 0x03 {
@@ -438,19 +439,19 @@ impl GbaPpu {
         }
     }
 
-    /// checks if a layer is a first target in BLDCNT (bits 0-5)
+    /// Checks if a layer is a first target in BLDCNT (bits 0-5).
     #[inline(always)]
     fn is_blend_target1(&self, layer: Layer) -> bool {
         self.bldcnt & (1 << layer as u16) != 0
     }
 
-    /// checks if a layer is a second target in BLDCNT (bits 8-13)
+    /// Checks if a layer is a second target in BLDCNT (bits 8-13).
     #[inline(always)]
     fn is_blend_target2(&self, layer: Layer) -> bool {
         self.bldcnt & (1 << (8 + layer as u16)) != 0
     }
 
-    /// applies alpha blending between two BGR555 colors
+    /// Applies alpha blending between two BGR555 colors.
     #[inline(always)]
     fn blend_alpha(&self, color1: u16, color2: u16) -> u16 {
         let eva = ((self.bldalpha & 0x1F) as u32).min(16);
@@ -471,7 +472,7 @@ impl GbaPpu {
         (r | (g << 5) | (b << 10)) as u16
     }
 
-    /// applies brightness increase to a BGR555 color
+    /// Applies brightness increase to a BGR555 color.
     #[inline(always)]
     fn blend_brighten(&self, color: u16) -> u16 {
         let evy = ((self.bldy & 0x1F) as u32).min(16);
@@ -487,7 +488,7 @@ impl GbaPpu {
         (r | (g << 5) | (b << 10)) as u16
     }
 
-    /// applies brightness decrease to a BGR555 color
+    /// Applies brightness decrease to a BGR555 color.
     #[inline(always)]
     fn blend_darken(&self, color: u16) -> u16 {
         let evy = ((self.bldy & 0x1F) as u32).min(16);
@@ -503,7 +504,7 @@ impl GbaPpu {
         (r | (g << 5) | (b << 10)) as u16
     }
 
-    /// applies OBJ mosaic to a coordinate, snapping to the mosaic grid
+    /// Applies OBJ mosaic to a coordinate, snapping to the mosaic grid.
     #[inline(always)]
     fn apply_obj_mosaic(&self, x: usize, horizontal: bool) -> usize {
         let size = if horizontal {
@@ -514,9 +515,10 @@ impl GbaPpu {
         x / size * size
     }
 
-    /// clocks the PPU by the given number of CPU cycles.
-    /// returns flags: bit 0 = hblank, bit 1 = vblank, bit 2 = hblank IRQ,
-    /// bit 3 = vblank IRQ, bit 4 = vcount match IRQ
+    /// Clocks the PPU by the given number of CPU cycles.
+    ///
+    /// Returns flags: bit 0 = hblank, bit 1 = vblank, bit 2 = hblank IRQ,
+    /// bit 3 = vblank IRQ, bit 4 = vcount match IRQ.
     pub fn clock(&mut self, cycles: u32, vram: &[u8], palette: &[u8], oam: &[u8]) -> u8 {
         let mut events = 0u8;
 
@@ -590,7 +592,7 @@ impl GbaPpu {
         events
     }
 
-    /// renders a single scanline into the frame buffer
+    /// Renders a single scanline into the frame buffer.
     fn render_scanline(&mut self, vram: &[u8], palette: &[u8], oam: &[u8]) {
         let line = self.vcount as usize;
         if line >= DISPLAY_HEIGHT {
@@ -617,9 +619,10 @@ impl GbaPpu {
         }
     }
 
-    /// composites BG and OBJ layers with window masking and blending.
+    /// Composites BG and OBJ layers with window masking and blending.
+    ///
     /// `bg_layers` contains (bg_index, bg_type, affine_index) for each enabled BG.
-    /// bg_type: 0=text, 1=affine, 3/4/5=bitmap mode
+    /// bg_type: 0=text, 1=affine, 3/4/5=bitmap mode.
     fn render_composited(
         &mut self,
         line: usize,
@@ -689,6 +692,14 @@ impl GbaPpu {
         let blend_mode = self.blend_mode();
         let bg_layer_ids = [Layer::Bg0, Layer::Bg1, Layer::Bg2, Layer::Bg3];
 
+        // build compact list of enabled BG indices for the inner loop
+        let mut active_bgs = [0usize; 4];
+        let mut active_bg_count = 0;
+        for &(bg_index, _, _) in bg_layers {
+            active_bgs[active_bg_count] = bg_index;
+            active_bg_count += 1;
+        }
+
         let mut line_buffer = [backdrop; DISPLAY_WIDTH];
 
         for x in 0..DISPLAY_WIDTH {
@@ -716,7 +727,8 @@ impl GbaPpu {
 
             // insert visible layers sorted by priority (lower = higher priority),
             // with BG index as tiebreaker (lower index wins), OBJ treated as index 4
-            for bg_index in 0..4 {
+            for i in 0..active_bg_count {
+                let bg_index = active_bgs[i];
                 if !bg_has_pixel[bg_index][x] {
                     continue;
                 }
@@ -801,7 +813,7 @@ impl GbaPpu {
         self.write_line_buffer(line, &line_buffer);
     }
 
-    /// mode 0: 4 text BG layers
+    /// Mode 0: 4 text BG layers.
     fn render_mode0(&mut self, line: usize, vram: &[u8], palette: &[u8], oam: &[u8]) {
         let mut layers = [(0usize, 0u8, 0usize); 4];
         let mut count = 0;
@@ -814,7 +826,7 @@ impl GbaPpu {
         self.render_composited(line, &layers[..count], vram, palette, oam);
     }
 
-    /// mode 1: 2 text BGs + 1 affine BG (BG2)
+    /// Mode 1: 2 text BGs + 1 affine BG (BG2).
     fn render_mode1(&mut self, line: usize, vram: &[u8], palette: &[u8], oam: &[u8]) {
         let mut layers = [(0usize, 0u8, 0usize); 3];
         let mut count = 0;
@@ -833,7 +845,7 @@ impl GbaPpu {
         self.render_composited(line, &layers[..count], vram, palette, oam);
     }
 
-    /// mode 2: 2 affine BGs (BG2, BG3)
+    /// Mode 2: 2 affine BGs (BG2, BG3).
     fn render_mode2(&mut self, line: usize, vram: &[u8], palette: &[u8], oam: &[u8]) {
         let mut layers = [(0usize, 0u8, 0usize); 2];
         let mut count = 0;
@@ -848,25 +860,25 @@ impl GbaPpu {
         self.render_composited(line, &layers[..count], vram, palette, oam);
     }
 
-    /// mode 3: single 240x160 bitmap, 15-bit direct color (BG2 with affine)
+    /// Mode 3: single 240x160 bitmap, 15-bit direct color (BG2 with affine).
     fn render_mode3(&mut self, line: usize, vram: &[u8], palette: &[u8], oam: &[u8]) {
         let layers: [(usize, u8, usize); 1] = [(2, 3, 0)];
         self.render_composited(line, &layers, vram, palette, oam);
     }
 
-    /// mode 4: single 240x160 bitmap, 8-bit palette indexed, double buffered (BG2 with affine)
+    /// Mode 4: single 240x160 bitmap, 8-bit palette indexed, double buffered (BG2 with affine).
     fn render_mode4(&mut self, line: usize, vram: &[u8], palette: &[u8], oam: &[u8]) {
         let layers: [(usize, u8, usize); 1] = [(2, 4, 0)];
         self.render_composited(line, &layers, vram, palette, oam);
     }
 
-    /// mode 5: 160x128 bitmap, 15-bit direct color, double buffered (BG2 with affine)
+    /// Mode 5: 160x128 bitmap, 15-bit direct color, double buffered (BG2 with affine).
     fn render_mode5(&mut self, line: usize, vram: &[u8], palette: &[u8], oam: &[u8]) {
         let layers: [(usize, u8, usize); 1] = [(2, 5, 0)];
         self.render_composited(line, &layers, vram, palette, oam);
     }
 
-    /// collects bitmap background pixels with BG2 affine transform
+    /// Collects bitmap background pixels with BG2 affine transform.
     #[allow(clippy::too_many_arguments)]
     fn collect_bitmap_bg(
         &self,
@@ -947,7 +959,7 @@ impl GbaPpu {
         }
     }
 
-    /// collects text background pixels into per-pixel arrays
+    /// Collects text background pixels into per-pixel arrays.
     #[allow(clippy::too_many_arguments)]
     fn collect_text_bg(
         &self,
@@ -992,89 +1004,214 @@ impl GbaPpu {
             line as u32
         };
         let y = (mosaic_line + scroll_y) % map_height;
+        let tile_row = (y % 8) as usize;
+        let screen_y_block = y / 256;
+        let tile_y = (y % 256) / 8;
 
-        for x_screen in 0..DISPLAY_WIDTH {
-            let eff_x = if mosaic_on {
-                (x_screen as u32 / mos_h) * mos_h
-            } else {
-                x_screen as u32
-            };
-            let x = (eff_x + scroll_x) % map_width;
-
-            // determine which screen block
-            let screen_x = x / 256;
-            let screen_y = y / 256;
-            let screen_offset = match screen_size {
-                0 => 0,
-                1 => screen_x as usize,
-                2 => screen_y as usize,
-                3 => (screen_x + screen_y * 2) as usize,
-                _ => 0,
-            };
-
-            let tile_x = (x % 256) / 8;
-            let tile_y = (y % 256) / 8;
-            let map_entry_offset =
-                screen_base + screen_offset * 0x800 + (tile_y * 32 + tile_x) as usize * 2;
-
-            if map_entry_offset + 1 >= vram.len() {
-                continue;
+        if mosaic_on {
+            // per-pixel fallback for mosaic (uncommon path)
+            for x_screen in 0..DISPLAY_WIDTH {
+                let eff_x = (x_screen as u32 / mos_h) * mos_h;
+                self.collect_text_bg_pixel(
+                    x_screen,
+                    eff_x,
+                    scroll_x,
+                    map_width,
+                    screen_size,
+                    screen_base,
+                    screen_y_block,
+                    tile_y,
+                    tile_row,
+                    char_base,
+                    is_8bpp,
+                    vram,
+                    palette,
+                    pixels,
+                    has_pixel,
+                    bg_priority,
+                );
             }
+        } else {
+            // tile-stride fast path: one tilemap lookup per 8-pixel tile column
+            let mut screen_x = 0usize;
+            while screen_x < DISPLAY_WIDTH {
+                let x = (screen_x as u32 + scroll_x) % map_width;
+                let pixel_in_tile = (x % 8) as usize;
+                let pixels_this_tile = (8 - pixel_in_tile).min(DISPLAY_WIDTH - screen_x);
 
-            let map_entry =
-                (vram[map_entry_offset] as u16) | ((vram[map_entry_offset + 1] as u16) << 8);
-            let tile_number = (map_entry & 0x03FF) as usize;
-            let h_flip = map_entry & (1 << 10) != 0;
-            let v_flip = map_entry & (1 << 11) != 0;
-            let palette_bank = ((map_entry >> 12) & 0x0F) as usize;
+                let screen_x_block = x / 256;
+                let screen_offset = match screen_size {
+                    0 => 0,
+                    1 => screen_x_block as usize,
+                    2 => screen_y_block as usize,
+                    3 => (screen_x_block + screen_y_block * 2) as usize,
+                    _ => 0,
+                };
 
-            let pixel_y = if v_flip {
-                7 - (y % 8) as usize
-            } else {
-                (y % 8) as usize
-            };
-            let pixel_x = if h_flip {
-                7 - (x % 8) as usize
-            } else {
-                (x % 8) as usize
-            };
+                let tile_x = (x % 256) / 8;
+                let map_entry_offset =
+                    screen_base + screen_offset * 0x800 + (tile_y * 32 + tile_x) as usize * 2;
 
-            let color_index = if is_8bpp {
-                let tile_offset = char_base + tile_number * 64 + pixel_y * 8 + pixel_x;
-                if tile_offset < vram.len() {
-                    vram[tile_offset] as usize
-                } else {
-                    0
+                if map_entry_offset + 1 >= vram.len() {
+                    screen_x += pixels_this_tile;
+                    continue;
                 }
-            } else {
-                let tile_offset = char_base + tile_number * 32 + pixel_y * 4 + pixel_x / 2;
-                if tile_offset < vram.len() {
-                    let byte = vram[tile_offset];
-                    if pixel_x & 1 == 0 {
-                        (byte & 0x0F) as usize
-                    } else {
-                        ((byte >> 4) & 0x0F) as usize
+
+                let map_entry =
+                    (vram[map_entry_offset] as u16) | ((vram[map_entry_offset + 1] as u16) << 8);
+                let tile_number = (map_entry & 0x03FF) as usize;
+                let h_flip = map_entry & (1 << 10) != 0;
+                let v_flip = map_entry & (1 << 11) != 0;
+                let palette_bank = ((map_entry >> 12) & 0x0F) as usize;
+
+                let pixel_y = if v_flip { 7 - tile_row } else { tile_row };
+
+                if is_8bpp {
+                    let row_base = char_base + tile_number * 64 + pixel_y * 8;
+                    for px in 0..pixels_this_tile {
+                        let tile_px = if h_flip {
+                            7 - (pixel_in_tile + px)
+                        } else {
+                            pixel_in_tile + px
+                        };
+                        let tile_offset = row_base + tile_px;
+                        let color_index = if tile_offset < vram.len() {
+                            vram[tile_offset] as usize
+                        } else {
+                            0
+                        };
+                        if color_index != 0 {
+                            let color = self.read_palette_color(palette, color_index);
+                            pixels[screen_x + px] = (color, bg_priority);
+                            has_pixel[screen_x + px] = true;
+                        }
                     }
                 } else {
-                    0
+                    let row_base = char_base + tile_number * 32 + pixel_y * 4;
+                    for px in 0..pixels_this_tile {
+                        let tile_px = if h_flip {
+                            7 - (pixel_in_tile + px)
+                        } else {
+                            pixel_in_tile + px
+                        };
+                        let tile_offset = row_base + tile_px / 2;
+                        let color_index = if tile_offset < vram.len() {
+                            let byte = vram[tile_offset];
+                            if tile_px & 1 == 0 {
+                                (byte & 0x0F) as usize
+                            } else {
+                                ((byte >> 4) & 0x0F) as usize
+                            }
+                        } else {
+                            0
+                        };
+                        if color_index != 0 {
+                            let color =
+                                self.read_palette_color(palette, palette_bank * 16 + color_index);
+                            pixels[screen_x + px] = (color, bg_priority);
+                            has_pixel[screen_x + px] = true;
+                        }
+                    }
                 }
-            };
 
-            if color_index == 0 {
-                continue;
+                screen_x += pixels_this_tile;
             }
-
-            let color = if is_8bpp {
-                self.read_palette_color(palette, color_index)
-            } else {
-                self.read_palette_color(palette, palette_bank * 16 + color_index)
-            };
-            pixels[x_screen] = (color, bg_priority);
-            has_pixel[x_screen] = true;
         }
     }
 
-    /// collects affine background pixels into per-pixel arrays
+    /// Collects a single text BG pixel for the given screen x position.
+    ///
+    /// Used as the per-pixel fallback when mosaic is enabled, since mosaic
+    /// snaps effective coordinates to a grid that breaks the tile-stride
+    /// fast path in `collect_text_bg()`.
+    #[allow(clippy::too_many_arguments)]
+    fn collect_text_bg_pixel(
+        &self,
+        x_screen: usize,
+        eff_x: u32,
+        scroll_x: u32,
+        map_width: u32,
+        screen_size: u16,
+        screen_base: usize,
+        screen_y_block: u32,
+        tile_y: u32,
+        tile_row: usize,
+        char_base: usize,
+        is_8bpp: bool,
+        vram: &[u8],
+        palette: &[u8],
+        pixels: &mut [(u16, u8); DISPLAY_WIDTH],
+        has_pixel: &mut [bool; DISPLAY_WIDTH],
+        bg_priority: u8,
+    ) {
+        let x = (eff_x + scroll_x) % map_width;
+
+        let screen_x_block = x / 256;
+        let screen_offset = match screen_size {
+            0 => 0,
+            1 => screen_x_block as usize,
+            2 => screen_y_block as usize,
+            3 => (screen_x_block + screen_y_block * 2) as usize,
+            _ => 0,
+        };
+
+        let tile_x = (x % 256) / 8;
+        let map_entry_offset =
+            screen_base + screen_offset * 0x800 + (tile_y * 32 + tile_x) as usize * 2;
+
+        if map_entry_offset + 1 >= vram.len() {
+            return;
+        }
+
+        let map_entry =
+            (vram[map_entry_offset] as u16) | ((vram[map_entry_offset + 1] as u16) << 8);
+        let tile_number = (map_entry & 0x03FF) as usize;
+        let h_flip = map_entry & (1 << 10) != 0;
+        let v_flip = map_entry & (1 << 11) != 0;
+        let palette_bank = ((map_entry >> 12) & 0x0F) as usize;
+
+        let pixel_y = if v_flip { 7 - tile_row } else { tile_row };
+        let pixel_x = if h_flip {
+            7 - (x % 8) as usize
+        } else {
+            (x % 8) as usize
+        };
+
+        let color_index = if is_8bpp {
+            let tile_offset = char_base + tile_number * 64 + pixel_y * 8 + pixel_x;
+            if tile_offset < vram.len() {
+                vram[tile_offset] as usize
+            } else {
+                0
+            }
+        } else {
+            let tile_offset = char_base + tile_number * 32 + pixel_y * 4 + pixel_x / 2;
+            if tile_offset < vram.len() {
+                let byte = vram[tile_offset];
+                if pixel_x & 1 == 0 {
+                    (byte & 0x0F) as usize
+                } else {
+                    ((byte >> 4) & 0x0F) as usize
+                }
+            } else {
+                0
+            }
+        };
+
+        if color_index == 0 {
+            return;
+        }
+
+        let color = if is_8bpp {
+            self.read_palette_color(palette, color_index)
+        } else {
+            self.read_palette_color(palette, palette_bank * 16 + color_index)
+        };
+        pixels[x_screen] = (color, bg_priority);
+        has_pixel[x_screen] = true;
+    }
+
+    /// Collects affine background pixels into per-pixel arrays.
     #[allow(clippy::too_many_arguments)]
     fn collect_affine_bg(
         &self,
@@ -1187,7 +1324,7 @@ impl GbaPpu {
         }
     }
 
-    /// collects sprite pixels with support for affine and OBJ window sprites
+    /// Collects sprite pixels with support for affine and OBJ window sprites.
     #[allow(clippy::too_many_arguments)]
     fn collect_sprites(
         &self,
@@ -1485,7 +1622,7 @@ impl GbaPpu {
         }
     }
 
-    /// converts the line buffer (BGR555) to RGB888 and writes to frame buffer
+    /// Converts the line buffer (BGR555) to RGB888 and writes to frame buffer.
     fn write_line_buffer(&mut self, line: usize, line_buffer: &[u16; DISPLAY_WIDTH]) {
         let offset = line * DISPLAY_WIDTH * 3;
         for (x, &color) in line_buffer.iter().enumerate() {
@@ -1528,7 +1665,7 @@ impl Default for GbaPpu {
     }
 }
 
-/// returns (width, height) in pixels for a sprite given shape and size
+/// Returns (width, height) in pixels for a sprite given shape and size.
 #[inline(always)]
 fn obj_dimensions(shape: u8, size: u8) -> (usize, usize) {
     match (shape, size) {
@@ -1551,7 +1688,7 @@ fn obj_dimensions(shape: u8, size: u8) -> (usize, usize) {
     }
 }
 
-/// converts a 15-bit BGR555 color to RGB888
+/// Converts a 15-bit BGR555 color to RGB888.
 #[inline(always)]
 fn bgr555_to_rgb888(color: u16) -> (u8, u8, u8) {
     let r = ((color & 0x1F) << 3) as u8;
