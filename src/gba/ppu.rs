@@ -581,11 +581,9 @@ impl GbaPpu {
             // (DISPSTAT[8:15]) and DISPSTAT bit 5 enables the interrupt.
             // used by games for mid-frame effects (e.g. Mode 7 roads).
             let lyc = (self.dispstat >> 8) & 0xFF;
-            if self.vcount == lyc {
-                if self.dispstat & (1 << 5) != 0 {
-                    self.int_vcount = true;
-                    events |= 16;
-                }
+            if self.vcount == lyc && self.dispstat & (1 << 5) != 0 {
+                self.int_vcount = true;
+                events |= 16;
             }
         }
 
