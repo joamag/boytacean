@@ -173,6 +173,13 @@ impl GbaBus {
         self.bios_write32(0x138, 0xE8BD500F); // LDMFD SP!, {R0-R3, R12, LR}
         self.bios_write32(0x13C, 0xE25EF004); // SUBS PC, LR, #4
 
+        // Write real BIOS values past the IRQ handler so that pipeline
+        // prefetch during the final instructions updates bios_value
+        // to match what real hardware leaves (test: jsmolka bios 004).
+        // Executing 0x138 fetches 0x140, executing 0x13C fetches 0x144.
+        self.bios_write32(0x140, 0xE55EC002); // Real BIOS value at 0x140
+        self.bios_write32(0x144, 0xE55EC002); // Real BIOS value at 0x144
+
         // Write real BIOS values at addresses used by BIOS protection tests.
         // SWI handler return area (real BIOS address 0x190)
         self.bios_write32(0x190, 0xE3A02004);
