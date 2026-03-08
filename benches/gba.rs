@@ -62,5 +62,10 @@ fn benchmark_gba_cpu_only(c: &mut Criterion) {
     });
 }
 
-criterion_group!(benches, benchmark_gba_full_frame, benchmark_gba_arm_frame, benchmark_gba_cpu_only);
+criterion_group!(
+    benches,
+    benchmark_gba_full_frame,
+    benchmark_gba_arm_frame,
+    benchmark_gba_cpu_only
+);
 criterion_main!(benches);
