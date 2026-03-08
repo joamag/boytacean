@@ -314,6 +314,7 @@ impl Default for GbaDma {
 #[cfg(test)]
 mod tests {
     use super::{DmaAddrControl, DmaChannel, GbaDma};
+    use crate::gba::consts::{REG_FIFO_A, REG_FIFO_B};
 
     #[test]
     fn test_dma_channel_new() {
@@ -490,7 +491,7 @@ mod tests {
         let mut dma = GbaDma::new();
         // channel 1 for FIFO A (fifo_index=0 -> channel 1)
         dma.channels[1].set_src_reg(0x0200_0000);
-        dma.channels[1].set_dst_reg(0x0400_00A0);
+        dma.channels[1].set_dst_reg(REG_FIFO_A);
         dma.channels[1].set_count_reg(4);
 
         // enable with special timing (timing = 3)
@@ -499,6 +500,267 @@ mod tests {
 
         dma.trigger_sound_fifo(0);
         assert!(dma.channels[1].active());
+    }
+
+    #[test]
+    fn test_dma_sound_fifo_trigger_fifo_b() {
+        let mut dma = GbaDma::new();
+        // channel 2 for FIFO B
+        dma.channels[2].set_src_reg(0x0200_1000);
+        dma.channels[2].set_dst_reg(REG_FIFO_B);
+        dma.channels[2].set_count_reg(4);
+
+        // enable with special timing
+        dma.channels[2].set_control((1 << 15) | (3 << 12), 2);
+        assert!(!dma.channels[2].active());
+
+        dma.trigger_sound_fifo(1);
+        assert!(dma.channels[2].active());
+    }
+
+    #[test]
+    fn test_dma_sound_fifo_only_triggers_matching_dst() {
+        // regression: trigger_sound_fifo must only activate channels whose
+        // dst_reg matches the requested FIFO address
+        let mut dma = GbaDma::new();
+
+        // DMA1 → FIFO A
+        dma.channels[1].set_src_reg(0x0300_5000);
+        dma.channels[1].set_dst_reg(REG_FIFO_A);
+        dma.channels[1].set_count_reg(4);
+        dma.channels[1].set_control((1 << 15) | (3 << 12) | (1 << 9) | (1 << 10), 1);
+
+        // DMA2 → FIFO B
+        dma.channels[2].set_src_reg(0x0300_6000);
+        dma.channels[2].set_dst_reg(REG_FIFO_B);
+        dma.channels[2].set_count_reg(4);
+        dma.channels[2].set_control((1 << 15) | (3 << 12) | (1 << 9) | (1 << 10), 2);
+
+        // triggering FIFO A should only activate DMA1
+        dma.trigger_sound_fifo(0);
+        assert!(
+            dma.channels[1].active(),
+            "DMA1 should be active (dst = FIFO A)"
+        );
+        assert!(
+            !dma.channels[2].active(),
+            "DMA2 should NOT be active (dst = FIFO B)"
+        );
+    }
+
+    #[test]
+    fn test_dma_sound_fifo_b_does_not_trigger_fifo_a_channel() {
+        // regression: triggering FIFO B must not activate a channel assigned to FIFO A
+        let mut dma = GbaDma::new();
+
+        // DMA1 → FIFO A
+        dma.channels[1].set_src_reg(0x0300_5000);
+        dma.channels[1].set_dst_reg(REG_FIFO_A);
+        dma.channels[1].set_count_reg(4);
+        dma.channels[1].set_control((1 << 15) | (3 << 12) | (1 << 9) | (1 << 10), 1);
+
+        // DMA2 → FIFO B
+        dma.channels[2].set_src_reg(0x0300_6000);
+        dma.channels[2].set_dst_reg(REG_FIFO_B);
+        dma.channels[2].set_count_reg(4);
+        dma.channels[2].set_control((1 << 15) | (3 << 12) | (1 << 9) | (1 << 10), 2);
+
+        // triggering FIFO B should only activate DMA2
+        dma.trigger_sound_fifo(1);
+        assert!(
+            !dma.channels[1].active(),
+            "DMA1 should NOT be active (dst = FIFO A)"
+        );
+        assert!(
+            dma.channels[2].active(),
+            "DMA2 should be active (dst = FIFO B)"
+        );
+    }
+
+    #[test]
+    fn test_dma_sound_fifo_both_fifos_independent() {
+        // both FIFOs can be triggered independently without cross-contamination
+        let mut dma = GbaDma::new();
+
+        // DMA1 → FIFO A, DMA2 → FIFO B
+        dma.channels[1].set_src_reg(0x0300_5000);
+        dma.channels[1].set_dst_reg(REG_FIFO_A);
+        dma.channels[1].set_count_reg(4);
+        dma.channels[1].set_control((1 << 15) | (3 << 12) | (1 << 9) | (1 << 10), 1);
+
+        dma.channels[2].set_src_reg(0x0300_6000);
+        dma.channels[2].set_dst_reg(REG_FIFO_B);
+        dma.channels[2].set_count_reg(4);
+        dma.channels[2].set_control((1 << 15) | (3 << 12) | (1 << 9) | (1 << 10), 2);
+
+        // trigger FIFO A, run DMA1 to completion
+        dma.trigger_sound_fifo(0);
+        assert!(dma.channels[1].active());
+        assert!(!dma.channels[2].active());
+        for _ in 0..4 {
+            dma.channels[1].step();
+        }
+        assert!(!dma.channels[1].active());
+
+        // trigger FIFO B, only DMA2 activates
+        dma.trigger_sound_fifo(1);
+        assert!(
+            !dma.channels[1].active(),
+            "DMA1 should stay inactive after FIFO B trigger"
+        );
+        assert!(
+            dma.channels[2].active(),
+            "DMA2 should be active after FIFO B trigger"
+        );
+    }
+
+    #[test]
+    fn test_dma_sound_fifo_forces_count_4() {
+        // sound DMA always forces count to 4 regardless of count_reg
+        let mut dma = GbaDma::new();
+        dma.channels[1].set_src_reg(0x0200_0000);
+        dma.channels[1].set_dst_reg(REG_FIFO_A);
+        dma.channels[1].set_count_reg(16); // game sets 16, but hardware forces 4
+        dma.channels[1].set_control((1 << 15) | (3 << 12) | (1 << 9) | (1 << 10), 1);
+
+        dma.trigger_sound_fifo(0);
+        assert_eq!(dma.channels[1].remaining(), 4);
+    }
+
+    #[test]
+    fn test_dma_sound_fifo_src_advances_correctly() {
+        // verify DMA source advances by 4 per step (32-bit words)
+        let mut dma = GbaDma::new();
+        dma.channels[1].set_src_reg(0x0300_5FF0);
+        dma.channels[1].set_dst_reg(REG_FIFO_A);
+        dma.channels[1].set_count_reg(4);
+        dma.channels[1].set_control((1 << 15) | (3 << 12) | (1 << 9) | (1 << 10), 1);
+
+        dma.trigger_sound_fifo(0);
+
+        // 4 steps, each advancing src by 4 (32-bit)
+        for i in 0u32..4 {
+            let (src, dst, _) = dma.channels[1].step();
+            assert_eq!(src, 0x0300_5FF0 + i * 4);
+            assert_eq!(dst, REG_FIFO_A); // dst stays fixed for sound DMA
+        }
+        // after 4 steps, src should have advanced by 16 bytes total
+        assert_eq!(dma.channels[1].src(), 0x0300_5FF0 + 16);
+    }
+
+    #[test]
+    fn test_dma_sound_fifo_dst_fixed_for_special_timing() {
+        // sound DMA (SPECIAL timing) keeps dst fixed regardless of dst_control
+        let mut dma = GbaDma::new();
+        dma.channels[1].set_src_reg(0x0200_0000);
+        dma.channels[1].set_dst_reg(REG_FIFO_A);
+        dma.channels[1].set_count_reg(4);
+        // dst_control = Increment (0), but SPECIAL timing overrides to Fixed
+        dma.channels[1].set_control((1 << 15) | (3 << 12) | (1 << 9) | (1 << 10), 1);
+
+        dma.trigger_sound_fifo(0);
+        for _ in 0..4 {
+            let (_, dst, _) = dma.channels[1].step();
+            assert_eq!(dst, REG_FIFO_A, "dst should remain fixed at FIFO address");
+        }
+    }
+
+    #[test]
+    fn test_dma_sound_fifo_repeat_reloads_count() {
+        // after completion with repeat, count is re-latched for the next trigger
+        let mut dma = GbaDma::new();
+        dma.channels[1].set_src_reg(0x0200_0000);
+        dma.channels[1].set_dst_reg(REG_FIFO_A);
+        dma.channels[1].set_count_reg(4);
+        dma.channels[1].set_control((1 << 15) | (3 << 12) | (1 << 9) | (1 << 10), 1);
+
+        // first trigger + complete
+        dma.trigger_sound_fifo(0);
+        for _ in 0..4 {
+            dma.channels[1].step();
+        }
+        assert!(!dma.channels[1].active());
+        assert!(
+            dma.channels[1].enabled(),
+            "channel stays enabled with repeat"
+        );
+
+        // second trigger should work (count re-latched)
+        dma.trigger_sound_fifo(0);
+        assert!(dma.channels[1].active());
+        assert_eq!(dma.channels[1].remaining(), 4);
+    }
+
+    #[test]
+    fn test_dma_sound_fifo_src_continues_across_triggers() {
+        // source address is NOT re-latched on repeat — it continues advancing
+        let mut dma = GbaDma::new();
+        dma.channels[1].set_src_reg(0x0300_5000);
+        dma.channels[1].set_dst_reg(REG_FIFO_A);
+        dma.channels[1].set_count_reg(4);
+        dma.channels[1].set_control((1 << 15) | (3 << 12) | (1 << 9) | (1 << 10), 1);
+
+        // first trigger: src starts at 0x0300_5000
+        dma.trigger_sound_fifo(0);
+        for _ in 0..4 {
+            dma.channels[1].step();
+        }
+        let src_after_first = dma.channels[1].src();
+        assert_eq!(src_after_first, 0x0300_5000 + 16);
+
+        // second trigger: src continues from where it left off
+        dma.trigger_sound_fifo(0);
+        let (src, _, _) = dma.channels[1].step();
+        assert_eq!(
+            src, src_after_first,
+            "src should continue from previous position"
+        );
+    }
+
+    #[test]
+    fn test_dma_sound_fifo_ignores_non_special_timing() {
+        // channels with non-SPECIAL timing are not triggered by sound FIFO
+        let mut dma = GbaDma::new();
+        dma.channels[1].set_src_reg(0x0200_0000);
+        dma.channels[1].set_dst_reg(REG_FIFO_A);
+        dma.channels[1].set_count_reg(4);
+        // timing = VBLANK (1), not SPECIAL (3)
+        dma.channels[1].set_control((1 << 15) | (1 << 12), 1);
+
+        dma.trigger_sound_fifo(0);
+        assert!(!dma.channels[1].active());
+    }
+
+    #[test]
+    fn test_dma_sound_fifo_ignores_disabled_channel() {
+        // disabled channels are not triggered even with correct dst and timing
+        let mut dma = GbaDma::new();
+        dma.channels[1].set_src_reg(0x0200_0000);
+        dma.channels[1].set_dst_reg(REG_FIFO_A);
+        dma.channels[1].set_count_reg(4);
+        // NOT enabled (bit 15 = 0)
+        dma.channels[1].set_control(3 << 12, 1);
+
+        dma.trigger_sound_fifo(0);
+        assert!(!dma.channels[1].active());
+    }
+
+    #[test]
+    fn test_dma_sound_fifo_does_not_override_dst() {
+        // trigger_sound_fifo must NOT override the channel's latched dst
+        let mut dma = GbaDma::new();
+        dma.channels[1].set_src_reg(0x0200_0000);
+        dma.channels[1].set_dst_reg(REG_FIFO_A);
+        dma.channels[1].set_count_reg(4);
+        dma.channels[1].set_control((1 << 15) | (3 << 12) | (1 << 9) | (1 << 10), 1);
+
+        let dst_before = dma.channels[1].dst();
+        dma.trigger_sound_fifo(0);
+        assert_eq!(
+            dma.channels[1].dst(),
+            dst_before,
+            "dst should not be overridden"
+        );
     }
 
     #[test]
