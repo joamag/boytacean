@@ -99,7 +99,7 @@ impl GbaTimer {
 
     /// Clocks this timer by the given number of CPU cycles.
     ///
-    /// Returns true if an overflow occurred.
+    /// Returns if an overflow occurred.
     pub fn clock(&mut self, cycles: u32) -> bool {
         if !self.enabled || self.cascade {
             return false;
