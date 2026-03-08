@@ -744,9 +744,18 @@ fn swi_diff_unfilt16(cpu: &mut Arm7Tdmi) {
 }
 
 /// SWI 0x19: SoundBias - adjusts the sound bias.
+///
+/// R0 selects the target: 0 sets SOUNDBIAS=0x000, non-zero sets SOUNDBIAS=0x200.
+/// On real hardware this gradually fades with delays to avoid pops.
+/// HLE shortcut: set the bias immediately, preserving upper bits.
 fn swi_sound_bias(cpu: &mut Arm7Tdmi) {
-    let _bias = cpu.reg(0);
-    // simplified: sound bias is handled by the APU directly
+    let flag = cpu.reg(0);
+    let current = cpu.bus.apu.soundbias();
+    let target_bias: u16 = if flag == 0 { 0x000 } else { 0x200 };
+
+    // preserve upper bits (amplitude resolution), replace bias level
+    let new_value = (current & 0xC000) | (target_bias & 0x3FFF);
+    cpu.bus.apu.set_soundbias(new_value);
 }
 
 /// SWI 0x1F: MidiKey2Freq - converts MIDI key to frequency.
@@ -1048,9 +1057,16 @@ mod tests {
     #[test]
     fn test_swi_sound_bias() {
         let mut cpu = make_cpu();
-        cpu.set_reg(0, 0x200);
+
+        // R0 != 0 sets SOUNDBIAS to 0x200
+        cpu.set_reg(0, 1);
         handle_swi(&mut cpu, 0x19);
-        // should not crash; SWI 0x19 is a no-op in HLE
+        assert_eq!(cpu.bus.apu.soundbias(), 0x200);
+
+        // R0 == 0 sets SOUNDBIAS to 0x000
+        cpu.set_reg(0, 0);
+        handle_swi(&mut cpu, 0x19);
+        assert_eq!(cpu.bus.apu.soundbias(), 0x000);
     }
 
     #[test]
