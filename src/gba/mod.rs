@@ -686,7 +686,7 @@ mod tests {
         let mut gba = GameBoyAdvance::new();
         // set LYC = 0 and enable VCount IRQ (bit 5) in DISPSTAT
         // DISPSTAT bits [8:15] = LYC, bit 5 = VCount IRQ enable
-        gba.cpu.bus.write16(REG_DISPSTAT, (0 << 8) | (1 << 5));
+        gba.cpu.bus.write16(REG_DISPSTAT, 1 << 5);
         // enable VCount in IE and set IME
         gba.cpu.bus.irq.set_ie(IRQ_VCOUNT);
         gba.cpu.bus.irq.set_ime(true);

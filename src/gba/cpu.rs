@@ -455,10 +455,10 @@ impl Arm7Tdmi {
         };
         let exec_region = exec_pc >> 24;
         match exec_region {
-            0x00 if exec_pc < 0x4000 => {}                // BIOS
-            0x02 => {}                                    // EWRAM
-            0x03 => {}                                    // IWRAM
-            0x08 | 0x09 | 0x0A | 0x0B | 0x0C | 0x0D => {} // ROM
+            0x00 if exec_pc < 0x4000 => {} // BIOS
+            0x02 => {}                     // EWRAM
+            0x03 => {}                     // IWRAM
+            0x08..=0x0D => {}              // ROM
             _ => {
                 warnln!(
                     "GBA: executing from unmapped memory region at PC={:#010x}",
