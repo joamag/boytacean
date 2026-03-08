@@ -23,20 +23,6 @@ fn make_gba_arm() -> GameBoyAdvance {
     gba
 }
 
-fn make_gba_cpu_only() -> GameBoyAdvance {
-    let rom = include_bytes!("../res/roms.gba/test/jsmolka_gba-tests/arm.gba");
-    let mut gba = GameBoyAdvance::new();
-    gba.load_rom(rom).expect("Failed to load arm.gba");
-    gba.set_ppu_enabled(false);
-    gba.set_apu_enabled(false);
-    gba.set_dma_enabled(false);
-    gba.set_timer_enabled(false);
-    for _ in 0..10 {
-        gba.next_frame();
-    }
-    gba
-}
-
 fn benchmark_gba_full_frame(c: &mut Criterion) {
     let mut gba = make_gba_ppu();
     c.bench_function("gba_full_frame", |b| {
@@ -55,21 +41,12 @@ fn benchmark_gba_arm_frame(c: &mut Criterion) {
     });
 }
 
-fn benchmark_gba_cpu_only(c: &mut Criterion) {
-    let mut gba = make_gba_cpu_only();
-    c.bench_function("gba_cpu_only_1m_cycles", |b| {
-        b.iter(|| {
-            gba.clocks_cycles(1000000);
-        })
-    });
-}
-
 criterion_group! {
     name = benches;
     config = Criterion::default()
         .sample_size(10)
         .measurement_time(Duration::from_secs(2))
         .warm_up_time(Duration::from_secs(1));
-    targets = benchmark_gba_full_frame, benchmark_gba_arm_frame, benchmark_gba_cpu_only
+    targets = benchmark_gba_full_frame, benchmark_gba_arm_frame
 }
 criterion_main!(benches);
