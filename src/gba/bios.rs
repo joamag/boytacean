@@ -119,8 +119,7 @@ fn swi_intr_wait(cpu: &mut Arm7Tdmi) {
 
     if discard_old != 0 {
         let offset = (0x0300_7FF8u32 & 0x7FFF) as usize;
-        let old =
-            u16::from_le_bytes([cpu.bus.iwram[offset], cpu.bus.iwram[offset + 1]]);
+        let old = u16::from_le_bytes([cpu.bus.iwram[offset], cpu.bus.iwram[offset + 1]]);
         let cleared = old & !flags;
         let bytes = cleared.to_le_bytes();
         cpu.bus.iwram[offset] = bytes[0];

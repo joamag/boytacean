@@ -140,6 +140,15 @@ impl GbaBus {
     /// Initializes BIOS memory with HLE stubs for exception vectors
     /// and the IRQ handler that the real BIOS provides.
     fn init_bios_stubs(&mut self) {
+        // undefined instruction vector at 0x04: infinite loop (matches real BIOS)
+        // on real hardware, executing an undefined instruction freezes here.
+        // our infinite loop detector in step() will catch this and panic.
+        self.bios_write32(0x04, 0xEAFFFFFE); // B . (branch to self)
+
+        // SWI vector at 0x08: handled via HLE in the instruction decoder,
+        // but place a branch-to-self as a safety net for real BIOS mode.
+        self.bios_write32(0x08, 0xEAFFFFFE); // B . (branch to self)
+
         // IRQ vector at 0x18: branch to handler at 0x128
         // offset = (0x128 - 0x18 - 8) / 4 = 0x42
         self.bios_write32(0x18, 0xEA000042); // B #0x128

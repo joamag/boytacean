@@ -5,7 +5,7 @@
 
 use crate::gba::{
     bios::handle_swi,
-    consts::{CPSR_MODE_MASK, CPSR_T, MODE_SVC},
+    consts::{CPSR_MODE_MASK, CPSR_T, MODE_SVC, MODE_UND},
     cpu::Arm7Tdmi,
 };
 
@@ -64,7 +64,8 @@ pub fn execute_arm(cpu: &mut Arm7Tdmi, instr: u32) {
         }
         0b011 => {
             if bits_7_4 & 0x01 != 0 {
-                // undefined instruction
+                // undefined instruction — trigger UND exception
+                cpu.enter_exception(0x04, MODE_UND);
                 cpu.cycles = 1;
             } else {
                 // single data transfer (register offset)
@@ -84,12 +85,14 @@ pub fn execute_arm(cpu: &mut Arm7Tdmi, instr: u32) {
                 // software interrupt
                 arm_swi(cpu, instr);
             } else {
-                // coprocessor (ignored on GBA)
+                // coprocessor — no coprocessor on GBA, trigger UND exception
+                cpu.enter_exception(0x04, MODE_UND);
                 cpu.cycles = 1;
             }
         }
         _ => {
-            // coprocessor data transfer / other (0b110)
+            // coprocessor data transfer (0b110) — trigger UND exception
+            cpu.enter_exception(0x04, MODE_UND);
             cpu.cycles = 1;
         }
     }
@@ -1260,5 +1263,55 @@ mod tests {
         assert_eq!(cpu.reg(14), pc.wrapping_sub(4));
         // SPSR_svc should be the old CPSR
         assert_eq!(cpu.spsr(), old_cpsr);
+    }
+
+    #[test]
+    fn test_arm_undefined_instruction_0b011_bit0() {
+        // 0b011 with bit 4 set triggers UND exception
+        let mut cpu = make_cpu();
+        let old_cpsr = cpu.cpsr();
+        // Encoding: cond=AL (0xE), bits[27:25]=011, bit[4]=1
+        // 0xE6000010: undefined instruction in 0b011 space
+        super::execute_arm(&mut cpu, 0xE6000010);
+        assert_eq!(cpu.cpsr() & 0x1F, 0x1B); // MODE_UND
+        assert_eq!(cpu.pc(), 0x04); // UND vector
+        assert_eq!(cpu.spsr(), old_cpsr);
+        assert_eq!(cpu.cycles, 1);
+    }
+
+    #[test]
+    fn test_arm_coprocessor_triggers_und() {
+        // 0b111 without SWI bit: coprocessor instruction
+        let mut cpu = make_cpu();
+        let old_cpsr = cpu.cpsr();
+        // 0xEE000000: coprocessor data operation (bits[27:24]=1110)
+        super::execute_arm(&mut cpu, 0xEE000000);
+        assert_eq!(cpu.cpsr() & 0x1F, 0x1B); // MODE_UND
+        assert_eq!(cpu.pc(), 0x04);
+        assert_eq!(cpu.spsr(), old_cpsr);
+    }
+
+    #[test]
+    fn test_arm_coprocessor_data_transfer_triggers_und() {
+        // 0b110: coprocessor data transfer
+        let mut cpu = make_cpu();
+        let old_cpsr = cpu.cpsr();
+        // 0xEC000000: coprocessor data transfer (bits[27:25]=110)
+        super::execute_arm(&mut cpu, 0xEC000000);
+        assert_eq!(cpu.cpsr() & 0x1F, 0x1B); // MODE_UND
+        assert_eq!(cpu.pc(), 0x04);
+        assert_eq!(cpu.spsr(), old_cpsr);
+    }
+
+    #[test]
+    fn test_arm_undefined_saves_return_address() {
+        // UND exception should save PC in LR_und
+        let mut cpu = make_cpu();
+        let pc = 0x0800_0010u32;
+        cpu.set_reg(15, pc);
+        // trigger UND
+        super::execute_arm(&mut cpu, 0xE6000010);
+        // LR_und = PC of undefined instruction + 4
+        assert_eq!(cpu.reg(14), pc.wrapping_sub(4));
     }
 }

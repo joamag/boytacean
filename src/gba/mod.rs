@@ -20,14 +20,14 @@ pub mod rom;
 pub mod thumb;
 pub mod timer;
 
-use std::collections::VecDeque;
-use std::fmt::{self, Display, Formatter};
-
 #[cfg(feature = "wasm")]
 use std::panic::{set_hook, take_hook, PanicInfo};
+use std::{
+    collections::VecDeque,
+    fmt::{self, Display, Formatter},
+};
 
 use boytacean_common::error::Error;
-
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
 
