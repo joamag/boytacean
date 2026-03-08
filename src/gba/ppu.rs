@@ -307,16 +307,32 @@ impl GbaPpu {
         self.winv[index] = value;
     }
 
+    pub fn winin(&self) -> u16 {
+        self.winin
+    }
+
     pub fn set_winin(&mut self, value: u16) {
         self.winin = value;
+    }
+
+    pub fn winout(&self) -> u16 {
+        self.winout
     }
 
     pub fn set_winout(&mut self, value: u16) {
         self.winout = value;
     }
 
+    pub fn bldcnt(&self) -> u16 {
+        self.bldcnt
+    }
+
     pub fn set_bldcnt(&mut self, value: u16) {
         self.bldcnt = value;
+    }
+
+    pub fn bldalpha(&self) -> u16 {
+        self.bldalpha
     }
 
     pub fn set_bldalpha(&mut self, value: u16) {
@@ -499,7 +515,8 @@ impl GbaPpu {
     }
 
     /// clocks the PPU by the given number of CPU cycles.
-    /// returns flags: bit 0 = entered hblank, bit 1 = entered vblank
+    /// returns flags: bit 0 = hblank, bit 1 = vblank, bit 2 = hblank IRQ,
+    /// bit 3 = vblank IRQ, bit 4 = vcount match IRQ
     pub fn clock(&mut self, cycles: u32, vram: &[u8], palette: &[u8], oam: &[u8]) -> u8 {
         let mut events = 0u8;
 
@@ -527,11 +544,22 @@ impl GbaPpu {
             self.dot -= CYCLES_PER_SCANLINE;
             self.vcount += 1;
 
+            // update internal affine reference points after each visible scanline;
+            // advance happens after lines 0-159 render (vcount 1-160), not on
+            // the 227->0 wrap which would shift line 0 by one row
+            if self.vcount > 0 && self.vcount <= DISPLAY_HEIGHT as u16 {
+                self.bg_ref_x[0] = self.bg_ref_x[0].wrapping_add(self.bg_pb[0] as i32);
+                self.bg_ref_y[0] = self.bg_ref_y[0].wrapping_add(self.bg_pd[0] as i32);
+                self.bg_ref_x[1] = self.bg_ref_x[1].wrapping_add(self.bg_pb[1] as i32);
+                self.bg_ref_y[1] = self.bg_ref_y[1].wrapping_add(self.bg_pd[1] as i32);
+            }
+
             if self.vcount == DISPLAY_HEIGHT as u16 {
                 // entering vblank
                 self.frame += 1;
 
-                // latch affine reference points
+                // latch affine reference points (after advance, so latch
+                // overwrites the advance on the vblank entry scanline)
                 self.bg_ref_x[0] = self.bg_ref_x_write[0];
                 self.bg_ref_y[0] = self.bg_ref_y_write[0];
                 self.bg_ref_x[1] = self.bg_ref_x_write[1];
@@ -549,18 +577,15 @@ impl GbaPpu {
                 self.vcount = 0;
             }
 
-            // check vcount match
+            // raises VCount match IRQ when the scanline matches LYC
+            // (DISPSTAT[8:15]) and DISPSTAT bit 5 enables the interrupt.
+            // used by games for mid-frame effects (e.g. Mode 7 roads).
             let lyc = (self.dispstat >> 8) & 0xFF;
-            if self.vcount == lyc && self.dispstat & (1 << 5) != 0 {
-                self.int_vcount = true;
-            }
-
-            // update internal affine reference points after each visible scanline
-            if self.vcount < DISPLAY_HEIGHT as u16 {
-                self.bg_ref_x[0] = self.bg_ref_x[0].wrapping_add(self.bg_pb[0] as i32);
-                self.bg_ref_y[0] = self.bg_ref_y[0].wrapping_add(self.bg_pd[0] as i32);
-                self.bg_ref_x[1] = self.bg_ref_x[1].wrapping_add(self.bg_pb[1] as i32);
-                self.bg_ref_y[1] = self.bg_ref_y[1].wrapping_add(self.bg_pd[1] as i32);
+            if self.vcount == lyc {
+                if self.dispstat & (1 << 5) != 0 {
+                    self.int_vcount = true;
+                    events |= 16;
+                }
             }
         }
 
@@ -632,7 +657,7 @@ impl GbaPpu {
                     &mut bg_has_pixel[bg_index],
                     bg_priority,
                 ),
-                3 | 4 | 5 => self.collect_bitmap_bg(
+                3..=5 => self.collect_bitmap_bg(
                     affine_index,
                     vram,
                     palette,
@@ -2385,6 +2410,116 @@ mod tests {
         assert_eq!(fb[offset], 0x00); // R=0 (blue)
         assert_eq!(fb[offset + 1], 0x00); // G=0
         assert_eq!(fb[offset + 2], 0xF8); // B=0xF8
+    }
+
+    #[test]
+    fn test_winin_getter() {
+        let mut ppu = GbaPpu::new();
+        ppu.set_winin(0x1234);
+        assert_eq!(ppu.winin(), 0x1234);
+    }
+
+    #[test]
+    fn test_winout_getter() {
+        let mut ppu = GbaPpu::new();
+        ppu.set_winout(0x5678);
+        assert_eq!(ppu.winout(), 0x5678);
+    }
+
+    #[test]
+    fn test_bldcnt_getter() {
+        let mut ppu = GbaPpu::new();
+        ppu.set_bldcnt(0x00FF);
+        assert_eq!(ppu.bldcnt(), 0x00FF);
+    }
+
+    #[test]
+    fn test_bldalpha_getter() {
+        let mut ppu = GbaPpu::new();
+        ppu.set_bldalpha(0x1010);
+        assert_eq!(ppu.bldalpha(), 0x1010);
+    }
+
+    #[test]
+    fn test_affine_ref_no_advance_on_frame_wrap() {
+        let mut ppu = GbaPpu::new();
+        let vram = vec![0u8; 0x18000];
+        let palette = vec![0u8; 0x400];
+        let oam = vec![0u8; 0x400];
+
+        // set BG2 reference point and PB/PD
+        ppu.set_bg_ref_x_lo(0, 0x1000);
+        ppu.set_bg_ref_x_hi(0, 0x0000);
+        ppu.set_bg_ref_y_lo(0, 0x2000);
+        ppu.set_bg_ref_y_hi(0, 0x0000);
+        ppu.set_bg_pb(0, 0x0100); // PB = 1.0 in 8.8 fixed point
+        ppu.set_bg_pd(0, 0x0100); // PD = 1.0 in 8.8 fixed point
+
+        // clock through a full frame (228 scanlines)
+        for _ in 0..228 {
+            ppu.clock(CYCLES_PER_SCANLINE, &vram, &palette, &oam);
+        }
+
+        // at VBlank (line 160), reference points are latched from write values;
+        // after wrapping to line 0, the ref point should NOT have been advanced
+        // (the advance only happens after rendering lines 0-159)
+        assert_eq!(ppu.bg_ref_x[0], 0x1000);
+        assert_eq!(ppu.bg_ref_y[0], 0x2000);
+    }
+
+    #[test]
+    fn test_affine_ref_advances_after_visible_line() {
+        let mut ppu = GbaPpu::new();
+        let vram = vec![0u8; 0x18000];
+        let palette = vec![0u8; 0x400];
+        let oam = vec![0u8; 0x400];
+
+        ppu.set_bg_ref_x_lo(0, 0x0000);
+        ppu.set_bg_ref_x_hi(0, 0x0000);
+        ppu.set_bg_pb(0, 0x0100); // PB = 1.0
+
+        // clock line 0 (render + end of scanline advances vcount to 1)
+        ppu.clock(CYCLES_PER_SCANLINE, &vram, &palette, &oam);
+
+        // after rendering line 0 and advancing to line 1, ref_x should be 0 + 0x100
+        assert_eq!(ppu.bg_ref_x[0], 0x0100);
+    }
+
+    #[test]
+    fn test_vcount_match_event() {
+        let mut ppu = GbaPpu::new();
+        let vram = vec![0u8; 0x18000];
+        let palette = vec![0u8; 0x400];
+        let oam = vec![0u8; 0x400];
+
+        // set LYC=5, enable vcount match IRQ (DISPSTAT bit 5)
+        ppu.set_dispstat((5 << 8) | (1 << 5));
+
+        // clock through lines 0-4 (vcount goes 0->1->2->3->4->5)
+        let mut vcount_event = false;
+        for _ in 0..5 {
+            let events = ppu.clock(CYCLES_PER_SCANLINE, &vram, &palette, &oam);
+            if events & 16 != 0 {
+                vcount_event = true;
+            }
+        }
+        assert!(vcount_event);
+        assert!(ppu.int_vcount());
+    }
+
+    #[test]
+    fn test_vcount_match_no_event_without_enable() {
+        let mut ppu = GbaPpu::new();
+        let vram = vec![0u8; 0x18000];
+        let palette = vec![0u8; 0x400];
+        let oam = vec![0u8; 0x400];
+
+        // set LYC=1, but do NOT enable vcount match IRQ
+        ppu.set_dispstat(1 << 8);
+
+        let events = ppu.clock(CYCLES_PER_SCANLINE, &vram, &palette, &oam);
+        assert_eq!(events & 16, 0);
+        assert!(!ppu.int_vcount());
     }
 
     #[test]

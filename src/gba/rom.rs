@@ -18,6 +18,7 @@ const HEADER_CHECKSUM: usize = 0x0BD;
 const MIN_ROM_SIZE: usize = 0xC0;
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
+#[derive(Clone)]
 pub struct GbaRomInfo {
     title: String,
     game_code: String,
@@ -100,7 +101,7 @@ impl GbaRomInfo {
         let maker_l = format!("{:width$}", "Maker", width = column_length);
         let size_l = format!("{:width$}", "Size", width = column_length);
         format!(
-            "{}  {}\n{}  {}\n{}  {}\n{}  {}KB",
+            "{}  {}\n{}  {}\n{}  {}\n{}  {} KB",
             title_l,
             self.title,
             code_l,

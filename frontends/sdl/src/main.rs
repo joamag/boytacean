@@ -308,7 +308,7 @@ impl Emulator {
     pub fn load_rom(&mut self, path: Option<&str>) -> Result<(), Error> {
         let rom_path: &str = path.unwrap_or(&self.rom_path);
         let ram_path = replace_ext(rom_path, "sav").unwrap_or_else(|| "invalid".to_string());
-        let title = self.system.load_rom_file(
+        let rom = self.system.load_rom_file(
             rom_path,
             if Path::new(&ram_path).exists() {
                 Some(&ram_path)
@@ -316,10 +316,10 @@ impl Emulator {
                 None
             },
         )?;
-        println!("========= ROM =========\n{title}\n=======================");
+        println!("========= Cartridge =========\n{rom}\n=============================");
         if let Some(ref mut sdl) = self.sdl {
             sdl.window_mut()
-                .set_title(format!("{} [{}]", self.title, title).as_str())
+                .set_title(format!("{} [{}]", self.title, rom.title()).as_str())
                 .unwrap();
         }
         self.rom_path = String::from(rom_path);
@@ -1150,7 +1150,7 @@ fn main() -> Result<(), Box<dyn StdError>> {
             let bios_data = read_file(&args.boot_rom_path).expect("Failed to read GBA BIOS file");
             gba.load_bios(&bios_data);
         }
-        println!("========= {} =========\nGBA Mode", Info::name());
+        println!("========= {} =========\n{}", Info::name(), gba);
         System::Gba(gba)
     } else {
         // tries to build the target mode from the mode argument

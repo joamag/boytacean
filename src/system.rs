@@ -1,7 +1,18 @@
 //! Unified system abstraction for running either a Game Boy
 //! or a Game Boy Advance emulator through a single interface.
+//!
+//! The [`System`] enum wraps both [`GameBoy`] and [`GameBoyAdvance`]
+//! behind a common API, allowing frontends (SDL, web, console) to
+//! drive either emulator without branching on the system type.
+//!
+//! ROM loading returns a [`RomInfo`] value that carries both the
+//! cartridge title (for window titles) and a multi-line description
+//! (for startup banner printing).
 
-use std::collections::VecDeque;
+use std::{
+    collections::VecDeque,
+    fmt::{self, Display, Formatter},
+};
 
 use boytacean_common::error::Error;
 
@@ -10,6 +21,32 @@ use crate::{
     gba::{rom::is_gba_rom, GameBoyAdvance},
     pad::PadKey,
 };
+
+/// ROM/Cartridge information returned by [`System::load_rom_file`].
+///
+/// Provides both the title (for window titles, etc.) and the full
+/// description (for banner printing), mirroring the `Cartridge`
+/// type used by the Game Boy path.
+pub struct RomInfo {
+    title: String,
+    description: String,
+}
+
+impl RomInfo {
+    pub fn title(&self) -> &str {
+        &self.title
+    }
+
+    pub fn description(&self) -> &str {
+        &self.description
+    }
+}
+
+impl Display for RomInfo {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.description)
+    }
+}
 
 /// Unified system enum wrapping either a Game Boy or
 /// a Game Boy Advance emulator instance.
@@ -131,16 +168,22 @@ impl System {
         }
     }
 
-    pub fn load_rom_file(&mut self, path: &str, ram_path: Option<&str>) -> Result<String, Error> {
+    pub fn load_rom_file(&mut self, path: &str, ram_path: Option<&str>) -> Result<RomInfo, Error> {
         match self {
             System::Gb(gb) => {
-                let cart = gb.load_rom_file(path, ram_path)?;
-                Ok(cart.title().to_string())
+                let rom = gb.load_rom_file(path, ram_path)?;
+                Ok(RomInfo {
+                    title: rom.title().to_string(),
+                    description: rom.description(9),
+                })
             }
             System::Gba(gba) => {
                 let data = boytacean_common::util::read_file(path)?;
                 let info = gba.load_rom(&data)?;
-                Ok(info.title().to_string())
+                Ok(RomInfo {
+                    title: info.title(),
+                    description: info.description(9),
+                })
             }
         }
     }

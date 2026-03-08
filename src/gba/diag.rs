@@ -26,11 +26,33 @@ pub fn run_diagnostics(gba: &mut GameBoyAdvance, num_frames: u32) {
 
         gba.next_frame();
 
-        if frame % 500 == 0 || frame == num_frames - 1 {
+        if frame < 15 || frame == num_frames - 1 {
             print_state(gba, frame, 0);
             let handler = gba.cpu.bus.read32(0x03FF_FFFC);
             let intrcheck = gba.cpu.bus.read16(0x0300_7FF8);
-            println!("         | handler={handler:#010x} IntrCheck={intrcheck:#06x}");
+            let iwf = gba.cpu.bus.intr_wait_flags;
+            println!("         | handler={handler:#010x} IntrCheck={intrcheck:#06x} iwf={iwf:#06x}");
+            // dump game IRQ handler code and code around PC
+            if frame == 0 {
+                print!("         | IRQ handler code:");
+                for i in 0..64u32 {
+                    let word = gba.cpu.bus.read32(handler.wrapping_add(i * 4));
+                    if i % 4 == 0 { print!("\n         |   {:#010x}:", handler.wrapping_add(i * 4)); }
+                    print!(" {word:08x}");
+                }
+                println!();
+            }
+            if frame == 2 {
+                let pc = gba.cpu.reg(15);
+                print!("         | code around PC={pc:#010x}:");
+                for i in 0..8u32 {
+                    let addr = pc.wrapping_sub(8).wrapping_add(i * 4);
+                    let word = gba.cpu.bus.read32(addr);
+                    if i % 4 == 0 { print!("\n         |   {:#010x}:", addr); }
+                    print!(" {word:08x}");
+                }
+                println!();
+            }
             save_frame_buffer_ppm(gba, &format!("/tmp/gba_frame_{frame}.ppm"));
         }
 

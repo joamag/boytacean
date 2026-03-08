@@ -21,21 +21,24 @@ pub mod thumb;
 pub mod timer;
 
 use std::collections::VecDeque;
+use std::fmt::{self, Display, Formatter};
+
 #[cfg(feature = "wasm")]
 use std::panic::{set_hook, take_hook, PanicInfo};
 
 use boytacean_common::error::Error;
+
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
 
 use self::{
     bus::GbaBus,
-    consts::{DISPLAY_HEIGHT, DISPLAY_WIDTH},
+    consts::{DISPLAY_HEIGHT, DISPLAY_WIDTH, EWRAM_SIZE, IWRAM_SIZE, VRAM_SIZE},
     cpu::Arm7Tdmi,
     flash::SaveType,
     rom::GbaRomInfo,
 };
-use crate::pad::PadKey;
+use crate::{info::Info, pad::PadKey};
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 pub struct GbaClockFrame {
@@ -76,8 +79,8 @@ pub struct GameBoyAdvance {
     /// if timers are enabled, they will be clocked
     timer_enabled: bool,
 
-    /// ROM title extracted from the header
-    rom_title: String,
+    /// ROM information extracted from the header
+    rom_info: Option<GbaRomInfo>,
 }
 
 impl GameBoyAdvance {
@@ -106,10 +109,11 @@ impl GameBoyAdvance {
         self.cpu.reset_for_bios_boot();
     }
 
-    /// loads a ROM from a byte slice
+    /// Loads a ROM from a byte slice, returning the extracted
+    /// ROM information as a result.
     pub fn load_rom(&mut self, data: &[u8]) -> Result<GbaRomInfo, Error> {
         let info = GbaRomInfo::from_data(data)?;
-        self.rom_title = info.title();
+        self.rom_info = Some(info.clone());
         self.cpu.bus.load_rom(data);
         if !self.cpu.bus.use_real_bios {
             self.cpu.bus.postflg = 1; // mark as post-boot
@@ -117,14 +121,19 @@ impl GameBoyAdvance {
         Ok(info)
     }
 
-    /// returns the current frame buffer (RGB888)
+    /// Returns the current frame buffer (RGB888)
     pub fn frame_buffer(&self) -> &[u8] {
         self.cpu.bus.ppu.frame_buffer()
     }
 
-    /// returns a reference to the audio buffer
+    /// Returns a reference to the audio buffer
     pub fn audio_buffer(&self) -> &VecDeque<i16> {
         self.cpu.bus.apu.audio_buffer()
+    }
+
+    /// Returns the ROM information if a ROM has been loaded
+    pub fn rom_info(&self) -> Option<&GbaRomInfo> {
+        self.rom_info.as_ref()
     }
 }
 
@@ -141,11 +150,12 @@ impl GameBoyAdvance {
             apu_enabled: true,
             dma_enabled: true,
             timer_enabled: true,
-            rom_title: String::new(),
+            rom_info: None,
         }
     }
 
-    /// advance the clock by one CPU instruction, clocking all subsystems
+    /// Advances the clock by one CPU instruction, clocking all subsystems.
+    /// Returns the number of cycles elapsed during this clock.
     pub fn clock(&mut self) -> u32 {
         // handle halt state
         if self.cpu.bus.halt_requested {
@@ -181,7 +191,8 @@ impl GameBoyAdvance {
             }
         }
 
-        // clock PPU
+        // clock PPU, retrieves the events that occurred during
+        // this clock to trigger related behavior
         if self.ppu_enabled {
             let events = self.cpu.bus.ppu.clock(
                 cycles,
@@ -210,6 +221,12 @@ impl GameBoyAdvance {
             if events & 8 != 0 {
                 // vblank IRQ (only when DISPSTAT enables it)
                 self.cpu.bus.irq.raise_vblank();
+            }
+            if events & 16 != 0 {
+                // delivers VCount match IRQ to the controller, relies on
+                // the IntrWait re-halt check in cpu.rs (gated on CPSR_I==0)
+                // to prevent premature unhalt of VBlankIntrWait callers.
+                self.cpu.bus.irq.raise_vcount();
             }
         }
 
@@ -330,7 +347,10 @@ impl GameBoyAdvance {
     }
 
     pub fn rom_title(&self) -> String {
-        self.rom_title.clone()
+        self.rom_info
+            .as_ref()
+            .map(|info| info.title())
+            .unwrap_or_default()
     }
 
     pub fn apu_enabled(&self) -> bool {
@@ -404,18 +424,30 @@ impl GameBoyAdvance {
     }
 
     pub fn description(&self, column_length: usize) -> String {
-        let system_l = format!("{:width$}", "System", width = column_length);
-        let cpu_l = format!("{:width$}", "CPU", width = column_length);
+        let version_l = format!("{:width$}", "Version", width = column_length);
+        let mode_l = format!("{:width$}", "Mode", width = column_length);
+        let boot_rom_l = format!("{:width$}", "Boot ROM", width = column_length);
         let clock_l = format!("{:width$}", "Clock", width = column_length);
-        let rom_l = format!("{:width$}", "ROM", width = column_length);
+        let ram_size_l = format!("{:width$}", "RAM Size", width = column_length);
+        let vram_size_l = format!("{:width$}", "VRAM Size", width = column_length);
         format!(
-            "{}  Game Boy Advance\n{}  ARM7TDMI\n{}  {:.2} MHz\n{}  {}",
-            system_l,
-            cpu_l,
+            "{}  {}\n{}  {}\n{}  {}\n{}  {:.02} Mhz\n{}  {} KB\n{}  {} KB",
+            version_l,
+            Info::version(),
+            mode_l,
+            "Game Boy Advance",
+            boot_rom_l,
+            if self.cpu.bus.use_real_bios {
+                "Real BIOS"
+            } else {
+                "HLE"
+            },
             clock_l,
             Self::CPU_FREQ as f64 / 1_000_000.0,
-            rom_l,
-            self.rom_title
+            ram_size_l,
+            (EWRAM_SIZE + IWRAM_SIZE) / 1024,
+            vram_size_l,
+            VRAM_SIZE / 1024,
         )
     }
 }
@@ -456,6 +488,12 @@ pub fn gba_hook_impl(info: &PanicInfo) {
 impl Default for GameBoyAdvance {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl Display for GameBoyAdvance {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.description(9))
     }
 }
 
@@ -639,5 +677,27 @@ mod tests {
         let restored = gba.ram_data_eager();
         assert_eq!(restored[0], 0x42);
         assert_eq!(restored[1], 0xAB);
+    }
+
+    #[test]
+    fn test_vcount_irq_delivered_on_match() {
+        use crate::gba::consts::{IRQ_VCOUNT, REG_DISPSTAT};
+
+        let mut gba = GameBoyAdvance::new();
+        // set LYC = 0 and enable VCount IRQ (bit 5) in DISPSTAT
+        // DISPSTAT bits [8:15] = LYC, bit 5 = VCount IRQ enable
+        gba.cpu.bus.write16(REG_DISPSTAT, (0 << 8) | (1 << 5));
+        // enable VCount in IE and set IME
+        gba.cpu.bus.irq.set_ie(IRQ_VCOUNT);
+        gba.cpu.bus.irq.set_ime(true);
+
+        // PPU starts at vcount=0, so after a full scanline the vcount
+        // wraps and eventually matches LYC=0; clock enough cycles
+        // to complete at least one full frame (228 scanlines × 1232 dots)
+        let total: usize = 228 * 1232;
+        gba.clocks_cycles(total);
+
+        // VCount IRQ should have been raised in IF at some point
+        assert!(gba.cpu.bus.irq.if_() & IRQ_VCOUNT != 0);
     }
 }

@@ -283,7 +283,11 @@ export class GbaEmulator extends EmulatorLogic implements Emulator {
 
         // loads the ROM file into the system and retrieves
         // the ROM info instance associated with it
-        const romInfoResult = this.gba.load_rom_wa(romData);
+        const cartridge = this.gba.load_rom_wa(romData);
+
+        // prints some debug information about the cartridge that
+        // has just been loaded, this should provide some insights
+        this.logger.info(`${cartridge.description(9)}`);
 
         // updates the name of the currently selected engine
         // to the one that has been provided (logic change)
@@ -291,11 +295,11 @@ export class GbaEmulator extends EmulatorLogic implements Emulator {
 
         // updates the ROM name in case there's extra information
         // coming from the ROM info
-        romName = romInfoResult.title() ? romInfoResult.title() : romName;
+        romName = cartridge.title() ? cartridge.title() : romName;
 
         // updates the complete set of global information that
         // is going to be displayed
-        this.setRom(romName, romData, romInfoResult);
+        this.setRom(romName, romData, cartridge);
 
         // in case there's a battery involved tries to load the
         // current RAM from the local storage

@@ -86,6 +86,10 @@ pub struct GbaBus {
     /// halt flag (set via HALTCNT register)
     pub halt_requested: bool,
 
+    /// IntrWait flags for HLE SWI 0x04/0x05: re-halts the CPU until
+    /// a serviced IRQ matches these bits. Zero with real BIOS.
+    pub intr_wait_flags: u16,
+
     /// last BIOS read value (for open bus emulation)
     bios_value: u32,
 
@@ -116,6 +120,7 @@ impl GbaBus {
             waitcnt: 0,
             postflg: 0,
             halt_requested: false,
+            intr_wait_flags: 0,
             bios_value: 0,
             bios_readable: false,
             use_real_bios: false,
@@ -139,10 +144,10 @@ impl GbaBus {
         // offset = (0x128 - 0x18 - 8) / 4 = 0x42
         self.bios_write32(0x18, 0xEA000042); // B #0x128
 
-        // BIOS IRQ handler at 0x128 (matches real GBA BIOS):
-        // Saves state, calls game handler via [0x03FFFFFC], restores
-        // state, and returns from IRQ. The IntrCheck update at
-        // 0x03007FF8 is the game's IRQ handler responsibility.
+        // BIOS IRQ handler at 0x128:
+        // saves state, calls game handler via [0x03FFFFFC], restores
+        // and returns. IntrCheck updates happen in the REG_IF write
+        // handler when the game (or stub) acknowledges IF.
         //
         // 0x128: STMFD SP!, {R0-R3, R12, LR}
         // 0x12C: MOV R0, #0x04000000        ; I/O base
@@ -150,7 +155,7 @@ impl GbaBus {
         // 0x134: LDR PC, [R0, #-4]          ; PC = [0x03FFFFFC] (game handler)
         // --- game handler returns here ---
         // 0x138: LDMFD SP!, {R0-R3, R12, LR}
-        // 0x13C: SUBS PC, LR, #4            ; return from IRQ, restore CPSR
+        // 0x13C: SUBS PC, LR, #4            ; return from IRQ
 
         self.bios_write32(0x128, 0xE92D500F); // STMFD SP!, {R0-R3, R12, LR}
         self.bios_write32(0x12C, 0xE3A00301); // MOV R0, #0x04000000
@@ -158,8 +163,6 @@ impl GbaBus {
         self.bios_write32(0x134, 0xE510F004); // LDR PC, [R0, #-4]
         self.bios_write32(0x138, 0xE8BD500F); // LDMFD SP!, {R0-R3, R12, LR}
         self.bios_write32(0x13C, 0xE25EF004); // SUBS PC, LR, #4
-        self.bios_write32(0x140, 0xE55EC002); // Real BIOS value at 0x140 (for BIOS protection after IRQ)
-        self.bios_write32(0x144, 0xE55EC002); // Real BIOS value at 0x144 (for BIOS protection after IRQ)
 
         // Write real BIOS values at addresses used by BIOS protection tests.
         // SWI handler return area (real BIOS address 0x190)
@@ -394,8 +397,17 @@ impl GbaBus {
                 self.palette[offset + 1] = value;
             }
             0x06 => {
-                // VRAM: 8-bit writes to BG area are mirrored
+                // VRAM: 8-bit writes to OBJ region are ignored;
+                // BG area writes are mirrored to both bytes of the halfword
                 let offset = self.mirror_vram(addr);
+                let obj_boundary = if self.ppu.video_mode() as u8 >= 3 {
+                    0x14000
+                } else {
+                    0x10000
+                };
+                if offset >= obj_boundary {
+                    return;
+                }
                 let aligned = offset & !1;
                 self.vram[aligned] = value;
                 self.vram[aligned + 1] = value;
@@ -522,6 +534,10 @@ impl GbaBus {
             REG_BG1CNT => self.ppu.bgcnt(1),
             REG_BG2CNT => self.ppu.bgcnt(2),
             REG_BG3CNT => self.ppu.bgcnt(3),
+            REG_WININ => self.ppu.winin(),
+            REG_WINOUT => self.ppu.winout(),
+            REG_BLDCNT => self.ppu.bldcnt(),
+            REG_BLDALPHA => self.ppu.bldalpha(),
             REG_KEYINPUT => self.pad.keyinput(),
             REG_KEYCNT => self.pad.keycnt(),
             REG_IE => self.irq.ie(),
@@ -790,6 +806,7 @@ impl GbaBus {
         self.waitcnt = 0;
         self.postflg = 0;
         self.halt_requested = false;
+        self.intr_wait_flags = 0;
         self.bios_value = 0;
         self.bios_readable = false;
     }
@@ -808,7 +825,10 @@ impl Default for GbaBus {
 #[cfg(test)]
 mod tests {
     use super::GbaBus;
-    use crate::gba::consts::{REG_DISPCNT, REG_IE, REG_IME, REG_KEYINPUT};
+    use crate::gba::consts::{
+        REG_BLDALPHA, REG_BLDCNT, REG_DISPCNT, REG_IE, REG_IF, REG_IME, REG_KEYINPUT, REG_WININ,
+        REG_WINOUT,
+    };
 
     #[test]
     fn test_new() {
@@ -1252,5 +1272,176 @@ mod tests {
     fn test_load_bios_use_real_bios_default_false() {
         let bus = GbaBus::new();
         assert!(!bus.use_real_bios);
+    }
+
+    #[test]
+    fn test_io_winin_read_write() {
+        let mut bus = GbaBus::new();
+        bus.write16(REG_WININ, 0x3F1F);
+        assert_eq!(bus.read16(REG_WININ), 0x3F1F);
+    }
+
+    #[test]
+    fn test_io_winout_read_write() {
+        let mut bus = GbaBus::new();
+        bus.write16(REG_WINOUT, 0x2A15);
+        assert_eq!(bus.read16(REG_WINOUT), 0x2A15);
+    }
+
+    #[test]
+    fn test_io_bldcnt_read_write() {
+        let mut bus = GbaBus::new();
+        bus.write16(REG_BLDCNT, 0x00C1);
+        assert_eq!(bus.read16(REG_BLDCNT), 0x00C1);
+    }
+
+    #[test]
+    fn test_io_bldalpha_read_write() {
+        let mut bus = GbaBus::new();
+        bus.write16(REG_BLDALPHA, 0x0810);
+        assert_eq!(bus.read16(REG_BLDALPHA), 0x0810);
+    }
+
+    #[test]
+    fn test_io_8bit_write_preserves_other_byte() {
+        let mut bus = GbaBus::new();
+        bus.write16(REG_WININ, 0x3F1F);
+        // write only the low byte via 8-bit write
+        bus.write8(REG_WININ, 0x00);
+        // high byte should be preserved via read-modify-write
+        assert_eq!(bus.read16(REG_WININ), 0x3F00);
+    }
+
+    #[test]
+    fn test_vram_8bit_write_bg_mirrors_to_both_bytes() {
+        let mut bus = GbaBus::new();
+        // mode 0 (default), BG region at offset 0x0000
+        bus.write8(0x0600_0000, 0x42);
+        assert_eq!(bus.read8(0x0600_0000), 0x42);
+        assert_eq!(bus.read8(0x0600_0001), 0x42);
+    }
+
+    #[test]
+    fn test_vram_8bit_write_obj_region_ignored_tile_mode() {
+        let mut bus = GbaBus::new();
+        // mode 0 (default): OBJ region starts at 0x10000
+        // first write a known value via 16-bit to OBJ region
+        bus.write16(0x0601_0000, 0x1234);
+        // 8-bit write to OBJ region should be ignored
+        bus.write8(0x0601_0000, 0xFF);
+        assert_eq!(bus.read16(0x0601_0000), 0x1234);
+    }
+
+    #[test]
+    fn test_vram_8bit_write_obj_region_ignored_bitmap_mode() {
+        let mut bus = GbaBus::new();
+        // set mode 3 (bitmap) via DISPCNT
+        bus.write16(REG_DISPCNT, 0x0003);
+        // OBJ region starts at 0x14000 in bitmap modes
+        bus.write16(0x0601_4000, 0x1234);
+        // 8-bit write to OBJ region should be ignored
+        bus.write8(0x0601_4000, 0xFF);
+        assert_eq!(bus.read16(0x0601_4000), 0x1234);
+    }
+
+    #[test]
+    fn test_vram_8bit_write_bg_allowed_bitmap_mode() {
+        let mut bus = GbaBus::new();
+        // set mode 3 (bitmap) via DISPCNT
+        bus.write16(REG_DISPCNT, 0x0003);
+        // offset 0x13FFE is still BG area in bitmap mode (< 0x14000)
+        bus.write8(0x0601_3FFE, 0xAB);
+        assert_eq!(bus.read8(0x0601_3FFE), 0xAB);
+        assert_eq!(bus.read8(0x0601_3FFF), 0xAB);
+    }
+
+    #[test]
+    fn test_reg_if_ack_updates_intrcheck() {
+        let mut bus = GbaBus::new();
+        // enable VBlank and raise it
+        bus.write16(REG_IE, 0x01);
+        bus.irq.raise(0x01);
+        assert_eq!(bus.irq.if_(), 0x01);
+
+        // IntrCheck should be empty initially
+        let offset = (0x0300_7FF8u32 & 0x7FFF) as usize;
+        assert_eq!(
+            u16::from_le_bytes([bus.iwram[offset], bus.iwram[offset + 1]]),
+            0
+        );
+
+        // acknowledge VBlank by writing to REG_IF
+        bus.write16(REG_IF, 0x01);
+
+        // IntrCheck should now have VBlank set
+        let check = u16::from_le_bytes([bus.iwram[offset], bus.iwram[offset + 1]]);
+        assert_eq!(check, 0x01);
+        // IF should be cleared
+        assert_eq!(bus.irq.if_(), 0x00);
+    }
+
+    #[test]
+    fn test_reg_if_ack_only_updates_intrcheck_for_enabled_irqs() {
+        let mut bus = GbaBus::new();
+        // enable only HBlank (bit 1), not VBlank
+        bus.write16(REG_IE, 0x02);
+        // raise both VBlank and HBlank
+        bus.irq.raise(0x03);
+
+        // acknowledge both
+        bus.write16(REG_IF, 0x03);
+
+        // IntrCheck should only have HBlank (the enabled one)
+        let offset = (0x0300_7FF8u32 & 0x7FFF) as usize;
+        let check = u16::from_le_bytes([bus.iwram[offset], bus.iwram[offset + 1]]);
+        assert_eq!(check, 0x02);
+    }
+
+    #[test]
+    fn test_reg_if_ack_accumulates_intrcheck() {
+        let mut bus = GbaBus::new();
+        let offset = (0x0300_7FF8u32 & 0x7FFF) as usize;
+
+        // first IRQ: VBlank
+        bus.write16(REG_IE, 0x01);
+        bus.irq.raise(0x01);
+        bus.write16(REG_IF, 0x01);
+
+        let check1 = u16::from_le_bytes([bus.iwram[offset], bus.iwram[offset + 1]]);
+        assert_eq!(check1, 0x01);
+
+        // second IRQ: HBlank
+        bus.write16(REG_IE, 0x03); // enable both
+        bus.irq.raise(0x02);
+        bus.write16(REG_IF, 0x02);
+
+        // IntrCheck should have both bits ORed
+        let check2 = u16::from_le_bytes([bus.iwram[offset], bus.iwram[offset + 1]]);
+        assert_eq!(check2, 0x03);
+    }
+
+    #[test]
+    fn test_bios_irq_vector_branches_to_handler() {
+        let mut bus = GbaBus::new();
+        bus.bios_readable = true;
+        // IRQ vector at 0x18 should be a branch to 0x128
+        let instr = bus.read32(0x0000_0018);
+        // B #offset: 0xEA000042 -> offset = 0x42 * 4 + 8 = 0x110
+        // target = 0x18 + 0x110 = 0x128
+        assert_eq!(instr, 0xEA000042);
+    }
+
+    #[test]
+    fn test_intr_wait_flags_default_zero() {
+        let bus = GbaBus::new();
+        assert_eq!(bus.intr_wait_flags, 0);
+    }
+
+    #[test]
+    fn test_intr_wait_flags_reset_to_zero() {
+        let mut bus = GbaBus::new();
+        bus.intr_wait_flags = 0x05;
+        bus.reset();
+        assert_eq!(bus.intr_wait_flags, 0);
     }
 }
