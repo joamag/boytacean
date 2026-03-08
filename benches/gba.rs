@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use boytacean::gba::GameBoyAdvance;
 use criterion::{criterion_group, criterion_main, Criterion};
 
@@ -57,15 +59,17 @@ fn benchmark_gba_cpu_only(c: &mut Criterion) {
     let mut gba = make_gba_cpu_only();
     c.bench_function("gba_cpu_only_1m_cycles", |b| {
         b.iter(|| {
-            gba.clocks_cycles(1_000_000);
+            gba.clocks_cycles(1000000);
         })
     });
 }
 
-criterion_group!(
-    benches,
-    benchmark_gba_full_frame,
-    benchmark_gba_arm_frame,
-    benchmark_gba_cpu_only
-);
+criterion_group! {
+    name = benches;
+    config = Criterion::default()
+        .sample_size(10)
+        .measurement_time(Duration::from_secs(2))
+        .warm_up_time(Duration::from_secs(1));
+    targets = benchmark_gba_full_frame, benchmark_gba_arm_frame, benchmark_gba_cpu_only
+}
 criterion_main!(benches);
