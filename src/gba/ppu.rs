@@ -1271,10 +1271,7 @@ impl GbaPpu {
             ref_y += pc;
 
             let (tx, ty) = if wraparound {
-                (
-                    (tex_x & map_mask) as usize,
-                    (tex_y & map_mask) as usize,
-                )
+                ((tex_x & map_mask) as usize, (tex_y & map_mask) as usize)
             } else {
                 if tex_x < 0 || tex_y < 0 || tex_x >= map_size as i32 || tex_y >= map_size as i32 {
                     continue;
