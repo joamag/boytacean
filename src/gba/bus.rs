@@ -571,8 +571,14 @@ impl GbaBus {
             REG_DMA3CNT_H => self.dma.channels[3].control(),
             REG_POSTFLG => self.postflg as u16,
             _ => {
-                // wave RAM
-                if (REG_WAVE_RAM..REG_WAVE_RAM + 16).contains(&addr) {
+                let io_offset = addr & 0x3FF;
+                if (0x60..=0x7C).contains(&io_offset) {
+                    // legacy sound channel registers
+                    let lo = self.apu.read_channel_reg(addr) as u16;
+                    let hi = self.apu.read_channel_reg(addr + 1) as u16;
+                    lo | (hi << 8)
+                } else if (REG_WAVE_RAM..REG_WAVE_RAM + 16).contains(&addr) {
+                    // wave RAM
                     let offset = (addr - REG_WAVE_RAM) as usize;
                     let lo = self.apu.read_wave_ram(offset) as u16;
                     let hi = self.apu.read_wave_ram(offset + 1) as u16;
@@ -689,6 +695,13 @@ impl GbaBus {
             REG_POSTFLG => self.postflg = value as u8,
             REG_HALTCNT => self.halt_requested = true,
             _ => {
+                // handle sound channel registers (0x60-0x7E) via byte-level writes
+                let io_offset = addr & 0x3FF;
+                if (0x60..=0x7C).contains(&io_offset) {
+                    self.apu.write_channel_reg(addr, value as u8);
+                    self.apu.write_channel_reg(addr + 1, (value >> 8) as u8);
+                }
+
                 // handle 32-bit DMA address registers
                 // (these are written as two 16-bit writes)
                 self.write_dma_addr(addr, value);
@@ -696,11 +709,11 @@ impl GbaBus {
                 // handle 32-bit BG reference point registers
                 self.write_bg_ref(addr, value);
 
-                // handle FIFO writes
+                // handle FIFO writes (16-bit path, 2 samples per write)
                 if addr == REG_FIFO_A || addr == REG_FIFO_A + 2 {
-                    self.apu.direct_sound[0].write_fifo(value as u32);
+                    self.apu.direct_sound[0].write_fifo_half(value);
                 } else if addr == REG_FIFO_B || addr == REG_FIFO_B + 2 {
-                    self.apu.direct_sound[1].write_fifo(value as u32);
+                    self.apu.direct_sound[1].write_fifo_half(value);
                 }
 
                 // wave RAM
@@ -835,8 +848,9 @@ impl Default for GbaBus {
 mod tests {
     use super::GbaBus;
     use crate::gba::consts::{
-        REG_BLDALPHA, REG_BLDCNT, REG_DISPCNT, REG_IE, REG_IF, REG_IME, REG_KEYINPUT, REG_WININ,
-        REG_WINOUT,
+        REG_BLDALPHA, REG_BLDCNT, REG_DISPCNT, REG_DMA1CNT_H, REG_DMA1CNT_L, REG_DMA1DAD,
+        REG_DMA1SAD, REG_FIFO_A, REG_IE, REG_IF, REG_IME, REG_KEYINPUT, REG_SOUNDCNT_H,
+        REG_SOUNDCNT_L, REG_SOUNDCNT_X, REG_TM0CNT_H, REG_TM0CNT_L, REG_WININ, REG_WINOUT,
     };
 
     #[test]
@@ -1452,5 +1466,304 @@ mod tests {
         bus.intr_wait_flags = 0x05;
         bus.reset();
         assert_eq!(bus.intr_wait_flags, 0);
+    }
+
+    /// Integration test: simulates a typical GBA DirectSound music playback
+    /// pipeline step by step, verifying each stage of the chain:
+    ///
+    /// 1. Place PCM data in EWRAM (simulating ROM audio data)
+    /// 2. Configure SOUNDCNT_X (master enable)
+    /// 3. Configure SOUNDCNT_L (legacy panning/volume, needed for mixing)
+    /// 4. Configure SOUNDCNT_H (DirectSound A: enable L+R, timer 0, full volume)
+    /// 5. Configure Timer 0 (reload value for ~16 KHz sample rate)
+    /// 6. Configure DMA1 (source=EWRAM, dest=FIFO_A, timing=SPECIAL, repeat, 32-bit)
+    /// 7. Clock timers until overflow → APU pops sample → DMA refills FIFO
+    /// 8. Clock APU to generate output samples
+    /// 9. Verify audio buffer contains non-zero DirectSound output
+    #[test]
+    fn test_direct_sound_full_pipeline() {
+        let mut bus = GbaBus::new();
+
+        // -- step 1: place PCM audio data in EWRAM --
+        // write 16 bytes of non-zero signed 8-bit samples (a simple sawtooth)
+        let pcm_base: u32 = 0x0200_0000;
+        for i in 0u32..16 {
+            // values: 0x10, 0x20, 0x30, ... 0x7F, 0x10, ...
+            let sample = (((i % 8) + 1) * 0x10) as u8;
+            bus.write8(pcm_base + i, sample);
+        }
+        // verify PCM data is readable
+        let word0 = bus.read32(pcm_base);
+        assert_ne!(word0, 0, "PCM data should be non-zero in EWRAM");
+
+        // -- step 2: enable master sound --
+        bus.write16(REG_SOUNDCNT_X, 0x0080);
+        assert_eq!(
+            bus.apu.soundcnt_x() & 0x80,
+            0x80,
+            "SOUNDCNT_X master enable should be set"
+        );
+
+        // -- step 3: configure legacy mixing (all channels panned L+R, max volume) --
+        bus.write16(REG_SOUNDCNT_L, 0xFF77);
+
+        // -- step 4: configure DirectSound A --
+        // bit 2: DMA-A full volume
+        // bit 8: DMA-A enable right
+        // bit 9: DMA-A enable left
+        // bit 10: DMA-A timer 0
+        // bit 11: DMA-A FIFO reset (strobe)
+        let soundcnt_h: u16 = ((1 << 2) | (1 << 8) | (1 << 9)) | (1 << 11);
+        bus.write16(REG_SOUNDCNT_H, soundcnt_h);
+
+        // verify DirectSound A is configured correctly
+        assert!(
+            bus.apu.direct_sound[0].enable_left(),
+            "DirectSound A left should be enabled"
+        );
+        assert!(
+            bus.apu.direct_sound[0].enable_right(),
+            "DirectSound A right should be enabled"
+        );
+        assert!(
+            bus.apu.direct_sound[0].volume_full(),
+            "DirectSound A should be full volume"
+        );
+        assert_eq!(
+            bus.apu.direct_sound[0].timer_id, 0,
+            "DirectSound A should use timer 0"
+        );
+
+        // verify FIFO was reset (should be empty after reset strobe)
+        assert!(
+            bus.apu.direct_sound[0].fifo_len() == 0,
+            "FIFO A should be empty after reset"
+        );
+
+        // verify strobe bits are NOT stored
+        assert_eq!(
+            bus.apu.soundcnt_h() & (1 << 11),
+            0,
+            "FIFO reset strobe bit should not persist in readback"
+        );
+
+        // -- step 5: configure Timer 0 --
+        // reload = 0xFFFF - 512 + 1 = 0xFE00 (overflows every 512 cycles ≈ 32 KHz)
+        // but for testing, use 0xFFF0 so it overflows after just 16 ticks
+        bus.write16(REG_TM0CNT_L, 0xFFF0); // reload value
+        bus.write16(REG_TM0CNT_H, 0x0080); // enable, prescaler=1
+
+        // verify timer is configured
+        assert!(bus.timers.timers[0].enabled(), "Timer 0 should be enabled");
+
+        // -- step 6: configure DMA1 for sound FIFO A --
+        // source: EWRAM PCM data
+        bus.write32(REG_DMA1SAD, pcm_base);
+        // destination: FIFO A register
+        bus.write32(REG_DMA1DAD, REG_FIFO_A);
+        // word count: 4 (hardware forces this for sound DMA anyway)
+        bus.write16(REG_DMA1CNT_L, 4);
+        // control: enable | timing=SPECIAL(3) | repeat | 32-bit | src_inc | dst_fixed
+        let dma_control: u16 = (1 << 15) | // enable
+            (3 << 12) | // timing = SPECIAL
+            (1 << 9)  | // repeat
+            (1 << 10) | // 32-bit word size
+            (2 << 5); // dst addr control = Fixed
+        bus.write16(REG_DMA1CNT_H, dma_control);
+
+        // verify DMA1 is configured but not yet active (SPECIAL waits for trigger)
+        assert!(bus.dma.channels[1].enabled(), "DMA1 should be enabled");
+        assert!(
+            !bus.dma.channels[1].active(),
+            "DMA1 should not be active yet (SPECIAL timing)"
+        );
+
+        // -- step 7: clock timers until overflow --
+        // timer reloaded with 0xFFF0, needs 16 ticks to overflow (0xFFF0 → 0xFFFF → overflow)
+        let overflows = bus.timers.clock(16);
+        assert_eq!(
+            overflows & 1,
+            1,
+            "Timer 0 should have overflowed after 16 cycles"
+        );
+
+        // -- step 8: simulate the timer overflow → APU → DMA chain --
+        // (this is what mod.rs clock() does)
+
+        // 8a: APU timer overflow → pops a sample from FIFO (empty, so current_sample stays 0)
+        bus.apu.timer_overflow(0);
+
+        // 8b: FIFO needs refill → trigger DMA
+        assert!(
+            bus.apu.direct_sound[0].needs_refill(),
+            "FIFO A should need refill (it's empty)"
+        );
+        bus.dma.trigger_sound_fifo(0);
+        assert!(
+            bus.dma.channels[1].active(),
+            "DMA1 should now be active after sound FIFO trigger"
+        );
+
+        // 8c: process DMA transfers (4 words = 16 bytes from EWRAM to FIFO)
+        let mut transfers = 0;
+        while let Some(index) = bus.dma.highest_active() {
+            if !bus.dma.channels[index].active() {
+                break;
+            }
+            let word32 = bus.dma.channels[index].word_size();
+            let (src, dst, complete) = bus.dma.channels[index].step();
+
+            if word32 {
+                let value = bus.read32(src);
+                bus.write32(dst, value);
+            } else {
+                let value = bus.read16(src);
+                bus.write16(dst, value);
+            }
+            transfers += 1;
+
+            if complete {
+                break;
+            }
+        }
+        assert_eq!(transfers, 4, "Sound DMA should transfer exactly 4 words");
+
+        // verify FIFO is now populated
+        let fifo_len = bus.apu.direct_sound[0].fifo_len();
+        assert!(
+            fifo_len > 0,
+            "FIFO A should have samples after DMA transfer, got {}",
+            fifo_len
+        );
+        // 4 words × 4 bytes/word = 16 samples (each write32 → 2 write_io16 → 4 samples)
+        assert_eq!(
+            fifo_len, 16,
+            "FIFO A should have 16 samples (4 words × 4 bytes)"
+        );
+
+        // -- step 9: simulate second timer overflow → pop a real sample --
+        let overflows = bus.timers.clock(16);
+        assert_eq!(overflows & 1, 1, "Timer 0 should overflow again");
+
+        bus.apu.timer_overflow(0);
+        let current = bus.apu.direct_sound[0].current_sample();
+        assert_ne!(
+            current, 0,
+            "After second timer overflow, current_sample should be non-zero (popped from FIFO)"
+        );
+
+        // verify output functions produce non-zero values
+        let output = bus.apu.direct_sound[0].output();
+        assert_ne!(output, 0, "DirectSound A output() should be non-zero");
+
+        let output_left = bus.apu.direct_sound[0].output_left();
+        assert_ne!(
+            output_left, 0,
+            "DirectSound A output_left() should be non-zero (enable_left=true)"
+        );
+
+        let output_right = bus.apu.direct_sound[0].output_right();
+        assert_ne!(
+            output_right, 0,
+            "DirectSound A output_right() should be non-zero (enable_right=true)"
+        );
+
+        // -- step 10: clock APU to generate audio samples --
+        // clock enough cycles to generate at least one sample (sample_period = 512 cycles)
+        bus.apu.clock(1024);
+        let buffer_len = bus.apu.audio_buffer().len();
+        assert!(
+            buffer_len >= 2,
+            "Audio buffer should have at least one stereo sample pair, got {}",
+            buffer_len
+        );
+
+        // check that at least one sample in the buffer is non-zero
+        let has_nonzero = bus.apu.audio_buffer().iter().any(|&s| s != 0);
+        assert!(
+            has_nonzero,
+            "Audio buffer should contain non-zero samples from DirectSound"
+        );
+
+        // verify the actual sample values are reasonable (not clipped extremes)
+        let max_abs = bus
+            .apu
+            .audio_buffer()
+            .iter()
+            .map(|s| s.unsigned_abs() as u32)
+            .max()
+            .unwrap_or(0);
+        assert!(
+            max_abs > 0 && max_abs < 32768,
+            "Sample magnitude {} should be non-zero and within i16 range",
+            max_abs
+        );
+    }
+
+    /// Tests that a read-modify-write on SOUNDCNT_H does NOT reset the FIFO.
+    /// This was a critical bug: FIFO reset bits (11, 15) were persisted in the
+    /// stored register value, causing every read-modify-write to clear the FIFO.
+    #[test]
+    fn test_soundcnt_h_read_modify_write_preserves_fifo() {
+        let mut bus = GbaBus::new();
+
+        // enable master sound
+        bus.write16(REG_SOUNDCNT_X, 0x80);
+
+        // configure DirectSound A with FIFO reset
+        let initial: u16 = (1 << 2) | (1 << 8) | (1 << 9) | (1 << 11);
+        bus.write16(REG_SOUNDCNT_H, initial);
+        assert_eq!(bus.apu.direct_sound[0].fifo_len(), 0);
+
+        // push some samples into the FIFO directly
+        bus.apu.direct_sound[0].write_fifo(0x40302010);
+        assert_eq!(bus.apu.direct_sound[0].fifo_len(), 4);
+
+        // simulate read-modify-write: read SOUNDCNT_H, modify, write back
+        let readback = bus.read16(REG_SOUNDCNT_H);
+        // bit 11 (FIFO reset) should NOT be set in readback
+        assert_eq!(
+            readback & (1 << 11),
+            0,
+            "FIFO reset bit should not appear in readback"
+        );
+
+        // write back with a minor change (e.g., toggle DMA-B volume)
+        let modified = readback | (1 << 3);
+        bus.write16(REG_SOUNDCNT_H, modified);
+
+        // FIFO should still have its samples (not reset!)
+        assert_eq!(
+            bus.apu.direct_sound[0].fifo_len(),
+            4,
+            "FIFO should NOT be cleared by read-modify-write"
+        );
+    }
+
+    /// Tests that 16-bit writes to sound channel registers are properly routed.
+    #[test]
+    fn test_write16_sound_channel_registers() {
+        let mut bus = GbaBus::new();
+        bus.write16(REG_SOUNDCNT_X, 0x80); // master enable
+
+        // write to SOUND1CNT_L (0x04000060) via 16-bit write
+        // bits 0-2: sweep slope=3, bit 3: decrease, bits 4-6: sweep pace=2
+        bus.write16(0x0400_0060, 0x002B); // 0x2B = 0b00_101_0_11
+        assert_eq!(bus.apu.read_channel_reg(0x0400_0060) & 0x07, 3); // slope
+        assert_eq!(bus.apu.read_channel_reg(0x0400_0060) & 0x08, 0x08); // decrease
+        assert_eq!((bus.apu.read_channel_reg(0x0400_0060) >> 4) & 0x07, 2); // pace
+
+        // write to SOUND1CNT_H (0x04000062) via 16-bit write
+        // low byte: duty=2, length=10 → 0x8A (duty in bits 6-7, length in bits 0-5)
+        // high byte: initial_volume=0xF, direction=1, pace=3 → 0xFB
+        bus.write16(0x0400_0062, 0xFB8A);
+        // check duty was set from low byte
+        let lo = bus.apu.read_channel_reg(0x0400_0062);
+        assert_eq!((lo >> 6) & 0x03, 2, "CH1 duty should be 2");
+        // check envelope from high byte
+        let hi = bus.apu.read_channel_reg(0x0400_0063);
+        assert_eq!((hi >> 4) & 0x0F, 0xF, "CH1 initial volume should be 15");
+        assert_eq!((hi >> 3) & 0x01, 1, "CH1 envelope direction should be 1");
+        assert_eq!(hi & 0x07, 3, "CH1 envelope pace should be 3");
     }
 }
