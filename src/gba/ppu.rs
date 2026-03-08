@@ -1230,12 +1230,13 @@ impl GbaPpu {
         let screen_size = (cnt >> 14) & 0x03;
 
         let map_size = match screen_size {
-            0 => 128,
+            0 => 128usize,
             1 => 256,
             2 => 512,
             3 => 1024,
             _ => 128,
         };
+        let map_mask = (map_size - 1) as i32;
         let tiles_per_row = map_size / 8;
 
         let pa = self.bg_pa[affine_index] as i32;
@@ -1271,8 +1272,8 @@ impl GbaPpu {
 
             let (tx, ty) = if wraparound {
                 (
-                    ((tex_x % map_size as i32) + map_size as i32) as usize % map_size,
-                    ((tex_y % map_size as i32) + map_size as i32) as usize % map_size,
+                    (tex_x & map_mask) as usize,
+                    (tex_y & map_mask) as usize,
                 )
             } else {
                 if tex_x < 0 || tex_y < 0 || tex_x >= map_size as i32 || tex_y >= map_size as i32 {
@@ -1281,8 +1282,8 @@ impl GbaPpu {
                 (tex_x as usize, tex_y as usize)
             };
 
-            let tile_x = tx / 8;
-            let tile_y = ty / 8;
+            let tile_x = tx >> 3;
+            let tile_y = ty >> 3;
             let map_offset = screen_base + tile_y * tiles_per_row + tile_x;
 
             if map_offset >= vram.len() {
@@ -1290,8 +1291,8 @@ impl GbaPpu {
             }
 
             let tile_number = vram[map_offset] as usize;
-            let pixel_x = tx % 8;
-            let pixel_y = ty % 8;
+            let pixel_x = tx & 7;
+            let pixel_y = ty & 7;
 
             // affine BGs are always 8bpp
             let tile_offset = char_base + tile_number * 64 + pixel_y * 8 + pixel_x;
@@ -1309,7 +1310,7 @@ impl GbaPpu {
             has_pixel[x_screen] = true;
         }
 
-        // apply horizontal mosaic as a post-pass
+        // applies horizontal mosaic as a post-pass
         if cnt & (1 << 6) != 0 {
             let mos_h = (self.mosaic & 0x0F) as usize + 1;
             if mos_h > 1 {
