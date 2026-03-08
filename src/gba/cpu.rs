@@ -368,17 +368,54 @@ impl Arm7Tdmi {
             let was_halted = self.halted;
             self.halted = false;
 
-            // When waking from halt, the pipeline hasn't been refilled,
+            // when waking from halt, the pipeline hasn't been refilled,
             // so regs[15] points directly at the next instruction without
-            // the pipeline prefetch offset. We need to add +4 so that
-            // the IRQ handler's SUBS PC, LR, #4 returns to the correct
-            // instruction (the one after the halt point).
+            // the pipeline prefetch offset. adds +4 so the IRQ handler's
+            // SUBS PC, LR, #4 returns to the correct instruction.
             if was_halted {
                 self.regs[15] = self.regs[15].wrapping_add(4);
             }
 
             self.enter_exception(0x18, MODE_IRQ);
             return 3; // interrupt takes ~3 cycles
+        }
+
+        // HLE IntrWait: emulates the BIOS IntrWait/VBlankIntrWait loop.
+        // when intr_wait_flags is set, the CPU blocks until the waited
+        // interrupt appears in IntrCheck (0x03007FF8) or in IF directly
+        // (fallback for games that disable the waited interrupt in IE
+        // during their IRQ handler, like Zelda).
+        if self.bus.intr_wait_flags != 0 {
+            // skip re-halt check while inside the IRQ handler itself
+            if self.cpsr & CPSR_I == 0 {
+                let offset = (0x0300_7FF8u32 & 0x7FFF) as usize;
+                let intr_check = u16::from_le_bytes([
+                    self.bus.iwram[offset],
+                    self.bus.iwram[offset + 1],
+                ]);
+                if intr_check & self.bus.intr_wait_flags != 0 {
+                    // waited interrupt was serviced — clear from IntrCheck
+                    // and resume execution
+                    let cleared = intr_check & !self.bus.intr_wait_flags;
+                    let bytes = cleared.to_le_bytes();
+                    self.bus.iwram[offset] = bytes[0];
+                    self.bus.iwram[offset + 1] = bytes[1];
+                    self.halted = false;
+                    self.bus.intr_wait_flags = 0;
+                } else if self.bus.irq.if_() & self.bus.intr_wait_flags != 0 {
+                    // fallback: waited interrupt is in IF but not in
+                    // IntrCheck (game disabled it in IE so the handler
+                    // never ran for it). acknowledge and resume.
+                    self.bus.irq.ack_if(self.bus.intr_wait_flags);
+                    self.halted = false;
+                    self.bus.intr_wait_flags = 0;
+                } else if !self.halted {
+                    // IRQ handler has returned but waited interrupt not
+                    // in IntrCheck yet — re-halt to wait for more IRQs
+                    self.halted = true;
+                    return 1;
+                }
+            }
         }
 
         if self.halted {
@@ -388,7 +425,7 @@ impl Arm7Tdmi {
         self.cycles = 0;
         let instr = self.fetch();
 
-        // Prefetch the next pipeline entry BEFORE executing the instruction.
+        // preftches the next pipeline entry BEFORE executing the instruction.
         // On real ARM7TDMI, fetch/decode/execute happen simultaneously:
         // the fetch stage reads from PC at the same time as the execute
         // stage runs the current instruction, so self-modifying code that
@@ -408,7 +445,7 @@ impl Arm7Tdmi {
             None
         };
 
-        // allow BIOS data reads while executing BIOS code
+        // allows BIOS data reads while executing BIOS code
         let in_bios = self.regs[15] < 0x4000 + 8;
         if in_bios {
             self.bus.bios_readable = true;
@@ -1030,5 +1067,261 @@ mod tests {
         // step should enter IRQ exception
         cpu.step();
         assert_eq!(cpu.cpsr() & CPSR_MODE_MASK, MODE_IRQ);
+    }
+
+    #[test]
+    fn test_intr_wait_stays_halted_when_wrong_irq() {
+        let mut cpu = make_cpu();
+        // simulate IntrWait waiting for VBlank (bit 0)
+        cpu.bus.intr_wait_flags = 1;
+        cpu.set_halted(true);
+        // IntrCheck has VCount (bit 2) but NOT VBlank
+        let offset = (0x0300_7FF8u32 & 0x7FFF) as usize;
+        let bytes = 0x04u16.to_le_bytes();
+        cpu.bus.iwram[offset] = bytes[0];
+        cpu.bus.iwram[offset + 1] = bytes[1];
+
+        let cycles = cpu.step();
+
+        // should stay halted because VBlank not in IntrCheck
+        assert!(cpu.halted());
+        assert_eq!(cycles, 1);
+        // flags should remain set
+        assert_eq!(cpu.bus.intr_wait_flags, 1);
+    }
+
+    #[test]
+    fn test_intr_wait_unhalts_when_correct_irq() {
+        let mut cpu = make_cpu();
+        // simulate IntrWait waiting for VBlank (bit 0),
+        // CPU in SYS mode (CPSR_I == 0) and not halted —
+        // simulates the state after IRQ handler has returned
+        cpu.bus.intr_wait_flags = 1;
+        // IntrCheck has VBlank set
+        let offset = (0x0300_7FF8u32 & 0x7FFF) as usize;
+        let bytes = 0x01u16.to_le_bytes();
+        cpu.bus.iwram[offset] = bytes[0];
+        cpu.bus.iwram[offset + 1] = bytes[1];
+
+        cpu.step();
+
+        // should not be halted — waited interrupt was serviced
+        assert!(!cpu.halted());
+        // flags should be cleared
+        assert_eq!(cpu.bus.intr_wait_flags, 0);
+        // IntrCheck should have VBlank bit cleared
+        let check = u16::from_le_bytes([cpu.bus.iwram[offset], cpu.bus.iwram[offset + 1]]);
+        assert_eq!(check, 0);
+    }
+
+    #[test]
+    fn test_intr_wait_skipped_during_irq_handler() {
+        let mut cpu = make_cpu();
+        // simulate IntrWait flags set but CPU is in IRQ mode (CPSR_I=1)
+        cpu.bus.intr_wait_flags = 1;
+        cpu.set_cpsr(MODE_IRQ | CPSR_I);
+        // IntrCheck does NOT have VBlank
+        let offset = (0x0300_7FF8u32 & 0x7FFF) as usize;
+        cpu.bus.iwram[offset] = 0x00;
+        cpu.bus.iwram[offset + 1] = 0x00;
+
+        cpu.step();
+
+        // should NOT re-halt — CPSR_I is set, check is skipped
+        assert!(!cpu.halted());
+        // flags should remain (not cleared)
+        assert_eq!(cpu.bus.intr_wait_flags, 1);
+    }
+
+    #[test]
+    fn test_intr_wait_noop_when_flags_zero() {
+        let mut cpu = make_cpu();
+        // intr_wait_flags is 0 (default, or real BIOS mode)
+        assert_eq!(cpu.bus.intr_wait_flags, 0);
+
+        cpu.step();
+
+        // should execute normally, not halt
+        assert!(!cpu.halted());
+    }
+
+    #[test]
+    fn test_intr_wait_if_fallback_when_not_in_ie() {
+        // Zelda scenario: game disables VBlank in IE during handler,
+        // but VBlank is still in IF. the IF fallback should detect it.
+        let mut cpu = make_cpu();
+        cpu.bus.intr_wait_flags = 1; // wait for VBlank
+        // IE does NOT include VBlank — only VCount (bit 2)
+        cpu.bus.irq.set_ie(0x04);
+        // VBlank is pending in IF
+        cpu.bus.irq.raise(0x01);
+        // IntrCheck does NOT have VBlank
+        let offset = (0x0300_7FF8u32 & 0x7FFF) as usize;
+        cpu.bus.iwram[offset] = 0x00;
+        cpu.bus.iwram[offset + 1] = 0x00;
+
+        cpu.step();
+
+        // should unhalt via IF fallback
+        assert!(!cpu.halted());
+        assert_eq!(cpu.bus.intr_wait_flags, 0);
+        // VBlank should be acknowledged from IF
+        assert_eq!(cpu.bus.irq.if_() & 1, 0);
+    }
+
+    #[test]
+    fn test_intr_wait_if_fallback_wrong_irq_in_if() {
+        // IF has the wrong interrupt — should not trigger fallback
+        let mut cpu = make_cpu();
+        cpu.bus.intr_wait_flags = 1; // wait for VBlank
+        cpu.bus.irq.raise(0x04); // only VCount in IF
+        // IntrCheck empty
+        let offset = (0x0300_7FF8u32 & 0x7FFF) as usize;
+        cpu.bus.iwram[offset] = 0x00;
+        cpu.bus.iwram[offset + 1] = 0x00;
+
+        cpu.step();
+
+        // should re-halt — neither IntrCheck nor IF has VBlank
+        assert!(cpu.halted());
+        assert_eq!(cpu.bus.intr_wait_flags, 1);
+    }
+
+    #[test]
+    fn test_intr_wait_rehalts_after_irq_handler_returns() {
+        // Mario Kart scenario: IRQ fires, handler runs and returns,
+        // but waited interrupt not yet in IntrCheck — should re-halt
+        let mut cpu = make_cpu();
+        cpu.bus.intr_wait_flags = 1; // wait for VBlank
+        // CPU is NOT halted (handler just returned to user code)
+        assert!(!cpu.halted());
+        // IntrCheck does NOT have VBlank
+        let offset = (0x0300_7FF8u32 & 0x7FFF) as usize;
+        cpu.bus.iwram[offset] = 0x00;
+        cpu.bus.iwram[offset + 1] = 0x00;
+        // IF is also empty (handler acknowledged it)
+
+        let cycles = cpu.step();
+
+        // should re-halt to wait for next IRQ
+        assert!(cpu.halted());
+        assert_eq!(cycles, 1);
+        assert_eq!(cpu.bus.intr_wait_flags, 1);
+    }
+
+    #[test]
+    fn test_intr_wait_clears_only_waited_bits_from_intrcheck() {
+        // IntrCheck has multiple bits set; only the waited ones are cleared
+        let mut cpu = make_cpu();
+        cpu.bus.intr_wait_flags = 1; // wait for VBlank only
+        let offset = (0x0300_7FF8u32 & 0x7FFF) as usize;
+        // IntrCheck has VBlank (0x01) + HBlank (0x02) + VCount (0x04)
+        let bytes = 0x07u16.to_le_bytes();
+        cpu.bus.iwram[offset] = bytes[0];
+        cpu.bus.iwram[offset + 1] = bytes[1];
+
+        cpu.step();
+
+        assert!(!cpu.halted());
+        assert_eq!(cpu.bus.intr_wait_flags, 0);
+        // only VBlank (bit 0) cleared; HBlank + VCount remain
+        let check = u16::from_le_bytes([cpu.bus.iwram[offset], cpu.bus.iwram[offset + 1]]);
+        assert_eq!(check, 0x06);
+    }
+
+    #[test]
+    fn test_intr_wait_intrcheck_takes_priority_over_if_fallback() {
+        // when both IntrCheck and IF have the waited bit,
+        // IntrCheck path should be taken (clears IntrCheck, not IF)
+        let mut cpu = make_cpu();
+        cpu.bus.intr_wait_flags = 1; // wait for VBlank
+        // IntrCheck has VBlank
+        let offset = (0x0300_7FF8u32 & 0x7FFF) as usize;
+        let bytes = 0x01u16.to_le_bytes();
+        cpu.bus.iwram[offset] = bytes[0];
+        cpu.bus.iwram[offset + 1] = bytes[1];
+        // IF also has VBlank
+        cpu.bus.irq.raise(0x01);
+
+        cpu.step();
+
+        assert!(!cpu.halted());
+        assert_eq!(cpu.bus.intr_wait_flags, 0);
+        // IntrCheck should be cleared
+        let check = u16::from_le_bytes([cpu.bus.iwram[offset], cpu.bus.iwram[offset + 1]]);
+        assert_eq!(check, 0);
+        // IF should NOT be touched (IntrCheck path was used)
+        assert_eq!(cpu.bus.irq.if_() & 1, 1);
+    }
+
+    #[test]
+    fn test_intr_wait_irq_dispatch_preserves_flags() {
+        // when an IRQ fires while intr_wait_flags is set,
+        // the IRQ dispatch should not clear intr_wait_flags
+        let mut cpu = make_cpu();
+        cpu.bus.intr_wait_flags = 1; // wait for VBlank
+        cpu.set_halted(true);
+        // enable VBlank IRQ and raise it
+        cpu.bus.irq.set_ime(true);
+        cpu.bus.irq.set_ie(0x01);
+        cpu.bus.irq.raise(0x01);
+
+        cpu.step();
+
+        // IRQ dispatch should fire (pending() is true)
+        assert_eq!(cpu.cpsr() & CPSR_MODE_MASK, MODE_IRQ);
+        // intr_wait_flags should be preserved for after handler returns
+        assert_eq!(cpu.bus.intr_wait_flags, 1);
+    }
+
+    #[test]
+    fn test_intr_wait_multiple_flags() {
+        // waiting for multiple interrupts (VBlank | HBlank)
+        let mut cpu = make_cpu();
+        cpu.bus.intr_wait_flags = 0x03; // VBlank | HBlank
+        let offset = (0x0300_7FF8u32 & 0x7FFF) as usize;
+        // only HBlank in IntrCheck (bit 1) — partial match is enough
+        let bytes = 0x02u16.to_le_bytes();
+        cpu.bus.iwram[offset] = bytes[0];
+        cpu.bus.iwram[offset + 1] = bytes[1];
+
+        cpu.step();
+
+        // should unhalt — at least one waited bit matched
+        assert!(!cpu.halted());
+        assert_eq!(cpu.bus.intr_wait_flags, 0);
+        // both VBlank and HBlank bits cleared from IntrCheck
+        let check = u16::from_le_bytes([cpu.bus.iwram[offset], cpu.bus.iwram[offset + 1]]);
+        assert_eq!(check, 0);
+    }
+
+    #[test]
+    fn test_halt_wakes_on_pending_irq() {
+        // normal halt (no IntrWait) wakes on pending IRQ
+        let mut cpu = make_cpu();
+        cpu.set_halted(true);
+        cpu.bus.irq.set_ime(true);
+        cpu.bus.irq.set_ie(0x01);
+        cpu.bus.irq.raise_vblank();
+
+        cpu.step();
+
+        assert!(!cpu.halted());
+        assert_eq!(cpu.cpsr() & CPSR_MODE_MASK, MODE_IRQ);
+    }
+
+    #[test]
+    fn test_halt_stays_halted_without_pending_irq() {
+        // halt without matching IRQ should stay halted
+        let mut cpu = make_cpu();
+        cpu.set_halted(true);
+        // IME on but IE empty — nothing can wake it
+        cpu.bus.irq.set_ime(true);
+        cpu.bus.irq.raise_vblank();
+
+        let cycles = cpu.step();
+
+        assert!(cpu.halted());
+        assert_eq!(cycles, 1);
     }
 }

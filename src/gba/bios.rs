@@ -5,7 +5,7 @@
 
 use crate::{gba::cpu::Arm7Tdmi, warnln};
 
-/// handles a SWI call by dispatching to the appropriate HLE function.
+/// Handles a SWI call by dispatching to the appropriate HLE function.
 /// the comment field identifies which SWI is being called.
 pub fn handle_swi(cpu: &mut Arm7Tdmi, comment: u8) {
     match comment {
@@ -42,7 +42,7 @@ pub fn handle_swi(cpu: &mut Arm7Tdmi, comment: u8) {
     }
 }
 
-/// SWI 0x00: SoftReset - resets the system
+/// SWI 0x00: SoftReset - resets the system.
 fn swi_soft_reset(cpu: &mut Arm7Tdmi) {
     // clear IWRAM 0x03007E00-0x03007FFF
     for addr in (0x0300_7E00u32..0x0300_8000).step_by(4) {
@@ -57,7 +57,7 @@ fn swi_soft_reset(cpu: &mut Arm7Tdmi) {
     cpu.set_reg(15, 0x0800_0000); // jump to ROM entry
 }
 
-/// SWI 0x01: RegisterRamReset - clears specified memory regions
+/// SWI 0x01: RegisterRamReset - clears specified memory regions.
 fn swi_register_ram_reset(cpu: &mut Arm7Tdmi) {
     let flags = cpu.reg(0);
 
@@ -97,32 +97,59 @@ fn swi_register_ram_reset(cpu: &mut Arm7Tdmi) {
     }
 }
 
-/// SWI 0x02: Halt - halts the CPU until an interrupt occurs
+/// SWI 0x02: Halt - halts the CPU until an interrupt occurs.
 fn swi_halt(cpu: &mut Arm7Tdmi) {
     cpu.set_halted(true);
 }
 
-/// SWI 0x03: Stop - low-power stop mode (treat as halt)
+/// SWI 0x03: Stop - low-power stop mode (treat as halt).
 fn swi_stop(cpu: &mut Arm7Tdmi) {
     cpu.set_halted(true);
 }
 
-/// SWI 0x04: IntrWait - waits for specified interrupt(s)
+/// SWI 0x04: IntrWait — halts until the requested interrupt flags
+/// appear in IntrCheck (0x03007FF8).
+///
+/// sets intr_wait_flags so the re-halt check in cpu.rs keeps the CPU halted until matched.
+///
+/// r0 = discard_old, r1 = interrupt flags to wait for
 fn swi_intr_wait(cpu: &mut Arm7Tdmi) {
-    let _discard_old = cpu.reg(0);
-    let _flags = cpu.reg(1);
-    // simplified: just halt and let the main loop handle it
+    let discard_old = cpu.reg(0);
+    let flags = cpu.reg(1) as u16;
+
+    if discard_old != 0 {
+        let offset = (0x0300_7FF8u32 & 0x7FFF) as usize;
+        let old =
+            u16::from_le_bytes([cpu.bus.iwram[offset], cpu.bus.iwram[offset + 1]]);
+        let cleared = old & !flags;
+        let bytes = cleared.to_le_bytes();
+        cpu.bus.iwram[offset] = bytes[0];
+        cpu.bus.iwram[offset + 1] = bytes[1];
+    }
+
+    cpu.bus.intr_wait_flags = flags;
     cpu.set_halted(true);
 }
 
-/// SWI 0x05: VBlankIntrWait - waits for VBlank interrupt
+/// SWI 0x05: VBlankIntrWait — waits for VBlank interrupt and is equivalent to IntrWait(1, 1).
+///
+/// clears VBlank from IntrCheck and halts until VBlank arrives.
 fn swi_vblank_intr_wait(cpu: &mut Arm7Tdmi) {
+    let offset = (0x0300_7FF8u32 & 0x7FFF) as usize;
+    let old = u16::from_le_bytes([cpu.bus.iwram[offset], cpu.bus.iwram[offset + 1]]);
+    let cleared = old & !1u16;
+    let bytes = cleared.to_le_bytes();
+    cpu.bus.iwram[offset] = bytes[0];
+    cpu.bus.iwram[offset + 1] = bytes[1];
+
+    cpu.bus.intr_wait_flags = 1; // wait for VBlank (IRQ bit 0)
     cpu.set_halted(true);
 }
 
-/// SWI 0x06: Div - signed division
-/// r0 = numerator, r1 = denominator
-/// returns: r0 = result, r1 = remainder, r3 = abs(result)
+/// SWI 0x06: Div - signed division.
+///
+/// r0 = numerator, r1 = denominator.
+/// returns: r0 = result, r1 = remainder, r3 = abs(result).
 fn swi_div(cpu: &mut Arm7Tdmi) {
     let num = cpu.reg(0) as i32;
     let den = cpu.reg(1) as i32;
@@ -143,8 +170,9 @@ fn swi_div(cpu: &mut Arm7Tdmi) {
     cpu.set_reg(3, result.unsigned_abs());
 }
 
-/// SWI 0x07: DivArm - same as Div but with swapped arguments
-/// r0 = denominator, r1 = numerator
+/// SWI 0x07: DivArm - same as Div but with swapped arguments.
+///
+/// r0 = denominator, r1 = numerator.
 fn swi_div_arm(cpu: &mut Arm7Tdmi) {
     let den = cpu.reg(0) as i32;
     let num = cpu.reg(1) as i32;
@@ -164,7 +192,8 @@ fn swi_div_arm(cpu: &mut Arm7Tdmi) {
     cpu.set_reg(3, result.unsigned_abs());
 }
 
-/// SWI 0x08: Sqrt - integer square root
+/// SWI 0x08: Sqrt - integer square root.
+///
 /// r0 = value, returns r0 = sqrt(value)
 fn swi_sqrt(cpu: &mut Arm7Tdmi) {
     let value = cpu.reg(0);
@@ -172,7 +201,8 @@ fn swi_sqrt(cpu: &mut Arm7Tdmi) {
     cpu.set_reg(0, result);
 }
 
-/// SWI 0x09: ArcTan - arctangent
+/// SWI 0x09: ArcTan - arctangent.
+///
 /// r0 = tan (fixed point), returns r0 = angle
 fn swi_arctan(cpu: &mut Arm7Tdmi) {
     let tan = cpu.reg(0) as i16 as f64 / 16384.0;
@@ -181,7 +211,8 @@ fn swi_arctan(cpu: &mut Arm7Tdmi) {
     cpu.set_reg(0, result as u32);
 }
 
-/// SWI 0x0A: ArcTan2 - arctangent of y/x
+/// SWI 0x0A: ArcTan2 - arctangent of y/x.
+///
 /// r0 = x, r1 = y, returns r0 = angle (0x0000-0xFFFF)
 fn swi_arctan2(cpu: &mut Arm7Tdmi) {
     let x = cpu.reg(0) as i16 as f64;
@@ -192,7 +223,8 @@ fn swi_arctan2(cpu: &mut Arm7Tdmi) {
     cpu.set_reg(0, result as u32);
 }
 
-/// SWI 0x0B: CpuSet - memory copy/fill
+/// SWI 0x0B: CpuSet - memory copy/fill.
+///
 /// r0 = source, r1 = destination, r2 = length/mode
 fn swi_cpu_set(cpu: &mut Arm7Tdmi) {
     let src = cpu.reg(0);
@@ -226,7 +258,8 @@ fn swi_cpu_set(cpu: &mut Arm7Tdmi) {
     }
 }
 
-/// SWI 0x0C: CpuFastSet - fast memory copy/fill (32-bit, 8-word aligned)
+/// SWI 0x0C: CpuFastSet - fast memory copy/fill (32-bit, 8-word aligned).
+///
 /// r0 = source, r1 = destination, r2 = length/mode
 fn swi_cpu_fast_set(cpu: &mut Arm7Tdmi) {
     let src = cpu.reg(0);
@@ -248,12 +281,12 @@ fn swi_cpu_fast_set(cpu: &mut Arm7Tdmi) {
     }
 }
 
-/// SWI 0x0D: GetBiosChecksum - returns the BIOS checksum
+/// SWI 0x0D: GetBiosChecksum - returns the BIOS checksum.
 fn swi_get_bios_checksum(cpu: &mut Arm7Tdmi) {
     cpu.set_reg(0, 0xBAAE187F);
 }
 
-/// SWI 0x0E: BgAffineSet - calculates BG affine transformation parameters
+/// SWI 0x0E: BgAffineSet - calculates BG affine transformation parameters.
 fn swi_bg_affine_set(cpu: &mut Arm7Tdmi) {
     let src = cpu.reg(0);
     let dst = cpu.reg(1);
@@ -292,7 +325,7 @@ fn swi_bg_affine_set(cpu: &mut Arm7Tdmi) {
     }
 }
 
-/// SWI 0x0F: ObjAffineSet - calculates OBJ affine transformation parameters
+/// SWI 0x0F: ObjAffineSet - calculates OBJ affine transformation parameters.
 fn swi_obj_affine_set(cpu: &mut Arm7Tdmi) {
     let src = cpu.reg(0);
     let dst = cpu.reg(1);
@@ -323,7 +356,8 @@ fn swi_obj_affine_set(cpu: &mut Arm7Tdmi) {
     }
 }
 
-/// SWI 0x10: BitUnPack - bit unpacking
+/// SWI 0x10: BitUnPack - bit unpacking.
+///
 /// r0 = source, r1 = destination, r2 = pointer to unpack info
 fn swi_bit_unpack(cpu: &mut Arm7Tdmi) {
     let src = cpu.reg(0);
@@ -381,12 +415,12 @@ fn swi_bit_unpack(cpu: &mut Arm7Tdmi) {
     }
 }
 
-/// SWI 0x11: LZ77UnCompWram - LZ77 decompression to WRAM
+/// SWI 0x11: LZ77UnCompWram - LZ77 decompression to WRAM.
 fn swi_lz77_decomp_wram(cpu: &mut Arm7Tdmi) {
     lz77_decomp(cpu, false);
 }
 
-/// SWI 0x12: LZ77UnCompVram - LZ77 decompression to VRAM (16-bit writes)
+/// SWI 0x12: LZ77UnCompVram - LZ77 decompression to VRAM (16-bit writes).
 fn swi_lz77_decomp_vram(cpu: &mut Arm7Tdmi) {
     lz77_decomp(cpu, true);
 }
@@ -472,7 +506,8 @@ fn lz77_decomp(cpu: &mut Arm7Tdmi, vram_mode: bool) {
     }
 }
 
-/// SWI 0x13: HuffUnComp - huffman decompression
+/// SWI 0x13: HuffUnComp - huffman decompression.
+///
 /// r0 = source, r1 = destination
 fn swi_huff_decomp(cpu: &mut Arm7Tdmi) {
     let src = cpu.reg(0);
@@ -552,12 +587,12 @@ fn swi_huff_decomp(cpu: &mut Arm7Tdmi) {
     }
 }
 
-/// SWI 0x14: RLUnCompWram - run-length decompression to WRAM
+/// SWI 0x14: RLUnCompWram - run-length decompression to WRAM.
 fn swi_rl_decomp_wram(cpu: &mut Arm7Tdmi) {
     rl_decomp(cpu, false);
 }
 
-/// SWI 0x15: RLUnCompVram - run-length decompression to VRAM
+/// SWI 0x15: RLUnCompVram - run-length decompression to VRAM.
 fn swi_rl_decomp_vram(cpu: &mut Arm7Tdmi) {
     rl_decomp(cpu, true);
 }
@@ -638,12 +673,12 @@ fn rl_decomp(cpu: &mut Arm7Tdmi, vram_mode: bool) {
     }
 }
 
-/// SWI 0x16: DiffUnFilter8 - 8-bit differential unfilter to WRAM
+/// SWI 0x16: DiffUnFilter8 - 8-bit differential unfilter to WRAM.
 fn swi_diff_unfilt8_wram(cpu: &mut Arm7Tdmi) {
     diff_unfilt8(cpu, false);
 }
 
-/// SWI 0x17: DiffUnFilter8 - 8-bit differential unfilter to VRAM (16-bit writes)
+/// SWI 0x17: DiffUnFilter8 - 8-bit differential unfilter to VRAM (16-bit writes).
 fn swi_diff_unfilt8_vram(cpu: &mut Arm7Tdmi) {
     diff_unfilt8(cpu, true);
 }
@@ -688,7 +723,7 @@ fn diff_unfilt8(cpu: &mut Arm7Tdmi, vram_mode: bool) {
     }
 }
 
-/// SWI 0x18: DiffUnFilter16 - 16-bit differential unfilter
+/// SWI 0x18: DiffUnFilter16 - 16-bit differential unfilter.
 fn swi_diff_unfilt16(cpu: &mut Arm7Tdmi) {
     let src = cpu.reg(0);
     let mut dst = cpu.reg(1);
@@ -709,13 +744,14 @@ fn swi_diff_unfilt16(cpu: &mut Arm7Tdmi) {
     }
 }
 
-/// SWI 0x19: SoundBias - adjusts the sound bias
+/// SWI 0x19: SoundBias - adjusts the sound bias.
 fn swi_sound_bias(cpu: &mut Arm7Tdmi) {
     let _bias = cpu.reg(0);
     // simplified: sound bias is handled by the APU directly
 }
 
-/// SWI 0x1F: MidiKey2Freq - converts MIDI key to frequency
+/// SWI 0x1F: MidiKey2Freq - converts MIDI key to frequency.
+///
 /// r0 = wave data pointer, r1 = MIDI key, r2 = pitch adjust (fp)
 fn swi_midi_key2freq(cpu: &mut Arm7Tdmi) {
     let wave = cpu.reg(0);
@@ -812,6 +848,67 @@ mod tests {
         let mut cpu = make_cpu();
         handle_swi(&mut cpu, 0x05);
         assert!(cpu.halted());
+        // should set intr_wait_flags to VBlank (bit 0)
+        assert_eq!(cpu.bus.intr_wait_flags, 1);
+    }
+
+    #[test]
+    fn test_swi_vblank_intr_wait_clears_intr_check() {
+        let mut cpu = make_cpu();
+        // pre-set VBlank bit in IntrCheck at 0x03007FF8
+        let offset = (0x0300_7FF8u32 & 0x7FFF) as usize;
+        cpu.bus.iwram[offset] = 0x03; // VBlank | HBlank
+        cpu.bus.iwram[offset + 1] = 0x00;
+
+        handle_swi(&mut cpu, 0x05);
+
+        // VBlank bit should be cleared, HBlank preserved
+        let check = u16::from_le_bytes([cpu.bus.iwram[offset], cpu.bus.iwram[offset + 1]]);
+        assert_eq!(check, 0x02); // only HBlank remains
+    }
+
+    #[test]
+    fn test_swi_intr_wait_sets_flags_and_halts() {
+        let mut cpu = make_cpu();
+        cpu.set_reg(0, 1); // discard_old = true
+        cpu.set_reg(1, 0x04); // wait for VCount (bit 2)
+        handle_swi(&mut cpu, 0x04);
+        assert!(cpu.halted());
+        assert_eq!(cpu.bus.intr_wait_flags, 0x04);
+    }
+
+    #[test]
+    fn test_swi_intr_wait_discard_old_clears_intr_check() {
+        let mut cpu = make_cpu();
+        // pre-set VCount and VBlank in IntrCheck
+        let offset = (0x0300_7FF8u32 & 0x7FFF) as usize;
+        cpu.bus.iwram[offset] = 0x05; // VBlank | VCount
+        cpu.bus.iwram[offset + 1] = 0x00;
+
+        cpu.set_reg(0, 1); // discard_old = true
+        cpu.set_reg(1, 0x04); // wait for VCount
+        handle_swi(&mut cpu, 0x04);
+
+        // VCount bit cleared, VBlank preserved
+        let check = u16::from_le_bytes([cpu.bus.iwram[offset], cpu.bus.iwram[offset + 1]]);
+        assert_eq!(check, 0x01);
+    }
+
+    #[test]
+    fn test_swi_intr_wait_no_discard_preserves_intr_check() {
+        let mut cpu = make_cpu();
+        // pre-set VCount in IntrCheck
+        let offset = (0x0300_7FF8u32 & 0x7FFF) as usize;
+        cpu.bus.iwram[offset] = 0x04; // VCount
+        cpu.bus.iwram[offset + 1] = 0x00;
+
+        cpu.set_reg(0, 0); // discard_old = false
+        cpu.set_reg(1, 0x04); // wait for VCount
+        handle_swi(&mut cpu, 0x04);
+
+        // IntrCheck unchanged (discard_old == 0)
+        let check = u16::from_le_bytes([cpu.bus.iwram[offset], cpu.bus.iwram[offset + 1]]);
+        assert_eq!(check, 0x04);
     }
 
     #[test]
