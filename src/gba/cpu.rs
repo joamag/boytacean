@@ -1375,6 +1375,68 @@ mod tests {
     }
 
     #[test]
+    fn test_halt_irq_lr_hle_halt() {
+        // HLE halt flushes pipeline (pipeline_valid=false), so regs[15]
+        // points directly at the next instruction without the pipeline
+        // offset. the IRQ path must add +4 so that enter_exception()
+        // computes the correct LR for `SUBS PC, LR, #4` to return to
+        // the right instruction.
+        let mut cpu = make_cpu();
+        let resume_pc = 0x0800_1000u32;
+        cpu.set_reg(15, resume_pc);
+        // HLE halt: pipeline_valid stays false (default after new/reset)
+        cpu.set_halted(true);
+        assert!(!cpu.pipeline_valid);
+
+        cpu.bus.irq.set_ime(true);
+        cpu.bus.irq.set_ie(0x01);
+        cpu.bus.irq.raise_vblank();
+
+        cpu.step();
+
+        assert!(!cpu.halted());
+        assert_eq!(cpu.cpsr() & CPSR_MODE_MASK, MODE_IRQ);
+        // LR_IRQ should be resume_pc + 4 (the +4 adjustment was applied)
+        // enter_exception ARM path: LR = regs[15] - 4
+        // with adjustment: regs[15] = resume_pc + 4, so LR = resume_pc
+        // handler's `SUBS PC, LR, #4` returns resume_pc - 4? No:
+        // enter_exception sets LR = regs[15] - 4 = (resume_pc+4) - 4 = resume_pc
+        // but the real semantic: after IRQ, SUBS PC, LR, #4 returns to
+        // the interrupted instruction, which is resume_pc - 4 (since the
+        // +4 accounts for the missing pipeline offset).
+        // The key invariant: LR_IRQ = resume_pc (next_instr + 4)
+        assert_eq!(cpu.reg(14), resume_pc);
+    }
+
+    #[test]
+    fn test_halt_irq_lr_real_bios_halt() {
+        // real BIOS halt (via HALTCNT write) keeps pipeline valid, so
+        // regs[15] already includes the pipeline prefetch offset (+8 ARM).
+        // the IRQ path must NOT add +4, otherwise LR_IRQ ends up 4 bytes
+        // too high and `SUBS PC, LR, #4` returns to the wrong address.
+        // this was the root cause of the BIOS boot crash (regression test).
+        let mut cpu = make_cpu();
+        let halt_pc = 0x0800_2000u32;
+        // simulate real BIOS halt: PC has pipeline offset, pipeline valid
+        // after pipeline fill: regs[15] = halt_pc + 8 (2 words ahead)
+        cpu.set_reg(15, halt_pc + 8);
+        cpu.pipeline_valid = true;
+        cpu.set_halted(true);
+
+        cpu.bus.irq.set_ime(true);
+        cpu.bus.irq.set_ie(0x01);
+        cpu.bus.irq.raise_vblank();
+
+        cpu.step();
+
+        assert!(!cpu.halted());
+        assert_eq!(cpu.cpsr() & CPSR_MODE_MASK, MODE_IRQ);
+        // LR_IRQ = regs[15] - 4 = (halt_pc + 8) - 4 = halt_pc + 4
+        // handler's SUBS PC, LR, #4 returns halt_pc, which is correct
+        assert_eq!(cpu.reg(14), halt_pc + 4);
+    }
+
+    #[test]
     fn test_halt_stays_halted_without_pending_irq() {
         // halt without matching IRQ should stay halted
         let mut cpu = make_cpu();
