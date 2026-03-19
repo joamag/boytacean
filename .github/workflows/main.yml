@@ -10,10 +10,12 @@ jobs:
     strategy:
       matrix:
         rust-version: [
-          "1.83.0",
-          "1.84.0",
           "1.85.0",
           "1.86.0",
+          "1.87.0",
+          "1.88.0",
+          "1.89.0",
+          "1.90.0",
           "latest"
         ]
     runs-on: ubuntu-latest
@@ -45,10 +47,12 @@ jobs:
     strategy:
       matrix:
         rust-version: [
-          "1.83.0",
-          "1.84.0",
           "1.85.0",
           "1.86.0",
+          "1.87.0",
+          "1.88.0",
+          "1.89.0",
+          "1.90.0",
           "latest"
         ]
     runs-on: ubuntu-latest
@@ -177,10 +181,12 @@ jobs:
     strategy:
       matrix:
         rust-version: [
-          "1.83.0",
-          "1.84.0",
           "1.85.0",
           "1.86.0",
+          "1.87.0",
+          "1.88.0",
+          "1.89.0",
+          "1.90.0",
           "latest"
         ]
     runs-on: ubuntu-latest
@@ -214,10 +220,12 @@ jobs:
     strategy:
       matrix:
         rust-version: [
-          "1.83.0",
-          "1.84.0",
           "1.85.0",
           "1.86.0",
+          "1.87.0",
+          "1.88.0",
+          "1.89.0",
+          "1.90.0",
           "latest"
         ]
     runs-on: ubuntu-latest
