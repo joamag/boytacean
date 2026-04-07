@@ -10,6 +10,8 @@ pub mod devices;
 pub mod diag;
 pub mod dma;
 pub mod gb;
+pub mod gba;
+pub mod gba_test;
 pub mod gen;
 pub mod info;
 pub mod inst;
@@ -21,6 +23,7 @@ pub mod ppu;
 pub mod rom;
 pub mod serial;
 pub mod state;
+pub mod system;
 pub mod test;
 pub mod timer;
 
