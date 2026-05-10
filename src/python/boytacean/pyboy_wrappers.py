@@ -1,6 +1,6 @@
-from typing import Tuple, Union
+from typing import Any, Tuple, Union
 
-from .gb import GameBoy
+from .gb import GameBoy, PadKey
 from .pyboy_api import SPRITES, Sprite, TileMap
 
 NEXT_TETROMINO_ADDR = 0xC213
@@ -37,6 +37,8 @@ class GameWrapper:
         self._system = system
         self.game_has_started = False
         self.saved_state: Union[bytes, None] = None
+        self.mapping: Any = None
+        self.sprite_offset: int = 0
 
     def start_game(self, timer_div: Union[int, None] = None):
         if timer_div is not None:
@@ -148,6 +150,14 @@ class GameWrapperTetris(GameWrapper):
         # top of the playfield; tile 135 is the "game over" sigil
         return self._system.read_memory(0x9866) == 135
 
+    def _press_start(self, frames: int):
+        # internal helper used by start_game to navigate the title
+        # sequence without exposing button helpers on the wrapper
+        self._system.key_press(PadKey.Start)
+        for _ in range(frames):
+            self._system.next_frame()
+        self._system.key_lift(PadKey.Start)
+
 
 class GameWrapperSuperMarioLand(GameWrapper):
     cartridge_title = "SUPER MARIOLAND"
@@ -229,15 +239,3 @@ def _to_bcd(value: int) -> int:
     return ((value // 10) & 0xF) << 4 | (value % 10) & 0xF
 
 
-# helpers used internally by Tetris.start_game to navigate the
-# title sequence without exposing button helpers on the wrapper
-def _press_start(self, frames: int):
-    from .gb import PadKey
-
-    self._system.key_press(PadKey.Start)
-    for _ in range(frames):
-        self._system.next_frame()
-    self._system.key_lift(PadKey.Start)
-
-
-GameWrapperTetris._press_start = _press_start

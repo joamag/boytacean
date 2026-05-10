@@ -889,11 +889,16 @@ class PyBoyV2(GameBoy):
         return self.game_wrapper.game_area()
 
     def game_area_collision(self):
-        if not hasattr(self.game_wrapper, "game_area_collision"):
+        # not every wrapper implements game_area_collision (it's
+        # specific to overworld games like Pokemon Gen 1); resolve
+        # the method dynamically so the base class doesn't have to
+        # carry a `NotImplementedError` stub for every wrapper kind
+        impl = getattr(self.game_wrapper, "game_area_collision", None)
+        if impl is None:
             raise RuntimeError(
                 "Active game wrapper does not implement game_area_collision"
             )
-        return self.game_wrapper.game_area_collision()
+        return impl()
 
     def game_area_mapping(self, mapping, sprite_offset: int = 0):
         if mapping is not None:

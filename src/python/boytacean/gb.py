@@ -203,7 +203,11 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
     def load_graphics(self):
         from .graphics import Display
 
-        self._display = Display()
+        title = f"Boytacean - {self.rom_title}" if self.rom_title else "Boytacean"
+        self._display = Display(title=title)
+        cast(Display, self._display).set_hud(
+            enabled=True, base_title=title, clock_freq=self.clock_freq
+        )
 
     def save_state(self) -> bytes:
         return self._system.save_state()
@@ -449,10 +453,12 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
             self._video.save_frame(self.image(), self._frame_index)
             self._video.compute_next(self._frame_index)
 
-        if self._display is not None and self._display.should_render(self._frame_index):
+        if self._display is not None:
             from .graphics import Display
 
-            cast(Display, self._display).render_frame(self.frame_buffer())
+            display = cast(Display, self._display)
+            if display.should_render(self._frame_index):
+                display.render_frame(self.frame_buffer(), self._frame_index)
 
     def _start_capture(
         self,
