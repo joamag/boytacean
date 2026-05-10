@@ -139,6 +139,21 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
     def frame_buffer(self) -> bytes:
         return self._system.frame_buffer()
 
+    def vram(self) -> bytes:
+        return self._system.vram()
+
+    def oam(self) -> bytes:
+        return self._system.oam()
+
+    def hram(self) -> bytes:
+        return self._system.hram()
+
+    def rom_data(self) -> bytes:
+        return self._system.rom_data()
+
+    def ram_data(self) -> bytes:
+        return self._system.ram_data()
+
     def image(self) -> Image:
         frame_buffer = cast(bytes, self._system.frame_buffer())
         image = frombytes("RGB", (DISPLAY_WIDTH, DISPLAY_HEIGHT), frame_buffer, "raw")
@@ -219,12 +234,140 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
         self._system.set_serial_enabled(value)
 
     @property
+    def ppu_ly(self) -> int:
+        return self._system.ppu_ly()
+
+    @property
+    def ppu_frame(self) -> int:
+        return self._system.ppu_frame()
+
+    @property
+    def cpu_pc(self) -> int:
+        return self._system.cpu_pc()
+
+    @cpu_pc.setter
+    def cpu_pc(self, value: int):
+        self._system.set_cpu_pc(value)
+
+    @property
+    def cpu_sp(self) -> int:
+        return self._system.cpu_sp()
+
+    @cpu_sp.setter
+    def cpu_sp(self, value: int):
+        self._system.set_cpu_sp(value)
+
+    @property
+    def cpu_a(self) -> int:
+        return self._system.cpu_a()
+
+    @cpu_a.setter
+    def cpu_a(self, value: int):
+        self._system.set_cpu_a(value)
+
+    @property
+    def cpu_b(self) -> int:
+        return self._system.cpu_b()
+
+    @cpu_b.setter
+    def cpu_b(self, value: int):
+        self._system.set_cpu_b(value)
+
+    @property
+    def cpu_c(self) -> int:
+        return self._system.cpu_c()
+
+    @cpu_c.setter
+    def cpu_c(self, value: int):
+        self._system.set_cpu_c(value)
+
+    @property
+    def cpu_d(self) -> int:
+        return self._system.cpu_d()
+
+    @cpu_d.setter
+    def cpu_d(self, value: int):
+        self._system.set_cpu_d(value)
+
+    @property
+    def cpu_e(self) -> int:
+        return self._system.cpu_e()
+
+    @cpu_e.setter
+    def cpu_e(self, value: int):
+        self._system.set_cpu_e(value)
+
+    @property
+    def cpu_h(self) -> int:
+        return self._system.cpu_h()
+
+    @cpu_h.setter
+    def cpu_h(self, value: int):
+        self._system.set_cpu_h(value)
+
+    @property
+    def cpu_l(self) -> int:
+        return self._system.cpu_l()
+
+    @cpu_l.setter
+    def cpu_l(self, value: int):
+        self._system.set_cpu_l(value)
+
+    @property
+    def cgb(self) -> bool:
+        return self._system.cgb()
+
+    @property
+    def dmg(self) -> bool:
+        return self._system.dmg()
+
+    @property
+    def sgb(self) -> bool:
+        return self._system.sgb()
+
+    @property
     def rom_title(self) -> str:
         return self._system.rom_title()
 
     @property
+    def rom_bank(self) -> int:
+        return self._system.rom_bank()
+
+    @property
+    def ram_bank(self) -> int:
+        return self._system.ram_bank()
+
+    @property
+    def rom_banks(self) -> int:
+        return self._system.rom_banks()
+
+    @property
+    def ram_banks(self) -> int:
+        return self._system.ram_banks()
+
+    @property
+    def ram_enabled(self) -> bool:
+        return self._system.ram_enabled()
+
+    @property
+    def has_battery(self) -> bool:
+        return self._system.has_battery()
+
+    @property
+    def checksum(self) -> int:
+        return self._system.checksum()
+
+    @property
     def version(self) -> str:
         return self._system.version()
+
+    @property
+    def clock_freq(self) -> int:
+        return self._system.clock_freq()
+
+    @clock_freq.setter
+    def clock_freq(self, value: int):
+        self._system.set_clock_freq(value)
 
     @property
     def clock_freq_s(self) -> str:
@@ -233,6 +376,18 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
     @property
     def boot_rom_s(self) -> str:
         return self._system.boot_rom_s()
+
+    @property
+    def rom_type_s(self) -> str:
+        return self._system.rom_type_s()
+
+    @property
+    def rom_size_s(self) -> str:
+        return self._system.rom_size_s()
+
+    @property
+    def ram_size_s(self) -> str:
+        return self._system.ram_size_s()
 
     @property
     def timer_div(self) -> int:
