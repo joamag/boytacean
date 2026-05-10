@@ -203,7 +203,11 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
     def load_graphics(self):
         from .graphics import Display
 
-        title = f"Boytacean - {self.rom_title}" if self.rom_title else "Boytacean"
+        try:
+            rom_title = self.rom_title
+        except Exception:
+            rom_title = None
+        title = f"Boytacean - {rom_title}" if rom_title else "Boytacean"
         self._display = Display(title=title)
         cast(Display, self._display).set_hud(
             enabled=True, base_title=title, clock_freq=self.clock_freq
