@@ -8,6 +8,21 @@ except ImportError:
     frombytes = Any
 
 from .gb import GameBoy, GameBoyMode, PadKey
+from .pyboy_api import (
+    Sprite,
+    Tile,
+    TileMap,
+    SPRITES,
+    TILES,
+    TILES_CGB,
+)
+from .pyboy_wrappers import (
+    GameWrapper,
+    GameWrapperKirbyDreamLand,
+    GameWrapperSuperMarioLand,
+    GameWrapperTetris,
+    select_wrapper,
+)
 
 from .boytacean import (
     DISPLAY_WIDTH,
@@ -425,51 +440,6 @@ class Memory:
         self._system.write_memory(addr & 0xFFFF, value & 0xFF)
 
 
-class GameWrapper:
-    """
-    Generic game wrapper, used when no specific cartridge match is
-    found by the plugin system. Specific game wrappers (Tetris,
-    Super Mario Land, Kirby Dream Land) are introduced in later
-    tiers and inherit from this base class
-    """
-
-    cartridge_title: Union[str, None] = None
-    shape: Tuple[int, int] = (32, 32)
-    game_area_section: Tuple[int, int, int, int] = (0, 0, 32, 32)
-    game_area_follow_scxy: bool = False
-    tilemap_use_background: bool = True
-
-    def __init__(self, system: "GameBoy"):
-        self._system = system
-        self.game_has_started = False
-        self.saved_state: Union[bytes, None] = None
-
-    def start_game(self, timer_div: Union[int, None] = None):
-        if timer_div is not None:
-            self._system.timer_div = timer_div
-        self.saved_state = self._system.save_state()
-        self.game_has_started = True
-
-    def reset_game(self, timer_div: Union[int, None] = None):
-        if self.saved_state is None:
-            raise RuntimeError("Game has not been started")
-        self._system.load_state(self.saved_state)
-        if timer_div is not None:
-            self._system.timer_div = timer_div
-
-    def game_over(self) -> bool:
-        raise NotImplementedError("Generic wrapper does not implement game_over")
-
-    def game_area(self):
-        from numpy import zeros
-
-        x, y, w, h = self.game_area_section
-        return zeros((h, w), dtype="uint32")
-
-    def __repr__(self) -> str:
-        return f"GameWrapper({self.cartridge_title or 'Generic'})"
-
-
 class PyBoyV1(GameBoy):
     """
     Legacy PyBoy 1.x compatible class. Provides the historical API
@@ -505,7 +475,6 @@ class PyBoyV1(GameBoy):
         self.mb = MotherBoard(self, kwargs)
         self.screen = Screen(self)
         self.memory = Memory(self)
-        self.game_wrapper = GameWrapper(self)
         self.window_title = "PyBoy"
         self.paused = False
         self.stopped = False
@@ -518,6 +487,8 @@ class PyBoyV1(GameBoy):
 
         if gamerom_file:
             self.load_rom(gamerom_file)
+
+        self.game_wrapper = select_wrapper(self)
 
     def __enter__(self):
         return self
@@ -647,7 +618,8 @@ class PyBoyV2(GameBoy):
         self.screen = Screen(self)
         self.memory = Memory(self)
         self.register_file = RegisterFile(self)
-        self.game_wrapper = GameWrapper(self)
+        self.tilemap_background = TileMap(self, "BACKGROUND")
+        self.tilemap_window = TileMap(self, "WINDOW")
 
         self.window_title = ""
         self.paused = False
@@ -661,6 +633,7 @@ class PyBoyV2(GameBoy):
         if gamerom:
             self.load_rom(gamerom)
 
+        self.game_wrapper = select_wrapper(self)
         self.cartridge_title = self.rom_title
         self.gamerom = gamerom
 
@@ -739,8 +712,58 @@ class PyBoyV2(GameBoy):
         colors_hex = ",".join(f"{color & 0xFFFFFF:06x}" for color in palette)
         self.set_palette_colors(colors_hex)
 
+    def get_tile(self, identifier: int) -> Tile:
+        max_tiles = TILES_CGB if self.cgb else TILES
+        if not 0 <= identifier < max_tiles:
+            raise ValueError(f"Tile identifier out of range: {identifier}")
+        return Tile(self, identifier)
+
+    def get_sprite(self, index: int) -> Sprite:
+        return Sprite(self, index)
+
+    def get_sprite_by_tile_identifier(
+        self, tile_identifiers: List[int], on_screen: bool = True
+    ) -> List[List[int]]:
+        results: List[List[int]] = [[] for _ in tile_identifiers]
+        for index in range(SPRITES):
+            sprite = Sprite(self, index)
+            if on_screen and not sprite.on_screen:
+                continue
+            for slot, identifier in enumerate(tile_identifiers):
+                if sprite.tile_identifier == identifier:
+                    results[slot].append(index)
+        return results
+
     def game_area(self):
         return self.game_wrapper.game_area()
+
+    def game_area_collision(self):
+        if not hasattr(self.game_wrapper, "game_area_collision"):
+            raise RuntimeError(
+                "Active game wrapper does not implement game_area_collision"
+            )
+        return self.game_wrapper.game_area_collision()
+
+    def game_area_mapping(self, mapping, sprite_offset: int = 0):
+        if mapping is not None:
+            max_tiles = TILES_CGB if self.cgb else TILES
+            if len(mapping) != max_tiles:
+                raise ValueError(
+                    f"Mapping length must be {max_tiles}, got {len(mapping)}"
+                )
+        self.game_wrapper.mapping = mapping
+        self.game_wrapper.sprite_offset = sprite_offset
+
+    def game_area_dimensions(
+        self,
+        x: int,
+        y: int,
+        width: int,
+        height: int,
+        follow_scrolling: bool = True,
+    ):
+        self.game_wrapper.game_area_section = (x, y, width, height)
+        self.game_wrapper.game_area_follow_scxy = follow_scrolling
 
     def symbol_lookup(self, symbol: str) -> Tuple[int, int]:
         # symbol-file support is part of Tier 3 work, kept here as a

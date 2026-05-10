@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * High-pass audio filter options (Preserve, Accurate, Disable) with save-state support
 * SDL frontend shader loading support via `--shader-path`
 * PyBoy 2.x compatible Python interface (`PyBoyV2`) with `tick(count, render)`, `button`/`button_press`/`button_release`, `screen.ndarray`/`screen.image`, `memory[addr]` bracket accessor, `mb.cpu.registers` register file, `set_color_palette` and a generic `GameWrapper`
+* `Tile`, `Sprite` and `TileMap` API objects with bracket access, slice/2D indexing and `use_tile_objects(True)` toggle; `tilemap_background`/`tilemap_window` attributes plus `get_tile`/`get_sprite`/`get_sprite_by_tile_identifier` helpers on `PyBoyV2`
+* Standalone game wrappers (`GameWrapperTetris`, `GameWrapperSuperMarioLand`, `GameWrapperKirbyDreamLand`) auto-selected by cartridge title, plus `game_area`/`game_area_collision`/`game_area_mapping`/`game_area_dimensions` helpers
 * Standalone PyBoy 1.x compatible class (`PyBoyV1`) with `WindowEvent`, `send_input`, `screen_image`, `get_memory_value`/`set_memory_value` and `cartridge_title()` method
 * `PyBoy` alias resolving to `PyBoyV2` so the modern surface is the default for `from boytacean.pyboy import PyBoy`
 * Python bindings for VRAM, OAM, HRAM, ROM/RAM data, ROM/RAM banks, CPU register file, mode predicates and clock frequency
