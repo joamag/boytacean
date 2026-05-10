@@ -281,6 +281,7 @@ class GameWrapperTest(unittest.TestCase):
             self.assertEqual(pb.mb.cpu.registers.PC, pre)
 
     @requires_pocket
+    @requires_numpy
     def test_game_area_dimensions(self):
         with PyBoyV2(POCKET_ROM_PATH, window="headless", sound_emulated=False) as pb:
             pb.tick(60)
