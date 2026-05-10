@@ -237,5 +237,3 @@ def _bcd(value: int) -> int:
 
 def _to_bcd(value: int) -> int:
     return ((value // 10) & 0xF) << 4 | (value % 10) & 0xF
-
-

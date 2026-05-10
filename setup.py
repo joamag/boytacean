@@ -34,10 +34,7 @@ setuptools.setup(
     license="Apache License, Version 2.0",
     keywords="gameboy emulator rust",
     url="https://boytacean.joao.me",
-    packages=setuptools.find_packages(
-        where=os.path.normpath("src/python"),
-        exclude=("boytacean.test", "boytacean.test.*"),
-    ),
+    packages=setuptools.find_packages(where=os.path.normpath("src/python")),
     test_suite="boytacean.test",
     package_dir={"": os.path.normpath("src/python")},
     rust_extensions=[

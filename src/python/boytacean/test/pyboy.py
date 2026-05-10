@@ -3,7 +3,7 @@ import tempfile
 import unittest
 
 from io import BytesIO
-from os.path import dirname, realpath, join
+from os.path import dirname, exists, realpath, join
 
 from boytacean.pyboy import (
     BotSupportManager,
@@ -28,6 +28,15 @@ CURRENT_DIR = dirname(realpath(__file__))
 POCKET_ROM_PATH = join(CURRENT_DIR, "../../../../res/roms/demo/pocket.gb")
 ACID2_ROM_PATH = join(CURRENT_DIR, "../../../../res/roms/test/dmg_acid2.gb")
 
+requires_pocket = unittest.skipUnless(
+    exists(POCKET_ROM_PATH),
+    f"pocket.gb not present at {POCKET_ROM_PATH}; skipping ROM-dependent test",
+)
+requires_acid2 = unittest.skipUnless(
+    exists(ACID2_ROM_PATH),
+    f"dmg_acid2.gb not present at {ACID2_ROM_PATH}; skipping ROM-dependent test",
+)
+
 
 class PyBoyV2Test(unittest.TestCase):
 
@@ -38,6 +47,7 @@ class PyBoyV2Test(unittest.TestCase):
         self.assertEqual(len(list(WindowEvent)), 43)
         self.assertEqual(WindowEvent.CYCLE_PALETTE.value, 42)
 
+    @requires_pocket
     def test_pocket(self):
         with PyBoyV2(POCKET_ROM_PATH, window="headless", sound_emulated=False) as pb:
             self.assertEqual(pb.cartridge_title, "POCKET-DEMO")
@@ -45,6 +55,7 @@ class PyBoyV2Test(unittest.TestCase):
             self.assertTrue(pb.tick(10))
             self.assertEqual(pb.frame_count, 10)
 
+    @requires_pocket
     def test_memory_view(self):
         with PyBoyV2(POCKET_ROM_PATH, window="headless", sound_emulated=False) as pb:
             pb.tick(2)
@@ -57,6 +68,7 @@ class PyBoyV2Test(unittest.TestCase):
             pb.memory[0xC000:0xC004] = 0
             self.assertEqual(pb.memory[0xC000:0xC004], [0, 0, 0, 0])
 
+    @requires_pocket
     def test_screen(self):
         with PyBoyV2(POCKET_ROM_PATH, window="headless", sound_emulated=False) as pb:
             pb.tick(2)
@@ -68,6 +80,7 @@ class PyBoyV2Test(unittest.TestCase):
             self.assertEqual(str(ndarray.dtype), "uint8")
             self.assertEqual(pb.screen.raw_buffer_dims, (144, 160))
 
+    @requires_pocket
     def test_button(self):
         with PyBoyV2(POCKET_ROM_PATH, window="headless", sound_emulated=False) as pb:
             pb.button("a", delay=2)
@@ -76,6 +89,7 @@ class PyBoyV2Test(unittest.TestCase):
             with self.assertRaises(ValueError):
                 pb.button("invalid")
 
+    @requires_pocket
     def test_motherboard(self):
         with PyBoyV2(POCKET_ROM_PATH, window="headless", sound_emulated=False) as pb:
             pb.tick(2)
@@ -84,6 +98,7 @@ class PyBoyV2Test(unittest.TestCase):
             self.assertIsInstance(pb.mb.cpu.registers.PC, int)
             self.assertIsInstance(pb.mb.cpu.registers.HL, int)
 
+    @requires_pocket
     def test_save_state_roundtrip(self):
         with PyBoyV2(POCKET_ROM_PATH, window="headless", sound_emulated=False) as pb:
             pb.tick(20)
@@ -96,6 +111,7 @@ class PyBoyV2Test(unittest.TestCase):
             self.assertEqual(pb.mb.cpu.registers.PC, pc_before)
 
 
+@requires_pocket
 class PyBoyV1Test(unittest.TestCase):
 
     def test_pocket(self):
@@ -125,6 +141,7 @@ class PyBoyV1Test(unittest.TestCase):
             self.assertEqual(image.mode, "RGB")
 
 
+@requires_acid2
 class TileTest(unittest.TestCase):
 
     def test_tile(self):
@@ -151,6 +168,7 @@ class TileTest(unittest.TestCase):
                 pb.get_tile(9999)
 
 
+@requires_acid2
 class SpriteTest(unittest.TestCase):
 
     def test_sprite(self):
@@ -179,6 +197,7 @@ class SpriteTest(unittest.TestCase):
                 pb.get_sprite(40)
 
 
+@requires_acid2
 class TileMapTest(unittest.TestCase):
 
     def test_tilemap_attributes(self):
@@ -223,11 +242,13 @@ class TileMapTest(unittest.TestCase):
 
 class GameWrapperTest(unittest.TestCase):
 
+    @requires_pocket
     def test_generic_wrapper_auto_selected(self):
         with PyBoyV2(POCKET_ROM_PATH, window="headless", sound_emulated=False) as pb:
             self.assertIsInstance(pb.game_wrapper, GameWrapper)
             self.assertEqual(pb.game_wrapper.shape, (32, 32))
 
+    @requires_pocket
     def test_start_reset_round_trip(self):
         with PyBoyV2(POCKET_ROM_PATH, window="headless", sound_emulated=False) as pb:
             pb.tick(60)
@@ -238,6 +259,7 @@ class GameWrapperTest(unittest.TestCase):
             pb.game_wrapper.reset_game()
             self.assertEqual(pb.mb.cpu.registers.PC, pre)
 
+    @requires_pocket
     def test_game_area_dimensions(self):
         with PyBoyV2(POCKET_ROM_PATH, window="headless", sound_emulated=False) as pb:
             pb.tick(60)
@@ -245,6 +267,7 @@ class GameWrapperTest(unittest.TestCase):
             area = pb.game_area()
             self.assertEqual(area.shape, (4, 8))
 
+    @requires_pocket
     def test_game_area_mapping_validation(self):
         with PyBoyV2(POCKET_ROM_PATH, window="headless", sound_emulated=False) as pb:
             with self.assertRaises(ValueError):
@@ -261,6 +284,7 @@ class GameWrapperTest(unittest.TestCase):
         self.assertEqual(GameWrapperKirbyDreamLand.shape, (20, 16))
 
 
+@requires_acid2
 class SymbolLookupTest(unittest.TestCase):
 
     def _write_sym(self) -> str:
@@ -288,6 +312,7 @@ class SymbolLookupTest(unittest.TestCase):
             os.unlink(path)
 
 
+@requires_acid2
 class HookTest(unittest.TestCase):
 
     def test_register_and_deregister(self):
@@ -312,6 +337,7 @@ class HookTest(unittest.TestCase):
                 pb.hook_deregister(0, 0xBEEF)
 
 
+@requires_acid2
 class MemoryScannerTest(unittest.TestCase):
 
     def test_scan_exact(self):
@@ -358,6 +384,7 @@ class MemoryScannerTest(unittest.TestCase):
             self.assertEqual(survivors, [0xC201])
 
 
+@requires_acid2
 class GameSharkTest(unittest.TestCase):
 
     def test_apply_8bit_write(self):
@@ -387,6 +414,7 @@ class GameSharkTest(unittest.TestCase):
                 pb.gameshark.add("01010001")
 
 
+@requires_acid2
 class BotSupportManagerTest(unittest.TestCase):
 
     def test_manager_type(self):
