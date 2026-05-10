@@ -42,6 +42,7 @@ setuptools.setup(
             "boytacean.boytacean",
             binding=setuptools_rust.Binding.PyO3,
             features=["python"],
+            debug=False,
         )
     ],
     install_requires=[],

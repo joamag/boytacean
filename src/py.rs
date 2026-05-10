@@ -97,6 +97,14 @@ impl GameBoy {
         self.system.next_frame()
     }
 
+    pub fn next_frames(&mut self, count: usize) -> u64 {
+        let mut total = 0u64;
+        for _ in 0..count {
+            total += self.system.next_frame() as u64;
+        }
+        total
+    }
+
     pub fn step_to(&mut self, addr: u16) -> u32 {
         self.system.step_to(addr)
     }
@@ -111,6 +119,11 @@ impl GameBoy {
 
     pub fn frame_buffer(&mut self, py: Python) -> PyObject {
         let pybytes = PyBytes::new(py, self.system.frame_buffer());
+        pybytes.into()
+    }
+
+    pub fn frame_buffer_rgba(&mut self, py: Python) -> PyObject {
+        let pybytes = PyBytes::new(py, &self.system.ppu().frame_buffer_xrgb8888());
         pybytes.into()
     }
 

@@ -351,28 +351,24 @@ class Screen:
 
     @property
     def image(self) -> Image:
-        # converts the underlying RGB888 frame buffer into an RGBA
-        # PIL image so that consumers can rely on the modern PyBoy
-        # 4-channel layout
-        rgb = self._system.frame_buffer()
-        return frombytes("RGB", (DISPLAY_WIDTH, DISPLAY_HEIGHT), rgb, "raw").convert(
-            "RGBA"
-        )
+        # the core hands us a native RGBA buffer directly, which
+        # matches the modern PyBoy 4-channel layout without any
+        # per-pixel conversion in Python
+        rgba = self._system.frame_buffer_rgba()
+        return frombytes("RGBA", (DISPLAY_WIDTH, DISPLAY_HEIGHT), rgba, "raw")
 
     @property
     def ndarray(self):
-        from numpy import frombuffer, dstack, full
+        from numpy import frombuffer
 
-        rgb = self._system.frame_buffer()
-        flat = frombuffer(rgb, dtype="uint8").reshape(
-            (DISPLAY_HEIGHT, DISPLAY_WIDTH, 3)
+        rgba = self._system.frame_buffer_rgba()
+        return frombuffer(rgba, dtype="uint8").reshape(
+            (DISPLAY_HEIGHT, DISPLAY_WIDTH, 4)
         )
-        alpha = full((DISPLAY_HEIGHT, DISPLAY_WIDTH, 1), 255, dtype="uint8")
-        return dstack((flat, alpha))
 
     @property
     def raw_buffer(self) -> memoryview:
-        return memoryview(bytearray(self._system.frame_buffer()))
+        return memoryview(bytearray(self._system.frame_buffer_rgba()))
 
     @property
     def raw_buffer_dims(self) -> Tuple[int, int]:
@@ -380,7 +376,7 @@ class Screen:
 
     @property
     def raw_buffer_format(self) -> str:
-        return "RGB"
+        return "RGBA"
 
     @property
     def tilemap_position_list(self) -> List[List[int]]:
@@ -796,12 +792,23 @@ class PyBoyV2(GameBoy):
         # since the headless path always produces a frame buffer
         if self.stopped:
             return False
-        for _ in range(count):
-            self.next_frame()
-            if self.gameshark.cheats:
-                self.gameshark.apply()
-            if not self._hooks.is_empty():
-                self._hooks.fire_for(self.cpu_pc)
+        # fast path: when nothing observes per-frame state from Python,
+        # batch the loop entirely inside Rust to avoid the PyO3 boundary
+        # cost on every frame
+        if (
+            not self.gameshark.cheats
+            and self._hooks.is_empty()
+            and self._video is None
+            and self._display is None
+        ):
+            self.next_frames(count)
+        else:
+            for _ in range(count):
+                self.next_frame()
+                if self.gameshark.cheats:
+                    self.gameshark.apply()
+                if not self._hooks.is_empty():
+                    self._hooks.fire_for(self.cpu_pc)
         return not self.stopped
 
     def stop(
