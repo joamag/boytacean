@@ -28,6 +28,16 @@ CURRENT_DIR = dirname(realpath(__file__))
 POCKET_ROM_PATH = join(CURRENT_DIR, "../../../../res/roms/demo/pocket.gb")
 ACID2_ROM_PATH = join(CURRENT_DIR, "../../../../res/roms/test/dmg_acid2.gb")
 
+
+def _has_module(name: str) -> bool:
+    from importlib.util import find_spec
+
+    try:
+        return find_spec(name) is not None
+    except (ImportError, ValueError):
+        return False
+
+
 requires_pocket = unittest.skipUnless(
     exists(POCKET_ROM_PATH),
     f"pocket.gb not present at {POCKET_ROM_PATH}; skipping ROM-dependent test",
@@ -35,6 +45,13 @@ requires_pocket = unittest.skipUnless(
 requires_acid2 = unittest.skipUnless(
     exists(ACID2_ROM_PATH),
     f"dmg_acid2.gb not present at {ACID2_ROM_PATH}; skipping ROM-dependent test",
+)
+
+requires_numpy = unittest.skipUnless(
+    _has_module("numpy"), "numpy not installed; skipping ndarray-dependent test"
+)
+requires_pillow = unittest.skipUnless(
+    _has_module("PIL"), "Pillow not installed; skipping image-dependent test"
 )
 
 
@@ -69,6 +86,8 @@ class PyBoyV2Test(unittest.TestCase):
             self.assertEqual(pb.memory[0xC000:0xC004], [0, 0, 0, 0])
 
     @requires_pocket
+    @requires_numpy
+    @requires_pillow
     def test_screen(self):
         with PyBoyV2(POCKET_ROM_PATH, window="headless", sound_emulated=False) as pb:
             pb.tick(2)
@@ -144,6 +163,8 @@ class PyBoyV1Test(unittest.TestCase):
 @requires_acid2
 class TileTest(unittest.TestCase):
 
+    @requires_numpy
+    @requires_pillow
     def test_tile(self):
         with PyBoyV2(ACID2_ROM_PATH, window="headless", sound_emulated=False) as pb:
             pb.tick(80)
@@ -422,6 +443,8 @@ class BotSupportManagerTest(unittest.TestCase):
             mgr = pb.botsupport_manager()
             self.assertIsInstance(mgr, BotSupportManager)
 
+    @requires_numpy
+    @requires_pillow
     def test_legacy_screen(self):
         with PyBoyV1(ACID2_ROM_PATH, disable_renderer=True, sound_emulated=False) as pb:
             pb.tick()
