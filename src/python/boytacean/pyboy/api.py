@@ -6,7 +6,7 @@ except ImportError:
     Image = Any
     frombytes = Any
 
-from .gb import GameBoy
+from ..gb import GameBoy
 
 VRAM_OFFSET = 0x8000
 LCDC_OFFSET = 0xFF40

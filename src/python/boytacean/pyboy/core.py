@@ -7,8 +7,8 @@ except ImportError:
     Image = Any
     frombytes = Any
 
-from .gb import GameBoy, GameBoyMode, PadKey
-from .pyboy_api import (
+from ..gb import GameBoy, GameBoyMode, PadKey
+from .api import (
     Sprite,
     Tile,
     TileMap,
@@ -16,14 +16,14 @@ from .pyboy_api import (
     TILES,
     TILES_CGB,
 )
-from .pyboy_wrappers import (
+from .wrappers import (
     GameWrapper,
     GameWrapperKirbyDreamLand,
     GameWrapperSuperMarioLand,
     GameWrapperTetris,
     select_wrapper,
 )
-from .pyboy_debug import (
+from .debug import (
     DynamicComparisonType,
     GameShark,
     HookRegistry,
@@ -55,7 +55,7 @@ __all__ = [
     "WindowEvent",
 ]
 
-from .boytacean import (
+from ..boytacean import (
     DISPLAY_WIDTH,
     DISPLAY_HEIGHT,
     HRAM_SIZE,

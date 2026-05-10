@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import Any, Callable, Dict, List, Tuple, Union
 
-from .gb import GameBoy
+from ..gb import GameBoy
 
 
 class StandardComparisonType(Enum):

@@ -1,7 +1,7 @@
 from typing import Any, Tuple, Union
 
-from .gb import GameBoy, PadKey
-from .pyboy_api import SPRITES, Sprite, TileMap
+from ..gb import GameBoy, PadKey
+from .api import SPRITES, Sprite, TileMap
 
 NEXT_TETROMINO_ADDR = 0xC213
 
