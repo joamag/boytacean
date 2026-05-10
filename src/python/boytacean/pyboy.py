@@ -23,6 +23,35 @@ from .pyboy_wrappers import (
     GameWrapperTetris,
     select_wrapper,
 )
+from .pyboy_debug import (
+    DynamicComparisonType,
+    GameShark,
+    HookRegistry,
+    MemoryScanner,
+    ScanMode,
+    StandardComparisonType,
+    SymbolTable,
+)
+
+__all__ = [
+    "DMG_PALETTES",
+    "DynamicComparisonType",
+    "GameShark",
+    "GameWrapper",
+    "GameWrapperKirbyDreamLand",
+    "GameWrapperSuperMarioLand",
+    "GameWrapperTetris",
+    "MemoryScanner",
+    "PyBoy",
+    "PyBoyV1",
+    "PyBoyV2",
+    "ScanMode",
+    "Sprite",
+    "StandardComparisonType",
+    "Tile",
+    "TileMap",
+    "WindowEvent",
+]
 
 from .boytacean import (
     DISPLAY_WIDTH,
@@ -620,6 +649,10 @@ class PyBoyV2(GameBoy):
         self.register_file = RegisterFile(self)
         self.tilemap_background = TileMap(self, "BACKGROUND")
         self.tilemap_window = TileMap(self, "WINDOW")
+        self.memory_scanner = MemoryScanner(self)
+        self.gameshark = GameShark(self)
+        self._symbols = SymbolTable()
+        self._hooks = HookRegistry(self)
 
         self.window_title = ""
         self.paused = False
@@ -633,12 +666,21 @@ class PyBoyV2(GameBoy):
         if gamerom:
             self.load_rom(gamerom)
 
+        if symbols:
+            self._symbols.load(symbols)
+
         self.game_wrapper = select_wrapper(self)
         self.cartridge_title = self.rom_title
         self.gamerom = gamerom
 
         if isinstance(color_palette, tuple) and not self.cgb:
             self.set_color_palette(color_palette)
+
+        if gameshark:
+            for code in gameshark.split(","):
+                stripped = code.strip()
+                if stripped:
+                    self.gameshark.add(stripped)
 
         self._gameroms_ram_file = ram_file
         self._gameroms_rtc_file = rtc_file
@@ -658,6 +700,10 @@ class PyBoyV2(GameBoy):
             return False
         for _ in range(count):
             self.next_frame()
+            if self.gameshark.cheats:
+                self.gameshark.apply()
+            if not self._hooks.is_empty():
+                self._hooks.fire_for(self.cpu_pc)
         return not self.stopped
 
     def stop(
@@ -766,15 +812,27 @@ class PyBoyV2(GameBoy):
         self.game_wrapper.game_area_follow_scxy = follow_scrolling
 
     def symbol_lookup(self, symbol: str) -> Tuple[int, int]:
-        # symbol-file support is part of Tier 3 work, kept here as a
-        # placeholder so dependent scripts get a clear failure
-        raise RuntimeError("symbol_lookup is not yet implemented")
+        return self._symbols.lookup(symbol)
 
-    def hook_register(self, bank: int, addr, callback, context):
-        raise RuntimeError("hook_register is not yet implemented")
+    def hook_register(
+        self,
+        bank: Union[int, None],
+        addr: Union[int, str],
+        callback,
+        context=None,
+    ):
+        if bank is None and isinstance(addr, str):
+            bank, addr = self.symbol_lookup(addr)
+        if isinstance(addr, str):
+            raise ValueError("addr must be an integer when bank is provided")
+        self._hooks.register(bank if bank is not None else 0, addr, callback, context)
 
-    def hook_deregister(self, bank: int, addr):
-        raise RuntimeError("hook_deregister is not yet implemented")
+    def hook_deregister(self, bank: Union[int, None], addr: Union[int, str]):
+        if bank is None and isinstance(addr, str):
+            bank, addr = self.symbol_lookup(addr)
+        if isinstance(addr, str):
+            raise ValueError("addr must be an integer when bank is provided")
+        self._hooks.deregister(bank if bank is not None else 0, addr)
 
     def _key_from_name(self, name: str) -> PadKey:
         normalized = name.strip().lower()

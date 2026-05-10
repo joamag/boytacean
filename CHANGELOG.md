@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * PyBoy 2.x compatible Python interface (`PyBoyV2`) with `tick(count, render)`, `button`/`button_press`/`button_release`, `screen.ndarray`/`screen.image`, `memory[addr]` bracket accessor, `mb.cpu.registers` register file, `set_color_palette` and a generic `GameWrapper`
 * `Tile`, `Sprite` and `TileMap` API objects with bracket access, slice/2D indexing and `use_tile_objects(True)` toggle; `tilemap_background`/`tilemap_window` attributes plus `get_tile`/`get_sprite`/`get_sprite_by_tile_identifier` helpers on `PyBoyV2`
 * Standalone game wrappers (`GameWrapperTetris`, `GameWrapperSuperMarioLand`, `GameWrapperKirbyDreamLand`) auto-selected by cartridge title, plus `game_area`/`game_area_collision`/`game_area_mapping`/`game_area_dimensions` helpers
+* `.sym` symbol-file loader and `symbol_lookup(name)` returning `(bank, addr)` on `PyBoyV2`
+* Lightweight pure-Python `hook_register`/`hook_deregister` over per-frame PC checks (no opcode patching, zero cost when no hooks are registered)
+* `MemoryScanner` with EXACT/LESS_THAN/GREATER_THAN scans plus CHANGED/UNCHANGED/INCREASED/DECREASED/MATCH rescans
+* `GameShark` cheat manager applying 8-bit RAM-write codes (`ttvvaaaa` format) every frame, with `add`/`remove`/`clear_all`
 * Standalone PyBoy 1.x compatible class (`PyBoyV1`) with `WindowEvent`, `send_input`, `screen_image`, `get_memory_value`/`set_memory_value` and `cartridge_title()` method
 * `PyBoy` alias resolving to `PyBoyV2` so the modern surface is the default for `from boytacean.pyboy import PyBoy`
 * Python bindings for VRAM, OAM, HRAM, ROM/RAM data, ROM/RAM banks, CPU register file, mode predicates and clock frequency

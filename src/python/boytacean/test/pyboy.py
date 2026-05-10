@@ -1,9 +1,12 @@
+import os
+import tempfile
 import unittest
 
 from io import BytesIO
 from os.path import dirname, realpath, join
 
 from boytacean.pyboy import (
+    DynamicComparisonType,
     GameWrapper,
     GameWrapperKirbyDreamLand,
     GameWrapperSuperMarioLand,
@@ -11,7 +14,9 @@ from boytacean.pyboy import (
     PyBoy,
     PyBoyV1,
     PyBoyV2,
+    ScanMode,
     Sprite,
+    StandardComparisonType,
     Tile,
     TileMap,
     WindowEvent,
@@ -252,3 +257,129 @@ class GameWrapperTest(unittest.TestCase):
         self.assertEqual(GameWrapperSuperMarioLand.shape, (20, 16))
         self.assertEqual(GameWrapperKirbyDreamLand.cartridge_title, "KIRBY DREAM LAN")
         self.assertEqual(GameWrapperKirbyDreamLand.shape, (20, 16))
+
+
+class SymbolLookupTest(unittest.TestCase):
+
+    def _write_sym(self) -> str:
+        sym = tempfile.NamedTemporaryFile(
+            suffix=".sym", mode="w", delete=False, encoding="utf-8"
+        )
+        sym.write("[labels]\n; comment\n00:0100 EntryPoint\n02:6000 BankedFunc\n")
+        sym.close()
+        return sym.name
+
+    def test_symbol_lookup(self):
+        path = self._write_sym()
+        try:
+            with PyBoyV2(
+                ACID2_ROM_PATH,
+                window="headless",
+                sound_emulated=False,
+                symbols=path,
+            ) as pb:
+                self.assertEqual(pb.symbol_lookup("EntryPoint"), (0, 0x100))
+                self.assertEqual(pb.symbol_lookup("BankedFunc"), (2, 0x6000))
+                with self.assertRaises(ValueError):
+                    pb.symbol_lookup("nope")
+        finally:
+            os.unlink(path)
+
+
+class HookTest(unittest.TestCase):
+
+    def test_register_and_deregister(self):
+        with PyBoyV2(ACID2_ROM_PATH, window="headless", sound_emulated=False) as pb:
+            fired = []
+
+            def cb(ctx):
+                fired.append(ctx)
+
+            pb.hook_register(0, 0x0100, cb, context="ctx")
+            pb.hook_deregister(0, 0x0100)
+
+    def test_double_register_rejected(self):
+        with PyBoyV2(ACID2_ROM_PATH, window="headless", sound_emulated=False) as pb:
+            pb.hook_register(0, 0x0100, lambda ctx: None, None)
+            with self.assertRaises(ValueError):
+                pb.hook_register(0, 0x0100, lambda ctx: None, None)
+
+    def test_deregister_unknown_rejected(self):
+        with PyBoyV2(ACID2_ROM_PATH, window="headless", sound_emulated=False) as pb:
+            with self.assertRaises(ValueError):
+                pb.hook_deregister(0, 0xBEEF)
+
+
+class MemoryScannerTest(unittest.TestCase):
+
+    def test_scan_exact(self):
+        with PyBoyV2(ACID2_ROM_PATH, window="headless", sound_emulated=False) as pb:
+            pb.tick(2)
+            for offset, value in enumerate([0x12, 0x34, 0x12, 0x56, 0x12]):
+                pb.memory[0xC200 + offset] = value
+            addrs = pb.memory_scanner.scan_memory(
+                target_value=0x12,
+                start_addr=0xC200,
+                end_addr=0xC210,
+                standard_comparison_type=StandardComparisonType.EXACT,
+            )
+            self.assertEqual(addrs, [0xC200, 0xC202, 0xC204])
+
+    def test_scan_greater_than(self):
+        with PyBoyV2(ACID2_ROM_PATH, window="headless", sound_emulated=False) as pb:
+            pb.tick(2)
+            for offset, value in enumerate([0x10, 0x40, 0x20, 0x40, 0x10]):
+                pb.memory[0xC200 + offset] = value
+            addrs = pb.memory_scanner.scan_memory(
+                target_value=0x30,
+                start_addr=0xC200,
+                end_addr=0xC210,
+                standard_comparison_type=StandardComparisonType.GREATER_THAN,
+            )
+            self.assertEqual(addrs, [0xC201, 0xC203])
+
+    def test_rescan_changed(self):
+        with PyBoyV2(ACID2_ROM_PATH, window="headless", sound_emulated=False) as pb:
+            pb.tick(2)
+            for offset, value in enumerate([0x12, 0x12, 0x12]):
+                pb.memory[0xC200 + offset] = value
+            pb.memory_scanner.scan_memory(
+                target_value=0x12,
+                start_addr=0xC200,
+                end_addr=0xC210,
+                standard_comparison_type=StandardComparisonType.EXACT,
+            )
+            pb.memory[0xC201] = 0x99
+            survivors = pb.memory_scanner.rescan_memory(
+                dynamic_comparison_type=DynamicComparisonType.CHANGED
+            )
+            self.assertEqual(survivors, [0xC201])
+
+
+class GameSharkTest(unittest.TestCase):
+
+    def test_apply_8bit_write(self):
+        with PyBoyV2(ACID2_ROM_PATH, window="headless", sound_emulated=False) as pb:
+            pb.tick(2)
+            pb.memory[0xC100] = 0x00
+            pb.gameshark.add("014200C1")
+            pb.tick(1)
+            self.assertEqual(pb.memory[0xC100], 0x42)
+
+    def test_clear_all_restores(self):
+        with PyBoyV2(ACID2_ROM_PATH, window="headless", sound_emulated=False) as pb:
+            pb.tick(2)
+            pb.memory[0xC101] = 0x07
+            pb.gameshark.add("014401C1")
+            pb.tick(1)
+            self.assertEqual(pb.memory[0xC101], 0x44)
+            pb.gameshark.clear_all()
+            pb.tick(1)
+            self.assertEqual(pb.memory[0xC101], 0x07)
+
+    def test_invalid_codes_rejected(self):
+        with PyBoyV2(ACID2_ROM_PATH, window="headless", sound_emulated=False) as pb:
+            with self.assertRaises(ValueError):
+                pb.gameshark.add("BAD")
+            with self.assertRaises(ValueError):
+                pb.gameshark.add("01010001")
