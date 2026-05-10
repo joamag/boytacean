@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Lightweight pure-Python `hook_register`/`hook_deregister` over per-frame PC checks (no opcode patching, zero cost when no hooks are registered)
 * `MemoryScanner` with EXACT/LESS_THAN/GREATER_THAN scans plus CHANGED/UNCHANGED/INCREASED/DECREASED/MATCH rescans
 * `GameShark` cheat manager applying 8-bit RAM-write codes (`ttvvaaaa` format) every frame, with `add`/`remove`/`clear_all`
+* `PyBoyV1.botsupport_manager()` returning a `BotSupportManager` proxy with `screen()`, `sprite()`, `sprite_by_tile_identifier()`, `tile()`, `tilemap_background()` and `tilemap_window()` methods
+* `LegacyScreen` exposing the 1.x 3-channel RGB `screen_image`, `screen_ndarray`, `raw_screen_buffer*` and `tilemap_position*` shapes used by older AI scripts
+* `PyBoyV1.override_memory_value(rom_bank, addr, value)` for legacy memory-patching scripts (RAM addresses only — ROM patching surfaces a clear `RuntimeError` until the core exposes cartridge writes)
 * Standalone PyBoy 1.x compatible class (`PyBoyV1`) with `WindowEvent`, `send_input`, `screen_image`, `get_memory_value`/`set_memory_value` and `cartridge_title()` method
 * `PyBoy` alias resolving to `PyBoyV2` so the modern surface is the default for `from boytacean.pyboy import PyBoy`
 * Python bindings for VRAM, OAM, HRAM, ROM/RAM data, ROM/RAM banks, CPU register file, mode predicates and clock frequency

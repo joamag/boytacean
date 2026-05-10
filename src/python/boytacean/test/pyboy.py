@@ -6,11 +6,13 @@ from io import BytesIO
 from os.path import dirname, realpath, join
 
 from boytacean.pyboy import (
+    BotSupportManager,
     DynamicComparisonType,
     GameWrapper,
     GameWrapperKirbyDreamLand,
     GameWrapperSuperMarioLand,
     GameWrapperTetris,
+    LegacyScreen,
     PyBoy,
     PyBoyV1,
     PyBoyV2,
@@ -383,3 +385,69 @@ class GameSharkTest(unittest.TestCase):
                 pb.gameshark.add("BAD")
             with self.assertRaises(ValueError):
                 pb.gameshark.add("01010001")
+
+
+class BotSupportManagerTest(unittest.TestCase):
+
+    def test_manager_type(self):
+        with PyBoyV1(ACID2_ROM_PATH, disable_renderer=True, sound_emulated=False) as pb:
+            mgr = pb.botsupport_manager()
+            self.assertIsInstance(mgr, BotSupportManager)
+
+    def test_legacy_screen(self):
+        with PyBoyV1(ACID2_ROM_PATH, disable_renderer=True, sound_emulated=False) as pb:
+            pb.tick()
+            screen = pb.botsupport_manager().screen()
+            self.assertIsInstance(screen, LegacyScreen)
+            image = screen.screen_image()
+            self.assertEqual(image.size, (160, 144))
+            self.assertEqual(image.mode, "RGB")
+            arr = screen.screen_ndarray()
+            self.assertEqual(arr.shape, (144, 160, 3))
+            raw = screen.raw_screen_buffer()
+            self.assertEqual(len(raw), 160 * 144 * 3)
+            self.assertEqual(screen.raw_screen_buffer_dims(), (144, 160))
+            self.assertEqual(screen.raw_screen_buffer_format(), "RGB")
+
+    def test_legacy_tilemap_position(self):
+        with PyBoyV1(ACID2_ROM_PATH, disable_renderer=True, sound_emulated=False) as pb:
+            pb.tick()
+            screen = pb.botsupport_manager().screen()
+            pos = screen.tilemap_position()
+            self.assertIsInstance(pos, tuple)
+            self.assertEqual(len(pos), 2)
+            posl = screen.tilemap_position_list()
+            self.assertEqual(len(posl), 144)
+            self.assertEqual(len(posl[0]), 4)
+
+    def test_sprite_tile_tilemap_forwarding(self):
+        with PyBoyV1(ACID2_ROM_PATH, disable_renderer=True, sound_emulated=False) as pb:
+            for _ in range(80):
+                pb.tick()
+            mgr = pb.botsupport_manager()
+            self.assertIsInstance(mgr.sprite(0), Sprite)
+            self.assertIsInstance(mgr.tile(0), Tile)
+            self.assertIsInstance(mgr.tilemap_background(), TileMap)
+            self.assertIsInstance(mgr.tilemap_window(), TileMap)
+
+    def test_sprite_by_tile_identifier(self):
+        with PyBoyV1(ACID2_ROM_PATH, disable_renderer=True, sound_emulated=False) as pb:
+            for _ in range(80):
+                pb.tick()
+            mgr = pb.botsupport_manager()
+            sprite = mgr.sprite(0)
+            results = mgr.sprite_by_tile_identifier([sprite.tile_identifier, 999])
+            self.assertEqual(len(results), 2)
+            self.assertIn(0, results[0])
+            self.assertEqual(results[1], [])
+
+    def test_override_memory_value(self):
+        with PyBoyV1(ACID2_ROM_PATH, disable_renderer=True, sound_emulated=False) as pb:
+            pb.tick()
+            pb.set_memory_value(0xC100, 0x42)
+            self.assertEqual(pb.get_memory_value(0xC100), 0x42)
+            # WRAM writes go through the bus, ROM patches are rejected
+            pb.override_memory_value(0, 0xC101, 0x77)
+            self.assertEqual(pb.get_memory_value(0xC101), 0x77)
+            with self.assertRaises(RuntimeError):
+                pb.override_memory_value(0, 0x0100, 0xFF)

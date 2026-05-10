@@ -34,6 +34,7 @@ from .pyboy_debug import (
 )
 
 __all__ = [
+    "BotSupportManager",
     "DMG_PALETTES",
     "DynamicComparisonType",
     "GameShark",
@@ -41,6 +42,7 @@ __all__ = [
     "GameWrapperKirbyDreamLand",
     "GameWrapperSuperMarioLand",
     "GameWrapperTetris",
+    "LegacyScreen",
     "MemoryScanner",
     "PyBoy",
     "PyBoyV1",
@@ -399,6 +401,93 @@ class Screen:
         return ((scx, scy), (wx - 7, wy))
 
 
+class LegacyScreen:
+    """
+    Legacy PyBoy 1.x-style screen accessor, providing 3-channel RGB
+    PIL images and ndarrays plus the older `raw_screen_buffer*` and
+    `tilemap_position*` method shapes. Returned by
+    `PyBoyV1.botsupport_manager().screen()`
+    """
+
+    def __init__(self, system: "GameBoy"):
+        self._system = system
+
+    def screen_image(self) -> Image:
+        rgb = self._system.frame_buffer()
+        return frombytes("RGB", (DISPLAY_WIDTH, DISPLAY_HEIGHT), rgb, "raw")
+
+    def screen_ndarray(self):
+        from numpy import frombuffer
+
+        rgb = self._system.frame_buffer()
+        return frombuffer(rgb, dtype="uint8").reshape(
+            (DISPLAY_HEIGHT, DISPLAY_WIDTH, 3)
+        )
+
+    def raw_screen_buffer(self) -> bytes:
+        return self._system.frame_buffer()
+
+    def raw_screen_buffer_dims(self) -> Tuple[int, int]:
+        return (DISPLAY_HEIGHT, DISPLAY_WIDTH)
+
+    def raw_screen_buffer_format(self) -> str:
+        return "RGB"
+
+    def tilemap_position(self) -> Tuple[Tuple[int, int], Tuple[int, int]]:
+        scx = self._system.read_memory(0xFF43)
+        scy = self._system.read_memory(0xFF42)
+        wx = self._system.read_memory(0xFF4B)
+        wy = self._system.read_memory(0xFF4A)
+        return ((scx, scy), (wx - 7, wy))
+
+    def tilemap_position_list(self) -> List[List[int]]:
+        scx = self._system.read_memory(0xFF43)
+        scy = self._system.read_memory(0xFF42)
+        wx = self._system.read_memory(0xFF4B)
+        wy = self._system.read_memory(0xFF4A)
+        return [[scx, scy, wx - 7, wy] for _ in range(DISPLAY_HEIGHT)]
+
+
+class BotSupportManager:
+    """
+    Legacy PyBoy 1.x bot-support manager, returned by
+    `PyBoyV1.botsupport_manager()`. Forwards to the modern Tile,
+    Sprite and TileMap helpers but exposes them through the older
+    method-based API expected by 1.x scripts
+    """
+
+    def __init__(self, system: "GameBoy"):
+        self._system = system
+
+    def screen(self) -> LegacyScreen:
+        return LegacyScreen(self._system)
+
+    def sprite(self, index: int) -> Sprite:
+        return Sprite(self._system, index)
+
+    def sprite_by_tile_identifier(
+        self, tile_identifiers: List[int], on_screen: bool = True
+    ) -> List[List[int]]:
+        results: List[List[int]] = [[] for _ in tile_identifiers]
+        for index in range(SPRITES):
+            sprite = Sprite(self._system, index)
+            if on_screen and not sprite.on_screen:
+                continue
+            for slot, identifier in enumerate(tile_identifiers):
+                if sprite.tile_identifier == identifier:
+                    results[slot].append(index)
+        return results
+
+    def tile(self, identifier: int) -> Tile:
+        return Tile(self._system, identifier)
+
+    def tilemap_background(self) -> TileMap:
+        return TileMap(self._system, "BACKGROUND")
+
+    def tilemap_window(self) -> TileMap:
+        return TileMap(self._system, "WINDOW")
+
+
 class Memory:
     """
     Modern PyBoy bracket-accessor for the Game Boy memory bus,
@@ -563,6 +652,19 @@ class PyBoyV1(GameBoy):
     def set_memory_value(self, addr: int, value: int):
         self.write_memory(addr, value)
 
+    def override_memory_value(self, rom_bank: int, addr: int, value: int):
+        # the legacy method is intended to patch cartridge ROM data,
+        # which the core does not yet expose to Python; for non-ROM
+        # addresses (>= 0x8000) the write goes through the bus as a
+        # regular memory store, while ROM-targeted writes raise so
+        # callers learn early that the path is unimplemented
+        if addr < 0x8000:
+            raise RuntimeError(
+                "ROM override is not yet supported; only writes to "
+                "addresses >= 0x8000 are accepted"
+            )
+        self.write_memory(addr, value)
+
     def save_state(self, file: IO):
         data = super().save_state()
         file.write(data)
@@ -571,12 +673,8 @@ class PyBoyV1(GameBoy):
         data = file.read()
         super().load_state(data)
 
-    def botsupport_manager(self):
-        # PyBoy 1.x exposed bot helpers via this manager; the modern
-        # 2.x equivalents are mounted directly on PyBoyV2
-        raise RuntimeError(
-            "BotSupport is part of the legacy 1.x surface that is not yet implemented; use PyBoyV2 for modern equivalents"
-        )
+    def botsupport_manager(self) -> BotSupportManager:
+        return BotSupportManager(self)
 
     def game_area(self):
         return self.game_wrapper.game_area()
