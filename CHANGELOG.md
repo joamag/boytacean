@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 * Python extension defaults to release builds (`debug=False` in `setup.py`), making `pip install` and `pip install -e .` produce optimised binaries out of the box
+* Inlined the per-cycle dispatch chain (`GameBoy::clock`, `*_clock` wrappers and `Mmu`/`GameBoy` accessors for ppu/apu/dma/pad/timer/serial); native baseline frame rate on Tetris improved from ~7900 fps to ~8700 fps (+10%) and the cost of clocking idle serial hardware dropped from ~12% of frame time to ~1%
 * Standalone PyBoy 1.x compatible class (`PyBoyV1`) with `WindowEvent`, `send_input`, `screen_image`, `get_memory_value`/`set_memory_value` and `cartridge_title()` method
 * `PyBoy` alias resolving to `PyBoyV2` so the modern surface is the default for `from boytacean.pyboy import PyBoy`
 * Python bindings for VRAM, OAM, HRAM, ROM/RAM data, ROM/RAM banks, CPU register file, mode predicates and clock frequency
