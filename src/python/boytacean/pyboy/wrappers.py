@@ -9,17 +9,6 @@ TETROMINO_TABLE = {"L": 0, "J": 4, "I": 8, "O": 12, "Z": 16, "S": 20, "T": 24}
 TETROMINO_TABLE_INVERSE = {value: name for name, value in TETROMINO_TABLE.items()}
 
 
-def _digits_at(system: "GameBoy", base: int, length: int) -> int:
-    # decodes a sequence of `length` ASCII-encoded digit tiles into a
-    # base-10 integer; tiles map to 0x00..0x09 plus 0x2F for blank
-    value = 0
-    for offset in range(length):
-        tile = system.read_memory(base + offset)
-        if tile <= 9:
-            value = value * 10 + tile
-    return value
-
-
 class GameWrapper:
     """
     Generic game wrapper, used when no specific cartridge match is
@@ -229,6 +218,17 @@ def select_wrapper(system: "GameBoy") -> GameWrapper:
     title = system.rom_title
     cls = WRAPPERS.get(title, GameWrapper)
     return cls(system)
+
+
+def _digits_at(system: "GameBoy", base: int, length: int) -> int:
+    # decodes a sequence of `length` ASCII-encoded digit tiles into a
+    # base-10 integer; tiles map to 0x00..0x09 plus 0x2F for blank
+    value = 0
+    for offset in range(length):
+        tile = system.read_memory(base + offset)
+        if tile <= 9:
+            value = value * 10 + tile
+    return value
 
 
 def _bcd(value: int) -> int:
