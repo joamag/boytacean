@@ -53,6 +53,12 @@ pub struct FastPpu {
     pub int_vblank: bool,
 }
 
+impl Default for FastPpu {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FastPpu {
     pub fn new() -> Self {
         Self {
