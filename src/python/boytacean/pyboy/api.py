@@ -47,9 +47,6 @@ class Tile:
         if not 0 <= identifier < max_tiles:
             raise ValueError(f"Tile identifier out of range: {identifier}")
         self.tile_identifier = identifier
-        # `bank` overrides the identifier-derived bank; callers use
-        # this to point a Tile at the CGB bank-1 view of an OAM tile
-        # whose attribute byte selects the alternate VRAM bank
         if bank is not None:
             self.vram_bank = bank
             local_id = identifier
@@ -121,9 +118,7 @@ class Sprite:
         self.attr_palette_number = (attr >> 4) & 0x1
         self.attr_cgb_bank_number = (attr >> 3) & 0x1
         self.shape = (TILE_WIDTH, sprite_height)
-        # in CGB mode the OAM attribute byte selects which VRAM bank
-        # the sprite's tile data lives in; pass it through to Tile so
-        # bank-1 sprites don't silently read bank-0 pixels
+
         tile_bank = self.attr_cgb_bank_number if system.cgb else None
         self.tiles = [Tile(system, tile, bank=tile_bank)]
         if sprite_height == 16:
