@@ -1,3 +1,21 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+"""
+Frame-rate benchmark using boytacean's PyBoy 1.x drop-in surface.
+
+Counterpart to `pocket_pyboy_iface.py` but against the legacy 1.x
+`PyBoyV1` class, which keeps the `pyboy.tick()` per-frame loop and
+the `screen_image()` / `cartridge_title()` method-call shape. Used
+to verify that scripts written for old PyBoy releases continue to
+run unchanged against boytacean.
+
+Run from the project root with:
+    python examples/python/pocket_pyboy_iface_v1.py
+
+Requires: `pip install pillow pysdl2`
+"""
+
 from os import getenv
 from time import time
 from boytacean import VISUAL_FREQ

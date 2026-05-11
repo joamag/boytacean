@@ -1,3 +1,19 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+"""
+Throughput microbenchmark for the boytacean Python bindings.
+
+Boots the bundled pocket demo with audio and serial disabled and
+runs 100M clock cycles end-to-end, then reports the realised
+speedup versus the Game Boy's nominal CPU frequency. Used to spot
+regressions in the per-instruction dispatch cost when crossing the
+Rust-Python boundary.
+
+Run from the project root with:
+    python examples/python/bench.py
+"""
+
 from time import time
 from boytacean import GameBoy, CPU_FREQ
 from os.path import dirname, realpath, join

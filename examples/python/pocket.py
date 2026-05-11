@@ -1,3 +1,21 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+"""
+Frame-rate benchmark using the native boytacean Python surface.
+
+Boots the bundled pocket demo with audio and serial disabled, runs
+12000 frames via `gb.next_frame()` and reports the realised speedup
+versus the Game Boy's nominal visual frequency. At the end, saves a
+PNG snapshot of the final frame. Set `LOAD_GRAPHICS=0` to skip
+graphics work for a headless-style measurement.
+
+Run from the project root with:
+    python examples/python/pocket.py
+
+Requires: `pip install pillow pysdl2`
+"""
+
 from os import getenv
 from time import time
 from boytacean import GameBoy, VISUAL_FREQ

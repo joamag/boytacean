@@ -1,3 +1,22 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+"""
+Frame-rate benchmark using boytacean's PyBoy 2.x drop-in surface.
+
+Drives the bundled pocket demo through `boytacean.pyboy.PyBoy`, the
+modern 2.x compatibility shim served by boytacean, using the batched
+`tick(FRAME_COUNT, render=False)` fast path. Acts as a regression
+check that the PyBoy 2.x interface produces sensible throughput
+numbers, and that the SDL window swap (`LOAD_GRAPHICS=1`) doesn't
+silently break it.
+
+Run from the project root with:
+    python examples/python/pocket_pyboy_iface.py
+
+Requires: `pip install pillow pysdl2`
+"""
+
 from os import getenv
 from time import time
 from boytacean import VISUAL_FREQ

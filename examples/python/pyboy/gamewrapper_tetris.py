@@ -1,13 +1,31 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+"""
+PyBoy GameWrapperTetris drop-in compatibility test.
+
+Mirrors the upstream PyBoy `gamewrapper_tetris.py` test as closely
+as possible, swapping only `from pyboy import PyBoy` for
+`from boytacean.pyboy import PyBoy`, so that running it
+exercises every game-wrapper API (`game_area`, `next_tetromino`,
+`start_game`, `reset_game`, scoring/fitness) through boytacean's
+PyBoy surface. A clean pass demonstrates that boytacean is a
+drop-in replacement for the upstream interface.
+
+@TODO: there are still some significant structural deviations from
+the original file; reducing them is the goal so the upstream file
+can be used unmodified.
+
+Run from the project root with:
+    python examples/python/pyboy/gamewrapper_tetris.py <rom.gb>
+
+Requires: a `res/extern/PyBoy` clone alongside this repo, plus
+`pip install pyboy` for `pyboy.plugins.game_wrapper_tetris`.
+"""
+
 import os
 import sys
 from typing import cast
-
-# @TODO: There are still some significant changes in the way
-# this file is structured compared to the original file, need
-# to reduce the changes and comments in the file so that the
-# original file can be used without significant modifications.
-# This should prove that the Boytacean PyBoy interface is a
-# drop-in replacement for the original PyBoy interface.
 
 # makes us able to import PyBoy from the directory below
 # the res directory structure (where it should be cloned)
