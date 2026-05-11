@@ -15,7 +15,7 @@ with `pyboy==1.6.14` is required. Saves a separate
 Run from the project root with:
     python examples/python/pocket_pyboy_v1.py [rom.gb]
 
-Requires: `pip install "pyboy<2" "numpy<2"
+Requires: `pip install "pyboy<2" "numpy<2"`
 """
 
 from os import getenv
