@@ -12,6 +12,8 @@ Cargo.lock
 /.idea
 /.claude
 
+/.venv-*
+
 /ndk
 /dist
 /build
