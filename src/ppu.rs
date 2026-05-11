@@ -26,8 +26,8 @@ use crate::{
     assert_pedantic_gb,
     color::{
         rgb555_to_rgb888, rgb888_to_rgb1555_array, rgb888_to_rgb1555_u16, rgb888_to_rgb565,
-        rgb888_to_rgb565_u16, Pixel, PixelAlpha, RGB1555_SIZE, RGB565_SIZE, RGB888_SIZE, RGB_SIZE,
-        XRGB8888_SIZE,
+        rgb888_to_rgb565_u16, Pixel, PixelAlpha, RGB1555_SIZE, RGB565_SIZE, RGB888_SIZE, RGBA_SIZE,
+        RGB_SIZE, XRGB8888_SIZE,
     },
     consts::{
         BGP_ADDR, LCDC_ADDR, LYC_ADDR, LY_ADDR, OBP0_ADDR, OBP1_ADDR, SCX_ADDR, SCY_ADDR,
@@ -96,6 +96,9 @@ pub const FRAME_BUFFER_RGB1555_SIZE: usize = DISPLAY_SIZE * RGB1555_SIZE;
 
 /// The size of the RGB565 frame buffer in bytes.
 pub const FRAME_BUFFER_RGB565_SIZE: usize = DISPLAY_SIZE * RGB565_SIZE;
+
+/// The size of the RGBA frame buffer in bytes.
+pub const FRAME_BUFFER_RGBA_SIZE: usize = DISPLAY_SIZE * RGBA_SIZE;
 
 /// The base colors to be used to populate the
 /// custom palettes of the Game Boy.
@@ -1274,6 +1277,23 @@ impl Ppu {
                 frame_buffer[index * RGB_SIZE + 2],
             );
             *pixel = rgb888_to_rgb565_u16(r, g, b);
+        }
+        buffer
+    }
+
+    pub fn frame_buffer_rgba(&mut self) -> [u8; FRAME_BUFFER_RGBA_SIZE] {
+        let frame_buffer = self.frame_buffer();
+        let mut buffer = [0u8; FRAME_BUFFER_RGBA_SIZE];
+        for index in 0..DISPLAY_SIZE {
+            let (r, g, b) = (
+                frame_buffer[index * RGB_SIZE],
+                frame_buffer[index * RGB_SIZE + 1],
+                frame_buffer[index * RGB_SIZE + 2],
+            );
+            buffer[index * RGBA_SIZE] = r;
+            buffer[index * RGBA_SIZE + 1] = g;
+            buffer[index * RGBA_SIZE + 2] = b;
+            buffer[index * RGBA_SIZE + 3] = 0xff;
         }
         buffer
     }

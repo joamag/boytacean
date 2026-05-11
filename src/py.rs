@@ -123,7 +123,7 @@ impl GameBoy {
     }
 
     pub fn frame_buffer_rgba(&mut self, py: Python) -> PyObject {
-        let pybytes = PyBytes::new(py, &self.system.ppu().frame_buffer_xrgb8888());
+        let pybytes = PyBytes::new(py, &self.system.ppu().frame_buffer_rgba());
         pybytes.into()
     }
 
