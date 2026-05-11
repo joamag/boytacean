@@ -741,6 +741,9 @@ impl Cartridge {
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 impl Cartridge {
     pub fn title(&self) -> String {
+        if self.rom_data.len() < self.title_offset {
+            return String::new();
+        }
         String::from(
             std::str::from_utf8(&self.rom_data[0x0134..self.title_offset])
                 .unwrap_or("")

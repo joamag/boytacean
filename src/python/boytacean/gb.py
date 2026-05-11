@@ -199,14 +199,13 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
     def load_graphics(self):
         from .graphics import Display
 
-        try:
+        def _title() -> str:
             rom_title = self.rom_title
-        except Exception:
-            rom_title = None
-        title = f"Boytacean - {rom_title}" if rom_title else "Boytacean"
-        self._display = Display(title=title)
+            return f"Boytacean - {rom_title}" if rom_title else "Boytacean"
+
+        self._display = Display(title=_title())
         cast(Display, self._display).set_hud(
-            enabled=True, base_title=title, clock_freq=self.clock_freq
+            enabled=True, title_provider=_title, clock_freq=self.clock_freq
         )
 
     def save_state(self) -> bytes:
