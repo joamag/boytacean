@@ -741,6 +741,9 @@ impl Cartridge {
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 impl Cartridge {
     pub fn title(&self) -> String {
+        if self.title_offset < 0x0134 || self.rom_data.len() < self.title_offset {
+            return String::new();
+        }
         String::from(
             std::str::from_utf8(&self.rom_data[0x0134..self.title_offset])
                 .unwrap_or("")
@@ -1343,5 +1346,11 @@ mod tests {
 
         rom.set_rom_type(RomType::Mbc1).unwrap();
         assert!(!rom.has_rumble());
+    }
+
+    #[test]
+    fn test_title_empty_when_unloaded() {
+        let rom = Cartridge::new();
+        assert_eq!(rom.title(), "");
     }
 }

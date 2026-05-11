@@ -12,10 +12,13 @@ Cargo.lock
 /.idea
 /.claude
 
+/.venv-*
+
 /ndk
 /dist
 /build
 /target
+/reports
 /aarch64-linux-gnu
 /res/roms.prop
 /res/roms.gba/prop

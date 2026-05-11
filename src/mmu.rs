@@ -225,50 +225,62 @@ impl Mmu {
         self.speed_callback = callback;
     }
 
+    #[inline(always)]
     pub fn ppu(&mut self) -> &mut Ppu {
         &mut self.ppu
     }
 
+    #[inline(always)]
     pub fn ppu_i(&self) -> &Ppu {
         &self.ppu
     }
 
+    #[inline(always)]
     pub fn apu(&mut self) -> &mut Apu {
         &mut self.apu
     }
 
+    #[inline(always)]
     pub fn apu_i(&self) -> &Apu {
         &self.apu
     }
 
+    #[inline(always)]
     pub fn dma(&mut self) -> &mut Dma {
         &mut self.dma
     }
 
+    #[inline(always)]
     pub fn dma_i(&self) -> &Dma {
         &self.dma
     }
 
+    #[inline(always)]
     pub fn pad(&mut self) -> &mut Pad {
         &mut self.pad
     }
 
+    #[inline(always)]
     pub fn pad_i(&self) -> &Pad {
         &self.pad
     }
 
+    #[inline(always)]
     pub fn timer(&mut self) -> &mut Timer {
         &mut self.timer
     }
 
+    #[inline(always)]
     pub fn timer_i(&self) -> &Timer {
         &self.timer
     }
 
+    #[inline(always)]
     pub fn serial(&mut self) -> &mut Serial {
         &mut self.serial
     }
 
+    #[inline(always)]
     pub fn serial_i(&self) -> &Serial {
         &self.serial
     }
