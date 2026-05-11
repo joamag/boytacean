@@ -12,7 +12,7 @@ numbers, and that the SDL window swap (`LOAD_GRAPHICS=1`) doesn't
 silently break it.
 
 Run from the project root with:
-    python examples/python/pocket_pyboy_iface.py [rom.gb]
+    python examples/python/pocket_pyboy_iface_v2.py [rom.gb]
 
 Requires: `pip install pillow pysdl2`
 """
@@ -29,7 +29,7 @@ DEFAULT_ROM_PATH = join(CURRENT_DIR, "../../res/roms/demo/pocket.gb")
 ROM_PATH = argv[1] if len(argv) > 1 else DEFAULT_ROM_PATH
 BOOT_ROM_PATH = join(CURRENT_DIR, "../../res/boot/dmg_pyboy.bin")
 ROM_NAME = splitext(basename(ROM_PATH))[0]
-IMAGE_NAME = f"{ROM_NAME}_pyboy_iface.png"
+IMAGE_NAME = f"{ROM_NAME}_pyboy_iface_v2.png"
 
 FRAME_COUNT = 12000
 LOAD_GRAPHICS = bool(getenv("LOAD_GRAPHICS", True))
