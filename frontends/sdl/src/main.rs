@@ -4,6 +4,14 @@ pub mod sdl;
 pub mod shader;
 pub mod test;
 
+use std::{
+    cmp::max,
+    error::Error as StdError,
+    path::{Path, PathBuf},
+    thread,
+    time::{Duration, Instant, SystemTime},
+};
+
 use audio::Audio;
 use boytacean::{
     devices::{printer::PrinterDevice, stdout::StdoutDevice},
@@ -28,12 +36,6 @@ use sdl2::{
     keyboard::{Keycode, Mod},
     pixels::PixelFormatEnum,
     Sdl,
-};
-use std::{
-    cmp::max,
-    path::{Path, PathBuf},
-    thread,
-    time::{Duration, Instant, SystemTime},
 };
 
 /// The scale at which the screen is going to be drawn
@@ -594,38 +596,30 @@ Drag & drop ROM file: Load new ROM and reset system\n===========================
                         keycode: Some(Keycode::E),
                         keymod,
                         ..
-                    } => {
-                        if !self.fast && (keymod & (Mod::LCTRLMOD | Mod::RCTRLMOD)) != Mod::NOMOD {
-                            self.fast = true;
-                            self.logic_frequency *= 8;
-                        }
+                    } if !self.fast && (keymod & (Mod::LCTRLMOD | Mod::RCTRLMOD)) != Mod::NOMOD => {
+                        self.fast = true;
+                        self.logic_frequency *= 8;
                     }
                     Event::KeyUp {
                         keycode: Some(Keycode::E),
                         ..
-                    } => {
-                        if self.fast {
-                            self.fast = false;
-                            self.logic_frequency /= 8;
-                        }
+                    } if self.fast => {
+                        self.fast = false;
+                        self.logic_frequency /= 8;
                     }
                     Event::KeyUp {
                         keycode: Some(Keycode::LCtrl) | Some(Keycode::RCtrl),
                         ..
-                    } => {
-                        if self.fast {
-                            self.fast = false;
-                            self.logic_frequency /= 8;
-                        }
+                    } if self.fast => {
+                        self.fast = false;
+                        self.logic_frequency /= 8;
                     }
                     Event::KeyDown {
                         keycode: Some(Keycode::F),
                         keymod,
                         ..
-                    } => {
-                        if (keymod & (Mod::LCTRLMOD | Mod::RCTRLMOD)) != Mod::NOMOD {
-                            self.toggle_fullscreen()
-                        }
+                    } if (keymod & (Mod::LCTRLMOD | Mod::RCTRLMOD)) != Mod::NOMOD => {
+                        self.toggle_fullscreen()
                     }
                     Event::KeyDown {
                         keycode: Some(Keycode::Plus),
@@ -1104,7 +1098,7 @@ fn run(args: Args, emulator: &mut Emulator) {
     }
 }
 
-fn main() {
+fn main() -> Result<(), Box<dyn StdError>> {
     // parses the provided command line arguments and uses them to
     // obtain structured values
     let args = Args::parse();
@@ -1114,7 +1108,9 @@ fn main() {
     let path = Path::new(&args.rom_path);
     if args.rom_path == DEFAULT_ROM_PATH && !path.exists() {
         println!("No ROM file provided, please provide one using the [ROM_PATH] argument");
-        return;
+        return Err(Box::new(Error::InvalidParameter(String::from(
+            "No ROM file provided",
+        ))));
     }
 
     // tries to build the target mode from the mode argument
@@ -1130,23 +1126,21 @@ fn main() {
     // and the initial game ROM to "start the engine"
     let mut game_boy = GameBoy::new(Some(mode));
     if auto_mode {
-        let mode = Cartridge::from_file(&args.rom_path).unwrap().gb_mode();
+        let mode = Cartridge::from_file(&args.rom_path)?.gb_mode();
         game_boy.set_mode(mode);
     }
-    let device: Box<dyn SerialDevice> = build_device(&args.device).unwrap();
+    let device: Box<dyn SerialDevice> = build_device(&args.device)?;
     game_boy.set_ppu_enabled(!args.no_ppu);
     game_boy.set_apu_enabled(!args.no_apu);
     game_boy.set_dma_enabled(!args.no_dma);
     game_boy.set_timer_enabled(!args.no_timer);
     game_boy.attach_serial(device);
-    game_boy
-        .load(!args.no_boot && args.boot_rom_path.is_empty())
-        .unwrap();
+    game_boy.load(!args.no_boot && args.boot_rom_path.is_empty())?;
     if args.no_boot {
         game_boy.load_boot_state();
     }
     if !args.boot_rom_path.is_empty() {
-        game_boy.load_boot_path(&args.boot_rom_path).unwrap();
+        game_boy.load_boot_path(&args.boot_rom_path)?;
     }
 
     // prints the current version of the emulator (informational message)
@@ -1167,16 +1161,18 @@ fn main() {
     };
     let mut emulator = Emulator::new(game_boy, options);
     emulator.start(SCREEN_SCALE);
-    emulator.load_rom(Some(&args.rom_path)).unwrap();
+    emulator.load_rom(Some(&args.rom_path))?;
     emulator.apply_cheats(&args.cheats);
     emulator.toggle_palette();
     if !args.shader.is_empty() {
-        emulator.load_shader(&args.shader).unwrap();
+        emulator.load_shader(&args.shader)?;
     }
 
     run(args, &mut emulator);
 
     emulator.stop();
+
+    Ok(())
 }
 
 fn build_device(device: &str) -> Result<Box<dyn SerialDevice>, Error> {

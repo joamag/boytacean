@@ -1,8 +1,3 @@
-use boytacean_common::{
-    data::{read_bytes, read_string, read_u32, write_bytes, write_string, write_u32},
-    error::Error,
-};
-use boytacean_hashing::crc32c::crc32c;
 use std::{
     collections::HashSet,
     convert::TryInto,
@@ -12,6 +7,12 @@ use std::{
     iter::FromIterator,
     mem::size_of,
 };
+
+use boytacean_common::{
+    data::{read_bytes, read_string, read_u32, write_bytes, write_string, write_u32},
+    error::Error,
+};
+use boytacean_hashing::crc32c::crc32c;
 
 use crate::{
     codec::Codec,

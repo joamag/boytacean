@@ -1,9 +1,12 @@
+use std::error::Error;
+
 use boytacean::gb::{GameBoy, GameBoyMode};
 
-fn main() {
+fn main() -> Result<(), Box<dyn Error>> {
     let mut game_boy = GameBoy::new(Some(GameBoyMode::Dmg));
-    game_boy.load(true).unwrap();
-    game_boy.load_rom_empty().unwrap();
+    game_boy.load(true)?;
+    game_boy.load_rom_empty()?;
     let cycles = game_boy.step_to(0x0100);
     println!("Ran {cycles} cycles");
+    Ok(())
 }

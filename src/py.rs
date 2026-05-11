@@ -1,4 +1,9 @@
-use pyo3::{exceptions::PyException, prelude::*, types::PyBytes};
+use pyo3::{
+    exceptions::PyException,
+    prelude::*,
+    types::{PyBytes, PyModule},
+    Bound,
+};
 
 use crate::{
     gb::{GameBoy as GameBoyBase, GameBoyMode},
@@ -9,7 +14,7 @@ use crate::{
     state::StateManager,
 };
 
-#[pyclass]
+#[pyclass(unsendable)]
 struct GameBoy {
     system: GameBoyBase,
 }
@@ -190,7 +195,7 @@ impl GameBoy {
 }
 
 #[pymodule]
-fn boytacean(_py: Python, module: &PyModule) -> PyResult<()> {
+fn boytacean(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<GameBoy>()?;
     module.add("__version__", VERSION)?;
     module.add("COMPILATION_DATE", COMPILATION_DATE)?;

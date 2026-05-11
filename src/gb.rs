@@ -17,16 +17,24 @@
 //! println!("Ran {} cycles", cycles);
 //! ```
 
-use boytacean_common::{
-    error::Error,
-    util::{read_file, SharedThread},
-};
 use std::{
     collections::VecDeque,
     fmt::{self, Display, Formatter},
     io::Read,
     sync::{Arc, Mutex},
 };
+#[cfg(feature = "wasm")]
+use std::{
+    convert::TryInto,
+    panic::{set_hook, take_hook, PanicInfo},
+};
+
+use boytacean_common::{
+    error::Error,
+    util::{read_file, SharedThread},
+};
+#[cfg(feature = "wasm")]
+use wasm_bindgen::prelude::*;
 
 use crate::{
     apu::{Apu, HighPassFilter},
@@ -49,24 +57,15 @@ use crate::{
     serial::{NullDevice, Serial, SerialDevice},
     timer::Timer,
 };
-
-#[cfg(feature = "wasm")]
-use wasm_bindgen::prelude::*;
-
 #[cfg(feature = "wasm")]
 use crate::{color::Pixel, ppu::Palette};
 
-#[cfg(feature = "wasm")]
-use std::{
-    convert::TryInto,
-    panic::{set_hook, take_hook, PanicInfo},
-};
-
 /// Enumeration that describes the multiple running
-// modes of the Game Boy emulator.
-// DMG = Original Game Boy
-// CGB = Game Boy Color
-// SGB = Super Game Boy
+/// modes of the Game Boy emulator.
+///
+/// DMG = Original Game Boy
+/// CGB = Game Boy Color
+/// SGB = Super Game Boy
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum GameBoyMode {
@@ -567,10 +566,25 @@ impl GameBoy {
         }
     }
 
+    /// Verifies if the provided data represents a valid Game Boy ROM.
+    ///
+    /// It is used to verify if the provided data is a valid ROM
+    /// before loading it into the Game Boy.
+    /// Preventing the loading of invalid ROMs into the Game Boy which
+    /// would cause the emulator to crash at runtime.
+    ///
+    /// This approach is not guaranteed to be 100% accurate, but it
+    /// is a good (enough) way to verify if the provided data is
+    /// a valid ROM.
     pub fn verify_rom(data: &[u8]) -> bool {
         Cartridge::from_data(data).is_ok()
     }
 
+    /// Resets the entire state of the Game Boy system,
+    /// including all its components and the CPU.
+    ///
+    /// This method ensures that the [`Ppu`], [`Apu`], [`Timer`],
+    /// [`Serial`], [`Mmu`], and [`Cpu`] are all reset to their initial states.
     pub fn reset(&mut self) {
         self.ppu().reset();
         self.apu().reset();
@@ -581,16 +595,13 @@ impl GameBoy {
         self.reset_cheats();
     }
 
+    /// Resets all the cheats currently registered in the system.
+    ///
+    /// It clears both Game Genie and GameShark cheats from the
+    /// respective cheat managers.
     pub fn reset_cheats(&mut self) {
         self.reset_game_genie();
         self.reset_game_shark();
-    }
-
-    pub fn reload(&mut self) {
-        let rom = self.rom().clone();
-        self.reset();
-        self.load(true).unwrap();
-        self.load_cartridge(rom).unwrap();
     }
 
     /// Advance the clock of the system by one tick, this will
@@ -631,7 +642,7 @@ impl GameBoy {
         cycles
     }
 
-    /// Function equivalent to `clock()` but that allows pre-emptive
+    /// Function equivalent to [`clock()`][GameBoy::clock()] but that allows pre-emptive
     /// breaking of the clock cycle loop if the PC (Program Counter)
     /// reaches the provided address, making sure that in such a situation
     /// the devices are not clocked.
@@ -645,7 +656,7 @@ impl GameBoy {
         cycles
     }
 
-    /// Equivalent to `clock()` but allows the execution of multiple
+    /// Equivalent to [`clock()`][GameBoy::clock()] but allows the execution of multiple
     /// clock operations in a single call.
     pub fn clocks(&mut self, count: usize) -> u64 {
         let mut cycles = 0_u64;
@@ -698,6 +709,12 @@ impl GameBoy {
         }
     }
 
+    /// Clocks the system until the next frame is reached and returns
+    /// the amount of cycles that have been clocked.
+    ///
+    /// This function is used to clock the system until the next frame
+    /// is reached and returns the amount of cycles that have been
+    /// clocked.
     pub fn next_frame(&mut self) -> u32 {
         let mut cycles = 0u32;
         let current_frame = self.ppu_frame();
@@ -707,6 +724,13 @@ impl GameBoy {
         cycles
     }
 
+    /// Clocks the system until the Program Counter (PC) reaches the
+    /// provided address and returns the amount of cycles that have been
+    /// clocked.
+    ///
+    /// This advances the emulation step by step, accumulating the number of
+    /// cycles spent until the CPU's PC matches `addr`. Useful for precise
+    /// debugging or driving the emulator to a known execution point.
     pub fn step_to(&mut self, addr: u16) -> u32 {
         let mut cycles = 0u32;
         while self.cpu_i().pc() != addr {
@@ -715,6 +739,18 @@ impl GameBoy {
         cycles
     }
 
+    /// Clocks the peripheral devices (PPU, APU, DMA, Timer, Serial)
+    /// according to the provided cycle counts.
+    ///
+    /// The `cycles` parameter represents the raw CPU cycles executed,
+    /// while `cycles_n` represents the normalized cycles (adjusted
+    /// for the current speed multiplier).
+    /// This distinction allows for correct timing of devices that
+    /// operate at different rates relative to the CPU in Double
+    /// Speed mode (CGB).
+    ///
+    /// # Notes
+    /// This function is inline and should be optimized by the compiler.
     #[inline(always)]
     fn clock_devices(&mut self, cycles: u16, cycles_n: u16) {
         if self.ppu_enabled {
@@ -1138,11 +1174,11 @@ impl GameBoy {
 /// in mind and that do not support WASM interface of copy.
 impl GameBoy {
     /// The logic frequency of the Game Boy
-    /// CPU in hz.
+    /// CPU in Hz.
     pub const CPU_FREQ: u32 = 4194304;
 
     /// The visual frequency (refresh rate)
-    /// of the Game Boy, close to 60 hz.
+    /// of the Game Boy, close to 60 Hz.
     pub const VISUAL_FREQ: f32 = 59.7275;
 
     /// The cycles taken to run a complete frame
@@ -1263,6 +1299,23 @@ impl GameBoy {
 
     pub fn cartridge_i(&self) -> &Cartridge {
         self.mmu_i().rom_i()
+    }
+
+    /// Reloads the system by resetting the state and reloading the
+    /// current ROM (cartridge).
+    ///
+    /// This effectively restarts the emulation from the beginning,
+    /// while keeping the same cartridge loaded.
+    ///
+    /// # Notes
+    /// This function is inline and should be optimized by the compiler.
+    #[inline(always)]
+    pub fn reload(&mut self) -> Result<(), Error> {
+        let rom = self.rom().clone();
+        self.reset();
+        self.load(true)?;
+        self.load_cartridge(rom)?;
+        Ok(())
     }
 
     pub fn load(&mut self, boot: bool) -> Result<(), Error> {
@@ -1441,8 +1494,13 @@ impl GameBoy {
         }
     }
 
-    /// Loads an empty ROM into the Game Boy, this is useful for
-    /// testing the CPU and other Game Boy components without a ROM.
+    /// Loads an empty ROM into the Game Boy.
+    ///
+    /// This is useful for testing the CPU and other Game Boy
+    /// components without a ROM.
+    ///
+    /// All the ROM data will be set to 0x00 (NOP instruction),
+    /// and no MBC (ROM only) will be applied.
     pub fn load_rom_empty(&mut self) -> Result<&mut Cartridge, Error> {
         let data = [0u8; 32 * 1024];
         self.load_rom(&data, None)
@@ -1472,6 +1530,11 @@ impl GameBoy {
         self.apu().set_filter_mode(mode);
     }
 
+    /// Adds a cheat code to the Game Boy system.
+    ///
+    /// The code can be either a Game Genie or a GameShark code.
+    /// The function will detect the type of the code and add it
+    /// to the respective cheat manager.
     pub fn add_cheat_code(&mut self, code: &str) -> Result<bool, Error> {
         if GameGenie::is_code(code) {
             return self.add_game_genie_code(code).map(|_| true);
@@ -1488,7 +1551,7 @@ impl GameBoy {
         let rom = self.mmu().rom();
         if rom.game_genie().is_none() {
             let game_genie = GameGenie::default();
-            rom.attach_genie(game_genie);
+            rom.attach_genie(game_genie)?;
         }
         let game_genie = rom.game_genie_mut().as_mut().unwrap();
         game_genie.add_code(code)
@@ -1498,7 +1561,7 @@ impl GameBoy {
         let rom = self.rom();
         if rom.game_shark().is_none() {
             let game_shark = GameShark::default();
-            rom.attach_shark(game_shark);
+            rom.attach_shark(game_shark)?;
         }
         let game_shark = rom.game_shark_mut().as_mut().unwrap();
         game_shark.add_code(code)
@@ -1528,6 +1591,11 @@ impl GameBoy {
             hook_impl(info);
             prev(info);
         }));
+    }
+
+    pub fn reload_wa(&mut self) -> Result<(), String> {
+        self.reload()?;
+        Ok(())
     }
 
     pub fn load_rom_wa(&mut self, data: &[u8]) -> Result<Cartridge, String> {

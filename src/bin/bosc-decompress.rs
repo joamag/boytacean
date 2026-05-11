@@ -4,10 +4,11 @@
 //! It can be used to convert BOSC files back to their original BOS format for further processing.
 //!
 //! # Usage
-//! bosc-decompress <input_file> [output_file]
+//! bosc-decompress <input_file> \[output_file\]
+
+use std::{env::args, error::Error, fs::File, io::Read, path::Path};
 
 use boytacean::state::{SaveStateFormat, Serialize, StateManager};
-use std::{env::args, error::Error, fs::File, io::Read, path::Path};
 
 fn print_usage() {
     println!("Usage: bosc-decompress <input_file> [output_file]");

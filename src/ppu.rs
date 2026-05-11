@@ -4,11 +4,6 @@
 //! graphics on the handheld's screen. It handles the drawing of sprites and
 //! backgrounds using tile-based graphics.
 
-use boytacean_common::{
-    data::{read_into, read_u16, read_u8, write_bytes, write_u16, write_u8},
-    error::Error,
-    util::SharedThread,
-};
 use core::fmt;
 use std::{
     borrow::BorrowMut,
@@ -18,6 +13,14 @@ use std::{
     io::Cursor,
     sync::{Arc, Mutex},
 };
+
+use boytacean_common::{
+    data::{read_into, read_u16, read_u8, write_bytes, write_u16, write_u8},
+    error::Error,
+    util::SharedThread,
+};
+#[cfg(feature = "wasm")]
+use wasm_bindgen::prelude::*;
 
 use crate::{
     assert_pedantic_gb,
@@ -36,9 +39,6 @@ use crate::{
     state::{StateComponent, StateFormat},
     warnln,
 };
-
-#[cfg(feature = "wasm")]
-use wasm_bindgen::prelude::*;
 
 pub const VRAM_SIZE_DMG: usize = 8192;
 pub const VRAM_SIZE_CGB: usize = 16384;
@@ -667,6 +667,10 @@ pub struct Ppu {
     /// the next CPU clock operation.
     int_stat: bool,
 
+    /// Previous level of the internal LCD STAT line, used for edge detection
+    /// so that the LCD STAT interrupt is only triggered on rising edges (0 to 1).
+    int_stat_prev: bool,
+
     /// Flag that controls if the DMG compatibility mode is
     /// enabled meaning that some of the PPU decisions will
     /// be made differently to address this special situation
@@ -765,6 +769,7 @@ impl Ppu {
             stat_lyc: false,
             int_vblank: false,
             int_stat: false,
+            int_stat_prev: false,
             dmg_compat: false,
             gb_mode: mode,
             gbc,
@@ -772,10 +777,10 @@ impl Ppu {
     }
 
     pub fn reset(&mut self) {
-        self.color_buffer = Box::new([0u8; COLOR_BUFFER_SIZE]);
-        self.shade_buffer = Box::new([0u8; SHADE_BUFFER_SIZE]);
-        self.frame_buffer = Box::new([0u8; FRAME_BUFFER_SIZE]);
-        self.priority_buffer = Box::new([false; COLOR_BUFFER_SIZE]);
+        *self.color_buffer = [0u8; COLOR_BUFFER_SIZE];
+        *self.shade_buffer = [0u8; SHADE_BUFFER_SIZE];
+        *self.frame_buffer = [0u8; FRAME_BUFFER_SIZE];
+        *self.priority_buffer = [false; COLOR_BUFFER_SIZE];
         self.vram = [0u8; VRAM_SIZE_CGB];
         self.hram = [0u8; HRAM_SIZE];
         self.vram_bank = 0x0;
@@ -820,6 +825,7 @@ impl Ppu {
         self.stat_lyc = false;
         self.int_vblank = false;
         self.int_stat = false;
+        self.int_stat_prev = false;
         self.dmg_compat = false;
     }
 
@@ -834,6 +840,7 @@ impl Ppu {
         self.ly = 0;
         self.int_vblank = false;
         self.int_stat = false;
+        self.int_stat_prev = false;
         self.window_counter = 0;
         if hard {
             self.first_frame = true;
@@ -868,6 +875,7 @@ impl Ppu {
                 if self.mode_clock >= 80 {
                     self.mode = PpuMode::VramRead;
                     self.mode_clock -= 80;
+                    self.update_stat()
                 }
             }
             PpuMode::VramRead => {
@@ -926,10 +934,10 @@ impl Ppu {
                         self.window_counter = 0;
                         self.first_frame = false;
                         self.frame_index = self.frame_index.wrapping_add(1);
-                        self.update_stat()
                     }
 
                     self.mode_clock -= 456;
+                    self.update_stat()
                 }
             }
         }
@@ -980,10 +988,10 @@ impl Ppu {
             OBP0_ADDR => self.palettes[1],
             // 0xFF49 — OBP1 (Non-CGB Mode only)
             OBP1_ADDR => self.palettes[2],
-            // 0xFF4A — WX
-            WX_ADDR => self.wy,
-            // 0xFF4B — WY
-            WY_ADDR => self.wx,
+            // 0xFF4A — WY
+            WY_ADDR => self.wy,
+            // 0xFF4B — WX
+            WX_ADDR => self.wx,
             // 0xFF4F — VBK (CGB only)
             0xff4f => self.vram_bank | 0xfe,
             // 0xFF68 — BCPS/BGPI (CGB only)
@@ -1046,13 +1054,29 @@ impl Ppu {
                 self.stat_vblank = value & 0x10 == 0x10;
                 self.stat_oam = value & 0x20 == 0x20;
                 self.stat_lyc = value & 0x40 == 0x40;
+
+                if self.switch_lcd {
+                    // DMG STAT bug: writing to STAT momentarily glitches
+                    // the internal STAT line low, so we force a rising-edge
+                    // re-evaluation which may trigger a spurious interrupt
+                    if self.gb_mode == GameBoyMode::Dmg {
+                        self.int_stat_prev = false;
+                    }
+
+                    // re-evaluate STAT line after changing the enable flags,
+                    // a new condition may now be met causing a rising edge
+                    self.update_stat();
+                }
             }
             // 0xFF42 — SCY: Background Y position
             SCY_ADDR => self.scy = value,
             // 0xFF43 — SCX: Background X position
             SCX_ADDR => self.scx = value,
             // 0xFF45 — LYC: LY compare
-            LYC_ADDR => self.lyc = value,
+            LYC_ADDR => {
+                self.lyc = value;
+                self.update_stat();
+            }
             // 0xFF47 — BGP (Non-CGB Mode only)
             BGP_ADDR => {
                 if value == self.palettes[0] {
@@ -1097,10 +1121,10 @@ impl Ppu {
                 }
                 self.palettes[2] = value;
             }
-            // 0xFF4A — WX
-            WX_ADDR => self.wy = value,
-            // 0xFF4B — WY
-            WY_ADDR => self.wx = value,
+            // 0xFF4A — WY
+            WY_ADDR => self.wy = value,
+            // 0xFF4B — WX
+            WX_ADDR => self.wx = value,
             // 0xFF4F — VBK (CGB only)
             0xff4f => {
                 self.vram_bank = value & 0x01;
@@ -1392,6 +1416,16 @@ impl Ppu {
     #[inline(always)]
     pub fn set_int_stat(&mut self, value: bool) {
         self.int_stat = value;
+    }
+
+    #[inline(always)]
+    pub fn int_stat_prev(&self) -> bool {
+        self.int_stat_prev
+    }
+
+    #[inline(always)]
+    pub fn set_int_stat_prev(&mut self, value: bool) {
+        self.int_stat_prev = value;
     }
 
     #[inline(always)]
@@ -1973,15 +2007,15 @@ impl Ppu {
             // this is going to be used for shade index value computation (DMG only)
             let palette_v = self.palettes[palette_index as usize];
 
-            // calculates the offset in the color buffer (raw color information
-            // from 0 to 3) for the sprit that is going to be drawn, this value
-            // is kept as a signed integer to allow proper negative number math
-            let mut color_offset = self.ly as i32 * DISPLAY_WIDTH as i32 + obj.x as i32;
+            // calculates the base offset in the color buffer (raw color
+            // information from 0 to 3) for the sprite that is going to be
+            // drawn, each tile pixel adds to this base to get the final offset
+            let color_base = self.ly as i32 * DISPLAY_WIDTH as i32 + obj.x as i32;
 
-            // calculates the offset in the frame buffer for the sprite
-            // that is going to be drawn, this is going to be the starting
-            // point for the draw operation to be performed
-            let mut frame_offset =
+            // calculates the base offset in the frame buffer for the sprite
+            // that is going to be drawn, each tile pixel adds to this base
+            // (scaled by RGB_SIZE) to get the final frame buffer position
+            let frame_base =
                 (self.ly as i32 * DISPLAY_WIDTH as i32 + obj.x as i32) * RGB_SIZE as i32;
 
             // the relative title offset should range from 0 to 7 in 8x8
@@ -2035,6 +2069,11 @@ impl Ppu {
             let obj_over = always_over || !obj.bg_over;
 
             for tile_x in 0..TILE_WIDTH {
+                // calculates the color buffer offset for the current pixel in iteration,
+                // this is going to be used to update the color buffer and the shade buffer
+                let color_offset = color_base + tile_x as i32;
+                let frame_offset = frame_base + tile_x as i32 * RGB_SIZE as i32;
+
                 let x = obj.x + tile_x as i16;
                 let is_contained = (x >= 0) && (x < DISPLAY_WIDTH as i16);
                 if is_contained {
@@ -2082,14 +2121,6 @@ impl Ppu {
                         self.frame_buffer[frame_offset as usize + 2] = color[2];
                     }
                 }
-
-                // increment the color offset by one as this represents
-                // the advance of one color pixel
-                color_offset += 1;
-
-                // increments the offset of the frame buffer by the
-                // size of an RGB pixel (which is 3 bytes)
-                frame_offset += RGB_SIZE as i32;
             }
 
             // increments the counter so that we're able to keep
@@ -2098,11 +2129,19 @@ impl Ppu {
         }
     }
 
-    /// Runs an update operation on the LCD STAT interrupt meaning
-    /// that the flag that controls it will be updated in case the conditions
-    /// required for the LCD STAT interrupt to be triggered are met.
+    /// Runs an update operation on the LCD STAT interrupt using
+    /// rising-edge detection on the internal STAT line.
+    ///
+    /// The LCD STAT interrupt is only triggered on the 0 to 1 transition
+    /// of the combined STAT conditions, matching the real hardware
+    /// behaviour where the IF bit is set on the rising edge and
+    /// remains set until the CPU acknowledges it.
     fn update_stat(&mut self) {
-        self.int_stat = self.stat_level();
+        let level = self.stat_level();
+        if level && !self.int_stat_prev {
+            self.int_stat = true;
+        }
+        self.int_stat_prev = level;
     }
 
     /// Obtains the current level of the LCD STAT interrupt by
@@ -2307,6 +2346,7 @@ impl StateComponent for Ppu {
         write_u8(&mut cursor, self.stat_lyc as u8)?;
         write_u8(&mut cursor, self.int_vblank as u8)?;
         write_u8(&mut cursor, self.int_stat as u8)?;
+        write_u8(&mut cursor, self.int_stat_prev as u8)?;
         write_u8(&mut cursor, self.dmg_compat as u8)?;
         write_u8(&mut cursor, self.gb_mode as u8)?;
 
@@ -2388,6 +2428,7 @@ impl StateComponent for Ppu {
         self.stat_lyc = read_u8(&mut cursor)? != 0;
         self.int_vblank = read_u8(&mut cursor)? != 0;
         self.int_stat = read_u8(&mut cursor)? != 0;
+        self.int_stat_prev = read_u8(&mut cursor)? != 0;
         self.dmg_compat = read_u8(&mut cursor)? != 0;
         self.gb_mode = read_u8(&mut cursor)?.into();
 
@@ -2406,14 +2447,13 @@ impl Default for Ppu {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        gb::GameBoyMode,
-        state::{StateComponent, StateFormat},
-    };
-
     use super::{
         ObjectData, Ppu, PpuMode, Tile, COLOR_BUFFER_SIZE, FRAME_BUFFER_SIZE, HRAM_SIZE, OAM_SIZE,
         OBJ_COUNT, SHADE_BUFFER_SIZE, TILE_COUNT, VRAM_SIZE,
+    };
+    use crate::{
+        gb::GameBoyMode,
+        state::{StateComponent, StateFormat},
     };
 
     #[test]
@@ -2491,13 +2531,14 @@ mod tests {
             stat_lyc: true,
             int_vblank: true,
             int_stat: true,
+            int_stat_prev: true,
             dmg_compat: true,
             gb_mode: GameBoyMode::Dmg,
             ..Default::default()
         };
 
         let state = ppu.state(Some(StateFormat::Full)).unwrap();
-        assert_eq!(state.len(), 204714);
+        assert_eq!(state.len(), 204715);
 
         let mut new_ppu = Ppu::default();
         new_ppu.set_state(&state, Some(StateFormat::Full)).unwrap();
@@ -2546,6 +2587,7 @@ mod tests {
         assert!(new_ppu.stat_lyc);
         assert!(new_ppu.int_vblank);
         assert!(new_ppu.int_stat);
+        assert!(new_ppu.int_stat_prev);
         assert!(new_ppu.dmg_compat);
         assert_eq!(new_ppu.gb_mode, GameBoyMode::Dmg);
     }
@@ -2586,13 +2628,14 @@ mod tests {
             stat_lyc: true,
             int_vblank: true,
             int_stat: true,
+            int_stat_prev: true,
             dmg_compat: true,
             gb_mode: GameBoyMode::Dmg,
             ..Default::default()
         };
 
         let state = ppu.state(Some(StateFormat::Minimal)).unwrap();
-        assert_eq!(state.len(), 39);
+        assert_eq!(state.len(), 40);
 
         let mut new_ppu = Ppu::default();
         new_ppu
@@ -2632,6 +2675,7 @@ mod tests {
         assert!(new_ppu.stat_lyc);
         assert!(new_ppu.int_vblank);
         assert!(new_ppu.int_stat);
+        assert!(new_ppu.int_stat_prev);
         assert!(new_ppu.dmg_compat);
         assert_eq!(new_ppu.gb_mode, GameBoyMode::Dmg);
     }

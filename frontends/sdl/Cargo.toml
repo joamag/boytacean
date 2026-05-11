@@ -41,7 +41,7 @@ features = ["ttf", "image", "gfx", "mixer", "static-link", "use-vcpkg"]
 [package.metadata.vcpkg]
 dependencies = ["sdl2", "sdl2-image[libjpeg-turbo,tiff,libwebp]", "sdl2-ttf", "sdl2-gfx", "sdl2-mixer"]
 git = "https://github.com/microsoft/vcpkg"
-rev = "2024.12.16"
+rev = "2025.10.17"
 
 # If you face issues with the SDL2 libraries linking process
 # try to use the following revision instead

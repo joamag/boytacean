@@ -17,8 +17,8 @@ pub const LYC_ADDR: u16 = 0xff45;
 pub const BGP_ADDR: u16 = 0xff47;
 pub const OBP0_ADDR: u16 = 0xff48;
 pub const OBP1_ADDR: u16 = 0xff49;
-pub const WX_ADDR: u16 = 0xff4a;
-pub const WY_ADDR: u16 = 0xff4b;
+pub const WY_ADDR: u16 = 0xff4a;
+pub const WX_ADDR: u16 = 0xff4b;
 
 // APU registers
 pub const NR10_ADDR: u16 = 0xff10;

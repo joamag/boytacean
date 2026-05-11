@@ -1,7 +1,8 @@
 //! MMU (Memory Management Unit) functions and structures.
 
-use boytacean_common::util::SharedThread;
 use std::sync::Mutex;
+
+use boytacean_common::util::SharedThread;
 
 use crate::{
     apu::Apu,

@@ -157,13 +157,6 @@ impl SdlSystem {
     /// This function creates all the needed OpenGL objects to
     /// render the shader, this function is used to apply effects
     /// to the graphics of the emulator.
-    ///
-    /// # Arguments
-    /// * `name` - The name of the shader to load.
-    ///
-    /// # Returns
-    /// * `Ok(())` - If the shader was loaded successfully.
-    /// * `Err(String)` - If the shader was not loaded successfully.
     pub fn load_shader(&mut self, name: &str) -> Result<(), String> {
         let program = shader::load_shader_program(name)?;
 

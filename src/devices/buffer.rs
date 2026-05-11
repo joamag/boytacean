@@ -1,6 +1,6 @@
-use crate::serial::SerialDevice;
-
 use std::fmt::{self, Display, Formatter};
+
+use crate::serial::SerialDevice;
 
 pub struct BufferDevice {
     buffer: Vec<u8>,

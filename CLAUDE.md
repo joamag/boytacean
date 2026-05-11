@@ -51,6 +51,6 @@ Boytacean is a Game Boy and Game Boy Color emulator written in Rust. It supports
 ## Testing
 
 - Blargg test ROMs for CPU and sound accuracy
-- Acid2 tests for PPU accuracy  
+- Acid2 tests for PPU accuracy
 - Custom test suite in `src/test.rs`
 - Python tests in `src/python/boytacean/test/`

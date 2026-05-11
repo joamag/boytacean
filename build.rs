@@ -23,12 +23,6 @@
 //! ```
 
 #[cfg(not(feature = "gen-mock"))]
-use built::write_built_file_with_opts;
-#[cfg(not(feature = "gen-mock"))]
-use chrono::Utc;
-#[cfg(not(feature = "gen-mock"))]
-use regex::Regex;
-#[cfg(not(feature = "gen-mock"))]
 use std::{
     env,
     fs::{File, OpenOptions},
@@ -37,6 +31,13 @@ use std::{
     process::Command,
     str,
 };
+
+#[cfg(not(feature = "gen-mock"))]
+use built::write_built_file_with_opts;
+#[cfg(not(feature = "gen-mock"))]
+use chrono::Utc;
+#[cfg(not(feature = "gen-mock"))]
+use regex::Regex;
 
 #[cfg(not(feature = "gen-mock"))]
 const BUILD_OUT_FILE: &str = "build.rs";

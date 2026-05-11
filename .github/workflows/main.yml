@@ -10,10 +10,12 @@ jobs:
     strategy:
       matrix:
         rust-version: [
-          "1.82.0",
-          "1.83.0",
-          "1.84.0",
-          "1.85.0",
+          "1.86.0",
+          "1.87.0",
+          "1.88.0",
+          "1.89.0",
+          "1.90.0",
+          "1.91.0",
           "latest"
         ]
     runs-on: ubuntu-latest
@@ -45,10 +47,12 @@ jobs:
     strategy:
       matrix:
         rust-version: [
-          "1.82.0",
-          "1.83.0",
-          "1.84.0",
-          "1.85.0",
+          "1.86.0",
+          "1.87.0",
+          "1.88.0",
+          "1.89.0",
+          "1.90.0",
+          "1.91.0",
           "latest"
         ]
     runs-on: ubuntu-latest
@@ -76,10 +80,10 @@ jobs:
     strategy:
       matrix:
         rust-version: [
-          "1.82.0",
-          "1.83.0",
-          "1.84.0",
-          "1.85.0",
+          "1.91.0",
+          "1.92.0",
+          "1.93.0",
+          "1.94.0",
           "latest"
         ]
         node-version: ["18"]
@@ -120,10 +124,12 @@ jobs:
     strategy:
       matrix:
         rust-version: [
-          "1.82.0",
-          "1.83.0",
-          "1.84.0",
-          "1.85.0",
+          "1.86.0",
+          "1.87.0",
+          "1.88.0",
+          "1.89.0",
+          "1.90.0",
+          "1.91.0",
           "latest"
         ]
     runs-on: ubuntu-latest
@@ -155,7 +161,7 @@ jobs:
       - name: Verify Rust code format
         run: cd frontends/sdl && cargo fmt --all -- --check
       - name: Verify Rust code linting
-        run: cd frontends/sdl && cargo update -p half --precise 2.2.1 && cargo clippy -- -D warnings -A unknown-lints
+        run: cd frontends/sdl && cargo clippy -- -D warnings -A unknown-lints
       - name: Run unit tests
         run: cd frontends/sdl && cargo test
       - name: Run all unit tests
@@ -176,10 +182,12 @@ jobs:
     strategy:
       matrix:
         rust-version: [
-          "1.82.0",
-          "1.83.0",
-          "1.84.0",
-          "1.85.0",
+          "1.86.0",
+          "1.87.0",
+          "1.88.0",
+          "1.89.0",
+          "1.90.0",
+          "1.91.0",
           "latest"
         ]
     runs-on: ubuntu-latest
@@ -213,10 +221,12 @@ jobs:
     strategy:
       matrix:
         rust-version: [
-          "1.82.0",
-          "1.83.0",
-          "1.84.0",
-          "1.85.0",
+          "1.86.0",
+          "1.87.0",
+          "1.88.0",
+          "1.89.0",
+          "1.90.0",
+          "1.91.0",
           "latest"
         ]
     runs-on: ubuntu-latest
@@ -276,10 +286,12 @@ jobs:
     strategy:
       matrix:
         rust-image: [
-          "rust:1.82.0",
-          "rust:1.83.0",
-          "rust:1.84.0",
-          "rust:1.85.0",
+          "rust:1.86.0",
+          "rust:1.87.0",
+          "rust:1.88.0",
+          "rust:1.89.0",
+          "rust:1.90.0",
+          "rust:1.91.0",
           "rust:latest",
           "rustlang/rust:nightly"
         ]
@@ -312,11 +324,11 @@ jobs:
       - name: Verify Rust code format
         run: cd frontends/sdl && cargo fmt --all -- --check
       - name: Verify Rust code linting
-        run: cd frontends/sdl && cargo update -p half --precise 2.2.1 && cargo clippy -- -D warnings -A unknown-lints
+        run: cd frontends/sdl && cargo clippy -- -D warnings -A unknown-lints
       - name: Build documentation
         run: cargo doc --all
       - name: Build all documentation
         run: cargo doc --all --all-features
         env:
-          PYO3_USE_ABI3_FORWARD_COMPATIBILITY: 1 
+          PYO3_USE_ABI3_FORWARD_COMPATIBILITY: 1
         if: matrix.rust-image == 'rustlang/rust:nightly'
