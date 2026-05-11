@@ -10,7 +10,8 @@ use crate::{
     gen::{COMPILATION_DATE, COMPILATION_TIME, COMPILER, COMPILER_VERSION, NAME, VERSION},
     info::Info,
     pad::PadKey,
-    ppu::{PaletteInfo, DISPLAY_HEIGHT, DISPLAY_WIDTH},
+    ppu::{PaletteInfo, DISPLAY_HEIGHT, DISPLAY_WIDTH, HRAM_SIZE, OAM_SIZE, VRAM_SIZE},
+    rom::{Cartridge, RAM_BANK_SIZE, ROM_BANK_SIZE},
     state::StateManager,
 };
 
@@ -96,6 +97,14 @@ impl GameBoy {
         self.system.next_frame()
     }
 
+    pub fn next_frames(&mut self, count: usize) -> u64 {
+        let mut total = 0u64;
+        for _ in 0..count {
+            total += self.system.next_frame() as u64;
+        }
+        total
+    }
+
     pub fn step_to(&mut self, addr: u16) -> u32 {
         self.system.step_to(addr)
     }
@@ -110,6 +119,26 @@ impl GameBoy {
 
     pub fn frame_buffer(&mut self, py: Python) -> PyObject {
         let pybytes = PyBytes::new(py, self.system.frame_buffer());
+        pybytes.into()
+    }
+
+    pub fn frame_buffer_rgba(&mut self, py: Python) -> PyObject {
+        let pybytes = PyBytes::new(py, &self.system.ppu().frame_buffer_rgba());
+        pybytes.into()
+    }
+
+    pub fn vram(&mut self, py: Python) -> PyObject {
+        let pybytes = PyBytes::new(py, self.system.ppu_i().vram());
+        pybytes.into()
+    }
+
+    pub fn oam(&mut self, py: Python) -> PyObject {
+        let pybytes = PyBytes::new(py, self.system.ppu_i().oam());
+        pybytes.into()
+    }
+
+    pub fn hram(&mut self, py: Python) -> PyObject {
+        let pybytes = PyBytes::new(py, self.system.ppu_i().hram());
         pybytes.into()
     }
 
@@ -158,12 +187,158 @@ impl GameBoy {
         self.system.set_serial_enabled(value);
     }
 
+    pub fn ppu_ly(&mut self) -> u8 {
+        self.system.ppu_ly()
+    }
+
+    pub fn ppu_frame(&mut self) -> u16 {
+        self.system.ppu_frame()
+    }
+
+    pub fn cpu_pc(&self) -> u16 {
+        self.system.cpu_i().pc
+    }
+
+    pub fn set_cpu_pc(&mut self, value: u16) {
+        self.system.cpu().pc = value;
+    }
+
+    pub fn cpu_sp(&self) -> u16 {
+        self.system.cpu_i().sp
+    }
+
+    pub fn set_cpu_sp(&mut self, value: u16) {
+        self.system.cpu().sp = value;
+    }
+
+    pub fn cpu_a(&self) -> u8 {
+        self.system.cpu_i().a
+    }
+
+    pub fn set_cpu_a(&mut self, value: u8) {
+        self.system.cpu().a = value;
+    }
+
+    pub fn cpu_f(&self) -> u8 {
+        self.system.cpu_i().f()
+    }
+
+    pub fn set_cpu_f(&mut self, value: u8) {
+        self.system.cpu().set_f(value);
+    }
+
+    pub fn cpu_b(&self) -> u8 {
+        self.system.cpu_i().b
+    }
+
+    pub fn set_cpu_b(&mut self, value: u8) {
+        self.system.cpu().b = value;
+    }
+
+    pub fn cpu_c(&self) -> u8 {
+        self.system.cpu_i().c
+    }
+
+    pub fn set_cpu_c(&mut self, value: u8) {
+        self.system.cpu().c = value;
+    }
+
+    pub fn cpu_d(&self) -> u8 {
+        self.system.cpu_i().d
+    }
+
+    pub fn set_cpu_d(&mut self, value: u8) {
+        self.system.cpu().d = value;
+    }
+
+    pub fn cpu_e(&self) -> u8 {
+        self.system.cpu_i().e
+    }
+
+    pub fn set_cpu_e(&mut self, value: u8) {
+        self.system.cpu().e = value;
+    }
+
+    pub fn cpu_h(&self) -> u8 {
+        self.system.cpu_i().h
+    }
+
+    pub fn set_cpu_h(&mut self, value: u8) {
+        self.system.cpu().h = value;
+    }
+
+    pub fn cpu_l(&self) -> u8 {
+        self.system.cpu_i().l
+    }
+
+    pub fn set_cpu_l(&mut self, value: u8) {
+        self.system.cpu().l = value;
+    }
+
+    pub fn cgb(&self) -> bool {
+        self.system.is_cgb()
+    }
+
+    pub fn dmg(&self) -> bool {
+        self.system.is_dmg()
+    }
+
+    pub fn sgb(&self) -> bool {
+        self.system.is_sgb()
+    }
+
     pub fn rom_title(&self) -> String {
         self.system.rom_i().title()
     }
 
+    pub fn rom_data(&mut self, py: Python) -> PyObject {
+        let pybytes = PyBytes::new(py, self.system.mmu().rom().rom_data());
+        pybytes.into()
+    }
+
+    pub fn ram_data(&mut self, py: Python) -> PyObject {
+        let pybytes = PyBytes::new(py, self.system.mmu().rom().ram_data());
+        pybytes.into()
+    }
+
+    pub fn rom_bank(&mut self) -> u16 {
+        self.system.mmu().rom().rom_bank()
+    }
+
+    pub fn ram_bank(&mut self) -> u8 {
+        self.system.mmu().rom().ram_bank()
+    }
+
+    pub fn rom_banks(&mut self) -> u16 {
+        self.system.mmu().rom().rom_size().rom_banks()
+    }
+
+    pub fn ram_banks(&mut self) -> u16 {
+        self.system.mmu().rom().ram_size().ram_banks()
+    }
+
+    pub fn ram_enabled(&mut self) -> bool {
+        self.system.mmu().rom().ram_enabled()
+    }
+
+    pub fn has_battery(&mut self) -> bool {
+        self.system.mmu().rom().has_battery()
+    }
+
+    pub fn checksum(&mut self) -> u8 {
+        self.system.mmu().rom().checksum()
+    }
+
     pub fn version(&self) -> String {
         Info::version()
+    }
+
+    pub fn clock_freq(&self) -> u32 {
+        self.system.clock_freq()
+    }
+
+    pub fn set_clock_freq(&mut self, value: u32) {
+        self.system.set_clock_freq(value);
     }
 
     pub fn clock_freq_s(&self) -> String {
@@ -172,6 +347,18 @@ impl GameBoy {
 
     pub fn boot_rom_s(&self) -> String {
         self.system.boot_rom_s()
+    }
+
+    pub fn rom_type_s(&mut self) -> String {
+        self.system.mmu().rom().rom_type_s()
+    }
+
+    pub fn rom_size_s(&mut self) -> String {
+        self.system.mmu().rom().rom_size_s()
+    }
+
+    pub fn ram_size_s(&mut self) -> String {
+        self.system.mmu().rom().ram_size_s()
     }
 
     pub fn timer_div(&self) -> u8 {
@@ -194,9 +381,25 @@ impl GameBoy {
     }
 }
 
+#[pyfunction]
+fn infer_mode(path: &str) -> PyResult<u8> {
+    Cartridge::from_file(path)
+        .map(|cartridge| cartridge.gb_mode() as u8)
+        .map_err(PyErr::new::<PyException, _>)
+}
+
+#[pyfunction]
+fn infer_mode_data(data: &[u8]) -> PyResult<u8> {
+    Cartridge::from_data(data)
+        .map(|cartridge| cartridge.gb_mode() as u8)
+        .map_err(PyErr::new::<PyException, _>)
+}
+
 #[pymodule]
 fn boytacean(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<GameBoy>()?;
+    module.add_function(wrap_pyfunction!(infer_mode, module)?)?;
+    module.add_function(wrap_pyfunction!(infer_mode_data, module)?)?;
     module.add("__version__", VERSION)?;
     module.add("COMPILATION_DATE", COMPILATION_DATE)?;
     module.add("COMPILATION_TIME", COMPILATION_TIME)?;
@@ -206,6 +409,11 @@ fn boytacean(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add("VERSION", VERSION)?;
     module.add("DISPLAY_WIDTH", DISPLAY_WIDTH)?;
     module.add("DISPLAY_HEIGHT", DISPLAY_HEIGHT)?;
+    module.add("VRAM_SIZE", VRAM_SIZE)?;
+    module.add("OAM_SIZE", OAM_SIZE)?;
+    module.add("HRAM_SIZE", HRAM_SIZE)?;
+    module.add("ROM_BANK_SIZE", ROM_BANK_SIZE)?;
+    module.add("RAM_BANK_SIZE", RAM_BANK_SIZE)?;
     module.add("CPU_FREQ", GameBoyBase::CPU_FREQ)?;
     module.add("VISUAL_FREQ", GameBoyBase::VISUAL_FREQ)?;
     module.add("LCD_CYCLES", GameBoyBase::LCD_CYCLES)?;

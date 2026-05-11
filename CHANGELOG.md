@@ -11,13 +11,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * High-pass audio filter options (Preserve, Accurate, Disable) with save-state support
 * SDL frontend shader loading support via `--shader-path`
+* PyBoy 2.x compatible Python interface (`PyBoyV2`) with `tick(count, render)`, `button`/`button_press`/`button_release`, `screen.ndarray`/`screen.image`, `memory[addr]` bracket accessor, `mb.cpu.registers` register file, `set_color_palette` and a generic `GameWrapper`
+* `Tile`, `Sprite` and `TileMap` API objects with bracket access, slice/2D indexing and `use_tile_objects(True)` toggle; `tilemap_background`/`tilemap_window` attributes plus `get_tile`/`get_sprite`/`get_sprite_by_tile_identifier` helpers on `PyBoyV2`
+* Standalone game wrappers (`GameWrapperTetris`, `GameWrapperSuperMarioLand`, `GameWrapperKirbyDreamLand`) auto-selected by cartridge title, plus `game_area`/`game_area_collision`/`game_area_mapping`/`game_area_dimensions` helpers
+* `.sym` symbol-file loader and `symbol_lookup(name)` returning `(bank, addr)` on `PyBoyV2`
+* Lightweight pure-Python `hook_register`/`hook_deregister` over per-frame PC checks (no opcode patching, zero cost when no hooks are registered)
+* `MemoryScanner` with EXACT/LESS_THAN/GREATER_THAN scans plus CHANGED/UNCHANGED/INCREASED/DECREASED/MATCH rescans
+* `GameShark` cheat manager applying 8-bit RAM-write codes (`ttvvaaaa` format) every frame, with `add`/`remove`/`clear_all`
+* `PyBoyV1.botsupport_manager()` returning a `BotSupportManager` proxy with `screen()`, `sprite()`, `sprite_by_tile_identifier()`, `tile()`, `tilemap_background()` and `tilemap_window()` methods
+* `LegacyScreen` exposing the 1.x 3-channel RGB `screen_image`, `screen_ndarray`, `raw_screen_buffer*` and `tilemap_position*` shapes used by older AI scripts
+* `PyBoyV1.override_memory_value(rom_bank, addr, value)` for legacy memory-patching scripts (RAM addresses only — ROM patching surfaces a clear `RuntimeError` until the core exposes cartridge writes)
+* `GameBoy.next_frames(count)` and `frame_buffer_rgba()` Rust bridges; `PyBoyV2.tick(count, ...)` now batches the loop entirely inside Rust when no hooks/cheats/recorders are active, and `screen.ndarray`/`screen.image`/`screen.raw_buffer` consume the native 4-channel buffer directly
+* HBlank HDMA transfer support
+* Python 3.14 support via pyo3 0.25
+* `boytacean.test` package shipped with installs, with automatic skip guards when `numpy`/`Pillow` are missing or required test ROMs are absent
+* `GameBoy.cpu_f` / `set_cpu_f` accessors and a matching `PyBoyV2.register_file.F` property that reads and writes the real flag byte
+* `Tile(..., bank=)` kwarg and CGB-aware `Sprite` initialisation that routes bank-1 OAM sprites to the right VRAM bank instead of silently reading bank 0
+* Coverage for the PyBoy compatibility layer: 8 new Python unit tests (V1/V2 `set_emulation_speed`, banked memory rejection, applied `game_area_mapping`, per-tick `post_tick`, banked hook rejection, multi-byte `rescan_memory`, overlapping GameShark codes) and a Rust unit test for `Cartridge::title()` on an unloaded cartridge
 
 ### Changed
 
-* Added support for HBlank HDMA transfers
+* Python extension defaults to release builds (`debug=False` in `setup.py`), making `pip install` and `pip install -e .` produce optimised binaries out of the box
+* Inlined the per-cycle dispatch chain (`GameBoy::clock`, `*_clock` wrappers and `Mmu`/`GameBoy` accessors for ppu/apu/dma/pad/timer/serial); native baseline frame rate on Tetris improved from ~7900 fps to ~8700 fps (+10%) and the cost of clocking idle serial hardware dropped from ~12% of frame time to ~1%
+* Promoted hot dispatch-chain hints from `#[inline]` to `#[inline(always)]` across `gb.rs`, `mmu.rs` and `ppu_fast.rs` so the inlining is no longer left to the optimiser
+* PyBoy compatibility surface reorganised into a `boytacean.pyboy` subpackage (`api`, `core`, `debug`, `wrappers`); import paths from `boytacean.pyboy` (e.g. `from boytacean.pyboy import PyBoy`) remain stable
+* Standalone PyBoy 1.x compatible class (`PyBoyV1`) with `WindowEvent`, `send_input`, `screen_image`, `get_memory_value`/`set_memory_value` and `cartridge_title()` method
+* `PyBoy` alias resolving to `PyBoyV2` so the modern surface is the default for `from boytacean.pyboy import PyBoy`
+* Python bindings for VRAM, OAM, HRAM, ROM/RAM data, ROM/RAM banks, CPU register file, mode predicates and clock frequency
+* `PyBoyV1.set_emulation_speed` / `PyBoyV2.set_emulation_speed` now compute against a captured base clock rather than the current `clock_freq`, so repeated calls no longer compound; `speed=0` follows the PyBoy 2.x convention and means "unbounded", `speed<0` raises `ValueError`
+* `PyBoyV2.game_area_mapping(mapping, sprite_offset)` actually applies the mapping inside `GameWrapper.game_area()` instead of silently storing it; agents that pass a tile-id remap table now receive the remapped observation
+* `MemoryScanner.rescan_memory` reuses the original scan's `byte_width` / `value_type` / `byteorder` so dynamic comparisons on 2-byte/4-byte/BCD scans no longer fall back to a single-byte read
+* `GameShark.add` / `remove` reference-count the pre-cheat snapshot per address, so overlapping codes on the same byte share one snapshot and removing one cheat no longer prematurely restores the original value
+* `HookRegistry.register` rejects bank-aware registrations (`bank != 0`) with `NotImplementedError` rather than silently colliding with bank-0 entries at the same address
+* `Memory._read` / `_write` raise `NotImplementedError` when called with a non-`None` bank instead of silently returning the flat-bus value
+* `Display.set_hud(frame_index=...)` accepts a baseline so the first FPS sample doesn't include frames that ran before HUD activation
 
 ### Fixed
 
+* `boytacean.pyboy` subpackage was missing from shipped wheels/sdists
+* `Cartridge::title()` now returns `"UNKNOWN"` and guards against out-of-range `title_offset` instead of returning an empty string (or panicking on `rom_data.len() < 0x0134`) for unloaded cartridges
+* `PyBoyV1.screen_image()` was calling a non-existent `self.image()` and raising `AttributeError`; it now produces the 3-channel RGB image PyBoy 1.x callers expect
+* `PyBoyV1.tick()` / `PyBoyV2.tick()` invoke `self.game_wrapper.post_tick()` after advancing frames, so wrapper-cached fields (`score`, `level`, `world`, ...) no longer stay stale during normal emulation
 * Fixed `audio_ch1_enabled` returning the wrong channel status
 * Shader program was not applied to SDL output
 * SDL shader rendering failed due to lifetime issues

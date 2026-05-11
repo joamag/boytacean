@@ -51,7 +51,8 @@ use crate::{
     pad::{Pad, PadKey},
     ppu::{
         Ppu, PpuMode, Tile, DISPLAY_HEIGHT, DISPLAY_WIDTH, FRAME_BUFFER_RGB1555_SIZE,
-        FRAME_BUFFER_RGB565_SIZE, FRAME_BUFFER_SIZE, FRAME_BUFFER_XRGB8888_SIZE,
+        FRAME_BUFFER_RGB565_SIZE, FRAME_BUFFER_RGBA_SIZE, FRAME_BUFFER_SIZE,
+        FRAME_BUFFER_XRGB8888_SIZE,
     },
     rom::{Cartridge, RamSize},
     serial::{NullDevice, Serial, SerialDevice},
@@ -611,6 +612,7 @@ impl GameBoy {
     /// accordingly.
     ///
     /// The amount of cycles executed by the CPU is returned.
+    #[inline(always)]
     pub fn clock(&mut self) -> u16 {
         let cycles = self.cpu_clock() as u16;
         let cycles_n = cycles / self.multiplier() as u16;
@@ -773,26 +775,32 @@ impl GameBoy {
         self.pad().key_lift(key);
     }
 
+    #[inline(always)]
     pub fn cpu_clock(&mut self) -> u8 {
         self.cpu.clock()
     }
 
+    #[inline(always)]
     pub fn ppu_clock(&mut self, cycles: u16) {
         self.ppu().clock(cycles)
     }
 
+    #[inline(always)]
     pub fn apu_clock(&mut self, cycles: u16) {
         self.apu().clock(cycles)
     }
 
+    #[inline(always)]
     pub fn dma_clock(&mut self, cycles: u16) {
         self.mmu().clock_dma(cycles);
     }
 
+    #[inline(always)]
     pub fn timer_clock(&mut self, cycles: u16) {
         self.timer().clock(cycles)
     }
 
+    #[inline(always)]
     pub fn serial_clock(&mut self, cycles: u16) {
         self.serial().clock(cycles)
     }
@@ -1191,50 +1199,62 @@ impl GameBoy {
         self.cpu.mmu_i()
     }
 
+    #[inline(always)]
     pub fn ppu(&mut self) -> &mut Ppu {
         self.cpu.ppu()
     }
 
+    #[inline(always)]
     pub fn ppu_i(&self) -> &Ppu {
         self.cpu.ppu_i()
     }
 
+    #[inline(always)]
     pub fn apu(&mut self) -> &mut Apu {
         self.cpu.apu()
     }
 
+    #[inline(always)]
     pub fn apu_i(&self) -> &Apu {
         self.cpu.apu_i()
     }
 
+    #[inline(always)]
     pub fn dma(&mut self) -> &mut Dma {
         self.cpu.dma()
     }
 
+    #[inline(always)]
     pub fn dma_i(&self) -> &Dma {
         self.cpu.dma_i()
     }
 
+    #[inline(always)]
     pub fn pad(&mut self) -> &mut Pad {
         self.cpu.pad()
     }
 
+    #[inline(always)]
     pub fn pad_i(&self) -> &Pad {
         self.cpu.pad_i()
     }
 
+    #[inline(always)]
     pub fn timer(&mut self) -> &mut Timer {
         self.cpu.timer()
     }
 
+    #[inline(always)]
     pub fn timer_i(&self) -> &Timer {
         self.cpu.timer_i()
     }
 
+    #[inline(always)]
     pub fn serial(&mut self) -> &mut Serial {
         self.cpu.serial()
     }
 
+    #[inline(always)]
     pub fn serial_i(&self) -> &Serial {
         self.cpu.serial_i()
     }
@@ -1273,6 +1293,10 @@ impl GameBoy {
 
     pub fn frame_buffer_rgb565_u16(&mut self) -> [u16; FRAME_BUFFER_SIZE] {
         self.ppu().frame_buffer_rgb565_u16()
+    }
+
+    pub fn frame_buffer_rgba(&mut self) -> [u8; FRAME_BUFFER_RGBA_SIZE] {
+        self.ppu().frame_buffer_rgba()
     }
 
     pub fn frame_buffer_raw(&mut self) -> [u8; FRAME_BUFFER_SIZE] {
