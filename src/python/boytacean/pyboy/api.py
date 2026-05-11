@@ -27,33 +27,6 @@ TILE_WIDTH = 8
 TILE_HEIGHT = 8
 
 
-def _decode_tile_pixels(data: bytes) -> List[int]:
-    # decodes the 16-byte 2bpp tile data into a flat list of 64
-    # pixel values in the range 0..3, row-major
-    pixels = [0] * (TILE_WIDTH * TILE_HEIGHT)
-    for row in range(TILE_HEIGHT):
-        low = data[row * 2]
-        high = data[row * 2 + 1]
-        for col in range(TILE_WIDTH):
-            bit = 7 - col
-            value = ((high >> bit) & 0x1) << 1 | ((low >> bit) & 0x1)
-            pixels[row * TILE_WIDTH + col] = value
-    return pixels
-
-
-def _shade_to_rgba(value: int) -> Tuple[int, int, int, int]:
-    # converts a 0..3 shade index into an RGBA quadruple, using the
-    # canonical PyBoy DMG palette (white → black) so the produced
-    # PIL/numpy buffers match the upstream colour ordering
-    table = (
-        (0xFF, 0xFF, 0xFF, 0xFF),
-        (0xAA, 0xAA, 0xAA, 0xFF),
-        (0x55, 0x55, 0x55, 0xFF),
-        (0x00, 0x00, 0x00, 0xFF),
-    )
-    return table[value & 0x3]
-
-
 class Tile:
     """
     Read-only handle to a single 8x8 tile in VRAM, identified either
@@ -250,3 +223,30 @@ class TileMap:
             start, stop, step = value.indices(32)
             return list(range(start, stop, step))
         return [value]
+
+
+def _decode_tile_pixels(data: bytes) -> List[int]:
+    # decodes the 16-byte 2bpp tile data into a flat list of 64
+    # pixel values in the range 0..3, row-major
+    pixels = [0] * (TILE_WIDTH * TILE_HEIGHT)
+    for row in range(TILE_HEIGHT):
+        low = data[row * 2]
+        high = data[row * 2 + 1]
+        for col in range(TILE_WIDTH):
+            bit = 7 - col
+            value = ((high >> bit) & 0x1) << 1 | ((low >> bit) & 0x1)
+            pixels[row * TILE_WIDTH + col] = value
+    return pixels
+
+
+def _shade_to_rgba(value: int) -> Tuple[int, int, int, int]:
+    # converts a 0..3 shade index into an RGBA quadruple, using the
+    # canonical PyBoy DMG palette (white → black) so the produced
+    # PIL/numpy buffers match the upstream colour ordering
+    table = (
+        (0xFF, 0xFF, 0xFF, 0xFF),
+        (0xAA, 0xAA, 0xAA, 0xFF),
+        (0x55, 0x55, 0x55, 0xFF),
+        (0x00, 0x00, 0x00, 0xFF),
+    )
+    return table[value & 0x3]
