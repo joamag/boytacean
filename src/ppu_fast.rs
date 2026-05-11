@@ -68,7 +68,7 @@ impl FastPpuDriver {
     /// any rendering or interrupt-line book-keeping.
     /// Returns true once per scanline at the mode 3 -> HBlank edge
     /// (the host should call its renderer for `self.ly` then)
-    #[inline]
+    #[inline(always)]
     pub fn clock(&mut self, cycles: u16) -> bool {
         self.clock += cycles as u32;
         let mut rendered = false;
@@ -78,7 +78,7 @@ impl FastPpuDriver {
         rendered
     }
 
-    #[inline]
+    #[inline(always)]
     fn advance_mode(&mut self, rendered: &mut bool) {
         // every transition resets the clock window to "cycles into the
         // current scanline" so that clock/clock_target stay small and

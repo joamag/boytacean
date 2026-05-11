@@ -611,7 +611,7 @@ impl GameBoy {
     /// accordingly.
     ///
     /// The amount of cycles executed by the CPU is returned.
-    #[inline]
+    #[inline(always)]
     pub fn clock(&mut self) -> u16 {
         let cycles = self.cpu_clock() as u16;
         let cycles_n = cycles / self.multiplier() as u16;
@@ -774,32 +774,32 @@ impl GameBoy {
         self.pad().key_lift(key);
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn cpu_clock(&mut self) -> u8 {
         self.cpu.clock()
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn ppu_clock(&mut self, cycles: u16) {
         self.ppu().clock(cycles)
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn apu_clock(&mut self, cycles: u16) {
         self.apu().clock(cycles)
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn dma_clock(&mut self, cycles: u16) {
         self.mmu().clock_dma(cycles);
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn timer_clock(&mut self, cycles: u16) {
         self.timer().clock(cycles)
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn serial_clock(&mut self, cycles: u16) {
         self.serial().clock(cycles)
     }
@@ -1198,62 +1198,62 @@ impl GameBoy {
         self.cpu.mmu_i()
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn ppu(&mut self) -> &mut Ppu {
         self.cpu.ppu()
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn ppu_i(&self) -> &Ppu {
         self.cpu.ppu_i()
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn apu(&mut self) -> &mut Apu {
         self.cpu.apu()
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn apu_i(&self) -> &Apu {
         self.cpu.apu_i()
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn dma(&mut self) -> &mut Dma {
         self.cpu.dma()
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn dma_i(&self) -> &Dma {
         self.cpu.dma_i()
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn pad(&mut self) -> &mut Pad {
         self.cpu.pad()
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn pad_i(&self) -> &Pad {
         self.cpu.pad_i()
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn timer(&mut self) -> &mut Timer {
         self.cpu.timer()
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn timer_i(&self) -> &Timer {
         self.cpu.timer_i()
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn serial(&mut self) -> &mut Serial {
         self.cpu.serial()
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn serial_i(&self) -> &Serial {
         self.cpu.serial_i()
     }

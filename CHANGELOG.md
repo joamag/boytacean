@@ -22,21 +22,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * `LegacyScreen` exposing the 1.x 3-channel RGB `screen_image`, `screen_ndarray`, `raw_screen_buffer*` and `tilemap_position*` shapes used by older AI scripts
 * `PyBoyV1.override_memory_value(rom_bank, addr, value)` for legacy memory-patching scripts (RAM addresses only — ROM patching surfaces a clear `RuntimeError` until the core exposes cartridge writes)
 * `GameBoy.next_frames(count)` and `frame_buffer_rgba()` Rust bridges; `PyBoyV2.tick(count, ...)` now batches the loop entirely inside Rust when no hooks/cheats/recorders are active, and `screen.ndarray`/`screen.image`/`screen.raw_buffer` consume the native 4-channel buffer directly
+* HBlank HDMA transfer support
+* Python 3.14 support via pyo3 0.25
+* `boytacean.test` package shipped with installs, with automatic skip guards when `numpy`/`Pillow` are missing or required test ROMs are absent
 
 ### Changed
 
 * Python extension defaults to release builds (`debug=False` in `setup.py`), making `pip install` and `pip install -e .` produce optimised binaries out of the box
 * Inlined the per-cycle dispatch chain (`GameBoy::clock`, `*_clock` wrappers and `Mmu`/`GameBoy` accessors for ppu/apu/dma/pad/timer/serial); native baseline frame rate on Tetris improved from ~7900 fps to ~8700 fps (+10%) and the cost of clocking idle serial hardware dropped from ~12% of frame time to ~1%
+* Promoted hot dispatch-chain hints from `#[inline]` to `#[inline(always)]` across `gb.rs`, `mmu.rs` and `ppu_fast.rs` so the inlining is no longer left to the optimiser
+* PyBoy compatibility surface reorganised into a `boytacean.pyboy` subpackage (`api`, `core`, `debug`, `wrappers`); import paths from `boytacean.pyboy` (e.g. `from boytacean.pyboy import PyBoy`) remain stable
 * Standalone PyBoy 1.x compatible class (`PyBoyV1`) with `WindowEvent`, `send_input`, `screen_image`, `get_memory_value`/`set_memory_value` and `cartridge_title()` method
 * `PyBoy` alias resolving to `PyBoyV2` so the modern surface is the default for `from boytacean.pyboy import PyBoy`
 * Python bindings for VRAM, OAM, HRAM, ROM/RAM data, ROM/RAM banks, CPU register file, mode predicates and clock frequency
 
-### Changed
-
-* Added support for HBlank HDMA transfers
-
 ### Fixed
 
+* `boytacean.pyboy` subpackage was missing from shipped wheels/sdists
 * Fixed `audio_ch1_enabled` returning the wrong channel status
 * Shader program was not applied to SDL output
 * SDL shader rendering failed due to lifetime issues
