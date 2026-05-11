@@ -244,14 +244,11 @@ class RegisterFile:
 
     @property
     def F(self) -> int:
-        # the F register is not directly exposed by the core,
-        # so it's reconstructed from the individual flag registers
-        return 0
+        return self._system.cpu_f
 
     @F.setter
     def F(self, value: int):
-        # silently ignore writes, the core does not expose F
-        pass
+        self._system.cpu_f = value & 0xFF
 
     @property
     def B(self) -> int:
@@ -370,7 +367,7 @@ class Screen:
 
     @property
     def raw_buffer(self) -> memoryview:
-        return memoryview(bytearray(self._system.frame_buffer_rgba()))
+        return memoryview(self._system.frame_buffer_rgba())
 
     @property
     def raw_buffer_dims(self) -> Tuple[int, int]:
@@ -541,19 +538,15 @@ class Memory:
     def _read(self, bank: Union[int, None], addr: int) -> int:
         if bank is None:
             return self._system.read_memory(addr & 0xFFFF)
-        # bank-aware reads only differ from flat reads when the
-        # requested bank is not the one currently selected; for now
-        # we fall back to the flat read since the core does not yet
-        # expose arbitrary bank views
-        return self._system.read_memory(addr & 0xFFFF)
+        raise NotImplementedError("Memory._read does not support bank-aware access yet")
 
     def _write(self, bank: Union[int, None], addr: int, value: int):
         if bank is None:
             self._system.write_memory(addr & 0xFFFF, value & 0xFF)
             return
-        # writing with a bank to a ROM address performs an override,
-        # which the core models as a direct cartridge write
-        self._system.write_memory(addr & 0xFFFF, value & 0xFF)
+        raise NotImplementedError(
+            "Memory._write does not support bank-aware access yet"
+        )
 
 
 class PyBoyV1(GameBoy):
@@ -598,6 +591,7 @@ class PyBoyV1(GameBoy):
         self.paused = False
         self.stopped = False
         self.quitting = False
+        self._base_clock_freq = self.clock_freq
 
         if bootrom_file:
             self.load_boot(bootrom_file)
@@ -621,15 +615,19 @@ class PyBoyV1(GameBoy):
         if self.stopped:
             return True
         self.next_frame()
+        self.game_wrapper.post_tick()
         return self.quitting
 
     def stop(self, save: bool = True):
         self.stopped = True
 
     def set_emulation_speed(self, speed: float):
-        if speed <= 0:
+        if speed < 0:
+            raise ValueError(f"Emulation speed must be >= 0, got {speed}")
+        if speed == 0:
+            self.clock_freq = 0
             return
-        self.clock_freq = int(self.clock_freq * speed)
+        self.clock_freq = int(self._base_clock_freq * speed)
 
     def send_input(self, event: WindowEvent, delay: int = 0):
         if isinstance(event, int):
@@ -645,7 +643,8 @@ class PyBoyV1(GameBoy):
         return self.rom_title
 
     def screen_image(self) -> Image:
-        return self.image()
+        rgb = self.frame_buffer()
+        return frombytes("RGB", (DISPLAY_WIDTH, DISPLAY_HEIGHT), rgb, "raw")
 
     def get_memory_value(self, addr: int) -> int:
         return self.read_memory(addr)
@@ -759,6 +758,7 @@ class PyBoyV2(GameBoy):
         self.window_title = ""
         self.paused = False
         self.stopped = False
+        self._base_clock_freq = self.clock_freq
 
         if bootrom:
             self.load_boot(bootrom)
@@ -817,6 +817,8 @@ class PyBoyV2(GameBoy):
                     self.gameshark.apply()
                 if not self._hooks.is_empty():
                     self._hooks.fire_for(self.cpu_pc)
+        if count > 0:
+            self.game_wrapper.post_tick()
         return not self.stopped
 
     def stop(
@@ -828,11 +830,12 @@ class PyBoyV2(GameBoy):
         self.stopped = True
 
     def set_emulation_speed(self, target_speed: int):
-        # following the 2.x convention: 0 means unbounded, 1 means
-        # realtime, anything else is treated as a multiplier
-        if target_speed <= 0:
+        if target_speed < 0:
+            raise ValueError(f"Emulation speed must be >= 0, got {target_speed}")
+        if target_speed == 0:
+            self.clock_freq = 0
             return
-        self.clock_freq = int(self.clock_freq * target_speed)
+        self.clock_freq = int(self._base_clock_freq * target_speed)
 
     def button(self, input: str, delay: int = 1):
         key = self._key_from_name(input)
@@ -909,6 +912,12 @@ class PyBoyV2(GameBoy):
         return impl()
 
     def game_area_mapping(self, mapping, sprite_offset: int = 0):
+        # mapping is a list/dict of length matching the active tile
+        # space (TILES or TILES_CGB) that `GameWrapper.game_area()`
+        # uses to remap each tile id; sprite_offset is the index added
+        # to OAM tile ids when sprites are composited onto the area
+        # (composition is not yet wired in, so the value is stored for
+        # parity but only the background mapping is applied today)
         if mapping is not None:
             max_tiles = TILES_CGB if self.cgb else TILES
             if len(mapping) != max_tiles:

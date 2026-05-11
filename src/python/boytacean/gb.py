@@ -282,6 +282,14 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
         self._system.set_cpu_a(value)
 
     @property
+    def cpu_f(self) -> int:
+        return self._system.cpu_f()
+
+    @cpu_f.setter
+    def cpu_f(self, value: int):
+        self._system.set_cpu_f(value)
+
+    @property
     def cpu_b(self) -> int:
         return self._system.cpu_b()
 

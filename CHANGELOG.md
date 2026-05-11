@@ -25,6 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * HBlank HDMA transfer support
 * Python 3.14 support via pyo3 0.25
 * `boytacean.test` package shipped with installs, with automatic skip guards when `numpy`/`Pillow` are missing or required test ROMs are absent
+* `GameBoy.cpu_f` / `set_cpu_f` accessors and a matching `PyBoyV2.register_file.F` property that reads and writes the real flag byte
+* `Tile(..., bank=)` kwarg and CGB-aware `Sprite` initialisation that routes bank-1 OAM sprites to the right VRAM bank instead of silently reading bank 0
+* Coverage for the PyBoy compatibility layer: 8 new Python unit tests (V1/V2 `set_emulation_speed`, banked memory rejection, applied `game_area_mapping`, per-tick `post_tick`, banked hook rejection, multi-byte `rescan_memory`, overlapping GameShark codes) and a Rust unit test for `Cartridge::title()` on an unloaded cartridge
 
 ### Changed
 
@@ -35,10 +38,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Standalone PyBoy 1.x compatible class (`PyBoyV1`) with `WindowEvent`, `send_input`, `screen_image`, `get_memory_value`/`set_memory_value` and `cartridge_title()` method
 * `PyBoy` alias resolving to `PyBoyV2` so the modern surface is the default for `from boytacean.pyboy import PyBoy`
 * Python bindings for VRAM, OAM, HRAM, ROM/RAM data, ROM/RAM banks, CPU register file, mode predicates and clock frequency
+* `PyBoyV1.set_emulation_speed` / `PyBoyV2.set_emulation_speed` now compute against a captured base clock rather than the current `clock_freq`, so repeated calls no longer compound; `speed=0` follows the PyBoy 2.x convention and means "unbounded", `speed<0` raises `ValueError`
+* `PyBoyV2.game_area_mapping(mapping, sprite_offset)` actually applies the mapping inside `GameWrapper.game_area()` instead of silently storing it; agents that pass a tile-id remap table now receive the remapped observation
+* `MemoryScanner.rescan_memory` reuses the original scan's `byte_width` / `value_type` / `byteorder` so dynamic comparisons on 2-byte/4-byte/BCD scans no longer fall back to a single-byte read
+* `GameShark.add` / `remove` reference-count the pre-cheat snapshot per address, so overlapping codes on the same byte share one snapshot and removing one cheat no longer prematurely restores the original value
+* `HookRegistry.register` rejects bank-aware registrations (`bank != 0`) with `NotImplementedError` rather than silently colliding with bank-0 entries at the same address
+* `Memory._read` / `_write` raise `NotImplementedError` when called with a non-`None` bank instead of silently returning the flat-bus value
+* `Display.set_hud(frame_index=...)` accepts a baseline so the first FPS sample doesn't include frames that ran before HUD activation
 
 ### Fixed
 
 * `boytacean.pyboy` subpackage was missing from shipped wheels/sdists
+* `Cartridge::title()` now returns `"UNKNOWN"` and guards against out-of-range `title_offset` instead of returning an empty string (or panicking on `rom_data.len() < 0x0134`) for unloaded cartridges
+* `PyBoyV1.screen_image()` was calling a non-existent `self.image()` and raising `AttributeError`; it now produces the 3-channel RGB image PyBoy 1.x callers expect
+* `PyBoyV1.tick()` / `PyBoyV2.tick()` invoke `self.game_wrapper.post_tick()` after advancing frames, so wrapper-cached fields (`score`, `level`, `world`, ...) no longer stay stale during normal emulation
 * Fixed `audio_ch1_enabled` returning the wrong channel status
 * Shader program was not applied to SDL output
 * SDL shader rendering failed due to lifetime issues

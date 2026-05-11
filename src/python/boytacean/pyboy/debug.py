@@ -47,11 +47,11 @@ class SymbolTable:
 
 class HookRegistry:
     """
-    Lightweight pure-Python hook manager. Hooks fire when the
-    program counter matches a registered address, evaluated once per
-    instruction step inside the run loop. There is no opcode patching
-    — the cost when no hooks are registered is a single empty-dict
-    check per frame, so the CPU hot path stays untouched.
+    Hook manager. Hooks are matched against the program counter
+    after each emulated frame rather than each instruction, since
+    the core does not yet expose a per-instruction PC callback —
+    so hooks at addresses only crossed mid-frame are not currently
+    reachable from this registry.
     """
 
     def __init__(self, system: "GameBoy"):
@@ -65,11 +65,12 @@ class HookRegistry:
         callback: Callable[[Any], None],
         context: Any = None,
     ):
-        # bank is recorded for parity with the upstream API but is
-        # ignored when matching, since the core does not yet expose
-        # a per-bank PC predicate; addresses below 0x4000 always
-        # belong to ROM bank 0, addresses in 0x4000..0x7FFF are bank
-        # selected, the rest is bank-agnostic
+        if bank not in (0, None):
+            # the core does not yet expose a per-bank PC predicate,
+            # so banked hooks would silently collide with bank-0
+            # registrations at the same address; refuse them until
+            # the core grows the right primitive
+            raise NotImplementedError("Bank-aware hooks are not supported yet")
         if addr in self._hooks:
             raise ValueError(
                 f"Hook already registered for bank={bank} addr=0x{addr:04x}"
@@ -108,6 +109,9 @@ class MemoryScanner:
         self._system = system
         self._addresses: List[int] = []
         self._previous: Dict[int, int] = {}
+        self._byte_width: int = 1
+        self._value_type: ScanMode = ScanMode.INT
+        self._byteorder: str = "little"
 
     def scan_memory(
         self,
@@ -127,6 +131,10 @@ class MemoryScanner:
         ):
             raise ValueError("EXACT comparison requires a target_value")
 
+        self._byte_width = byte_width
+        self._value_type = value_type
+        self._byteorder = byteorder
+
         matches: List[int] = []
         snapshot: Dict[int, int] = {}
         for addr in range(start_addr, end_addr - byte_width + 2):
@@ -145,14 +153,18 @@ class MemoryScanner:
         self,
         new_value: Union[int, None] = None,
         dynamic_comparison_type: DynamicComparisonType = DynamicComparisonType.UNCHANGED,
-        byteorder: str = "little",
+        byteorder: Union[str, None] = None,
     ) -> List[int]:
         if dynamic_comparison_type == DynamicComparisonType.MATCH and new_value is None:
             raise ValueError("MATCH comparison requires a new_value")
 
+        width = self._byte_width
+        value_type = self._value_type
+        order = byteorder if byteorder is not None else self._byteorder
+
         survivors: List[int] = []
         for addr in self._addresses:
-            current = self._system.read_memory(addr)
+            current = self._read_value(addr, width, value_type, order)
             previous = self._previous.get(addr, current)
             if self._compare_dynamic(
                 current, previous, new_value, dynamic_comparison_type
@@ -249,7 +261,7 @@ class GameShark:
             raise ValueError(
                 f"GameShark codes targeting ROM are not supported: 0x{addr:04x}"
             )
-        if code not in self.cheats:
+        if addr not in self._restore:
             self._restore[addr] = self._system.read_memory(addr)
         self.cheats[code] = (addr, value)
 
@@ -257,7 +269,11 @@ class GameShark:
         if code not in self.cheats:
             return
         addr, _value = self.cheats.pop(code)
-        if restore_value and addr in self._restore:
+        if (
+            restore_value
+            and addr in self._restore
+            and not any(other_addr == addr for other_addr, _ in self.cheats.values())
+        ):
             self._system.write_memory(addr, self._restore.pop(addr))
 
     def clear_all(self, restore_value: bool = True):

@@ -72,6 +72,13 @@ class GameWrapper:
                 column = (x + col + scx) % 32
                 rrow = (y + row + scy) % 32
                 result[row, col] = tilemap.tile_identifier(column, rrow)
+
+        if self.mapping is not None:
+            mapping = self.mapping
+            for row in range(h):
+                for col in range(w):
+                    result[row, col] = mapping[int(result[row, col])]
+
         return result
 
     def _tilemap_background(self) -> TileMap:

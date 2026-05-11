@@ -219,6 +219,14 @@ impl GameBoy {
         self.system.cpu().a = value;
     }
 
+    pub fn cpu_f(&self) -> u8 {
+        self.system.cpu_i().f()
+    }
+
+    pub fn set_cpu_f(&mut self, value: u8) {
+        self.system.cpu().set_f(value);
+    }
+
     pub fn cpu_b(&self) -> u8 {
         self.system.cpu_i().b
     }

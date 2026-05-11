@@ -85,6 +85,14 @@ class PyBoyV2Test(unittest.TestCase):
             pb.memory[0xC000:0xC004] = 0
             self.assertEqual(pb.memory[0xC000:0xC004], [0, 0, 0, 0])
 
+            # banked memory accesses fail fast until the core exposes
+            # arbitrary bank views, so callers don't silently read or
+            # mutate the currently-mapped bank thinking it was bank N
+            with self.assertRaises(NotImplementedError):
+                _ = pb.memory[1, 0x4000]
+            with self.assertRaises(NotImplementedError):
+                pb.memory[1, 0x4000] = 0x00
+
     @requires_pocket
     @requires_numpy
     @requires_pillow
@@ -98,6 +106,21 @@ class PyBoyV2Test(unittest.TestCase):
             self.assertEqual(ndarray.shape, (144, 160, 4))
             self.assertEqual(str(ndarray.dtype), "uint8")
             self.assertEqual(pb.screen.raw_buffer_dims, (144, 160))
+
+    @requires_pocket
+    def test_set_emulation_speed(self):
+        with PyBoyV2(POCKET_ROM_PATH, window="headless", sound_emulated=False) as pb:
+            base = pb.clock_freq
+            pb.set_emulation_speed(2)
+            self.assertEqual(pb.clock_freq, base * 2)
+            pb.set_emulation_speed(2)
+            self.assertEqual(pb.clock_freq, base * 2)
+            pb.set_emulation_speed(0)
+            self.assertEqual(pb.clock_freq, 0)
+            pb.set_emulation_speed(1)
+            self.assertEqual(pb.clock_freq, base)
+            with self.assertRaises(ValueError):
+                pb.set_emulation_speed(-1)
 
     @requires_pocket
     def test_button(self):
@@ -158,6 +181,22 @@ class PyBoyV1Test(unittest.TestCase):
             image = pb.screen_image()
             self.assertEqual(image.size, (160, 144))
             self.assertEqual(image.mode, "RGB")
+
+    def test_set_emulation_speed(self):
+        with PyBoyV1(
+            POCKET_ROM_PATH, disable_renderer=True, sound_emulated=False
+        ) as pb:
+            base = pb.clock_freq
+            pb.set_emulation_speed(2)
+            self.assertEqual(pb.clock_freq, base * 2)
+            pb.set_emulation_speed(2)
+            self.assertEqual(pb.clock_freq, base * 2)
+            pb.set_emulation_speed(0)
+            self.assertEqual(pb.clock_freq, 0)
+            pb.set_emulation_speed(1)
+            self.assertEqual(pb.clock_freq, base)
+            with self.assertRaises(ValueError):
+                pb.set_emulation_speed(-1)
 
 
 @requires_acid2
@@ -297,6 +336,36 @@ class GameWrapperTest(unittest.TestCase):
             pb.game_area_mapping(None, sprite_offset=42)
             self.assertEqual(pb.game_wrapper.sprite_offset, 42)
 
+    @requires_pocket
+    @requires_numpy
+    def test_game_area_mapping_applied(self):
+        with PyBoyV2(POCKET_ROM_PATH, window="headless", sound_emulated=False) as pb:
+            pb.tick(60)
+            pb.game_area_dimensions(0, 0, 4, 4, follow_scrolling=False)
+            raw = pb.game_area()
+            mapping = [tile_id + 1000 for tile_id in range(384)]
+            pb.game_area_mapping(mapping)
+            remapped = pb.game_area()
+            self.assertEqual(remapped.shape, raw.shape)
+            for row in range(raw.shape[0]):
+                for col in range(raw.shape[1]):
+                    self.assertEqual(remapped[row, col], raw[row, col] + 1000)
+
+    @requires_pocket
+    def test_post_tick_invoked_per_tick(self):
+        with PyBoyV2(POCKET_ROM_PATH, window="headless", sound_emulated=False) as pb:
+            pb.tick(2)
+            calls = [0]
+
+            def counting_post_tick():
+                calls[0] += 1
+
+            pb.game_wrapper.post_tick = counting_post_tick
+            pb.tick(1)
+            pb.tick(1)
+            pb.tick(1)
+            self.assertEqual(calls[0], 3)
+
     def test_specific_wrapper_titles(self):
         self.assertEqual(GameWrapperTetris.cartridge_title, "TETRIS")
         self.assertEqual(GameWrapperTetris.shape, (10, 18))
@@ -358,6 +427,11 @@ class HookTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 pb.hook_deregister(0, 0xBEEF)
 
+    def test_register_banked_rejected(self):
+        with PyBoyV2(ACID2_ROM_PATH, window="headless", sound_emulated=False) as pb:
+            with self.assertRaises(NotImplementedError):
+                pb.hook_register(1, 0x4000, lambda ctx: None, None)
+
 
 @requires_acid2
 class MemoryScannerTest(unittest.TestCase):
@@ -405,6 +479,23 @@ class MemoryScannerTest(unittest.TestCase):
             )
             self.assertEqual(survivors, [0xC201])
 
+    def test_rescan_preserves_byte_width(self):
+        with PyBoyV2(ACID2_ROM_PATH, window="headless", sound_emulated=False) as pb:
+            pb.tick(2)
+            pb.memory[0xC200] = 0x12
+            pb.memory[0xC201] = 0x34
+            pb.memory_scanner.scan_memory(
+                target_value=0x3412,
+                start_addr=0xC200,
+                end_addr=0xC204,
+                standard_comparison_type=StandardComparisonType.EXACT,
+                byte_width=2,
+            )
+            survivors = pb.memory_scanner.rescan_memory(
+                dynamic_comparison_type=DynamicComparisonType.UNCHANGED
+            )
+            self.assertIn(0xC200, survivors)
+
 
 @requires_acid2
 class GameSharkTest(unittest.TestCase):
@@ -427,6 +518,20 @@ class GameSharkTest(unittest.TestCase):
             pb.gameshark.clear_all()
             pb.tick(1)
             self.assertEqual(pb.memory[0xC101], 0x07)
+
+    def test_overlapping_codes_share_restore(self):
+        with PyBoyV2(ACID2_ROM_PATH, window="headless", sound_emulated=False) as pb:
+            pb.tick(2)
+            pb.memory[0xC102] = 0x09
+            pb.gameshark.add("014102C1")
+            pb.gameshark.add("014202C1")
+            pb.tick(1)
+            pb.gameshark.remove("014102C1")
+            pb.tick(1)
+            self.assertEqual(pb.memory[0xC102], 0x42)
+            pb.gameshark.remove("014202C1")
+            pb.tick(1)
+            self.assertEqual(pb.memory[0xC102], 0x09)
 
     def test_invalid_codes_rejected(self):
         with PyBoyV2(ACID2_ROM_PATH, window="headless", sound_emulated=False) as pb:
