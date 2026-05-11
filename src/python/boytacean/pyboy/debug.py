@@ -25,36 +25,6 @@ class ScanMode(Enum):
     BCD = 2
 
 
-def parse_symbols(content: str) -> Dict[str, Tuple[int, int]]:
-    """
-    Parses the contents of a `.sym` file (RGBDS / no$gmb format)
-    and returns a mapping from symbol name to (bank, addr). Lines
-    starting with `;` are treated as comments, group headers like
-    `[labels]` and `[definitions]` are accepted but otherwise
-    ignored
-    """
-
-    symbols: Dict[str, Tuple[int, int]] = {}
-    for raw in content.splitlines():
-        line = raw.strip()
-        if not line or line.startswith(";") or line.startswith("["):
-            continue
-        parts = line.split(None, 1)
-        if len(parts) != 2:
-            continue
-        location, name = parts
-        if ":" not in location:
-            continue
-        bank_s, addr_s = location.split(":", 1)
-        try:
-            bank = int(bank_s, 16)
-            addr = int(addr_s, 16)
-        except ValueError:
-            continue
-        symbols[name.strip()] = (bank, addr)
-    return symbols
-
-
 class SymbolTable:
     def __init__(self):
         self._symbols: Dict[str, Tuple[int, int]] = {}
@@ -81,7 +51,7 @@ class HookRegistry:
     program counter matches a registered address, evaluated once per
     instruction step inside the run loop. There is no opcode patching
     — the cost when no hooks are registered is a single empty-dict
-    check per frame, so the CPU hot path stays untouched
+    check per frame, so the CPU hot path stays untouched.
     """
 
     def __init__(self, system: "GameBoy"):
@@ -131,7 +101,7 @@ class MemoryScanner:
     Provides EXACT/LESS_THAN/GREATER_THAN comparisons for the initial
     scan and CHANGED/UNCHANGED/INCREASED/DECREASED/MATCH for follow
     up rescans, mirroring the upstream `pyboy.api.memory_scanner`
-    semantics
+    semantics.
     """
 
     def __init__(self, system: "GameBoy"):
@@ -264,7 +234,7 @@ class GameShark:
     `01` 8-bit RAM write supported), `vv` is the byte value and
     `aaaa` is the address with the low byte first (so D11E becomes
     1ED1). Codes are applied each frame after the emulator has run,
-    so subsequent reads see the cheated value
+    so subsequent reads see the cheated value.
     """
 
     def __init__(self, system: "GameBoy"):
@@ -316,3 +286,33 @@ class GameShark:
                 f"Only 8-bit RAM write codes (type 01) are supported, got 0x{kind:02x}"
             )
         return (high << 8) | low, value
+
+
+def parse_symbols(content: str) -> Dict[str, Tuple[int, int]]:
+    """
+    Parses the contents of a `.sym` file (RGBDS / no$gmb format)
+    and returns a mapping from symbol name to (bank, addr). Lines
+    starting with `;` are treated as comments, group headers like
+    `[labels]` and `[definitions]` are accepted but otherwise
+    ignored.
+    """
+
+    symbols: Dict[str, Tuple[int, int]] = {}
+    for raw in content.splitlines():
+        line = raw.strip()
+        if not line or line.startswith(";") or line.startswith("["):
+            continue
+        parts = line.split(None, 1)
+        if len(parts) != 2:
+            continue
+        location, name = parts
+        if ":" not in location:
+            continue
+        bank_s, addr_s = location.split(":", 1)
+        try:
+            bank = int(bank_s, 16)
+            addr = int(addr_s, 16)
+        except ValueError:
+            continue
+        symbols[name.strip()] = (bank, addr)
+    return symbols

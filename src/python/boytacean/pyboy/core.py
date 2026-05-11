@@ -402,7 +402,7 @@ class LegacyScreen:
     Legacy PyBoy 1.x-style screen accessor, providing 3-channel RGB
     PIL images and ndarrays plus the older `raw_screen_buffer*` and
     `tilemap_position*` method shapes. Returned by
-    `PyBoyV1.botsupport_manager().screen()`
+    `PyBoyV1.botsupport_manager().screen()`.
     """
 
     def __init__(self, system: "GameBoy"):
@@ -449,7 +449,7 @@ class BotSupportManager:
     Legacy PyBoy 1.x bot-support manager, returned by
     `PyBoyV1.botsupport_manager()`. Forwards to the modern Tile,
     Sprite and TileMap helpers but exposes them through the older
-    method-based API expected by 1.x scripts
+    method-based API expected by 1.x scripts.
     """
 
     def __init__(self, system: "GameBoy"):
@@ -488,7 +488,7 @@ class Memory:
     """
     Modern PyBoy bracket-accessor for the Game Boy memory bus,
     supporting both flat addressing (`memory[addr]`) and bank-aware
-    addressing (`memory[bank, addr]`) with slice variants
+    addressing (`memory[bank, addr]`) with slice variants.
     """
 
     def __init__(self, system: "GameBoy"):
@@ -559,7 +559,7 @@ class PyBoyV1(GameBoy):
     Legacy PyBoy 1.x compatible class. Provides the historical API
     (`send_input`, `screen_image`, `get_memory_value`, ...) and is
     intended as a drop-in replacement for scripts written against
-    PyBoy 1.x. New code should target `PyBoyV2` instead
+    PyBoy 1.x. New code should target `PyBoyV2` instead.
     """
 
     def __init__(
@@ -681,7 +681,7 @@ class PyBoyV2(GameBoy):
     Modern PyBoy 2.x compatible class, providing the contemporary
     API (`button`, `screen.ndarray`, `memory[addr]`, ...) used by
     AI/RL projects. Intended as a drop-in replacement for the
-    `pyboy.PyBoy` class shipped by recent PyBoy releases
+    `pyboy.PyBoy` class shipped by recent PyBoy releases.
     """
 
     def __init__(

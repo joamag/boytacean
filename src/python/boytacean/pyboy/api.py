@@ -31,7 +31,7 @@ class Tile:
     """
     Read-only handle to a single 8x8 tile in VRAM, identified either
     by its global tile identifier or by its data address. Mirrors the
-    modern PyBoy `pyboy.api.tile.Tile` shape
+    modern PyBoy `pyboy.api.tile.Tile` shape.
     """
 
     shape: Tuple[int, int] = (TILE_WIDTH, TILE_HEIGHT)
@@ -82,7 +82,7 @@ class Sprite:
     """
     Read-only handle to a single sprite (object) in OAM, mirroring the
     modern PyBoy `pyboy.api.sprite.Sprite` shape with x/y offsets and
-    attribute-byte decoding
+    attribute-byte decoding.
     """
 
     def __init__(self, system: "GameBoy", index: int):
@@ -133,7 +133,7 @@ class TileMap:
     Read-only handle to one of the two background tile maps (32x32
     tiles each) in VRAM, mirroring the modern PyBoy
     `pyboy.api.tilemap.TileMap` shape with bracket access and
-    background/window selection
+    background/window selection.
     """
 
     shape: Tuple[int, int] = (32, 32)

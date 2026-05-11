@@ -24,7 +24,7 @@ class GameWrapper:
     """
     Generic game wrapper, used when no specific cartridge match is
     found. Specific wrappers inherit from this base class and
-    override the `cartridge_title`, `shape` and `post_tick` hooks
+    override the `cartridge_title`, `shape` and `post_tick` hooks.
     """
 
     cartridge_title: Union[str, None] = None
