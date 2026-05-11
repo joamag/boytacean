@@ -122,13 +122,9 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
         return cycles
 
     def next_frames(self, count: int) -> int:
-        # in-Rust batched frame loop, used by callers that don't need a
-        # per-frame Python callback (PyBoyV2.tick takes this fast path
-        # whenever no hooks or gameshark cheats are active)
         cycles = self._system.next_frames(count)
         self._frame_index += count
-        if self._video is not None or self._display is not None:
-            self._on_next_frame()
+        self._on_next_frame()
         return cycles
 
     def step_to(self, addr: int) -> int:
