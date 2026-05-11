@@ -1,7 +1,11 @@
-//! Measures the maximum native fps Boytacean achieves in pure Rust,
-//! with no Python boundary, no per-component instrumentation and no
+//! Measures the maximum native fps Boytacean achieves in pure Rust.
+//!
+//! No Python boundary, no per-component instrumentation and no
 //! frame-buffer extraction. APU is disabled (matching the typical
-//! AI training configuration). Reports best-of-three runs
+//! AI training configuration). Reports best-of-three runs.
+//!
+//! # Usage
+//! cargo run --release --example bench_headless -- <rom.gb> [frames]
 
 use std::{env::args, error::Error, time::Instant};
 
@@ -15,7 +19,7 @@ const RUNS: usize = 3;
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = args().collect();
     if args.len() < 2 {
-        println!("Usage: headless_max_fps <rom.gb> [frames]");
+        println!("Usage: bench_headless <rom.gb> [frames]");
         return Ok(());
     }
     let rom_path = &args[1];

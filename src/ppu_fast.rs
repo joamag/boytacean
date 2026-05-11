@@ -1,4 +1,4 @@
-//! Prototype of a "fast PPU" driver inspired by PyBoy's `lcd.py`.
+//! A "fast PPU" driver inspired by PyBoy's `lcd.py`.
 //!
 //! This is **not** a working PPU — it has no renderer, no STAT
 //! interrupts, no LYC compare and no CGB support. Its only purpose
@@ -10,12 +10,15 @@
 //! accumulated to cross a mode boundary, by tracking
 //! `clock_target` (a la PyBoy) instead of `mode_clock`. The state
 //! transitions and durations match Boytacean's existing PPU
-//! (mode 2 = 80, mode 3 = 172, mode 0 = 204, V-blank = 4560)
+//! (mode 2 = 80, mode 3 = 172, mode 0 = 204, V-blank = 4560).
 //!
-//! Use [`FastPpuDriver::clock`] in a benchmark harness against
-//! [`crate::ppu::Ppu::clock`] to measure the driver-only delta
+//! Use [`FastPpu::clock`] in a benchmark harness against
+//! [`crate::ppu::Ppu::clock`] to measure the driver-only delta.
 
+/// PPU state-machine mode tracked by the fast driver, matching
+/// the discriminants used by the LCD STAT register.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[repr(u8)]
 pub enum FastMode {
     OamRead = 2,
     VramRead = 3,
@@ -23,29 +26,35 @@ pub enum FastMode {
     VBlank = 1,
 }
 
-pub struct FastPpuDriver {
+pub struct FastPpu {
     /// Cumulative cycles since the start of the current scanline,
-    /// reset every 456 cycles
+    /// reset every 456 cycles.
     pub clock: u32,
+
     /// Target cycle count for the next mode transition; mirrors
-    /// PyBoy's `clock_target`
+    /// PyBoy's `clock_target`.
     pub clock_target: u32,
-    /// Current LCD line in 0..154
+
+    /// Current LCD line in 0..154.
     pub ly: u8,
-    /// Current PPU mode
+
+    /// Current PPU mode.
     pub mode: FastMode,
-    /// Frame index, advanced once per V-blank exit
+
+    /// Frame index, advanced once per V-blank exit.
     pub frame_index: u32,
+
     /// Render-trigger flag: set by the driver every time it crosses
     /// the mode 3 -> HBlank boundary, so a host can call its real
-    /// `render_line(ly)` only when needed
+    /// `render_line(ly)` only when needed.
     pub render_pending: bool,
-    /// V-blank IRQ pending; mirrors `int_vblank` in the real PPU
+
+    /// V-blank IRQ pending; mirrors `int_vblank` in the real PPU.
     pub int_vblank: bool,
 }
 
-impl Default for FastPpuDriver {
-    fn default() -> Self {
+impl FastPpu {
+    pub fn new() -> Self {
         Self {
             clock: 0,
             clock_target: 80,
@@ -56,18 +65,13 @@ impl Default for FastPpuDriver {
             int_vblank: false,
         }
     }
-}
-
-impl FastPpuDriver {
-    pub fn new() -> Self {
-        Self::default()
-    }
 
     /// Advances the driver by `cycles` and updates the mode/LY
     /// machine, exactly like [`crate::ppu::Ppu::clock`] but without
     /// any rendering or interrupt-line book-keeping.
+    ///
     /// Returns true once per scanline at the mode 3 -> HBlank edge
-    /// (the host should call its renderer for `self.ly` then)
+    /// (the host should call its renderer for `self.ly` then).
     #[inline(always)]
     pub fn clock(&mut self, cycles: u16) -> bool {
         self.clock += cycles as u32;
@@ -131,7 +135,7 @@ mod tests {
 
     #[test]
     fn one_frame_is_70224_cycles() {
-        let mut d = FastPpuDriver::new();
+        let mut d = FastPpu::new();
         let mut cycles = 0u32;
         let start_frame = d.frame_index;
         while d.frame_index == start_frame {
@@ -153,11 +157,11 @@ mod tests {
         // and the first scanline of the next frame in a single call;
         // a 1-cycle granularity guarantees 144 renders are observed
         // before frame_index advances
-        let mut d = FastPpuDriver::new();
+        let mut fast_ppu = FastPpu::new();
         let mut renders = 0;
-        let start_frame = d.frame_index;
-        while d.frame_index == start_frame {
-            if d.clock(1) {
+        let start_frame = fast_ppu.frame_index;
+        while fast_ppu.frame_index == start_frame {
+            if fast_ppu.clock(1) {
                 renders += 1;
             }
         }
