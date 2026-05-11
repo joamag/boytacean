@@ -11,7 +11,7 @@ use crate::{
     info::Info,
     pad::PadKey,
     ppu::{PaletteInfo, DISPLAY_HEIGHT, DISPLAY_WIDTH, HRAM_SIZE, OAM_SIZE, VRAM_SIZE},
-    rom::{RAM_BANK_SIZE, ROM_BANK_SIZE},
+    rom::{Cartridge, RAM_BANK_SIZE, ROM_BANK_SIZE},
     state::StateManager,
 };
 
@@ -373,9 +373,25 @@ impl GameBoy {
     }
 }
 
+#[pyfunction]
+fn infer_mode(path: &str) -> PyResult<u8> {
+    Cartridge::from_file(path)
+        .map(|cartridge| cartridge.gb_mode() as u8)
+        .map_err(PyErr::new::<PyException, _>)
+}
+
+#[pyfunction]
+fn infer_mode_data(data: &[u8]) -> PyResult<u8> {
+    Cartridge::from_data(data)
+        .map(|cartridge| cartridge.gb_mode() as u8)
+        .map_err(PyErr::new::<PyException, _>)
+}
+
 #[pymodule]
 fn boytacean(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<GameBoy>()?;
+    module.add_function(wrap_pyfunction!(infer_mode, module)?)?;
+    module.add_function(wrap_pyfunction!(infer_mode_data, module)?)?;
     module.add("__version__", VERSION)?;
     module.add("COMPILATION_DATE", COMPILATION_DATE)?;
     module.add("COMPILATION_TIME", COMPILATION_TIME)?;

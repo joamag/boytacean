@@ -41,7 +41,7 @@ with PyBoy(
     pyboy.set_emulation_speed(0)
     print(pyboy.cartridge_title)
     start = time()
-    pyboy.tick(FRAME_COUNT, render=LOAD_GRAPHICS)
+    pyboy.tick(count=FRAME_COUNT, render=LOAD_GRAPHICS)
     total = time() - start
     print(f"Time taken: {total:.2f} seconds")
     print(f"Speedup: {FRAME_COUNT / total / VISUAL_FREQ:.2f}x")

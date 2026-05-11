@@ -19,14 +19,19 @@ Requires: `pip install pillow pysdl2`
 from os import getenv
 from sys import argv
 from time import time
-from boytacean import VISUAL_FREQ
+from boytacean import GameBoyMode, VISUAL_FREQ
+from boytacean.boytacean import infer_mode
 from boytacean.pyboy import PyBoyV1
 from os.path import dirname, realpath, join, splitext, basename
 
 CURRENT_DIR = dirname(realpath(__file__))
 DEFAULT_ROM_PATH = join(CURRENT_DIR, "../../res/roms/demo/pocket.gb")
 ROM_PATH = argv[1] if len(argv) > 1 else DEFAULT_ROM_PATH
-BOOT_ROM_PATH = join(CURRENT_DIR, "../../res/boot/dmg_pyboy.bin")
+IS_CGB = GameBoyMode(infer_mode(ROM_PATH)) == GameBoyMode.CGB
+BOOT_ROM_PATH = join(
+    CURRENT_DIR,
+    f"../../res/boot/{'cgb_pyboy' if IS_CGB else 'dmg_pyboy'}.bin",
+)
 ROM_NAME = splitext(basename(ROM_PATH))[0]
 IMAGE_NAME = f"{ROM_NAME}_pyboy_iface_v1.png"
 
