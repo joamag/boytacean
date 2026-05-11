@@ -13,18 +13,20 @@ where `pyboy` ships prebuilt wheels. Saves a separate
 `pocket_pyboy_v2.png` snapshot of the final frame.
 
 Run from the project root with:
-    python examples/python/pocket_pyboy_v2.py
+    python examples/python/pocket_pyboy_v2.py [rom.gb]
 
 Requires: `pip install pyboy pillow`
 """
 
 from os import getenv
+from sys import argv
 from time import time
 from pyboy import PyBoy
 from os.path import dirname, realpath, join, splitext, basename
 
 CURRENT_DIR = dirname(realpath(__file__))
-ROM_PATH = join(CURRENT_DIR, "../../res/roms/demo/pocket.gb")
+DEFAULT_ROM_PATH = join(CURRENT_DIR, "../../res/roms/demo/pocket.gb")
+ROM_PATH = argv[1] if len(argv) > 1 else DEFAULT_ROM_PATH
 ROM_NAME = splitext(basename(ROM_PATH))[0]
 IMAGE_NAME = f"{ROM_NAME}_pyboy_v2.png"
 

@@ -11,18 +11,20 @@ PNG snapshot of the final frame. Set `LOAD_GRAPHICS=0` to skip
 graphics work for a headless-style measurement.
 
 Run from the project root with:
-    python examples/python/pocket.py
+    python examples/python/pocket.py [rom.gb]
 
 Requires: `pip install pillow pysdl2`
 """
 
 from os import getenv
+from sys import argv
 from time import time
 from boytacean import GameBoy, VISUAL_FREQ
 from os.path import dirname, realpath, join, splitext, basename
 
 CURRENT_DIR = dirname(realpath(__file__))
-ROM_PATH = join(CURRENT_DIR, "../../res/roms/demo/pocket.gb")
+DEFAULT_ROM_PATH = join(CURRENT_DIR, "../../res/roms/demo/pocket.gb")
+ROM_PATH = argv[1] if len(argv) > 1 else DEFAULT_ROM_PATH
 ROM_NAME = splitext(basename(ROM_PATH))[0]
 IMAGE_NAME = f"{ROM_NAME}.png"
 
