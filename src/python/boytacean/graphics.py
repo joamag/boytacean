@@ -34,8 +34,8 @@ class Display:
 
     def __init__(
         self,
-        width: int = DISPLAY_WIDTH,
-        height: int = DISPLAY_HEIGHT,
+        width=DISPLAY_WIDTH,
+        height=DISPLAY_HEIGHT,
         title="Boytacean",
         scale=3.0,
         start_frame=0,
@@ -67,7 +67,7 @@ class Display:
         self._window = window
         self._renderer = Renderer(window)
 
-    def should_render(self, frame_index) -> bool:
+    def should_render(self, frame_index: int) -> bool:
         return frame_index >= self._next_frame
 
     def set_title(self, title: str):
@@ -81,7 +81,7 @@ class Display:
         base_title: Union[str, None] = None,
         title_provider: Union[Callable[[], str], None] = None,
         clock_freq: Union[int, None] = None,
-        interval: float = 1.0,
+        interval=1.0,
     ):
         # turns the live FPS / clock-frequency HUD on or off; when
         # enabled the window title is rewritten at most once every
@@ -102,7 +102,7 @@ class Display:
         self._hud_last_t = perf_counter()
         self._hud_last_frame = 0
 
-    def render_frame(self, frame_buffer: bytes, frame_index: int = 0):
+    def render_frame(self, frame_buffer: bytes, frame_index=0):
         if self._window is None:
             raise RuntimeError("Window not initialized")
 

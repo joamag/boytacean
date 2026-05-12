@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import IO, Any, Iterable, List, Tuple, Union
+from typing import IO, Any, Callable, Dict, Iterable, List, Tuple, Union
 
 try:
     from PIL.Image import Image, frombytes
@@ -461,7 +461,7 @@ class BotSupportManager:
         return Sprite(self._system, index)
 
     def sprite_by_tile_identifier(
-        self, tile_identifiers: List[int], on_screen: bool = True
+        self, tile_identifiers: List[int], on_screen=True
     ) -> List[List[int]]:
         results: List[List[int]] = [[] for _ in tile_identifiers]
         for index in range(SPRITES):
@@ -559,13 +559,13 @@ class PyBoyV1(GameBoy):
 
     def __init__(
         self,
-        gamerom_file,
+        gamerom_file: str,
         *,
-        bootrom_file=None,
+        bootrom_file: Union[str, None] = None,
         disable_renderer=False,
         sound=False,
         sound_emulated=False,
-        cgb=None,
+        cgb: Union[bool, None] = None,
         randomize=False,
         **kwargs,
     ):
@@ -618,7 +618,7 @@ class PyBoyV1(GameBoy):
         self.game_wrapper.post_tick()
         return self.quitting
 
-    def stop(self, save: bool = True):
+    def stop(self, save=True):
         self.stopped = True
 
     def set_emulation_speed(self, speed: float):
@@ -629,7 +629,7 @@ class PyBoyV1(GameBoy):
             return
         self.clock_freq = int(self._base_clock_freq * speed)
 
-    def send_input(self, event: WindowEvent, delay: int = 0):
+    def send_input(self, event: WindowEvent, delay=0):
         if isinstance(event, int):
             event = WindowEvent.from_int(event)
         if event.is_press():
@@ -690,28 +690,28 @@ class PyBoyV2(GameBoy):
 
     def __init__(
         self,
-        gamerom,
+        gamerom: str,
         *,
         ram_file: Union[str, None] = None,
         rtc_file: Union[str, None] = None,
-        window: str = "SDL2",
-        scale: int = 3,
+        window="SDL2",
+        scale=3,
         symbols: Union[str, None] = None,
         bootrom: Union[str, None] = None,
-        sound_volume: int = 100,
-        sound_emulated: bool = True,
+        sound_volume=100,
+        sound_emulated=True,
         sound_sample_rate: Union[int, None] = None,
         cgb: Union[bool, None] = None,
         gameshark: Union[str, None] = None,
-        no_input: bool = False,
-        log_level: str = "WARNING",
+        no_input=False,
+        log_level="WARNING",
         color_palette: Tuple[int, int, int, int] = DMG_PALETTES["Grey"],
         cgb_color_palette: Tuple[
             Tuple[int, int, int, int],
             Tuple[int, int, int, int],
             Tuple[int, int, int, int],
         ] = CGB_PALETTE,
-        title_status: bool = False,
+        title_status=False,
         **kwargs,
     ):
         if not 0 <= sound_volume <= 100:
@@ -793,7 +793,7 @@ class PyBoyV2(GameBoy):
     def __exit__(self, exc_type, exc_value, traceback):
         self.stop()
 
-    def tick(self, count: int = 1, render: bool = True, sound: bool = True) -> bool:
+    def tick(self, count=1, render=True, sound=True) -> bool:
         # 2.x semantics: returns True while running, False once the
         # emulator has been stopped (this is the inverse of 1.x);
         # the `render` and `sound` flags are advisory in this build,
@@ -823,7 +823,7 @@ class PyBoyV2(GameBoy):
 
     def stop(
         self,
-        save: bool = True,
+        save=True,
         ram_file: Union[IO, None] = None,
         rtc_file: Union[IO, None] = None,
     ):
@@ -837,7 +837,7 @@ class PyBoyV2(GameBoy):
             return
         self.clock_freq = int(self._base_clock_freq * target_speed)
 
-    def button(self, input: str, delay: int = 1):
+    def button(self, input: str, delay=1):
         key = self._key_from_name(input)
         self.key_press(key)
         for _ in range(max(delay, 1)):
@@ -850,7 +850,7 @@ class PyBoyV2(GameBoy):
     def button_release(self, input: str):
         self.key_lift(self._key_from_name(input))
 
-    def send_input(self, event: WindowEvent, delay: int = 0):
+    def send_input(self, event: WindowEvent, delay=0):
         if isinstance(event, int):
             event = WindowEvent.from_int(event)
         if event.is_press():
@@ -884,7 +884,7 @@ class PyBoyV2(GameBoy):
         return Sprite(self, index)
 
     def get_sprite_by_tile_identifier(
-        self, tile_identifiers: List[int], on_screen: bool = True
+        self, tile_identifiers: List[int], on_screen=True
     ) -> List[List[int]]:
         results: List[List[int]] = [[] for _ in tile_identifiers]
         for index in range(SPRITES):
@@ -911,7 +911,11 @@ class PyBoyV2(GameBoy):
             )
         return impl()
 
-    def game_area_mapping(self, mapping, sprite_offset: int = 0):
+    def game_area_mapping(
+        self,
+        mapping: Union[List[int], Dict[int, int], None],
+        sprite_offset=0,
+    ):
         # mapping is a list/dict of length matching the active tile
         # space (TILES or TILES_CGB) that `GameWrapper.game_area()`
         # uses to remap each tile id; sprite_offset is the index added
@@ -933,7 +937,7 @@ class PyBoyV2(GameBoy):
         y: int,
         width: int,
         height: int,
-        follow_scrolling: bool = True,
+        follow_scrolling=True,
     ):
         self.game_wrapper.game_area_section = (x, y, width, height)
         self.game_wrapper.game_area_follow_scxy = follow_scrolling
@@ -945,8 +949,8 @@ class PyBoyV2(GameBoy):
         self,
         bank: Union[int, None],
         addr: Union[int, str],
-        callback,
-        context=None,
+        callback: Callable[[Any], None],
+        context: Any = None,
     ):
         if bank is None and isinstance(addr, str):
             bank, addr = self.symbol_lookup(addr)

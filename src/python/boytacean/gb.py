@@ -168,7 +168,7 @@ This is a [Game Boy](https://en.wikipedia.org/wiki/Game_Boy) emulator built usin
         image = frombytes("RGB", (DISPLAY_WIDTH, DISPLAY_HEIGHT), frame_buffer, "raw")
         return image
 
-    def save_image(self, path: str, format: str = "png"):
+    def save_image(self, path: str, format="png"):
         image = self.image()
         image.save(path, format=format)
 
