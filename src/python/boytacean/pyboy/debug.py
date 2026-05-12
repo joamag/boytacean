@@ -116,12 +116,12 @@ class MemoryScanner:
     def scan_memory(
         self,
         target_value: Union[int, None] = None,
-        start_addr: int = 0x0000,
-        end_addr: int = 0xFFFF,
+        start_addr=0x0000,
+        end_addr=0xFFFF,
         standard_comparison_type: StandardComparisonType = StandardComparisonType.EXACT,
         value_type: ScanMode = ScanMode.INT,
-        byte_width: int = 1,
-        byteorder: str = "little",
+        byte_width=1,
+        byteorder="little",
     ) -> List[int]:
         if byte_width not in (1, 2, 4):
             raise ValueError(f"Unsupported byte_width: {byte_width}")
@@ -265,7 +265,7 @@ class GameShark:
             self._restore[addr] = self._system.read_memory(addr)
         self.cheats[code] = (addr, value)
 
-    def remove(self, code: str, restore_value: bool = True):
+    def remove(self, code: str, restore_value=True):
         if code not in self.cheats:
             return
         addr, _value = self.cheats.pop(code)
@@ -276,7 +276,7 @@ class GameShark:
         ):
             self._system.write_memory(addr, self._restore.pop(addr))
 
-    def clear_all(self, restore_value: bool = True):
+    def clear_all(self, restore_value=True):
         for code in list(self.cheats.keys()):
             self.remove(code, restore_value=restore_value)
 
