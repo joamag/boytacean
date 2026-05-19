@@ -180,8 +180,8 @@ pub struct Apu {
     /// sampling rate would be of 44.1kHz.
     sampling_rate: u16,
 
-    /// The number of audion channels that are going to be
-    /// outputted as part fo the audio buffer)
+    /// The number of audio channels that are going to be
+    /// outputted as part fo the audio buffer).
     channels: u8,
 
     /// Internal sequencer counter that runs at 512Hz
