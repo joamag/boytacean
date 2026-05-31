@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 * JSON-based game playlist support with search and remote ROM loading via `playlist_url` parameter
+* Documentation describing the playlist file format and how to build one
 * High-pass audio filter options (Preserve, Accurate, Disable) with save-state support
 * SDL frontend shader loading support via `--shader-path`
 * PyBoy 2.x compatible Python interface (`PyBoyV2`) with `tick(count, render)`, `button`/`button_press`/`button_release`, `screen.ndarray`/`screen.image`, `memory[addr]` bracket accessor, `mb.cpu.registers` register file, `set_color_palette` and a generic `GameWrapper`
