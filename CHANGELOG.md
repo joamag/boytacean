@@ -13,11 +13,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-* Raised the minimum supported Rust version to 1.86
+*
 
 ### Fixed
 
 *
+
+## [0.12.1] - 2026-05-31
+
+### Changed
+
+* Raised the minimum supported Rust version to 1.86
 
 ## [0.12.0] - 2026-05-31
 
