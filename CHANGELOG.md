@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+*
+
+### Changed
+
+*
+
+### Fixed
+
+*
+
+## [0.12.0] - 2026-05-31
+
+### Added
+
 * JSON-based game playlist support with search and remote ROM loading via `playlist_url` parameter
 * Documentation describing the playlist file format and how to build one
 * High-pass audio filter options (Preserve, Accurate, Disable) with save-state support
