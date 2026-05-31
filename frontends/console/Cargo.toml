@@ -1,6 +1,6 @@
 [package]
 name = "boytacean-console"
-version = "0.12.0"
+version = "0.12.1"
 authors = ["João Magalhães <joamag@gmail.com>"]
 description = "A Console frontend for Boytacen"
 license = "Apache-2.0"
@@ -16,5 +16,5 @@ pedantic = ["boytacean/pedantic"]
 cpulog = ["boytacean/cpulog"]
 
 [dependencies]
-boytacean = { path = "../..", version = "0.12.0" }
+boytacean = { path = "../..", version = "0.12.1" }
 clap = { version = "4", features = ["derive"] }
