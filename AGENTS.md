@@ -61,6 +61,19 @@ cd frontends/sdl && cargo build
 - Rust files use LF line endings, while Python files use CRLF.
 - Inline comments should be in the format `// <comment>` and start with lowercase.
 
+## New Release
+
+To create a new release follow the following steps:
+
+- Make sure that both the tests pass and the code formatting are valid.
+- Increment (look at `CHANGELOG.md` for semver changes) the `version` value in all the `Cargo.toml` files across the repo, the `version` value in `setup.py`, the `version` value in `frontends/web/package.json` and the `display_version` value in `frontends/libretro/res/boytacean_libretro.info`.
+- Update the dependencies in the multiple `Cargo.toml` files that are associated with boytacean crates and back references.
+- Move all the `CHANGELOG.md` Unreleased items that have at least one non empty item the into a new section with the new version number and date, and then create new empty sub-sections (Added, Changed and Fixed) for the Unreleased section with a single empty item.
+- Create a commit with the following message `version: $VERSION_NUMBER`.
+- Push the commit.
+- Create a new tag with the value fo the new version number `$VERSION_NUMBER`.
+- Create a new release on the GitHub repo using the Markdown from the corresponding version entry in `CHANGELOG.md` as the description of the release and the version number as the title. Do not include the title of the release (version and date) in the description.
+
 ## License
 
 Boytacean is licensed under the [Apache License, Version 2.0](http://www.apache.org/licenses/).
