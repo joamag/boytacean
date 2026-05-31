@@ -1,0 +1,134 @@
+.game-playlist {
+    display: flex;
+    flex-direction: column;
+}
+
+.game-playlist > .game-playlist-header {
+    align-items: center;
+    display: flex;
+    flex-direction: row;
+    margin-bottom: 12px;
+}
+
+.game-playlist > .game-playlist-header > .game-playlist-header-left {
+    align-items: baseline;
+    display: flex;
+    flex: 1;
+    flex-direction: row;
+    gap: 8px;
+}
+
+.game-playlist > .game-playlist-header > .game-playlist-header-left > .game-playlist-header-title {
+    font-size: 22px;
+    font-weight: bold;
+}
+
+.game-playlist > .game-playlist-header > .game-playlist-header-left > .game-playlist-header-subtitle {
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 14px;
+}
+
+.game-playlist > .game-playlist-header-description {
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 16px;
+    line-height: 20px;
+    margin-bottom: 16px;
+}
+
+.game-playlist > .text-input {
+    margin-bottom: 16px;
+}
+
+.game-playlist > .game-playlist-list {
+    display: flex;
+    flex-direction: column;
+    max-height: 312px;
+    overflow-y: auto;
+}
+
+.game-playlist > .game-playlist-list > .game-playlist-empty {
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 16px;
+    padding: 12px 0px 12px 0px;
+    text-align: center;
+}
+
+.game-playlist > .game-playlist-list > .game-playlist-entry {
+    align-items: center;
+    border-radius: 6px 6px 6px 6px;
+    -o-border-radius: 6px 6px 6px 6px;
+    -ms-border-radius: 6px 6px 6px 6px;
+    -moz-border-radius: 6px 6px 6px 6px;
+    -khtml-border-radius: 6px 6px 6px 6px;
+    -webkit-border-radius: 6px 6px 6px 6px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: row;
+    padding: 10px 12px 10px 12px;
+    transition: background-color 0.25s cubic-bezier(0.075, 0.82, 0.165, 1);
+    -o-transition: background-color 0.25s cubic-bezier(0.075, 0.82, 0.165, 1);
+    -ms-transition: background-color 0.25s cubic-bezier(0.075, 0.82, 0.165, 1);
+    -moz-transition: background-color 0.25s cubic-bezier(0.075, 0.82, 0.165, 1);
+    -khtml-transition: background-color 0.25s cubic-bezier(0.075, 0.82, 0.165, 1);
+    -webkit-transition: background-color 0.25s cubic-bezier(0.075, 0.82, 0.165, 1);
+}
+
+.game-playlist > .game-playlist-list > .game-playlist-entry:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.game-playlist > .game-playlist-list > .game-playlist-entry.active {
+    background-color: rgba(255, 255, 255, 0.12);
+}
+
+.game-playlist > .game-playlist-list > .game-playlist-entry.loading {
+    opacity: 0.5;
+    -o-opacity: 0.5;
+    -ms-opacity: 0.5;
+    -moz-opacity: 0.5;
+    -khtml-opacity: 0.5;
+    -webkit-opacity: 0.5;
+    pointer-events: none;
+}
+
+.game-playlist > .game-playlist-list > .game-playlist-entry > .game-playlist-thumbnail {
+    border-radius: 4px 4px 4px 4px;
+    -o-border-radius: 4px 4px 4px 4px;
+    -ms-border-radius: 4px 4px 4px 4px;
+    -moz-border-radius: 4px 4px 4px 4px;
+    -khtml-border-radius: 4px 4px 4px 4px;
+    -webkit-border-radius: 4px 4px 4px 4px;
+    height: 56px;
+    margin-right: 12px;
+    object-fit: cover;
+    width: 56px;
+}
+
+.game-playlist > .game-playlist-list > .game-playlist-entry > .game-playlist-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.game-playlist > .game-playlist-list > .game-playlist-entry > .game-playlist-info > .game-playlist-title {
+    align-items: center;
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+}
+
+.game-playlist > .game-playlist-list > .game-playlist-entry > .game-playlist-info > .game-playlist-title > .game-playlist-name {
+    font-size: 16px;
+    font-weight: bold;
+}
+
+.game-playlist > .game-playlist-list > .game-playlist-entry > .game-playlist-info > .game-playlist-title > .game-playlist-loading {
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 13px;
+}
+
+.game-playlist > .game-playlist-list > .game-playlist-entry > .game-playlist-info > .game-playlist-description {
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 15px;
+    line-height: 18px;
+    margin-top: 4px;
+}
