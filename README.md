@@ -117,6 +117,10 @@ You can use some GET parameters to control the initial behavior of the emulator.
 | `playlist_url` | String  | The URL of a JSON playlist file containing a list of ROMs to be loaded, should support CORS.   |
 | `playlist`     | String  | The same as `playlist_url`.                                                                    |
 
+### Playlists
+
+You can load a collection of ROMs through a JSON playlist using the `playlist_url` parameter. See [Playlists](doc/playlists.md) for the file format, available fields, and examples.
+
 ## Palettes
 
 The palettes offered in the web version were provided by [TheWolfBunny64](https://www.deviantart.com/thewolfbunny).
