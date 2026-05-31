@@ -73,6 +73,8 @@ To create a new release follow the following steps:
 - Push the commit.
 - Create a new tag with the value fo the new version number `$VERSION_NUMBER`.
 - Create a new release on the GitHub repo using the Markdown from the corresponding version entry in `CHANGELOG.md` as the description of the release and the version number as the title. Do not include the title of the release (version and date) in the description.
+- Promote the release to the stable channel by merging `master` into the `stable` branch and pushing it (this triggers the stable and production deployments).
+- Sync the tag and the affected branches (`master` and `stable`) to both the GitLab and GitHub remotes, since the deployment and publishing pipelines run across both.
 
 ## License
 
