@@ -155,7 +155,7 @@ jobs:
             ~/.cache/vcpkg
             ~/vcpkg
             target/vcpkg
-          key: vcpkg-${{ runner.os }}-${{ hashFiles('frontends/sdl/Cargo.toml') }}
+          key: vcpkg-${{ runner.os }}-${{ matrix.rust-version }}-${{ hashFiles('frontends/sdl/Cargo.toml') }}
       - name: Install SDL dependencies
         run: cd frontends/sdl && cargo install cargo-vcpkg && cargo vcpkg -v build
       - name: Verify Rust code format
@@ -318,7 +318,7 @@ jobs:
             ~/.cache/vcpkg
             ~/vcpkg
             target/vcpkg
-          key: vcpkg-${{ runner.os }}-${{ hashFiles('frontends/sdl/Cargo.toml') }}
+          key: vcpkg-${{ runner.os }}-${{ matrix.rust-image }}-${{ hashFiles('frontends/sdl/Cargo.toml') }}
       - name: Install SDL dependencies
         run: cd frontends/sdl && cargo install cargo-vcpkg && cargo vcpkg -v build
       - name: Verify Rust code format
