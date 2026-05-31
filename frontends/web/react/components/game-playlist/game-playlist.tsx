@@ -1,5 +1,12 @@
 import { Emulator, Link, TextInput } from "emukit";
-import React, { FC, useCallback, useMemo, useState } from "react";
+import React, {
+    FC,
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState
+} from "react";
 
 import { Playlist, PlaylistEntry } from "../../../ts";
 import { PlaylistInfo } from "../playlist-info/playlist-info";
@@ -28,6 +35,8 @@ export const GamePlaylist: FC<GamePlaylistProps> = ({
     const [filter, setFilter] = useState("");
     const [loading, setLoading] = useState<string | null>(null);
     const [activeUrl, setActiveUrl] = useState<string | null>(null);
+    const [selectedIndex, setSelectedIndex] = useState(-1);
+    const listRef = useRef<HTMLDivElement>(null);
 
     const filteredEntries = useMemo(() => {
         if (!filter) return entries;
@@ -38,6 +47,19 @@ export const GamePlaylist: FC<GamePlaylistProps> = ({
                 entry.description?.toLowerCase().includes(query)
         );
     }, [entries, filter]);
+
+    useEffect(() => {
+        if (selectedIndex < 0) return;
+        const node = listRef.current?.children[selectedIndex] as
+            | HTMLElement
+            | undefined;
+        node?.scrollIntoView({ block: "nearest" });
+    }, [selectedIndex]);
+
+    const onFilterChange = useCallback((value: string) => {
+        setFilter(value);
+        setSelectedIndex(-1);
+    }, []);
 
     const onInfoClick = useCallback(async () => {
         if (!playlist) return;
@@ -92,8 +114,33 @@ export const GamePlaylist: FC<GamePlaylistProps> = ({
         [emulator, onSelect]
     );
 
+    const onKeyDown = useCallback(
+        (event: React.KeyboardEvent) => {
+            if (filteredEntries.length === 0) return;
+            switch (event.key) {
+                case "ArrowDown":
+                    event.preventDefault();
+                    setSelectedIndex((prev) =>
+                        Math.min(prev + 1, filteredEntries.length - 1)
+                    );
+                    break;
+                case "ArrowUp":
+                    event.preventDefault();
+                    setSelectedIndex((prev) => Math.max(prev - 1, 0));
+                    break;
+                case "Enter":
+                    if (selectedIndex >= 0) {
+                        event.preventDefault();
+                        onEntryClick(filteredEntries[selectedIndex]);
+                    }
+                    break;
+            }
+        },
+        [filteredEntries, selectedIndex, onEntryClick]
+    );
+
     return (
-        <div className={classes}>
+        <div className={classes} onKeyDown={onKeyDown}>
             {playlist && (
                 <div className="game-playlist-header">
                     <div className="game-playlist-header-left">
@@ -118,19 +165,20 @@ export const GamePlaylist: FC<GamePlaylistProps> = ({
                 size="medium"
                 placeholder="Search games..."
                 value={filter}
-                onChange={setFilter}
+                onChange={onFilterChange}
             />
-            <div className="game-playlist-list">
+            <div className="game-playlist-list" ref={listRef}>
                 {filteredEntries.length === 0 && (
                     <span className="game-playlist-empty">No games found.</span>
                 )}
-                {filteredEntries.map((entry) => (
+                {filteredEntries.map((entry, index) => (
                     <div
                         key={entry.url}
                         className={[
                             "game-playlist-entry",
                             loading === entry.url ? "loading" : "",
-                            activeUrl === entry.url ? "active" : ""
+                            activeUrl === entry.url ? "active" : "",
+                            selectedIndex === index ? "selected" : ""
                         ].join(" ")}
                         onClick={() => onEntryClick(entry)}
                     >
