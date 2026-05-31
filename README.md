@@ -30,6 +30,7 @@ For the Web front-end...
 * Rumble emulation and haptic feedback
 * Cool bespoke display palettes built by [TheWolfBunny64](https://www.deviantart.com/thewolfbunny).
 * Fullscreen browser mode
+* Game playlists loaded from a remote JSON file - see [Playlists](doc/playlists.md)
 * Debug mode - VRAM and registers
 
 What's still missing...
