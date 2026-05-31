@@ -12,18 +12,22 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use crate::error::Error;
-
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
+
+use crate::error::Error;
 
 /// Shared mutable type able to be passed between types
 /// allowing for circular referencing and interior mutability.
 pub type SharedMut<T> = Rc<RefCell<T>>;
 
 /// Shared thread type able to be passed between threads.
+///
 /// Significant performance overhead compared to `SharedMut`.
 pub type SharedThread<T> = Arc<Mutex<T>>;
+
+/// The size of a BMP file header in bytes.
+const BMP_HEADER_SIZE: u32 = 54;
 
 /// Reads the contents of the file at the given path into
 /// a vector of bytes.
@@ -50,6 +54,7 @@ pub fn write_file(path: &str, data: &[u8], flush: Option<bool>) -> Result<(), Er
 }
 
 /// Replaces the extension in the given path with the provided extension.
+///
 /// This function allows for simple associated file discovery.
 pub fn replace_ext(path: &str, new_extension: &str) -> Option<String> {
     let file_path = Path::new(path);
@@ -73,13 +78,25 @@ pub fn capitalize(string: &str) -> String {
     }
 }
 
+/// Saves the pixel data as a BMP file at the specified path.
+/// The pixel data should be in RGB format, with each pixel
+/// represented by three bytes (red, green, blue).
+///
+/// This is a raw implementation of BMP file saving, not using any
+/// external libraries. It writes the BMP file header and pixel data
+/// directly to the file in the correct format.
 pub fn save_bmp(path: &str, pixels: &[u8], width: u32, height: u32) -> Result<(), Error> {
     let file = File::create(path)
         .map_err(|_| Error::CustomError(format!("Failed to create file: {path}")))?;
     let mut writer = BufWriter::new(file);
 
-    // writes the BMP file header
-    let file_size = 54 + (width * height * 3);
+    // calculates the size of the BMP file header and the pixel data
+    // according to the BMP file format specification
+    let row_bytes = (width * 3 + 3) & !3;
+    let image_size = row_bytes * height;
+    let file_size = BMP_HEADER_SIZE + image_size;
+
+    // writes the BMP file header into the writer
     writer.write_all(&[0x42, 0x4d]).unwrap(); // "BM" magic number
     writer.write_all(&file_size.to_le_bytes()).unwrap(); // file size
     writer.write_all(&[0x00, 0x00]).unwrap(); // reserved
@@ -91,9 +108,7 @@ pub fn save_bmp(path: &str, pixels: &[u8], width: u32, height: u32) -> Result<()
     writer.write_all(&[0x01, 0x00]).unwrap(); // color planes
     writer.write_all(&[0x18, 0x00]).unwrap(); // bits per pixel
     writer.write_all(&[0x00, 0x00, 0x00, 0x00]).unwrap(); // compression method
-    writer
-        .write_all(&[(width * height * 3) as u8, 0x00, 0x00, 0x00])
-        .unwrap(); // image size
+    writer.write_all(&image_size.to_le_bytes()).unwrap(); // image size
     writer.write_all(&[0x13, 0x0b, 0x00, 0x00]).unwrap(); // horizontal resolution (72 DPI)
     writer.write_all(&[0x13, 0x0b, 0x00, 0x00]).unwrap(); // vertical resolution (72 DPI)
     writer.write_all(&[0x00, 0x00, 0x00, 0x00]).unwrap(); // color palette
@@ -134,8 +149,8 @@ pub fn copy_fast(src: &[u8], dst: &mut [u8], count: usize) {
     }
 }
 
-// Interleaves two arrays of bytes into a single array using
-// a pointer-based approach for performance reasons.
+/// Interleaves two arrays of bytes into a single array using
+/// a pointer-based approach for performance reasons.
 pub fn interleave_arrays(a: &[u8], b: &[u8], output: &mut [u8]) {
     assert_eq!(a.len(), b.len());
     assert_eq!(output.len(), a.len() + b.len());
@@ -159,6 +174,25 @@ pub fn interleave_arrays(a: &[u8], b: &[u8], output: &mut [u8]) {
     }
 }
 
+/// Flips a 2D array of pixels vertically, in place.
+///
+/// This function is optimized for performance and uses pointer-based
+/// operations to flip the pixels as fast as possible.
+pub fn flip_vertical(pixels: &[u8], width: usize, height: usize, channels: usize) -> Vec<u8> {
+    let row_len = width * channels;
+    let mut flipped = vec![0u8; pixels.len()];
+    for y in 0..height {
+        let src = &pixels[y * row_len..(y + 1) * row_len];
+        let dst = &mut flipped[(height - 1 - y) * row_len..(height - y) * row_len];
+        dst.copy_from_slice(src);
+    }
+    flipped
+}
+
+/// Returns the current timestamp in seconds since the UNIX epoch.
+///
+/// This function has different implementations depending on whether
+/// the `wasm` feature is enabled or not.
 #[cfg(not(feature = "wasm"))]
 pub fn timestamp() -> u64 {
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -167,6 +201,12 @@ pub fn timestamp() -> u64 {
     now.duration_since(UNIX_EPOCH).unwrap().as_secs()
 }
 
+/// Returns the current timestamp in seconds since the UNIX epoch.
+///
+/// This function has different implementations depending on whether
+/// the `wasm` feature is enabled or not.
+///
+/// WASM implementation is a static one using `js_sys::Date`.
 #[cfg(feature = "wasm")]
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 pub fn timestamp() -> u64 {
@@ -177,9 +217,13 @@ pub fn timestamp() -> u64 {
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
+    use std::{
+        env::temp_dir,
+        fs::{read, remove_file},
+        path::Path,
+    };
 
-    use super::{capitalize, replace_ext};
+    use super::{capitalize, replace_ext, save_bmp};
 
     #[test]
     fn test_change_extension() {
@@ -227,5 +271,45 @@ mod tests {
     fn test_capitalize_multiple_characters() {
         let result = capitalize("hello, world!");
         assert_eq!(result, "Hello, world!");
+    }
+
+    #[test]
+    fn test_bmp_le_bytes() {
+        // according to the BMP file format specification, both the file size
+        // and the image size fields are stored using little-endian encoding.
+        let path = temp_dir().join("boytacean_le_test.bmp");
+        save_bmp(path.to_str().unwrap(), &[255, 0, 0], 1, 1).expect("Failed to save BMP file");
+        let data: Vec<u8> = read(&path).unwrap();
+        assert_eq!(&data[2..6], &(58u32).to_le_bytes());
+        assert_eq!(&data[34..38], &(4u32).to_le_bytes());
+        remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn test_bmp_file_structure() {
+        // Creates a 2x2 image and verifies that the BMP header follows the
+        // expected structure as defined in the specification.
+        let path = temp_dir().join("boytacean_spec_test.bmp");
+        let pixels = [
+            255, 0, 0, // red
+            0, 255, 0, // green
+            0, 0, 255, // blue
+            255, 255, 0, // yellow
+        ];
+        save_bmp(path.to_str().unwrap(), &pixels, 2, 2).expect("Failed to save BMP file");
+        let data = read(&path).unwrap();
+
+        // header checks
+        assert_eq!(&data[0..2], b"BM");
+        assert_eq!(&data[2..6], &(70u32).to_le_bytes());
+        assert_eq!(&data[10..14], &(54u32).to_le_bytes());
+        assert_eq!(&data[14..18], &(40u32).to_le_bytes());
+        assert_eq!(&data[18..22], &(2i32).to_le_bytes());
+        assert_eq!(&data[22..26], &(2i32).to_le_bytes());
+        assert_eq!(&data[26..28], &(1u16).to_le_bytes());
+        assert_eq!(&data[28..30], &(24u16).to_le_bytes());
+        assert_eq!(&data[34..38], &(16u32).to_le_bytes());
+
+        remove_file(path).unwrap();
     }
 }

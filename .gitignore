@@ -10,13 +10,18 @@ Cargo.lock
 /.eggs
 /.venv
 /.idea
+/.claude
+
+/.venv-*
 
 /ndk
 /dist
 /build
 /target
+/reports
 /aarch64-linux-gnu
 /res/roms.prop
+/res/roms.gba/prop
 /frontends/*/target
 /frontends/*/ndk
 

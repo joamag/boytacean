@@ -6,15 +6,6 @@
 //! The [BESS](https://github.com/LIJI32/SameBoy/blob/master/BESS.md) format is a format developed by the [SameBoy](https://sameboy.github.io/) emulator and is used to store the emulator state
 //! in agnostic and compatible way.
 
-use boytacean_common::{
-    data::{
-        read_bytes, read_into, read_u16, read_u32, read_u64, read_u8, write_bytes, write_u16,
-        write_u32, write_u64, write_u8,
-    },
-    error::Error,
-    util::{save_bmp, timestamp},
-};
-use boytacean_encoding::zippy::{decode_zippy, encode_zippy};
 use std::{
     convert::TryInto,
     fmt::{self, Display, Formatter},
@@ -24,6 +15,18 @@ use std::{
     vec,
 };
 
+use boytacean_common::{
+    data::{
+        read_bytes, read_into, read_u16, read_u32, read_u64, read_u8, write_bytes, write_u16,
+        write_u32, write_u64, write_u8,
+    },
+    error::Error,
+    util::{save_bmp, timestamp},
+};
+use boytacean_encoding::zippy::{decode_zippy, encode_zippy};
+#[cfg(feature = "wasm")]
+use wasm_bindgen::prelude::*;
+
 use crate::{
     disable_pedantic, enable_pedantic,
     gb::{GameBoy, GameBoyDevice, GameBoyMode, GameBoySpeed},
@@ -31,9 +34,6 @@ use crate::{
     ppu::{DISPLAY_HEIGHT, DISPLAY_WIDTH, FRAME_BUFFER_SIZE},
     rom::{CgbMode, MbcType},
 };
-
-#[cfg(feature = "wasm")]
-use wasm_bindgen::prelude::*;
 
 /// Magic string for the BOSC (Boytacean Save Compressed) format.
 pub const BOSC_MAGIC: &str = "BOSC";
@@ -209,9 +209,28 @@ impl From<u8> for BosBlockKind {
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 pub struct FromGbOptions {
+    /// If true, the state will include a thumbnail of the
+    /// current frame buffer.
+    ///
+    /// This will increase the size of the state, but will
+    /// allow to have a preview of the state without having
+    /// to load it into the emulator.
     thumbnail: bool,
+
+    /// Defines the format to be used in the storage
+    /// of the state data (controls size of the state).
     state_format: Option<StateFormat>,
+
+    /// Name of the agent that is creating the state.
+    ///
+    /// If defined it's expected to have this value stored as
+    /// part of the state.
     agent: Option<String>,
+
+    /// Version of the agent that is creating the state.
+    ///
+    /// If defined it's expected to have this value stored as
+    /// part of the state.
     agent_version: Option<String>,
 }
 
@@ -245,18 +264,27 @@ impl Default for FromGbOptions {
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 pub struct ToGbOptions {
+    /// If set the emulator the Game Boy emulator is
+    /// going to be rebooted, before the state is set.
     reload: bool,
+
+    /// If set the device specific data will be loaded
+    /// into the current emuator machine.
+    devices: bool,
 }
 
 impl ToGbOptions {
-    pub fn new(reload: bool) -> Self {
-        Self { reload }
+    pub fn new(reload: bool, devices: bool) -> Self {
+        Self { reload, devices }
     }
 }
 
 impl Default for ToGbOptions {
     fn default() -> Self {
-        Self { reload: true }
+        Self {
+            reload: true,
+            devices: true,
+        }
     }
 }
 
@@ -613,8 +641,10 @@ impl StateBox for BosState {
     fn to_gb(&self, gb: &mut GameBoy, options: &ToGbOptions) -> Result<(), Error> {
         self.verify()?;
         self.bess.to_gb(gb, options)?;
-        for device_state in &self.device_states {
-            device_state.to_gb(gb, options)?;
+        if options.devices {
+            for device_state in &self.device_states {
+                device_state.to_gb(gb, options)?;
+            }
         }
         Ok(())
     }
@@ -1483,12 +1513,10 @@ impl BessInfo {
                 break;
             }
         }
-        String::from(
-            String::from_utf8(Vec::from(&self.title[..final_index]))
-                .unwrap()
-                .trim_matches(char::from(0))
-                .trim(),
-        )
+        String::from_utf8_lossy(&self.title[..final_index])
+            .trim_matches('\0')
+            .trim()
+            .to_string()
     }
 }
 
@@ -2281,7 +2309,7 @@ impl StateManager {
         // reload the Game Boy machine to make sure we're in
         // a clean state before loading the state
         if options.reload {
-            gb.reload();
+            gb.reload()?;
         }
 
         state.to_gb(gb, options)?;
@@ -2347,12 +2375,11 @@ impl StateManager {
 mod tests {
     use boytacean_encoding::zippy::{decode_zippy, encode_zippy};
 
+    use super::{BessCore, SaveStateFormat, StateManager};
     use crate::{
         gb::GameBoy,
         state::{FromGbOptions, State},
     };
-
-    use super::{BessCore, SaveStateFormat, StateManager};
 
     #[test]
     fn test_bess_core() {

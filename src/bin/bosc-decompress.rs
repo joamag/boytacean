@@ -1,13 +1,22 @@
+//! Decompression utility for BOSC files
+//!
+//! This utility reads a compressed BOSC file and decompresses it into the BOS format.
+//! It can be used to convert BOSC files back to their original BOS format for further processing.
+//!
+//! # Usage
+//! bosc-decompress <input_file> \[output_file\]
+
+use std::{env::args, error::Error, fs::File, io::Read, path::Path};
+
 use boytacean::state::{SaveStateFormat, Serialize, StateManager};
-use std::{env, fs::File, io::Read, path::Path};
 
 fn print_usage() {
     println!("Usage: bosc-decompress <input_file> [output_file]");
     println!("If output_file is not specified, it will use input_file with .bos extension");
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let args: Vec<String> = env::args().collect();
+fn main() -> Result<(), Box<dyn Error>> {
+    let args: Vec<String> = args().collect();
 
     if args.len() < 2 {
         print_usage();

@@ -1,7 +1,16 @@
 pub mod audio;
 pub mod data;
 pub mod sdl;
+pub mod shader;
 pub mod test;
+
+use std::{
+    cmp::max,
+    error::Error as StdError,
+    path::{Path, PathBuf},
+    thread,
+    time::{Duration, Instant, SystemTime},
+};
 
 use audio::Audio;
 use boytacean::{
@@ -27,12 +36,6 @@ use sdl2::{
     keyboard::{Keycode, Mod},
     pixels::PixelFormatEnum,
     Sdl,
-};
-use std::{
-    cmp::max,
-    path::{Path, PathBuf},
-    thread,
-    time::{Duration, Instant, SystemTime},
 };
 
 /// The scale at which the screen is going to be drawn
@@ -72,6 +75,7 @@ impl Default for Benchmark {
 pub struct EmulatorOptions {
     auto_mode: Option<bool>,
     unlimited: Option<bool>,
+    opengl: Option<bool>,
     features: Option<Vec<&'static str>>,
 }
 
@@ -144,6 +148,9 @@ pub struct Emulator {
     /// speed.
     fast: bool,
 
+    /// Flag that controls if the emulator is running using OpenGL.
+    opengl: bool,
+
     /// Set of features that are going to be enabled in the emulator, this
     /// value is going to be used to control the behavior of the emulator.
     features: Vec<&'static str>,
@@ -173,6 +180,7 @@ impl Emulator {
             next_tick_time: 0.0,
             next_tick_time_i: 0,
             fast: false,
+            opengl: options.opengl.unwrap_or(false),
             features: options
                 .features
                 .unwrap_or_else(|| vec!["video", "audio", "no-vsync"]),
@@ -251,7 +259,7 @@ impl Emulator {
         let sdl = sdl2::init().unwrap();
 
         if self.features.contains(&"video") {
-            self.start_graphics(&sdl, screen_scale);
+            self.start_graphics(&sdl, screen_scale, self.opengl);
         }
         if self.features.contains(&"audio") {
             self.start_audio(&sdl);
@@ -266,13 +274,14 @@ impl Emulator {
         }
     }
 
-    pub fn start_graphics(&mut self, sdl: &Sdl, screen_scale: f32) {
+    pub fn start_graphics(&mut self, sdl: &Sdl, screen_scale: f32, opengl: bool) {
         self.sdl = Some(SdlSystem::new(
             sdl,
             &self.title,
             self.system.display_width() as u32,
             self.system.display_height() as u32,
             screen_scale,
+            opengl,
             !self.features.contains(&"no-accelerated"),
             !self.features.contains(&"no-vsync"),
         ));
@@ -302,10 +311,7 @@ impl Emulator {
                 None
             },
         )?;
-        println!(
-            "========= Cartridge =========\n{}\n=============================",
-            rom
-        );
+        println!("========= Cartridge =========\n{rom}\n=============================");
         if let Some(ref mut sdl) = self.sdl {
             sdl.window_mut()
                 .set_title(format!("{} [{}]", self.title, rom.title()).as_str())
@@ -320,6 +326,18 @@ impl Emulator {
             .unwrap()
             .to_string();
         Ok(())
+    }
+
+    /// Loads a (fragment) shader into the SDL system.
+    ///
+    /// This function is used to load a shader into the SDL system,
+    /// this is useful to apply effects to the graphics of the emulator.
+    pub fn load_shader(&mut self, name: &str) -> Result<(), String> {
+        if let Some(ref mut sdl) = self.sdl {
+            sdl.load_shader(name)
+        } else {
+            Err(String::from("SDL system not started"))
+        }
     }
 
     pub fn reset(&mut self) -> Result<(), Error> {
@@ -361,24 +379,23 @@ impl Emulator {
         let framerate = speedup * GameBoy::VISUAL_FREQ as f64;
 
         println!(
-            "Took {:.2} seconds to run {} ticks ({} cycles) ({:.2} Mhz, {:.2} speedup, {:.2} FPS)!",
-            delta, count, cycles, frequency_mhz, speedup, framerate
+            "Took {delta:.2} seconds to run {count} ticks ({cycles} cycles) ({frequency_mhz:.2} Mhz, {speedup:.2} speedup, {framerate:.2} FPS)!"
         );
     }
 
     fn save_state(&mut self, file_path: &str) {
         if let Err(message) = StateManager::save_file(file_path, &mut self.system, None, None) {
-            println!("Error saving state: {}", message)
+            println!("Error saving state: {message}")
         } else {
-            println!("Saved state into: {}", file_path)
+            println!("Saved state into: {file_path}")
         }
     }
 
     fn load_state(&mut self, file_path: &str) {
         if let Err(message) = StateManager::load_file(file_path, &mut self.system, None, None) {
-            println!("Error loading state: {}", message)
+            println!("Error loading state: {message}")
         } else {
-            println!("Loaded state from: {}", file_path)
+            println!("Loaded state from: {file_path}")
         }
     }
 
@@ -442,19 +459,43 @@ impl Emulator {
         let surface = surface_from_bytes(&data::ICON);
         self.sdl.as_mut().unwrap().window_mut().set_icon(&surface);
 
-        // creates an accelerated canvas to be used in the drawing
-        // then clears it and presents it
-        self.sdl.as_mut().unwrap().canvas.present();
+        let texture_creator = if self.opengl {
+            None
+        } else {
+            Some(
+                self.sdl
+                    .as_mut()
+                    .unwrap()
+                    .canvas
+                    .as_ref()
+                    .unwrap()
+                    .texture_creator(),
+            )
+        };
 
-        // creates a texture creator for the current canvas, required
-        // for the creation of dynamic and static textures
-        let texture_creator = self.sdl.as_mut().unwrap().canvas.texture_creator();
+        let mut texture = if self.opengl {
+            None
+        } else {
+            // creates an accelerated canvas to be used in the drawing
+            // then clears it and presents it
+            self.sdl
+                .as_mut()
+                .unwrap()
+                .canvas
+                .as_mut()
+                .unwrap()
+                .present();
 
-        // creates the texture streaming that is going to be used
-        // as the target for the pixel buffer
-        let mut texture = texture_creator
-            .create_texture_streaming(PixelFormatEnum::RGB24, width as u32, height as u32)
-            .unwrap();
+            // creates the texture streaming that is going to be used
+            // as the target for the pixel buffer
+            let texture = texture_creator
+                .as_ref()
+                .unwrap()
+                .create_texture_streaming(PixelFormatEnum::RGB24, width as u32, height as u32)
+                .unwrap();
+
+            Some(texture)
+        };
 
         // calculates the rate as visual cycles that will take from
         // the current visual frequency to re-save the battery backed RAM
@@ -471,6 +512,11 @@ impl Emulator {
         // the main loop to execute the multiple machine clocks, in
         // theory the emulator should keep an infinite loop here
         'main: loop {
+            // obtains the dimensions of the window to be used in the
+            // aspect ratio calculation, making sure the aspect ratio
+            // is maintained when the window is resized
+            let (window_width, window_height) = self.sdl.as_ref().unwrap().window().drawable_size();
+
             // increments the counter that will keep track
             // on the number of visual ticks since beginning
             counter = counter.wrapping_add(1);
@@ -493,6 +539,30 @@ impl Emulator {
                         ..
                     } => break 'main,
                     Event::KeyDown {
+                        keycode: Some(Keycode::H),
+                        ..
+                    } => {
+                        println!(
+                            "=== Boytacean SDL Controls ===\n\
+Escape: Quit the emulator\n\
+H: Show this help message\n\
+I: Save a screenshot as PNG in the current directory\n\
+R: Reset the system (soft reset)\n\
+B: Run a benchmark of the emulator\n\
+T: Toggle audio on/off\n\
+P: Cycle through color palettes\n\
+M: Cycle through audio filter modes\n\
+C: Print debug information\n\
+Ctrl + E: Temporarily increase emulation speed (hold to speed up)\n\
+Ctrl + F: Toggle fullscreen mode\n\
++ / -: Increase / decrease emulation speed\n\
+0-9: Load state from slot (0-9)\n\
+Ctrl + 0-9: Save state to slot (0-9)\n\
+Arrow keys, Enter, Z, X, Backspace, etc.: Game Boy controls\n\
+Drag & drop ROM file: Load new ROM and reset system\n==============================="
+                        );
+                    }
+                    Event::KeyDown {
                         keycode: Some(Keycode::R),
                         ..
                     } => self.reset().unwrap(),
@@ -513,6 +583,12 @@ impl Emulator {
                         ..
                     } => self.toggle_palette(),
                     Event::KeyDown {
+                        keycode: Some(Keycode::M),
+                        ..
+                    } => self
+                        .system
+                        .set_audio_filter_mode(self.system.audio_filter_mode().next()),
+                    Event::KeyDown {
                         keycode: Some(Keycode::C),
                         ..
                     } => self.print_debug(),
@@ -520,38 +596,30 @@ impl Emulator {
                         keycode: Some(Keycode::E),
                         keymod,
                         ..
-                    } => {
-                        if !self.fast && (keymod & (Mod::LCTRLMOD | Mod::RCTRLMOD)) != Mod::NOMOD {
-                            self.fast = true;
-                            self.logic_frequency *= 8;
-                        }
+                    } if !self.fast && (keymod & (Mod::LCTRLMOD | Mod::RCTRLMOD)) != Mod::NOMOD => {
+                        self.fast = true;
+                        self.logic_frequency *= 8;
                     }
                     Event::KeyUp {
                         keycode: Some(Keycode::E),
                         ..
-                    } => {
-                        if self.fast {
-                            self.fast = false;
-                            self.logic_frequency /= 8;
-                        }
+                    } if self.fast => {
+                        self.fast = false;
+                        self.logic_frequency /= 8;
                     }
                     Event::KeyUp {
                         keycode: Some(Keycode::LCtrl) | Some(Keycode::RCtrl),
                         ..
-                    } => {
-                        if self.fast {
-                            self.fast = false;
-                            self.logic_frequency /= 8;
-                        }
+                    } if self.fast => {
+                        self.fast = false;
+                        self.logic_frequency /= 8;
                     }
                     Event::KeyDown {
                         keycode: Some(Keycode::F),
                         keymod,
                         ..
-                    } => {
-                        if (keymod & (Mod::LCTRLMOD | Mod::RCTRLMOD)) != Mod::NOMOD {
-                            self.toggle_fullscreen()
-                        }
+                    } if (keymod & (Mod::LCTRLMOD | Mod::RCTRLMOD)) != Mod::NOMOD => {
+                        self.toggle_fullscreen()
                     }
                     Event::KeyDown {
                         keycode: Some(Keycode::Plus),
@@ -588,7 +656,7 @@ impl Emulator {
                                     self.load_state(&file_path);
                                 }
                             }
-                            _ => {}
+                            _ => (),
                         }
                         if let Some(key) = key_to_pad(keycode) {
                             self.system.key_press(key)
@@ -653,8 +721,14 @@ impl Emulator {
                         // obtains the frame buffer of the Game Boy PPU and uses it
                         // to update the stream texture, that will latter be copied
                         // to the canvas
-                        let frame_buffer = self.system.frame_buffer().as_ref();
-                        texture.update(None, frame_buffer, width * 3).unwrap();
+                        if !self.opengl {
+                            let frame_buffer = self.system.frame_buffer().as_ref();
+                            texture
+                                .as_mut()
+                                .unwrap()
+                                .update(None, frame_buffer, width * 3)
+                                .unwrap();
+                        }
 
                         // obtains the index of the current PPU frame, this value
                         // is going to be used to detect for new frame presence
@@ -684,23 +758,32 @@ impl Emulator {
                 // resources from being over-used in situations where multiple frames
                 // are generated during the same tick cycle
                 if frame_dirty {
-                    // clears the graphics canvas, making sure that no garbage
-                    // pixel data remaining in the pixel buffer, not doing this would
-                    // create visual glitches in OSs like Mac OS X
-                    self.sdl.as_mut().unwrap().canvas.clear();
-
-                    // copies the texture that was created for the frame (during
-                    // the loop part of the tick) to the canvas
-                    self.sdl
-                        .as_mut()
-                        .unwrap()
-                        .canvas
-                        .copy(&texture, None, None)
-                        .unwrap();
-
-                    // presents the canvas effectively updating the screen
-                    // information presented to the user
-                    self.sdl.as_mut().unwrap().canvas.present();
+                    if self.opengl {
+                        self.sdl.as_mut().unwrap().render_frame_with_shader(
+                            self.system.frame_buffer().as_ref(),
+                            width as u32,
+                            height as u32,
+                            window_width,
+                            window_height,
+                        );
+                    } else {
+                        self.sdl.as_mut().unwrap().canvas.as_mut().unwrap().clear();
+                        self.sdl
+                            .as_mut()
+                            .unwrap()
+                            .canvas
+                            .as_mut()
+                            .unwrap()
+                            .copy(texture.as_ref().unwrap(), None, None)
+                            .unwrap();
+                        self.sdl
+                            .as_mut()
+                            .unwrap()
+                            .canvas
+                            .as_mut()
+                            .unwrap()
+                            .present();
+                    }
                 }
 
                 // calculates the number of ticks that have elapsed since the
@@ -756,8 +839,7 @@ impl Emulator {
         let frequency_mhz = cycles as f64 / delta / 1000.0 / 1000.0;
 
         println!(
-            "Took {:.2} seconds to run {} ticks ({} cycles) ({:.2} Mhz)!",
-            delta, count, cycles, frequency_mhz
+            "Took {delta:.2} seconds to run {count} ticks ({cycles} cycles) ({frequency_mhz:.2} Mhz)!"
         );
     }
 
@@ -991,6 +1073,9 @@ struct Args {
 
     #[arg(default_value_t = String::from(DEFAULT_ROM_PATH), help = "Path to the ROM file to be loaded")]
     rom_path: String,
+
+    #[arg(long, default_value_t = String::from(""), help = "Fragment shader to use")]
+    shader: String,
 }
 
 fn run(args: Args, emulator: &mut Emulator) {
@@ -1013,7 +1098,7 @@ fn run(args: Args, emulator: &mut Emulator) {
     }
 }
 
-fn main() {
+fn main() -> Result<(), Box<dyn StdError>> {
     // parses the provided command line arguments and uses them to
     // obtain structured values
     let args = Args::parse();
@@ -1023,7 +1108,9 @@ fn main() {
     let path = Path::new(&args.rom_path);
     if args.rom_path == DEFAULT_ROM_PATH && !path.exists() {
         println!("No ROM file provided, please provide one using the [ROM_PATH] argument");
-        return;
+        return Err(Box::new(Error::InvalidParameter(String::from(
+            "No ROM file provided",
+        ))));
     }
 
     // tries to build the target mode from the mode argument
@@ -1039,23 +1126,21 @@ fn main() {
     // and the initial game ROM to "start the engine"
     let mut game_boy = GameBoy::new(Some(mode));
     if auto_mode {
-        let mode = Cartridge::from_file(&args.rom_path).unwrap().gb_mode();
+        let mode = Cartridge::from_file(&args.rom_path)?.gb_mode();
         game_boy.set_mode(mode);
     }
-    let device: Box<dyn SerialDevice> = build_device(&args.device).unwrap();
+    let device: Box<dyn SerialDevice> = build_device(&args.device)?;
     game_boy.set_ppu_enabled(!args.no_ppu);
     game_boy.set_apu_enabled(!args.no_apu);
     game_boy.set_dma_enabled(!args.no_dma);
     game_boy.set_timer_enabled(!args.no_timer);
     game_boy.attach_serial(device);
-    game_boy
-        .load(!args.no_boot && args.boot_rom_path.is_empty())
-        .unwrap();
+    game_boy.load(!args.no_boot && args.boot_rom_path.is_empty())?;
     if args.no_boot {
         game_boy.load_boot_state();
     }
     if !args.boot_rom_path.is_empty() {
-        game_boy.load_boot_path(&args.boot_rom_path).unwrap();
+        game_boy.load_boot_path(&args.boot_rom_path)?;
     }
 
     // prints the current version of the emulator (informational message)
@@ -1067,6 +1152,7 @@ fn main() {
     let options = EmulatorOptions {
         auto_mode: Some(auto_mode),
         unlimited: Some(args.unlimited),
+        opengl: Some(!args.shader.is_empty()),
         features: if args.headless || args.benchmark {
             Some(vec![])
         } else {
@@ -1075,13 +1161,18 @@ fn main() {
     };
     let mut emulator = Emulator::new(game_boy, options);
     emulator.start(SCREEN_SCALE);
-    emulator.load_rom(Some(&args.rom_path)).unwrap();
+    emulator.load_rom(Some(&args.rom_path))?;
     emulator.apply_cheats(&args.cheats);
     emulator.toggle_palette();
+    if !args.shader.is_empty() {
+        emulator.load_shader(&args.shader)?;
+    }
 
     run(args, &mut emulator);
 
     emulator.stop();
+
+    Ok(())
 }
 
 fn build_device(device: &str) -> Result<Box<dyn SerialDevice>, Error> {

@@ -10,12 +10,12 @@
 //! This implementation is optimized for modern CPUs by using hardware acceleration
 //! when available. Current support includes only CRC for aarch64.
 
+#[cfg(all(feature = "simd", target_arch = "aarch64"))]
+use std::arch::is_aarch64_feature_detected;
+
 use boytacean_common::error::Error;
 
 use crate::hash::Hash;
-
-#[cfg(all(feature = "simd", target_arch = "aarch64"))]
-use std::arch::is_aarch64_feature_detected;
 
 const CRC32_TABLE: [u32; 256] = [
     0x00000000, 0x77073096, 0xee0e612c, 0x990951ba, 0x076dc419, 0x706af48f, 0xe963a535, 0x9e6495a3,
@@ -141,9 +141,8 @@ pub fn crc32(data: &[u8]) -> u32 {
 
 #[cfg(test)]
 mod tests {
-    use crate::hash::Hash;
-
     use super::{crc32, Crc32};
+    use crate::hash::Hash;
 
     #[test]
     fn test_crc32_empty() {

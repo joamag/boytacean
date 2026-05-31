@@ -1,6 +1,6 @@
 import unittest
 
-from os.path import dirname, realpath, join
+from os.path import dirname, exists, realpath, join
 
 from boytacean import GameBoy
 
@@ -10,6 +10,10 @@ POCKET_ROM_PATH = join(CURRENT_DIR, "../../../../res/roms/demo/pocket.gb")
 
 class BaseTest(unittest.TestCase):
 
+    @unittest.skipUnless(
+        exists(POCKET_ROM_PATH),
+        f"pocket.gb not present at {POCKET_ROM_PATH}; skipping ROM-dependent test",
+    )
     def test_pocket(self):
         gb = GameBoy(apu_enabled=False, serial_enabled=False, load_graphics=False)
         gb.load_rom(POCKET_ROM_PATH)
