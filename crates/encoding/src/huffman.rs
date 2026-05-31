@@ -1,10 +1,11 @@
-use boytacean_common::error::Error;
 use std::{
     cmp::Ordering,
     collections::BinaryHeap,
     io::{Cursor, Read},
     mem::size_of,
 };
+
+use boytacean_common::error::Error;
 
 use crate::codec::Codec;
 

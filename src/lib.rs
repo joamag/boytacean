@@ -18,6 +18,7 @@ pub mod macros;
 pub mod mmu;
 pub mod pad;
 pub mod ppu;
+pub mod ppu_fast;
 pub mod rom;
 pub mod serial;
 pub mod state;

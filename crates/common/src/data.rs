@@ -1,3 +1,9 @@
+//! Data manipulation utilities for reading and writing primitive types.
+//!
+//! This module provides functions to read and write various primitive data types
+//! (such as u8, i8, u16, i16, u32, i32, u64, i64, f32) from and to byte streams.
+//! It also includes functions to read and write byte arrays and strings.
+
 use std::{
     io::{Read, Write},
     mem::size_of,
@@ -59,6 +65,13 @@ pub fn read_i64<R: Read>(reader: &mut R) -> Result<i64, Error> {
     let mut buffer = [0x00; size_of::<i64>()];
     reader.read_exact(&mut buffer)?;
     Ok(i64::from_le_bytes(buffer))
+}
+
+#[inline(always)]
+pub fn read_f32<R: Read>(reader: &mut R) -> Result<f32, Error> {
+    let mut buffer = [0x00; size_of::<f32>()];
+    reader.read_exact(&mut buffer)?;
+    Ok(f32::from_le_bytes(buffer))
 }
 
 #[inline(always)]
@@ -124,6 +137,12 @@ pub fn write_u64<W: Write>(writer: &mut W, value: u64) -> Result<(), Error> {
 
 #[inline(always)]
 pub fn write_i64<W: Write>(writer: &mut W, value: i64) -> Result<(), Error> {
+    writer.write_all(&value.to_le_bytes())?;
+    Ok(())
+}
+
+#[inline(always)]
+pub fn write_f32<W: Write>(writer: &mut W, value: f32) -> Result<(), Error> {
     writer.write_all(&value.to_le_bytes())?;
     Ok(())
 }

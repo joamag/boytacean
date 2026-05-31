@@ -2,6 +2,10 @@ import { startApp } from "emukit";
 
 import { GameboyEmulator } from "./ts";
 
+/**
+ * List of available background theme colors that can be used
+ * to style the main emulator area.
+ */
 const BACKGROUNDS = [
     "264653",
     "1b1a17",
@@ -39,6 +43,8 @@ const BACKGROUNDS = [
         settings["background"] ??
         settings["theme"] ??
         undefined;
+    const playlistUrl =
+        params.get("playlist_url") ?? params.get("playlist") ?? undefined;
 
     // creates the emulator structure and initializes the
     // React app with both the parameters and the emulator
@@ -46,12 +52,24 @@ const BACKGROUNDS = [
         background: background,
         debug: debug || verbose
     });
+    if (playlistUrl) {
+        emulator.playlistUrl = playlistUrl;
+        await emulator.loadPlaylist();
+    }
+
+    // computes both the info and sections based on the initial
+    // state of the emulator configuration
+    const info = !playlistUrl;
+    const sections = playlistUrl ? ["Playlist"] : [];
+
     await emulator.init();
     startApp("app", {
         emulator: emulator,
         fullscreen: fullscreen,
+        info: info,
         debug: debug,
         keyboard: keyboard,
+        sections: sections,
         palette: palette,
         background: background,
         backgrounds: BACKGROUNDS
@@ -61,7 +79,8 @@ const BACKGROUNDS = [
     // to be able to access the emulator from global functions
     window.emulator = emulator;
 
-    // starts the emulator with the provided ROM URL, this is
-    // going to run the main emulator (infinite) loop
-    await emulator.start({ romUrl: romUrl });
+    // starts the emulator with the provided ROM URL, using
+    // the playlist default URL as fallback if available
+    const defaultRomUrl = romUrl ?? emulator.defaultRomUrl ?? undefined;
+    await emulator.start({ romUrl: defaultRomUrl });
 })();

@@ -89,6 +89,12 @@ If you're still facing issues try to remove the `installed` directory in the `vc
 rm -rf ~/vcpkg/installed
 ```
 
+If by the end there are still issues, you can release the "atomic bomb" by removing the whole `.vcpkg` directory:
+
+```bash
+rm -rf ~/.vcpkg
+```
+
 ## Execution
 
 ### Headless
@@ -107,3 +113,11 @@ cargo run -- --rom-path ../../res/roms/test/blargg/cpu/cpu_instrs.gb --cycles 10
 | `pedantic` | Additional safety instructions are executed to make sure the machine does no run "out of tracks", making sure to run many `panic()` calls. |
 | `slow`     | Runs the emulator at a very slow page 60x slower to allow visual debugging.                                                                |
 | `cpulog`   | Prints a log of the CPU instruction executed - will fill the stdout quickly.                                                               |
+
+### Shaders
+
+Use `--shader <SHADER>` to load a fragment shader. Example:
+
+```bash
+cargo run -- --rom-path path/to/game.gb --shader crt
+```

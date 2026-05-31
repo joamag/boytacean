@@ -17,19 +17,27 @@
 //! println!("Ran {} cycles", cycles);
 //! ```
 
-use boytacean_common::{
-    error::Error,
-    util::{read_file, SharedThread},
-};
 use std::{
     collections::VecDeque,
     fmt::{self, Display, Formatter},
     io::Read,
     sync::{Arc, Mutex},
 };
+#[cfg(feature = "wasm")]
+use std::{
+    convert::TryInto,
+    panic::{set_hook, take_hook, PanicInfo},
+};
+
+use boytacean_common::{
+    error::Error,
+    util::{read_file, SharedThread},
+};
+#[cfg(feature = "wasm")]
+use wasm_bindgen::prelude::*;
 
 use crate::{
-    apu::Apu,
+    apu::{Apu, HighPassFilter},
     cheats::{
         genie::{GameGenie, GameGenieCode},
         shark::{GameShark, GameSharkCode},
@@ -43,30 +51,22 @@ use crate::{
     pad::{Pad, PadKey},
     ppu::{
         Ppu, PpuMode, Tile, DISPLAY_HEIGHT, DISPLAY_WIDTH, FRAME_BUFFER_RGB1555_SIZE,
-        FRAME_BUFFER_RGB565_SIZE, FRAME_BUFFER_SIZE, FRAME_BUFFER_XRGB8888_SIZE,
+        FRAME_BUFFER_RGB565_SIZE, FRAME_BUFFER_RGBA_SIZE, FRAME_BUFFER_SIZE,
+        FRAME_BUFFER_XRGB8888_SIZE,
     },
     rom::{Cartridge, RamSize},
     serial::{NullDevice, Serial, SerialDevice},
     timer::Timer,
 };
-
-#[cfg(feature = "wasm")]
-use wasm_bindgen::prelude::*;
-
 #[cfg(feature = "wasm")]
 use crate::{color::Pixel, ppu::Palette};
 
-#[cfg(feature = "wasm")]
-use std::{
-    convert::TryInto,
-    panic::{set_hook, take_hook, PanicInfo},
-};
-
 /// Enumeration that describes the multiple running
-// modes of the Game Boy emulator.
-// DMG = Original Game Boy
-// CGB = Game Boy Color
-// SGB = Super Game Boy
+/// modes of the Game Boy emulator.
+///
+/// DMG = Original Game Boy
+/// CGB = Game Boy Color
+/// SGB = Super Game Boy
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum GameBoyMode {
@@ -423,8 +423,8 @@ pub struct Registers {
 }
 
 pub trait AudioProvider {
-    fn audio_output(&self) -> u8;
-    fn audio_buffer(&self) -> &VecDeque<u8>;
+    fn audio_output(&self) -> u16;
+    fn audio_buffer(&self) -> &VecDeque<i16>;
     fn clear_audio_buffer(&mut self);
 }
 
@@ -563,10 +563,25 @@ impl GameBoy {
         }
     }
 
+    /// Verifies if the provided data represents a valid Game Boy ROM.
+    ///
+    /// It is used to verify if the provided data is a valid ROM
+    /// before loading it into the Game Boy.
+    /// Preventing the loading of invalid ROMs into the Game Boy which
+    /// would cause the emulator to crash at runtime.
+    ///
+    /// This approach is not guaranteed to be 100% accurate, but it
+    /// is a good (enough) way to verify if the provided data is
+    /// a valid ROM.
     pub fn verify_rom(data: &[u8]) -> bool {
         Cartridge::from_data(data).is_ok()
     }
 
+    /// Resets the entire state of the Game Boy system,
+    /// including all its components and the CPU.
+    ///
+    /// This method ensures that the [`Ppu`], [`Apu`], [`Timer`],
+    /// [`Serial`], [`Mmu`], and [`Cpu`] are all reset to their initial states.
     pub fn reset(&mut self) {
         self.ppu().reset();
         self.apu().reset();
@@ -577,16 +592,13 @@ impl GameBoy {
         self.reset_cheats();
     }
 
+    /// Resets all the cheats currently registered in the system.
+    ///
+    /// It clears both Game Genie and GameShark cheats from the
+    /// respective cheat managers.
     pub fn reset_cheats(&mut self) {
         self.reset_game_genie();
         self.reset_game_shark();
-    }
-
-    pub fn reload(&mut self) {
-        let rom = self.rom().clone();
-        self.reset();
-        self.load(true).unwrap();
-        self.load_cartridge(rom).unwrap();
     }
 
     /// Advance the clock of the system by one tick, this will
@@ -600,6 +612,7 @@ impl GameBoy {
     /// accordingly.
     ///
     /// The amount of cycles executed by the CPU is returned.
+    #[inline(always)]
     pub fn clock(&mut self) -> u16 {
         let cycles = self.cpu_clock() as u16;
         let cycles_n = cycles / self.multiplier() as u16;
@@ -627,7 +640,7 @@ impl GameBoy {
         cycles
     }
 
-    /// Function equivalent to `clock()` but that allows pre-emptive
+    /// Function equivalent to [`clock()`][GameBoy::clock()] but that allows pre-emptive
     /// breaking of the clock cycle loop if the PC (Program Counter)
     /// reaches the provided address, making sure that in such a situation
     /// the devices are not clocked.
@@ -641,7 +654,7 @@ impl GameBoy {
         cycles
     }
 
-    /// Equivalent to `clock()` but allows the execution of multiple
+    /// Equivalent to [`clock()`][GameBoy::clock()] but allows the execution of multiple
     /// clock operations in a single call.
     pub fn clocks(&mut self, count: usize) -> u64 {
         let mut cycles = 0_u64;
@@ -693,6 +706,12 @@ impl GameBoy {
         }
     }
 
+    /// Clocks the system until the next frame is reached and returns
+    /// the amount of cycles that have been clocked.
+    ///
+    /// This function is used to clock the system until the next frame
+    /// is reached and returns the amount of cycles that have been
+    /// clocked.
     pub fn next_frame(&mut self) -> u32 {
         let mut cycles = 0u32;
         let current_frame = self.ppu_frame();
@@ -702,6 +721,13 @@ impl GameBoy {
         cycles
     }
 
+    /// Clocks the system until the Program Counter (PC) reaches the
+    /// provided address and returns the amount of cycles that have been
+    /// clocked.
+    ///
+    /// This advances the emulation step by step, accumulating the number of
+    /// cycles spent until the CPU's PC matches `addr`. Useful for precise
+    /// debugging or driving the emulator to a known execution point.
     pub fn step_to(&mut self, addr: u16) -> u32 {
         let mut cycles = 0u32;
         while self.cpu_i().pc() != addr {
@@ -710,6 +736,18 @@ impl GameBoy {
         cycles
     }
 
+    /// Clocks the peripheral devices (PPU, APU, DMA, Timer, Serial)
+    /// according to the provided cycle counts.
+    ///
+    /// The `cycles` parameter represents the raw CPU cycles executed,
+    /// while `cycles_n` represents the normalized cycles (adjusted
+    /// for the current speed multiplier).
+    /// This distinction allows for correct timing of devices that
+    /// operate at different rates relative to the CPU in Double
+    /// Speed mode (CGB).
+    ///
+    /// # Notes
+    /// This function is inline and should be optimized by the compiler.
     #[inline(always)]
     fn clock_devices(&mut self, cycles: u16, cycles_n: u16) {
         if self.ppu_enabled {
@@ -737,26 +775,32 @@ impl GameBoy {
         self.pad().key_lift(key);
     }
 
+    #[inline(always)]
     pub fn cpu_clock(&mut self) -> u8 {
         self.cpu.clock()
     }
 
+    #[inline(always)]
     pub fn ppu_clock(&mut self, cycles: u16) {
         self.ppu().clock(cycles)
     }
 
+    #[inline(always)]
     pub fn apu_clock(&mut self, cycles: u16) {
         self.apu().clock(cycles)
     }
 
+    #[inline(always)]
     pub fn dma_clock(&mut self, cycles: u16) {
         self.mmu().clock_dma(cycles);
     }
 
+    #[inline(always)]
     pub fn timer_clock(&mut self, cycles: u16) {
         self.timer().clock(cycles)
     }
 
+    #[inline(always)]
     pub fn serial_clock(&mut self, cycles: u16) {
         self.serial().clock(cycles)
     }
@@ -814,7 +858,7 @@ impl GameBoy {
         self.frame_buffer_raw().to_vec()
     }
 
-    pub fn audio_buffer_eager(&mut self, clear: bool) -> Vec<u8> {
+    pub fn audio_buffer_eager(&mut self, clear: bool) -> Vec<i16> {
         let buffer = Vec::from(self.audio_buffer().clone());
         if clear {
             self.clear_audio_buffer();
@@ -822,17 +866,17 @@ impl GameBoy {
         buffer
     }
 
-    pub fn audio_output(&self) -> u8 {
+    pub fn audio_output(&self) -> u16 {
         self.apu_i().output()
     }
 
-    pub fn audio_all_output(&self) -> Vec<u8> {
+    pub fn audio_all_output(&self) -> Vec<u16> {
         vec![
             self.audio_output(),
-            self.audio_ch1_output(),
-            self.audio_ch2_output(),
-            self.audio_ch3_output(),
-            self.audio_ch4_output(),
+            self.audio_ch1_output() as u16,
+            self.audio_ch2_output() as u16,
+            self.audio_ch3_output() as u16,
+            self.audio_ch4_output() as u16,
         ]
     }
 
@@ -853,7 +897,7 @@ impl GameBoy {
     }
 
     pub fn audio_ch1_enabled(&self) -> bool {
-        self.apu_i().ch2_out_enabled()
+        self.apu_i().ch1_out_enabled()
     }
 
     pub fn set_audio_ch1_enabled(&mut self, enabled: bool) {
@@ -1115,10 +1159,11 @@ impl GameBoy {
 
     pub fn description_debug(&self) -> String {
         format!(
-            "{}\nCPU:\n{}\nDMA:\n{}",
+            "{}\nCPU:\n{}\nDMA:\n{}\nAPU:\n{}",
             self.description(12),
             self.cpu_i().description_default(),
-            self.dma_i().description()
+            self.dma_i().description(),
+            self.apu_i().description()
         )
     }
 }
@@ -1127,11 +1172,11 @@ impl GameBoy {
 /// in mind and that do not support WASM interface of copy.
 impl GameBoy {
     /// The logic frequency of the Game Boy
-    /// CPU in hz.
+    /// CPU in Hz.
     pub const CPU_FREQ: u32 = 4194304;
 
     /// The visual frequency (refresh rate)
-    /// of the Game Boy, close to 60 hz.
+    /// of the Game Boy, close to 60 Hz.
     pub const VISUAL_FREQ: f32 = 59.7275;
 
     /// The cycles taken to run a complete frame
@@ -1154,50 +1199,62 @@ impl GameBoy {
         self.cpu.mmu_i()
     }
 
+    #[inline(always)]
     pub fn ppu(&mut self) -> &mut Ppu {
         self.cpu.ppu()
     }
 
+    #[inline(always)]
     pub fn ppu_i(&self) -> &Ppu {
         self.cpu.ppu_i()
     }
 
+    #[inline(always)]
     pub fn apu(&mut self) -> &mut Apu {
         self.cpu.apu()
     }
 
+    #[inline(always)]
     pub fn apu_i(&self) -> &Apu {
         self.cpu.apu_i()
     }
 
+    #[inline(always)]
     pub fn dma(&mut self) -> &mut Dma {
         self.cpu.dma()
     }
 
+    #[inline(always)]
     pub fn dma_i(&self) -> &Dma {
         self.cpu.dma_i()
     }
 
+    #[inline(always)]
     pub fn pad(&mut self) -> &mut Pad {
         self.cpu.pad()
     }
 
+    #[inline(always)]
     pub fn pad_i(&self) -> &Pad {
         self.cpu.pad_i()
     }
 
+    #[inline(always)]
     pub fn timer(&mut self) -> &mut Timer {
         self.cpu.timer()
     }
 
+    #[inline(always)]
     pub fn timer_i(&self) -> &Timer {
         self.cpu.timer_i()
     }
 
+    #[inline(always)]
     pub fn serial(&mut self) -> &mut Serial {
         self.cpu.serial()
     }
 
+    #[inline(always)]
     pub fn serial_i(&self) -> &Serial {
         self.cpu.serial_i()
     }
@@ -1238,11 +1295,15 @@ impl GameBoy {
         self.ppu().frame_buffer_rgb565_u16()
     }
 
+    pub fn frame_buffer_rgba(&mut self) -> [u8; FRAME_BUFFER_RGBA_SIZE] {
+        self.ppu().frame_buffer_rgba()
+    }
+
     pub fn frame_buffer_raw(&mut self) -> [u8; FRAME_BUFFER_SIZE] {
         self.ppu().frame_buffer_raw()
     }
 
-    pub fn audio_buffer(&mut self) -> &VecDeque<u8> {
+    pub fn audio_buffer(&mut self) -> &VecDeque<i16> {
         self.apu().audio_buffer()
     }
 
@@ -1252,6 +1313,23 @@ impl GameBoy {
 
     pub fn cartridge_i(&self) -> &Cartridge {
         self.mmu_i().rom_i()
+    }
+
+    /// Reloads the system by resetting the state and reloading the
+    /// current ROM (cartridge).
+    ///
+    /// This effectively restarts the emulation from the beginning,
+    /// while keeping the same cartridge loaded.
+    ///
+    /// # Notes
+    /// This function is inline and should be optimized by the compiler.
+    #[inline(always)]
+    pub fn reload(&mut self) -> Result<(), Error> {
+        let rom = self.rom().clone();
+        self.reset();
+        self.load(true)?;
+        self.load_cartridge(rom)?;
+        Ok(())
     }
 
     pub fn load(&mut self, boot: bool) -> Result<(), Error> {
@@ -1430,6 +1508,13 @@ impl GameBoy {
         }
     }
 
+    /// Loads an empty ROM into the Game Boy.
+    ///
+    /// This is useful for testing the CPU and other Game Boy
+    /// components without a ROM.
+    ///
+    /// All the ROM data will be set to 0x00 (NOP instruction),
+    /// and no MBC (ROM only) will be applied.
     pub fn load_rom_empty(&mut self) -> Result<&mut Cartridge, Error> {
         let data = [0u8; 32 * 1024];
         self.load_rom(&data, None)
@@ -1451,6 +1536,19 @@ impl GameBoy {
         self.mmu().set_speed_callback(callback);
     }
 
+    pub fn audio_filter_mode(&self) -> HighPassFilter {
+        self.apu_i().filter_mode()
+    }
+
+    pub fn set_audio_filter_mode(&mut self, mode: HighPassFilter) {
+        self.apu().set_filter_mode(mode);
+    }
+
+    /// Adds a cheat code to the Game Boy system.
+    ///
+    /// The code can be either a Game Genie or a GameShark code.
+    /// The function will detect the type of the code and add it
+    /// to the respective cheat manager.
     pub fn add_cheat_code(&mut self, code: &str) -> Result<bool, Error> {
         if GameGenie::is_code(code) {
             return self.add_game_genie_code(code).map(|_| true);
@@ -1467,7 +1565,7 @@ impl GameBoy {
         let rom = self.mmu().rom();
         if rom.game_genie().is_none() {
             let game_genie = GameGenie::default();
-            rom.attach_genie(game_genie);
+            rom.attach_genie(game_genie)?;
         }
         let game_genie = rom.game_genie_mut().as_mut().unwrap();
         game_genie.add_code(code)
@@ -1477,7 +1575,7 @@ impl GameBoy {
         let rom = self.rom();
         if rom.game_shark().is_none() {
             let game_shark = GameShark::default();
-            rom.attach_shark(game_shark);
+            rom.attach_shark(game_shark)?;
         }
         let game_shark = rom.game_shark_mut().as_mut().unwrap();
         game_shark.add_code(code)
@@ -1507,6 +1605,11 @@ impl GameBoy {
             hook_impl(info);
             prev(info);
         }));
+    }
+
+    pub fn reload_wa(&mut self) -> Result<(), String> {
+        self.reload()?;
+        Ok(())
     }
 
     pub fn load_rom_wa(&mut self, data: &[u8]) -> Result<Cartridge, String> {
@@ -1571,6 +1674,14 @@ impl GameBoy {
         self.ppu().set_palette_colors(&palette);
     }
 
+    pub fn audio_filter_mode_wa(&self) -> u8 {
+        self.apu_i().filter_mode().into()
+    }
+
+    pub fn set_audio_filter_mode_wa(&mut self, mode: u8) {
+        self.apu().set_filter_mode(mode.into());
+    }
+
     fn js_to_pixel(value: &JsValue) -> Pixel {
         value
             .as_string()
@@ -1612,11 +1723,11 @@ pub fn hook_impl(info: &PanicInfo) {
 }
 
 impl AudioProvider for GameBoy {
-    fn audio_output(&self) -> u8 {
+    fn audio_output(&self) -> u16 {
         self.apu_i().output()
     }
 
-    fn audio_buffer(&self) -> &VecDeque<u8> {
+    fn audio_buffer(&self) -> &VecDeque<i16> {
         self.apu_i().audio_buffer()
     }
 

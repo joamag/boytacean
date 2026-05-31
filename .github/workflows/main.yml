@@ -10,11 +10,12 @@ jobs:
     strategy:
       matrix:
         rust-version: [
-          "1.81.0",
-          "1.82.0",
-          "1.83.0",
-          "1.84.0",
-          "1.85.0",
+          "1.86.0",
+          "1.87.0",
+          "1.88.0",
+          "1.89.0",
+          "1.90.0",
+          "1.91.0",
           "latest"
         ]
     runs-on: ubuntu-latest
@@ -46,11 +47,12 @@ jobs:
     strategy:
       matrix:
         rust-version: [
-          "1.81.0",
-          "1.82.0",
-          "1.83.0",
-          "1.84.0",
-          "1.85.0",
+          "1.86.0",
+          "1.87.0",
+          "1.88.0",
+          "1.89.0",
+          "1.90.0",
+          "1.91.0",
           "latest"
         ]
     runs-on: ubuntu-latest
@@ -78,11 +80,10 @@ jobs:
     strategy:
       matrix:
         rust-version: [
-          "1.81.0",
-          "1.82.0",
-          "1.83.0",
-          "1.84.0",
-          "1.85.0",
+          "1.91.0",
+          "1.92.0",
+          "1.93.0",
+          "1.94.0",
           "latest"
         ]
         node-version: ["18"]
@@ -123,11 +124,12 @@ jobs:
     strategy:
       matrix:
         rust-version: [
-          "1.81.0",
-          "1.82.0",
-          "1.83.0",
-          "1.84.0",
-          "1.85.0",
+          "1.86.0",
+          "1.87.0",
+          "1.88.0",
+          "1.89.0",
+          "1.90.0",
+          "1.91.0",
           "latest"
         ]
     runs-on: ubuntu-latest
@@ -145,12 +147,21 @@ jobs:
           rustup component add clippy
       - name: Print Rust information
         run: rustc --version
+      - name: Cache SDL build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.vcpkg-root
+            ~/.cache/vcpkg
+            ~/vcpkg
+            target/vcpkg
+          key: vcpkg-${{ runner.os }}-${{ hashFiles('frontends/sdl/Cargo.toml') }}
       - name: Install SDL dependencies
         run: cd frontends/sdl && cargo install cargo-vcpkg && cargo vcpkg -v build
       - name: Verify Rust code format
         run: cd frontends/sdl && cargo fmt --all -- --check
       - name: Verify Rust code linting
-        run: cd frontends/sdl && cargo update -p half --precise 2.2.1 && cargo clippy -- -D warnings -A unknown-lints
+        run: cd frontends/sdl && cargo clippy -- -D warnings -A unknown-lints
       - name: Run unit tests
         run: cd frontends/sdl && cargo test
       - name: Run all unit tests
@@ -171,11 +182,12 @@ jobs:
     strategy:
       matrix:
         rust-version: [
-          "1.81.0",
-          "1.82.0",
-          "1.83.0",
-          "1.84.0",
-          "1.85.0",
+          "1.86.0",
+          "1.87.0",
+          "1.88.0",
+          "1.89.0",
+          "1.90.0",
+          "1.91.0",
           "latest"
         ]
     runs-on: ubuntu-latest
@@ -209,11 +221,12 @@ jobs:
     strategy:
       matrix:
         rust-version: [
-          "1.81.0",
-          "1.82.0",
-          "1.83.0",
-          "1.84.0",
-          "1.85.0",
+          "1.86.0",
+          "1.87.0",
+          "1.88.0",
+          "1.89.0",
+          "1.90.0",
+          "1.91.0",
           "latest"
         ]
     runs-on: ubuntu-latest
@@ -267,3 +280,55 @@ jobs:
           cargo build --target=aarch64-linux-android --release
           cargo build --target=armv7-linux-androideabi --release
           cargo build --target=i686-linux-android --release
+  build-docs:
+    name: Build Documentation
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        rust-image: [
+          "rust:1.86.0",
+          "rust:1.87.0",
+          "rust:1.88.0",
+          "rust:1.89.0",
+          "rust:1.90.0",
+          "rust:1.91.0",
+          "rust:latest",
+          "rustlang/rust:nightly"
+        ]
+    runs-on: ubuntu-latest
+    container: ${{ matrix.rust-image }}
+    steps:
+      - name: Checkout code from repository
+        uses: actions/checkout@v4
+      - name: Install Dependencies
+        run: |
+          apt-get update
+          apt-get install -y -q zip python3-jinja2
+      - name: Install Rust components
+        run: |
+          rustup component add rustfmt
+          rustup component add clippy
+      - name: Print Rust information
+        run: rustc --version
+      - name: Cache SDL build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.vcpkg-root
+            ~/.cache/vcpkg
+            ~/vcpkg
+            target/vcpkg
+          key: vcpkg-${{ runner.os }}-${{ hashFiles('frontends/sdl/Cargo.toml') }}
+      - name: Install SDL dependencies
+        run: cd frontends/sdl && cargo install cargo-vcpkg && cargo vcpkg -v build
+      - name: Verify Rust code format
+        run: cd frontends/sdl && cargo fmt --all -- --check
+      - name: Verify Rust code linting
+        run: cd frontends/sdl && cargo clippy -- -D warnings -A unknown-lints
+      - name: Build documentation
+        run: cargo doc --all
+      - name: Build all documentation
+        run: cargo doc --all --all-features
+        env:
+          PYO3_USE_ABI3_FORWARD_COMPATIBILITY: 1
+        if: matrix.rust-image == 'rustlang/rust:nightly'

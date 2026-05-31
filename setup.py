@@ -27,14 +27,14 @@ except ImportError:
 
 setuptools.setup(
     name="boytacean",
-    version="0.11.5",
+    version="0.12.0",
     author="João Magalhães",
     author_email="joamag@gmail.com",
     description="A Game Boy emulator that is written in Rust",
     license="Apache License, Version 2.0",
     keywords="gameboy emulator rust",
     url="https://boytacean.joao.me",
-    packages=["boytacean"],
+    packages=setuptools.find_packages(where=os.path.normpath("src/python")),
     test_suite="boytacean.test",
     package_dir={"": os.path.normpath("src/python")},
     rust_extensions=[
@@ -42,6 +42,7 @@ setuptools.setup(
             "boytacean.boytacean",
             binding=setuptools_rust.Binding.PyO3,
             features=["python"],
+            debug=False,
         )
     ],
     install_requires=[],

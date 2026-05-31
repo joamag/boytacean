@@ -108,6 +108,7 @@ pub fn run_image_test(
 
 #[cfg(test)]
 mod tests {
+    use super::{run_serial_test, run_step_test, TestOptions};
     use crate::{
         consts::{
             BGP_ADDR, DIV_ADDR, DMA_ADDR, IF_ADDR, LCDC_ADDR, LYC_ADDR, LY_ADDR, OBP0_ADDR,
@@ -119,8 +120,6 @@ mod tests {
         licensee::Licensee,
         rom::{RamSize, Region, RomSize},
     };
-
-    use super::{run_serial_test, run_step_test, TestOptions};
 
     #[test]
     fn test_boot_state() {
@@ -157,8 +156,8 @@ mod tests {
         assert_eq!(result.ppu().read(BGP_ADDR), 0xfc);
         assert_eq!(result.ppu().read(OBP0_ADDR), 0x00);
         assert_eq!(result.ppu().read(OBP1_ADDR), 0x00);
-        assert_eq!(result.ppu().read(WX_ADDR), 0x00);
         assert_eq!(result.ppu().read(WY_ADDR), 0x00);
+        assert_eq!(result.ppu().read(WX_ADDR), 0x00);
 
         assert_eq!(result.ppu().read(DMA_ADDR), 0xff);
     }

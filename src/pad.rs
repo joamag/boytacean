@@ -5,18 +5,18 @@ use std::{
     io::Cursor,
 };
 
-use crate::{
-    mmu::BusComponent,
-    state::{StateComponent, StateFormat},
-    warnln,
-};
-
 use boytacean_common::{
     data::{read_u8, write_u8},
     error::Error,
 };
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
+
+use crate::{
+    mmu::BusComponent,
+    state::{StateComponent, StateFormat},
+    warnln,
+};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum PadSelection {
@@ -282,9 +282,8 @@ impl Default for Pad {
 
 #[cfg(test)]
 mod tests {
-    use crate::state::StateComponent;
-
     use super::{Pad, PadSelection};
+    use crate::state::StateComponent;
 
     #[test]
     fn test_state_and_set_state() {

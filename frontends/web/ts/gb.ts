@@ -40,6 +40,7 @@ import {
     DebugAudio,
     DebugGeneral,
     DebugSettings,
+    GamePlaylist,
     HelpFaqs,
     HelpKeyboard,
     SerialSection,
@@ -47,6 +48,7 @@ import {
 } from "../react";
 
 import { PALETTES, PALETTES_MAP } from "./palettes";
+import { fetchPlaylist, Playlist } from "./playlist";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 declare const require: any;
@@ -165,9 +167,52 @@ export class GameboyEmulator extends EmulatorLogic implements Emulator {
      */
     private clockFrame: ClockFrame | null = null;
 
+    /**
+     * The URL of the JSON playlist file to be loaded
+     * remotely, if not set the playlist feature is disabled.
+     */
+    private _playlistUrl: string | null = null;
+
+    /**
+     * The cached playlist structure that has been loaded
+     * from the remote URL, avoiding redundant fetches.
+     */
+    private _playlist: Playlist | null = null;
+
     constructor(extraSettings = {}) {
         super();
         this.extraSettings = extraSettings;
+    }
+
+    get playlistUrl(): string | null {
+        return this._playlistUrl;
+    }
+
+    set playlistUrl(value: string | null) {
+        this._playlistUrl = value;
+        this._playlist = null;
+    }
+
+    /**
+     * The default ROM URL from the loaded playlist, if
+     * available. Used to boot the initial ROM when a
+     * playlist is provided.
+     */
+    get defaultRomUrl(): string | null {
+        return this._playlist?.defaultUrl ?? null;
+    }
+
+    /**
+     * Loads the playlist from the remote URL and caches
+     * it for subsequent usage in the playlist section.
+     */
+    async loadPlaylist() {
+        if (!this._playlistUrl) return;
+        try {
+            this._playlist = await fetchPlaylist(this._playlistUrl);
+        } catch (err) {
+            this.logger.error(`Failed to load playlist (${err})`);
+        }
     }
 
     /**
@@ -485,6 +530,17 @@ export class GameboyEmulator extends EmulatorLogic implements Emulator {
                 node: SerialSection({ emulator: this })
             }
         ];
+        if (this._playlistUrl) {
+            _sections.push({
+                name: "Playlist",
+                icon: require("../res/playlist.svg"),
+                node: GamePlaylist({
+                    entries: this._playlist?.entries ?? [],
+                    playlist: this._playlist ?? undefined,
+                    emulator: this
+                })
+            });
+        }
         if (process.env.NODE_ENV === "development") {
             _sections.push({
                 name: "Test",
@@ -927,6 +983,38 @@ export class GameboyEmulator extends EmulatorLogic implements Emulator {
         const palette = PALETTES[this.paletteIndex];
         this.gameBoy?.set_palette_colors_wa(palette.colors);
         this.storeSettings();
+    }
+
+    /**
+     * Shows the game playlist modal overlay allowing the
+     * user to search and select a ROM from the playlist.
+     */
+    async showPlaylist() {
+        if (!this._playlistUrl) return;
+
+        // fetches the playlist from the remote URL in case
+        // it has not been cached yet, avoiding redundant requests
+        if (!this._playlist) {
+            try {
+                this._playlist = await fetchPlaylist(this._playlistUrl);
+            } catch (err) {
+                this.handlers.showToast?.("Failed to load the playlist!", true);
+                this.logger.error(`Failed to load playlist (${err})`);
+                return;
+            }
+        }
+
+        // shows the playlist modal with the game entries
+        // allowing the user to search and select a ROM
+        await this.handlers.showModal?.(
+            this._playlist.name ?? "Game Playlist",
+            undefined,
+            GamePlaylist({
+                entries: this._playlist.entries,
+                playlist: this._playlist,
+                emulator: this
+            })
+        );
     }
 
     private static async fetchRom(

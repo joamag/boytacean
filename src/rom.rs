@@ -3,13 +3,16 @@
 //! Includes the implementation of the Memory Bank Controllers (MBCs)
 //! that are used to handle the memory access for the cartridge.
 
-use boytacean_common::{error::Error, util::read_file};
 use core::fmt;
 use std::{
     cmp::max,
     fmt::{Display, Formatter},
     vec,
 };
+
+use boytacean_common::{error::Error, util::read_file};
+#[cfg(feature = "wasm")]
+use wasm_bindgen::prelude::*;
 
 use crate::{
     cheats::{genie::GameGenie, shark::GameShark},
@@ -19,9 +22,6 @@ use crate::{
     mmu::BusComponent,
     panic_gb, warnln,
 };
-
-#[cfg(feature = "wasm")]
-use wasm_bindgen::prelude::*;
 
 pub const ROM_BANK_SIZE: usize = 16384;
 pub const RAM_BANK_SIZE: usize = 8192;
@@ -324,9 +324,10 @@ impl Display for CgbMode {
 }
 
 /// Structure that defines the ROM and ROM contents
-/// of a Game Boy cartridge. Should correctly address
-/// the specifics of all the major MBCs (Memory Bank
-/// Controllers).
+/// of a Game Boy cartridge.
+///
+/// Should correctly address the specifics of all the
+/// major MBCs (Memory Bank Controllers).
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 #[derive(Clone)]
 pub struct Cartridge {
@@ -549,6 +550,49 @@ impl Cartridge {
         )
     }
 
+    pub fn attach_genie(&mut self, game_genie: GameGenie) -> Result<(), Error> {
+        self.game_genie = Some(game_genie);
+        self.handler = &GAME_GENIE;
+        Ok(())
+    }
+
+    pub fn detach_genie(&mut self) -> Result<(), Error> {
+        self.game_genie = None;
+        self.handler = self.mbc;
+        Ok(())
+    }
+
+    pub fn attach_shark(&mut self, game_shark: GameShark) -> Result<(), Error> {
+        let rom_type = self.rom_type();
+        self.game_shark = Some(game_shark);
+        self.game_shark
+            .as_mut()
+            .ok_or(Error::CustomError(String::from("GameShark not attached")))?
+            .set_rom_type(rom_type);
+        Ok(())
+    }
+
+    pub fn detach_shark(&mut self) -> Result<(), Error> {
+        self.game_shark = None;
+        Ok(())
+    }
+
+    pub fn rom_data(&self) -> &Vec<u8> {
+        &self.rom_data
+    }
+
+    pub fn rom_data_mut(&mut self) -> &mut Vec<u8> {
+        &mut self.rom_data
+    }
+
+    pub fn ram_data(&self) -> &Vec<u8> {
+        &self.ram_data
+    }
+
+    pub fn ram_data_mut(&mut self) -> &mut Vec<u8> {
+        &mut self.ram_data
+    }
+
     pub fn ram_enabled(&self) -> bool {
         self.ram_enabled
     }
@@ -587,7 +631,7 @@ impl Cartridge {
         self.rom_offset = 0x4000;
         self.ram_offset = 0x0000;
         self.set_mbc()?;
-        self.set_computed();
+        self.set_computed(true);
         self.set_title_offset();
         self.allocate_ram();
         self.set_rom_bank(1);
@@ -601,8 +645,28 @@ impl Cartridge {
         Ok(())
     }
 
-    fn set_computed(&mut self) {
-        self.rom_bank_count = self.rom_size().rom_banks();
+    fn set_computed(&mut self, fix: bool) {
+        let mut rom_banks = self.rom_size().rom_banks();
+
+        // in case the fix flag is set we'll check the length of the ROM
+        // data to try to infer the number of ROM banks, this will allow
+        // us to circumvent some bugs in the header of ROMs, which is common
+        // especially in the Homebrew ROM scene
+        if fix {
+            let header_rom_banks = rom_banks;
+            let actual_rom_banks = (self.rom_data.len() / ROM_BANK_SIZE) as u16;
+            rom_banks = max(header_rom_banks, actual_rom_banks);
+            rom_banks = rom_banks.next_power_of_two();
+            if actual_rom_banks > header_rom_banks && header_rom_banks > 0 {
+                warnln!(
+                    "ROM header declares {} banks but file contains {} banks, using actual size",
+                    header_rom_banks,
+                    actual_rom_banks
+                );
+            }
+        }
+
+        self.rom_bank_count = rom_banks;
         self.ram_bank_count = self.ram_size().ram_banks();
     }
 
@@ -654,6 +718,8 @@ impl Cartridge {
         self.game_shark = game_shark;
     }
 
+    /// Allocates the RAM data for the cartridge based on the
+    /// the number of RAM banks (of 8KB) that are defined in the ROM.
     fn allocate_ram(&mut self) {
         let ram_banks = max(self.ram_size().ram_banks(), 1);
         self.ram_data = vec![0u8; ram_banks as usize * RAM_BANK_SIZE];
@@ -675,6 +741,9 @@ impl Cartridge {
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 impl Cartridge {
     pub fn title(&self) -> String {
+        if self.title_offset < 0x0134 || self.rom_data.len() < self.title_offset {
+            return String::new();
+        }
         String::from(
             std::str::from_utf8(&self.rom_data[0x0134..self.title_offset])
                 .unwrap_or("")
@@ -854,26 +923,6 @@ impl Cartridge {
         self.ram_data = vec![0u8; self.ram_data.len()];
     }
 
-    pub fn attach_genie(&mut self, game_genie: GameGenie) {
-        self.game_genie = Some(game_genie);
-        self.handler = &GAME_GENIE;
-    }
-
-    pub fn detach_genie(&mut self) {
-        self.game_genie = None;
-        self.handler = self.mbc;
-    }
-
-    pub fn attach_shark(&mut self, game_shark: GameShark) {
-        let rom_type = self.rom_type();
-        self.game_shark = Some(game_shark);
-        self.game_shark.as_mut().unwrap().set_rom_type(rom_type);
-    }
-
-    pub fn detach_shark(&mut self) {
-        self.game_shark = None;
-    }
-
     pub fn checksum(&self) -> u8 {
         let mut sum: u8 = 0;
         for i in 0x0134..=0x014c {
@@ -914,24 +963,6 @@ impl Cartridge {
     }
 }
 
-impl Cartridge {
-    pub fn rom_data(&self) -> &Vec<u8> {
-        &self.rom_data
-    }
-
-    pub fn rom_data_mut(&mut self) -> &mut Vec<u8> {
-        &mut self.rom_data
-    }
-
-    pub fn ram_data(&self) -> &Vec<u8> {
-        &self.ram_data
-    }
-
-    pub fn ram_data_mut(&mut self) -> &mut Vec<u8> {
-        &mut self.ram_data
-    }
-}
-
 impl BusComponent for Cartridge {
     fn read(&self, addr: u16) -> u8 {
         self.read(addr)
@@ -954,6 +985,14 @@ impl Display for Cartridge {
     }
 }
 
+/// Definition of a Memory Bank Controller (MBC) that
+/// handles the ROM and RAM access for a given cartridge.
+///
+/// Each MBC defines functions for reading and writing
+/// both ROM and RAM areas of the cartridge.
+///
+/// This strategy allows dynamic dispatch of the memory
+/// access functions based on the MBC type of the cartridge.
 pub struct Mbc {
     pub name: &'static str,
     pub read_rom: fn(rom: &Cartridge, addr: u16) -> u8,
@@ -1007,7 +1046,7 @@ pub static MBC1: Mbc = Mbc {
             // 0x2000-0x3FFF - ROM bank selection 5 lower bits
             0x2000..=0x3fff => {
                 let mut rom_bank = value as u16 & 0x1f;
-                rom_bank &= rom.rom_bank_count * 2 - 1;
+                rom_bank &= rom.rom_bank_count - 1;
                 if rom_bank == 0 {
                     rom_bank = 1;
                 }
@@ -1074,7 +1113,7 @@ pub static MBC2: Mbc = Mbc {
                     rom.ram_enabled = (value & 0x0f) == 0x0a;
                 } else {
                     let mut rom_bank = value as u16 & 0x0f;
-                    rom_bank &= rom.rom_bank_count * 2 - 1;
+                    rom_bank &= rom.rom_bank_count - 1;
                     if rom_bank == 0 {
                         rom_bank = 1;
                     }
@@ -1145,7 +1184,7 @@ pub static MBC3: Mbc = Mbc {
             // 0x2000-0x3FFF - ROM bank selection
             0x2000..=0x3fff => {
                 let mut rom_bank = value as u16 & 0x7f;
-                rom_bank &= rom.rom_bank_count * 2 - 1;
+                rom_bank &= rom.rom_bank_count - 1;
                 if rom_bank == 0 {
                     rom_bank = 1;
                 }
@@ -1307,5 +1346,11 @@ mod tests {
 
         rom.set_rom_type(RomType::Mbc1).unwrap();
         assert!(!rom.has_rumble());
+    }
+
+    #[test]
+    fn test_title_empty_when_unloaded() {
+        let rom = Cartridge::new();
+        assert_eq!(rom.title(), "");
     }
 }
