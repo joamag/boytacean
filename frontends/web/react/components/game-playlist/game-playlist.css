@@ -44,6 +44,7 @@
     flex-direction: column;
     max-height: 312px;
     overflow-y: auto;
+    gap: 8px;
 }
 
 .game-playlist > .game-playlist-list > .game-playlist-empty {
@@ -74,6 +75,10 @@
 }
 
 .game-playlist > .game-playlist-list > .game-playlist-entry:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.game-playlist > .game-playlist-list > .game-playlist-entry.selected {
     background-color: rgba(255, 255, 255, 0.1);
 }
 
