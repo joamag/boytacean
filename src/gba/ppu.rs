@@ -633,8 +633,9 @@ impl GbaPpu {
     ) {
         let backdrop = self.read_palette_color(palette, 0);
 
-        // collect per-pixel BG colors: [bg_index] -> Option<(color, priority)>
-        let mut bg_pixels: [[(u16, u8); DISPLAY_WIDTH]; 4] = [[(0, 255); DISPLAY_WIDTH]; 4];
+        // collect per-pixel BG colors: [bg_index] -> (color, priority),
+        // only meaningful where the matching bg_has_pixel entry is set
+        let mut bg_pixels: [[(u16, u8); DISPLAY_WIDTH]; 4] = [[(0, 0); DISPLAY_WIDTH]; 4];
         let mut bg_has_pixel: [[bool; DISPLAY_WIDTH]; 4] = [[false; DISPLAY_WIDTH]; 4];
 
         for &(bg_index, bg_type, affine_index) in bg_layers {
@@ -701,6 +702,21 @@ impl GbaPpu {
         }
 
         let mut line_buffer = [backdrop; DISPLAY_WIDTH];
+
+        // fast path: with a single BG layer, no OBJ pixels, no windows
+        // and no color effects there is nothing to compose per pixel,
+        // the BG row is simply laid over the backdrop
+        let obj_any = obj_has_pixel.iter().any(|&has| has);
+        if !use_windows && !obj_any && blend_mode == BlendMode::None && active_bg_count == 1 {
+            let bg_index = active_bgs[0];
+            for x in 0..DISPLAY_WIDTH {
+                if bg_has_pixel[bg_index][x] {
+                    line_buffer[x] = bg_pixels[bg_index][x].0;
+                }
+            }
+            self.write_line_buffer(line, &line_buffer);
+            return;
+        }
 
         for x in 0..DISPLAY_WIDTH {
             let win_mask = if use_windows {
@@ -2446,6 +2462,39 @@ mod tests {
         assert_eq!(fb[0], 0xF8); // R
         assert_eq!(fb[1], 0x00); // G
         assert_eq!(fb[2], 0x00); // B
+    }
+
+    #[test]
+    fn test_render_single_bg_backdrop_fast_path() {
+        let mut ppu = GbaPpu::new();
+        // mode 4, BG2 enabled only (no OBJ, windows or blending),
+        // taking the single layer composition fast path
+        ppu.set_dispcnt(0x0404);
+
+        let mut vram = vec![0u8; 0x18000];
+        let mut palette = vec![0u8; 0x400];
+        let oam = vec![0u8; 0x400];
+
+        // set backdrop to red
+        let red: u16 = 0x001F;
+        palette[0] = (red & 0xFF) as u8;
+        palette[1] = ((red >> 8) & 0xFF) as u8;
+
+        // palette index 5 = green, used by the pixel at (1, 0);
+        // pixel at (0, 0) keeps index 0 (transparent)
+        let green: u16 = 0x03E0;
+        palette[5 * 2] = (green & 0xFF) as u8;
+        palette[5 * 2 + 1] = ((green >> 8) & 0xFF) as u8;
+        vram[1] = 5;
+
+        ppu.clock(VISIBLE_DOTS, &vram, &palette, &oam);
+
+        // transparent pixel shows the backdrop, opaque pixel the BG color
+        let fb = ppu.frame_buffer();
+        assert_eq!(fb[0], 0xF8); // R (backdrop)
+        assert_eq!(fb[1], 0x00); // G
+        assert_eq!(fb[3], 0x00); // R
+        assert_eq!(fb[4], 0xF8); // G (bg pixel)
     }
 
     #[test]

@@ -26,7 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-*
+* Major GBA emulation performance improvements across memory access, idle CPU handling, audio and video rendering
 
 ### Fixed
 

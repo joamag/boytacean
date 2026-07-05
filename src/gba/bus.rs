@@ -36,22 +36,22 @@ const BIOS_SIZE: usize = 0x4000;
 
 pub struct GbaBus {
     /// BIOS memory (16KB, contains HLE stubs for IRQ handler etc.)
-    pub bios: Vec<u8>,
+    pub bios: Box<[u8; BIOS_SIZE]>,
 
     /// external work RAM (256KB)
-    pub ewram: Vec<u8>,
+    pub ewram: Box<[u8; EWRAM_SIZE]>,
 
     /// internal work RAM (32KB)
-    pub iwram: Vec<u8>,
+    pub iwram: Box<[u8; IWRAM_SIZE]>,
 
     /// palette RAM (1KB)
-    pub palette: Vec<u8>,
+    pub palette: Box<[u8; PALETTE_SIZE]>,
 
     /// video RAM (96KB)
-    pub vram: Vec<u8>,
+    pub vram: Box<[u8; VRAM_SIZE]>,
 
     /// OAM - object attribute memory (1KB)
-    pub oam: Vec<u8>,
+    pub oam: Box<[u8; OAM_SIZE]>,
 
     /// cartridge ROM data
     pub rom: Vec<u8>,
@@ -100,15 +100,20 @@ pub struct GbaBus {
     pub use_real_bios: bool,
 }
 
+/// allocates a zeroed fixed-size byte array directly on the heap
+fn boxed_array<const N: usize>() -> Box<[u8; N]> {
+    vec![0u8; N].into_boxed_slice().try_into().unwrap()
+}
+
 impl GbaBus {
     pub fn new() -> Self {
         let mut bus = Self {
-            bios: vec![0u8; BIOS_SIZE],
-            ewram: vec![0u8; EWRAM_SIZE],
-            iwram: vec![0u8; IWRAM_SIZE],
-            palette: vec![0u8; PALETTE_SIZE],
-            vram: vec![0u8; VRAM_SIZE],
-            oam: vec![0u8; OAM_SIZE],
+            bios: boxed_array(),
+            ewram: boxed_array(),
+            iwram: boxed_array(),
+            palette: boxed_array(),
+            vram: boxed_array(),
+            oam: boxed_array(),
             rom: Vec::new(),
             save: SaveMedia::new(),
             ppu: GbaPpu::new(),
@@ -210,11 +215,12 @@ impl GbaBus {
     }
 
     // 8-bit read
+    #[inline(always)]
     pub fn read8(&mut self, addr: u32) -> u8 {
         match addr >> 24 {
             0x00 => {
                 let offset = (addr & 0x3FFF) as usize;
-                if self.bios_readable && offset < self.bios.len() {
+                if self.bios_readable {
                     self.bios[offset]
                 } else {
                     (self.bios_value >> ((addr & 3) * 8)) as u8
@@ -230,7 +236,9 @@ impl GbaBus {
             }
             0x07 => self.oam[(addr & 0x3FF) as usize],
             0x08..=0x0D => {
-                if self.save.is_eeprom_addr(addr) {
+                // eeprom only ever maps into the 0x0D region, gate on it
+                // before the (more expensive) save media address check
+                if (addr >> 24) == 0x0D && self.save.is_eeprom_addr(addr) {
                     self.save.eeprom_read() as u8
                 } else {
                     let offset = (addr & 0x01FFFFFF) as usize;
@@ -250,45 +258,48 @@ impl GbaBus {
     }
 
     // 16-bit read (aligned)
+    #[inline(always)]
     pub fn read16(&mut self, addr: u32) -> u16 {
         let addr = addr & !1;
         match addr >> 24 {
             0x00 => {
-                let offset = (addr & 0x3FFF) as usize;
-                if self.bios_readable && offset + 1 < self.bios.len() {
-                    u16::from_le_bytes([self.bios[offset], self.bios[offset + 1]])
+                let offset = (addr & 0x3FFE) as usize;
+                if self.bios_readable {
+                    u16::from_le_bytes(self.bios[offset..offset + 2].try_into().unwrap())
                 } else {
                     (self.bios_value >> ((addr & 2) * 8)) as u16
                 }
             }
             0x02 => {
-                let offset = (addr & 0x3FFFF) as usize;
-                u16::from_le_bytes([self.ewram[offset], self.ewram[offset + 1]])
+                let offset = (addr & 0x3FFFE) as usize;
+                u16::from_le_bytes(self.ewram[offset..offset + 2].try_into().unwrap())
             }
             0x03 => {
-                let offset = (addr & 0x7FFF) as usize;
-                u16::from_le_bytes([self.iwram[offset], self.iwram[offset + 1]])
+                let offset = (addr & 0x7FFE) as usize;
+                u16::from_le_bytes(self.iwram[offset..offset + 2].try_into().unwrap())
             }
             0x04 => self.read_io16(addr),
             0x05 => {
-                let offset = (addr & 0x3FF) as usize;
-                u16::from_le_bytes([self.palette[offset], self.palette[offset + 1]])
+                let offset = (addr & 0x3FE) as usize;
+                u16::from_le_bytes(self.palette[offset..offset + 2].try_into().unwrap())
             }
             0x06 => {
                 let offset = self.mirror_vram(addr);
-                u16::from_le_bytes([self.vram[offset], self.vram[offset + 1]])
+                u16::from_le_bytes(self.vram[offset..offset + 2].try_into().unwrap())
             }
             0x07 => {
-                let offset = (addr & 0x3FF) as usize;
-                u16::from_le_bytes([self.oam[offset], self.oam[offset + 1]])
+                let offset = (addr & 0x3FE) as usize;
+                u16::from_le_bytes(self.oam[offset..offset + 2].try_into().unwrap())
             }
             0x08..=0x0D => {
-                if self.save.is_eeprom_addr(addr) {
+                // eeprom only ever maps into the 0x0D region, gate on it
+                // before the (more expensive) save media address check
+                if (addr >> 24) == 0x0D && self.save.is_eeprom_addr(addr) {
                     self.save.eeprom_read()
                 } else {
                     let offset = (addr & 0x01FFFFFF) as usize;
-                    if offset + 1 < self.rom.len() {
-                        u16::from_le_bytes([self.rom[offset], self.rom[offset + 1]])
+                    if let Some(bytes) = self.rom.get(offset..offset + 2) {
+                        u16::from_le_bytes(bytes.try_into().unwrap())
                     } else {
                         // open bus: 16-bit ROM bus returns halfword address
                         ((addr / 2) & 0xFFFF) as u16
@@ -305,39 +316,25 @@ impl GbaBus {
     }
 
     // 32-bit read (aligned)
+    #[inline(always)]
     pub fn read32(&mut self, addr: u32) -> u32 {
         let addr = addr & !3;
         match addr >> 24 {
             0x00 => {
-                let offset = (addr & 0x3FFF) as usize;
-                if self.bios_readable && offset + 3 < self.bios.len() {
-                    u32::from_le_bytes([
-                        self.bios[offset],
-                        self.bios[offset + 1],
-                        self.bios[offset + 2],
-                        self.bios[offset + 3],
-                    ])
+                let offset = (addr & 0x3FFC) as usize;
+                if self.bios_readable {
+                    u32::from_le_bytes(self.bios[offset..offset + 4].try_into().unwrap())
                 } else {
                     self.bios_value
                 }
             }
             0x02 => {
-                let offset = (addr & 0x3FFFF) as usize;
-                u32::from_le_bytes([
-                    self.ewram[offset],
-                    self.ewram[offset + 1],
-                    self.ewram[offset + 2],
-                    self.ewram[offset + 3],
-                ])
+                let offset = (addr & 0x3FFFC) as usize;
+                u32::from_le_bytes(self.ewram[offset..offset + 4].try_into().unwrap())
             }
             0x03 => {
-                let offset = (addr & 0x7FFF) as usize;
-                u32::from_le_bytes([
-                    self.iwram[offset],
-                    self.iwram[offset + 1],
-                    self.iwram[offset + 2],
-                    self.iwram[offset + 3],
-                ])
+                let offset = (addr & 0x7FFC) as usize;
+                u32::from_le_bytes(self.iwram[offset..offset + 4].try_into().unwrap())
             }
             0x04 => {
                 let lo = self.read_io16(addr) as u32;
@@ -345,44 +342,26 @@ impl GbaBus {
                 lo | (hi << 16)
             }
             0x05 => {
-                let offset = (addr & 0x3FF) as usize;
-                u32::from_le_bytes([
-                    self.palette[offset],
-                    self.palette[offset + 1],
-                    self.palette[offset + 2],
-                    self.palette[offset + 3],
-                ])
+                let offset = (addr & 0x3FC) as usize;
+                u32::from_le_bytes(self.palette[offset..offset + 4].try_into().unwrap())
             }
             0x06 => {
                 let offset = self.mirror_vram(addr);
-                u32::from_le_bytes([
-                    self.vram[offset],
-                    self.vram[offset + 1],
-                    self.vram[offset + 2],
-                    self.vram[offset + 3],
-                ])
+                u32::from_le_bytes(self.vram[offset..offset + 4].try_into().unwrap())
             }
             0x07 => {
-                let offset = (addr & 0x3FF) as usize;
-                u32::from_le_bytes([
-                    self.oam[offset],
-                    self.oam[offset + 1],
-                    self.oam[offset + 2],
-                    self.oam[offset + 3],
-                ])
+                let offset = (addr & 0x3FC) as usize;
+                u32::from_le_bytes(self.oam[offset..offset + 4].try_into().unwrap())
             }
             0x08..=0x0D => {
-                if self.save.is_eeprom_addr(addr) {
+                // eeprom only ever maps into the 0x0D region, gate on it
+                // before the (more expensive) save media address check
+                if (addr >> 24) == 0x0D && self.save.is_eeprom_addr(addr) {
                     self.save.eeprom_read() as u32
                 } else {
                     let offset = (addr & 0x01FFFFFF) as usize;
-                    if offset + 3 < self.rom.len() {
-                        u32::from_le_bytes([
-                            self.rom[offset],
-                            self.rom[offset + 1],
-                            self.rom[offset + 2],
-                            self.rom[offset + 3],
-                        ])
+                    if let Some(bytes) = self.rom.get(offset..offset + 4) {
+                        u32::from_le_bytes(bytes.try_into().unwrap())
                     } else {
                         // open bus: two consecutive halfword addresses
                         let hw0 = (addr / 2) & 0xFFFF;
@@ -401,6 +380,7 @@ impl GbaBus {
     }
 
     // 8-bit write
+    #[inline(always)]
     pub fn write8(&mut self, addr: u32, value: u8) {
         match addr >> 24 {
             0x02 => self.ewram[(addr & 0x3FFFF) as usize] = value,
@@ -436,36 +416,32 @@ impl GbaBus {
     }
 
     // 16-bit write (aligned)
+    #[inline(always)]
     pub fn write16(&mut self, addr: u32, value: u16) {
         let raw_addr = addr;
         let addr = addr & !1;
         let bytes = value.to_le_bytes();
         match addr >> 24 {
             0x02 => {
-                let offset = (addr & 0x3FFFF) as usize;
-                self.ewram[offset] = bytes[0];
-                self.ewram[offset + 1] = bytes[1];
+                let offset = (addr & 0x3FFFE) as usize;
+                self.ewram[offset..offset + 2].copy_from_slice(&bytes);
             }
             0x03 => {
-                let offset = (addr & 0x7FFF) as usize;
-                self.iwram[offset] = bytes[0];
-                self.iwram[offset + 1] = bytes[1];
+                let offset = (addr & 0x7FFE) as usize;
+                self.iwram[offset..offset + 2].copy_from_slice(&bytes);
             }
             0x04 => self.write_io16(addr, value),
             0x05 => {
-                let offset = (addr & 0x3FF) as usize;
-                self.palette[offset] = bytes[0];
-                self.palette[offset + 1] = bytes[1];
+                let offset = (addr & 0x3FE) as usize;
+                self.palette[offset..offset + 2].copy_from_slice(&bytes);
             }
             0x06 => {
                 let offset = self.mirror_vram(addr);
-                self.vram[offset] = bytes[0];
-                self.vram[offset + 1] = bytes[1];
+                self.vram[offset..offset + 2].copy_from_slice(&bytes);
             }
             0x07 => {
-                let offset = (addr & 0x3FF) as usize;
-                self.oam[offset] = bytes[0];
-                self.oam[offset + 1] = bytes[1];
+                let offset = (addr & 0x3FE) as usize;
+                self.oam[offset..offset + 2].copy_from_slice(&bytes);
             }
             0x08..=0x0D if self.save.is_eeprom_addr(raw_addr) => {
                 self.save.eeprom_write(value);
@@ -481,17 +457,18 @@ impl GbaBus {
     }
 
     // 32-bit write (aligned)
+    #[inline(always)]
     pub fn write32(&mut self, addr: u32, value: u32) {
         let raw_addr = addr;
         let addr = addr & !3;
         let bytes = value.to_le_bytes();
         match addr >> 24 {
             0x02 => {
-                let offset = (addr & 0x3FFFF) as usize;
+                let offset = (addr & 0x3FFFC) as usize;
                 self.ewram[offset..offset + 4].copy_from_slice(&bytes);
             }
             0x03 => {
-                let offset = (addr & 0x7FFF) as usize;
+                let offset = (addr & 0x7FFC) as usize;
                 self.iwram[offset..offset + 4].copy_from_slice(&bytes);
             }
             0x04 => {
@@ -499,7 +476,7 @@ impl GbaBus {
                 self.write_io16(addr + 2, (value >> 16) as u16);
             }
             0x05 => {
-                let offset = (addr & 0x3FF) as usize;
+                let offset = (addr & 0x3FC) as usize;
                 self.palette[offset..offset + 4].copy_from_slice(&bytes);
             }
             0x06 => {
@@ -507,7 +484,7 @@ impl GbaBus {
                 self.vram[offset..offset + 4].copy_from_slice(&bytes);
             }
             0x07 => {
-                let offset = (addr & 0x3FF) as usize;
+                let offset = (addr & 0x3FC) as usize;
                 self.oam[offset..offset + 4].copy_from_slice(&bytes);
             }
             0x0E..=0x0F => {
@@ -521,6 +498,7 @@ impl GbaBus {
     }
 
     /// mirrors VRAM address (96KB total: 64KB + 32KB mirrored)
+    #[inline(always)]
     fn mirror_vram(&self, addr: u32) -> usize {
         let offset = (addr & 0x1FFFF) as usize;
         if offset >= VRAM_SIZE {
@@ -532,7 +510,7 @@ impl GbaBus {
 
     // I/O register reads
 
-    fn read_io8(&self, addr: u32) -> u8 {
+    fn read_io8(&mut self, addr: u32) -> u8 {
         let value = self.read_io16(addr & !1);
         if addr & 1 == 0 {
             value as u8
@@ -541,7 +519,7 @@ impl GbaBus {
         }
     }
 
-    fn read_io16(&self, addr: u32) -> u16 {
+    fn read_io16(&mut self, addr: u32) -> u16 {
         match addr {
             REG_DISPCNT => self.ppu.dispcnt(),
             REG_DISPSTAT => self.ppu.dispstat(),
@@ -560,9 +538,18 @@ impl GbaBus {
             REG_IF => self.irq.if_(),
             REG_IME => self.irq.ime() as u16,
             REG_WAITCNT => self.waitcnt,
-            REG_SOUNDCNT_L => self.apu.soundcnt_l(),
-            REG_SOUNDCNT_H => self.apu.soundcnt_h(),
-            REG_SOUNDCNT_X => self.apu.soundcnt_x(),
+            REG_SOUNDCNT_L => {
+                self.apu.flush();
+                self.apu.soundcnt_l()
+            }
+            REG_SOUNDCNT_H => {
+                self.apu.flush();
+                self.apu.soundcnt_h()
+            }
+            REG_SOUNDCNT_X => {
+                self.apu.flush();
+                self.apu.soundcnt_x()
+            }
             REG_SOUNDBIAS => self.apu.soundbias(),
             REG_TM0CNT_L => self.timers.timers[0].counter(),
             REG_TM0CNT_H => self.timers.timers[0].control(),
@@ -581,11 +568,13 @@ impl GbaBus {
                 let io_offset = addr & 0x3FF;
                 if (0x60..=0x7C).contains(&io_offset) {
                     // legacy sound channel registers
+                    self.apu.flush();
                     let lo = self.apu.read_channel_reg(addr) as u16;
                     let hi = self.apu.read_channel_reg(addr + 1) as u16;
                     lo | (hi << 8)
                 } else if (REG_WAVE_RAM..REG_WAVE_RAM + 16).contains(&addr) {
                     // wave RAM
+                    self.apu.flush();
                     let offset = (addr - REG_WAVE_RAM) as usize;
                     let lo = self.apu.read_wave_ram(offset) as u16;
                     let hi = self.apu.read_wave_ram(offset + 1) as u16;
@@ -603,6 +592,7 @@ impl GbaBus {
         // for sound channel registers, write directly
         let io_offset = addr & 0x3FF;
         if (0x60..=0x7D).contains(&io_offset) {
+            self.apu.flush();
             self.apu.write_channel_reg(addr, value);
             return;
         }
@@ -659,9 +649,18 @@ impl GbaBus {
             REG_BLDCNT => self.ppu.set_bldcnt(value),
             REG_BLDALPHA => self.ppu.set_bldalpha(value),
             REG_BLDY => self.ppu.set_bldy(value),
-            REG_SOUNDCNT_L => self.apu.set_soundcnt_l(value),
-            REG_SOUNDCNT_H => self.apu.set_soundcnt_h(value),
-            REG_SOUNDCNT_X => self.apu.set_soundcnt_x(value),
+            REG_SOUNDCNT_L => {
+                self.apu.flush();
+                self.apu.set_soundcnt_l(value)
+            }
+            REG_SOUNDCNT_H => {
+                self.apu.flush();
+                self.apu.set_soundcnt_h(value)
+            }
+            REG_SOUNDCNT_X => {
+                self.apu.flush();
+                self.apu.set_soundcnt_x(value)
+            }
             REG_SOUNDBIAS => self.apu.set_soundbias(value),
             REG_TM0CNT_L => self.timers.timers[0].set_reload(value),
             REG_TM0CNT_H => self.timers.timers[0].set_control(value),
@@ -705,6 +704,7 @@ impl GbaBus {
                 // handle sound channel registers (0x60-0x7E) via byte-level writes
                 let io_offset = addr & 0x3FF;
                 if (0x60..=0x7C).contains(&io_offset) {
+                    self.apu.flush();
                     self.apu.write_channel_reg(addr, value as u8);
                     self.apu.write_channel_reg(addr + 1, (value >> 8) as u8);
                 }
@@ -718,13 +718,16 @@ impl GbaBus {
 
                 // handle FIFO writes (16-bit path, 2 samples per write)
                 if addr == REG_FIFO_A || addr == REG_FIFO_A + 2 {
+                    self.apu.flush();
                     self.apu.direct_sound[0].write_fifo_half(value);
                 } else if addr == REG_FIFO_B || addr == REG_FIFO_B + 2 {
+                    self.apu.flush();
                     self.apu.direct_sound[1].write_fifo_half(value);
                 }
 
                 // wave RAM
                 if (REG_WAVE_RAM..REG_WAVE_RAM + 16).contains(&addr) {
+                    self.apu.flush();
                     let offset = (addr - REG_WAVE_RAM) as usize;
                     self.apu.write_wave_ram(offset, value as u8);
                     self.apu.write_wave_ram(offset + 1, (value >> 8) as u8);
@@ -1258,6 +1261,19 @@ mod tests {
         let val = bus.read16(0x0D00_0000);
         // first read is dummy bit (0)
         assert_eq!(val & 1, 0);
+    }
+
+    #[test]
+    fn test_eeprom_rom_region_reads_rom() {
+        let mut bus = GbaBus::new();
+        let mut rom = vec![0u8; 512];
+        rom[0x100..0x108].copy_from_slice(b"EEPROM_V");
+        rom[0..4].copy_from_slice(&[0x12, 0x34, 0x56, 0x78]);
+        bus.load_rom(&rom);
+        // regular ROM regions read cartridge data even with EEPROM saves
+        assert_eq!(bus.read32(0x0800_0000), 0x78563412);
+        assert_eq!(bus.read16(0x0800_0000), 0x3412);
+        assert_eq!(bus.read8(0x0800_0000), 0x12);
     }
 
     #[test]

@@ -17,6 +17,12 @@ use crate::{
     warnln,
 };
 
+/// Number of idle cycles consumed per step while the CPU is halted.
+/// Small enough that no PPU scanline transition (1232 cycles) or
+/// practical timer overflow can be skipped within a single batch,
+/// large enough to amortize the per-step subsystem dispatch cost.
+const HALT_IDLE_CYCLES: u32 = 16;
+
 /// index mapping for banked SPSR: FIQ=0, SVC=1, ABT=2, IRQ=3, UND=4
 fn mode_to_spsr_index(mode: u32) -> Option<usize> {
     match mode & CPSR_MODE_MASK {
@@ -446,7 +452,11 @@ impl Arm7Tdmi {
                     self.pc()
                 );
             }
-            return 1; // idle cycle while halted
+            // fast-forward idle cycles in small batches, avoiding the
+            // per-cycle subsystem dispatch overhead while halted; the
+            // batch is small enough that no PPU or timer event can be
+            // skipped, only detected a few cycles later
+            return HALT_IDLE_CYCLES;
         }
 
         self.cycles = 0;
@@ -1031,7 +1041,7 @@ mod tests {
         let mut cpu = make_cpu();
         cpu.set_halted(true);
         let cycles = cpu.step();
-        assert_eq!(cycles, 1); // idle cycle
+        assert_eq!(cycles, HALT_IDLE_CYCLES); // idle batch
     }
 
     #[test]
@@ -1149,7 +1159,7 @@ mod tests {
 
         // should stay halted because VBlank not in IntrCheck
         assert!(cpu.halted());
-        assert_eq!(cycles, 1);
+        assert_eq!(cycles, HALT_IDLE_CYCLES);
         // flags should remain set
         assert_eq!(cpu.bus.intr_wait_flags, 1);
     }
@@ -1448,7 +1458,7 @@ mod tests {
         let cycles = cpu.step();
 
         assert!(cpu.halted());
-        assert_eq!(cycles, 1);
+        assert_eq!(cycles, HALT_IDLE_CYCLES);
     }
 
     // -- crash detection tests --

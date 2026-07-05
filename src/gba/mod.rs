@@ -197,9 +197,9 @@ impl GameBoyAdvance {
         if self.ppu_enabled {
             let events = self.cpu.bus.ppu.clock(
                 cycles,
-                &self.cpu.bus.vram,
-                &self.cpu.bus.palette,
-                &self.cpu.bus.oam,
+                self.cpu.bus.vram.as_slice(),
+                self.cpu.bus.palette.as_slice(),
+                self.cpu.bus.oam.as_slice(),
             );
 
             if events != 0 {
@@ -403,6 +403,7 @@ impl GameBoyAdvance {
     }
 
     pub fn audio_buffer_eager(&mut self, clear: bool) -> Vec<i16> {
+        self.cpu.bus.apu.flush();
         let buffer = Vec::from(self.audio_buffer().clone());
         if clear {
             self.clear_audio_buffer();

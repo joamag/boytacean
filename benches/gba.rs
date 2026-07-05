@@ -23,9 +23,26 @@ fn make_gba_arm() -> GameBoyAdvance {
     gba
 }
 
+fn make_gba_halted() -> GameBoyAdvance {
+    let mut gba = make_gba_ppu();
+    gba.cpu.bus.irq.set_ime(true);
+    gba.cpu.bus.irq.set_ie(1);
+    gba.cpu.set_halted(true);
+    gba
+}
+
 fn benchmark_gba_full_frame(c: &mut Criterion) {
     let mut gba = make_gba_ppu();
     c.bench_function("gba_full_frame", |b| {
+        b.iter(|| {
+            gba.next_frame();
+        })
+    });
+}
+
+fn benchmark_gba_halted_frame(c: &mut Criterion) {
+    let mut gba = make_gba_halted();
+    c.bench_function("gba_halted_frame", |b| {
         b.iter(|| {
             gba.next_frame();
         })
@@ -47,6 +64,6 @@ criterion_group! {
         .sample_size(10)
         .measurement_time(Duration::from_secs(2))
         .warm_up_time(Duration::from_secs(1));
-    targets = benchmark_gba_full_frame, benchmark_gba_arm_frame
+    targets = benchmark_gba_full_frame, benchmark_gba_halted_frame, benchmark_gba_arm_frame
 }
 criterion_main!(benches);

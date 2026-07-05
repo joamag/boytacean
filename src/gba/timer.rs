@@ -166,7 +166,17 @@ impl GbaTimers {
 
     /// clocks all 4 timers, handling cascade chains.
     /// returns a bitmask of which timers overflowed (bit 0 = TM0, etc)
+    #[inline(always)]
     pub fn clock(&mut self, cycles: u32) -> u8 {
+        // fast path: no enabled timer means nothing can tick or overflow
+        if !self.timers[0].enabled()
+            && !self.timers[1].enabled()
+            && !self.timers[2].enabled()
+            && !self.timers[3].enabled()
+        {
+            return 0;
+        }
+
         let mut overflows = 0u8;
 
         // clock timer 0 (never cascade)
@@ -288,6 +298,17 @@ mod tests {
         assert!(timer.overflow());
         timer.clear_overflow();
         assert!(!timer.overflow());
+    }
+
+    #[test]
+    fn test_timers_clock_all_disabled() {
+        let mut timers = GbaTimers::new();
+
+        // with no timer enabled the clock is a no-op
+        let overflows = timers.clock(0x10000);
+        assert_eq!(overflows, 0);
+        assert_eq!(timers.timers[0].counter(), 0);
+        assert_eq!(timers.timers[3].counter(), 0);
     }
 
     #[test]

@@ -13,6 +13,11 @@ use crate::warnln;
 /// Sampling rate for audio output in Hz.
 const SAMPLING_RATE: u32 = 32768;
 
+/// Number of CPU cycles accumulated before the APU channels are
+/// clocked, small enough to stay well below the sample period
+/// (~512 cycles) while amortizing the per instruction call cost.
+const APU_BATCH_CYCLES: u32 = 64;
+
 /// Duty cycle waveforms for square wave channels.
 ///
 /// Each row represents one of 4 duty cycles (12.5%, 25%, 50%, 75%)
@@ -426,6 +431,10 @@ pub struct GbaApu {
 
     /// Number of CPU cycles per audio sample.
     sample_period: u32,
+
+    /// CPU cycles accumulated but not yet processed by the channels,
+    /// allowing the (per instruction) clock calls to be batched.
+    pending_cycles: u32,
 }
 
 impl GbaApu {
@@ -512,6 +521,7 @@ impl GbaApu {
             audio_buffer: VecDeque::with_capacity(4096),
             sample_counter: 0,
             sample_period: super::consts::CPU_FREQ / SAMPLING_RATE,
+            pending_cycles: 0,
         }
     }
 
@@ -634,6 +644,7 @@ impl GbaApu {
     }
 
     pub fn clear_audio_buffer(&mut self) {
+        self.flush();
         self.audio_buffer.clear();
     }
 
@@ -641,6 +652,7 @@ impl GbaApu {
 
     /// Called when a timer overflows; feeds DirectSound FIFO channels.
     pub fn timer_overflow(&mut self, timer_id: usize) {
+        self.flush();
         for i in 0..2 {
             if self.direct_sound[i].timer_id == timer_id {
                 self.direct_sound[i].timer_tick();
@@ -651,10 +663,36 @@ impl GbaApu {
     // -- main clock --
 
     /// Clocks the APU by the given number of CPU cycles.
+    ///
+    /// Cycles are accumulated and processed in batches to keep the
+    /// per instruction cost low; [`Self::flush`] runs any pending
+    /// cycles before register state is observed.
+    #[inline(always)]
     pub fn clock(&mut self, cycles: u32) {
         if self.soundcnt_x & 0x80 == 0 {
+            self.pending_cycles = 0;
             return;
         }
+
+        self.pending_cycles += cycles;
+        if self.pending_cycles >= APU_BATCH_CYCLES {
+            self.run_pending();
+        }
+    }
+
+    /// Processes any accumulated cycles, bringing the channel and
+    /// sample state up to date with the CPU clock.
+    pub fn flush(&mut self) {
+        if self.pending_cycles > 0 {
+            self.run_pending();
+        }
+    }
+
+    /// Runs the accumulated pending cycles through the channels,
+    /// frame sequencer and sample generation.
+    fn run_pending(&mut self) {
+        let cycles = self.pending_cycles;
+        self.pending_cycles = 0;
 
         // clock legacy channel frequency timers
         self.tick_channels(cycles);
@@ -1443,7 +1481,7 @@ impl Default for GbaApu {
 
 #[cfg(test)]
 mod tests {
-    use super::{DirectSoundChannel, GbaApu};
+    use super::{DirectSoundChannel, GbaApu, APU_BATCH_CYCLES};
 
     #[test]
     fn test_direct_sound_new() {
@@ -1629,6 +1667,7 @@ mod tests {
         let mut apu = GbaApu::new();
         apu.set_soundcnt_x(0x80);
         apu.clock(1000);
+        apu.flush();
         apu.clear_audio_buffer();
         assert!(apu.audio_buffer().is_empty());
     }
@@ -1637,7 +1676,53 @@ mod tests {
     fn test_apu_clock_disabled() {
         let mut apu = GbaApu::new();
         apu.clock(1000);
+        apu.flush();
         assert!(apu.audio_buffer().is_empty());
+    }
+
+    #[test]
+    fn test_apu_clock_batches_pending_cycles() {
+        let mut apu = GbaApu::new();
+        apu.set_soundcnt_x(0x80);
+
+        // below the batch threshold cycles are only accumulated
+        apu.clock(APU_BATCH_CYCLES - 1);
+        assert_eq!(apu.pending_cycles, APU_BATCH_CYCLES - 1);
+
+        // reaching the threshold processes the accumulated cycles
+        apu.clock(1);
+        assert_eq!(apu.pending_cycles, 0);
+    }
+
+    #[test]
+    fn test_apu_clock_disabled_clears_pending() {
+        let mut apu = GbaApu::new();
+        apu.set_soundcnt_x(0x80);
+        apu.clock(1);
+        assert_eq!(apu.pending_cycles, 1);
+
+        // disabling the master enable drops any pending cycles
+        apu.set_soundcnt_x(0x00);
+        apu.clock(1);
+        assert_eq!(apu.pending_cycles, 0);
+    }
+
+    #[test]
+    fn test_apu_flush_processes_pending_cycles() {
+        let mut apu = GbaApu::new();
+        apu.set_soundcnt_x(0x80);
+
+        // advance to one cycle before an envelope tick (step 7)
+        let sequencer_period = super::super::consts::CPU_FREQ / 512;
+        apu.sequencer_step = 7;
+        apu.sequencer_counter = sequencer_period - 1;
+
+        // pending cycles are not visible until flushed
+        apu.clock(1);
+        assert_eq!(apu.sequencer_step, 7);
+        apu.flush();
+        assert_eq!(apu.sequencer_step, 0);
+        assert_eq!(apu.pending_cycles, 0);
     }
 
     #[test]
@@ -1685,6 +1770,7 @@ mod tests {
         apu.sequencer_step = 0; // step 0 dispatches length tick
         apu.sequencer_counter = sequencer_period - 1;
         apu.clock(1);
+        apu.flush();
 
         // length counter should have ticked, disabling the channel
         assert!(!apu.ch1_enabled);
@@ -1707,6 +1793,7 @@ mod tests {
         apu.sequencer_step = 7; // step 7 dispatches envelope tick
         apu.sequencer_counter = sequencer_period - 1;
         apu.clock(1);
+        apu.flush();
 
         assert_eq!(apu.ch1_volume, 14);
     }
@@ -1727,6 +1814,7 @@ mod tests {
         apu.sequencer_step = 7; // step 7 dispatches envelope tick
         apu.sequencer_counter = sequencer_period - 1;
         apu.clock(1);
+        apu.flush();
 
         assert_eq!(apu.ch1_volume, 6);
     }
@@ -1751,6 +1839,7 @@ mod tests {
         apu.sequencer_step = 2; // step 2 dispatches sweep + length
         apu.sequencer_counter = sequencer_period - 1;
         apu.clock(1);
+        apu.flush();
 
         // frequency should have increased: 0x100 + (0x100 >> 1) = 0x100 + 0x80 = 0x180
         assert_eq!(apu.ch1_sweep_shadow, 0x180);
@@ -1776,6 +1865,7 @@ mod tests {
         apu.sequencer_step = 2; // step 2 dispatches sweep + length
         apu.sequencer_counter = sequencer_period - 1;
         apu.clock(1);
+        apu.flush();
 
         // 0x700 + 0x700 = 0xE00 > 0x7FF, channel should be disabled
         assert!(!apu.ch1_enabled);
@@ -1833,6 +1923,7 @@ mod tests {
         // clock enough to generate a sample
         let sample_period = super::super::consts::CPU_FREQ / 32768;
         apu.clock(sample_period + 1);
+        apu.flush();
 
         // should have at least 2 samples (left, right)
         assert!(apu.audio_buffer().len() >= 2);
@@ -1935,6 +2026,7 @@ mod tests {
         apu.sequencer_step = 0;
         apu.sequencer_counter = sequencer_period - 1;
         apu.clock(1);
+        apu.flush();
 
         assert!(!apu.ch2_enabled);
     }
@@ -1958,6 +2050,7 @@ mod tests {
         apu.sequencer_step = 0;
         apu.sequencer_counter = sequencer_period - 1;
         apu.clock(1);
+        apu.flush();
 
         assert!(!apu.ch3_enabled);
     }
@@ -1981,6 +2074,7 @@ mod tests {
         apu.sequencer_step = 0;
         apu.sequencer_counter = sequencer_period - 1;
         apu.clock(1);
+        apu.flush();
 
         assert!(!apu.ch4_enabled);
     }
@@ -2007,6 +2101,7 @@ mod tests {
         apu.sequencer_step = 0;
         apu.sequencer_counter = sequencer_period - 1;
         apu.clock(1);
+        apu.flush();
 
         assert!(apu.ch1_enabled);
     }
@@ -2047,6 +2142,7 @@ mod tests {
         apu.sequencer_step = 7;
         apu.sequencer_counter = sequencer_period - 1;
         apu.clock(1);
+        apu.flush();
 
         assert_eq!(apu.ch1_volume, 0);
         assert!(!apu.ch1_envelope_enabled);
@@ -2055,6 +2151,7 @@ mod tests {
         apu.sequencer_step = 7;
         apu.sequencer_counter = sequencer_period - 1;
         apu.clock(1);
+        apu.flush();
 
         assert_eq!(apu.ch1_volume, 0);
     }
@@ -2075,6 +2172,7 @@ mod tests {
         apu.sequencer_step = 7;
         apu.sequencer_counter = sequencer_period - 1;
         apu.clock(1);
+        apu.flush();
 
         assert_eq!(apu.ch1_volume, 15);
         assert!(!apu.ch1_envelope_enabled);
@@ -2097,6 +2195,7 @@ mod tests {
         apu.sequencer_step = 7;
         apu.sequencer_counter = sequencer_period - 1;
         apu.clock(1);
+        apu.flush();
 
         assert_eq!(apu.ch1_volume, 10);
     }
@@ -2117,6 +2216,7 @@ mod tests {
         apu.sequencer_step = 7;
         apu.sequencer_counter = sequencer_period - 1;
         apu.clock(1);
+        apu.flush();
 
         assert_eq!(apu.ch4_volume, 7);
     }
@@ -2142,6 +2242,7 @@ mod tests {
         apu.sequencer_step = 2;
         apu.sequencer_counter = sequencer_period - 1;
         apu.clock(1);
+        apu.flush();
 
         // 0x200 - (0x200 >> 2) = 0x200 - 0x80 = 0x180
         assert_eq!(apu.ch1_sweep_shadow, 0x180);
@@ -2164,6 +2265,7 @@ mod tests {
         apu.sequencer_step = 2;
         apu.sequencer_counter = sequencer_period - 1;
         apu.clock(1);
+        apu.flush();
 
         // frequency should not change with pace=0
         assert_eq!(apu.ch1_sweep_shadow, original);
@@ -2399,6 +2501,7 @@ mod tests {
         // at 32768 Hz and 16.78 MHz, expect ~547 samples per frame
         // each sample is 2 entries (stereo)
         apu.clock(super::super::consts::CYCLES_PER_FRAME);
+        apu.flush();
 
         let sample_count = apu.audio_buffer().len() / 2;
         // should be approximately 547 stereo samples
