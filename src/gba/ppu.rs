@@ -709,9 +709,9 @@ impl GbaPpu {
         let obj_any = obj_has_pixel.iter().any(|&has| has);
         if !use_windows && !obj_any && blend_mode == BlendMode::None && active_bg_count == 1 {
             let bg_index = active_bgs[0];
-            for x in 0..DISPLAY_WIDTH {
+            for (x, pixel) in line_buffer.iter_mut().enumerate() {
                 if bg_has_pixel[bg_index][x] {
-                    line_buffer[x] = bg_pixels[bg_index][x].0;
+                    *pixel = bg_pixels[bg_index][x].0;
                 }
             }
             self.write_line_buffer(line, &line_buffer);
