@@ -57,7 +57,7 @@ pub enum System {
 }
 
 impl System {
-    /// detects the system type from the ROM data and creates
+    /// Detects the system type from the ROM data and creates
     /// the appropriate emulator instance
     pub fn from_rom(data: &[u8]) -> Result<Self, Error> {
         if is_gba_rom(data) {

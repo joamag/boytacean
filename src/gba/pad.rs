@@ -15,7 +15,7 @@ pub struct GbaPad {
     /// KEYCNT register (interrupt control)
     keycnt: u16,
 
-    /// interrupt pending flag
+    /// Interrupt pending flag
     int_keypad: bool,
 }
 
@@ -74,7 +74,7 @@ impl GbaPad {
         }
     }
 
-    /// checks if the keypad interrupt condition is met
+    /// Checks if the keypad interrupt condition is met
     /// based on KEYCNT settings
     fn check_interrupt(&mut self) {
         let irq_enable = self.keycnt & (1 << 14) != 0;

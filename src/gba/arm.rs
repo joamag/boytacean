@@ -749,7 +749,7 @@ fn arm_msr_imm(cpu: &mut Arm7Tdmi, instr: u32) {
     cpu.cycles = 1;
 }
 
-/// builds a mask for PSR writes based on the field mask bits (16-19)
+/// Builds a mask for PSR writes based on the field mask bits (16-19)
 fn build_psr_mask(instr: u32) -> u32 {
     let mut mask = 0u32;
     if instr & (1 << 19) != 0 {
@@ -767,7 +767,7 @@ fn build_psr_mask(instr: u32) -> u32 {
     mask
 }
 
-/// writes to CPSR or SPSR with the given mask
+/// Writes to CPSR or SPSR with the given mask
 fn write_psr(cpu: &mut Arm7Tdmi, use_spsr: bool, value: u32, mask: u32) {
     if use_spsr {
         let old = cpu.spsr();

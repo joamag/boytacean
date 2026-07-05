@@ -10,10 +10,10 @@ use crate::gba::consts::SRAM_SIZE;
 const EEPROM_SIZE_4K: usize = 512;
 const EEPROM_SIZE_64K: usize = 8192;
 
-/// save media type detected from ROM strings
+/// Save media type detected from ROM strings
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum SaveType {
-    /// no backup media
+    /// No backup media
     None,
     /// 32KB SRAM (direct byte access)
     Sram,
@@ -28,32 +28,32 @@ pub enum SaveType {
 /// EEPROM serial protocol state machine
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum EepromState {
-    /// waiting for command and address bits
+    /// Waiting for command and address bits
     AcceptingCommand,
-    /// reading data bits (4 dummy + 64 data)
+    /// Reading data bits (4 dummy + 64 data)
     ReadingData,
-    /// collecting 64 data bits + stop bit for write
+    /// Collecting 64 data bits + stop bit for write
     CollectingWriteData,
-    /// write pending, reads return 0 until ready
+    /// Write pending, reads return 0 until ready
     WritePending,
 }
 
-/// flash command state machine
+/// Flash command state machine
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum FlashState {
-    /// no command in progress
+    /// No command in progress
     Ready,
-    /// received 0xAA at 0x5555
+    /// Received 0xAA at 0x5555
     CmdStep1,
-    /// received 0x55 at 0x2AAA, waiting for command byte at 0x5555
+    /// Received 0x55 at 0x2AAA, waiting for command byte at 0x5555
     CmdStep2,
     /// 0xA0 issued, next byte write programs a single byte
     Write,
     /// 0x80 issued, waiting for second command sequence (erase type)
     EraseStep1,
-    /// erase: received 0xAA at 0x5555
+    /// Erase: received 0xAA at 0x5555
     EraseStep2,
-    /// erase: received 0x55 at 0x2AAA, waiting for 0x10 or 0x30
+    /// Erase: received 0x55 at 0x2AAA, waiting for 0x10 or 0x30
     EraseStep3,
     /// 0x90 issued, reads return chip ID instead of data
     ChipId,
@@ -61,21 +61,21 @@ enum FlashState {
     BankSelect,
 }
 
-/// cartridge save media controller
+/// Cartridge save media controller
 pub struct SaveMedia {
-    /// backing storage
+    /// Backing storage
     pub data: Vec<u8>,
-    /// detected save type
+    /// Detected save type
     save_type: SaveType,
-    /// flash command state
+    /// Flash command state
     state: FlashState,
-    /// active bank for 128KB flash (0 or 1)
+    /// Active bank for 128KB flash (0 or 1)
     bank: u8,
     /// EEPROM state machine
     eeprom_state: EepromState,
     /// EEPROM bit buffer for incoming serial data
     eeprom_buffer: u64,
-    /// number of bits received in current command
+    /// Number of bits received in current command
     eeprom_bits: u8,
     /// EEPROM address (block index) for current read/write
     eeprom_addr: u16,
@@ -83,7 +83,7 @@ pub struct SaveMedia {
     eeprom_addr_width: u8,
     /// EEPROM read output shift register (68 bits: 4 dummy + 64 data)
     eeprom_read_buffer: u64,
-    /// number of bits remaining to output during read
+    /// Number of bits remaining to output during read
     eeprom_read_bits: u8,
     /// ROM size (used to determine EEPROM bus address range)
     rom_size: usize,
@@ -107,7 +107,7 @@ impl SaveMedia {
         }
     }
 
-    /// detects save type from ROM identification strings
+    /// Detects save type from ROM identification strings
     pub fn detect_save_type(&mut self, rom: &[u8]) {
         self.save_type = detect_from_rom(rom);
         self.rom_size = rom.len();
@@ -127,7 +127,7 @@ impl SaveMedia {
         self.save_type
     }
 
-    /// reads a byte from the save region
+    /// Reads a byte from the save region
     pub fn read8(&self, addr: u32) -> u8 {
         let offset = (addr & 0xFFFF) as usize;
         match self.save_type {
@@ -152,7 +152,7 @@ impl SaveMedia {
         }
     }
 
-    /// writes a byte to the save region
+    /// Writes a byte to the save region
     pub fn write8(&mut self, addr: u32, value: u8) {
         let offset = (addr & 0xFFFF) as usize;
         match self.save_type {
@@ -168,7 +168,7 @@ impl SaveMedia {
         }
     }
 
-    /// checks if an address in the 0x0D region maps to EEPROM
+    /// Checks if an address in the 0x0D region maps to EEPROM
     pub fn is_eeprom_addr(&self, addr: u32) -> bool {
         if self.save_type != SaveType::Eeprom {
             return false;
@@ -182,7 +182,7 @@ impl SaveMedia {
         }
     }
 
-    /// reads a bit from the EEPROM serial interface (bit 0 of return value)
+    /// Reads a bit from the EEPROM serial interface (bit 0 of return value)
     pub fn eeprom_read(&mut self) -> u16 {
         match self.eeprom_state {
             EepromState::ReadingData => {
@@ -221,7 +221,7 @@ impl SaveMedia {
         }
     }
 
-    /// writes a bit to the EEPROM serial interface (bit 0 of value)
+    /// Writes a bit to the EEPROM serial interface (bit 0 of value)
     pub fn eeprom_write(&mut self, value: u16) {
         let bit = value & 1;
 
@@ -278,7 +278,7 @@ impl SaveMedia {
         }
     }
 
-    /// returns the expected EEPROM address width, auto-detecting on first use
+    /// Returns the expected EEPROM address width, auto-detecting on first use
     fn eeprom_expected_addr_width(&mut self) -> u8 {
         if self.eeprom_addr_width != 0 {
             return self.eeprom_addr_width;
@@ -296,7 +296,7 @@ impl SaveMedia {
         }
     }
 
-    /// loads 8 bytes from the EEPROM at the current address into the read buffer
+    /// Loads 8 bytes from the EEPROM at the current address into the read buffer
     fn eeprom_start_read(&mut self) {
         let byte_offset = self.eeprom_addr as usize * 8;
         let mut value = 0u64;
@@ -313,7 +313,7 @@ impl SaveMedia {
         self.eeprom_state = EepromState::ReadingData;
     }
 
-    /// writes 8 bytes of data to the EEPROM at the current address
+    /// Writes 8 bytes of data to the EEPROM at the current address
     fn eeprom_commit_write(&mut self, data: u64) {
         let byte_offset = self.eeprom_addr as usize * 8;
 
@@ -341,7 +341,7 @@ impl SaveMedia {
         self.eeprom_read_bits = 0;
     }
 
-    /// computes the actual data offset accounting for bank switching
+    /// Computes the actual data offset accounting for bank switching
     fn flash_offset(&self, offset: usize) -> usize {
         if self.save_type == SaveType::Flash128 {
             (self.bank as usize) * 0x10000 + offset
@@ -350,7 +350,7 @@ impl SaveMedia {
         }
     }
 
-    /// returns the manufacturer/device ID for chip ID mode
+    /// Returns the manufacturer/device ID for chip ID mode
     fn chip_id(&self, offset: usize) -> u8 {
         match self.save_type {
             SaveType::Flash64 => match offset {
@@ -367,7 +367,7 @@ impl SaveMedia {
         }
     }
 
-    /// processes a flash write through the command state machine
+    /// Processes a flash write through the command state machine
     fn flash_write(&mut self, offset: usize, value: u8) {
         match self.state {
             FlashState::Ready => {
@@ -459,7 +459,7 @@ impl Default for SaveMedia {
     }
 }
 
-/// scans ROM data for save type identification strings
+/// Scans ROM data for save type identification strings
 fn detect_from_rom(rom: &[u8]) -> SaveType {
     let haystack = rom;
     if find_bytes(haystack, b"EEPROM_V").is_some() {
@@ -477,7 +477,7 @@ fn detect_from_rom(rom: &[u8]) -> SaveType {
     }
 }
 
-/// simple byte pattern search
+/// Simple byte pattern search
 fn find_bytes(haystack: &[u8], needle: &[u8]) -> Option<usize> {
     haystack.windows(needle.len()).position(|w| w == needle)
 }
@@ -914,7 +914,7 @@ mod tests {
 
     // --- EEPROM read/write protocol tests ---
 
-    /// creates a small-ROM EEPROM save (6-bit addressing, 512B)
+    /// Creates a small-ROM EEPROM save (6-bit addressing, 512B)
     fn make_eeprom_save_6bit() -> SaveMedia {
         let mut save = SaveMedia::new();
         let mut rom = vec![0u8; 1024 * 1024]; // 1MB ROM -> 6-bit
@@ -923,7 +923,7 @@ mod tests {
         save
     }
 
-    /// creates a large-ROM EEPROM save (14-bit addressing, 8KB)
+    /// Creates a large-ROM EEPROM save (14-bit addressing, 8KB)
     fn make_eeprom_save_14bit() -> SaveMedia {
         let mut save = SaveMedia::new();
         let mut rom = vec![0u8; 4 * 1024 * 1024]; // 4MB ROM -> 14-bit
@@ -932,7 +932,7 @@ mod tests {
         save
     }
 
-    /// sends a sequence of bits to the EEPROM (MSB first)
+    /// Sends a sequence of bits to the EEPROM (MSB first)
     fn send_bits(save: &mut SaveMedia, value: u64, count: u8) {
         for i in (0..count).rev() {
             save.eeprom_write(((value >> i) & 1) as u16);

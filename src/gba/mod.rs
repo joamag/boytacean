@@ -60,23 +60,23 @@ impl GbaClockFrame {
 /// Should serve as the main entry-point API.
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 pub struct GameBoyAdvance {
-    /// the ARM7TDMI CPU (includes the memory bus)
+    /// The ARM7TDMI CPU (includes the memory bus)
     #[cfg_attr(feature = "wasm", wasm_bindgen(skip))]
     pub cpu: Arm7Tdmi,
 
-    /// frame counter tracking completed frames
+    /// Frame counter tracking completed frames
     frame: u64,
 
-    /// if the PPU is enabled, it will be clocked
+    /// If the PPU is enabled, it will be clocked
     ppu_enabled: bool,
 
-    /// if the APU is enabled, it will be clocked
+    /// If the APU is enabled, it will be clocked
     apu_enabled: bool,
 
-    /// if DMA is enabled, it will be processed
+    /// If DMA is enabled, it will be processed
     dma_enabled: bool,
 
-    /// if timers are enabled, they will be clocked
+    /// If timers are enabled, they will be clocked
     timer_enabled: bool,
 
     /// ROM information extracted from the header
@@ -87,13 +87,13 @@ impl GameBoyAdvance {
     /// CPU clock frequency: 16.78 MHz
     pub const CPU_FREQ: u32 = consts::CPU_FREQ;
 
-    /// visual refresh frequency (~59.7275 Hz)
+    /// Visual refresh frequency (~59.7275 Hz)
     pub const VISUAL_FREQ: f32 = consts::VISUAL_FREQ;
 
-    /// display width in pixels
+    /// Display width in pixels
     pub const DISPLAY_WIDTH: usize = DISPLAY_WIDTH;
 
-    /// display height in pixels
+    /// Display height in pixels
     pub const DISPLAY_HEIGHT: usize = DISPLAY_HEIGHT;
 
     /// Loads a real BIOS ROM from a byte slice.
@@ -252,7 +252,7 @@ impl GameBoyAdvance {
         cycles
     }
 
-    /// processes pending DMA transfers
+    /// Processes pending DMA transfers
     fn process_dma(&mut self) {
         while let Some(index) = self.cpu.bus.dma.highest_active() {
             let channel = &mut self.cpu.bus.dma.channels[index];
@@ -280,7 +280,7 @@ impl GameBoyAdvance {
         }
     }
 
-    /// clocks the emulator until a full frame is completed
+    /// Clocks the emulator until a full frame is completed
     pub fn next_frame(&mut self) -> u64 {
         let mut cycles = 0u64;
         let last_frame = self.frame;
@@ -290,7 +290,7 @@ impl GameBoyAdvance {
         cycles
     }
 
-    /// clocks the emulator for the given number of cycles
+    /// Clocks the emulator for the given number of cycles
     pub fn clocks_cycles(&mut self, limit: usize) -> u64 {
         let mut cycles = 0u64;
         while cycles < limit as u64 {
@@ -299,12 +299,12 @@ impl GameBoyAdvance {
         cycles
     }
 
-    /// returns the current frame number
+    /// Returns the current frame number
     pub fn ppu_frame(&self) -> u64 {
         self.frame
     }
 
-    /// clears the audio buffer
+    /// Clears the audio buffer
     pub fn clear_audio_buffer(&mut self) {
         self.cpu.bus.apu.clear_audio_buffer();
     }

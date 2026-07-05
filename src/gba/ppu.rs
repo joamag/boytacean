@@ -637,7 +637,7 @@ impl GbaPpu {
     /// Composites BG and OBJ layers with window masking and blending.
     ///
     /// `bg_layers` contains (bg_index, bg_type, affine_index) for each enabled BG.
-    /// bg_type: 0=text, 1=affine, 3/4/5=bitmap mode.
+    /// Bg_type: 0=text, 1=affine, 3/4/5=bitmap mode.
     fn render_composited(
         &mut self,
         line: usize,

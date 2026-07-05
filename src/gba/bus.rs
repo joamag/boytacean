@@ -38,25 +38,25 @@ pub struct GbaBus {
     /// BIOS memory (16KB, contains HLE stubs for IRQ handler etc.)
     pub bios: Box<[u8; BIOS_SIZE]>,
 
-    /// external work RAM (256KB)
+    /// External work RAM (256KB)
     pub ewram: Box<[u8; EWRAM_SIZE]>,
 
-    /// internal work RAM (32KB)
+    /// Internal work RAM (32KB)
     pub iwram: Box<[u8; IWRAM_SIZE]>,
 
-    /// palette RAM (1KB)
+    /// Palette RAM (1KB)
     pub palette: Box<[u8; PALETTE_SIZE]>,
 
-    /// video RAM (96KB)
+    /// Video RAM (96KB)
     pub vram: Box<[u8; VRAM_SIZE]>,
 
     /// OAM - object attribute memory (1KB)
     pub oam: Box<[u8; OAM_SIZE]>,
 
-    /// cartridge ROM data
+    /// Cartridge ROM data
     pub rom: Vec<u8>,
 
-    /// cartridge save media (SRAM/Flash)
+    /// Cartridge save media (SRAM/Flash)
     pub save: SaveMedia,
 
     /// PPU
@@ -68,29 +68,29 @@ pub struct GbaBus {
     /// DMA controller
     pub dma: GbaDma,
 
-    /// timers
+    /// Timers
     pub timers: GbaTimers,
 
-    /// keypad input
+    /// Keypad input
     pub pad: GbaPad,
 
-    /// interrupt controller
+    /// Interrupt controller
     pub irq: IrqController,
 
-    /// wait state control register
+    /// Wait state control register
     pub waitcnt: u16,
 
-    /// post boot flag
+    /// Post boot flag
     pub postflg: u8,
 
-    /// halt flag (set via HALTCNT register)
+    /// Halt flag (set via HALTCNT register)
     pub halt_requested: bool,
 
     /// IntrWait flags for HLE SWI 0x04/0x05: re-halts the CPU until
     /// a serviced IRQ matches these bits. Zero with real BIOS.
     pub intr_wait_flags: u16,
 
-    /// last BIOS read value (for open bus emulation)
+    /// Last BIOS read value (for open bus emulation)
     bios_value: u32,
 
     /// Whether BIOS reads are currently allowed (true when CPU PC is in BIOS)
@@ -100,7 +100,7 @@ pub struct GbaBus {
     pub use_real_bios: bool,
 }
 
-/// allocates a zeroed fixed-size byte array directly on the heap
+/// Allocates a zeroed fixed-size byte array directly on the heap
 fn boxed_array<const N: usize>() -> Box<[u8; N]> {
     vec![0u8; N].into_boxed_slice().try_into().unwrap()
 }
@@ -497,7 +497,7 @@ impl GbaBus {
         }
     }
 
-    /// mirrors VRAM address (96KB total: 64KB + 32KB mirrored)
+    /// Mirrors VRAM address (96KB total: 64KB + 32KB mirrored)
     #[inline(always)]
     fn mirror_vram(&self, addr: u32) -> usize {
         let offset = (addr & 0x1FFFF) as usize;
@@ -736,7 +736,7 @@ impl GbaBus {
         }
     }
 
-    /// handles 32-bit DMA address register writes (split across two 16-bit writes)
+    /// Handles 32-bit DMA address register writes (split across two 16-bit writes)
     fn write_dma_addr(&mut self, addr: u32, value: u16) {
         match addr {
             REG_DMA0SAD => {
@@ -807,7 +807,7 @@ impl GbaBus {
         }
     }
 
-    /// handles 32-bit BG reference point register writes
+    /// Handles 32-bit BG reference point register writes
     fn write_bg_ref(&mut self, addr: u32, value: u16) {
         match addr {
             REG_BG2X => self.ppu.set_bg_ref_x_lo(0, value),

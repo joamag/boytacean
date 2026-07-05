@@ -45,24 +45,24 @@ impl IrqController {
         self.if_
     }
 
-    /// acknowledges interrupts by writing 1 bits to IF
+    /// Acknowledges interrupts by writing 1 bits to IF
     /// (writing 1 clears the corresponding bit)
     pub fn ack_if(&mut self, value: u16) {
         self.if_ &= !value;
     }
 
-    /// raises an interrupt by setting the corresponding bit in IF
+    /// Raises an interrupt by setting the corresponding bit in IF
     pub fn raise(&mut self, irq: u16) {
         self.if_ |= irq;
     }
 
-    /// returns true if there are any pending interrupts that
+    /// Returns true if there are any pending interrupts that
     /// are both enabled (IE) and requested (IF) with IME on
     pub fn pending(&self) -> bool {
         self.ime && (self.ie & self.if_) != 0
     }
 
-    /// returns the highest priority pending interrupt bit,
+    /// Returns the highest priority pending interrupt bit,
     /// or 0 if no interrupts are pending
     pub fn highest_pending(&self) -> u16 {
         let pending = self.ie & self.if_;
