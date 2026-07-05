@@ -5,7 +5,7 @@ use crate::gba::consts::{
     REG_FIFO_B,
 };
 
-/// Address control mode for DMA source/destination
+/// Address control mode for DMA source/destination.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum DmaAddrControl {
     Increment = 0,
@@ -27,28 +27,28 @@ impl DmaAddrControl {
 }
 
 pub struct DmaChannel {
-    /// Source address register (written by CPU)
+    /// Source address register (written by CPU).
     src_reg: u32,
 
-    /// Destination address register (written by CPU)
+    /// Destination address register (written by CPU).
     dst_reg: u32,
 
-    /// Word count register (written by CPU)
+    /// Word count register (written by CPU).
     count_reg: u16,
 
-    /// Control register (DMA*CNT_H)
+    /// Control register (DMA*CNT_H).
     control: u16,
 
-    /// Internal latched source address
+    /// Internal latched source address.
     src: u32,
 
-    /// Internal latched destination address
+    /// Internal latched destination address.
     dst: u32,
 
-    /// Internal latched word count
+    /// Internal latched word count.
     count: u32,
 
-    /// Whether this channel is currently active/pending
+    /// Whether this channel is currently active/pending.
     active: bool,
 }
 
@@ -158,17 +158,17 @@ impl DmaChannel {
         DmaAddrControl::from_u16((self.control >> 5) & 0x03)
     }
 
-    /// Returns the internal source address
+    /// Returns the internal source address.
     pub fn src(&self) -> u32 {
         self.src
     }
 
-    /// Returns the internal destination address
+    /// Returns the internal destination address.
     pub fn dst(&self) -> u32 {
         self.dst
     }
 
-    /// Returns the remaining transfer count
+    /// Returns the remaining transfer count.
     pub fn remaining(&self) -> u32 {
         self.count
     }
@@ -176,7 +176,7 @@ impl DmaChannel {
     /// Advances the DMA transfer by one unit,
     /// updating internal addresses and count.
     ///
-    /// Returns (src_addr, dst_addr, is_complete)
+    /// Returns (src_addr, dst_addr, is_complete).
     pub fn step(&mut self) -> (u32, u32, bool) {
         let src_addr = self.src;
         let dst_addr = self.dst;
@@ -248,7 +248,7 @@ impl GbaDma {
         }
     }
 
-    /// Triggers DMA channels matching the given timing mode
+    /// Triggers DMA channels matching the given timing mode.
     pub fn trigger(&mut self, timing: u16) {
         for channel in &mut self.channels {
             if channel.enabled() && channel.timing() == timing {
@@ -257,12 +257,12 @@ impl GbaDma {
         }
     }
 
-    /// Triggers vblank DMA channels
+    /// Triggers vblank DMA channels.
     pub fn trigger_vblank(&mut self) {
         self.trigger(DMA_TIMING_VBLANK);
     }
 
-    /// Triggers hblank DMA channels
+    /// Triggers hblank DMA channels.
     pub fn trigger_hblank(&mut self) {
         self.trigger(DMA_TIMING_HBLANK);
     }
@@ -294,7 +294,7 @@ impl GbaDma {
     }
 
     /// Returns the index of the highest priority active DMA channel,
-    /// or None if no channels are active
+    /// or None if no channels are active.
     pub fn highest_active(&self) -> Option<usize> {
         for (i, channel) in self.channels.iter().enumerate() {
             if channel.active() {

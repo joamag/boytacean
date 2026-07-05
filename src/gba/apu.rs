@@ -124,6 +124,7 @@ impl DirectSoundChannel {
     }
 
     /// Returns the current output sample with hardware volume scaling.
+    ///
     /// On real GBA, DirectSound samples are multiplied by 4 at full volume
     /// or by 2 at half volume (matching NanoBoyAdvance and mGBA).
     pub fn output(&self) -> i16 {

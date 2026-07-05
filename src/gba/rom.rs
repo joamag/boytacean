@@ -6,7 +6,7 @@ use boytacean_common::error::Error;
 #[cfg(feature = "wasm")]
 use wasm_bindgen::prelude::*;
 
-/// GBA ROM header offsets
+/// GBA ROM header offsets.
 const HEADER_TITLE: usize = 0x0A0;
 const HEADER_GAME_CODE: usize = 0x0AC;
 const HEADER_MAKER_CODE: usize = 0x0B0;
@@ -14,7 +14,7 @@ const HEADER_FIXED_VALUE: usize = 0x0B2;
 const HEADER_SOFTWARE_VERSION: usize = 0x0BC;
 const HEADER_CHECKSUM: usize = 0x0BD;
 
-/// Minimum valid ROM size (must at least contain the header)
+/// Minimum valid ROM size (must at least contain the header).
 const MIN_ROM_SIZE: usize = 0xC0;
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
@@ -63,7 +63,7 @@ impl GbaRomInfo {
         })
     }
 
-    /// Validates the header checksum against the computed value
+    /// Validates the header checksum against the computed value.
     pub fn validate_checksum(&self, data: &[u8]) -> bool {
         compute_checksum(data) == self.header_checksum
     }
@@ -129,12 +129,12 @@ impl Display for GbaRomInfo {
 }
 
 /// Checks if the provided data is a GBA ROM by examining
-/// the fixed value at offset 0xB2 (must be 0x96)
+/// the fixed value at offset 0xB2 (must be 0x96).
 pub fn is_gba_rom(data: &[u8]) -> bool {
     data.len() >= MIN_ROM_SIZE && data[HEADER_FIXED_VALUE] == 0x96
 }
 
-/// Computes the header checksum for validation
+/// Computes the header checksum for validation.
 fn compute_checksum(data: &[u8]) -> u8 {
     let mut checksum: u8 = 0;
     for &byte in &data[0xA0..0xBD] {

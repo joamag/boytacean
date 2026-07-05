@@ -94,7 +94,7 @@ pub fn execute_thumb(cpu: &mut Arm7Tdmi, instr: u16) {
     }
 }
 
-/// Format 1: move shifted register (LSL, LSR, ASR)
+/// Format 1: move shifted register (LSL, LSR, ASR).
 fn thumb_shift(cpu: &mut Arm7Tdmi, instr: u16) {
     let op = (instr >> 11) & 0x03;
     let offset = ((instr >> 6) & 0x1F) as u32;
@@ -111,7 +111,7 @@ fn thumb_shift(cpu: &mut Arm7Tdmi, instr: u16) {
     cpu.cycles = 1;
 }
 
-/// Format 2: add/subtract
+/// Format 2: add/subtract.
 fn thumb_add_sub(cpu: &mut Arm7Tdmi, instr: u16) {
     let is_immediate = instr & (1 << 10) != 0;
     let is_sub = instr & (1 << 9) != 0;
@@ -144,7 +144,7 @@ fn thumb_add_sub(cpu: &mut Arm7Tdmi, instr: u16) {
     cpu.cycles = 1;
 }
 
-/// Format 3: move/compare/add/subtract immediate
+/// Format 3: move/compare/add/subtract immediate.
 fn thumb_imm_op(cpu: &mut Arm7Tdmi, instr: u16) {
     let op = (instr >> 11) & 0x03;
     let rd = ((instr >> 8) & 0x07) as u32;
@@ -188,7 +188,7 @@ fn thumb_imm_op(cpu: &mut Arm7Tdmi, instr: u16) {
     cpu.cycles = 1;
 }
 
-/// Format 4: ALU operations
+/// Format 4: ALU operations.
 fn thumb_alu(cpu: &mut Arm7Tdmi, instr: u16) {
     let op = (instr >> 6) & 0xF;
     let rs = ((instr >> 3) & 0x07) as u32;
@@ -327,7 +327,7 @@ fn thumb_alu(cpu: &mut Arm7Tdmi, instr: u16) {
     cpu.cycles = 1;
 }
 
-/// Format 5: hi register operations / branch exchange
+/// Format 5: hi register operations / branch exchange.
 fn thumb_hi_reg(cpu: &mut Arm7Tdmi, instr: u16) {
     let op = (instr >> 8) & 0x03;
     let h1 = (instr >> 7) & 1;
@@ -373,7 +373,7 @@ fn thumb_hi_reg(cpu: &mut Arm7Tdmi, instr: u16) {
     cpu.cycles = 1;
 }
 
-/// Format 6: PC-relative load (LDR Rd, [PC, #imm])
+/// Format 6: PC-relative load (LDR Rd, [PC, #imm]).
 fn thumb_pc_load(cpu: &mut Arm7Tdmi, instr: u16) {
     let rd = ((instr >> 8) & 0x07) as u32;
     let offset = ((instr & 0xFF) as u32) * 4;
@@ -386,7 +386,7 @@ fn thumb_pc_load(cpu: &mut Arm7Tdmi, instr: u16) {
     cpu.cycles = 3;
 }
 
-/// Format 7/8: load/store with register offset
+/// Format 7/8: load/store with register offset.
 fn thumb_load_store_reg(cpu: &mut Arm7Tdmi, instr: u16) {
     let opcode = (instr >> 9) & 0x07;
     let ro = ((instr >> 6) & 0x07) as u32;
@@ -454,7 +454,7 @@ fn thumb_load_store_reg(cpu: &mut Arm7Tdmi, instr: u16) {
     cpu.cycles = if opcode >= 0b011 { 3 } else { 2 };
 }
 
-/// Format 9: load/store with immediate offset
+/// Format 9: load/store with immediate offset.
 fn thumb_load_store_imm(cpu: &mut Arm7Tdmi, instr: u16) {
     let is_byte = instr & (1 << 12) != 0;
     let is_load = instr & (1 << 11) != 0;
@@ -492,7 +492,7 @@ fn thumb_load_store_imm(cpu: &mut Arm7Tdmi, instr: u16) {
     cpu.cycles = if is_load { 3 } else { 2 };
 }
 
-/// Format 10: load/store halfword
+/// Format 10: load/store halfword.
 fn thumb_load_store_half(cpu: &mut Arm7Tdmi, instr: u16) {
     let is_load = instr & (1 << 11) != 0;
     let offset = (((instr >> 6) & 0x1F) as u32) * 2;
@@ -517,7 +517,7 @@ fn thumb_load_store_half(cpu: &mut Arm7Tdmi, instr: u16) {
     cpu.cycles = if is_load { 3 } else { 2 };
 }
 
-/// Format 11: SP-relative load/store
+/// Format 11: SP-relative load/store.
 fn thumb_sp_load_store(cpu: &mut Arm7Tdmi, instr: u16) {
     let is_load = instr & (1 << 11) != 0;
     let rd = ((instr >> 8) & 0x07) as u32;
@@ -542,7 +542,7 @@ fn thumb_sp_load_store(cpu: &mut Arm7Tdmi, instr: u16) {
     cpu.cycles = if is_load { 3 } else { 2 };
 }
 
-/// Format 12: load address (ADD Rd, PC/SP, #imm)
+/// Format 12: load address (ADD Rd, PC/SP, #imm).
 fn thumb_load_addr(cpu: &mut Arm7Tdmi, instr: u16) {
     let use_sp = instr & (1 << 11) != 0;
     let rd = ((instr >> 8) & 0x07) as u32;
@@ -559,7 +559,7 @@ fn thumb_load_addr(cpu: &mut Arm7Tdmi, instr: u16) {
     cpu.cycles = 1;
 }
 
-/// Format 13: add offset to SP
+/// Format 13: add offset to SP.
 fn thumb_sp_offset(cpu: &mut Arm7Tdmi, instr: u16) {
     let offset = ((instr & 0x7F) as u32) * 4;
     let negative = instr & (1 << 7) != 0;
@@ -576,7 +576,7 @@ fn thumb_sp_offset(cpu: &mut Arm7Tdmi, instr: u16) {
     cpu.cycles = 1;
 }
 
-/// Format 14: push/pop registers
+/// Format 14: push/pop registers.
 fn thumb_push_pop(cpu: &mut Arm7Tdmi, instr: u16) {
     let is_pop = instr & (1 << 11) != 0;
     let store_lr_load_pc = instr & (1 << 8) != 0;
@@ -618,7 +618,7 @@ fn thumb_push_pop(cpu: &mut Arm7Tdmi, instr: u16) {
     cpu.cycles = 2 + reg_list.count_ones() + store_lr_load_pc as u32;
 }
 
-/// Format 15: multiple load/store (LDMIA, STMIA)
+/// Format 15: multiple load/store (LDMIA, STMIA).
 fn thumb_ldm_stm(cpu: &mut Arm7Tdmi, instr: u16) {
     let is_load = instr & (1 << 11) != 0;
     let rb = ((instr >> 8) & 0x07) as u32;
@@ -678,7 +678,7 @@ fn thumb_ldm_stm(cpu: &mut Arm7Tdmi, instr: u16) {
     };
 }
 
-/// Format 16: conditional branch
+/// Format 16: conditional branch.
 fn thumb_cond_branch(cpu: &mut Arm7Tdmi, instr: u16) {
     let cond = (instr >> 8) & 0xF;
     let offset = ((instr & 0xFF) as i8 as i32) * 2;
@@ -711,7 +711,7 @@ fn thumb_cond_branch(cpu: &mut Arm7Tdmi, instr: u16) {
     }
 }
 
-/// Format 17: software interrupt
+/// Format 17: software interrupt.
 fn thumb_swi(cpu: &mut Arm7Tdmi, instr: u16) {
     let comment = (instr & 0xFF) as u8;
 
@@ -740,7 +740,7 @@ fn thumb_swi(cpu: &mut Arm7Tdmi, instr: u16) {
     cpu.cycles = 3;
 }
 
-/// Format 18: unconditional branch
+/// Format 18: unconditional branch.
 fn thumb_branch(cpu: &mut Arm7Tdmi, instr: u16) {
     let offset = ((instr & 0x07FF) as i32) << 21 >> 20; // sign-extend, shift left by 1
     let target = (cpu.pc() as i32).wrapping_add(offset) as u32;
@@ -749,7 +749,7 @@ fn thumb_branch(cpu: &mut Arm7Tdmi, instr: u16) {
     cpu.cycles = 3;
 }
 
-/// Format 19: long branch with link (two-instruction sequence)
+/// Format 19: long branch with link (two-instruction sequence).
 fn thumb_long_branch(cpu: &mut Arm7Tdmi, instr: u16) {
     let is_second = instr & (1 << 11) != 0;
 

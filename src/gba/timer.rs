@@ -3,31 +3,31 @@
 use crate::gba::consts::TIMER_PRESCALERS;
 
 pub struct GbaTimer {
-    /// Current counter value
+    /// Current counter value.
     counter: u16,
 
-    /// Reload value (written to TM*CNT_L)
+    /// Reload value (written to TM*CNT_L).
     reload: u16,
 
-    /// Control register (TM*CNT_H)
+    /// Control register (TM*CNT_H).
     control: u16,
 
-    /// Internal prescaler cycle counter
+    /// Internal prescaler cycle counter.
     prescaler_counter: u32,
 
-    /// Derived: timer enabled
+    /// Derived: timer enabled.
     enabled: bool,
 
-    /// Derived: interrupt on overflow
+    /// Derived: interrupt on overflow.
     irq_enable: bool,
 
-    /// Derived: cascade mode (count on previous timer overflow)
+    /// Derived: cascade mode (count on previous timer overflow).
     cascade: bool,
 
-    /// Derived: prescaler divisor (1, 64, 256, 1024)
+    /// Derived: prescaler divisor (1, 64, 256, 1024).
     prescaler: u32,
 
-    /// Overflow flag (set when timer overflows, consumed externally)
+    /// Overflow flag (set when timer overflows, consumed externally).
     overflow: bool,
 }
 
@@ -123,7 +123,8 @@ impl GbaTimer {
     }
 
     /// Handles a cascade tick from the previous timer's overflow.
-    /// Returns true if this timer also overflows
+    ///
+    /// Returns true if this timer also overflows.
     pub fn cascade_tick(&mut self) -> bool {
         if !self.enabled || !self.cascade {
             return false;
@@ -165,7 +166,8 @@ impl GbaTimers {
     }
 
     /// Clocks all 4 timers, handling cascade chains.
-    /// Returns a bitmask of which timers overflowed (bit 0 = TM0, etc)
+    ///
+    /// Returns a bitmask of which timers overflowed (bit 0 = TM0, etc).
     #[inline(always)]
     pub fn clock(&mut self, cycles: u32) -> u8 {
         // fast path: no enabled timer means nothing can tick or overflow

@@ -60,40 +60,40 @@ impl GbaClockFrame {
 /// Should serve as the main entry-point API.
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 pub struct GameBoyAdvance {
-    /// The ARM7TDMI CPU (includes the memory bus)
+    /// The ARM7TDMI CPU (includes the memory bus).
     #[cfg_attr(feature = "wasm", wasm_bindgen(skip))]
     pub cpu: Arm7Tdmi,
 
-    /// Frame counter tracking completed frames
+    /// Frame counter tracking completed frames.
     frame: u64,
 
-    /// If the PPU is enabled, it will be clocked
+    /// If the PPU is enabled, it will be clocked.
     ppu_enabled: bool,
 
-    /// If the APU is enabled, it will be clocked
+    /// If the APU is enabled, it will be clocked.
     apu_enabled: bool,
 
-    /// If DMA is enabled, it will be processed
+    /// If DMA is enabled, it will be processed.
     dma_enabled: bool,
 
-    /// If timers are enabled, they will be clocked
+    /// If timers are enabled, they will be clocked.
     timer_enabled: bool,
 
-    /// ROM information extracted from the header
+    /// ROM information extracted from the header.
     rom_info: Option<GbaRomInfo>,
 }
 
 impl GameBoyAdvance {
-    /// CPU clock frequency: 16.78 MHz
+    /// CPU clock frequency: 16.78 MHz.
     pub const CPU_FREQ: u32 = consts::CPU_FREQ;
 
-    /// Visual refresh frequency (~59.7275 Hz)
+    /// Visual refresh frequency (~59.7275 Hz).
     pub const VISUAL_FREQ: f32 = consts::VISUAL_FREQ;
 
-    /// Display width in pixels
+    /// Display width in pixels.
     pub const DISPLAY_WIDTH: usize = DISPLAY_WIDTH;
 
-    /// Display height in pixels
+    /// Display height in pixels.
     pub const DISPLAY_HEIGHT: usize = DISPLAY_HEIGHT;
 
     /// Loads a real BIOS ROM from a byte slice.
@@ -121,17 +121,17 @@ impl GameBoyAdvance {
         Ok(info)
     }
 
-    /// Returns the current frame buffer (RGB888)
+    /// Returns the current frame buffer (RGB888).
     pub fn frame_buffer(&self) -> &[u8] {
         self.cpu.bus.ppu.frame_buffer()
     }
 
-    /// Returns a reference to the audio buffer
+    /// Returns a reference to the audio buffer.
     pub fn audio_buffer(&self) -> &VecDeque<i16> {
         self.cpu.bus.apu.audio_buffer()
     }
 
-    /// Returns the ROM information if a ROM has been loaded
+    /// Returns the ROM information if a ROM has been loaded.
     pub fn rom_info(&self) -> Option<&GbaRomInfo> {
         self.rom_info.as_ref()
     }
@@ -155,6 +155,7 @@ impl GameBoyAdvance {
     }
 
     /// Advances the clock by one CPU instruction, clocking all subsystems.
+    ///
     /// Returns the number of cycles elapsed during this clock.
     pub fn clock(&mut self) -> u32 {
         // handle halt state
@@ -252,7 +253,7 @@ impl GameBoyAdvance {
         cycles
     }
 
-    /// Processes pending DMA transfers
+    /// Processes pending DMA transfers.
     fn process_dma(&mut self) {
         while let Some(index) = self.cpu.bus.dma.highest_active() {
             let channel = &mut self.cpu.bus.dma.channels[index];
@@ -280,7 +281,7 @@ impl GameBoyAdvance {
         }
     }
 
-    /// Clocks the emulator until a full frame is completed
+    /// Clocks the emulator until a full frame is completed.
     pub fn next_frame(&mut self) -> u64 {
         let mut cycles = 0u64;
         let last_frame = self.frame;
@@ -290,7 +291,7 @@ impl GameBoyAdvance {
         cycles
     }
 
-    /// Clocks the emulator for the given number of cycles
+    /// Clocks the emulator for the given number of cycles.
     pub fn clocks_cycles(&mut self, limit: usize) -> u64 {
         let mut cycles = 0u64;
         while cycles < limit as u64 {
@@ -299,12 +300,12 @@ impl GameBoyAdvance {
         cycles
     }
 
-    /// Returns the current frame number
+    /// Returns the current frame number.
     pub fn ppu_frame(&self) -> u64 {
         self.frame
     }
 
-    /// Clears the audio buffer
+    /// Clears the audio buffer.
     pub fn clear_audio_buffer(&mut self) {
         self.cpu.bus.apu.clear_audio_buffer();
     }

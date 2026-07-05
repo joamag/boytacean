@@ -6,13 +6,13 @@ use crate::gba::consts::{
 };
 
 pub struct IrqController {
-    /// Interrupt Master Enable (IME) - global interrupt toggle
+    /// Interrupt Master Enable (IME) - global interrupt toggle.
     ime: bool,
 
-    /// Interrupt Enable register (IE) - per-source enable bits
+    /// Interrupt Enable register (IE) - per-source enable bits.
     ie: u16,
 
-    /// Interrupt Request Flags register (IF) - pending interrupt bits
+    /// Interrupt Request Flags register (IF) - pending interrupt bits.
     if_: u16,
 }
 
@@ -46,24 +46,24 @@ impl IrqController {
     }
 
     /// Acknowledges interrupts by writing 1 bits to IF
-    /// (writing 1 clears the corresponding bit)
+    /// (writing 1 clears the corresponding bit).
     pub fn ack_if(&mut self, value: u16) {
         self.if_ &= !value;
     }
 
-    /// Raises an interrupt by setting the corresponding bit in IF
+    /// Raises an interrupt by setting the corresponding bit in IF.
     pub fn raise(&mut self, irq: u16) {
         self.if_ |= irq;
     }
 
     /// Returns true if there are any pending interrupts that
-    /// are both enabled (IE) and requested (IF) with IME on
+    /// are both enabled (IE) and requested (IF) with IME on.
     pub fn pending(&self) -> bool {
         self.ime && (self.ie & self.if_) != 0
     }
 
     /// Returns the highest priority pending interrupt bit,
-    /// or 0 if no interrupts are pending
+    /// or 0 if no interrupts are pending.
     pub fn highest_pending(&self) -> u16 {
         let pending = self.ie & self.if_;
         if pending == 0 {

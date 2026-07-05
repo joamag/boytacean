@@ -6,6 +6,7 @@
 use crate::{gba::cpu::Arm7Tdmi, warnln};
 
 /// Handles a SWI call by dispatching to the appropriate HLE function.
+///
 /// The comment field identifies which SWI is being called.
 pub fn handle_swi(cpu: &mut Arm7Tdmi, comment: u8) {
     match comment {
@@ -112,7 +113,7 @@ fn swi_stop(cpu: &mut Arm7Tdmi) {
 ///
 /// Sets intr_wait_flags so the re-halt check in cpu.rs keeps the CPU halted until matched.
 ///
-/// R0 = discard_old, R1 = interrupt flags to wait for
+/// R0 = discard_old, R1 = interrupt flags to wait for.
 fn swi_intr_wait(cpu: &mut Arm7Tdmi) {
     let discard_old = cpu.reg(0);
     let flags = cpu.reg(1) as u16;
@@ -193,7 +194,7 @@ fn swi_div_arm(cpu: &mut Arm7Tdmi) {
 
 /// SWI 0x08: Sqrt - integer square root.
 ///
-/// R0 = value, returns R0 = sqrt(value)
+/// R0 = value, returns R0 = sqrt(value).
 fn swi_sqrt(cpu: &mut Arm7Tdmi) {
     let value = cpu.reg(0);
     let result = (value as f64).sqrt() as u32;
@@ -202,7 +203,7 @@ fn swi_sqrt(cpu: &mut Arm7Tdmi) {
 
 /// SWI 0x09: ArcTan - arctangent.
 ///
-/// R0 = tan (fixed point), returns R0 = angle
+/// R0 = tan (fixed point), returns R0 = angle.
 fn swi_arctan(cpu: &mut Arm7Tdmi) {
     let tan = cpu.reg(0) as i16 as f64 / 16384.0;
     let angle = tan.atan();
@@ -212,7 +213,7 @@ fn swi_arctan(cpu: &mut Arm7Tdmi) {
 
 /// SWI 0x0A: ArcTan2 - arctangent of y/x.
 ///
-/// R0 = x, R1 = y, returns R0 = angle (0x0000-0xFFFF)
+/// R0 = x, R1 = y, returns R0 = angle (0x0000-0xFFFF).
 fn swi_arctan2(cpu: &mut Arm7Tdmi) {
     let x = cpu.reg(0) as i16 as f64;
     let y = cpu.reg(1) as i16 as f64;
@@ -224,7 +225,7 @@ fn swi_arctan2(cpu: &mut Arm7Tdmi) {
 
 /// SWI 0x0B: CpuSet - memory copy/fill.
 ///
-/// R0 = source, R1 = destination, R2 = length/mode
+/// R0 = source, R1 = destination, R2 = length/mode.
 fn swi_cpu_set(cpu: &mut Arm7Tdmi) {
     let src = cpu.reg(0);
     let dst = cpu.reg(1);
@@ -259,7 +260,7 @@ fn swi_cpu_set(cpu: &mut Arm7Tdmi) {
 
 /// SWI 0x0C: CpuFastSet - fast memory copy/fill (32-bit, 8-word aligned).
 ///
-/// R0 = source, R1 = destination, R2 = length/mode
+/// R0 = source, R1 = destination, R2 = length/mode.
 fn swi_cpu_fast_set(cpu: &mut Arm7Tdmi) {
     let src = cpu.reg(0);
     let dst = cpu.reg(1);
@@ -357,7 +358,7 @@ fn swi_obj_affine_set(cpu: &mut Arm7Tdmi) {
 
 /// SWI 0x10: BitUnPack - bit unpacking.
 ///
-/// R0 = source, R1 = destination, R2 = pointer to unpack info
+/// R0 = source, R1 = destination, R2 = pointer to unpack info.
 fn swi_bit_unpack(cpu: &mut Arm7Tdmi) {
     let src = cpu.reg(0);
     let dst = cpu.reg(1);
@@ -424,7 +425,7 @@ fn swi_lz77_decomp_vram(cpu: &mut Arm7Tdmi) {
     lz77_decomp(cpu, true);
 }
 
-/// Shared LZ77 decompression logic
+/// Shared LZ77 decompression logic.
 fn lz77_decomp(cpu: &mut Arm7Tdmi, vram_mode: bool) {
     let src = cpu.reg(0);
     let mut dst = cpu.reg(1);
@@ -507,7 +508,7 @@ fn lz77_decomp(cpu: &mut Arm7Tdmi, vram_mode: bool) {
 
 /// SWI 0x13: HuffUnComp - huffman decompression.
 ///
-/// R0 = source, R1 = destination
+/// R0 = source, R1 = destination.
 fn swi_huff_decomp(cpu: &mut Arm7Tdmi) {
     let src = cpu.reg(0);
     let mut dst = cpu.reg(1);
@@ -596,7 +597,7 @@ fn swi_rl_decomp_vram(cpu: &mut Arm7Tdmi) {
     rl_decomp(cpu, true);
 }
 
-/// Shared run-length decompression logic
+/// Shared run-length decompression logic.
 #[allow(unused_assignments)]
 fn rl_decomp(cpu: &mut Arm7Tdmi, vram_mode: bool) {
     let src = cpu.reg(0);
@@ -682,7 +683,7 @@ fn swi_diff_unfilt8_vram(cpu: &mut Arm7Tdmi) {
     diff_unfilt8(cpu, true);
 }
 
-/// Shared 8-bit differential unfilter logic
+/// Shared 8-bit differential unfilter logic.
 fn diff_unfilt8(cpu: &mut Arm7Tdmi, vram_mode: bool) {
     let src = cpu.reg(0);
     let mut dst = cpu.reg(1);
@@ -760,7 +761,7 @@ fn swi_sound_bias(cpu: &mut Arm7Tdmi) {
 
 /// SWI 0x1F: MidiKey2Freq - converts MIDI key to frequency.
 ///
-/// R0 = wave data pointer, R1 = MIDI key, R2 = pitch adjust (fp)
+/// R0 = wave data pointer, R1 = MIDI key, R2 = pitch adjust (fp).
 fn swi_midi_key2freq(cpu: &mut Arm7Tdmi) {
     let wave = cpu.reg(0);
     let mk = cpu.reg(1);

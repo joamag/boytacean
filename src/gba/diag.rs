@@ -11,6 +11,7 @@ use std::{fs::File, io::Write};
 use crate::{gba::GameBoyAdvance, pad::PadKey};
 
 /// Runs diagnostics on a GBA instance after executing some frames.
+///
 /// Prints CPU state, PPU state, memory contents, and frame buffer status.
 pub fn run_diagnostics(gba: &mut GameBoyAdvance, num_frames: u32) {
     println!("=== GBA Diagnostics ===");

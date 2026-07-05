@@ -18,12 +18,13 @@ use crate::{
 };
 
 /// Number of idle cycles consumed per step while the CPU is halted.
+///
 /// Small enough that no PPU scanline transition (1232 cycles) or
 /// practical timer overflow can be skipped within a single batch,
 /// large enough to amortize the per-step subsystem dispatch cost.
 const HALT_IDLE_CYCLES: u32 = 16;
 
-/// Index mapping for banked SPSR: FIQ=0, SVC=1, ABT=2, IRQ=3, UND=4
+/// Index mapping for banked SPSR: FIQ=0, SVC=1, ABT=2, IRQ=3, UND=4.
 fn mode_to_spsr_index(mode: u32) -> Option<usize> {
     match mode & CPSR_MODE_MASK {
         0x11 => Some(0), // FIQ
@@ -35,24 +36,24 @@ fn mode_to_spsr_index(mode: u32) -> Option<usize> {
     }
 }
 
-/// Banked register storage for privileged CPU modes
+/// Banked register storage for privileged CPU modes.
 struct BankedRegisters {
-    /// FIQ mode banks R8-R14 (7 registers)
+    /// FIQ mode banks R8-R14 (7 registers).
     fiq: [u32; 7],
 
-    /// IRQ mode banks R13-R14 (2 registers)
+    /// IRQ mode banks R13-R14 (2 registers).
     irq: [u32; 2],
 
-    /// SVC mode banks R13-R14 (2 registers)
+    /// SVC mode banks R13-R14 (2 registers).
     svc: [u32; 2],
 
-    /// ABT mode banks R13-R14 (2 registers)
+    /// ABT mode banks R13-R14 (2 registers).
     abt: [u32; 2],
 
-    /// UND mode banks R13-R14 (2 registers)
+    /// UND mode banks R13-R14 (2 registers).
     und: [u32; 2],
 
-    /// User/system mode R8-R14 (saved when switching away)
+    /// User/system mode R8-R14 (saved when switching away).
     usr: [u32; 7],
 }
 
@@ -77,35 +78,35 @@ impl Default for BankedRegisters {
 
 pub struct Arm7Tdmi {
     /// General-purpose registers R0-R15
-    /// R13 = SP, R14 = LR, R15 = PC
+    /// R13 = SP, R14 = LR, R15 = PC.
     regs: [u32; 16],
 
-    /// Current program status register
+    /// Current program status register.
     cpsr: u32,
 
-    /// Saved program status registers (one per privileged mode)
+    /// Saved program status registers (one per privileged mode).
     spsr: [u32; 5],
 
-    /// Banked registers for each CPU mode
+    /// Banked registers for each CPU mode.
     banked: BankedRegisters,
 
-    /// Memory bus
+    /// Memory bus.
     pub bus: GbaBus,
 
-    /// Cycles consumed by the last instruction
+    /// Cycles consumed by the last instruction.
     pub cycles: u32,
 
-    /// Whether the CPU is halted (waiting for interrupt)
+    /// Whether the CPU is halted (waiting for interrupt).
     halted: bool,
 
-    /// Whether we already warned about halt deadlock (to avoid spam)
+    /// Whether we already warned about halt deadlock (to avoid spam).
     halt_deadlock_warned: bool,
 
-    /// Infinite loop detection: previous PC and repeat count
+    /// Infinite loop detection: previous PC and repeat count.
     prev_pc: u32,
     same_pc_count: u32,
 
-    /// Pipeline state for prefetched instruction
+    /// Pipeline state for prefetched instruction.
     pipeline: [u32; 2],
     pipeline_valid: bool,
 }
@@ -140,6 +141,7 @@ impl Arm7Tdmi {
     }
 
     /// Resets the CPU to boot from the BIOS at address 0x00000000.
+    ///
     /// The real BIOS will initialize all registers and stack pointers,
     /// then jump to the ROM entry point.
     pub fn reset_for_bios_boot(&mut self) {
@@ -172,7 +174,7 @@ impl Arm7Tdmi {
         }
     }
 
-    /// Reads a register from the user/system bank (for STM with S bit)
+    /// Reads a register from the user/system bank (for STM with S bit).
     pub fn reg_user(&self, index: u32) -> u32 {
         let i = index as usize & 0xF;
         let mode = self.cpsr & CPSR_MODE_MASK;
@@ -196,7 +198,7 @@ impl Arm7Tdmi {
         }
     }
 
-    /// Writes a register to the user/system bank (for LDM with S bit, no PC)
+    /// Writes a register to the user/system bank (for LDM with S bit, no PC).
     pub fn set_reg_user(&mut self, index: u32, value: u32) {
         let i = index as usize & 0xF;
         let mode = self.cpsr & CPSR_MODE_MASK;
@@ -283,7 +285,7 @@ impl Arm7Tdmi {
         self.cpsr & CPSR_T != 0
     }
 
-    /// Sets the N and Z flags based on a result value
+    /// Sets the N and Z flags based on a result value.
     #[inline(always)]
     pub fn set_nz_flags(&mut self, result: u32) {
         self.cpsr = (self.cpsr & !(CPSR_N | CPSR_Z))
@@ -358,6 +360,7 @@ impl Arm7Tdmi {
     }
 
     /// Fetches the next instruction from the pipeline without advancing PC.
+    ///
     /// The PC advance happens after instruction execution in [`Self::step()`].
     fn fetch(&mut self) -> u32 {
         if !self.pipeline_valid {
@@ -555,7 +558,7 @@ impl Arm7Tdmi {
         self.cycles
     }
 
-    /// Checks the condition code of an ARM instruction
+    /// Checks the condition code of an ARM instruction.
     #[inline(always)]
     pub fn check_condition(&self, instr: u32) -> bool {
         let cond = instr >> 28;
@@ -580,7 +583,7 @@ impl Arm7Tdmi {
         }
     }
 
-    /// Enters an exception (interrupt, SWI, etc)
+    /// Enters an exception (interrupt, SWI, etc).
     pub fn enter_exception(&mut self, vector: u32, mode: u32) {
         let old_cpsr = self.cpsr;
         // for IRQ: LR_irq = next_instruction + 4
@@ -605,7 +608,7 @@ impl Arm7Tdmi {
         self.flush_pipeline();
     }
 
-    /// Restores CPSR from SPSR (used by exception return instructions)
+    /// Restores CPSR from SPSR (used by exception return instructions).
     pub fn restore_cpsr(&mut self) {
         let spsr = self.spsr();
         self.set_cpsr(spsr);
@@ -675,7 +678,7 @@ impl Arm7Tdmi {
         }
     }
 
-    /// Handles R8-R12 banking when switching between FIQ and non-FIQ modes
+    /// Handles R8-R12 banking when switching between FIQ and non-FIQ modes.
     fn swap_banked_registers(&mut self, old_mode: u32, new_mode: u32) {
         let was_fiq = old_mode == MODE_FIQ;
         let is_fiq = new_mode == MODE_FIQ;
@@ -703,7 +706,7 @@ impl Arm7Tdmi {
 
     // barrel shifter operations
 
-    /// Performs a barrel shift operation, returning (result, carry_out)
+    /// Performs a barrel shift operation, returning (result, carry_out).
     pub fn barrel_shift(&self, value: u32, shift_type: u32, amount: u32) -> (u32, bool) {
         if amount == 0 {
             return (value, self.flag_c());
@@ -757,7 +760,7 @@ impl Arm7Tdmi {
         }
     }
 
-    /// Barrel shift with special handling for immediate shift amounts of 0
+    /// Barrel shift with special handling for immediate shift amounts of 0.
     pub fn barrel_shift_immediate(&self, value: u32, shift_type: u32, amount: u32) -> (u32, bool) {
         match (shift_type, amount) {
             (0, 0) => (value, self.flag_c()), // LSL #0 = no shift

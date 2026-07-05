@@ -15,7 +15,7 @@ pub const OBJ_COUNT: usize = 128;
 /// Maximum number of BG layers.
 pub const BG_COUNT: usize = 4;
 
-/// Layer ID for blending target identification
+/// Layer ID for blending target identification.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
 enum Layer {
@@ -56,7 +56,7 @@ enum BlendMode {
     BrightnessDec = 3,
 }
 
-/// PPU rendering mode derived from DISPCNT bits 0-2
+/// PPU rendering mode derived from DISPCNT bits 0-2.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum VideoMode {
     Mode0 = 0,

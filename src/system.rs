@@ -58,7 +58,7 @@ pub enum System {
 
 impl System {
     /// Detects the system type from the ROM data and creates
-    /// the appropriate emulator instance
+    /// the appropriate emulator instance.
     pub fn from_rom(data: &[u8]) -> Result<Self, Error> {
         if is_gba_rom(data) {
             let mut gba = GameBoyAdvance::new();

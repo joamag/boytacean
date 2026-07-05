@@ -31,76 +31,76 @@ use crate::{
     },
 };
 
-/// Size of the BIOS stub (we only need a small region for HLE stubs)
+/// Size of the BIOS stub (we only need a small region for HLE stubs).
 const BIOS_SIZE: usize = 0x4000;
 
 pub struct GbaBus {
-    /// BIOS memory (16KB, contains HLE stubs for IRQ handler etc.)
+    /// BIOS memory (16KB, contains HLE stubs for IRQ handler etc.).
     pub bios: Box<[u8; BIOS_SIZE]>,
 
-    /// External work RAM (256KB)
+    /// External work RAM (256KB).
     pub ewram: Box<[u8; EWRAM_SIZE]>,
 
-    /// Internal work RAM (32KB)
+    /// Internal work RAM (32KB).
     pub iwram: Box<[u8; IWRAM_SIZE]>,
 
-    /// Palette RAM (1KB)
+    /// Palette RAM (1KB).
     pub palette: Box<[u8; PALETTE_SIZE]>,
 
-    /// Video RAM (96KB)
+    /// Video RAM (96KB).
     pub vram: Box<[u8; VRAM_SIZE]>,
 
-    /// OAM - object attribute memory (1KB)
+    /// OAM - object attribute memory (1KB).
     pub oam: Box<[u8; OAM_SIZE]>,
 
-    /// Cartridge ROM data
+    /// Cartridge ROM data.
     pub rom: Vec<u8>,
 
-    /// Cartridge save media (SRAM/Flash)
+    /// Cartridge save media (SRAM/Flash).
     pub save: SaveMedia,
 
-    /// PPU
+    /// PPU.
     pub ppu: GbaPpu,
 
-    /// APU
+    /// APU.
     pub apu: GbaApu,
 
-    /// DMA controller
+    /// DMA controller.
     pub dma: GbaDma,
 
-    /// Timers
+    /// Timers.
     pub timers: GbaTimers,
 
-    /// Keypad input
+    /// Keypad input.
     pub pad: GbaPad,
 
-    /// Interrupt controller
+    /// Interrupt controller.
     pub irq: IrqController,
 
-    /// Wait state control register
+    /// Wait state control register.
     pub waitcnt: u16,
 
-    /// Post boot flag
+    /// Post boot flag.
     pub postflg: u8,
 
-    /// Halt flag (set via HALTCNT register)
+    /// Halt flag (set via HALTCNT register).
     pub halt_requested: bool,
 
     /// IntrWait flags for HLE SWI 0x04/0x05: re-halts the CPU until
     /// a serviced IRQ matches these bits. Zero with real BIOS.
     pub intr_wait_flags: u16,
 
-    /// Last BIOS read value (for open bus emulation)
+    /// Last BIOS read value (for open bus emulation).
     bios_value: u32,
 
-    /// Whether BIOS reads are currently allowed (true when CPU PC is in BIOS)
+    /// Whether BIOS reads are currently allowed (true when CPU PC is in BIOS).
     pub bios_readable: bool,
 
-    /// Whether a real BIOS ROM is loaded (disables HLE SWI handling)
+    /// Whether a real BIOS ROM is loaded (disables HLE SWI handling).
     pub use_real_bios: bool,
 }
 
-/// Allocates a zeroed fixed-size byte array directly on the heap
+/// Allocates a zeroed fixed-size byte array directly on the heap.
 fn boxed_array<const N: usize>() -> Box<[u8; N]> {
     vec![0u8; N].into_boxed_slice().try_into().unwrap()
 }
@@ -134,7 +134,7 @@ impl GbaBus {
         bus
     }
 
-    /// Writes ARM instruction word into BIOS memory at given address
+    /// Writes ARM instruction word into BIOS memory at given address.
     fn bios_write32(&mut self, addr: u32, value: u32) {
         let offset = addr as usize;
         if offset + 3 < self.bios.len() {
@@ -200,6 +200,7 @@ impl GbaBus {
     }
 
     /// Loads a real BIOS ROM, replacing the HLE stubs.
+    ///
     /// When a real BIOS is loaded, SWI instructions will execute
     /// through the actual BIOS code instead of HLE handlers.
     pub fn load_bios(&mut self, data: &[u8]) {
@@ -497,7 +498,7 @@ impl GbaBus {
         }
     }
 
-    /// Mirrors VRAM address (96KB total: 64KB + 32KB mirrored)
+    /// Mirrors VRAM address (96KB total: 64KB + 32KB mirrored).
     #[inline(always)]
     fn mirror_vram(&self, addr: u32) -> usize {
         let offset = (addr & 0x1FFFF) as usize;
@@ -736,7 +737,7 @@ impl GbaBus {
         }
     }
 
-    /// Handles 32-bit DMA address register writes (split across two 16-bit writes)
+    /// Handles 32-bit DMA address register writes (split across two 16-bit writes).
     fn write_dma_addr(&mut self, addr: u32, value: u16) {
         match addr {
             REG_DMA0SAD => {
@@ -807,7 +808,7 @@ impl GbaBus {
         }
     }
 
-    /// Handles 32-bit BG reference point register writes
+    /// Handles 32-bit BG reference point register writes.
     fn write_bg_ref(&mut self, addr: u32, value: u16) {
         match addr {
             REG_BG2X => self.ppu.set_bg_ref_x_lo(0, value),
@@ -1502,7 +1503,7 @@ mod tests {
     /// 6. Configure DMA1 (source=EWRAM, dest=FIFO_A, timing=SPECIAL, repeat, 32-bit)
     /// 7. Clock timers until overflow → APU pops sample → DMA refills FIFO
     /// 8. Clock APU to generate output samples
-    /// 9. Verify audio buffer contains non-zero DirectSound output
+    /// 9. Verify audio buffer contains non-zero DirectSound output.
     #[test]
     fn test_direct_sound_full_pipeline() {
         let mut bus = GbaBus::new();
@@ -1724,6 +1725,7 @@ mod tests {
     }
 
     /// Tests that a read-modify-write on SOUNDCNT_H does NOT reset the FIFO.
+    ///
     /// This was a critical bug: FIFO reset bits (11, 15) were persisted in the
     /// stored register value, causing every read-modify-write to clear the FIFO.
     #[test]

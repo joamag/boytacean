@@ -101,7 +101,7 @@ pub fn execute_arm(cpu: &mut Arm7Tdmi, instr: u32) {
     }
 }
 
-/// ARM data processing instructions
+/// ARM data processing instructions.
 fn arm_data_processing(cpu: &mut Arm7Tdmi, instr: u32) {
     let opcode = (instr >> 21) & 0xF;
     let set_flags = instr & (1 << 20) != 0;
@@ -322,7 +322,7 @@ fn arm_data_processing(cpu: &mut Arm7Tdmi, instr: u32) {
     cpu.cycles = 1;
 }
 
-/// ARM multiply instruction (MUL, MLA)
+/// ARM multiply instruction (MUL, MLA).
 fn arm_multiply(cpu: &mut Arm7Tdmi, instr: u32) {
     let rd = (instr >> 16) & 0xF;
     let rn = (instr >> 12) & 0xF;
@@ -346,7 +346,7 @@ fn arm_multiply(cpu: &mut Arm7Tdmi, instr: u32) {
     cpu.cycles = 2; // simplified timing
 }
 
-/// ARM multiply long instruction (UMULL, UMLAL, SMULL, SMLAL)
+/// ARM multiply long instruction (UMULL, UMLAL, SMULL, SMLAL).
 fn arm_multiply_long(cpu: &mut Arm7Tdmi, instr: u32) {
     let rd_hi = (instr >> 16) & 0xF;
     let rd_lo = (instr >> 12) & 0xF;
@@ -391,7 +391,7 @@ fn arm_multiply_long(cpu: &mut Arm7Tdmi, instr: u32) {
     cpu.cycles = 3; // simplified timing
 }
 
-/// ARM single data swap (SWP, SWPB)
+/// ARM single data swap (SWP, SWPB).
 fn arm_swap(cpu: &mut Arm7Tdmi, instr: u32) {
     let rn = (instr >> 16) & 0xF;
     let rd = (instr >> 12) & 0xF;
@@ -420,7 +420,7 @@ fn arm_swap(cpu: &mut Arm7Tdmi, instr: u32) {
     cpu.cycles = 4;
 }
 
-/// ARM halfword and signed data transfer (LDRH, STRH, LDRSB, LDRSH)
+/// ARM halfword and signed data transfer (LDRH, STRH, LDRSB, LDRSH).
 fn arm_halfword_transfer(cpu: &mut Arm7Tdmi, instr: u32) {
     let pre_index = instr & (1 << 24) != 0;
     let add_offset = instr & (1 << 23) != 0;
@@ -497,7 +497,7 @@ fn arm_halfword_transfer(cpu: &mut Arm7Tdmi, instr: u32) {
     cpu.cycles = if is_load { 3 } else { 2 };
 }
 
-/// ARM single data transfer (LDR, STR, LDRB, STRB)
+/// ARM single data transfer (LDR, STR, LDRB, STRB).
 fn arm_single_transfer(cpu: &mut Arm7Tdmi, instr: u32) {
     let is_register = instr & (1 << 25) != 0;
     let pre_index = instr & (1 << 24) != 0;
@@ -575,7 +575,7 @@ fn arm_single_transfer(cpu: &mut Arm7Tdmi, instr: u32) {
     cpu.cycles = if is_load { 3 } else { 2 };
 }
 
-/// ARM block data transfer (LDM, STM)
+/// ARM block data transfer (LDM, STM).
 fn arm_block_transfer(cpu: &mut Arm7Tdmi, instr: u32) {
     let pre_index = instr & (1 << 24) != 0;
     let add_offset = instr & (1 << 23) != 0;
@@ -680,7 +680,7 @@ fn arm_block_transfer(cpu: &mut Arm7Tdmi, instr: u32) {
     cpu.cycles = count + if is_load { 2 } else { 1 };
 }
 
-/// ARM branch and branch with link (B, BL)
+/// ARM branch and branch with link (B, BL).
 fn arm_branch(cpu: &mut Arm7Tdmi, instr: u32) {
     let link = instr & (1 << 24) != 0;
     let offset = ((instr & 0x00FFFFFF) as i32) << 8 >> 6; // sign-extend and shift left by 2
@@ -695,7 +695,7 @@ fn arm_branch(cpu: &mut Arm7Tdmi, instr: u32) {
     cpu.cycles = 3;
 }
 
-/// ARM branch and exchange (BX)
+/// ARM branch and exchange (BX).
 fn arm_branch_exchange(cpu: &mut Arm7Tdmi, instr: u32) {
     let rm = instr & 0xF;
     let addr = cpu.reg(rm);
@@ -713,7 +713,7 @@ fn arm_branch_exchange(cpu: &mut Arm7Tdmi, instr: u32) {
     cpu.cycles = 3;
 }
 
-/// ARM MRS (transfer PSR to register)
+/// ARM MRS (transfer PSR to register).
 fn arm_mrs(cpu: &mut Arm7Tdmi, instr: u32) {
     let rd = (instr >> 12) & 0xF;
     let use_spsr = instr & (1 << 22) != 0;
@@ -724,7 +724,7 @@ fn arm_mrs(cpu: &mut Arm7Tdmi, instr: u32) {
     cpu.cycles = 1;
 }
 
-/// ARM MSR (transfer register to PSR)
+/// ARM MSR (transfer register to PSR).
 fn arm_msr_reg(cpu: &mut Arm7Tdmi, instr: u32) {
     let use_spsr = instr & (1 << 22) != 0;
     let rm = instr & 0xF;
@@ -736,7 +736,7 @@ fn arm_msr_reg(cpu: &mut Arm7Tdmi, instr: u32) {
     cpu.cycles = 1;
 }
 
-/// ARM MSR immediate
+/// ARM MSR immediate.
 fn arm_msr_imm(cpu: &mut Arm7Tdmi, instr: u32) {
     let use_spsr = instr & (1 << 22) != 0;
     let imm = instr & 0xFF;
@@ -749,7 +749,7 @@ fn arm_msr_imm(cpu: &mut Arm7Tdmi, instr: u32) {
     cpu.cycles = 1;
 }
 
-/// Builds a mask for PSR writes based on the field mask bits (16-19)
+/// Builds a mask for PSR writes based on the field mask bits (16-19).
 fn build_psr_mask(instr: u32) -> u32 {
     let mut mask = 0u32;
     if instr & (1 << 19) != 0 {
@@ -767,7 +767,7 @@ fn build_psr_mask(instr: u32) -> u32 {
     mask
 }
 
-/// Writes to CPSR or SPSR with the given mask
+/// Writes to CPSR or SPSR with the given mask.
 fn write_psr(cpu: &mut Arm7Tdmi, use_spsr: bool, value: u32, mask: u32) {
     if use_spsr {
         let old = cpu.spsr();
@@ -784,7 +784,7 @@ fn write_psr(cpu: &mut Arm7Tdmi, use_spsr: bool, value: u32, mask: u32) {
     }
 }
 
-/// ARM software interrupt (SWI)
+/// ARM software interrupt (SWI).
 fn arm_swi(cpu: &mut Arm7Tdmi, instr: u32) {
     let comment = ((instr >> 16) & 0xFF) as u8;
 

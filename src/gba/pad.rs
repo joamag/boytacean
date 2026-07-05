@@ -9,13 +9,13 @@ pub struct GbaPad {
     /// KEYINPUT register value (active-low, 10 bits)
     /// bit 0: A, bit 1: B, bit 2: Select, bit 3: Start,
     /// bit 4: Right, bit 5: Left, bit 6: Up, bit 7: Down,
-    /// bit 8: R, bit 9: L
+    /// bit 8: R, bit 9: L.
     keyinput: u16,
 
-    /// KEYCNT register (interrupt control)
+    /// KEYCNT register (interrupt control).
     keycnt: u16,
 
-    /// Interrupt pending flag
+    /// Interrupt pending flag.
     int_keypad: bool,
 }
 
@@ -75,7 +75,7 @@ impl GbaPad {
     }
 
     /// Checks if the keypad interrupt condition is met
-    /// based on KEYCNT settings
+    /// based on KEYCNT settings.
     fn check_interrupt(&mut self) {
         let irq_enable = self.keycnt & (1 << 14) != 0;
         if !irq_enable {
