@@ -643,6 +643,13 @@ impl GbaApu {
         &self.audio_buffer
     }
 
+    /// Drains the audio buffer, returning the accumulated samples
+    /// and leaving the buffer empty.
+    pub fn drain_audio_buffer(&mut self) -> Vec<i16> {
+        self.flush();
+        self.audio_buffer.drain(..).collect()
+    }
+
     pub fn clear_audio_buffer(&mut self) {
         self.flush();
         self.audio_buffer.clear();
@@ -976,35 +983,17 @@ impl GbaApu {
         let ch3 = self.ch3_output as i32;
         let ch4 = self.ch4_output as i32;
 
-        // stereo panning from SOUNDCNT_L bits 8-15
-        let panning = self.soundcnt_l;
-        let mut legacy_right: i32 = 0;
-        let mut legacy_left: i32 = 0;
-
-        if panning & (1 << 8) != 0 {
-            legacy_right += ch1;
-        }
-        if panning & (1 << 9) != 0 {
-            legacy_right += ch2;
-        }
-        if panning & (1 << 10) != 0 {
-            legacy_right += ch3;
-        }
-        if panning & (1 << 11) != 0 {
-            legacy_right += ch4;
-        }
-        if panning & (1 << 12) != 0 {
-            legacy_left += ch1;
-        }
-        if panning & (1 << 13) != 0 {
-            legacy_left += ch2;
-        }
-        if panning & (1 << 14) != 0 {
-            legacy_left += ch3;
-        }
-        if panning & (1 << 15) != 0 {
-            legacy_left += ch4;
-        }
+        // stereo panning from SOUNDCNT_L bits 8-15, applied as
+        // branchless masks (all ones when the channel is routed)
+        let panning = self.soundcnt_l as i32;
+        let mut legacy_right: i32 = (ch1 & -((panning >> 8) & 1))
+            + (ch2 & -((panning >> 9) & 1))
+            + (ch3 & -((panning >> 10) & 1))
+            + (ch4 & -((panning >> 11) & 1));
+        let mut legacy_left: i32 = (ch1 & -((panning >> 12) & 1))
+            + (ch2 & -((panning >> 13) & 1))
+            + (ch3 & -((panning >> 14) & 1))
+            + (ch4 & -((panning >> 15) & 1));
 
         // Scale PSG sum by 8 (matches mGBA's <<= 3 and NanoBoyAdvance's
         // ×8 waveform amplitude). Without this, PSG is 16x too quiet
@@ -1660,6 +1649,16 @@ mod tests {
 
         apu.timer_overflow(0);
         assert_eq!(apu.direct_sound[0].current_sample, 0x42);
+    }
+
+    #[test]
+    fn test_apu_drain_audio_buffer() {
+        let mut apu = GbaApu::new();
+        apu.set_soundcnt_x(0x80);
+        apu.clock(1000);
+        let samples = apu.drain_audio_buffer();
+        assert!(!samples.is_empty());
+        assert!(apu.audio_buffer().is_empty());
     }
 
     #[test]

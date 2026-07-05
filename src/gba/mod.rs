@@ -404,11 +404,11 @@ impl GameBoyAdvance {
 
     pub fn audio_buffer_eager(&mut self, clear: bool) -> Vec<i16> {
         self.cpu.bus.apu.flush();
-        let buffer = Vec::from(self.audio_buffer().clone());
         if clear {
-            self.clear_audio_buffer();
+            self.cpu.bus.apu.drain_audio_buffer()
+        } else {
+            self.audio_buffer().iter().copied().collect()
         }
-        buffer
     }
 
     pub fn has_battery(&self) -> bool {

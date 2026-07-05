@@ -383,7 +383,11 @@ impl GbaPpu {
     }
 
     /// Evaluates window mask including OBJ window support.
-    #[inline(always)]
+    ///
+    /// The composition loop inlines this logic with the vertical
+    /// window checks hoisted out of the per pixel path, this method
+    /// remains as the reference implementation for testing.
+    #[cfg(test)]
     fn window_mask_with_obj(&self, x: usize, line: usize, obj_window: bool) -> u8 {
         if !self.windows_enabled() {
             return 0x3F;
@@ -405,26 +409,37 @@ impl GbaPpu {
     }
 
     /// Checks if a pixel (x, line) is inside the given window (0 or 1).
-    #[inline(always)]
+    #[cfg(test)]
     fn pixel_in_window(&self, x: usize, line: usize, win: usize) -> bool {
+        self.x_in_window(x, win) && self.line_in_window(line, win)
+    }
+
+    /// Checks if an X coordinate is inside the horizontal span of
+    /// the given window (0 or 1), handling wrap-around ranges.
+    #[inline(always)]
+    fn x_in_window(&self, x: usize, win: usize) -> bool {
         let h = self.winh[win];
-        let v = self.winv[win];
         let x1 = (h >> 8) as usize;
         let x2 = (h & 0xFF) as usize;
-        let y1 = (v >> 8) as usize;
-        let y2 = (v & 0xFF) as usize;
-
-        let in_h = if x1 <= x2 {
+        if x1 <= x2 {
             x >= x1 && x < x2
         } else {
             x >= x1 || x < x2
-        };
-        let in_v = if y1 <= y2 {
+        }
+    }
+
+    /// Checks if a line is inside the vertical span of the given
+    /// window (0 or 1), handling wrap-around ranges.
+    #[inline(always)]
+    fn line_in_window(&self, line: usize, win: usize) -> bool {
+        let v = self.winv[win];
+        let y1 = (v >> 8) as usize;
+        let y2 = (v & 0xFF) as usize;
+        if y1 <= y2 {
             line >= y1 && line < y2
         } else {
             line >= y1 || line < y2
-        };
-        in_h && in_v
+        }
     }
 
     /// Returns the blend mode from BLDCNT.
@@ -693,11 +708,19 @@ impl GbaPpu {
         let blend_mode = self.blend_mode();
         let bg_layer_ids = [Layer::Bg0, Layer::Bg1, Layer::Bg2, Layer::Bg3];
 
-        // build compact list of enabled BG indices for the inner loop
-        let mut active_bgs = [0usize; 4];
+        // builds a compact list of enabled BG indices sorted by priority
+        // (stable, so the BG index remains the tiebreaker), allowing the
+        // per pixel scan to early-exit on the first two visible layers
+        let mut active_bgs = [(0usize, 0u8); 4];
         let mut active_bg_count = 0;
         for &(bg_index, _, _) in bg_layers {
-            active_bgs[active_bg_count] = bg_index;
+            let priority = (self.bgcnt[bg_index] & 0x03) as u8;
+            let mut pos = active_bg_count;
+            while pos > 0 && active_bgs[pos - 1].1 > priority {
+                active_bgs[pos] = active_bgs[pos - 1];
+                pos -= 1;
+            }
+            active_bgs[pos] = (bg_index, priority);
             active_bg_count += 1;
         }
 
@@ -708,7 +731,7 @@ impl GbaPpu {
         // the BG row is simply laid over the backdrop
         let obj_any = obj_has_pixel.iter().any(|&has| has);
         if !use_windows && !obj_any && blend_mode == BlendMode::None && active_bg_count == 1 {
-            let bg_index = active_bgs[0];
+            let bg_index = active_bgs[0].0;
             for (x, pixel) in line_buffer.iter_mut().enumerate() {
                 if bg_has_pixel[bg_index][x] {
                     *pixel = bg_pixels[bg_index][x].0;
@@ -718,11 +741,25 @@ impl GbaPpu {
             return;
         }
 
+        // hoists the (line constant) vertical window checks out of the
+        // per pixel loop, leaving only the horizontal span tests inside
+        let win0_line =
+            use_windows && self.dispcnt & (1 << 13) != 0 && self.line_in_window(line, 0);
+        let win1_line =
+            use_windows && self.dispcnt & (1 << 14) != 0 && self.line_in_window(line, 1);
+        let obj_win_enabled = self.dispcnt & (1 << 15) != 0;
+
         for x in 0..DISPLAY_WIDTH {
-            let win_mask = if use_windows {
-                self.window_mask_with_obj(x, line, obj_window_mask[x])
-            } else {
+            let win_mask = if !use_windows {
                 0x3F
+            } else if win0_line && self.x_in_window(x, 0) {
+                (self.winin & 0x3F) as u8
+            } else if win1_line && self.x_in_window(x, 1) {
+                ((self.winin >> 8) & 0x3F) as u8
+            } else if obj_win_enabled && obj_window_mask[x] {
+                ((self.winout >> 8) & 0x3F) as u8
+            } else {
+                (self.winout & 0x3F) as u8
             };
 
             let blend_enabled = win_mask & 0x20 != 0;
@@ -741,31 +778,27 @@ impl GbaPpu {
                 is_semi_transparent: false,
             };
 
-            // insert visible layers sorted by priority (lower = higher priority),
-            // with BG index as tiebreaker (lower index wins), OBJ treated as index 4
-            for &bg_index in active_bgs.iter().take(active_bg_count) {
+            // scans the priority sorted BG list; the first visible layer
+            // is the top pixel, the second the bottom one, OBJ treated
+            // as index 4 for the tiebreak
+            for &(bg_index, priority) in active_bgs.iter().take(active_bg_count) {
                 if !bg_has_pixel[bg_index][x] {
                     continue;
                 }
                 if win_mask & (1 << bg_index) == 0 {
                     continue;
                 }
-                let (color, pri) = bg_pixels[bg_index][x];
                 let entry = PixelEntry {
-                    color,
-                    priority: pri,
+                    color: bg_pixels[bg_index][x].0,
+                    priority,
                     layer: bg_layer_ids[bg_index],
                     is_semi_transparent: false,
                 };
-                if entry.priority < top.priority
-                    || (entry.priority == top.priority && top.layer == Layer::Backdrop)
-                {
-                    bot = top;
+                if top.layer == Layer::Backdrop {
                     top = entry;
-                } else if entry.priority < bot.priority
-                    || (entry.priority == bot.priority && bot.layer == Layer::Backdrop)
-                {
+                } else {
                     bot = entry;
+                    break;
                 }
             }
 
@@ -1082,49 +1115,47 @@ impl GbaPpu {
                 let pixel_y = if v_flip { 7 - tile_row } else { tile_row };
 
                 if is_8bpp {
+                    // reads the full 8 byte tile row once, tile rows are
+                    // 8 byte aligned so they never straddle the VRAM end
                     let row_base = char_base + tile_number * 64 + pixel_y * 8;
-                    for px in 0..pixels_this_tile {
-                        let tile_px = if h_flip {
-                            7 - (pixel_in_tile + px)
-                        } else {
-                            pixel_in_tile + px
-                        };
-                        let tile_offset = row_base + tile_px;
-                        let color_index = if tile_offset < vram.len() {
-                            vram[tile_offset] as usize
-                        } else {
-                            0
-                        };
-                        if color_index != 0 {
-                            let color = self.read_palette_color(palette, color_index);
-                            pixels[screen_x + px] = (color, bg_priority);
-                            has_pixel[screen_x + px] = true;
+                    if row_base + 8 <= vram.len() {
+                        let row =
+                            u64::from_le_bytes(vram[row_base..row_base + 8].try_into().unwrap());
+                        for px in 0..pixels_this_tile {
+                            let tile_px = if h_flip {
+                                7 - (pixel_in_tile + px)
+                            } else {
+                                pixel_in_tile + px
+                            };
+                            let color_index = ((row >> (tile_px * 8)) & 0xFF) as usize;
+                            if color_index != 0 {
+                                let color = self.read_palette_color(palette, color_index);
+                                pixels[screen_x + px] = (color, bg_priority);
+                                has_pixel[screen_x + px] = true;
+                            }
                         }
                     }
                 } else {
+                    // reads the full 4 byte tile row once, tile rows are
+                    // 4 byte aligned so they never straddle the VRAM end
                     let row_base = char_base + tile_number * 32 + pixel_y * 4;
-                    for px in 0..pixels_this_tile {
-                        let tile_px = if h_flip {
-                            7 - (pixel_in_tile + px)
-                        } else {
-                            pixel_in_tile + px
-                        };
-                        let tile_offset = row_base + tile_px / 2;
-                        let color_index = if tile_offset < vram.len() {
-                            let byte = vram[tile_offset];
-                            if tile_px & 1 == 0 {
-                                (byte & 0x0F) as usize
+                    if row_base + 4 <= vram.len() {
+                        let row =
+                            u32::from_le_bytes(vram[row_base..row_base + 4].try_into().unwrap());
+                        let palette_base = palette_bank * 16;
+                        for px in 0..pixels_this_tile {
+                            let tile_px = if h_flip {
+                                7 - (pixel_in_tile + px)
                             } else {
-                                ((byte >> 4) & 0x0F) as usize
+                                pixel_in_tile + px
+                            };
+                            let color_index = ((row >> (tile_px * 4)) & 0x0F) as usize;
+                            if color_index != 0 {
+                                let color =
+                                    self.read_palette_color(palette, palette_base + color_index);
+                                pixels[screen_x + px] = (color, bg_priority);
+                                has_pixel[screen_x + px] = true;
                             }
-                        } else {
-                            0
-                        };
-                        if color_index != 0 {
-                            let color =
-                                self.read_palette_color(palette, palette_bank * 16 + color_index);
-                            pixels[screen_x + px] = (color, bg_priority);
-                            has_pixel[screen_x + px] = true;
                         }
                     }
                 }
@@ -1360,8 +1391,6 @@ impl GbaPpu {
             }
 
             let attr0 = (oam[oam_offset] as u16) | ((oam[oam_offset + 1] as u16) << 8);
-            let attr1 = (oam[oam_offset + 2] as u16) | ((oam[oam_offset + 3] as u16) << 8);
-            let attr2 = (oam[oam_offset + 4] as u16) | ((oam[oam_offset + 5] as u16) << 8);
 
             let is_affine = attr0 & (1 << 8) != 0;
             let is_double = is_affine && attr0 & (1 << 9) != 0;
@@ -1377,6 +1406,8 @@ impl GbaPpu {
                 continue;
             }
 
+            let attr1 = (oam[oam_offset + 2] as u16) | ((oam[oam_offset + 3] as u16) << 8);
+
             let shape = (attr0 >> 14) & 0x03;
             let size = (attr1 >> 14) & 0x03;
             let (width, height) = obj_dimensions(shape as u8, size as u8);
@@ -1390,11 +1421,14 @@ impl GbaPpu {
             let x = if x >= 240 { x - 512 } else { x };
             let y = if y >= 160 { y - 256 } else { y };
 
-            // check if this sprite is on the current scanline
+            // check if this sprite is on the current scanline before
+            // decoding the remaining (only then needed) attributes
             let rel_y = line as i32 - y;
             if rel_y < 0 || rel_y >= bound_h as i32 {
                 continue;
             }
+
+            let attr2 = (oam[oam_offset + 4] as u16) | ((oam[oam_offset + 5] as u16) << 8);
 
             let tile_number = (attr2 & 0x03FF) as usize;
             let priority = ((attr2 >> 10) & 0x03) as u8;
@@ -1638,11 +1672,12 @@ impl GbaPpu {
     /// Converts the line buffer (BGR555) to RGB888 and writes to frame buffer.
     fn write_line_buffer(&mut self, line: usize, line_buffer: &[u16; DISPLAY_WIDTH]) {
         let offset = line * DISPLAY_WIDTH * 3;
-        for (x, &color) in line_buffer.iter().enumerate() {
+        let row = &mut self.frame_buffer[offset..offset + DISPLAY_WIDTH * 3];
+        for (pixel, &color) in row.chunks_exact_mut(3).zip(line_buffer.iter()) {
             let (r, g, b) = bgr555_to_rgb888(color);
-            self.frame_buffer[offset + x * 3] = r;
-            self.frame_buffer[offset + x * 3 + 1] = g;
-            self.frame_buffer[offset + x * 3 + 2] = b;
+            pixel[0] = r;
+            pixel[1] = g;
+            pixel[2] = b;
         }
     }
 
@@ -2062,6 +2097,30 @@ mod tests {
         assert!(ppu.pixel_in_window(210, 80, 0)); // past x1
         assert!(ppu.pixel_in_window(30, 80, 0)); // before x2
         assert!(!ppu.pixel_in_window(100, 80, 0)); // between x2 and x1
+    }
+
+    #[test]
+    fn test_x_in_window() {
+        let mut ppu = GbaPpu::new();
+        // WIN0: x=[10,50)
+        ppu.set_winh(0, (10 << 8) | 50);
+
+        assert!(ppu.x_in_window(10, 0));
+        assert!(ppu.x_in_window(49, 0));
+        assert!(!ppu.x_in_window(50, 0)); // x out of range
+        assert!(!ppu.x_in_window(9, 0)); // x before start
+    }
+
+    #[test]
+    fn test_line_in_window() {
+        let mut ppu = GbaPpu::new();
+        // WIN0: y=[20,40)
+        ppu.set_winv(0, (20 << 8) | 40);
+
+        assert!(ppu.line_in_window(20, 0));
+        assert!(ppu.line_in_window(39, 0));
+        assert!(!ppu.line_in_window(40, 0)); // y out of range
+        assert!(!ppu.line_in_window(19, 0)); // y before start
     }
 
     #[test]
@@ -2495,6 +2554,87 @@ mod tests {
         assert_eq!(fb[1], 0x00); // G
         assert_eq!(fb[3], 0x00); // R
         assert_eq!(fb[4], 0xF8); // G (bg pixel)
+    }
+
+    #[test]
+    fn test_render_mode0_bg_priority_order() {
+        let mut ppu = GbaPpu::new();
+        // mode 0, BG0 and BG1 enabled
+        ppu.set_dispcnt((1 << 8) | (1 << 9));
+        // BG0: priority 1, char base 0, screen base block 8
+        ppu.set_bgcnt(0, (8 << 8) | 1);
+        // BG1: priority 0, char base 0, screen base block 9
+        ppu.set_bgcnt(1, 9 << 8);
+
+        let mut vram = vec![0u8; 0x18000];
+        let mut palette = vec![0u8; 0x400];
+        let oam = vec![0u8; 0x400];
+
+        // both maps use tile 1 at (0, 0), BG1 selects palette bank 1
+        vram[8 * 0x800] = 0x01;
+        vram[9 * 0x800] = 0x01;
+        vram[9 * 0x800 + 1] = 0x10;
+
+        // tile 1 (4bpp) row 0 filled with color index 1
+        for byte in vram.iter_mut().skip(32).take(4) {
+            *byte = 0x11;
+        }
+
+        // bank 0 color 1 = red, bank 1 color 1 = green
+        let red: u16 = 0x001F;
+        palette[2] = (red & 0xFF) as u8;
+        palette[3] = ((red >> 8) & 0xFF) as u8;
+        let green: u16 = 0x03E0;
+        palette[17 * 2] = (green & 0xFF) as u8;
+        palette[17 * 2 + 1] = ((green >> 8) & 0xFF) as u8;
+
+        ppu.clock(VISIBLE_DOTS, &vram, &palette, &oam);
+
+        // BG1 (green) wins with the lower priority value despite
+        // the higher BG index
+        let fb = ppu.frame_buffer();
+        assert_eq!(fb[0], 0x00); // R
+        assert_eq!(fb[1], 0xF8); // G
+        assert_eq!(fb[2], 0x00); // B
+    }
+
+    #[test]
+    fn test_render_mode0_bg_priority_tiebreak() {
+        let mut ppu = GbaPpu::new();
+        // mode 0, BG0 and BG1 enabled, both with priority 0
+        ppu.set_dispcnt((1 << 8) | (1 << 9));
+        ppu.set_bgcnt(0, 8 << 8);
+        ppu.set_bgcnt(1, 9 << 8);
+
+        let mut vram = vec![0u8; 0x18000];
+        let mut palette = vec![0u8; 0x400];
+        let oam = vec![0u8; 0x400];
+
+        // both maps use tile 1 at (0, 0), BG1 selects palette bank 1
+        vram[8 * 0x800] = 0x01;
+        vram[9 * 0x800] = 0x01;
+        vram[9 * 0x800 + 1] = 0x10;
+
+        // tile 1 (4bpp) row 0 filled with color index 1
+        for byte in vram.iter_mut().skip(32).take(4) {
+            *byte = 0x11;
+        }
+
+        // bank 0 color 1 = red, bank 1 color 1 = green
+        let red: u16 = 0x001F;
+        palette[2] = (red & 0xFF) as u8;
+        palette[3] = ((red >> 8) & 0xFF) as u8;
+        let green: u16 = 0x03E0;
+        palette[17 * 2] = (green & 0xFF) as u8;
+        palette[17 * 2 + 1] = ((green >> 8) & 0xFF) as u8;
+
+        ppu.clock(VISIBLE_DOTS, &vram, &palette, &oam);
+
+        // on equal priority the lower BG index (BG0, red) wins
+        let fb = ppu.frame_buffer();
+        assert_eq!(fb[0], 0xF8); // R
+        assert_eq!(fb[1], 0x00); // G
+        assert_eq!(fb[2], 0x00); // B
     }
 
     #[test]

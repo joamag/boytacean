@@ -11,8 +11,9 @@ use crate::gba::{
 
 /// executes a single ARM instruction
 pub fn execute_arm(cpu: &mut Arm7Tdmi, instr: u32) {
-    // check condition code first
-    if !cpu.check_condition(instr) {
+    // check condition code first, skipping the flag evaluation
+    // for the (by far most common) always condition (AL)
+    if instr >> 28 != 0xE && !cpu.check_condition(instr) {
         cpu.cycles = 1;
         return;
     }
