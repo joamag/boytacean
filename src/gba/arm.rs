@@ -9,7 +9,9 @@ use crate::gba::{
     cpu::Arm7Tdmi,
 };
 
-/// executes a single ARM instruction
+/// Executes a single ARM (32-bit) instruction, checking its condition
+/// code and dispatching to the handler of the instruction class
+/// decoded from bits [27:20] and [7:4].
 pub fn execute_arm(cpu: &mut Arm7Tdmi, instr: u32) {
     // check condition code first, skipping the flag evaluation
     // for the (by far most common) always condition (AL)

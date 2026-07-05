@@ -8,7 +8,8 @@ use crate::gba::{
     cpu::Arm7Tdmi,
 };
 
-/// executes a single Thumb instruction
+/// Executes a single Thumb (16-bit) instruction, dispatching to the
+/// handler of the instruction format decoded from bits [15:8].
 pub fn execute_thumb(cpu: &mut Arm7Tdmi, instr: u16) {
     let bits_15_8 = instr >> 8;
 
