@@ -1,8 +1,8 @@
 //! GBA interrupt controller (IE, IF, IME registers).
 
 use crate::gba::consts::{
-    IRQ_DMA0, IRQ_DMA1, IRQ_DMA2, IRQ_DMA3, IRQ_HBLANK, IRQ_KEYPAD, IRQ_TIMER0, IRQ_TIMER1,
-    IRQ_TIMER2, IRQ_TIMER3, IRQ_VBLANK, IRQ_VCOUNT,
+    IRQ_DMA0, IRQ_DMA1, IRQ_DMA2, IRQ_DMA3, IRQ_HBLANK, IRQ_KEYPAD, IRQ_SERIAL, IRQ_TIMER0,
+    IRQ_TIMER1, IRQ_TIMER2, IRQ_TIMER3, IRQ_VBLANK, IRQ_VCOUNT,
 };
 
 pub struct IrqController {
@@ -96,6 +96,10 @@ impl IrqController {
         self.raise(irq);
     }
 
+    pub fn raise_serial(&mut self) {
+        self.raise(IRQ_SERIAL);
+    }
+
     pub fn raise_dma(&mut self, index: usize) {
         let irq = match index {
             0 => IRQ_DMA0,
@@ -122,7 +126,8 @@ impl Default for IrqController {
 mod tests {
     use super::IrqController;
     use crate::gba::consts::{
-        IRQ_DMA0, IRQ_DMA3, IRQ_HBLANK, IRQ_KEYPAD, IRQ_TIMER0, IRQ_TIMER3, IRQ_VBLANK, IRQ_VCOUNT,
+        IRQ_DMA0, IRQ_DMA3, IRQ_HBLANK, IRQ_KEYPAD, IRQ_SERIAL, IRQ_TIMER0, IRQ_TIMER3, IRQ_VBLANK,
+        IRQ_VCOUNT,
     };
 
     #[test]
@@ -223,6 +228,13 @@ mod tests {
         // invalid index should be ignored
         irq.raise_timer(4);
         assert_eq!(irq.if_(), IRQ_TIMER0 | IRQ_TIMER3);
+    }
+
+    #[test]
+    fn test_raise_serial() {
+        let mut irq = IrqController::new();
+        irq.raise_serial();
+        assert_eq!(irq.if_(), IRQ_SERIAL);
     }
 
     #[test]

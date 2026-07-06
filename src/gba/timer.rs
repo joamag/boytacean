@@ -122,6 +122,16 @@ impl GbaTimer {
         self.overflow
     }
 
+    /// Returns the number of cycles until this timer overflows, or
+    /// `u32::MAX` when the timer is disabled or in cascade mode.
+    pub fn cycles_to_overflow(&self) -> u32 {
+        if !self.enabled || self.cascade {
+            return u32::MAX;
+        }
+        let ticks = 0x10000 - self.counter as u32;
+        (ticks * self.prescaler - self.prescaler_counter).max(1)
+    }
+
     /// Handles a cascade tick from the previous timer's overflow.
     ///
     /// Returns true if this timer also overflows.
@@ -163,6 +173,19 @@ impl GbaTimers {
                 GbaTimer::new(),
             ],
         }
+    }
+
+    /// Returns the number of cycles until the earliest enabled timer
+    /// overflows, or `u32::MAX` when no timer can overflow on its own.
+    ///
+    /// Cascade timers are excluded, they only tick when their driving
+    /// timer overflows, which is already an event boundary.
+    pub fn cycles_to_next_overflow(&self) -> u32 {
+        let mut next = u32::MAX;
+        for timer in &self.timers {
+            next = next.min(timer.cycles_to_overflow());
+        }
+        next
     }
 
     /// Clocks all 4 timers, handling cascade chains.
@@ -275,6 +298,31 @@ mod tests {
     }
 
     #[test]
+    fn test_timer_cycles_to_overflow() {
+        let mut timer = GbaTimer::new();
+        // disabled timers can never overflow on their own
+        assert_eq!(timer.cycles_to_overflow(), u32::MAX);
+
+        // enabled with prescaler 1, one tick away from overflow
+        timer.set_reload(0xFFFF);
+        timer.set_control(1 << 7);
+        assert_eq!(timer.cycles_to_overflow(), 1);
+
+        // prescaler 64 multiplies the tick distance
+        timer.set_control(0);
+        timer.set_control((1 << 7) | 1);
+        assert_eq!(timer.cycles_to_overflow(), 64);
+
+        // partially elapsed prescaler cycles shorten the distance
+        timer.clock(10);
+        assert_eq!(timer.cycles_to_overflow(), 54);
+
+        // cascade timers are not clocked by CPU cycles
+        timer.set_control((1 << 7) | (1 << 2));
+        assert_eq!(timer.cycles_to_overflow(), u32::MAX);
+    }
+
+    #[test]
     fn test_timer_cascade_tick() {
         let mut timer = GbaTimer::new();
         timer.set_reload(0xFFFE);
@@ -300,6 +348,20 @@ mod tests {
         assert!(timer.overflow());
         timer.clear_overflow();
         assert!(!timer.overflow());
+    }
+
+    #[test]
+    fn test_timers_cycles_to_next_overflow() {
+        let mut timers = GbaTimers::new();
+        // no enabled timer means no overflow can happen
+        assert_eq!(timers.cycles_to_next_overflow(), u32::MAX);
+
+        // the earliest overflowing timer bounds the distance
+        timers.timers[0].set_reload(0xFF00);
+        timers.timers[0].set_control(1 << 7);
+        timers.timers[1].set_reload(0xFFFF);
+        timers.timers[1].set_control(1 << 7);
+        assert_eq!(timers.cycles_to_next_overflow(), 1);
     }
 
     #[test]

@@ -127,6 +127,9 @@ fn swi_intr_wait(cpu: &mut Arm7Tdmi) {
         cpu.bus.iwram[offset + 1] = bytes[1];
     }
 
+    // the real BIOS forcefully sets IME=1 so the waited interrupt
+    // can actually be delivered while halted
+    cpu.bus.irq.set_ime(true);
     cpu.bus.intr_wait_flags = flags;
     cpu.set_halted(true);
 }
@@ -142,6 +145,9 @@ fn swi_vblank_intr_wait(cpu: &mut Arm7Tdmi) {
     cpu.bus.iwram[offset] = bytes[0];
     cpu.bus.iwram[offset + 1] = bytes[1];
 
+    // the real BIOS forcefully sets IME=1 so the waited interrupt
+    // can actually be delivered while halted
+    cpu.bus.irq.set_ime(true);
     cpu.bus.intr_wait_flags = 1; // wait for VBlank (IRQ bit 0)
     cpu.set_halted(true);
 }

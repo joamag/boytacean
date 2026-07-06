@@ -530,6 +530,20 @@ impl GbaPpu {
         x / size * size
     }
 
+    /// Returns the number of cycles until the next PPU event, either
+    /// the HBlank entry or the end of the current scanline.
+    ///
+    /// VBlank and VCount transitions happen on scanline boundaries,
+    /// so both are covered by the end of scanline distance.
+    #[inline(always)]
+    pub fn cycles_to_next_event(&self) -> u32 {
+        if self.dot < VISIBLE_DOTS {
+            VISIBLE_DOTS - self.dot
+        } else {
+            CYCLES_PER_SCANLINE - self.dot
+        }
+    }
+
     /// Clocks the PPU by the given number of CPU cycles.
     ///
     /// Returns flags: bit 0 = hblank, bit 1 = vblank, bit 2 = hblank IRQ,
@@ -544,10 +558,11 @@ impl GbaPpu {
             // entering hblank
             if self.vcount < DISPLAY_HEIGHT as u16 {
                 self.render_scanline(vram, palette, oam);
-            }
 
-            // bit 0: hblank DMA trigger (always fires)
-            events |= 1;
+                // bit 0: hblank DMA trigger (only fires within the
+                // display area, never during VBlank lines)
+                events |= 1;
+            }
 
             // bit 2: hblank IRQ (only when DISPSTAT bit 4 is set)
             if self.dispstat & (1 << 4) != 0 {
@@ -1898,6 +1913,28 @@ mod tests {
         assert!(ppu.int_vcount());
         ppu.ack_vcount();
         assert!(!ppu.int_vcount());
+    }
+
+    #[test]
+    fn test_cycles_to_next_event() {
+        let mut ppu = GbaPpu::new();
+        let vram = vec![0u8; 0x18000];
+        let palette = vec![0u8; 0x400];
+        let oam = vec![0u8; 0x400];
+
+        // at dot 0 the next event is the HBlank entry
+        assert_eq!(ppu.cycles_to_next_event(), VISIBLE_DOTS);
+
+        // advancing shortens the distance to the HBlank entry
+        ppu.clock(10, &vram, &palette, &oam);
+        assert_eq!(ppu.cycles_to_next_event(), VISIBLE_DOTS - 10);
+
+        // inside HBlank the next event is the end of the scanline
+        ppu.clock(VISIBLE_DOTS - 10, &vram, &palette, &oam);
+        assert_eq!(
+            ppu.cycles_to_next_event(),
+            CYCLES_PER_SCANLINE - VISIBLE_DOTS
+        );
     }
 
     #[test]

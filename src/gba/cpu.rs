@@ -17,13 +17,6 @@ use crate::{
     warnln,
 };
 
-/// Number of idle cycles consumed per step while the CPU is halted.
-///
-/// Small enough that no PPU scanline transition (1232 cycles) or
-/// practical timer overflow can be skipped within a single batch,
-/// large enough to amortize the per-step subsystem dispatch cost.
-const HALT_IDLE_CYCLES: u32 = 16;
-
 /// Index mapping for banked SPSR: FIQ=0, SVC=1, ABT=2, IRQ=3, UND=4.
 fn mode_to_spsr_index(mode: u32) -> Option<usize> {
     match mode & CPSR_MODE_MASK {
@@ -415,8 +408,12 @@ impl Arm7Tdmi {
         // (fallback for games that disable the waited interrupt in IE
         // during their IRQ handler, like Zelda).
         if self.bus.intr_wait_flags != 0 {
-            // skip re-halt check while inside the IRQ handler itself
-            if self.cpsr & CPSR_I == 0 {
+            // evaluates the wake conditions while halted (no handler can
+            // be running) or with IRQs enabled at the CPU, skipping them
+            // only while inside the IRQ handler itself; games may enter
+            // IntrWait with CPSR IRQs masked (the real BIOS wait loop
+            // runs with them enabled), so halt must still be able to wake
+            if self.cpsr & CPSR_I == 0 || self.halted {
                 let offset = (0x0300_7FF8u32 & 0x7FFF) as usize;
                 let intr_check =
                     u16::from_le_bytes([self.bus.iwram[offset], self.bus.iwram[offset + 1]]);
@@ -446,20 +443,7 @@ impl Arm7Tdmi {
         }
 
         if self.halted {
-            // detect halt deadlock: if no interrupts are enabled in IE,
-            // nothing can ever wake the CPU from halt
-            if self.bus.irq.ie() == 0 && !self.halt_deadlock_warned {
-                self.halt_deadlock_warned = true;
-                warnln!(
-                    "GBA: halt deadlock detected — CPU halted with IE=0, nothing can wake it (PC={:#010x})",
-                    self.pc()
-                );
-            }
-            // fast-forward idle cycles in small batches, avoiding the
-            // per-cycle subsystem dispatch overhead while halted; the
-            // batch is small enough that no PPU or timer event can be
-            // skipped, only detected a few cycles later
-            return HALT_IDLE_CYCLES;
+            return self.halted_cycles();
         }
 
         self.cycles = 0;
@@ -556,6 +540,28 @@ impl Arm7Tdmi {
         }
 
         self.cycles
+    }
+
+    /// Consumes idle cycles while the CPU is halted, fast-forwarding
+    /// up to the next PPU or timer event boundary.
+    ///
+    /// Avoids the per-cycle subsystem dispatch overhead while keeping
+    /// the IRQ wake timing cycle accurate; kept out of line so the
+    /// (hotter) instruction execution path in [`Self::step`] stays small.
+    #[inline(never)]
+    fn halted_cycles(&mut self) -> u32 {
+        // detect halt deadlock: if no interrupts are enabled in IE,
+        // nothing can ever wake the CPU from halt
+        if self.bus.irq.ie() == 0 && !self.halt_deadlock_warned {
+            self.halt_deadlock_warned = true;
+            warnln!(
+                "GBA: halt deadlock detected — CPU halted with IE=0, nothing can wake it (PC={:#010x})",
+                self.pc()
+            );
+        }
+        let ppu_next = self.bus.ppu.cycles_to_next_event();
+        let timer_next = self.bus.timers.cycles_to_next_overflow();
+        ppu_next.min(timer_next).max(1)
     }
 
     /// Checks the condition code of an ARM instruction.
@@ -1044,7 +1050,8 @@ mod tests {
         let mut cpu = make_cpu();
         cpu.set_halted(true);
         let cycles = cpu.step();
-        assert_eq!(cycles, HALT_IDLE_CYCLES); // idle batch
+        // idle fast-forward up to the next PPU event boundary
+        assert_eq!(cycles, cpu.bus.ppu.cycles_to_next_event());
     }
 
     #[test]
@@ -1162,7 +1169,7 @@ mod tests {
 
         // should stay halted because VBlank not in IntrCheck
         assert!(cpu.halted());
-        assert_eq!(cycles, HALT_IDLE_CYCLES);
+        assert_eq!(cycles, cpu.bus.ppu.cycles_to_next_event());
         // flags should remain set
         assert_eq!(cpu.bus.intr_wait_flags, 1);
     }
@@ -1461,7 +1468,7 @@ mod tests {
         let cycles = cpu.step();
 
         assert!(cpu.halted());
-        assert_eq!(cycles, HALT_IDLE_CYCLES);
+        assert_eq!(cycles, cpu.bus.ppu.cycles_to_next_event());
     }
 
     // -- crash detection tests --

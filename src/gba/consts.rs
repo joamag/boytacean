@@ -124,8 +124,13 @@ pub const REG_TM2CNT_H: u32 = 0x0400_010A;
 pub const REG_TM3CNT_L: u32 = 0x0400_010C;
 pub const REG_TM3CNT_H: u32 = 0x0400_010E;
 
-// I/O register addresses (serial / unused in this emulator)
+// I/O register addresses (serial)
+pub const REG_SIOMULTI0: u32 = 0x0400_0120;
+pub const REG_SIOMULTI1: u32 = 0x0400_0122;
+pub const REG_SIOMULTI2: u32 = 0x0400_0124;
+pub const REG_SIOMULTI3: u32 = 0x0400_0126;
 pub const REG_SIOCNT: u32 = 0x0400_0128;
+pub const REG_SIOMLT_SEND: u32 = 0x0400_012A;
 pub const REG_RCNT: u32 = 0x0400_0134;
 
 // I/O register addresses (keypad)
