@@ -726,15 +726,19 @@ fn thumb_swi(cpu: &mut Arm7Tdmi, instr: u16) {
         // real BIOS: jump to SWI exception vector
         cpu.set_reg(15, 0x08);
     } else {
-        handle_swi(cpu, comment);
+        let redirected = handle_swi(cpu, comment);
 
         // Update BIOS protection value to match what real BIOS leaves
         // after SWI dispatch (instruction at real BIOS address 0x190)
         cpu.bus.update_bios_value(0xE3A02004);
 
-        let lr = cpu.reg(14);
-        cpu.restore_cpsr();
-        cpu.set_reg(15, lr);
+        // return from SWI (restore CPSR and jump to LR), unless the
+        // handler redirected execution itself (e.g. SoftReset)
+        if !redirected {
+            let lr = cpu.reg(14);
+            cpu.restore_cpsr();
+            cpu.set_reg(15, lr);
+        }
     }
 
     cpu.cycles = 3;
@@ -1018,10 +1022,25 @@ mod tests {
         let mut cpu = make_thumb_cpu();
         let pc = 0x08000004u32;
         cpu.set_reg(15, pc);
-        // SWI #0 = 0xDF00
-        execute_thumb(&mut cpu, 0xDF00);
+        // SWI #8 (Sqrt) = 0xDF08
+        execute_thumb(&mut cpu, 0xDF08);
         // HLE: should return after SWI, back in SYS mode with THUMB
         assert_eq!(cpu.cpsr() & 0x1F, 0x1F); // MODE_SYS
+        assert_eq!(cpu.pc(), pc.wrapping_sub(2));
+    }
+
+    #[test]
+    fn test_thumb_swi_hle_soft_reset_redirects() {
+        let mut cpu = make_thumb_cpu();
+        let pc = 0x08000004u32;
+        cpu.set_reg(15, pc);
+        // SWI #0 (SoftReset) = 0xDF00
+        execute_thumb(&mut cpu, 0xDF00);
+        // HLE: SoftReset controls the return itself and jumps to the
+        // ROM entry point in ARM system mode
+        assert_eq!(cpu.pc(), 0x0800_0000);
+        assert_eq!(cpu.cpsr() & 0x1F, 0x1F); // MODE_SYS
+        assert!(cpu.cpsr() & 0x20 == 0); // ARM mode (T bit cleared)
     }
 
     #[test]

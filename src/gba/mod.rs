@@ -117,6 +117,7 @@ impl GameBoyAdvance {
         self.cpu.bus.load_rom(data);
         if !self.cpu.bus.use_real_bios {
             self.cpu.bus.postflg = 1; // mark as post-boot
+            self.cpu.bus.rcnt = 0x8000; // BIOS leaves general-purpose mode
         }
         Ok(info)
     }
@@ -375,6 +376,8 @@ impl GameBoyAdvance {
             self.cpu.reset_for_bios_boot();
         } else {
             self.cpu.reset();
+            self.cpu.bus.postflg = 1; // mark as post-boot
+            self.cpu.bus.rcnt = 0x8000; // BIOS leaves general-purpose mode
         }
         self.frame = 0;
     }
@@ -641,6 +644,18 @@ mod tests {
         let bios = vec![0u8; 0x4000];
         gba.load_bios(&bios);
         assert_eq!(gba.cpu.pc(), 0x0000_0000);
+    }
+
+    #[test]
+    fn test_load_rom_post_boot_state() {
+        let mut gba = GameBoyAdvance::new();
+        let mut rom = vec![0u8; 512];
+        rom[0xB2] = 0x96;
+        let _ = gba.load_rom(&rom);
+        // HLE boot leaves the post-BIOS register state: POSTFLG set
+        // and RCNT in general-purpose mode
+        assert_eq!(gba.cpu.bus.read16(0x0400_0300), 1);
+        assert_eq!(gba.cpu.bus.read16(0x0400_0134), 0x8000);
     }
 
     #[test]

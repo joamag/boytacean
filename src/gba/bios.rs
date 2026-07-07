@@ -7,10 +7,13 @@ use crate::{gba::cpu::Arm7Tdmi, warnln};
 
 /// Handles a SWI call by dispatching to the appropriate HLE function.
 ///
-/// The comment field identifies which SWI is being called.
-pub fn handle_swi(cpu: &mut Arm7Tdmi, comment: u8) {
+/// The comment field identifies which SWI is being called. Returns
+/// `true` when the handler redirected execution (set PC and CPSR
+/// itself), in which case the caller must not overwrite PC with the
+/// SWI return address.
+pub fn handle_swi(cpu: &mut Arm7Tdmi, comment: u8) -> bool {
     match comment {
-        0x00 => swi_soft_reset(cpu),
+        0x00 => return swi_soft_reset(cpu),
         0x01 => swi_register_ram_reset(cpu),
         0x02 => swi_halt(cpu),
         0x03 => swi_stop(cpu),
@@ -41,26 +44,58 @@ pub fn handle_swi(cpu: &mut Arm7Tdmi, comment: u8) {
             warnln!("Unhandled SWI 0x{:02X}", comment);
         }
     }
+    false
 }
 
 /// SWI 0x00: SoftReset - resets the system.
-fn swi_soft_reset(cpu: &mut Arm7Tdmi) {
+///
+/// Always returns `true` since it redirects execution to the entry
+/// point instead of returning to the caller.
+fn swi_soft_reset(cpu: &mut Arm7Tdmi) -> bool {
+    // the return address flag selects the entry point and must be
+    // read before the area that contains it is cleared
+    let flag = cpu.bus_read8(0x0300_7FFA);
+
     // clear IWRAM 0x03007E00-0x03007FFF
     for addr in (0x0300_7E00u32..0x0300_8000).step_by(4) {
         cpu.bus_write32(addr, 0);
     }
 
-    // set registers to reset state
-    cpu.set_reg(13, 0x0300_7F00); // SP_IRQ
-    cpu.set_cpsr(0x1F); // system mode
-    cpu.set_reg(13, 0x0300_7FE0); // SP_SYS
+    // set registers to reset state, with the banked stack pointers
+    // re-initialized per mode (SVC=0x03007FE0, IRQ=0x03007FA0,
+    // SYS=0x03007F00) and LR/SPSR cleared, matching the real BIOS
+    for reg in 0..=12 {
+        cpu.set_reg(reg, 0);
+    }
+    cpu.set_cpsr(0x93); // supervisor mode
+    cpu.set_reg(13, 0x0300_7FE0); // SP_SVC
     cpu.set_reg(14, 0);
-    cpu.set_reg(15, 0x0800_0000); // jump to ROM entry
+    cpu.set_spsr(0);
+    cpu.set_cpsr(0x92); // IRQ mode
+    cpu.set_reg(13, 0x0300_7FA0); // SP_IRQ
+    cpu.set_reg(14, 0);
+    cpu.set_spsr(0);
+    cpu.set_cpsr(0x1F); // system mode
+    cpu.set_reg(13, 0x0300_7F00); // SP_SYS
+    cpu.set_reg(14, 0);
+
+    // jump to the ROM entry point, or to RAM for multiboot images
+    // (non-zero return address flag at 0x03007FFA)
+    if flag == 0 {
+        cpu.set_reg(15, 0x0800_0000);
+    } else {
+        cpu.set_reg(15, 0x0200_0000);
+    }
+    true
 }
 
 /// SWI 0x01: RegisterRamReset - clears specified memory regions.
 fn swi_register_ram_reset(cpu: &mut Arm7Tdmi) {
     let flags = cpu.reg(0);
+
+    // the real BIOS always sets DISPCNT to forced blank, regardless
+    // of the requested flags (documented BIOS quirk)
+    cpu.bus_write16(0x0400_0000, 0x0080);
 
     // bit 0: clear EWRAM (256KB)
     if flags & (1 << 0) != 0 {
@@ -790,6 +825,62 @@ mod tests {
 
     fn make_cpu() -> Arm7Tdmi {
         Arm7Tdmi::new(GbaBus::new())
+    }
+
+    #[test]
+    fn test_swi_soft_reset() {
+        let mut cpu = make_cpu();
+        for reg in 0..=12 {
+            cpu.set_reg(reg, 0xDEAD_BEEF);
+        }
+        let redirected = handle_swi(&mut cpu, 0x00);
+        assert!(redirected);
+        // jumps to the ROM entry point in ARM system mode
+        assert_eq!(cpu.pc(), 0x0800_0000);
+        assert_eq!(cpu.cpsr() & 0x1F, 0x1F); // MODE_SYS
+        assert!(cpu.cpsr() & 0x20 == 0); // ARM mode (T bit cleared)
+
+        // r0-r12 are zeroed and LR is cleared
+        for reg in 0..=12 {
+            assert_eq!(cpu.reg(reg), 0);
+        }
+        assert_eq!(cpu.reg(14), 0);
+        // banked stack pointers match the post-BIOS state
+        assert_eq!(cpu.reg(13), 0x0300_7F00); // SP_SYS
+        cpu.set_cpsr(0x92);
+        assert_eq!(cpu.reg(13), 0x0300_7FA0); // SP_IRQ
+        cpu.set_cpsr(0x93);
+        assert_eq!(cpu.reg(13), 0x0300_7FE0); // SP_SVC
+    }
+
+    #[test]
+    fn test_swi_soft_reset_clears_bios_ram() {
+        let mut cpu = make_cpu();
+        cpu.bus_write32(0x0300_7E00, 0xCAFE_BABE);
+        cpu.bus_write32(0x0300_7FF8, 0xCAFE_BABE);
+        handle_swi(&mut cpu, 0x00);
+        assert_eq!(cpu.bus_read32(0x0300_7E00), 0);
+        assert_eq!(cpu.bus_read32(0x0300_7FF8), 0);
+    }
+
+    #[test]
+    fn test_swi_soft_reset_multiboot_flag() {
+        let mut cpu = make_cpu();
+        // a non-zero return address flag selects the RAM entry point
+        cpu.bus_write8(0x0300_7FFA, 1);
+        handle_swi(&mut cpu, 0x00);
+        assert_eq!(cpu.pc(), 0x0200_0000);
+    }
+
+    #[test]
+    fn test_swi_register_ram_reset_forces_blank() {
+        let mut cpu = make_cpu();
+        cpu.bus_write16(0x0400_0000, 0x1234);
+        cpu.set_reg(0, 0);
+        handle_swi(&mut cpu, 0x01);
+        // DISPCNT is always destroyed (set to forced blank), even
+        // with no reset flags requested
+        assert_eq!(cpu.bus_read16(0x0400_0000), 0x0080);
     }
 
     #[test]

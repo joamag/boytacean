@@ -801,16 +801,19 @@ fn arm_swi(cpu: &mut Arm7Tdmi, instr: u32) {
         cpu.set_reg(15, 0x08);
     } else {
         // HLE: handle the SWI in Rust
-        handle_swi(cpu, comment);
+        let redirected = handle_swi(cpu, comment);
 
         // Update BIOS protection value to match what real BIOS leaves
         // after SWI dispatch (instruction at real BIOS address 0x190)
         cpu.bus.update_bios_value(0xE3A02004);
 
-        // return from SWI (restore CPSR and jump to LR)
-        let lr = cpu.reg(14);
-        cpu.restore_cpsr();
-        cpu.set_reg(15, lr);
+        // return from SWI (restore CPSR and jump to LR), unless the
+        // handler redirected execution itself (e.g. SoftReset)
+        if !redirected {
+            let lr = cpu.reg(14);
+            cpu.restore_cpsr();
+            cpu.set_reg(15, lr);
+        }
     }
 
     cpu.cycles = 3;
@@ -1231,11 +1234,25 @@ mod tests {
         let mut cpu = make_cpu();
         let pc = 0x0800_0008u32;
         cpu.set_reg(15, pc);
-        // SWI #0 (comment=0, no-op SWI)
-        // E.g. SWI #0x000000 = 0xEF000000
-        super::execute_arm(&mut cpu, 0xEF000000);
+        // SWI #8 (Sqrt) = 0xEF080000
+        super::execute_arm(&mut cpu, 0xEF080000);
         // HLE: should return after SWI, back in SYS mode
         assert_eq!(cpu.cpsr() & 0x1F, 0x1F); // MODE_SYS
+        assert_eq!(cpu.pc(), pc.wrapping_sub(4));
+    }
+
+    #[test]
+    fn test_arm_swi_hle_soft_reset_redirects() {
+        let mut cpu = make_cpu();
+        let pc = 0x0800_0008u32;
+        cpu.set_reg(15, pc);
+        // SWI #0 (SoftReset) = 0xEF000000
+        super::execute_arm(&mut cpu, 0xEF000000);
+        // HLE: SoftReset controls the return itself and jumps to the
+        // ROM entry point in ARM system mode
+        assert_eq!(cpu.pc(), 0x0800_0000);
+        assert_eq!(cpu.cpsr() & 0x1F, 0x1F); // MODE_SYS
+        assert!(cpu.cpsr() & 0x20 == 0); // ARM mode (T bit cleared)
     }
 
     #[test]

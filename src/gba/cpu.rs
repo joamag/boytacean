@@ -383,17 +383,17 @@ impl Arm7Tdmi {
     pub fn step(&mut self) -> u32 {
         // checks for any pending interrupts
         if self.bus.irq.pending() && self.cpsr & CPSR_I == 0 {
-            let was_halted = self.halted;
             self.halted = false;
 
-            // when waking from HLE halt, the pipeline was flushed so
+            // when the pipeline was flushed (by a branch or an HLE halt)
             // regs[15] points directly at the next instruction without
-            // the pipeline prefetch offset. adds +4 so the IRQ handler's
-            // SUBS PC, LR, #4 returns to the correct instruction.
-            // when halt came from a real HALTCNT write, the pipeline is
-            // still valid and regs[15] already has the correct offset.
-            if was_halted && !self.pipeline_valid {
-                self.regs[15] = self.regs[15].wrapping_add(4);
+            // the pipeline prefetch offset. normalizes it so the IRQ
+            // handler's SUBS PC, LR, #4 returns to the correct
+            // instruction (+4 in Thumb, +8 in ARM). when the pipeline is
+            // still valid regs[15] already has the correct offset.
+            if !self.pipeline_valid {
+                let offset = if self.in_thumb_mode() { 4 } else { 8 };
+                self.regs[15] = self.regs[15].wrapping_add(offset);
             }
 
             self.enter_exception(0x18, MODE_IRQ);
@@ -448,8 +448,12 @@ impl Arm7Tdmi {
 
         self.cycles = 0;
 
-        // warns if executing from unmapped or unusual memory regions
-        let exec_pc = if self.in_thumb_mode() {
+        // warns if executing from unmapped or unusual memory regions;
+        // with a flushed pipeline regs[15] holds the execution address
+        // directly, otherwise it carries the pipeline prefetch offset
+        let exec_pc = if !self.pipeline_valid {
+            self.regs[15]
+        } else if self.in_thumb_mode() {
             self.regs[15].wrapping_sub(4)
         } else {
             self.regs[15].wrapping_sub(8)
@@ -1398,9 +1402,9 @@ mod tests {
     fn test_halt_irq_lr_hle_halt() {
         // HLE halt flushes pipeline (pipeline_valid=false), so regs[15]
         // points directly at the next instruction without the pipeline
-        // offset. the IRQ path must add +4 so that enter_exception()
-        // computes the correct LR for `SUBS PC, LR, #4` to return to
-        // the right instruction.
+        // offset. the IRQ path must add +8 (ARM) so that
+        // enter_exception() computes the correct LR for
+        // `SUBS PC, LR, #4` to return to the right instruction.
         let mut cpu = make_cpu();
         let resume_pc = 0x0800_1000u32;
         cpu.set_reg(15, resume_pc);
@@ -1416,16 +1420,11 @@ mod tests {
 
         assert!(!cpu.halted());
         assert_eq!(cpu.cpsr() & CPSR_MODE_MASK, MODE_IRQ);
-        // LR_IRQ should be resume_pc + 4 (the +4 adjustment was applied)
-        // enter_exception ARM path: LR = regs[15] - 4
-        // with adjustment: regs[15] = resume_pc + 4, so LR = resume_pc
-        // handler's `SUBS PC, LR, #4` returns resume_pc - 4? No:
-        // enter_exception sets LR = regs[15] - 4 = (resume_pc+4) - 4 = resume_pc
-        // but the real semantic: after IRQ, SUBS PC, LR, #4 returns to
-        // the interrupted instruction, which is resume_pc - 4 (since the
-        // +4 accounts for the missing pipeline offset).
-        // The key invariant: LR_IRQ = resume_pc (next_instr + 4)
-        assert_eq!(cpu.reg(14), resume_pc);
+        // with the ARM adjustment: regs[15] = resume_pc + 8, so
+        // enter_exception sets LR = regs[15] - 4 = resume_pc + 4 and
+        // the handler's `SUBS PC, LR, #4` returns to resume_pc.
+        // The key invariant: LR_IRQ = next_instr + 4
+        assert_eq!(cpu.reg(14), resume_pc + 4);
     }
 
     #[test]
@@ -1454,6 +1453,48 @@ mod tests {
         // LR_IRQ = regs[15] - 4 = (halt_pc + 8) - 4 = halt_pc + 4
         // handler's SUBS PC, LR, #4 returns halt_pc, which is correct
         assert_eq!(cpu.reg(14), halt_pc + 4);
+    }
+
+    #[test]
+    fn test_irq_lr_after_branch_arm() {
+        // an IRQ taken right after a branch (pipeline flushed, not
+        // halted) must normalize regs[15] by +8 in ARM so LR_IRQ is
+        // next_instr + 4 and `SUBS PC, LR, #4` resumes at the branch
+        // target instead of two instructions before it.
+        let mut cpu = make_cpu();
+        let target = 0x0800_3000u32;
+        cpu.set_reg(15, target); // set_reg(15) flushes the pipeline
+        assert!(!cpu.pipeline_valid);
+
+        cpu.bus.irq.set_ime(true);
+        cpu.bus.irq.set_ie(0x01);
+        cpu.bus.irq.raise_vblank();
+
+        cpu.step();
+
+        assert_eq!(cpu.cpsr() & CPSR_MODE_MASK, MODE_IRQ);
+        assert_eq!(cpu.reg(14), target + 4);
+    }
+
+    #[test]
+    fn test_irq_lr_after_branch_thumb() {
+        // same as the ARM case but in Thumb state, where the pipeline
+        // normalization is +4 (LR_IRQ = next_instr + 4).
+        let mut cpu = make_cpu();
+        cpu.set_cpsr(cpu.cpsr() | CPSR_T);
+        let target = 0x0800_3000u32;
+        cpu.set_reg(15, target);
+        assert!(!cpu.pipeline_valid);
+
+        cpu.bus.irq.set_ime(true);
+        cpu.bus.irq.set_ie(0x01);
+        cpu.bus.irq.raise_vblank();
+
+        cpu.step();
+
+        assert_eq!(cpu.cpsr() & CPSR_MODE_MASK, MODE_IRQ);
+        assert!(cpu.spsr() & CPSR_T != 0); // interrupted in Thumb state
+        assert_eq!(cpu.reg(14), target + 4);
     }
 
     #[test]

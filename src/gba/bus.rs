@@ -17,11 +17,11 @@ use crate::{
             REG_DMA1SAD, REG_DMA2CNT_H, REG_DMA2CNT_L, REG_DMA2DAD, REG_DMA2SAD, REG_DMA3CNT_H,
             REG_DMA3CNT_L, REG_DMA3DAD, REG_DMA3SAD, REG_FIFO_A, REG_FIFO_B, REG_HALTCNT, REG_IE,
             REG_IF, REG_IME, REG_KEYCNT, REG_KEYINPUT, REG_MOSAIC, REG_POSTFLG, REG_RCNT,
-            REG_SIOCNT, REG_SIOMLT_SEND, REG_SIOMULTI0, REG_SIOMULTI3, REG_SOUNDBIAS,
-            REG_SOUNDCNT_H, REG_SOUNDCNT_L, REG_SOUNDCNT_X, REG_TM0CNT_H, REG_TM0CNT_L,
-            REG_TM1CNT_H, REG_TM1CNT_L, REG_TM2CNT_H, REG_TM2CNT_L, REG_TM3CNT_H, REG_TM3CNT_L,
-            REG_VCOUNT, REG_WAITCNT, REG_WAVE_RAM, REG_WIN0H, REG_WIN0V, REG_WIN1H, REG_WIN1V,
-            REG_WININ, REG_WINOUT, VRAM_SIZE,
+            REG_SIOCNT, REG_SIOMLT_SEND, REG_SIOMULTI0, REG_SIOMULTI1, REG_SIOMULTI3,
+            REG_SOUNDBIAS, REG_SOUNDCNT_H, REG_SOUNDCNT_L, REG_SOUNDCNT_X, REG_TM0CNT_H,
+            REG_TM0CNT_L, REG_TM1CNT_H, REG_TM1CNT_L, REG_TM2CNT_H, REG_TM2CNT_L, REG_TM3CNT_H,
+            REG_TM3CNT_L, REG_VCOUNT, REG_WAITCNT, REG_WAVE_RAM, REG_WIN0H, REG_WIN0V, REG_WIN1H,
+            REG_WIN1V, REG_WININ, REG_WINOUT, VRAM_SIZE,
         },
         dma::GbaDma,
         flash::SaveMedia,
@@ -88,8 +88,13 @@ pub struct GbaBus {
     /// Serial multiplayer send register (SIOMLT_SEND).
     siomlt_send: u16,
 
-    /// Serial mode select register (RCNT).
-    rcnt: u16,
+    /// Serial multiplayer data register 0 (SIOMULTI0), holds the
+    /// parent's own data after a multiplayer transfer.
+    siomulti0: u16,
+
+    /// Serial mode select register (RCNT), left in general-purpose
+    /// mode (0x8000) by the BIOS after boot.
+    pub rcnt: u16,
 
     /// Post boot flag.
     pub postflg: u8,
@@ -136,6 +141,7 @@ impl GbaBus {
             waitcnt: 0,
             siocnt: 0,
             siomlt_send: 0,
+            siomulti0: 0xFFFF,
             rcnt: 0,
             postflg: 0,
             halt_requested: false,
@@ -553,15 +559,26 @@ impl GbaBus {
             REG_IF => self.irq.if_(),
             REG_IME => self.irq.ime() as u16,
             REG_WAITCNT => self.waitcnt,
-            REG_SIOMULTI0..=REG_SIOMULTI3 => {
+            REG_SIOMULTI0 => {
+                // the parent's own data is transferred to slot 0, the
+                // remaining slots read all ones (no children attached)
+                self.siomulti0
+            }
+            REG_SIOMULTI1..=REG_SIOMULTI3 => {
                 // incoming multiplayer data reads all ones with no
                 // link partner attached (lines pulled high)
                 0xFFFF
             }
             REG_SIOCNT => {
-                // busy bit is kept clear (transfers complete instantly)
-                // and the SI line reads high with no link partner
-                self.siocnt | (1 << 2)
+                // busy bit is kept clear (transfers complete instantly);
+                // in multiplayer mode a lone unit reads as parent (SI=0)
+                // with the SD line low (no ready partners), while in
+                // normal mode the SI line reads high with no link partner
+                if self.rcnt & (1 << 15) == 0 && self.siocnt & (3 << 12) == (2 << 12) {
+                    self.siocnt & !(1 << 2) & !(1 << 3)
+                } else {
+                    self.siocnt | (1 << 2)
+                }
             }
             REG_SIOMLT_SEND => {
                 // doubles as SIODATA8, received data is all ones with
@@ -732,11 +749,18 @@ impl GbaBus {
             REG_SIOCNT => {
                 // with no link partner the transfer completes right
                 // away, the busy bit (7) is never observed as set and
-                // the completion IRQ is raised when enabled
+                // the completion IRQ is raised when enabled; in
+                // multiplayer mode the parent's own data lands in
+                // SIOMULTI0 while the child slots stay all ones
                 let start = value & (1 << 7) != 0;
                 self.siocnt = value & !(1 << 7);
-                if start && value & (1 << 14) != 0 {
-                    self.irq.raise_serial();
+                if start {
+                    if self.rcnt & (1 << 15) == 0 && value & (3 << 12) == (2 << 12) {
+                        self.siomulti0 = self.siomlt_send;
+                    }
+                    if value & (1 << 14) != 0 {
+                        self.irq.raise_serial();
+                    }
                 }
             }
             REG_SIOMLT_SEND => self.siomlt_send = value,
@@ -903,8 +927,8 @@ mod tests {
     use crate::gba::consts::{
         IRQ_SERIAL, REG_BLDALPHA, REG_BLDCNT, REG_DISPCNT, REG_DMA1CNT_H, REG_DMA1CNT_L,
         REG_DMA1DAD, REG_DMA1SAD, REG_FIFO_A, REG_IE, REG_IF, REG_IME, REG_KEYINPUT, REG_RCNT,
-        REG_SIOCNT, REG_SIOMLT_SEND, REG_SIOMULTI0, REG_SOUNDCNT_H, REG_SOUNDCNT_L, REG_SOUNDCNT_X,
-        REG_TM0CNT_H, REG_TM0CNT_L, REG_WININ, REG_WINOUT,
+        REG_SIOCNT, REG_SIOMLT_SEND, REG_SIOMULTI0, REG_SIOMULTI1, REG_SIOMULTI3, REG_SOUNDCNT_H,
+        REG_SOUNDCNT_L, REG_SOUNDCNT_X, REG_TM0CNT_H, REG_TM0CNT_L, REG_WININ, REG_WINOUT,
     };
 
     #[test]
@@ -1849,6 +1873,24 @@ mod tests {
         // RCNT round-trips written values
         bus.write16(REG_RCNT, 0x8000);
         assert_eq!(bus.read16(REG_RCNT), 0x8000);
+    }
+
+    #[test]
+    fn test_serial_multiplayer_no_link() {
+        let mut bus = GbaBus::new();
+        // in multiplayer mode a lone unit reads as parent (SI=0) with
+        // the SD line low, keeping the busy bit clear
+        bus.write16(REG_SIOCNT, 0x2003);
+        assert_eq!(bus.read16(REG_SIOCNT), 0x2003);
+
+        // starting a transfer moves the parent's own data to slot 0,
+        // while the child slots keep reading all ones
+        bus.write16(REG_SIOMLT_SEND, 0x1234);
+        bus.write16(REG_SIOCNT, 0x2003 | (1 << 7));
+        assert_eq!(bus.read16(REG_SIOCNT) & (1 << 7), 0);
+        assert_eq!(bus.read16(REG_SIOMULTI0), 0x1234);
+        assert_eq!(bus.read16(REG_SIOMULTI1), 0xFFFF);
+        assert_eq!(bus.read16(REG_SIOMULTI3), 0xFFFF);
     }
 
     #[test]

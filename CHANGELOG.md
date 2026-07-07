@@ -36,6 +36,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Build of the web front-end, which was broken by the resolution of the WASM binary through a bare specifier, as Parcel resolves those at build time and the `boytacean` package is aliased to a local file
 * Corrupted backgrounds in Golden Sun caused by idle CPU wake timing
 * Distorted intro screens in Sonic Advance caused by extra scroll updates during VBlank
+* Random GBA crashes and stack corruption from interrupts taken right after a branch
+* Advance Wars 1 and 2 crashing at boot due to broken software reset handling
+* GBA games seeing a phantom link partner during the multiplayer probe at boot
 
 ## [0.13.2] - 2026-07-28
 
