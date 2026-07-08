@@ -10,10 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 * Keyboard navigation in the game playlist (arrow keys to browse results, Enter to load)
+* Performance profiling support with per-frame timings, render timings and memory access counters - [#34](https://github.com/joamag/boytacean/issues/34)
+* Performance audit document with benchmark comparisons against other emulators - [#34](https://github.com/joamag/boytacean/issues/34)
 
 ### Changed
 
-*
+* Faster background rendering and main loop clocking with identical emulation output - [#34](https://github.com/joamag/boytacean/issues/34)
 
 ### Fixed
 
