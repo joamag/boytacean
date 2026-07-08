@@ -293,6 +293,18 @@ impl GbaDma {
         }
     }
 
+    /// Returns whether any DMA channel is active/pending.
+    ///
+    /// Fast path check used to skip DMA processing entirely on the
+    /// (by far most common) instruction clocks with no transfer.
+    #[inline(always)]
+    pub fn any_active(&self) -> bool {
+        self.channels[0].active()
+            || self.channels[1].active()
+            || self.channels[2].active()
+            || self.channels[3].active()
+    }
+
     /// Returns the index of the highest priority active DMA channel,
     /// or None if no channels are active.
     pub fn highest_active(&self) -> Option<usize> {
@@ -441,6 +453,16 @@ mod tests {
         ch.step();
         assert!(!ch.active());
         assert!(!ch.enabled()); // disabled after non-repeat completion
+    }
+
+    #[test]
+    fn test_dma_any_active() {
+        let mut dma = GbaDma::new();
+        assert!(!dma.any_active());
+
+        // enable with immediate timing
+        dma.channels[0].set_control(1 << 15, 0);
+        assert!(dma.any_active());
     }
 
     #[test]

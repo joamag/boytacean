@@ -15,6 +15,11 @@ pub const OBJ_COUNT: usize = 128;
 /// Maximum number of BG layers.
 pub const BG_COUNT: usize = 4;
 
+/// Marker stored in the per-line BG color lanes for columns where the
+/// BG produced no (opaque) pixel; real colors are 15-bit so the top
+/// bit is free to flag transparency.
+const BG_NO_PIXEL: u16 = 0x8000;
+
 /// Layer ID for blending target identification.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
@@ -544,6 +549,25 @@ impl GbaPpu {
         }
     }
 
+    /// Returns whether clocking by the given number of cycles reaches
+    /// an event boundary (hblank entry or end of scanline).
+    ///
+    /// Fast path check used to advance the dot counter without the
+    /// full event handling on the (by far most common) instruction
+    /// clocks that stay within the current scanline phase.
+    #[inline(always)]
+    pub fn will_event(&self, cycles: u32) -> bool {
+        let dot = self.dot + cycles;
+        (self.dot < VISIBLE_DOTS && dot >= VISIBLE_DOTS) || dot >= CYCLES_PER_SCANLINE
+    }
+
+    /// Advances the dot counter without event handling, only valid
+    /// when [`Self::will_event`] returned false for the same cycles.
+    #[inline(always)]
+    pub fn advance(&mut self, cycles: u32) {
+        self.dot += cycles;
+    }
+
     /// Clocks the PPU by the given number of CPU cycles.
     ///
     /// Returns flags: bit 0 = hblank, bit 1 = vblank, bit 2 = hblank IRQ,
@@ -663,39 +687,25 @@ impl GbaPpu {
     ) {
         let backdrop = self.read_palette_color(palette, 0);
 
-        // collect per-pixel BG colors: [bg_index] -> (color, priority),
-        // only meaningful where the matching bg_has_pixel entry is set
-        let mut bg_pixels: [[(u16, u8); DISPLAY_WIDTH]; 4] = [[(0, 0); DISPLAY_WIDTH]; 4];
-        let mut bg_has_pixel: [[bool; DISPLAY_WIDTH]; 4] = [[false; DISPLAY_WIDTH]; 4];
+        // collect per-pixel BG colors: [bg_index] -> 15-bit color, with
+        // the top bit marking columns without an opaque pixel
+        let mut bg_pixels: [[u16; DISPLAY_WIDTH]; 4] = [[BG_NO_PIXEL; DISPLAY_WIDTH]; 4];
 
         for &(bg_index, bg_type, affine_index) in bg_layers {
-            let bg_priority = (self.bgcnt[bg_index] & 0x03) as u8;
             match bg_type {
-                0 => self.collect_text_bg(
-                    bg_index,
-                    line,
-                    vram,
-                    palette,
-                    &mut bg_pixels[bg_index],
-                    &mut bg_has_pixel[bg_index],
-                    bg_priority,
-                ),
+                0 => self.collect_text_bg(bg_index, line, vram, palette, &mut bg_pixels[bg_index]),
                 1 => self.collect_affine_bg(
                     affine_index,
                     bg_index,
                     vram,
                     palette,
                     &mut bg_pixels[bg_index],
-                    &mut bg_has_pixel[bg_index],
-                    bg_priority,
                 ),
                 3..=5 => self.collect_bitmap_bg(
                     affine_index,
                     vram,
                     palette,
                     &mut bg_pixels[bg_index],
-                    &mut bg_has_pixel[bg_index],
-                    bg_priority,
                     bg_type,
                 ),
                 _ => {}
@@ -741,16 +751,31 @@ impl GbaPpu {
 
         let mut line_buffer = [backdrop; DISPLAY_WIDTH];
 
-        // fast path: with a single BG layer, no OBJ pixels, no windows
-        // and no color effects there is nothing to compose per pixel,
-        // the BG row is simply laid over the backdrop
+        // fast path: with no windows, no color effects and no semi
+        // transparent sprite pixels, composition reduces to picking
+        // the highest priority pixel per column (the BG scan follows
+        // the priority sorted list, OBJ wins ties against BGs below)
         let obj_any = obj_has_pixel.iter().any(|&has| has);
-        if !use_windows && !obj_any && blend_mode == BlendMode::None && active_bg_count == 1 {
-            let bg_index = active_bgs[0].0;
+        let obj_semi_any = obj_any && obj_pixels.iter().any(|&(_, _, semi)| semi);
+        if !use_windows && !obj_semi_any && blend_mode == BlendMode::None {
             for (x, pixel) in line_buffer.iter_mut().enumerate() {
-                if bg_has_pixel[bg_index][x] {
-                    *pixel = bg_pixels[bg_index][x].0;
+                let mut color = backdrop;
+                let mut priority = 5u8;
+                for &(bg_index, bg_priority) in active_bgs.iter().take(active_bg_count) {
+                    let bg_color = bg_pixels[bg_index][x];
+                    if bg_color & BG_NO_PIXEL == 0 {
+                        color = bg_color;
+                        priority = bg_priority;
+                        break;
+                    }
                 }
+                if obj_has_pixel[x] {
+                    let (obj_color, obj_priority, _) = obj_pixels[x];
+                    if obj_priority <= priority {
+                        color = obj_color;
+                    }
+                }
+                *pixel = color;
             }
             self.write_line_buffer(line, &line_buffer);
             return;
@@ -797,14 +822,15 @@ impl GbaPpu {
             // is the top pixel, the second the bottom one, OBJ treated
             // as index 4 for the tiebreak
             for &(bg_index, priority) in active_bgs.iter().take(active_bg_count) {
-                if !bg_has_pixel[bg_index][x] {
+                let bg_color = bg_pixels[bg_index][x];
+                if bg_color & BG_NO_PIXEL != 0 {
                     continue;
                 }
                 if win_mask & (1 << bg_index) == 0 {
                     continue;
                 }
                 let entry = PixelEntry {
-                    color: bg_pixels[bg_index][x].0,
+                    color: bg_color,
                     priority,
                     layer: bg_layer_ids[bg_index],
                     is_semi_transparent: false,
@@ -948,9 +974,7 @@ impl GbaPpu {
         affine_index: usize,
         vram: &[u8],
         palette: &[u8],
-        pixels: &mut [(u16, u8); DISPLAY_WIDTH],
-        has_pixel: &mut [bool; DISPLAY_WIDTH],
-        bg_priority: u8,
+        pixels: &mut [u16; DISPLAY_WIDTH],
         mode: u8,
     ) {
         let page_offset: usize = if self.dispcnt & (1 << 4) != 0 {
@@ -971,7 +995,7 @@ impl GbaPpu {
         let pa = self.bg_pa[affine_index] as i32;
         let pc = self.bg_pc[affine_index] as i32;
 
-        for x_screen in 0..DISPLAY_WIDTH {
+        for pixel in pixels.iter_mut() {
             let tex_x = ref_x >> 8;
             let tex_y = ref_y >> 8;
 
@@ -1017,8 +1041,7 @@ impl GbaPpu {
                 _ => continue,
             };
 
-            pixels[x_screen] = (color, bg_priority);
-            has_pixel[x_screen] = true;
+            *pixel = color & !BG_NO_PIXEL;
         }
     }
 
@@ -1030,9 +1053,7 @@ impl GbaPpu {
         line: usize,
         vram: &[u8],
         palette: &[u8],
-        pixels: &mut [(u16, u8); DISPLAY_WIDTH],
-        has_pixel: &mut [bool; DISPLAY_WIDTH],
-        bg_priority: u8,
+        pixels: &mut [u16; DISPLAY_WIDTH],
     ) {
         let cnt = self.bgcnt[bg_index];
         let char_base = ((cnt >> 2) & 0x03) as usize * 0x4000;
@@ -1090,8 +1111,6 @@ impl GbaPpu {
                     vram,
                     palette,
                     pixels,
-                    has_pixel,
-                    bg_priority,
                 );
             }
         } else {
@@ -1145,8 +1164,7 @@ impl GbaPpu {
                             let color_index = ((row >> (tile_px * 8)) & 0xFF) as usize;
                             if color_index != 0 {
                                 let color = self.read_palette_color(palette, color_index);
-                                pixels[screen_x + px] = (color, bg_priority);
-                                has_pixel[screen_x + px] = true;
+                                pixels[screen_x + px] = color & !BG_NO_PIXEL;
                             }
                         }
                     }
@@ -1168,8 +1186,7 @@ impl GbaPpu {
                             if color_index != 0 {
                                 let color =
                                     self.read_palette_color(palette, palette_base + color_index);
-                                pixels[screen_x + px] = (color, bg_priority);
-                                has_pixel[screen_x + px] = true;
+                                pixels[screen_x + px] = color & !BG_NO_PIXEL;
                             }
                         }
                     }
@@ -1201,9 +1218,7 @@ impl GbaPpu {
         is_8bpp: bool,
         vram: &[u8],
         palette: &[u8],
-        pixels: &mut [(u16, u8); DISPLAY_WIDTH],
-        has_pixel: &mut [bool; DISPLAY_WIDTH],
-        bg_priority: u8,
+        pixels: &mut [u16; DISPLAY_WIDTH],
     ) {
         let x = (eff_x + scroll_x) % map_width;
 
@@ -1268,8 +1283,7 @@ impl GbaPpu {
         } else {
             self.read_palette_color(palette, palette_bank * 16 + color_index)
         };
-        pixels[x_screen] = (color, bg_priority);
-        has_pixel[x_screen] = true;
+        pixels[x_screen] = color & !BG_NO_PIXEL;
     }
 
     /// Collects affine background pixels into per-pixel arrays.
@@ -1280,9 +1294,7 @@ impl GbaPpu {
         bg_index: usize,
         vram: &[u8],
         palette: &[u8],
-        pixels: &mut [(u16, u8); DISPLAY_WIDTH],
-        has_pixel: &mut [bool; DISPLAY_WIDTH],
-        bg_priority: u8,
+        pixels: &mut [u16; DISPLAY_WIDTH],
     ) {
         let cnt = self.bgcnt[bg_index];
         let char_base = ((cnt >> 2) & 0x03) as usize * 0x4000;
@@ -1323,7 +1335,7 @@ impl GbaPpu {
             (self.bg_ref_x[affine_index], self.bg_ref_y[affine_index])
         };
 
-        for x_screen in 0..DISPLAY_WIDTH {
+        for pixel in pixels.iter_mut() {
             // convert fixed-point (8.8) to pixel coordinates
             let tex_x = ref_x >> 8;
             let tex_y = ref_y >> 8;
@@ -1364,8 +1376,7 @@ impl GbaPpu {
             }
 
             let color = self.read_palette_color(palette, color_index);
-            pixels[x_screen] = (color, bg_priority);
-            has_pixel[x_screen] = true;
+            *pixel = color & !BG_NO_PIXEL;
         }
 
         // applies horizontal mosaic as a post-pass
@@ -1376,7 +1387,6 @@ impl GbaPpu {
                     let src = x / mos_h * mos_h;
                     if src != x {
                         pixels[x] = pixels[src];
-                        has_pixel[x] = has_pixel[src];
                     }
                 }
             }
@@ -1935,6 +1945,21 @@ mod tests {
             ppu.cycles_to_next_event(),
             CYCLES_PER_SCANLINE - VISIBLE_DOTS
         );
+    }
+
+    #[test]
+    fn test_will_event_advance() {
+        let mut ppu = GbaPpu::new();
+
+        // crossing into HBlank or the scanline end is an event
+        assert!(!ppu.will_event(VISIBLE_DOTS - 1));
+        assert!(ppu.will_event(VISIBLE_DOTS));
+        assert!(ppu.will_event(CYCLES_PER_SCANLINE));
+
+        // advancing moves the boundary closer without event handling
+        ppu.advance(VISIBLE_DOTS - 1);
+        assert!(ppu.will_event(1));
+        assert_eq!(ppu.cycles_to_next_event(), 1);
     }
 
     #[test]

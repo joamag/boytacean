@@ -27,6 +27,9 @@ pub struct GbaTimer {
     /// Derived: prescaler divisor (1, 64, 256, 1024).
     prescaler: u32,
 
+    /// Derived: prescaler divisor as a shift amount (0, 6, 8, 10).
+    prescaler_shift: u32,
+
     /// Overflow flag (set when timer overflows, consumed externally).
     overflow: bool,
 }
@@ -42,6 +45,7 @@ impl GbaTimer {
             irq_enable: false,
             cascade: false,
             prescaler: 1,
+            prescaler_shift: 0,
             overflow: false,
         }
     }
@@ -69,6 +73,7 @@ impl GbaTimer {
         self.irq_enable = value & (1 << 6) != 0;
         self.cascade = value & (1 << 2) != 0;
         self.prescaler = TIMER_PRESCALERS[(value & 0x03) as usize];
+        self.prescaler_shift = self.prescaler.trailing_zeros();
 
         // reload counter when transitioning from disabled to enabled
         if !was_enabled && self.enabled {
@@ -108,14 +113,18 @@ impl GbaTimer {
         self.overflow = false;
         self.prescaler_counter += cycles;
 
-        while self.prescaler_counter >= self.prescaler {
-            self.prescaler_counter -= self.prescaler;
-            let (new_counter, overflow) = self.counter.overflowing_add(1);
-            if overflow {
-                self.counter = self.reload;
+        // consumes whole prescaler periods in one step, wrapping the
+        // counter through the reload value on overflow
+        let ticks = self.prescaler_counter >> self.prescaler_shift;
+        if ticks > 0 {
+            self.prescaler_counter &= self.prescaler - 1;
+            let total = self.counter as u32 + ticks;
+            if total >= 0x10000 {
+                let period = 0x10000 - self.reload as u32;
+                self.counter = (self.reload as u32 + (total - 0x10000) % period) as u16;
                 self.overflow = true;
             } else {
-                self.counter = new_counter;
+                self.counter = total as u16;
             }
         }
 
@@ -129,7 +138,7 @@ impl GbaTimer {
             return u32::MAX;
         }
         let ticks = 0x10000 - self.counter as u32;
-        (ticks * self.prescaler - self.prescaler_counter).max(1)
+        ((ticks << self.prescaler_shift) - self.prescaler_counter).max(1)
     }
 
     /// Handles a cascade tick from the previous timer's overflow.
@@ -161,6 +170,13 @@ impl Default for GbaTimer {
 
 pub struct GbaTimers {
     pub timers: [GbaTimer; 4],
+
+    /// Cycles accumulated since the last batch run.
+    pending_cycles: u32,
+
+    /// Cycles from the last batch run until the earliest overflow,
+    /// `u32::MAX` when no timer can overflow on its own.
+    next_overflow: u32,
 }
 
 impl GbaTimers {
@@ -172,15 +188,51 @@ impl GbaTimers {
                 GbaTimer::new(),
                 GbaTimer::new(),
             ],
+            pending_cycles: 0,
+            next_overflow: u32::MAX,
         }
+    }
+
+    /// Writes a timer reload value, flushing pending cycles so the
+    /// change applies from the current CPU clock position.
+    pub fn write_reload(&mut self, index: usize, value: u16) {
+        self.flush();
+        self.timers[index].set_reload(value);
+        self.next_overflow = self.compute_next_overflow();
+    }
+
+    /// Writes a timer control register, flushing pending cycles so the
+    /// change applies from the current CPU clock position.
+    pub fn write_control(&mut self, index: usize, value: u16) {
+        self.flush();
+        self.timers[index].set_control(value);
+        self.next_overflow = self.compute_next_overflow();
+    }
+
+    /// Reads a timer counter, flushing pending cycles so the value
+    /// reflects the current CPU clock position.
+    pub fn read_counter(&mut self, index: usize) -> u16 {
+        self.flush();
+        self.timers[index].counter()
     }
 
     /// Returns the number of cycles until the earliest enabled timer
     /// overflows, or `u32::MAX` when no timer can overflow on its own.
     ///
+    /// Accounts for cycles accumulated since the last batch run, so
+    /// the boundary is exact from the current CPU clock position.
+    pub fn cycles_to_next_overflow(&self) -> u32 {
+        if self.next_overflow == u32::MAX {
+            return u32::MAX;
+        }
+        (self.next_overflow - self.pending_cycles).max(1)
+    }
+
+    /// Computes the batch boundary from the current timer state.
+    ///
     /// Cascade timers are excluded, they only tick when their driving
     /// timer overflows, which is already an event boundary.
-    pub fn cycles_to_next_overflow(&self) -> u32 {
+    fn compute_next_overflow(&self) -> u32 {
         let mut next = u32::MAX;
         for timer in &self.timers {
             next = next.min(timer.cycles_to_overflow());
@@ -190,9 +242,38 @@ impl GbaTimers {
 
     /// Clocks all 4 timers, handling cascade chains.
     ///
+    /// Cycles are accumulated and processed in batches bounded by the
+    /// earliest overflow, keeping the per instruction cost low while
+    /// overflow timing stays exact; [`Self::flush`] runs any pending
+    /// cycles before timer state is observed.
+    ///
     /// Returns a bitmask of which timers overflowed (bit 0 = TM0, etc).
     #[inline(always)]
     pub fn clock(&mut self, cycles: u32) -> u8 {
+        self.pending_cycles = self.pending_cycles.saturating_add(cycles);
+        if self.pending_cycles < self.next_overflow {
+            return 0;
+        }
+        self.run_pending()
+    }
+
+    /// Processes any accumulated cycles, bringing the timer counters
+    /// up to date with the CPU clock.
+    ///
+    /// Flushing never crosses the overflow boundary (the batched clock
+    /// runs as soon as it is reached), so no overflow events are lost.
+    pub fn flush(&mut self) {
+        if self.pending_cycles > 0 {
+            self.run_pending();
+        }
+    }
+
+    /// Runs the accumulated pending cycles through the timers and
+    /// recomputes the next overflow boundary.
+    fn run_pending(&mut self) -> u8 {
+        let cycles = self.pending_cycles;
+        self.pending_cycles = 0;
+
         // fast path: no enabled timer means nothing can tick or overflow
         if !self.timers[0].enabled()
             && !self.timers[1].enabled()
@@ -220,6 +301,8 @@ impl GbaTimers {
                 overflows |= 1 << i;
             }
         }
+
+        self.next_overflow = self.compute_next_overflow();
 
         overflows
     }
@@ -351,17 +434,98 @@ mod tests {
     }
 
     #[test]
+    fn test_timer_clock_batched_ticks() {
+        let mut timer = GbaTimer::new();
+        timer.set_control((1 << 7) | 0x01); // enabled, prescaler 64
+
+        // 129 cycles are two whole prescaler periods plus a remainder
+        timer.clock(129);
+        assert_eq!(timer.counter(), 2);
+
+        // the remainder carries over into the next clock
+        timer.clock(63);
+        assert_eq!(timer.counter(), 3);
+    }
+
+    #[test]
+    fn test_timer_clock_multi_overflow_wrap() {
+        let mut timer = GbaTimer::new();
+        timer.set_reload(0xFFFE);
+        timer.set_control(1 << 7);
+
+        // 5 ticks from 0xFFFE wrap through the reload value twice
+        assert!(timer.clock(5));
+        assert_eq!(timer.counter(), 0xFFFF);
+    }
+
+    #[test]
     fn test_timers_cycles_to_next_overflow() {
         let mut timers = GbaTimers::new();
         // no enabled timer means no overflow can happen
         assert_eq!(timers.cycles_to_next_overflow(), u32::MAX);
 
         // the earliest overflowing timer bounds the distance
-        timers.timers[0].set_reload(0xFF00);
-        timers.timers[0].set_control(1 << 7);
-        timers.timers[1].set_reload(0xFFFF);
-        timers.timers[1].set_control(1 << 7);
+        timers.write_reload(0, 0xFF00);
+        timers.write_control(0, 1 << 7);
+        timers.write_reload(1, 0xFFFF);
+        timers.write_control(1, 1 << 7);
         assert_eq!(timers.cycles_to_next_overflow(), 1);
+    }
+
+    #[test]
+    fn test_timers_cycles_to_next_overflow_pending() {
+        let mut timers = GbaTimers::new();
+        timers.write_reload(0, 0xFF00);
+        timers.write_control(0, 1 << 7);
+        assert_eq!(timers.cycles_to_next_overflow(), 0x100);
+
+        // accumulated cycles shorten the distance to the boundary
+        timers.clock(0x40);
+        assert_eq!(timers.cycles_to_next_overflow(), 0xC0);
+    }
+
+    #[test]
+    fn test_timers_clock_batches_until_overflow() {
+        let mut timers = GbaTimers::new();
+        timers.write_reload(0, 0xFF00);
+        timers.write_control(0, 1 << 7);
+
+        // clocking below the overflow boundary reports nothing
+        assert_eq!(timers.clock(0xFF), 0);
+
+        // the boundary cycle itself delivers the overflow
+        assert_eq!(timers.clock(1), 1);
+    }
+
+    #[test]
+    fn test_timers_flush_applies_pending() {
+        let mut timers = GbaTimers::new();
+        timers.write_control(0, 1 << 7);
+        timers.clock(100);
+
+        timers.flush();
+        assert_eq!(timers.timers[0].counter(), 100);
+    }
+
+    #[test]
+    fn test_timers_write_control_applies_pending() {
+        let mut timers = GbaTimers::new();
+        timers.write_control(0, 1 << 7);
+        timers.clock(50);
+
+        // re-writing control flushes, the elapsed time is not lost
+        timers.write_control(0, 1 << 7);
+        assert_eq!(timers.timers[0].counter(), 50);
+    }
+
+    #[test]
+    fn test_timers_read_counter_flushes() {
+        let mut timers = GbaTimers::new();
+        timers.write_control(0, 1 << 7);
+
+        // pending cycles are only applied when the counter is observed
+        timers.clock(100);
+        assert_eq!(timers.read_counter(0), 100);
     }
 
     #[test]
@@ -378,10 +542,10 @@ mod tests {
     #[test]
     fn test_timer_overflow() {
         let mut timers = GbaTimers::new();
-        timers.timers[0].set_reload(0xFFFF);
+        timers.write_reload(0, 0xFFFF);
 
         // enable timer 0 with prescaler 1
-        timers.timers[0].set_control(1 << 7);
+        timers.write_control(0, 1 << 7);
 
         // should overflow after 1 tick from 0xFFFF
         let overflows = timers.clock(1);
@@ -393,12 +557,12 @@ mod tests {
         let mut timers = GbaTimers::new();
 
         // timer 0: reload 0xFFFF, prescaler 1
-        timers.timers[0].set_reload(0xFFFF);
-        timers.timers[0].set_control(1 << 7);
+        timers.write_reload(0, 0xFFFF);
+        timers.write_control(0, 1 << 7);
 
         // timer 1: reload 0xFFFE, cascade mode
-        timers.timers[1].set_reload(0xFFFE);
-        timers.timers[1].set_control((1 << 7) | (1 << 2));
+        timers.write_reload(1, 0xFFFE);
+        timers.write_control(1, (1 << 7) | (1 << 2));
 
         // timer 0 overflows, timer 1 increments from 0xFFFE to 0xFFFF
         let overflows = timers.clock(1);
@@ -411,12 +575,12 @@ mod tests {
         let mut timers = GbaTimers::new();
 
         // timer 0: reload 0xFFFF
-        timers.timers[0].set_reload(0xFFFF);
-        timers.timers[0].set_control(1 << 7);
+        timers.write_reload(0, 0xFFFF);
+        timers.write_control(0, 1 << 7);
 
         // timer 1: reload 0xFFFF, cascade
-        timers.timers[1].set_reload(0xFFFF);
-        timers.timers[1].set_control((1 << 7) | (1 << 2));
+        timers.write_reload(1, 0xFFFF);
+        timers.write_control(1, (1 << 7) | (1 << 2));
 
         // both should overflow
         let overflows = timers.clock(1);
@@ -437,8 +601,8 @@ mod tests {
         let mut timers = GbaTimers::new();
 
         // only enable timer 2
-        timers.timers[2].set_reload(0xFFFF);
-        timers.timers[2].set_control(1 << 7);
+        timers.write_reload(2, 0xFFFF);
+        timers.write_control(2, 1 << 7);
 
         let overflows = timers.clock(1);
         assert_eq!(overflows & 1, 0); // timer 0 not enabled

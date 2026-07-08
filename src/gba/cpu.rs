@@ -497,14 +497,23 @@ impl Arm7Tdmi {
         // writes to upcoming instruction addresses does not affect the
         // already-fetched pipeline contents.
         let prefetched = if self.pipeline_valid {
-            self.bus.bios_readable = self.regs[15] < 0x4000;
-            let value = if self.in_thumb_mode() {
+            let value = if self.regs[15] < 0x4000 {
+                // (rare) fetch inside the BIOS region: makes the BIOS
+                // readable for the fetch and updates the protection value
+                self.bus.bios_readable = true;
+                let value = if self.in_thumb_mode() {
+                    self.bus.read16(self.regs[15]) as u32
+                } else {
+                    self.bus.read32(self.regs[15])
+                };
+                self.fetch_bios_guard(self.regs[15], value);
+                self.bus.bios_readable = false;
+                value
+            } else if self.in_thumb_mode() {
                 self.bus.read16(self.regs[15]) as u32
             } else {
                 self.bus.read32(self.regs[15])
             };
-            self.fetch_bios_guard(self.regs[15], value);
-            self.bus.bios_readable = false;
             Some(value)
         } else {
             None

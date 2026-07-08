@@ -195,16 +195,20 @@ impl GameBoyAdvance {
         }
 
         // clocks PPU, retrieves the events that occurred during
-        // this clock to trigger related behavior
+        // this clock to trigger related behavior; the dot counter is
+        // advanced without the full event handling (and its slice
+        // arguments) when no event boundary can be reached
         if self.ppu_enabled {
-            let events = self.cpu.bus.ppu.clock(
-                cycles,
-                self.cpu.bus.vram.as_slice(),
-                self.cpu.bus.palette.as_slice(),
-                self.cpu.bus.oam.as_slice(),
-            );
+            if !self.cpu.bus.ppu.will_event(cycles) {
+                self.cpu.bus.ppu.advance(cycles);
+            } else {
+                let events = self.cpu.bus.ppu.clock(
+                    cycles,
+                    self.cpu.bus.vram.as_slice(),
+                    self.cpu.bus.palette.as_slice(),
+                    self.cpu.bus.oam.as_slice(),
+                );
 
-            if events != 0 {
                 if events & 1 != 0 {
                     // hblank DMA trigger (always fires at hblank)
                     if self.dma_enabled {
@@ -241,7 +245,7 @@ impl GameBoyAdvance {
         }
 
         // processes DMA transfers
-        if self.dma_enabled {
+        if self.dma_enabled && self.cpu.bus.dma.any_active() {
             self.process_dma();
         }
 
