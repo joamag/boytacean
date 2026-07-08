@@ -171,13 +171,20 @@ impl Cpu {
 
         // fetches the current interrupt request flags (IF) with the enabled
         // mask (IE) applied, each interrupt flag is fetched once so that both
-        // the halt release check and the handler dispatch reuse the same value
-        let flags = (self.mmu.ppu().int_vblank() as u8)
-            | ((self.mmu.ppu().int_stat() as u8) << 1)
-            | ((self.mmu.timer().int_tima() as u8) << 2)
-            | ((self.mmu.serial().int_serial() as u8) << 3)
-            | ((self.mmu.pad().int_pad() as u8) << 4);
-        let pending = flags & self.mmu.ie;
+        // the halt release check and the handler dispatch reuse the same value,
+        // the (expensive) fetch operation is only performed when the pending
+        // value can affect execution (IME set or halted) and at least one
+        // interrupt source is enabled, otherwise it would be discarded
+        let pending = if (self.ime || self.halted) && self.mmu.ie != 0 {
+            let flags = (self.mmu.ppu().int_vblank() as u8)
+                | ((self.mmu.ppu().int_stat() as u8) << 1)
+                | ((self.mmu.timer().int_tima() as u8) << 2)
+                | ((self.mmu.serial().int_serial() as u8) << 3)
+                | ((self.mmu.pad().int_pad() as u8) << 4);
+            flags & self.mmu.ie
+        } else {
+            0
+        };
 
         // in case the CPU execution is halted and there's a pending interrupt
         // while IME is disabled, releases the CPU from the halted state so that
@@ -994,6 +1001,38 @@ mod tests {
         assert_eq!(cycles, 4);
         assert_eq!(cpu.pc, 0xc001);
         assert!(!cpu.halted);
+        assert!(cpu.mmu.ppu().int_vblank());
+    }
+
+    /// Tests that an interrupt request is ignored when no interrupt
+    /// source is enabled (IE empty), both in the normal and in the
+    /// halted states.
+    #[test]
+    fn test_int_ignored_ie_empty() {
+        let mut cpu = Cpu::default();
+        cpu.boot();
+        cpu.mmu.allocate_default();
+
+        cpu.pc = 0xc000;
+        cpu.sp = 0xfffe;
+        cpu.mmu.write(0xc000, 0x00);
+        cpu.mmu.ie = 0x00;
+        cpu.mmu.ppu().set_int_vblank(true);
+        cpu.enable_int();
+
+        let cycles = cpu.clock();
+        assert_eq!(cycles, 4);
+        assert_eq!(cpu.pc, 0xc001);
+        assert_eq!(cpu.sp, 0xfffe);
+        assert!(cpu.mmu.ppu().int_vblank());
+
+        cpu.pc = 0xc000;
+        cpu.halted = true;
+
+        let cycles = cpu.clock();
+        assert_eq!(cycles, 4);
+        assert_eq!(cpu.pc, 0xc000);
+        assert!(cpu.halted);
         assert!(cpu.mmu.ppu().int_vblank());
     }
 }
