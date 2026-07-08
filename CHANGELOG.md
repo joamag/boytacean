@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Major GBA emulation performance improvements across memory access, idle CPU handling, audio and video rendering
 * Faster GBA scanline composition, tile fetching and sprite scanning
 * Another round of GBA performance work making commercial games run about 1.5x faster
+* Faster GBA instruction fetching from the main memory regions
 
 ### Fixed
 

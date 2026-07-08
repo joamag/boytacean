@@ -330,21 +330,21 @@ impl Arm7Tdmi {
         if self.in_thumb_mode() {
             self.regs[15] &= !1;
             self.bus.bios_readable = self.regs[15] < 0x4000;
-            self.pipeline[0] = self.bus.read16(self.regs[15]) as u32;
+            self.pipeline[0] = self.bus.fetch16(self.regs[15]) as u32;
             self.fetch_bios_guard(self.regs[15], self.pipeline[0]);
             self.regs[15] = self.regs[15].wrapping_add(2);
             self.bus.bios_readable = self.regs[15] < 0x4000;
-            self.pipeline[1] = self.bus.read16(self.regs[15]) as u32;
+            self.pipeline[1] = self.bus.fetch16(self.regs[15]) as u32;
             self.fetch_bios_guard(self.regs[15], self.pipeline[1]);
             self.regs[15] = self.regs[15].wrapping_add(2);
         } else {
             self.regs[15] &= !3;
             self.bus.bios_readable = self.regs[15] < 0x4000;
-            self.pipeline[0] = self.bus.read32(self.regs[15]);
+            self.pipeline[0] = self.bus.fetch32(self.regs[15]);
             self.fetch_bios_guard(self.regs[15], self.pipeline[0]);
             self.regs[15] = self.regs[15].wrapping_add(4);
             self.bus.bios_readable = self.regs[15] < 0x4000;
-            self.pipeline[1] = self.bus.read32(self.regs[15]);
+            self.pipeline[1] = self.bus.fetch32(self.regs[15]);
             self.fetch_bios_guard(self.regs[15], self.pipeline[1]);
             self.regs[15] = self.regs[15].wrapping_add(4);
         }
@@ -510,9 +510,9 @@ impl Arm7Tdmi {
                 self.bus.bios_readable = false;
                 value
             } else if self.in_thumb_mode() {
-                self.bus.read16(self.regs[15]) as u32
+                self.bus.fetch16(self.regs[15]) as u32
             } else {
-                self.bus.read32(self.regs[15])
+                self.bus.fetch32(self.regs[15])
             };
             Some(value)
         } else {

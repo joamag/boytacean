@@ -400,6 +400,66 @@ impl GbaBus {
         }
     }
 
+    // 16-bit instruction fetch (aligned)
+    //
+    // Fast path for opcode fetches: the program counter is always
+    // halfword aligned and executes from EWRAM, IWRAM or ROM in the
+    // overwhelming majority of cases, letting the alignment mask,
+    // EEPROM gating and IO handling of read16() be skipped.
+    #[inline(always)]
+    pub fn fetch16(&mut self, addr: u32) -> u16 {
+        match addr >> 24 {
+            0x02 => {
+                let offset = (addr & 0x3FFFE) as usize;
+                u16::from_le_bytes(self.ewram[offset..offset + 2].try_into().unwrap())
+            }
+            0x03 => {
+                let offset = (addr & 0x7FFE) as usize;
+                u16::from_le_bytes(self.iwram[offset..offset + 2].try_into().unwrap())
+            }
+            0x08..=0x0C => {
+                let offset = (addr & 0x01FFFFFF) as usize;
+                if let Some(bytes) = self.rom.get(offset..offset + 2) {
+                    u16::from_le_bytes(bytes.try_into().unwrap())
+                } else {
+                    // open bus: 16-bit ROM bus returns halfword address
+                    ((addr / 2) & 0xFFFF) as u16
+                }
+            }
+            _ => self.read16(addr),
+        }
+    }
+
+    // 32-bit instruction fetch (aligned)
+    //
+    // Fast path for opcode fetches, mirroring fetch16() for the word
+    // sized fetches of ARM mode.
+    #[inline(always)]
+    pub fn fetch32(&mut self, addr: u32) -> u32 {
+        match addr >> 24 {
+            0x02 => {
+                let offset = (addr & 0x3FFFC) as usize;
+                u32::from_le_bytes(self.ewram[offset..offset + 4].try_into().unwrap())
+            }
+            0x03 => {
+                let offset = (addr & 0x7FFC) as usize;
+                u32::from_le_bytes(self.iwram[offset..offset + 4].try_into().unwrap())
+            }
+            0x08..=0x0C => {
+                let offset = (addr & 0x01FFFFFF) as usize;
+                if let Some(bytes) = self.rom.get(offset..offset + 4) {
+                    u32::from_le_bytes(bytes.try_into().unwrap())
+                } else {
+                    // open bus: two consecutive halfword addresses
+                    let hw0 = (addr / 2) & 0xFFFF;
+                    let hw1 = ((addr + 2) / 2) & 0xFFFF;
+                    hw0 | (hw1 << 16)
+                }
+            }
+            _ => self.read32(addr),
+        }
+    }
+
     // 8-bit write
     #[inline(always)]
     pub fn write8(&mut self, addr: u32, value: u8) {
@@ -989,6 +1049,36 @@ mod tests {
         assert_eq!(bus.read32(0x0800_0000), 0x00010000);
         assert_eq!(bus.read8(0x0800_0000), 0x12);
         assert_eq!(bus.read8(0x0800_0010), ((0x0800_0010 / 2) & 0xFF) as u8);
+    }
+
+    #[test]
+    fn test_fetch_matches_read() {
+        let mut bus = GbaBus::new();
+        bus.load_rom(&[0x12, 0x34, 0x56, 0x78]);
+        bus.write16(0x0200_0010, 0xAABB);
+        bus.write32(0x0300_0020, 0x1122_3344);
+
+        // fast path regions agree with the generic reads
+        assert_eq!(bus.fetch16(0x0800_0000), bus.read16(0x0800_0000));
+        assert_eq!(bus.fetch32(0x0800_0000), bus.read32(0x0800_0000));
+        assert_eq!(bus.fetch16(0x0200_0010), 0xAABB);
+        assert_eq!(bus.fetch32(0x0300_0020), 0x1122_3344);
+
+        // other regions fall back to the generic reads
+        assert_eq!(bus.fetch16(0x0600_0000), bus.read16(0x0600_0000));
+        assert_eq!(bus.fetch32(0x0600_0000), bus.read32(0x0600_0000));
+    }
+
+    #[test]
+    fn test_fetch_open_bus() {
+        let mut bus = GbaBus::new();
+        bus.load_rom(&[0x12, 0x34]);
+        // open bus: 16-bit ROM bus returns halfword addresses
+        assert_eq!(
+            bus.fetch16(0x0800_0010),
+            ((0x0800_0010u32 / 2) & 0xFFFF) as u16
+        );
+        assert_eq!(bus.fetch32(0x0800_0010), bus.read32(0x0800_0010));
     }
 
     #[test]
