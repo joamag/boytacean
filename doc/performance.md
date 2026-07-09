@@ -19,16 +19,18 @@ Emulation output equivalence was verified by hashing the complete frame buffer o
 
 Frames per second, best of three interleaved runs of 12000 frames, higher is better:
 
-| ROM | Mode | Boytacean | Boytacean (APU) | mGBA |
-| --- | ---- | --------- | --------------- | ---- |
-| pocket.gb | DMG | 16318 | 12068 | 8595 |
-| shocklobster.gb | DMG | 17188 | 11628 | 21868 |
-| opus5.gb | DMG | 18492 | 14387 | 8435 |
-| cgb_acid2.gbc | CGB | 10439 | - | 22986 |
+| ROM | Mode | Boytacean | Boytacean (APU) | mGBA | SameBoy |
+| --- | ---- | --------- | --------------- | ---- | ------- |
+| pocket.gb | DMG | 16318 | 12068 | 8595 | 2510 |
+| shocklobster.gb | DMG | 17188 | 11628 | 21868 | 2532 |
+| opus5.gb | DMG | 18492 | 14387 | 8435 | n/a |
+| cgb_acid2.gbc | CGB | 10439 | - | 22986 | 4196 |
 
-With audio emulation on both sides, Boytacean is ~1.4-1.7x faster than mGBA on typical DMG workloads, while mGBA is ~1.9x faster on shocklobster (a sprite and interrupt heavy action game) and ~2.2x faster on the CGB test ROM. The pattern is consistent with the audit findings below: Boytacean wins on rendering-bound scenes, mGBA wins on halt/interrupt-bound and CGB scenes thanks to its event-driven scheduler.
+With audio emulation on both sides, Boytacean is ~1.4-1.7x faster than mGBA on typical DMG workloads, while mGBA is ~1.9x faster on shocklobster (a sprite and interrupt heavy action game) and ~2.2x faster on the CGB test ROM. The pattern is consistent with the audit findings below: Boytacean wins on rendering-bound scenes, mGBA wins on halt/interrupt-bound and CGB scenes thanks to its event-driven scheduler. SameBoy trades throughput for maximum accuracy (per-T-cycle stepping) and runs roughly 5-8x slower than the other two, while remaining far above realtime.
 
-Notes on fairness: `mgba-perf` always emulates audio, so the closest comparison column is Boytacean with `--apu`. mGBA is also a full-system emulator whose Game Boy core (SM83) favours accuracy features (event scheduler, cycle-level timings) that Boytacean's simpler loop does not implement.
+The timestamped report with the exact environment, versions, harness details and raw per-round data is kept in [benchmarks.md](benchmarks.md).
+
+Notes on fairness: `mgba-perf` and the SameBoy tester always emulate audio, so the closest comparison column is Boytacean with `--apu`. mGBA is also a full-system emulator whose Game Boy core (SM83) favours accuracy features (event scheduler, cycle-level timings) that Boytacean's simpler loop does not implement.
 
 ## Internal profiling
 
