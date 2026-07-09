@@ -19,12 +19,12 @@ Emulation output equivalence was verified by hashing the complete frame buffer o
 
 Frames per second, best of three interleaved runs of 12000 frames, higher is better:
 
-| ROM | Mode | Boytacean | Boytacean (APU) | mGBA | SameBoy |
-| --- | ---- | --------- | --------------- | ---- | ------- |
-| pocket.gb | DMG | 16318 | 12068 | 8595 | 2510 |
-| shocklobster.gb | DMG | 17188 | 11628 | 21868 | 2532 |
-| opus5.gb | DMG | 18492 | 14387 | 8435 | n/a |
-| cgb_acid2.gbc | CGB | 10439 | - | 22986 | 4196 |
+| ROM             | Mode | Boytacean | Boytacean (APU) | mGBA  | SameBoy |
+| --------------- | ---- | --------- | --------------- | ----- | ------- |
+| pocket.gb       | DMG  | 16318     | 12068           | 8595  | 2510    |
+| shocklobster.gb | DMG  | 17188     | 11628           | 21868 | 2532    |
+| opus5.gb        | DMG  | 18492     | 14387           | 8435  | n/a     |
+| cgb_acid2.gbc   | CGB  | 10439     | -               | 22986 | 4196    |
 
 With audio emulation on both sides, Boytacean is ~1.4-1.7x faster than mGBA on typical DMG workloads, while mGBA is ~1.9x faster on shocklobster (a sprite and interrupt heavy action game) and ~2.2x faster on the CGB test ROM. The pattern is consistent with the audit findings below: Boytacean wins on rendering-bound scenes, mGBA wins on halt/interrupt-bound and CGB scenes thanks to its event-driven scheduler. SameBoy trades throughput for maximum accuracy (per-T-cycle stepping) and runs roughly 5-8x slower than the other two, while remaining far above realtime.
 
