@@ -157,6 +157,8 @@ pub enum GameBoySpeed {
 }
 
 impl GameBoySpeed {
+    /// Human readable description of the current speed mode,
+    /// to be used mostly for display purposes.
     pub fn description(&self) -> &'static str {
         match self {
             GameBoySpeed::Normal => "Normal Speed",
@@ -164,6 +166,9 @@ impl GameBoySpeed {
         }
     }
 
+    /// Speed mode that results from a speed switch operation,
+    /// effectively toggling between the two available speed
+    /// modes (used by the KEY1 register in CGB mode).
     pub fn switch(&self) -> Self {
         match self {
             GameBoySpeed::Normal => GameBoySpeed::Double,
@@ -171,6 +176,9 @@ impl GameBoySpeed {
         }
     }
 
+    /// Number of times the clock runs faster than the base
+    /// (normal) speed, to be used as the reference value in
+    /// cycle normalization operations.
     pub fn multiplier(&self) -> u8 {
         match self {
             GameBoySpeed::Normal => 1,
@@ -188,6 +196,9 @@ impl GameBoySpeed {
         }
     }
 
+    /// Converts the provided `u8` value into the corresponding
+    /// speed mode, panicking in case the value does not represent
+    /// a valid speed mode.
     pub fn from_u8(value: u8) -> Self {
         match value {
             0 => GameBoySpeed::Normal,
