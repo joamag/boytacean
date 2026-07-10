@@ -1826,11 +1826,12 @@ impl Ppu {
 
         // selects the correct background attributes map based on the bg map flag
         // because the attributes are separated according to the map they represent
-        // this is only relevant for CGB mode
+        // this is only relevant for CGB mode, the map is borrowed to avoid
+        // an expensive copy of the complete attributes buffer per line
         let bg_map_attrs = if map {
-            self.bg_map_attrs_1
+            &self.bg_map_attrs_1
         } else {
-            self.bg_map_attrs_0
+            &self.bg_map_attrs_0
         };
 
         // obtains the base address of the background map using the bg map flag
@@ -1913,9 +1914,6 @@ impl Ppu {
         // bank in which the tile is stored, this is only required for CGB mode
         tile_index += tile_attr.vram_bank as usize * TILE_COUNT_DMG;
 
-        // obtains the reference to the tile that is going to be drawn
-        let mut tile = &self.tiles[tile_index];
-
         // calculates the offset that is going to be used in the update of the color buffer
         // which stores Game Boy colors from 0 to 3
         let mut color_offset = self.ly as usize * DISPLAY_WIDTH;
@@ -1929,6 +1927,12 @@ impl Ppu {
         let y = (ld as usize + scy as usize) & 0x07;
         let mut x = line_x & 0x07;
 
+        // obtains the reference to the row of the tile that is going
+        // to be drawn, taking into consideration the Y flip attribute,
+        // this avoids a per pixel tile buffer indexing
+        let mut tile_row =
+            self.tiles[tile_index].get_row(if yflip { TILE_HEIGHT_I - y } else { y });
+
         // offsets both the color and the frame buffer positions by the
         // start index, skipping the pixels that are not going to be drawn
         color_offset += start_index;
@@ -1939,8 +1943,9 @@ impl Ppu {
         // to skip the drawing of the tiles that are not visible (WX) or
         // that have already been drawn (partial line rendering)
         for _ in start_index..end_x {
-            // obtains the current pixel data from the tile
-            let pixel = tile.get_flipped(x, y, xflip, yflip);
+            // obtains the current pixel data from the tile row
+            // taking into consideration the X flip attribute
+            let pixel = tile_row[if xflip { TILE_WIDTH_I - x } else { x }];
 
             // updates the pixel in the color buffer, which stores
             // the raw pixel color information (unmapped) and then
@@ -1994,8 +1999,9 @@ impl Ppu {
                     tile_index += tile_attr.vram_bank as usize * TILE_COUNT_DMG;
                 }
 
-                // obtains the reference to the new tile in drawing
-                tile = &self.tiles[tile_index];
+                // obtains the reference to the row of the new tile in drawing
+                tile_row =
+                    self.tiles[tile_index].get_row(if yflip { TILE_HEIGHT_I - y } else { y });
             }
 
             // increments the color offset by one, representing
@@ -2661,7 +2667,7 @@ impl Default for Ppu {
 mod tests {
     use super::{
         ObjectData, Ppu, PpuMode, Tile, COLOR_BUFFER_SIZE, FRAME_BUFFER_SIZE, HRAM_SIZE, OAM_SIZE,
-        OBJ_COUNT, SHADE_BUFFER_SIZE, TILE_COUNT, VRAM_SIZE,
+        OBJ_COUNT, SHADE_BUFFER_SIZE, TILE_COUNT, TILE_HEIGHT_I, TILE_WIDTH_I, VRAM_SIZE,
     };
     use crate::{
         consts::LCDC_ADDR,
@@ -2685,6 +2691,29 @@ mod tests {
             assert_eq!(row.len(), 8);
             for (x, pixel) in row.iter().enumerate() {
                 assert_eq!(*pixel, tile.get(x, y));
+            }
+        }
+    }
+
+    /// Tests that the tile row access with flip aware indexing is
+    /// equivalent to the flipped per pixel access for all of the
+    /// flip combinations.
+    #[test]
+    fn test_tile_get_row_flipped() {
+        let mut tile = Tile::new();
+        for y in 0..8 {
+            for x in 0..8 {
+                tile.set(x, y, ((y * 8 + x) % 4) as u8);
+            }
+        }
+
+        for (xflip, yflip) in [(false, false), (true, false), (false, true), (true, true)] {
+            for y in 0..8 {
+                let row = tile.get_row(if yflip { TILE_HEIGHT_I - y } else { y });
+                for x in 0..8 {
+                    let pixel = row[if xflip { TILE_WIDTH_I - x } else { x }];
+                    assert_eq!(pixel, tile.get_flipped(x, y, xflip, yflip));
+                }
             }
         }
     }
