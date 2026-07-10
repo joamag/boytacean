@@ -2,6 +2,23 @@
 
 Timestamped benchmark reports comparing Boytacean against other Game Boy emulators. Each section is a self-contained snapshot with the exact environment, versions and raw per-round data, so that results remain reproducible and comparable over time. The methodology is described in [performance.md](performance.md).
 
+## 2026-07-10 — CGB rendering tuning
+
+Environment identical to the 2026-07-09 section below, measuring the effect of the CGB rendering optimizations (borrowed background attributes map and per-tile row slice rendering in `render_map()`). Before is the branch state of the 2026-07-09 report, after includes the CGB rendering changes. Runs were interleaved, 3 rounds of 12000 frames each.
+
+### Results (fps, per round)
+
+| ROM           | Mode | Before                | After                 | mGBA (2026-07-09) |
+| ------------- | ---- | --------------------- | --------------------- | ----------------- |
+| cgb_acid2.gbc | CGB  | 10966 / 10771 / 10437 | 12512 / 12167 / 12408 | 22986             |
+
+### Findings
+
+* The CGB background attributes map (`[TileData; 1024]`, 5 KB) was copied by value on every scanline render pass; borrowing it instead yields +13-19% CGB frame throughput.
+* Background map rendering dropped from ~45% to ~37% of the CGB frame time (internal `profile` instrumentation).
+* Emulation output remains bit-exact (frame-buffer hashes match across cgb-acid2 and game ROMs in DMG and CGB modes).
+* The remaining gap to mGBA on CGB (~1.8x) is dominated by the halt-tick loop, consistent with the event-scheduler future work item in [performance.md](performance.md).
+
 ## 2026-07-09 — DMG/CGB frame throughput vs mGBA and SameBoy
 
 ### Environment
