@@ -17,7 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-*
+* Freeze with a blank screen (music still playing) in demos that wait for the first V-Blank line
+* Garbled graphics in demos that change video registers in the middle of a scanline (raster effects)
 
 ## [0.12.1] - 2026-05-31
 

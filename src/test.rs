@@ -108,7 +108,7 @@ pub fn run_image_test(
 
 #[cfg(test)]
 mod tests {
-    use super::{run_serial_test, run_step_test, TestOptions};
+    use super::{run_image_test, run_serial_test, run_step_test, TestOptions};
     use crate::{
         consts::{
             BGP_ADDR, DIV_ADDR, DMA_ADDR, IF_ADDR, LCDC_ADDR, LYC_ADDR, LY_ADDR, OBP0_ADDR,
@@ -196,5 +196,26 @@ mod tests {
         assert_eq!(game_boy.rom_i().rom_size(), RomSize::Size32K);
         assert_eq!(game_boy.rom_i().ram_size(), RamSize::NoRam);
         assert!(game_boy.rom_i().valid_checksum());
+    }
+
+    #[test]
+    fn test_pocket_demo() {
+        let (frame_buffer, game_boy) = run_image_test(
+            "res/roms/demo/pocket.gb",
+            Some(300000000),
+            TestOptions {
+                mode: Some(GameBoyMode::Dmg),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        // the demo's wipe effect polls the LY register for the first
+        // V-Blank line (144) and would previously hang in the polling
+        // loop with a plain gray screen, ensures that execution has
+        // moved past the effect and that the screen has real content
+        assert!(!(0x27b5..0x27d0).contains(&game_boy.cpu_i().pc()));
+        let first_pixel = &frame_buffer[0..3];
+        assert!(frame_buffer.chunks(3).any(|pixel| pixel != first_pixel));
     }
 }
