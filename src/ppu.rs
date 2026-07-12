@@ -7,7 +7,7 @@
 use core::fmt;
 use std::{
     borrow::BorrowMut,
-    cmp::max,
+    cmp::{max, min},
     convert::TryInto,
     fmt::{Display, Formatter},
     io::Cursor,
@@ -629,6 +629,12 @@ pub struct Ppu {
     // is valid.
     window_counter: u8,
 
+    /// Screen X position of the next pixel to be drawn for the current
+    /// line, used to support partial line rendering when one of the
+    /// rendering related registers is written mid Mode 3 (VRAM read),
+    /// allowing mid-scanline raster effects to be displayed.
+    line_cursor: u8,
+
     /// If the auto increment of the background color palette is enabled
     /// so that the next address is going to be set on every write.
     auto_increment_bg: bool,
@@ -665,6 +671,13 @@ pub struct Ppu {
     /// Boolean value set when the V-Blank interrupt should be handled
     /// by the next CPU clock operation.
     int_vblank: bool,
+
+    /// Boolean value set when the V-Blank interrupt request is delayed
+    /// by one clock operation, giving the CPU the chance to observe the
+    /// LY change (to 144) before the interrupt is serviced, as in real
+    /// hardware where the request is raised a few T-cycles after the
+    /// LY increment.
+    int_vblank_pending: bool,
 
     /// Boolean value when the LCD STAT interrupt should be handled by
     /// the next CPU clock operation.
@@ -759,6 +772,7 @@ impl Ppu {
             window_map: false,
             switch_lcd: false,
             window_counter: 0x0,
+            line_cursor: 0x0,
             auto_increment_bg: false,
             palette_address_bg: 0x0,
             auto_increment_obj: false,
@@ -771,6 +785,7 @@ impl Ppu {
             stat_oam: false,
             stat_lyc: false,
             int_vblank: false,
+            int_vblank_pending: false,
             int_stat: false,
             int_stat_prev: false,
             dmg_compat: false,
@@ -815,6 +830,7 @@ impl Ppu {
         self.window_map = false;
         self.switch_lcd = false;
         self.window_counter = 0;
+        self.line_cursor = 0;
         self.auto_increment_bg = false;
         self.palette_address_bg = 0x0;
         self.auto_increment_obj = false;
@@ -827,6 +843,7 @@ impl Ppu {
         self.stat_oam = false;
         self.stat_lyc = false;
         self.int_vblank = false;
+        self.int_vblank_pending = false;
         self.int_stat = false;
         self.int_stat_prev = false;
         self.dmg_compat = false;
@@ -842,9 +859,11 @@ impl Ppu {
         self.mode_clock = 0;
         self.ly = 0;
         self.int_vblank = false;
+        self.int_vblank_pending = false;
         self.int_stat = false;
         self.int_stat_prev = false;
         self.window_counter = 0;
+        self.line_cursor = 0;
         if hard {
             self.first_frame = true;
             self.clear_frame_buffer();
@@ -856,6 +875,15 @@ impl Ppu {
         // clock operation the PPU should not work
         if !self.switch_lcd {
             return;
+        }
+
+        // promotes a pending V-Blank interrupt request into an
+        // effective one, the promotion is delayed by one clock
+        // operation so that the CPU is able to observe the LY
+        // change (to 144) before the interrupt is serviced
+        if self.int_vblank_pending {
+            self.int_vblank = true;
+            self.int_vblank_pending = false;
         }
 
         // runs a series of pre-emptive PPU state validations to ensure
@@ -909,9 +937,13 @@ impl Ppu {
                     self.ly += 1;
 
                     // in case we've reached the end of the
-                    // screen we're now entering the V-Blank
+                    // screen we're now entering the V-Blank,
+                    // the interrupt request is marked as pending
+                    // so that it is only raised on the next clock
+                    // operation, allowing the CPU to read the new
+                    // LY value (144) before being interrupted
                     if self.ly == 144 {
-                        self.int_vblank = true;
+                        self.int_vblank_pending = true;
                         self.mode = PpuMode::VBlank;
                     } else {
                         self.mode = PpuMode::OamRead;
@@ -1036,6 +1068,7 @@ impl Ppu {
             // 0xFF80-0xFFFE - High RAM (HRAM)
             0xff80..=0xfffe => self.hram[(addr & 0x007f) as usize] = value,
             LCDC_ADDR => {
+                self.flush_line();
                 self.switch_bg = value & 0x01 == 0x01;
                 self.switch_obj = value & 0x02 == 0x02;
                 self.obj_size = value & 0x04 == 0x04;
@@ -1072,9 +1105,15 @@ impl Ppu {
                 }
             }
             // 0xFF42 — SCY: Background Y position
-            SCY_ADDR => self.scy = value,
+            SCY_ADDR => {
+                self.flush_line();
+                self.scy = value;
+            }
             // 0xFF43 — SCX: Background X position
-            SCX_ADDR => self.scx = value,
+            SCX_ADDR => {
+                self.flush_line();
+                self.scx = value;
+            }
             // 0xFF45 — LYC: LY compare
             LYC_ADDR => {
                 self.lyc = value;
@@ -1085,6 +1124,7 @@ impl Ppu {
                 if value == self.palettes[0] {
                     return;
                 }
+                self.flush_line();
                 if self.dmg_compat {
                     Self::compute_palette(&mut self.palette_bg, &self.palettes_color_bg[0], value);
                 } else {
@@ -1125,9 +1165,15 @@ impl Ppu {
                 self.palettes[2] = value;
             }
             // 0xFF4A — WY
-            WY_ADDR => self.wy = value,
+            WY_ADDR => {
+                self.flush_line();
+                self.wy = value;
+            }
             // 0xFF4B — WX
-            WX_ADDR => self.wx = value,
+            WX_ADDR => {
+                self.flush_line();
+                self.wx = value;
+            }
             // 0xFF4F — VBK (CGB only)
             0xff4f => {
                 self.vram_bank = value & 0x01;
@@ -1140,6 +1186,7 @@ impl Ppu {
             }
             // 0xFF69 — BCPD/BGPD (CGB only)
             0xff69 => {
+                self.flush_line();
                 let palette_index = self.palette_address_bg / 8;
                 let color_index = (self.palette_address_bg % 8) / 2;
 
@@ -1636,45 +1683,125 @@ impl Ppu {
     }
 
     fn render_line(&mut self) {
+        let start_x = self.line_cursor as usize;
         if self.gb_mode == GameBoyMode::Dmg {
-            self.render_line_dmg();
+            self.render_line_dmg(start_x, DISPLAY_WIDTH, true);
         } else {
-            self.render_line_cgb();
+            self.render_line_cgb(start_x, DISPLAY_WIDTH, true);
         }
+        self.line_cursor = 0;
     }
 
-    fn render_line_dmg(&mut self) {
+    /// Renders the portion of the current line up to the (estimated)
+    /// raster X position, making sure that a change to one of the
+    /// rendering related registers mid Mode 3 (VRAM read) only affects
+    /// the pixels that are still to be drawn, allowing mid-scanline
+    /// raster effects to be displayed.
+    ///
+    /// Object rendering is excluded from the partial pass as objects
+    /// are always drawn over the complete line at the end of Mode 3.
+    fn flush_line(&mut self) {
+        if self.mode != PpuMode::VramRead {
+            return;
+        }
+        let start_x = self.line_cursor as usize;
+
+        // estimates the raster X position from the time spent in the
+        // current mode, snapping it up to the next tile boundary as the
+        // tile fetcher has already latched the tile in drawing (which is
+        // then completed using the previous register values), this also
+        // keeps the split position stable against clock jitter
+        let end_x = min((self.mode_clock as usize & !7) + 8, DISPLAY_WIDTH);
+        if end_x <= start_x {
+            return;
+        }
+        if self.gb_mode == GameBoyMode::Dmg {
+            self.render_line_dmg(start_x, end_x, false);
+        } else {
+            self.render_line_cgb(start_x, end_x, false);
+        }
+        self.line_cursor = end_x as u8;
+    }
+
+    fn render_line_dmg(&mut self, start_x: usize, end_x: usize, objects: bool) {
         if self.first_frame {
             return;
         }
         if self.switch_bg {
-            self.render_map_dmg(self.bg_map, self.scx, self.scy, 0, 0, self.ly);
+            self.render_map_dmg(
+                self.bg_map,
+                self.scx,
+                self.scy,
+                0,
+                0,
+                self.ly,
+                start_x,
+                end_x,
+            );
         }
         if self.switch_bg && self.switch_window {
-            self.render_map_dmg(self.window_map, 0, 0, self.wx, self.wy, self.window_counter);
+            self.render_map_dmg(
+                self.window_map,
+                0,
+                0,
+                self.wx,
+                self.wy,
+                self.window_counter,
+                start_x,
+                end_x,
+            );
         }
-        if self.switch_obj {
+        if objects && self.switch_obj {
             self.render_objects();
         }
     }
 
-    fn render_line_cgb(&mut self) {
+    fn render_line_cgb(&mut self, start_x: usize, end_x: usize, objects: bool) {
         if self.first_frame {
             return;
         }
         let switch_bg_window = (self.gb_mode.is_cgb() && !self.dmg_compat) || self.switch_bg;
         if switch_bg_window {
-            self.render_map(self.bg_map, self.scx, self.scy, 0, 0, self.ly);
+            self.render_map(
+                self.bg_map,
+                self.scx,
+                self.scy,
+                0,
+                0,
+                self.ly,
+                start_x,
+                end_x,
+            );
         }
         if switch_bg_window && self.switch_window {
-            self.render_map(self.window_map, 0, 0, self.wx, self.wy, self.window_counter);
+            self.render_map(
+                self.window_map,
+                0,
+                0,
+                self.wx,
+                self.wy,
+                self.window_counter,
+                start_x,
+                end_x,
+            );
         }
-        if self.switch_obj {
+        if objects && self.switch_obj {
             self.render_objects();
         }
     }
 
-    fn render_map(&mut self, map: bool, scx: u8, scy: u8, wx: u8, wy: u8, ld: u8) {
+    #[allow(clippy::too_many_arguments)]
+    fn render_map(
+        &mut self,
+        map: bool,
+        scx: u8,
+        scy: u8,
+        wx: u8,
+        wy: u8,
+        ld: u8,
+        start_x: usize,
+        end_x: usize,
+    ) {
         // in case the target window Y position has not yet been reached
         // then there's nothing to be done, returns control flow immediately
         if self.ly < wy {
@@ -1704,9 +1831,26 @@ impl Ppu {
         // of tiles in each row (32)
         let row_offset = row_index * 32;
 
-        // calculates the sprite line offset by using the SCX register
+        // calculates the initial tile X position in drawing, doing this
+        // allows us to position the background map properly in the display
+        let initial_index = max(wx as i16 - 7, 0) as usize;
+
+        // calculates the effective start position by taking into account
+        // the partial rendering range, returning immediately in case the
+        // range to be drawn is empty
+        let start_index = max(initial_index, start_x);
+        if start_index >= end_x {
+            return;
+        }
+
+        // calculates the horizontal position within the map for the first
+        // pixel in drawing, taking into consideration both the SCX register
+        // and the start of the (partial) drawing range
+        let line_x = scx as usize + (start_index - initial_index);
+
+        // calculates the sprite line offset by using the line X position
         // shifted by 3 meaning that the tiles are 8x8
-        let mut line_offset = (scx >> 3) as usize;
+        let mut line_offset = (line_x >> 3) % 32;
 
         // calculates the index of the initial tile in drawing,
         // if the tile data set in use is #1, the indexes are
@@ -1767,18 +1911,18 @@ impl Ppu {
         // calculates both the current Y and X positions within the tiles
         // using the bitwise and operation as an effective modulus 8
         let y = (ld as usize + scy as usize) & 0x07;
-        let mut x = (scx & 0x07) as usize;
+        let mut x = line_x & 0x07;
 
-        // calculates the initial tile X position in drawing, doing this
-        // allows us to position the background map properly in the display
-        let initial_index = max(wx as i16 - 7, 0) as usize;
-        color_offset += initial_index;
-        frame_offset += initial_index * RGB_SIZE;
+        // offsets both the color and the frame buffer positions by the
+        // start index, skipping the pixels that are not going to be drawn
+        color_offset += start_index;
+        frame_offset += start_index * RGB_SIZE;
 
-        // iterates over all the pixels in the current line of the display
-        // to draw the background map, note that the initial index is used
-        // to skip the drawing of the tiles that are not visible (WX)
-        for _ in initial_index..DISPLAY_WIDTH {
+        // iterates over all the pixels in the drawing range of the display
+        // to draw the background map, note that the start index is used
+        // to skip the drawing of the tiles that are not visible (WX) or
+        // that have already been drawn (partial line rendering)
+        for _ in start_index..end_x {
             // obtains the current pixel data from the tile
             let pixel = tile.get_flipped(x, y, xflip, yflip);
 
@@ -1848,7 +1992,18 @@ impl Ppu {
         }
     }
 
-    fn render_map_dmg(&mut self, map: bool, scx: u8, scy: u8, wx: u8, wy: u8, ld: u8) {
+    #[allow(clippy::too_many_arguments)]
+    fn render_map_dmg(
+        &mut self,
+        map: bool,
+        scx: u8,
+        scy: u8,
+        wx: u8,
+        wy: u8,
+        ld: u8,
+        start_x: usize,
+        end_x: usize,
+    ) {
         // in case the target window Y position has not yet been reached
         // then there's nothing to be done, returns control flow immediately
         if self.ly < wy {
@@ -1869,9 +2024,26 @@ impl Ppu {
         // of tiles in each row (32)
         let row_offset = row_index * 32;
 
-        // calculates the sprite line offset by using the SCX register
+        // calculates the initial tile X position in drawing, doing this
+        // allows us to position the background map properly in the display
+        let initial_index = max(wx as i16 - 7, 0) as usize;
+
+        // calculates the effective start position by taking into account
+        // the partial rendering range, returning immediately in case the
+        // range to be drawn is empty
+        let start_index = max(initial_index, start_x);
+        if start_index >= end_x {
+            return;
+        }
+
+        // calculates the horizontal position within the map for the first
+        // pixel in drawing, taking into consideration both the SCX register
+        // and the start of the (partial) drawing range
+        let line_x = scx as usize + (start_index - initial_index);
+
+        // calculates the sprite line offset by using the line X position
         // shifted by 3 meaning that the tiles are 8x8
-        let mut line_offset = (scx >> 3) as usize;
+        let mut line_offset = (line_x >> 3) % 32;
 
         // calculates the index of the initial tile in drawing,
         // if the tile data set in use is #1, the indexes are
@@ -1895,17 +2067,17 @@ impl Ppu {
         // calculates both the current Y and X positions within the tiles
         // using the bitwise and operation as an effective modulus 8
         let y = (ld as usize + scy as usize) & 0x07;
-        let mut x = (scx & 0x07) as usize;
+        let mut x = line_x & 0x07;
 
-        // calculates the initial tile X position in drawing, doing this
-        // allows us to position the background map properly in the display
-        let initial_index = max(wx as i16 - 7, 0) as usize;
-        color_offset += initial_index;
+        // offsets the color buffer position by the start index,
+        // skipping the pixels that are not going to be drawn
+        color_offset += start_index;
 
-        // iterates over all the pixels in the current line of the display
-        // to draw the background map, note that the initial index is used
-        // to skip the drawing of the tiles that are not visible (WX)
-        for _ in initial_index..DISPLAY_WIDTH {
+        // iterates over all the pixels in the drawing range of the display
+        // to draw the background map, note that the start index is used
+        // to skip the drawing of the tiles that are not visible (WX) or
+        // that have already been drawn (partial line rendering)
+        for _ in start_index..end_x {
             // obtains the current pixel data from the tile
             let pixel = tile.get(x, y);
 
@@ -2472,9 +2644,80 @@ mod tests {
         OBJ_COUNT, SHADE_BUFFER_SIZE, TILE_COUNT, VRAM_SIZE,
     };
     use crate::{
+        consts::LCDC_ADDR,
         gb::GameBoyMode,
         state::{StateComponent, StateFormat},
     };
+
+    #[test]
+    fn test_clear_screen_pending_vblank() {
+        let mut ppu = Ppu {
+            int_vblank_pending: true,
+            ..Default::default()
+        };
+
+        ppu.clear_screen(false);
+        assert!(!ppu.int_vblank_pending);
+        assert!(!ppu.int_vblank());
+    }
+
+    #[test]
+    fn test_clock_vblank_interrupt_delayed() {
+        let mut ppu = Ppu {
+            switch_lcd: true,
+            mode: PpuMode::HBlank,
+            mode_clock: 200,
+            ly: 143,
+            ..Default::default()
+        };
+
+        ppu.clock(4);
+        assert_eq!(ppu.ly(), 144);
+        assert_eq!(ppu.mode(), PpuMode::VBlank);
+        assert!(!ppu.int_vblank());
+
+        ppu.clock(4);
+        assert!(ppu.int_vblank());
+    }
+
+    #[test]
+    fn test_write_lcdc_partial_line() {
+        let mut ppu = Ppu::default();
+
+        // fills the first tile of the base tile data area (0x8000)
+        // with the color 3 pixels, the equivalent tile of the signed
+        // tile data area (0x9000) is left as color 0 pixels
+        for addr in (0x8000..0x8010).step_by(2) {
+            ppu.write(addr, 0xff);
+            ppu.write(addr + 1, 0xff);
+        }
+
+        // switches the LCD on with both the background and the base
+        // tile data area (0x8000) selected, then positions the PPU
+        // at the beginning of the Mode 3 (VRAM read) period
+        ppu.write(LCDC_ADDR, 0x91);
+        ppu.mode = PpuMode::VramRead;
+        ppu.mode_clock = 0;
+        ppu.ly = 0;
+
+        // runs half of the Mode 3 (VRAM read) period and then switches
+        // the tile data area (0x8800) mid-scanline, the pixels drawn so
+        // far (up to the next tile boundary) must be flushed using the
+        // previous tile data area
+        ppu.clock(80);
+        ppu.write(LCDC_ADDR, 0x81);
+        assert_eq!(ppu.line_cursor, 88);
+
+        // completes the line and verifies that the two sections of the
+        // line have been drawn using different tile data areas
+        ppu.clock(92);
+        assert_eq!(ppu.mode(), PpuMode::HBlank);
+        assert_eq!(ppu.line_cursor, 0);
+        assert_eq!(ppu.color_buffer[0], 3);
+        assert_eq!(ppu.color_buffer[87], 3);
+        assert_eq!(ppu.color_buffer[88], 0);
+        assert_eq!(ppu.color_buffer[159], 0);
+    }
 
     #[test]
     fn test_update_tile_simple() {
