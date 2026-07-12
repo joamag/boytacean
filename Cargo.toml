@@ -23,6 +23,7 @@ simd = ["boytacean-encoding/simd", "boytacean-hashing/simd"]
 debug = []
 pedantic = []
 cpulog = []
+profile = []
 gen-mock = []
 
 [dependencies]
