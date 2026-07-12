@@ -35,7 +35,7 @@ use crate::{
     },
     gb::{GameBoyConfig, GameBoyMode},
     mmu::BusComponent,
-    panic_gb,
+    panic_gb, profile_count_gb, profile_time_gb,
     state::{StateComponent, StateFormat},
     warnln,
 };
@@ -213,10 +213,12 @@ impl Tile {
         Self { buffer: [0u8; 64] }
     }
 
+    #[inline(always)]
     pub fn get(&self, x: usize, y: usize) -> u8 {
         self.buffer[y * TILE_WIDTH + x]
     }
 
+    #[inline(always)]
     pub fn get_flipped(&self, x: usize, y: usize, xflip: bool, yflip: bool) -> u8 {
         let x: usize = if xflip { TILE_WIDTH_I - x } else { x };
         let y = if yflip { TILE_HEIGHT_I - y } else { y };
@@ -233,6 +235,7 @@ impl Tile {
 }
 
 impl Tile {
+    #[inline(always)]
     pub fn get_row(&self, y: usize) -> &[u8] {
         &self.buffer[y * TILE_WIDTH..(y + 1) * TILE_WIDTH]
     }
@@ -1683,6 +1686,7 @@ impl Ppu {
     }
 
     fn render_line(&mut self) {
+        profile_count_gb!(render_lines);
         let start_x = self.line_cursor as usize;
         if self.gb_mode == GameBoyMode::Dmg {
             self.render_line_dmg(start_x, DISPLAY_WIDTH, true);
@@ -1728,31 +1732,37 @@ impl Ppu {
             return;
         }
         if self.switch_bg {
-            self.render_map_dmg(
-                self.bg_map,
-                self.scx,
-                self.scy,
-                0,
-                0,
-                self.ly,
-                start_x,
-                end_x,
+            profile_time_gb!(
+                render_bg_time,
+                self.render_map_dmg(
+                    self.bg_map,
+                    self.scx,
+                    self.scy,
+                    0,
+                    0,
+                    self.ly,
+                    start_x,
+                    end_x,
+                )
             );
         }
         if self.switch_bg && self.switch_window {
-            self.render_map_dmg(
-                self.window_map,
-                0,
-                0,
-                self.wx,
-                self.wy,
-                self.window_counter,
-                start_x,
-                end_x,
+            profile_time_gb!(
+                render_bg_time,
+                self.render_map_dmg(
+                    self.window_map,
+                    0,
+                    0,
+                    self.wx,
+                    self.wy,
+                    self.window_counter,
+                    start_x,
+                    end_x,
+                )
             );
         }
         if objects && self.switch_obj {
-            self.render_objects();
+            profile_time_gb!(render_obj_time, self.render_objects());
         }
     }
 
@@ -1762,31 +1772,37 @@ impl Ppu {
         }
         let switch_bg_window = (self.gb_mode.is_cgb() && !self.dmg_compat) || self.switch_bg;
         if switch_bg_window {
-            self.render_map(
-                self.bg_map,
-                self.scx,
-                self.scy,
-                0,
-                0,
-                self.ly,
-                start_x,
-                end_x,
+            profile_time_gb!(
+                render_bg_time,
+                self.render_map(
+                    self.bg_map,
+                    self.scx,
+                    self.scy,
+                    0,
+                    0,
+                    self.ly,
+                    start_x,
+                    end_x,
+                )
             );
         }
         if switch_bg_window && self.switch_window {
-            self.render_map(
-                self.window_map,
-                0,
-                0,
-                self.wx,
-                self.wy,
-                self.window_counter,
-                start_x,
-                end_x,
+            profile_time_gb!(
+                render_bg_time,
+                self.render_map(
+                    self.window_map,
+                    0,
+                    0,
+                    self.wx,
+                    self.wy,
+                    self.window_counter,
+                    start_x,
+                    end_x,
+                )
             );
         }
         if objects && self.switch_obj {
-            self.render_objects();
+            profile_time_gb!(render_obj_time, self.render_objects());
         }
     }
 
@@ -1810,11 +1826,12 @@ impl Ppu {
 
         // selects the correct background attributes map based on the bg map flag
         // because the attributes are separated according to the map they represent
-        // this is only relevant for CGB mode
+        // this is only relevant for CGB mode, the map is borrowed to avoid
+        // an expensive copy of the complete attributes buffer per line
         let bg_map_attrs = if map {
-            self.bg_map_attrs_1
+            &self.bg_map_attrs_1
         } else {
-            self.bg_map_attrs_0
+            &self.bg_map_attrs_0
         };
 
         // obtains the base address of the background map using the bg map flag
@@ -1897,9 +1914,6 @@ impl Ppu {
         // bank in which the tile is stored, this is only required for CGB mode
         tile_index += tile_attr.vram_bank as usize * TILE_COUNT_DMG;
 
-        // obtains the reference to the tile that is going to be drawn
-        let mut tile = &self.tiles[tile_index];
-
         // calculates the offset that is going to be used in the update of the color buffer
         // which stores Game Boy colors from 0 to 3
         let mut color_offset = self.ly as usize * DISPLAY_WIDTH;
@@ -1913,6 +1927,12 @@ impl Ppu {
         let y = (ld as usize + scy as usize) & 0x07;
         let mut x = line_x & 0x07;
 
+        // obtains the reference to the row of the tile that is going
+        // to be drawn, taking into consideration the Y flip attribute,
+        // this avoids a per pixel tile buffer indexing
+        let mut tile_row =
+            self.tiles[tile_index].get_row(if yflip { TILE_HEIGHT_I - y } else { y });
+
         // offsets both the color and the frame buffer positions by the
         // start index, skipping the pixels that are not going to be drawn
         color_offset += start_index;
@@ -1923,8 +1943,9 @@ impl Ppu {
         // to skip the drawing of the tiles that are not visible (WX) or
         // that have already been drawn (partial line rendering)
         for _ in start_index..end_x {
-            // obtains the current pixel data from the tile
-            let pixel = tile.get_flipped(x, y, xflip, yflip);
+            // obtains the current pixel data from the tile row
+            // taking into consideration the X flip attribute
+            let pixel = tile_row[if xflip { TILE_WIDTH_I - x } else { x }];
 
             // updates the pixel in the color buffer, which stores
             // the raw pixel color information (unmapped) and then
@@ -1978,8 +1999,9 @@ impl Ppu {
                     tile_index += tile_attr.vram_bank as usize * TILE_COUNT_DMG;
                 }
 
-                // obtains the reference to the new tile in drawing
-                tile = &self.tiles[tile_index];
+                // obtains the reference to the row of the new tile in drawing
+                tile_row =
+                    self.tiles[tile_index].get_row(if yflip { TILE_HEIGHT_I - y } else { y });
             }
 
             // increments the color offset by one, representing
@@ -2053,9 +2075,6 @@ impl Ppu {
             tile_index += 256;
         }
 
-        // obtains the reference to the tile that is going to be drawn
-        let mut tile = &self.tiles[tile_index];
-
         // calculates the offset that is going to be used in the update of the color buffer
         // which stores Game Boy colors from 0 to 3
         let mut color_offset = self.ly as usize * DISPLAY_WIDTH;
@@ -2069,6 +2088,10 @@ impl Ppu {
         let y = (ld as usize + scy as usize) & 0x07;
         let mut x = line_x & 0x07;
 
+        // obtains the reference to the row of the tile that is going
+        // to be drawn, this avoids a per pixel tile buffer indexing
+        let mut tile_row = self.tiles[tile_index].get_row(y);
+
         // offsets the color buffer position by the start index,
         // skipping the pixels that are not going to be drawn
         color_offset += start_index;
@@ -2078,8 +2101,8 @@ impl Ppu {
         // to skip the drawing of the tiles that are not visible (WX) or
         // that have already been drawn (partial line rendering)
         for _ in start_index..end_x {
-            // obtains the current pixel data from the tile
-            let pixel = tile.get(x, y);
+            // obtains the current pixel data from the tile row
+            let pixel = tile_row[x];
 
             // updates the pixel in the color buffer, which stores
             // the raw pixel color information (unmapped) and then
@@ -2108,8 +2131,8 @@ impl Ppu {
                     tile_index += 256;
                 }
 
-                // obtains the reference to the new tile in drawing
-                tile = &self.tiles[tile_index];
+                // obtains the reference to the row of the new tile in drawing
+                tile_row = self.tiles[tile_index].get_row(y);
             }
 
             // increments the color offset by one, representing
@@ -2147,6 +2170,15 @@ impl Ppu {
             false
         };
 
+        // calculates the height of the objects that is going to be
+        // used in the sprite containment verification, the value
+        // is the same for all of the objects in the current line
+        let obj_height = if self.obj_size {
+            TILE_DOUBLE_HEIGHT
+        } else {
+            TILE_HEIGHT
+        };
+
         // iterates over the complete set of available object to check
         // the ones that require drawing and draws them
         for index in 0..OBJ_COUNT {
@@ -2159,12 +2191,6 @@ impl Ppu {
             // obtains the meta data of the object that is currently
             // under iteration to be checked for drawing
             let obj = &self.obj_data[index];
-
-            let obj_height = if self.obj_size {
-                TILE_DOUBLE_HEIGHT
-            } else {
-                TILE_HEIGHT
-            };
 
             // verifies if the sprite is currently located at the
             // current line that is going to be drawn and skips it
@@ -2641,13 +2667,56 @@ impl Default for Ppu {
 mod tests {
     use super::{
         ObjectData, Ppu, PpuMode, Tile, COLOR_BUFFER_SIZE, FRAME_BUFFER_SIZE, HRAM_SIZE, OAM_SIZE,
-        OBJ_COUNT, SHADE_BUFFER_SIZE, TILE_COUNT, VRAM_SIZE,
+        OBJ_COUNT, SHADE_BUFFER_SIZE, TILE_COUNT, TILE_HEIGHT_I, TILE_WIDTH_I, VRAM_SIZE,
     };
     use crate::{
         consts::LCDC_ADDR,
         gb::GameBoyMode,
         state::{StateComponent, StateFormat},
     };
+
+    /// Tests that the tile row access is equivalent to the per
+    /// pixel access for the complete tile surface.
+    #[test]
+    fn test_tile_get_row() {
+        let mut tile = Tile::new();
+        for y in 0..8 {
+            for x in 0..8 {
+                tile.set(x, y, ((y * 8 + x) % 4) as u8);
+            }
+        }
+
+        for y in 0..8 {
+            let row = tile.get_row(y);
+            assert_eq!(row.len(), 8);
+            for (x, pixel) in row.iter().enumerate() {
+                assert_eq!(*pixel, tile.get(x, y));
+            }
+        }
+    }
+
+    /// Tests that the tile row access with flip aware indexing is
+    /// equivalent to the flipped per pixel access for all of the
+    /// flip combinations.
+    #[test]
+    fn test_tile_get_row_flipped() {
+        let mut tile = Tile::new();
+        for y in 0..8 {
+            for x in 0..8 {
+                tile.set(x, y, ((y * 8 + x) % 4) as u8);
+            }
+        }
+
+        for (xflip, yflip) in [(false, false), (true, false), (false, true), (true, true)] {
+            for y in 0..8 {
+                let row = tile.get_row(if yflip { TILE_HEIGHT_I - y } else { y });
+                for x in 0..8 {
+                    let pixel = row[if xflip { TILE_WIDTH_I - x } else { x }];
+                    assert_eq!(pixel, tile.get_flipped(x, y, xflip, yflip));
+                }
+            }
+        }
+    }
 
     #[test]
     fn test_clear_screen_pending_vblank() {

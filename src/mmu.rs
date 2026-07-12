@@ -12,6 +12,7 @@ use crate::{
     pad::Pad,
     panic_gb,
     ppu::{Ppu, PpuMode},
+    profile_read_gb, profile_write_gb,
     rom::Cartridge,
     serial::Serial,
     timer::Timer,
@@ -383,6 +384,7 @@ impl Mmu {
     }
 
     pub fn read(&self, addr: u16) -> u8 {
+        profile_read_gb!(addr);
         match addr {
             // 0x0000-0x0FFF - BOOT (256 B) + ROM0 (4 KB/16 KB)
             0x0000..=0x0fff => {
@@ -496,6 +498,7 @@ impl Mmu {
     }
 
     pub fn write(&mut self, addr: u16, value: u8) {
+        profile_write_gb!(addr);
         match addr {
             // 0x0000-0x0FFF - BOOT (256 B) + ROM0 (4 KB/16 KB)
             // 0x1000-0x3FFF - ROM 0 (12 KB/16 KB)

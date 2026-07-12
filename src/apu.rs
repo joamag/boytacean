@@ -22,6 +22,7 @@ use crate::{
     },
     gb::GameBoy,
     mmu::BusComponent,
+    profile_count_gb,
     state::{StateComponent, StateFormat},
     warnln,
 };
@@ -421,6 +422,8 @@ impl Apu {
 
         self.output_timer = self.output_timer.saturating_sub(cycles as i16);
         if self.output_timer <= 0 {
+            profile_count_gb!(apu_samples);
+
             // verifies if we've reached the maximum allowed size for the
             // audio buffer and if that's the case an item is removed from
             // the buffer (avoiding overflow)
