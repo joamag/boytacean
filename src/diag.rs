@@ -50,7 +50,8 @@ pub struct Profile {
     /// Number of frames executed.
     pub frames: u64,
 
-    /// Number of CPU instructions executed.
+    /// Number of CPU clock steps executed (including `HALT` ticks),
+    /// i.e. the number of `Cpu::clock()` calls, not just decoded opcodes.
     pub instructions: u64,
 
     /// Number of PPU lines rendered.
