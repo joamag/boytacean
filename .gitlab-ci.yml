@@ -56,11 +56,12 @@ build-wasm:
     - rustc --version
     - cargo install wasm-pack
     - wasm-pack build --release --target=web --out-dir=frontends/web/lib -- --features wasm
-    - cd frontends/web && npm install && NODE_ENV=production npm run build && npm run lint
+    - cd frontends/web && npm install && NODE_ENV=production npm run build && NODE_ENV=production npm run build:embed && npm run build:pkg && npm run lint
   artifacts:
     paths:
       - frontends/web/dist
       - frontends/web/lib
+      - frontends/web/pkg
     expire_in: 1 day
 
 build-pyo3:
@@ -180,7 +181,8 @@ deploy-npm:
   stage: deploy
   script:
     - echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
-    - cd frontends/web/lib && npm publish
+    - npm publish ./frontends/web/lib
+    - npm publish ./frontends/web/pkg
   dependencies:
     - build-wasm
   only:

@@ -122,6 +122,32 @@ You can use some GET parameters to control the initial behavior of the emulator.
 
 You can load a collection of ROMs through a JSON playlist using the `playlist_url` parameter. See [Playlists](doc/playlists.md) for the file format, available fields, and examples.
 
+### Embedding
+
+Boytacean can be embedded in any website through the [`boytacean-web`](https://www.npmjs.com/package/boytacean-web) package. See [Embedding](doc/embedding.md) for the complete reference.
+
+The quickest way is a single script tag and the `<boytacean-emulator>` element:
+
+```html
+<script type="module" src="https://cdn.jsdelivr.net/npm/boytacean-web/embed/embed.js"></script>
+
+<boytacean-emulator rom-url="https://example.com/game.gb"></boytacean-emulator>
+```
+
+If you are using a bundler, install the package and mount the emulator yourself:
+
+```bash
+npm install boytacean-web
+```
+
+```javascript
+import { embed } from "boytacean-web";
+
+const { emulator, pause, resume, loadRom } = await embed("#emulator", {
+    romUrl: "https://example.com/game.gb"
+});
+```
+
 ## Palettes
 
 The palettes offered in the web version were provided by [TheWolfBunny64](https://www.deviantart.com/thewolfbunny).

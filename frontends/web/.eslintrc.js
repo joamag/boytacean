@@ -27,5 +27,16 @@ module.exports = {
         "no-empty-function": "off",
         semi: ["error", "always"]
     },
+    overrides: [
+        {
+            files: ["scripts/**/*.js"],
+            env: {
+                node: true
+            },
+            rules: {
+                "@typescript-eslint/no-var-requires": "off"
+            }
+        }
+    ],
     root: true
 };

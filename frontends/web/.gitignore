@@ -4,4 +4,8 @@ package-lock.json
 /.parcel-cache
 
 /dist
+/embed
+/lib
+/module
 /node_modules
+/pkg

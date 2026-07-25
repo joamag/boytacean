@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+* Embeddable web build published as the `boytacean-web` npm package, with a `<boytacean-emulator>` custom element, an `embed()` function and a `window.Boytacean` global for script tag usage
+* `doc/embedding.md` documenting how to embed the emulator in external websites
+* `storagePrefix` option namespacing the `localStorage` keys of an embedded emulator, so that they do not collide with the ones of the host page
 * Keyboard navigation in the game playlist (arrow keys to browse results, Enter to load)
 * Performance profiling support with per-frame timings, render timings and memory access counters - [#34](https://github.com/joamag/boytacean/issues/34)
 * Performance audit document with benchmark comparisons against other emulators - [#34](https://github.com/joamag/boytacean/issues/34)
@@ -19,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+* Cross-talk between the speed, serial and printer callbacks of multiple emulators running in the same page, they are now routed to the instance that is being clocked
 * Freeze with a blank screen (music still playing) in demos that wait for the first V-Blank line
 * Garbled graphics in demos that change video registers in the middle of a scanline (raster effects)
 

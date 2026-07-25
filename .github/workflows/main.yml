@@ -117,7 +117,7 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
       - name: Build and lint Web code
-        run: cd frontends/web && npm install && npm run build && npm run lint
+        run: cd frontends/web && npm install && npm run build && npm run build:embed && npm run build:pkg && npm run lint
   build-sdl:
     name: Build SDL
     timeout-minutes: 30

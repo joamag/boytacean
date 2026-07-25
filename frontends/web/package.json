@@ -7,16 +7,53 @@
         "url": "git+https://github.com/joamag/boytacean.git"
     },
     "license": "Apache-2.0",
+    "keywords": [
+        "gameboy",
+        "emulator",
+        "wasm",
+        "embed"
+    ],
     "scripts": {
-        "build": "parcel build index.html",
-        "dev": "parcel index.html",
+        "build": "parcel build index.html --target default",
+        "build:embed": "parcel build --target embed --target module",
+        "build:pkg": "node scripts/pack-embed.js",
+        "dev": "parcel index.html --target default",
         "lint": "eslint .",
-        "nodemon": "nodemon --exec \"parcel --no-cache index.html\"",
+        "nodemon": "nodemon --exec \"parcel --no-cache index.html --target default\"",
         "pretty": "prettier --config .prettierrc \"./**/*.{js,ts,tsx,json}\" --write",
         "start": "npm run build",
-        "watch": "parcel watch index.html"
+        "watch": "parcel watch index.html --target default"
     },
     "source": "index.ts",
+    "exports": {
+        ".": "./module/embed.js",
+        "./embed": "./embed/embed.js",
+        "./embed.css": "./embed/embed.css",
+        "./module/embed.css": "./module/embed.css"
+    },
+    "module": "module/embed.js",
+    "targets": {
+        "default": {
+            "context": "browser",
+            "distDir": "dist"
+        },
+        "embed": {
+            "source": "embed.ts",
+            "distDir": "embed",
+            "context": "browser",
+            "outputFormat": "esmodule",
+            "isLibrary": false,
+            "optimize": true,
+            "sourceMap": false
+        },
+        "module": {
+            "source": "embed.ts",
+            "context": "browser",
+            "includeNodeModules": true,
+            "optimize": true,
+            "sourceMap": false
+        }
+    },
     "devDependencies": {
         "@parcel/transformer-typescript-tsc": "^2.14.0",
         "@types/react": "^18.3.18",

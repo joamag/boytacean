@@ -104,6 +104,24 @@ export enum SerialDevice {
 }
 
 /**
+ * The emulator instance that is currently being clocked, the callbacks
+ * exported by the WASM module are bound to the `window` object (and are
+ * therefore global) meaning that this is the only way of routing them to
+ * the proper instance when multiple emulators coexist in the same page.
+ *
+ * This works because the callbacks are invoked synchronously from within
+ * the clock operation of the instance that owns them.
+ */
+let activeEmulator: GameboyEmulator | null = null;
+
+/**
+ * Marks the provided emulator as the one currently being clocked.
+ */
+const setActiveEmulator = (emulator: GameboyEmulator) => {
+    activeEmulator = emulator;
+};
+
+/**
  * Top level class that controls the emulator behaviour
  * and "joins" all the elements together to bring input/output
  * of the associated machine.
@@ -179,9 +197,28 @@ export class GameboyEmulator extends EmulatorLogic implements Emulator {
      */
     private _playlist: Playlist | null = null;
 
-    constructor(extraSettings = {}) {
+    /**
+     * The prefix prepended to every `localStorage` key used by the
+     * emulator, allows an embedded instance to keep its storage
+     * namespaced from the one of the host page.
+     */
+    private _storagePrefix = "";
+
+    constructor(
+        extraSettings = {},
+        { storagePrefix = "" }: { storagePrefix?: string } = {}
+    ) {
         super();
         this.extraSettings = extraSettings;
+        this._storagePrefix = storagePrefix;
+    }
+
+    get storagePrefix(): string {
+        return this._storagePrefix;
+    }
+
+    set storagePrefix(value: string) {
+        this._storagePrefix = value;
     }
 
     get playlistUrl(): string | null {
@@ -253,6 +290,12 @@ export class GameboyEmulator extends EmulatorLogic implements Emulator {
         // tick operation, this is the ideal value and the concrete
         // execution should not match this value
         const targetCycles = tickCycles - this.pending;
+
+        // marks the current instance as the one being clocked, the WASM
+        // callbacks are global (window bound) and fire synchronously from
+        // within the clock operation, so this is what allows them to be
+        // routed to the proper instance when multiple ones coexist
+        setActiveEmulator(this);
 
         // clocks the system by the target number of cycles (deducted
         // by the carryover cycles) and then in case there's at least
@@ -954,7 +997,15 @@ export class GameboyEmulator extends EmulatorLogic implements Emulator {
         const title = this.cartridge.title();
         const ramData = this.gameBoy.ram_data_eager();
         const ramDataB64 = bufferToBase64(ramData);
-        localStorage.setItem(title, ramDataB64);
+        localStorage.setItem(this.storageKey(title), ramDataB64);
+    }
+
+    /**
+     * Builds the effective `localStorage` key for the provided name,
+     * taking the configured storage prefix into account.
+     */
+    private storageKey(name: string): string {
+        return `${this._storagePrefix}${name}`;
     }
 
     /**
@@ -964,7 +1015,9 @@ export class GameboyEmulator extends EmulatorLogic implements Emulator {
      */
     private loadRam() {
         if (!this.gameBoy || !this.cartridge || !window.localStorage) return;
-        const ramDataB64 = localStorage.getItem(this.cartridge.title());
+        const ramDataB64 = localStorage.getItem(
+            this.storageKey(this.cartridge.title())
+        );
         if (!ramDataB64) return;
         const ramData = base64ToBuffer(ramDataB64);
         this.gameBoy.set_ram_data(ramData);
@@ -976,7 +1029,10 @@ export class GameboyEmulator extends EmulatorLogic implements Emulator {
             palette: PALETTES[this.paletteIndex].name,
             ...this.extraSettings
         };
-        localStorage.setItem("settings", JSON.stringify(settings));
+        localStorage.setItem(
+            this.storageKey("settings"),
+            JSON.stringify(settings)
+        );
     }
 
     private updatePalette() {
@@ -1063,15 +1119,15 @@ window.panic = (message: string) => {
 };
 
 window.speedCallback = (speed: GameBoySpeed) => {
-    window.emulator.onSpeedSwitch(speed);
+    (activeEmulator ?? window.emulator)?.onSpeedSwitch(speed);
 };
 
 window.loggerCallback = (data: Uint8Array) => {
-    window.emulator.onLoggerDevice(data);
+    (activeEmulator ?? window.emulator)?.onLoggerDevice(data);
 };
 
 window.printerCallback = (imageBuffer: Uint8Array) => {
-    window.emulator.onPrinterDevice(imageBuffer);
+    (activeEmulator ?? window.emulator)?.onPrinterDevice(imageBuffer);
 };
 
 window.rumbleCallback = (active: boolean) => {

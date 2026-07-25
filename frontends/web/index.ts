@@ -1,20 +1,4 @@
-import { startApp } from "emukit";
-
-import { GameboyEmulator } from "./ts";
-
-/**
- * List of available background theme colors that can be used
- * to style the main emulator area.
- */
-const BACKGROUNDS = [
-    "264653",
-    "1b1a17",
-    "023047",
-    "bc6c25",
-    "283618",
-    "2a9d8f",
-    "3a5a40"
-];
+import { BACKGROUNDS, embed } from "./ts";
 
 (async () => {
     // tries to load the settings from the local storage
@@ -46,41 +30,27 @@ const BACKGROUNDS = [
     const playlistUrl =
         params.get("playlist_url") ?? params.get("playlist") ?? undefined;
 
-    // creates the emulator structure and initializes the
-    // React app with both the parameters and the emulator
-    const emulator = new GameboyEmulator({
-        background: background,
-        debug: debug || verbose
-    });
-    if (playlistUrl) {
-        emulator.playlistUrl = playlistUrl;
-        await emulator.loadPlaylist();
-    }
-
-    // computes both the info and sections based on the initial
-    // state of the emulator configuration
-    const info = !playlistUrl;
-    const sections = playlistUrl ? ["Playlist"] : [];
-
-    await emulator.init();
-    startApp("app", {
-        emulator: emulator,
-        fullscreen: fullscreen,
-        info: info,
-        debug: debug,
-        keyboard: keyboard,
-        sections: sections,
+    // creates the emulator and mounts it in the app element, sharing the
+    // same code path used by the external embeds, note that the storage
+    // prefix is kept empty so that the saved games of the standalone
+    // front-end remain compatible with the previous versions
+    const { emulator } = await embed("#app", {
+        romUrl: romUrl,
+        playlistUrl: playlistUrl,
         palette: palette,
         background: background,
-        backgrounds: BACKGROUNDS
+        backgrounds: BACKGROUNDS,
+        fullscreen: fullscreen,
+        keyboard: keyboard,
+        debug: debug,
+        verbose: verbose,
+        info: !playlistUrl,
+        storagePrefix: "",
+        styles: false,
+        contain: false
     });
 
     // sets the emulator in the global scope this is useful
     // to be able to access the emulator from global functions
     window.emulator = emulator;
-
-    // starts the emulator with the provided ROM URL, using
-    // the playlist default URL as fallback if available
-    const defaultRomUrl = romUrl ?? emulator.defaultRomUrl ?? undefined;
-    await emulator.start({ romUrl: defaultRomUrl });
 })();

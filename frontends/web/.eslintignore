@@ -1,4 +1,10 @@
 /lib
 /dist
+/embed
+/module
+/pkg
 **/lib
 **/dist
+**/embed
+**/module
+**/pkg

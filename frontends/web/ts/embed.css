@@ -1,0 +1,54 @@
+/*
+ * Styles that keep an embedded emulator contained within the element
+ * provided by the host page.
+ *
+ * The UI toolkit is built around the assumption that the emulator owns
+ * the complete page, these rules scope the sizing and typography back to
+ * the mount node so that the emulator behaves like any other block level
+ * element of the host page.
+ */
+
+/*
+ * The minimum height (instead of a fixed one) is what allows the mount
+ * node to grow past the height of the host element when the UI does not
+ * fit, keeping the footer below the contents rather than over them.
+ */
+.boytacean-embed {
+    box-sizing: border-box;
+    font-family: "VT323", "Roboto", "Open Sans", Arial, Helvetica, sans-serif;
+    min-height: 100%;
+    padding: 12px 12px 52px 12px;
+    position: relative;
+    width: 100%;
+}
+
+.boytacean-embed * {
+    box-sizing: border-box;
+}
+
+.boytacean-embed .app {
+    max-width: 100%;
+}
+
+/*
+ * The display container is pushed down to clear the fixed header of the
+ * standalone front-end, which does not exist in an embed context.
+ */
+.boytacean-embed .app .display-container {
+    margin-top: 0px;
+}
+
+/*
+ * The footer is pinned to the viewport in the standalone front-end,
+ * which would make it float over the host page, so it's re-anchored to
+ * the bottom of the emulator's own box (the reason for the bottom
+ * padding of the mount node).
+ */
+.boytacean-embed .footer > .footer-contents {
+    position: absolute;
+    width: 100%;
+}
+
+.boytacean-embed .footer > .footer-background {
+    display: none;
+}
