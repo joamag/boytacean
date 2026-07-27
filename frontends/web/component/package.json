@@ -1,6 +1,6 @@
 {
     "name": "boytacean-react",
-    "version": "0.12.1",
+    "version": "0.13.0",
     "description": "The React component of Boytacean, ready to be embedded",
     "repository": {
         "type": "git",
@@ -31,7 +31,7 @@
     ],
     "peerDependencies": {
         "@types/react": "^18.3.18",
-        "boytacean-core": "^0.12.1",
+        "boytacean-core": "^0.13.0",
         "react": "^18.3.1"
     },
     "devDependencies": {
