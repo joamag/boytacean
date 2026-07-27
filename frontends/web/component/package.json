@@ -9,11 +9,21 @@
     "license": "Apache-2.0",
     "scripts": {
         "lint": "eslint .",
-        "pretty": "prettier --config .prettierrc \"./**/*.{js,ts,tsx,json}\" --write",
+        "pretty": "prettier --config ../.prettierrc \"./**/*.{js,ts,tsx,json}\" --write",
         "test": "npm run test:mocha",
         "test:mocha": "mocha --require tsx/cjs --recursive test"
     },
     "source": "index.ts",
+    "main": "index.ts",
+    "types": "index.ts",
+    "exports": {
+        ".": "./index.ts",
+        "./package.json": "./package.json"
+    },
+    "files": [
+        "index.ts",
+        "react"
+    ],
     "peerDependencies": {
         "@types/react": "^18.3.18",
         "boytacean-core": "^0.12.1",

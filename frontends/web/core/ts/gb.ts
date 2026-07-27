@@ -118,6 +118,14 @@ let activeCore: GameBoyCore | null = null;
  * @param core The core instance to be set as the active one.
  */
 const setActiveCore = (core: GameBoyCore) => {
+    // warns about the takeover of the callbacks, as the previously
+    // active core stops receiving the speed switch, serial, printer
+    // and rumble events from that moment on
+    if (activeCore && activeCore !== core) {
+        core.logger.warn(
+            "Multiple Game Boy cores detected, only the last one created receives the WASM callbacks"
+        );
+    }
     activeCore = core;
 };
 
@@ -287,6 +295,13 @@ export class GameBoyCore extends EmulatorLogic {
     }
 
     async hardReset() {
+        // releases the references to the structures of the previous
+        // WASM instance, as they would otherwise be used against the
+        // fresh linear memory that the reload creates
+        this.gameBoy = null;
+        this.cartridge = null;
+        this.clockFrame = null;
+
         await this.wasm(false);
         await this.boot({
             engine: this._engine || "auto",
@@ -324,10 +339,10 @@ export class GameBoyCore extends EmulatorLogic {
     } = {}) {
         // in case a remote ROM loading operation has been
         // requested then loads it from the remote origin
-        if (loadRom && romPath) {
+        if (loadRom && romPath !== undefined) {
             ({ name: romName, data: romData } =
                 await GameBoyCore.fetchRom(romPath));
-        } else if (!romName || !romData) {
+        } else if (romName === null || romData === null) {
             [romName, romData] = [this.romName, this.romData];
         }
 
@@ -769,7 +784,15 @@ export class GameBoyCore extends EmulatorLogic {
         const title = this.cartridge.title();
         const ramData = this.gameBoy.ram_data_eager();
         const ramDataB64 = bufferToBase64(ramData);
-        this.storage.setItem(title, ramDataB64);
+
+        // the storage operation is guarded as it runs from the tick
+        // operation, meaning that a failing adapter (eg: exhausted
+        // quota) would otherwise break the emulation loop
+        try {
+            this.storage.setItem(title, ramDataB64);
+        } catch (err) {
+            this.logger.warn(`Failed to save RAM data (${err})`);
+        }
     }
 
     /**
@@ -790,7 +813,15 @@ export class GameBoyCore extends EmulatorLogic {
             palette: PALETTES[this.paletteIndex].name,
             ...this.extraSettings
         };
-        this.storage.setItem("settings", JSON.stringify(settings));
+
+        // guards the storage operation as this method is called as
+        // part of the boot sequence, which should not be interrupted
+        // by a failing storage adapter
+        try {
+            this.storage.setItem("settings", JSON.stringify(settings));
+        } catch (err) {
+            this.logger.warn(`Failed to store settings (${err})`);
+        }
     }
 
     protected updatePalette() {
@@ -870,6 +901,11 @@ export class GameBoyCore extends EmulatorLogic {
         // loads the ROM data and converts it into the
         // target byte array buffer (to be used by WASM)
         const response = await fetch(romPath);
+        if (!response.ok) {
+            throw new Error(
+                `Unable to load ROM from ${romPath} (${response.status})`
+            );
+        }
         const blob = await response.blob();
         const arrayBuffer = await blob.arrayBuffer();
         const romData = new Uint8Array(arrayBuffer);

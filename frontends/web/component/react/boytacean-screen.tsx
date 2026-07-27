@@ -1,6 +1,5 @@
 import React, { CSSProperties, FC, useEffect, useRef } from "react";
-
-import { DISPLAY_HEIGHT, DISPLAY_WIDTH } from "../../core";
+import { DISPLAY_HEIGHT, DISPLAY_WIDTH } from "boytacean-core";
 
 import { useBoytacean } from "./boytacean-context";
 

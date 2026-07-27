@@ -1,6 +1,5 @@
 import React, { CSSProperties, FC, ReactNode } from "react";
-
-import { StorageAdapter } from "../../core";
+import { StorageAdapter } from "boytacean-core";
 
 import { BoytaceanGamepad } from "./boytacean-gamepad";
 import { BoytaceanKeyboard } from "./boytacean-keyboard";

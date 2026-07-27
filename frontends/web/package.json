@@ -43,6 +43,7 @@
     },
     "alias": {
         "boytacean": "./lib/boytacean.js",
+        "boytacean-core": "./core/index.ts",
         "emukit/logic": "./node_modules/emukit/logic.ts",
         "process": {
             "global": "process"

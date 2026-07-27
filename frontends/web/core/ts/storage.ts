@@ -5,6 +5,11 @@
  *
  * Allows the embedder to provide its own persistence strategy
  * instead of being bound to the Web Storage API.
+ *
+ * The operations are synchronous as they are run from the tick
+ * operation of the emulator, meaning that asynchronous back-ends
+ * (eg: IndexedDB) have to be fronted by an in memory cache that
+ * is flushed out of band.
  */
 export interface StorageAdapter {
     /**

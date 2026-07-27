@@ -227,7 +227,9 @@ export class GameboyEmulator extends GameBoyCore implements Emulator {
             size: this.romSize,
             extra: {
                 bootRom: this.gameBoy?.boot_rom_s(),
-                romType: this.cartridge?.rom_type_s()
+                romType: this.cartridge?.rom_type_s(),
+                romSize: this.cartridge?.rom_size_s(),
+                ramSize: this.cartridge?.ram_size_s()
             }
         };
     }

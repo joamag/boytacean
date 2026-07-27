@@ -61,12 +61,21 @@ export const BoytaceanKeyboard: FC<BoytaceanKeyboardProps> = ({
             event.preventDefault();
         };
 
+        // releases every mapped key whenever the page loses focus, as
+        // the key up event is not delivered in that situation and the
+        // key would otherwise stay pressed forever
+        const onBlur = () => {
+            Object.values(keys).forEach((key) => release(key));
+        };
+
         element.addEventListener("keydown", onKeyDown);
         element.addEventListener("keyup", onKeyUp);
+        window.addEventListener("blur", onBlur);
 
         return () => {
             element.removeEventListener("keydown", onKeyDown);
             element.removeEventListener("keyup", onKeyUp);
+            window.removeEventListener("blur", onBlur);
         };
     }, [keys, target, press, release]);
 
