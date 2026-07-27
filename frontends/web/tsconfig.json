@@ -19,6 +19,8 @@
         "baseUrl": ".",
         "lib": ["es2019", "dom"],
         "paths": {
+            "boytacean": ["lib/boytacean"],
+            "emukit/logic": ["node_modules/emukit/logic"],
             "*": ["node_modules/*", "src/types/*"]
         }
     },
