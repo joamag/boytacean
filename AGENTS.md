@@ -66,8 +66,9 @@ cd frontends/sdl && cargo build
 To create a new release follow the following steps:
 
 - Make sure that both the tests pass and the code formatting are valid.
-- Increment (look at `CHANGELOG.md` for semver changes) the `version` value in all the `Cargo.toml` files across the repo, the `version` value in `setup.py`, the `version` value in `frontends/web/package.json` and the `display_version` value in `frontends/libretro/res/boytacean_libretro.info`.
+- Increment (look at `CHANGELOG.md` for semver changes) the `version` value in all the `Cargo.toml` files across the repo, the `version` value in `setup.py`, the `version` value in `frontends/web/package.json`, `frontends/web/core/package.json` (`boytacean-core`) and `frontends/web/component/package.json` (`boytacean-react`), and the `display_version` value in `frontends/libretro/res/boytacean_libretro.info`.
 - Update the dependencies in the multiple `Cargo.toml` files that are associated with boytacean crates and back references.
+- Update the boytacean dependencies in the multiple `package.json` files, meaning the `boytacean` and `boytacean-core` entries of `frontends/web/core/package.json` and `frontends/web/component/package.json`.
 - Move all the `CHANGELOG.md` Unreleased items that have at least one non empty item the into a new section with the new version number and date, and then create new empty sub-sections (Added, Changed and Fixed) for the Unreleased section with a single empty item.
 - Create a commit with the following message `version: $VERSION_NUMBER`.
 - Push the commit.
