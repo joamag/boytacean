@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 *
 
-## [0.13.0] - 2026-07-27
+## [0.13.1] - 2026-07-28
 
 ### Added
 
@@ -47,6 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * Physical keys stayed pressed whenever the page lost focus, as the key up event is not delivered in that situation - [#2](https://github.com/joamag/boytacean/issues/2)
 * Build of the web packages, which failed while EmuKit could not be compiled by TypeScript 5.7 or newer - [#2](https://github.com/joamag/boytacean/issues/2)
+* Type error in `buildRomData()` when unpacking a zipped ROM, which prevented the type check of the web front-end
 * Freeze with a blank screen (music still playing) in demos that wait for the first V-Blank line
 * Garbled graphics in demos that change video registers in the middle of a scanline (raster effects)
 
