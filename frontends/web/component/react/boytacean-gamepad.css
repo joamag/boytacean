@@ -1,0 +1,72 @@
+.gamepad {
+    align-items: center;
+    display: flex;
+    gap: 24px;
+    justify-content: center;
+    user-select: none;
+}
+
+.gamepad .gamepad-dpad {
+    display: grid;
+    grid-template-areas:
+        ". up ."
+        "left . right"
+        ". down .";
+    grid-template-columns: repeat(3, 36px);
+    grid-template-rows: repeat(3, 36px);
+}
+
+.gamepad .gamepad-dpad .up {
+    grid-area: up;
+}
+
+.gamepad .gamepad-dpad .left {
+    grid-area: left;
+}
+
+.gamepad .gamepad-dpad .right {
+    grid-area: right;
+}
+
+.gamepad .gamepad-dpad .down {
+    grid-area: down;
+}
+
+.gamepad .gamepad-actions {
+    display: flex;
+    gap: 12px;
+}
+
+.gamepad .gamepad-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.gamepad .gamepad-button {
+    background-color: #2a9d8f;
+    border: none;
+    border-radius: 6px;
+    color: #ffffff;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 14px;
+    padding: 0px;
+    touch-action: none;
+}
+
+.gamepad .gamepad-button:active {
+    background-color: #21867a;
+}
+
+.gamepad .gamepad-button.action {
+    border-radius: 50%;
+    height: 48px;
+    width: 48px;
+}
+
+.gamepad .gamepad-button.menu {
+    font-size: 10px;
+    height: 22px;
+    width: 64px;
+}
