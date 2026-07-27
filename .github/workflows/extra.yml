@@ -10,7 +10,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Checkout code from repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Setup Rust
         run: |
           rustup install 1.86.0
@@ -53,7 +53,7 @@ jobs:
     runs-on: macos-latest
     steps:
       - name: Checkout code from repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Setup Rust
         run: |
           rustup install 1.86.0

@@ -2,6 +2,9 @@ yarn.lock
 package-lock.json
 
 /.parcel-cache
+/.parcel-cache-*
 
 /dist
 /node_modules
+
+/example/dist

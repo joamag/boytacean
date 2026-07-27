@@ -1,6 +1,6 @@
 {
     "name": "boytacean-web",
-    "version": "0.12.1",
+    "version": "0.13.0",
     "description": "The web version of Boytacean",
     "repository": {
         "type": "git",
@@ -19,12 +19,14 @@
     "source": "index.ts",
     "devDependencies": {
         "@parcel/transformer-typescript-tsc": "^2.14.0",
+        "@types/mocha": "^10.0.10",
+        "@types/node": "^26.1.2",
         "@types/react": "^18.3.18",
         "@types/react-dom": "^18.3.5",
         "@typescript-eslint/eslint-plugin": "^7.18.0",
         "@typescript-eslint/parser": "^7.18.0",
         "buffer": "^6.0.3",
-        "emukit": "^0.10.22",
+        "emukit": "^0.10.25",
         "eslint": "^8.57.1",
         "eslint-plugin-import": "^2.31.0",
         "eslint-plugin-react-hooks": "^5.2.0",
@@ -42,6 +44,9 @@
         "webgl-plot": "^0.7.2"
     },
     "alias": {
+        "boytacean": "./lib/boytacean.js",
+        "boytacean-core": "./core/index.ts",
+        "emukit/logic": "./node_modules/emukit/logic.ts",
         "process": {
             "global": "process"
         }

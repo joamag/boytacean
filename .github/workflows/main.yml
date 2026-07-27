@@ -22,7 +22,7 @@ jobs:
     container: rust:${{ matrix.rust-version }}
     steps:
       - name: Checkout code from repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Install Rust components
         run: |
           rustup component add rustfmt
@@ -59,7 +59,7 @@ jobs:
     container: rust:${{ matrix.rust-version }}
     steps:
       - name: Checkout code from repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Install Rust components
         run: |
           rustup component add rustfmt
@@ -91,7 +91,7 @@ jobs:
     container: rust:${{ matrix.rust-version }}
     steps:
       - name: Checkout code from repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Install Dependencies
         run: |
           apt-get update
@@ -118,6 +118,10 @@ jobs:
           node-version: ${{ matrix.node-version }}
       - name: Build and lint Web code
         run: cd frontends/web && npm install && npm run build && npm run lint
+      - name: Run Web unit tests
+        run: |
+          cd frontends/web/core && npm install && npm test
+          cd ../component && npm install && npm test
   build-sdl:
     name: Build SDL
     timeout-minutes: 30
@@ -136,7 +140,7 @@ jobs:
     container: rust:${{ matrix.rust-version }}
     steps:
       - name: Checkout code from repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Install Dependencies
         run: |
           apt-get update
@@ -155,7 +159,7 @@ jobs:
             ~/.cache/vcpkg
             ~/vcpkg
             target/vcpkg
-          key: vcpkg-${{ runner.os }}-${{ hashFiles('frontends/sdl/Cargo.toml') }}
+          key: vcpkg-${{ runner.os }}-${{ matrix.rust-version }}-${{ hashFiles('frontends/sdl/Cargo.toml') }}
       - name: Install SDL dependencies
         run: cd frontends/sdl && cargo install cargo-vcpkg && cargo vcpkg -v build
       - name: Verify Rust code format
@@ -194,7 +198,7 @@ jobs:
     container: rust:${{ matrix.rust-version }}
     steps:
       - name: Checkout code from repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Install Dependencies
         run: |
           apt-get update
@@ -233,7 +237,7 @@ jobs:
     container: rust:${{ matrix.rust-version }}
     steps:
       - name: Checkout code from repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Install Android NDK
         uses: nttld/setup-ndk@v1
         id: setup-ndk
@@ -299,7 +303,7 @@ jobs:
     container: ${{ matrix.rust-image }}
     steps:
       - name: Checkout code from repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Install Dependencies
         run: |
           apt-get update
@@ -318,7 +322,7 @@ jobs:
             ~/.cache/vcpkg
             ~/vcpkg
             target/vcpkg
-          key: vcpkg-${{ runner.os }}-${{ hashFiles('frontends/sdl/Cargo.toml') }}
+          key: vcpkg-${{ runner.os }}-${{ matrix.rust-image }}-${{ hashFiles('frontends/sdl/Cargo.toml') }}
       - name: Install SDL dependencies
         run: cd frontends/sdl && cargo install cargo-vcpkg && cargo vcpkg -v build
       - name: Verify Rust code format
