@@ -57,7 +57,7 @@ build-wasm:
     - cargo install wasm-pack
     - wasm-pack build --release --target=web --out-dir=frontends/web/lib -- --features wasm
     - cd frontends/web && npm install && NODE_ENV=production npm run build && npm run lint
-    - cd core && npm install && npm test && cd ..
+    - cd core && npm install --no-save ../lib && npm install && npm test && cd ..
     - cd component && npm install && npm test && cd ..
   artifacts:
     paths:
