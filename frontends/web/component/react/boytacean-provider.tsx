@@ -1,4 +1,4 @@
-import { GameBoyCore, StorageAdapter } from "boytacean-core";
+import { GameBoyCore, releaseCore, StorageAdapter } from "boytacean-core";
 import React, { FC, ReactNode, useEffect, useMemo, useState } from "react";
 
 import { BoytaceanContext, BoytaceanContextValue } from "./boytacean-context";
@@ -66,6 +66,7 @@ export const BoytaceanProvider: FC<BoytaceanProviderProps> = ({
         return () => {
             disposed = true;
             core.stop();
+            releaseCore(core);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [core, rom]);

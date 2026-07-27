@@ -1,0 +1,29 @@
+{
+    "compilerOptions": {
+        "module": "ES2020",
+        "moduleResolution": "node",
+        "target": "es6",
+        "declaration": true,
+        "noImplicitAny": true,
+        "noImplicitThis": true,
+        "alwaysStrict": true,
+        "strictBindCallApply": true,
+        "strictNullChecks": true,
+        "strictFunctionTypes": true,
+        "strictPropertyInitialization": true,
+        "sourceMap": true,
+        "outDir": "dist",
+        "baseUrl": ".",
+        "lib": ["es2019", "dom"],
+        "types": [],
+        "skipLibCheck": true,
+        "allowImportingTsExtensions": true,
+        "rewriteRelativeImportExtensions": true,
+        "paths": {
+            "boytacean": ["../lib/boytacean"],
+            "emukit/logic": ["../node_modules/emukit/logic"]
+        }
+    },
+    "include": ["index.ts", "ts/**/*"],
+    "exclude": ["test", "../node_modules"]
+}

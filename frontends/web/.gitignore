@@ -7,4 +7,4 @@ package-lock.json
 /dist
 /node_modules
 
-/component/example/dist
+/example/dist
