@@ -183,8 +183,8 @@ deploy-npm:
   script:
     - echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
     - cd frontends/web/lib && npm publish
-    - cd ../core && npm publish
-    - cd ../component && npm publish
+    - cd ../core && npm install --no-save ../lib && npm install && npm publish
+    - cd ../component && npm install && npm publish
   dependencies:
     - build-wasm
   only:
