@@ -274,9 +274,6 @@ export class GameboyEmulator extends GameBoyCore implements Emulator {
         if (file.name.endsWith(".zip")) {
             const zip = await loadAsync(romData);
             const firstFile = Object.values(zip.files)[0];
-
-            // the buffer is copied so that it's backed by its own array
-            // buffer, as a shared backed one is not assignable
             romData = await firstFile.async("uint8array");
         }
 
