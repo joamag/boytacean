@@ -3,6 +3,7 @@ package-lock.json
 
 /.parcel-cache
 
+/component
 /dist
 /embed
 /lib

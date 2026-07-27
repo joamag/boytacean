@@ -48,7 +48,7 @@ const STYLESHEET_ATTRIBUTE = "data-boytacean-styles";
  * The class set on the mount node of an embedded emulator, used by the
  * embed stylesheet to keep the layout contained within the host element.
  */
-const MOUNT_CLASS = "boytacean-embed";
+export const MOUNT_CLASS = "boytacean-embed";
 
 /**
  * Sequence counter used to generate unique element identifiers
@@ -253,9 +253,6 @@ const containBackground = (
     container: HTMLElement,
     emulator: GameboyEmulator
 ): (() => void) => {
-    const body = document.body;
-    const original = body.style.backgroundColor;
-
     // redirects the background notification of this specific instance
     // into its own container, preserving the original behaviour
     const onBackground = emulator.onBackground.bind(emulator);
@@ -263,6 +260,23 @@ const containBackground = (
         onBackground(background);
         container.style.backgroundColor = `#${background}`;
     };
+
+    return containBodyBackground();
+};
+
+/**
+ * Keeps the document's body background untouched by the emulator UI,
+ * which paints it with the current background color on every change.
+ *
+ * The color itself is never read back from the body, as multiple embeds
+ * in the same page would race with each other over it, the emulator's
+ * own background notification is used instead.
+ *
+ * @returns The function that stops the containment.
+ */
+export const containBodyBackground = (): (() => void) => {
+    const body = document.body;
+    const original = body.style.backgroundColor;
 
     const observer = new MutationObserver(() => {
         if (body.style.backgroundColor === original) return;

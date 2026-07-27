@@ -1,10 +1,12 @@
-/lib
+/component
 /dist
 /embed
+/lib
 /module
 /pkg
-**/lib
+**/component
 **/dist
 **/embed
+**/lib
 **/module
 **/pkg

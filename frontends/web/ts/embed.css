@@ -52,3 +52,31 @@
 .boytacean-embed .footer > .footer-background {
     display: none;
 }
+
+/*
+ * The responsive breakpoints of the UI toolkit are expressed against the
+ * viewport, which is the wrong reference for an embed: a narrow emulator
+ * inside a wide window would keep the side by side desktop layout and
+ * collapse the display, as the info panel reserves a large minimum width.
+ *
+ * Turning the mount node into a container makes those breakpoints follow
+ * the size of the emulator itself instead. The containment is dropped
+ * while the display is in fullscreen, as it would otherwise become the
+ * containing block of the fixed positioned display and confine it to the
+ * emulator's box rather than the viewport.
+ */
+.boytacean-embed:not(:has(.display.fullscreen)) {
+    container-name: boytacean;
+    container-type: inline-size;
+}
+
+@container boytacean (max-width: 1120px) {
+    .boytacean-embed .panel-split {
+        flex-direction: column;
+    }
+
+    .boytacean-embed .panel-split > .side-right {
+        min-width: unset;
+        padding: 0px 0px 0px 0px;
+    }
+}

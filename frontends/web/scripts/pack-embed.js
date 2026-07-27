@@ -26,7 +26,23 @@ const TARGET = join(BASE, "pkg");
  * The directories with the built bundles that are copied into the
  * package, must be built before this script runs.
  */
-const BUNDLES = ["embed", "module"];
+const BUNDLES = ["component", "embed", "module"];
+
+/**
+ * The bundles that are published under a different directory name, the
+ * React one is built into `component` to avoid colliding with the
+ * `react` source directory, but is published as `react` so that
+ * `boytacean-web/react` also resolves in the bundlers that ignore the
+ * `exports` map (eg: Parcel).
+ */
+const RENAMES = { component: "react" };
+
+/**
+ * The entry point shims written into the published bundle directories,
+ * they are what makes a directory import resolve without relying on the
+ * `exports` map.
+ */
+const INDEXES = { react: "react.js" };
 
 const manifest = require(join(BASE, "package.json"));
 
@@ -39,7 +55,16 @@ rmSync(TARGET, { force: true, recursive: true });
 mkdirSync(TARGET, { recursive: true });
 
 for (const bundle of BUNDLES) {
-    cpSync(join(BASE, bundle), join(TARGET, bundle), { recursive: true });
+    cpSync(join(BASE, bundle), join(TARGET, RENAMES[bundle] ?? bundle), {
+        recursive: true
+    });
+}
+
+for (const [directory, entry] of Object.entries(INDEXES)) {
+    writeFileSync(
+        join(TARGET, directory, "index.js"),
+        `export * from "./${entry}";\n`
+    );
 }
 
 copyFileSync(join(ROOT, "LICENSE"), join(TARGET, "LICENSE"));
@@ -57,6 +82,9 @@ writeFileSync(
             keywords: manifest.keywords,
             exports: manifest.exports,
             module: manifest.module,
+            dependencies: manifest.dependencies,
+            peerDependencies: manifest.peerDependencies,
+            peerDependenciesMeta: manifest.peerDependenciesMeta,
             sideEffects: true
         },
         null,

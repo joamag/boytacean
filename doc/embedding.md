@@ -2,11 +2,91 @@
 
 Boytacean can be embedded in any website through the [`boytacean-web`](https://www.npmjs.com/package/boytacean-web) package, which ships a self-contained build of the emulator (WebAssembly core and UI included). No build step, no extra runtime dependencies and no server-side component are required.
 
-There are three ways to embed the emulator, in increasing order of control:
+There are four ways to embed the emulator:
 
-1. A [custom element](#custom-element) driven by HTML attributes.
-2. The [`embed()` function](#javascript-api) for programmatic control.
-3. An [`<iframe>`](#iframe) pointing at the hosted front-end, for maximum isolation.
+1. A [React component](#react-component), for React applications.
+2. A [custom element](#custom-element) driven by HTML attributes, for plain HTML pages.
+3. The [`embed()` function](#javascript-api) for programmatic control outside of React.
+4. An [`<iframe>`](#iframe) pointing at the hosted front-end, for maximum isolation.
+
+## React component
+
+Install the package and render the `Boytacean` component, it mounts the emulator inside the React tree of the host application:
+
+```bash
+npm install boytacean-web
+```
+
+```jsx
+import { Boytacean } from "boytacean-web/react";
+
+export const Page = () => (
+    <Boytacean
+        romUrl="https://example.com/game.gb"
+        palette="christmas"
+        style={{ maxWidth: 760 }}
+    />
+);
+```
+
+`react` and `react-dom` are peer dependencies (React 18), everything else the emulator needs is either bundled or installed automatically.
+
+The stylesheet is imported by the component, so bundlers pick it up without any extra setup. Should your setup strip CSS imports, import it explicitly with `import "boytacean-web/react/react.css"`.
+
+### Props
+
+| Prop            | Type       | Default      | Description                                                                          |
+| --------------- | ---------- | ------------ | ------------------------------------------------------------------------------------ |
+| `romUrl`        | String     | bundled ROM  | The URL of the ROM to load at startup, the origin must support CORS.                 |
+| `playlistUrl`   | String     | —            | The URL of a JSON [playlist](playlists.md), enables the playlist section.            |
+| `palette`       | String     | `basic`      | The palette to use at startup.                                                       |
+| `background`    | String     | `264653`     | The background color of the emulator area, hexadecimal without the `#` prefix.       |
+| `backgrounds`   | String[]   | built-in     | The background colors offered in the UI.                                             |
+| `fullscreen`    | Boolean    | `false`      | If the emulator should start in fullscreen mode.                                     |
+| `keyboard`      | Boolean    | `false`      | If the on-screen keyboard should start visible.                                      |
+| `debug`         | Boolean    | `false`      | If the debug panels should start visible.                                            |
+| `verbose`       | Boolean    | `false`      | If information should be logged in verbose mode.                                     |
+| `info`          | Boolean    | `false`      | If the informative panels should be shown.                                           |
+| `storagePrefix` | String     | `boytacean:` | The prefix for the `localStorage` keys.                                              |
+| `contain`       | Boolean    | `true`       | If the page level side effects should be contained, see [Containment](#containment). |
+| `className`     | String     | —            | Extra class names for the container element.                                         |
+| `style`         | CSSProperties | —         | Inline styles for the container element.                                             |
+| `onReady`       | Function   | —            | Called with the emulator instance once it has booted and is running.                 |
+| `onError`       | Function   | —            | Called with the error when the boot process fails.                                   |
+| `onBackground`  | Function   | —            | Called with the new color whenever the background changes through the UI.            |
+
+The emulator is created once on mount, so the props above are only read at that point. Use the ref handle (or the `onReady` instance) to drive it afterwards.
+
+### Ref handle
+
+The component forwards a ref exposing `emulator`, `pause()`, `resume()` and `loadRom(url)`:
+
+```jsx
+import { useRef } from "react";
+import { Boytacean } from "boytacean-web/react";
+
+export const Page = () => {
+    const emulator = useRef(null);
+    return (
+        <>
+            <button onClick={() => emulator.current.pause()}>Pause</button>
+            <button onClick={() => emulator.current.loadRom("/other.gb")}>Swap ROM</button>
+            <Boytacean ref={emulator} onReady={(gb) => console.log(gb.romName)} />
+        </>
+    );
+};
+```
+
+### Multiple components
+
+Several `Boytacean` components can coexist in the same tree, each with its own ROM, palette and storage. Give them distinct `storagePrefix` values to keep their saved games separate:
+
+```jsx
+<Boytacean romUrl="/first.gb" storagePrefix="first:" />
+<Boytacean romUrl="/second.gb" storagePrefix="second:" />
+```
+
+Every running instance consumes a full emulation loop, so keep the number of simultaneously running emulators low and `pause()` the ones that are not visible.
 
 ## Custom element
 
@@ -132,10 +212,11 @@ Alternatively, point the `styles` option at the stylesheet (`styles: "/assets/em
 
 ## Containment
 
-The emulator UI is primarily built for the standalone front-end, where it owns the whole page. When embedded it would otherwise paint the host page's `<body>` and pin its footer to the viewport, so by default the embed:
+The emulator UI is primarily built for the standalone front-end, where it owns the whole page. When embedded it would otherwise paint the host page's `<body>`, pin its footer to the viewport and lay itself out against the viewport size, so by default the embed:
 
 - Redirects the background color to its own container instead of the document's body.
 - Scopes the layout and the footer to the element it has been mounted into.
+- Makes the responsive breakpoints follow the width of the emulator rather than the one of the window, so that a narrow emulator in a wide page still lays out correctly.
 
 Set `contain` to `false` only when the emulator owns the complete page.
 
@@ -177,6 +258,8 @@ The `allow="gamepad"` attribute is required for the Web Gamepad API to work insi
 - The ROM (and playlist) origins must allow **CORS**, they are fetched directly by the browser.
 - Host pages that set a `Content-Security-Policy` need `wasm-unsafe-eval` in `script-src` for the WebAssembly core to be instantiated.
 - Audio only starts after a user interaction, as required by the browser autoplay policies.
+- The containment relies on CSS container queries and `:has()`, available in all the major browsers since 2023.
+- The React component requires React 18.
 
 ## Legal
 

@@ -9,7 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-* Embeddable web build published as the `boytacean-web` npm package, with a `<boytacean-emulator>` custom element, an `embed()` function and a `window.Boytacean` global for script tag usage
+* Embeddable web build published as the `boytacean-web` npm package, with a `Boytacean` React component, a `<boytacean-emulator>` custom element, an `embed()` function and a `window.Boytacean` global for script tag usage
+* `Boytacean` React component (`boytacean-web/react`) rendering the emulator inside the host application's React tree, with props, a ref handle (`pause`, `resume`, `loadRom`) and `onReady`/`onError`/`onBackground` callbacks
 * `doc/embedding.md` documenting how to embed the emulator in external websites
 * `storagePrefix` option namespacing the `localStorage` keys of an embedded emulator, so that they do not collide with the ones of the host page
 * Keyboard navigation in the game playlist (arrow keys to browse results, Enter to load)
@@ -23,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 * Cross-talk between the speed, serial and printer callbacks of multiple emulators running in the same page, they are now routed to the instance that is being clocked
+* Collapsed emulator display when embedded in a container narrower than the window, the responsive breakpoints of an embed now follow the size of the emulator instead of the one of the viewport
 * Freeze with a blank screen (music still playing) in demos that wait for the first V-Blank line
 * Garbled graphics in demos that change video registers in the middle of a scanline (raster effects)
 

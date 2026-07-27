@@ -126,7 +126,19 @@ You can load a collection of ROMs through a JSON playlist using the `playlist_ur
 
 Boytacean can be embedded in any website through the [`boytacean-web`](https://www.npmjs.com/package/boytacean-web) package. See [Embedding](doc/embedding.md) for the complete reference.
 
-The quickest way is a single script tag and the `<boytacean-emulator>` element:
+In a React application, install the package and render the component:
+
+```bash
+npm install boytacean-web
+```
+
+```jsx
+import { Boytacean } from "boytacean-web/react";
+
+<Boytacean romUrl="https://example.com/game.gb" palette="christmas" />;
+```
+
+Outside of React, the quickest way is a single script tag and the `<boytacean-emulator>` element:
 
 ```html
 <script type="module" src="https://cdn.jsdelivr.net/npm/boytacean-web/embed/embed.js"></script>
@@ -134,11 +146,7 @@ The quickest way is a single script tag and the `<boytacean-emulator>` element:
 <boytacean-emulator rom-url="https://example.com/game.gb"></boytacean-emulator>
 ```
 
-If you are using a bundler, install the package and mount the emulator yourself:
-
-```bash
-npm install boytacean-web
-```
+There's also an imperative API for the non-React bundler setups:
 
 ```javascript
 import { embed } from "boytacean-web";

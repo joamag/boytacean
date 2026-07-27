@@ -15,7 +15,7 @@
     ],
     "scripts": {
         "build": "parcel build index.html --target default",
-        "build:embed": "parcel build --target embed --target module",
+        "build:embed": "parcel build --target embed --target module --target react",
         "build:pkg": "node scripts/pack-embed.js",
         "dev": "parcel index.html --target default",
         "lint": "eslint .",
@@ -27,6 +27,8 @@
     "source": "index.ts",
     "exports": {
         ".": "./module/embed.js",
+        "./react": "./react/index.js",
+        "./react/react.css": "./react/react.css",
         "./embed": "./embed/embed.js",
         "./embed.css": "./embed/embed.css",
         "./module/embed.css": "./module/embed.css"
@@ -52,6 +54,35 @@
             "includeNodeModules": true,
             "optimize": true,
             "sourceMap": false
+        },
+        "react": {
+            "source": "entries/react.tsx",
+            "distDir": "component",
+            "context": "browser",
+            "outputFormat": "esmodule",
+            "isLibrary": true,
+            "includeNodeModules": {
+                "react": false,
+                "react-dom": false,
+                "recoil": false
+            },
+            "optimize": true,
+            "sourceMap": false
+        }
+    },
+    "dependencies": {
+        "recoil": "^0.7.7"
+    },
+    "peerDependencies": {
+        "react": "^18.3.1",
+        "react-dom": "^18.3.1"
+    },
+    "peerDependenciesMeta": {
+        "react": {
+            "optional": true
+        },
+        "react-dom": {
+            "optional": true
         }
     },
     "devDependencies": {
