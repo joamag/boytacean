@@ -12,10 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Keyboard navigation in the game playlist (arrow keys to browse results, Enter to load)
 * Performance profiling support with per-frame timings, render timings and memory access counters - [#34](https://github.com/joamag/boytacean/issues/34)
 * Performance audit document with benchmark comparisons against other emulators - [#34](https://github.com/joamag/boytacean/issues/34)
+* Headless `boytacean-core` package with a `GameBoyCore` that carries the emulation logic without any React, EmuKit UI or bundler-specific dependency - [#2](https://github.com/joamag/boytacean/issues/2)
+* `StorageAdapter` abstraction for the persistence of battery-backed RAM and settings, allowing embedders to replace the Web Storage API - [#2](https://github.com/joamag/boytacean/issues/2)
 
 ### Changed
 
 * Faster background rendering and main loop clocking with identical emulation output - [#34](https://github.com/joamag/boytacean/issues/34)
+* `GameboyEmulator` reduced to an EmuKit adapter over the headless core, keeping only the UI-bound surface - [#2](https://github.com/joamag/boytacean/issues/2)
+* WASM path and extra settings are provided as core options instead of being resolved through bundler-specific `require` calls - [#2](https://github.com/joamag/boytacean/issues/2)
 
 ### Fixed
 

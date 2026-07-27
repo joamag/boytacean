@@ -1,0 +1,38 @@
+{
+    "name": "boytacean-react",
+    "version": "0.12.1",
+    "description": "The React component of Boytacean, ready to be embedded",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/joamag/boytacean.git"
+    },
+    "license": "Apache-2.0",
+    "scripts": {
+        "lint": "eslint .",
+        "pretty": "prettier --config ../.prettierrc \"./**/*.{js,ts,tsx,json}\" --write",
+        "test": "npm run test:mocha",
+        "test:mocha": "mocha --require tsx/cjs --recursive test"
+    },
+    "source": "index.ts",
+    "main": "index.ts",
+    "types": "index.ts",
+    "exports": {
+        ".": "./index.ts",
+        "./package.json": "./package.json"
+    },
+    "files": [
+        "index.ts",
+        "react"
+    ],
+    "peerDependencies": {
+        "@types/react": "^18.3.18",
+        "boytacean-core": "^0.12.1",
+        "react": "^18.3.1"
+    },
+    "devDependencies": {
+        "mocha": "^11.1.0",
+        "prettier": "^3.5.3",
+        "tsx": "^4.19.3",
+        "typescript": "^5.8.2"
+    }
+}
