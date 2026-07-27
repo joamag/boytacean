@@ -1,5 +1,5 @@
-import { createContext, useContext } from "react";
 import { GameBoyCore } from "boytacean-core";
+import { createContext, useContext } from "react";
 
 /**
  * The stable set of values exposed by the Boytacean context, the

@@ -1,5 +1,5 @@
-import React, { FC, ReactNode, useEffect, useMemo, useState } from "react";
 import { GameBoyCore, StorageAdapter } from "boytacean-core";
+import React, { FC, ReactNode, useEffect, useMemo, useState } from "react";
 
 import { BoytaceanContext, BoytaceanContextValue } from "./boytacean-context";
 

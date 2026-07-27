@@ -7,7 +7,8 @@ module.exports = {
         "react-hooks/rules-of-hooks": "error",
         "react-hooks/exhaustive-deps": "warn",
         "import/order": [
-            "error", {
+            "error",
+            {
                 groups: [
                     "builtin",
                     "external",
@@ -20,7 +21,8 @@ module.exports = {
             }
         ],
         "no-constant-condition": [
-            "error", {
+            "error",
+            {
                 checkLoops: false
             }
         ],

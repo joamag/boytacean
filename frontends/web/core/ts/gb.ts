@@ -658,7 +658,7 @@ export class GameBoyCore extends EmulatorLogic {
         } catch (err) {
             return {
                 index: index,
-                error: err
+                error: err instanceof Error ? err : new Error(String(err))
             };
         }
     }
