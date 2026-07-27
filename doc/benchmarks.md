@@ -8,11 +8,11 @@ Release to release comparison of the native frame throughput, covering the perfo
 
 ### Environment
 
-| Item      | Value                                                                                         |
-| --------- | --------------------------------------------------------------------------------------------- |
-| Hardware  | AMD Ryzen 5 5600X (6 cores, 12 threads), Windows 11                                           |
+| Item      | Value                                                                                          |
+| --------- | ---------------------------------------------------------------------------------------------- |
+| Hardware  | AMD Ryzen 5 5600X (6 cores, 12 threads), Windows 11                                            |
 | Boytacean | tags `0.12.0` (`0042d14`) and `0.13.1` (`83fd9a5`), release profile (fat LTO, `opt-level = 3`) |
-| Toolchain | rustc 1.97.0-nightly (`4b0c9d76a`)                                                            |
+| Toolchain | rustc 1.97.0-nightly (`4b0c9d76a`)                                                             |
 
 ### Harnesses
 
