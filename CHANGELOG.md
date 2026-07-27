@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+*
+
+### Changed
+
+*
+
+### Fixed
+
+*
+
+## [0.13.0] - 2026-07-27
+
+### Added
+
 * Keyboard navigation in the game playlist (arrow keys to browse results, Enter to load)
 * Performance profiling support with per-frame timings, render timings and memory access counters - [#34](https://github.com/joamag/boytacean/issues/34)
 * Performance audit document with benchmark comparisons against other emulators - [#34](https://github.com/joamag/boytacean/issues/34)
@@ -33,7 +47,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * Physical keys stayed pressed whenever the page lost focus, as the key up event is not delivered in that situation - [#2](https://github.com/joamag/boytacean/issues/2)
 * Build of the web packages, which failed while EmuKit could not be compiled by TypeScript 5.7 or newer - [#2](https://github.com/joamag/boytacean/issues/2)
-
 * Freeze with a blank screen (music still playing) in demos that wait for the first V-Blank line
 * Garbled graphics in demos that change video registers in the middle of a scanline (raster effects)
 
