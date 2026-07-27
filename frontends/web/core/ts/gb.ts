@@ -120,13 +120,29 @@ let activeCore: GameBoyCore | null = null;
 const setActiveCore = (core: GameBoyCore) => {
     // warns about the takeover of the callbacks, as the previously
     // active core stops receiving the speed switch, serial, printer
-    // and rumble events from that moment on
-    if (activeCore && activeCore !== core) {
+    // and rumble events from that moment on, only a core that has
+    // already loaded a ROM is considered, so that the sequential
+    // creation of cores is not reported as a conflict
+    if (activeCore && activeCore !== core && activeCore.loaded) {
         core.logger.warn(
             "Multiple Game Boy cores detected, only the last one created receives the WASM callbacks"
         );
     }
     activeCore = core;
+};
+
+/**
+ * Releases the provided core from the active position, so that it
+ * stops receiving the callbacks triggered from the WASM side.
+ *
+ * A core that is not the active one is ignored, avoiding the release
+ * of a core that has already been superseded by another one.
+ *
+ * @param core The core instance to be released.
+ */
+export const releaseCore = (core: GameBoyCore) => {
+    if (activeCore !== core) return;
+    activeCore = null;
 };
 
 /**
@@ -603,6 +619,30 @@ export class GameBoyCore extends EmulatorLogic {
 
     set serialDevice(value: SerialDevice) {
         this._serialDevice = value;
+    }
+
+    /**
+     * The name of the ROM that is currently loaded in the machine,
+     * null in case no ROM has been loaded yet.
+     */
+    get loadedRomName(): string | null {
+        return this.romName;
+    }
+
+    /**
+     * The size in bytes of the ROM that is currently loaded in the
+     * machine, zero in case no ROM has been loaded yet.
+     */
+    get loadedRomSize(): number {
+        return this.romSize;
+    }
+
+    /**
+     * If a ROM has already been loaded into the machine, meaning
+     * that the emulation is able to run.
+     */
+    get loaded(): boolean {
+        return this.romData !== null;
     }
 
     keyPress(key: string) {

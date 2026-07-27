@@ -14,14 +14,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Performance audit document with benchmark comparisons against other emulators - [#34](https://github.com/joamag/boytacean/issues/34)
 * Headless `boytacean-core` package with a `GameBoyCore` that carries the emulation logic without any React, EmuKit UI or bundler-specific dependency - [#2](https://github.com/joamag/boytacean/issues/2)
 * `StorageAdapter` abstraction for the persistence of battery-backed RAM and settings, allowing embedders to replace the Web Storage API - [#2](https://github.com/joamag/boytacean/issues/2)
+* `boytacean-react` package with a drop-in `Boytacean` component, rendering the display, binding the physical keyboard and showing an on screen game pad out of the box - [#2](https://github.com/joamag/boytacean/issues/2)
+* `Boytacean.Provider`, `Boytacean.Screen`, `Boytacean.Gamepad` and `Boytacean.Keyboard` components, allowing the complete presentation to be replaced by the embedder - [#2](https://github.com/joamag/boytacean/issues/2)
+* `useBoytacean()`, `useBoytaceanStatus()` and `useBoytaceanStats()` hooks, keeping the context identity stable so that consumers are never re-rendered by the emulation - [#2](https://github.com/joamag/boytacean/issues/2)
+* Embedding example covering the out of the box usage, a custom layout with a remapped keyboard and a fully custom game pad - [#2](https://github.com/joamag/boytacean/issues/2)
+* Unit test suites for both the core and the React packages, run as part of the WASM continuous integration jobs - [#2](https://github.com/joamag/boytacean/issues/2)
+* `loadedRomName`, `loadedRomSize` and `loaded` accessors in `GameBoyCore`, exposing the currently loaded ROM to embedders - [#2](https://github.com/joamag/boytacean/issues/2)
 
 ### Changed
 
 * Faster background rendering and main loop clocking with identical emulation output - [#34](https://github.com/joamag/boytacean/issues/34)
 * `GameboyEmulator` reduced to an EmuKit adapter over the headless core, keeping only the UI-bound surface - [#2](https://github.com/joamag/boytacean/issues/2)
 * WASM path and extra settings are provided as core options instead of being resolved through bundler-specific `require` calls - [#2](https://github.com/joamag/boytacean/issues/2)
+* Both web packages are now built into plain JavaScript with type declarations, so that they are resolvable outside of a TypeScript aware bundler - [#2](https://github.com/joamag/boytacean/issues/2)
+* The `deploy-npm` job publishes the core and React packages alongside the WASM one - [#2](https://github.com/joamag/boytacean/issues/2)
 
 ### Fixed
+
+* Physical keys stayed pressed whenever the page lost focus, as the key up event is not delivered in that situation - [#2](https://github.com/joamag/boytacean/issues/2)
 
 * Freeze with a blank screen (music still playing) in demos that wait for the first V-Blank line
 * Garbled graphics in demos that change video registers in the middle of a scanline (raster effects)

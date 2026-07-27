@@ -1,0 +1,33 @@
+{
+    "compilerOptions": {
+        "module": "ES2020",
+        "moduleResolution": "node",
+        "target": "es6",
+        "jsx": "react",
+        "allowSyntheticDefaultImports": true,
+        "declaration": true,
+        "noImplicitAny": true,
+        "noImplicitThis": true,
+        "alwaysStrict": true,
+        "strictBindCallApply": true,
+        "strictNullChecks": true,
+        "strictFunctionTypes": true,
+        "strictPropertyInitialization": true,
+        "sourceMap": true,
+        "outDir": "dist",
+        "baseUrl": ".",
+        "lib": ["es2019", "dom"],
+        "types": ["react"],
+        "skipLibCheck": true,
+        "allowImportingTsExtensions": true,
+        "rewriteRelativeImportExtensions": true,
+        "paths": {
+            "react": ["../node_modules/@types/react"],
+            "boytacean": ["../lib/boytacean"],
+            "boytacean-core": ["../core"],
+            "emukit/logic": ["../node_modules/emukit/logic"]
+        }
+    },
+    "include": ["index.ts", "react/**/*"],
+    "exclude": ["test", "../node_modules"]
+}

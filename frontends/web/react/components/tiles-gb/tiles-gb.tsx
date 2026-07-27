@@ -24,7 +24,7 @@ export const TilesGB: FC<TilesGBProps> = ({
         () => ["tiles-gb", contentBox ? "content-box" : "", ...style].join(" "),
         [contentBox, style]
     );
-    const intervalsRef = useRef<number>();
+    const intervalsRef = useRef<ReturnType<typeof setInterval>>();
     const canvasRef = useRef<HTMLCanvasElement>(null);
     useEffect(() => {
         return () => {

@@ -1,14 +1,19 @@
-import React, { FC, useEffect, useState } from "react";
+import React, { FC, useState } from "react";
 import ReactDOM from "react-dom/client";
 
-import { Boytacean, useBoytacean } from "../index";
+import {
+    Boytacean,
+    useBoytacean,
+    useBoytaceanStats,
+    useBoytaceanStatus
+} from "../component";
 
 import "./index.css";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 declare const require: any;
 
-const ROM_PATH = require("../../../../res/roms/demo/pocket.gb");
+const ROM_PATH = require("../../../res/roms/demo/pocket.gb");
 
 /**
  * Custom mapping between the physical keyboard and the emulated
@@ -30,14 +35,10 @@ const CUSTOM_KEYS: Record<string, string> = {
  * emulator can be controlled from any component under the provider.
  */
 const Status: FC = () => {
-    const { core, play, pause } = useBoytacean();
-    const [framerate, setFramerate] = useState(0);
+    const { play, pause } = useBoytacean();
+    const { framerate } = useBoytaceanStats();
+    const { romName } = useBoytaceanStatus();
     const [paused, setPaused] = useState(false);
-
-    useEffect(() => {
-        const interval = setInterval(() => setFramerate(core.framerate), 1000);
-        return () => clearInterval(interval);
-    }, [core]);
 
     return (
         <div className="status">
@@ -55,7 +56,9 @@ const Status: FC = () => {
             >
                 {paused ? "Resume" : "Pause"}
             </button>
-            <span className="status-label">{framerate} FPS</span>
+            <span className="status-label">
+                {romName ?? "no ROM"} · {framerate} FPS
+            </span>
         </div>
     );
 };

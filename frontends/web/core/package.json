@@ -8,21 +8,25 @@
     },
     "license": "Apache-2.0",
     "scripts": {
+        "build": "tsc --project tsconfig.build.json",
         "lint": "eslint .",
+        "prepublishOnly": "npm run build",
         "pretty": "prettier --config ../.prettierrc \"./**/*.{js,ts,tsx,json}\" --write",
         "test": "npm run test:mocha",
-        "test:mocha": "mocha --require tsx/cjs --recursive test"
+        "test:mocha": "mocha --require tsx/cjs --recursive --extension ts test"
     },
     "source": "index.ts",
-    "main": "index.ts",
-    "types": "index.ts",
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
     "exports": {
-        ".": "./index.ts",
+        ".": {
+            "types": "./dist/index.d.ts",
+            "default": "./dist/index.js"
+        },
         "./package.json": "./package.json"
     },
     "files": [
-        "index.ts",
-        "ts"
+        "dist"
     ],
     "peerDependencies": {
         "boytacean": "^0.12.1",
