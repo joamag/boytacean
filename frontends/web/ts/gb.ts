@@ -93,8 +93,8 @@ export class GameboyEmulator extends GameBoyCore implements Emulator {
         }
     }
 
-    async boot(options = {}) {
-        await super.boot({ romPath: ROM_PATH, ...options });
+    async boot({ romPath = ROM_PATH, ...options } = {} as { romPath?: string }) {
+        await super.boot({ romPath: romPath, ...options });
     }
 
     get name(): string {
