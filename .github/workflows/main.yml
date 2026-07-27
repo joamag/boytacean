@@ -120,7 +120,7 @@ jobs:
         run: cd frontends/web && npm install && npm run build && npm run lint
       - name: Run Web unit tests
         run: |
-          cd frontends/web/core && npm install && npm test
+          cd frontends/web/core && npm install --no-save ../lib && npm install && npm test
           cd ../component && npm install && npm test
   build-sdl:
     name: Build SDL
