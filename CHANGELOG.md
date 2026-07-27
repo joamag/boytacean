@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 * Physical keys stayed pressed whenever the page lost focus, as the key up event is not delivered in that situation - [#2](https://github.com/joamag/boytacean/issues/2)
+* Build of the web packages, which failed while EmuKit could not be compiled by TypeScript 5.7 or newer - [#2](https://github.com/joamag/boytacean/issues/2)
 
 * Freeze with a blank screen (music still playing) in demos that wait for the first V-Blank line
 * Garbled graphics in demos that change video registers in the middle of a scanline (raster effects)
