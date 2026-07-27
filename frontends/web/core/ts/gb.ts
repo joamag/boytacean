@@ -1,15 +1,4 @@
 import {
-    base64ToBuffer,
-    BenchmarkResult,
-    bufferToBase64,
-    EmulatorLogic,
-    PixelFormat,
-    SaveState,
-    Size,
-    TickParams,
-    Validation
-} from "emukit/logic";
-import {
     default as _wasm,
     Cartridge,
     ClockFrame,
@@ -20,6 +9,17 @@ import {
     SaveStateFormat,
     StateManager
 } from "boytacean";
+import {
+    base64ToBuffer,
+    BenchmarkResult,
+    bufferToBase64,
+    EmulatorLogic,
+    PixelFormat,
+    SaveState,
+    Size,
+    TickParams,
+    Validation
+} from "emukit/logic";
 
 import { PALETTES, PALETTES_MAP } from "./palettes";
 import { defaultStorage, StorageAdapter } from "./storage";
@@ -808,14 +808,18 @@ export class GameBoyCore extends EmulatorLogic {
      * WASM module loading operation.
      */
     protected async wasm(setHook = true) {
+        // resolves the path of the WASM binary, falling back to the
+        // one that sits next to the `boytacean` package, this is
+        // required as some bundlers strip the `import.meta.url` based
+        // resolution that wasm-bindgen relies on by default
+        const wasmPath = this.wasmPath ?? GameBoyCore.defaultWasmPath();
+
         // waits for the WASM module to be (hard) re-loaded
         // this should be an expensive operation, uses fallback
         // logic to determine if the new set of arguments for
         // wasm-bindgen should be used
         try {
-            await (this.wasmPath
-                ? _wasm({ module_or_path: this.wasmPath })
-                : _wasm());
+            await (wasmPath ? _wasm({ module_or_path: wasmPath }) : _wasm());
         } catch (err) {
             if (err instanceof TypeError) {
                 await _wasm();
@@ -835,6 +839,21 @@ export class GameBoyCore extends EmulatorLogic {
             } catch (err) {
                 console.error(err);
             }
+        }
+    }
+
+    /**
+     * Resolves the default location of the WASM binary, which is the
+     * one distributed next to the `boytacean` package.
+     *
+     * @returns The URL of the WASM binary or null in case it cannot
+     * be resolved in the current environment.
+     */
+    protected static defaultWasmPath(): string | null {
+        try {
+            return new URL("../../lib/boytacean_bg.wasm", import.meta.url).href;
+        } catch (err) {
+            return null;
         }
     }
 

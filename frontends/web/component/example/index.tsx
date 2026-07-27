@@ -9,7 +9,6 @@ import "./index.css";
 declare const require: any;
 
 const ROM_PATH = require("../../../../res/roms/demo/pocket.gb");
-const WASM_PATH = require("../../lib/boytacean_bg.wasm");
 
 /**
  * Custom mapping between the physical keyboard and the emulated
@@ -95,12 +94,7 @@ const App: FC = () => (
             A single element renders the display, binds the keyboard and shows
             the on screen game pad.
         </p>
-        <Boytacean
-            rom={ROM_PATH}
-            wasmPath={WASM_PATH}
-            palette="christmas"
-            className="emulator"
-        />
+        <Boytacean rom={ROM_PATH} palette="christmas" className="emulator" />
 
         <h2>Custom layout</h2>
         <p>
@@ -110,7 +104,7 @@ const App: FC = () => (
             here, using <code>Z</code> and <code>X</code> for the action keys
             instead of the defaults.
         </p>
-        <Boytacean.Provider rom={ROM_PATH} wasmPath={WASM_PATH}>
+        <Boytacean.Provider rom={ROM_PATH}>
             <div className="emulator">
                 <Boytacean.Screen scale={2} className="screen" />
                 <Status />
@@ -124,7 +118,7 @@ const App: FC = () => (
             driven directly through the <code>press()</code> and
             <code> release()</code> actions of the context.
         </p>
-        <Boytacean.Provider rom={ROM_PATH} wasmPath={WASM_PATH}>
+        <Boytacean.Provider rom={ROM_PATH}>
             <div className="emulator">
                 <Boytacean.Screen scale={2} className="screen" />
                 <CustomKeys />
