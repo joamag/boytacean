@@ -2,10 +2,11 @@
 //!
 //! No Python boundary, no per-component instrumentation and no
 //! frame-buffer extraction. APU is disabled (matching the typical
-//! AI training configuration). Reports best-of-three runs.
+//! AI training configuration) unless the `--apu` flag is provided.
+//! Reports best-of-three runs.
 //!
 //! # Usage
-//! cargo run --release --example bench_headless -- <rom.gb> [frames]
+//! cargo run --release --example bench_headless -- <rom.gb> [frames] [--apu] [--cgb]
 
 use std::{env::args, error::Error, time::Instant};
 
@@ -19,7 +20,7 @@ const RUNS: usize = 3;
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = args().collect();
     if args.len() < 2 {
-        println!("Usage: bench_headless <rom.gb> [frames]");
+        println!("Usage: bench_headless <rom.gb> [frames] [--apu] [--cgb]");
         return Ok(());
     }
     let rom_path = &args[1];
@@ -27,17 +28,26 @@ fn main() -> Result<(), Box<dyn Error>> {
         .get(2)
         .and_then(|s| s.parse().ok())
         .unwrap_or(DEFAULT_FRAMES);
+    let apu_enabled = args.iter().any(|arg| arg == "--apu");
+    let mode = if args.iter().any(|arg| arg == "--cgb") {
+        GameBoyMode::Cgb
+    } else {
+        GameBoyMode::Dmg
+    };
 
     let mut best_ns: u128 = u128::MAX;
     for run in 1..=RUNS {
-        let mut gb = GameBoy::new(Some(GameBoyMode::Dmg));
+        let mut gb = GameBoy::new(Some(mode));
         gb.load(true)?;
         gb.load_rom_file(rom_path, None)?;
-        gb.set_apu_enabled(false);
+        gb.set_apu_enabled(apu_enabled);
 
         for _ in 0..WARMUP {
             gb.next_frame();
         }
+
+        #[cfg(feature = "profile")]
+        GameBoy::reset_profile();
 
         let t0 = Instant::now();
         for _ in 0..frames {
@@ -54,6 +64,9 @@ fn main() -> Result<(), Box<dyn Error>> {
             elapsed as f64 / 1000.0 / frames as f64,
         );
         best_ns = best_ns.min(elapsed);
+
+        #[cfg(feature = "profile")]
+        GameBoy::dump_profile();
     }
 
     let best_fps = frames as f64 / (best_ns as f64 / 1e9);

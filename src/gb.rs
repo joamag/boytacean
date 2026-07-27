@@ -54,6 +54,7 @@ use crate::{
         FRAME_BUFFER_RGB565_SIZE, FRAME_BUFFER_RGBA_SIZE, FRAME_BUFFER_SIZE,
         FRAME_BUFFER_XRGB8888_SIZE,
     },
+    profile_count_gb, profile_time_gb,
     rom::{Cartridge, RamSize},
     serial::{NullDevice, Serial, SerialDevice},
     timer::Timer,
@@ -156,6 +157,8 @@ pub enum GameBoySpeed {
 }
 
 impl GameBoySpeed {
+    /// Human readable description of the current speed mode,
+    /// to be used mostly for display purposes.
     pub fn description(&self) -> &'static str {
         match self {
             GameBoySpeed::Normal => "Normal Speed",
@@ -163,6 +166,9 @@ impl GameBoySpeed {
         }
     }
 
+    /// Speed mode that results from a speed switch operation,
+    /// effectively toggling between the two available speed
+    /// modes (used by the KEY1 register in CGB mode).
     pub fn switch(&self) -> Self {
         match self {
             GameBoySpeed::Normal => GameBoySpeed::Double,
@@ -170,6 +176,9 @@ impl GameBoySpeed {
         }
     }
 
+    /// Number of times the clock runs faster than the base
+    /// (normal) speed, to be used as the reference value in
+    /// cycle normalization operations.
     pub fn multiplier(&self) -> u8 {
         match self {
             GameBoySpeed::Normal => 1,
@@ -177,6 +186,19 @@ impl GameBoySpeed {
         }
     }
 
+    /// Number of bits to shift a cycle count by to normalize
+    /// it according to the current speed, equivalent to a
+    /// division by the [`GameBoySpeed::multiplier()`] value.
+    pub fn shift(&self) -> u8 {
+        match self {
+            GameBoySpeed::Normal => 0,
+            GameBoySpeed::Double => 1,
+        }
+    }
+
+    /// Converts the provided `u8` value into the corresponding
+    /// speed mode, panicking in case the value does not represent
+    /// a valid speed mode.
     pub fn from_u8(value: u8) -> Self {
         match value {
             0 => GameBoySpeed::Normal,
@@ -615,7 +637,7 @@ impl GameBoy {
     #[inline(always)]
     pub fn clock(&mut self) -> u16 {
         let cycles = self.cpu_clock() as u16;
-        let cycles_n = cycles / self.multiplier() as u16;
+        let cycles_n = cycles >> self.speed().shift();
         self.clock_devices(cycles, cycles_n);
         cycles
     }
@@ -635,7 +657,7 @@ impl GameBoy {
         for _ in 0..count {
             cycles += self.cpu_clock() as u16;
         }
-        let cycles_n = cycles / self.multiplier() as u16;
+        let cycles_n = cycles >> self.speed().shift();
         self.clock_devices(cycles, cycles_n);
         cycles
     }
@@ -649,7 +671,7 @@ impl GameBoy {
         if self.cpu_i().pc() == addr {
             return cycles;
         }
-        let cycles_n = cycles / self.multiplier() as u16;
+        let cycles_n = cycles >> self.speed().shift();
         self.clock_devices(cycles, cycles_n);
         cycles
     }
@@ -713,12 +735,15 @@ impl GameBoy {
     /// is reached and returns the amount of cycles that have been
     /// clocked.
     pub fn next_frame(&mut self) -> u32 {
-        let mut cycles = 0u32;
-        let current_frame = self.ppu_frame();
-        while self.ppu_frame() == current_frame {
-            cycles += self.clock() as u32;
-        }
-        cycles
+        profile_count_gb!(frames);
+        profile_time_gb!(frame_time, {
+            let mut cycles = 0u32;
+            let current_frame = self.ppu_frame();
+            while self.ppu_frame() == current_frame {
+                cycles += self.clock() as u32;
+            }
+            cycles
+        })
     }
 
     /// Clocks the system until the Program Counter (PC) reaches the
@@ -777,6 +802,7 @@ impl GameBoy {
 
     #[inline(always)]
     pub fn cpu_clock(&mut self) -> u8 {
+        profile_count_gb!(instructions);
         self.cpu.clock()
     }
 
@@ -1745,5 +1771,21 @@ impl Default for GameBoy {
 impl Display for GameBoy {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.description(9))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::GameBoySpeed;
+
+    /// Tests that the speed shift value is equivalent to a division
+    /// by the speed multiplier when normalizing cycle counts.
+    #[test]
+    fn test_speed_shift() {
+        for speed in [GameBoySpeed::Normal, GameBoySpeed::Double] {
+            for cycles in [0u16, 4, 8, 12, 16, 20, 24] {
+                assert_eq!(cycles >> speed.shift(), cycles / speed.multiplier() as u16);
+            }
+        }
     }
 }

@@ -1,0 +1,94 @@
+body {
+    background-color: #264653;
+    color: #ffffff;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    margin: 0px;
+    padding: 32px 16px 64px 16px;
+}
+
+.app {
+    margin: 0px auto 0px auto;
+    max-width: 720px;
+}
+
+.app h1 {
+    font-size: 28px;
+    margin: 0px 0px 32px 0px;
+}
+
+.app h2 {
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+    font-size: 18px;
+    margin: 40px 0px 8px 0px;
+    padding-top: 24px;
+}
+
+.app p {
+    font-size: 14px;
+    line-height: 20px;
+    margin: 0px 0px 20px 0px;
+    opacity: 0.8;
+}
+
+.app code {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+    font-size: 13px;
+    padding: 1px 4px 1px 4px;
+}
+
+.emulator {
+    align-items: center;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.emulator .screen {
+    border-radius: 4px;
+    box-shadow: 0px 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.status {
+    align-items: center;
+    display: flex;
+    gap: 16px;
+}
+
+.status .status-button {
+    background-color: #2a9d8f;
+    border: none;
+    border-radius: 4px;
+    color: #ffffff;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 13px;
+    padding: 6px 16px 6px 16px;
+}
+
+.status .status-label {
+    font-size: 13px;
+    opacity: 0.8;
+}
+
+.keys {
+    display: flex;
+    gap: 8px;
+}
+
+.keys .key {
+    background-color: rgba(255, 255, 255, 0.12);
+    border: none;
+    border-radius: 4px;
+    color: #ffffff;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 12px;
+    padding: 8px 14px 8px 14px;
+    touch-action: none;
+    user-select: none;
+}
+
+.keys .key:active {
+    background-color: #2a9d8f;
+}

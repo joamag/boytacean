@@ -1,0 +1,44 @@
+{
+    "name": "boytacean-react",
+    "version": "0.13.0",
+    "description": "The React component of Boytacean, ready to be embedded",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/joamag/boytacean.git"
+    },
+    "license": "Apache-2.0",
+    "scripts": {
+        "build": "tsc --project tsconfig.build.json && node scripts/copy-assets.js",
+        "lint": "eslint .",
+        "prepublishOnly": "npm run build",
+        "pretty": "prettier --config ../.prettierrc \"./**/*.{js,ts,tsx,json}\" --write",
+        "test": "npm run test:mocha",
+        "test:mocha": "mocha --require tsx/cjs --recursive --extension ts test"
+    },
+    "source": "index.ts",
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "default": "./dist/index.js"
+        },
+        "./styles.css": "./dist/react/boytacean-gamepad.css",
+        "./package.json": "./package.json"
+    },
+    "files": [
+        "dist"
+    ],
+    "peerDependencies": {
+        "@types/react": "^18.3.18",
+        "boytacean-core": "^0.13.0",
+        "react": "^18.3.1"
+    },
+    "devDependencies": {
+        "boytacean-core": "file:../core",
+        "mocha": "^11.1.0",
+        "prettier": "^3.5.3",
+        "tsx": "^4.19.3",
+        "typescript": "^5.8.2"
+    }
+}

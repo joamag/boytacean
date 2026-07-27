@@ -57,6 +57,8 @@ build-wasm:
     - cargo install wasm-pack
     - wasm-pack build --release --target=web --out-dir=frontends/web/lib -- --features wasm
     - cd frontends/web && npm install && NODE_ENV=production npm run build && npm run lint
+    - cd core && npm install && npm test && cd ..
+    - cd component && npm install && npm test && cd ..
   artifacts:
     paths:
       - frontends/web/dist
@@ -181,6 +183,8 @@ deploy-npm:
   script:
     - echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
     - cd frontends/web/lib && npm publish
+    - cd ../core && npm publish
+    - cd ../component && npm publish
   dependencies:
     - build-wasm
   only:
