@@ -19,6 +19,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 *
 
+## [0.13.2] - 2026-07-28
+
+### Added
+
+*
+
+### Changed
+
+*
+
+### Fixed
+
+* Publish of the core and React packages, which failed as the deploy job did not install the dependencies required by their build
+
 ## [0.13.1] - 2026-07-28
 
 ### Added
