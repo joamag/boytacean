@@ -2,6 +2,42 @@
 
 Timestamped benchmark reports comparing Boytacean against other Game Boy emulators. Each section is a self-contained snapshot with the exact environment, versions and raw per-round data, so that results remain reproducible and comparable over time. The methodology is described in [performance.md](performance.md).
 
+## 2026-07-28 — 0.13.1 versus 0.12.0
+
+Release to release comparison of the native frame throughput, covering the performance work of [#34](https://github.com/joamag/boytacean/issues/34) and the PPU fixes that landed in the same range.
+
+### Environment
+
+| Item      | Value                                                                                         |
+| --------- | --------------------------------------------------------------------------------------------- |
+| Hardware  | AMD Ryzen 5 5600X (6 cores, 12 threads), Windows 11                                           |
+| Boytacean | tags `0.12.0` (`0042d14`) and `0.13.1` (`83fd9a5`), release profile (fat LTO, `opt-level = 3`) |
+| Toolchain | rustc 1.97.0-nightly (`4b0c9d76a`)                                                            |
+
+### Harnesses
+
+* `bench_headless` example, 12000 frames per run, 600 warmup frames, DMG mode, APU disabled.
+* Runs interleaved between the two versions, 3 rounds each, to bound scheduling and thermal drift.
+* The harness differs slightly between the two tags (the newer one adds `--apu` and `--cgb` flags plus `profile` hooks that compile out), the measured loop is the same.
+
+### Results (fps, per round)
+
+| ROM        | 0.12.0             | 0.13.1             | Delta |
+| ---------- | ------------------ | ------------------ | ----- |
+| 20y.gb     | 8299 / 7544 / 7769 | 8065 / 8223 / 7837 | ~flat |
+| gejmboj.gb | 6610 / 6847 / 6025 | 6720 / 6910 / 6932 | +4%   |
+
+### Findings
+
+* Frame throughput on the two ROMs that render continuously across the whole run is flat to slightly positive, within or just above the ~3% run-to-run noise of this machine.
+* The performance work of [#34](https://github.com/joamag/boytacean/issues/34) was measured on Apple silicon in the sections below, this report does not reproduce those gains on this machine.
+
+### Excluded ROMs
+
+`pocket.gb` measures 6930 fps on `0.12.0` against 5363 fps on `0.13.1`, which reads as a 21% regression but is an artifact of the V-Blank freeze fixed in `bfd1cfb`. Hashing the frame buffer every 1000 frames shows the `0.12.0` screen going static from frame ~5000 onwards and staying identical for the remaining 8000 frames, while `0.13.1` keeps producing new frames. The CPU executes the same number of cycles per frame in both (70223), so the difference is in the render path that the frozen build never reaches. The comparison is not meaningful.
+
+`dmg_acid2.gb` settles into a static test pattern on both versions and is therefore not representative of sustained rendering throughput, even though the behaviour is identical across them.
+
 ## 2026-07-10 — CGB rendering tuning
 
 Environment identical to the 2026-07-09 section below, measuring the effect of the CGB rendering optimizations (borrowed background attributes map and per-tile row slice rendering in `render_map()`). Before is the branch state of the 2026-07-09 report, after includes the CGB rendering changes. Runs were interleaved, 3 rounds of 12000 frames each.
