@@ -98,3 +98,7 @@ harness = false
 [[bench]]
 name = "cpu"
 harness = false
+
+[[bench]]
+name = "gba"
+harness = false

@@ -1,5 +1,15 @@
-import { GameBoyCore } from "boytacean-core";
+import { GameBoyCore, GbaCore } from "boytacean-core";
 import { createContext, useContext } from "react";
+
+/**
+ * Enumeration with the complete set of systems that can be emulated
+ * by the component, used to select the core to be built.
+ */
+export enum BoytaceanSystem {
+    Auto = "auto",
+    GameBoy = "gb",
+    GameBoyAdvance = "gba"
+}
 
 /**
  * The stable set of values exposed by the Boytacean context, the
@@ -16,7 +26,13 @@ export type BoytaceanContextValue = {
      * The core instance that is driving the emulation, provides
      * access to the complete set of low level operations.
      */
-    core: GameBoyCore;
+    core: GameBoyCore | GbaCore;
+
+    /**
+     * The system that is currently being emulated by the core, as
+     * resolved from the `system` property and the ROM.
+     */
+    system: BoytaceanSystem.GameBoy | BoytaceanSystem.GameBoyAdvance;
 
     /**
      * Resumes the emulation in case it's currently paused.

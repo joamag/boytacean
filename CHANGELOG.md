@@ -10,15 +10,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 * `README.md` for the `boytacean-react` package, documenting the components, props, hooks and keys, with a quick start, a complete emulation page example and copy and paste instructions to build one from scratch
+* Game Boy Advance (GBA) emulation with ARM7TDMI CPU (ARM and Thumb instruction sets)
+* GBA scanline-based PPU supporting video modes 0-5 with text and affine backgrounds
+* GBA APU with 4 legacy channels and 2 DirectSound PCM FIFO channels
+* GBA DMA controller with 4 channels and priority-based transfers
+* GBA timer hardware with prescaler and cascade support
+* GBA keypad input handling with interrupt control (KEYINPUT/KEYCNT)
+* GBA BIOS HLE for common SWI calls (Div, Sqrt, CpuSet, LZ77, RLUnComp, etc.)
+* GBA interrupt controller (IE, IF, IME) with per-source enable/acknowledge
+* GBA ROM header parsing, checksum validation, and auto-detection via fixed byte
+* `System` enum for unified frontend integration of Game Boy and GBA emulators
+* GBA web frontend integration with WASM bindings and auto-detection via ROM URL
+* `GbaEmulator` TypeScript class for running GBA ROMs in the browser
+* `PadKey::L` and `PadKey::R` shoulder button variants for GBA input
+* Basic GBA link port emulation with no-partner behavior
+* Headless `GbaCore` in the `boytacean-core` package, carrying the GBA emulation logic without any React, EmuKit UI or bundler-specific dependency
+* Support for the GBA in the `boytacean-react` package, through a `system` property that selects the core to be built and falls back to the inference of the system from the extension of the ROM
+* Mapping of the `Q` and `W` keys to the shoulder buttons of the GBA in the default key mapping of the React package
 
 ### Changed
 
-*
+* Major GBA emulation performance improvements across memory access, idle CPU handling, audio and video rendering
+* Faster GBA scanline composition, tile fetching and sprite scanning
+* Another round of GBA performance work making commercial games run about 1.5x faster
+* Faster GBA instruction fetching from the main memory regions
 
 ### Fixed
 
 * Resolution of the default WASM binary path in `boytacean-core`, which pointed at a `lib` directory that only exists in the repository and therefore failed whenever the package was installed from npm
 * Build of the web front-end, which was broken by the resolution of the WASM binary through a bare specifier, as Parcel resolves those at build time and the `boytacean` package is aliased to a local file
+* Corrupted backgrounds in Golden Sun caused by idle CPU wake timing
+* Distorted intro screens in Sonic Advance caused by extra scroll updates during VBlank
+* Random GBA crashes and stack corruption from interrupts taken right after a branch
+* Advance Wars 1 and 2 crashing at boot due to broken software reset handling
+* GBA games seeing a phantom link partner during the multiplayer probe at boot
 
 ## [0.13.2] - 2026-07-28
 
