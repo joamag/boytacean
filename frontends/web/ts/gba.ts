@@ -456,7 +456,12 @@ export class GbaEmulator extends EmulatorLogic implements Emulator {
             name: this.romName ?? undefined,
             data: this.romData ?? undefined,
             size: this.romSize,
-            extra: {}
+            extra: {
+                title: this._romInfo?.title(),
+                gameCode: this._romInfo?.game_code(),
+                makerCode: this._romInfo?.maker_code(),
+                softwareVersion: this._romInfo?.software_version().toString()
+            }
         };
     }
 

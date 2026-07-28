@@ -1,4 +1,4 @@
-import { Emulator, startApp } from "emukit";
+import { startApp } from "emukit";
 
 import { GameboyEmulator, GbaEmulator } from "./ts";
 
@@ -64,7 +64,7 @@ const isGbaUrl = (url: string): boolean => {
     // creates the appropriate emulator structure based on the
     // detected ROM type and initializes the React app with
     // both the parameters and the emulator
-    const emulator: Emulator = isGba
+    const emulator: GameboyEmulator | GbaEmulator = isGba
         ? new GbaEmulator({
               background: background,
               debug: debug || verbose
