@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-*
+* `README.md` for the `boytacean-react` package, documenting the components, props, hooks and keys, with a quick start, a complete emulation page example and copy and paste instructions to build one from scratch
 
 ### Changed
 
@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-*
+* Resolution of the default WASM binary path in `boytacean-core`, which pointed at a `lib` directory that only exists in the repository and therefore failed whenever the package was installed from npm
 
 ## [0.13.2] - 2026-07-28
 
