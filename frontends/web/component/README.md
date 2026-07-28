@@ -144,23 +144,42 @@ Passing `children` to `<Boytacean />` switches it into provider only mode, so no
 
 ### Props
 
-`<Boytacean />` accepts `rom`, `wasmPath`, `storage`, `palette`, `scale`, `keyboard`, `gamepad`, `className`, `style` and `children`. The provider takes the first four.
+`<Boytacean />` accepts `rom`, `wasmPath`, `storage`, `palette`, `system`, `scale`, `keyboard`, `gamepad`, `className`, `style` and `children`. The provider takes the first five.
 
-| Prop       | Type             | Default | Description                                                                  |
-| ---------- | ---------------- | ------- | ---------------------------------------------------------------------------- |
-| `rom`      | `string`         | —       | URL of the ROM to load at boot, the machine stays idle when omitted.         |
-| `wasmPath` | `string`         | —       | Where to load the WASM binary from, defaults to the wasm-bindgen resolution. |
-| `storage`  | `StorageAdapter` | —       | Persistence for the battery backed RAM and the settings.                     |
-| `palette`  | `string`         | —       | Palette applied at startup.                                                  |
-| `scale`    | `number`         | `3`     | Scale factor of the display, ignored when custom children are provided.      |
-| `keyboard` | `boolean`        | `true`  | Whether the physical keyboard is bound, ignored with custom children.        |
-| `gamepad`  | `boolean`        | `true`  | Whether the on screen game pad is shown, ignored with custom children.       |
+| Prop       | Type              | Default  | Description                                                                  |
+| ---------- | ----------------- | -------- | ---------------------------------------------------------------------------- |
+| `rom`      | `string`          | —        | URL of the ROM to load at boot, the machine stays idle when omitted.         |
+| `wasmPath` | `string`          | —        | Where to load the WASM binary from, defaults to the wasm-bindgen resolution. |
+| `storage`  | `StorageAdapter`  | —        | Persistence for the battery backed RAM and the settings.                     |
+| `palette`  | `string`          | —        | Palette applied at startup, only used by the Game Boy.                       |
+| `system`   | `BoytaceanSystem` | `"auto"` | System to emulate, inferred from the ROM extension in the automatic mode.    |
+| `scale`    | `number`          | `3`      | Scale factor of the display, ignored when custom children are provided.      |
+| `keyboard` | `boolean`         | `true`   | Whether the physical keyboard is bound, ignored with custom children.        |
+| `gamepad`  | `boolean`         | `true`   | Whether the on screen game pad is shown, ignored with custom children.       |
 
 Built-in palettes: `basic`, `hogwards`, `christmas`, `goldsilver`, `pacman`, `mariobros` and `pokemon`.
 
+## Game Boy Advance
+
+The same component runs Game Boy Advance ROMs, building a `GbaCore` instead of a `GameBoyCore` whenever the system resolves to the GBA. A `.gba` ROM is detected out of the box:
+
+```tsx
+<Boytacean rom="/roms/pocket.gba" />
+```
+
+Use the `system` property to select it explicitly, which is required whenever the ROM is not loaded from a URL that carries the extension:
+
+```tsx
+import { Boytacean, BoytaceanSystem } from "boytacean-react";
+
+<Boytacean rom="/roms/pocket" system={BoytaceanSystem.GameBoyAdvance} />;
+```
+
+The display is sized from the core, so the screen switches between the 160x144 of the Game Boy and the 240x160 of the GBA on its own. Notice that the palette is ignored by the GBA, as the colors come from the ROM itself, and that save states are not yet supported by it.
+
 ## Hooks
 
-* `useBoytacean()` — the context of the closest provider: the `core` instance plus the `play()`, `pause()`, `reset()`, `loadRom()`, `press()` and `release()` actions. Its identity is stable for the lifetime of the provider, so consumers are never re-rendered by emulation activity.
+* `useBoytacean()` — the context of the closest provider: the `core` instance and the `system` it emulates, plus the `play()`, `pause()`, `reset()`, `loadRom()`, `press()` and `release()` actions. Its identity is stable for the lifetime of the provider, so consumers are never re-rendered by emulation activity.
 * `useBoytaceanStatus()` — `booted` and `romName`, updated only when a ROM is booted.
 * `useBoytaceanStats()` — `framerate`, `cyclerate` and `emulationSpeed`, sampled every 500 ms by default (`useBoytaceanStats(interval)` to change it).
 
@@ -168,12 +187,13 @@ High frequency data such as the frame buffer is deliberately kept out of React s
 
 ## Keys
 
-| Key        | Action |
-| ---------- | ------ |
-| Arrow keys | D-Pad  |
-| Enter      | Start  |
-| Space      | Select |
-| A / S      | A / B  |
+| Key        | Action           |
+| ---------- | ---------------- |
+| Arrow keys | D-Pad            |
+| Enter      | Start            |
+| Space      | Select           |
+| A / S      | A / B            |
+| Q / W      | L / R (GBA only) |
 
 Remap them by passing a `keys` record to `<Boytacean.Keyboard />`:
 
@@ -181,7 +201,7 @@ Remap them by passing a `keys` record to `<Boytacean.Keyboard />`:
 <Boytacean.Keyboard keys={{ ...KEYS_MAP, z: "A", x: "B" }} />
 ```
 
-Or skip the component and drive `press()` / `release()` from the context yourself, using the key names `ArrowUp`, `ArrowDown`, `ArrowLeft`, `ArrowRight`, `Start`, `Select`, `A` and `B`.
+Or skip the component and drive `press()` / `release()` from the context yourself, using the key names `ArrowUp`, `ArrowDown`, `ArrowLeft`, `ArrowRight`, `Start`, `Select`, `A`, `B`, `L` and `R`.
 
 ## Persistence
 

@@ -24,6 +24,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * `GbaEmulator` TypeScript class for running GBA ROMs in the browser
 * `PadKey::L` and `PadKey::R` shoulder button variants for GBA input
 * Basic GBA link port emulation with no-partner behavior
+* Headless `GbaCore` in the `boytacean-core` package, carrying the GBA emulation logic without any React, EmuKit UI or bundler-specific dependency
+* Support for the GBA in the `boytacean-react` package, through a `system` property that selects the core to be built and falls back to the inference of the system from the extension of the ROM
+* Mapping of the `Q` and `W` keys to the shoulder buttons of the GBA in the default key mapping of the React package
 
 ### Changed
 
