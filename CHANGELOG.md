@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-*
+* Faster and more resilient release builds through caching of native dependencies
 
 ### Fixed
 

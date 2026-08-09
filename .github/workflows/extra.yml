@@ -25,6 +25,8 @@ jobs:
             ~/vcpkg
             target/vcpkg
           key: vcpkg-${{ runner.os }}-${{ hashFiles('frontends/sdl/Cargo.toml') }}
+          restore-keys: |
+            vcpkg-${{ runner.os }}-
       - name: Setup SDL
         run: |
           cd frontends/sdl
@@ -67,6 +69,8 @@ jobs:
             ~/vcpkg
             target/vcpkg
           key: vcpkg-${{ runner.os }}-${{ hashFiles('frontends/sdl/Cargo.toml') }}
+          restore-keys: |
+            vcpkg-${{ runner.os }}-
       - name: Setup SDL
         run: |
           cd frontends/sdl

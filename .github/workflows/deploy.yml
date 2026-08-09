@@ -14,6 +14,17 @@ jobs:
         uses: actions/checkout@v6
       - name: Build Base
         run: cargo build --release
+      - name: Cache SDL build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.vcpkg-root
+            ~/.cache/vcpkg
+            ~/vcpkg
+            target/vcpkg
+          key: vcpkg-${{ runner.os }}-${{ hashFiles('frontends/sdl/Cargo.toml') }}
+          restore-keys: |
+            vcpkg-${{ runner.os }}-
       - name: Build SDL
         run: |
           cd frontends/sdl
@@ -56,6 +67,17 @@ jobs:
           rustup default stable-msvc
       - name: Build Base
         run: cargo build --release
+      - name: Cache SDL build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.vcpkg-root
+            ~/.cache/vcpkg
+            ~/vcpkg
+            target/vcpkg
+          key: vcpkg-${{ runner.os }}-${{ hashFiles('frontends/sdl/Cargo.toml') }}
+          restore-keys: |
+            vcpkg-${{ runner.os }}-
       - name: Build SDL
         run: |
           cd frontends/sdl
@@ -91,6 +113,17 @@ jobs:
           rustup override set 1.86.0
       - name: Build Base
         run: cargo build --release
+      - name: Cache SDL build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.vcpkg-root
+            ~/.cache/vcpkg
+            ~/vcpkg
+            target/vcpkg
+          key: vcpkg-${{ runner.os }}-${{ hashFiles('frontends/sdl/Cargo.toml') }}
+          restore-keys: |
+            vcpkg-${{ runner.os }}-
       - name: Build SDL
         run: |
           cd frontends/sdl
