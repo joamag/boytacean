@@ -164,7 +164,7 @@ jobs:
       - name: Build WASM
         run: wasm-pack build --release --target=web --out-dir=frontends/web/lib -- --features wasm
       - name: Install Node.js 18
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 18
       - name: Build Web code
