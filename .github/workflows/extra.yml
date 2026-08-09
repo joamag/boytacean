@@ -17,7 +17,7 @@ jobs:
           rustup override set 1.86.0
           rustup default stable-msvc
       - name: Cache SDL build
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.vcpkg-root
@@ -61,7 +61,7 @@ jobs:
           rustup install 1.86.0
           rustup override set 1.86.0
       - name: Cache SDL build
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.vcpkg-root

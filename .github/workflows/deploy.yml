@@ -15,7 +15,7 @@ jobs:
       - name: Build Base
         run: cargo build --release
       - name: Cache SDL build
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.vcpkg-root
@@ -68,7 +68,7 @@ jobs:
       - name: Build Base
         run: cargo build --release
       - name: Cache SDL build
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.vcpkg-root
@@ -114,7 +114,7 @@ jobs:
       - name: Build Base
         run: cargo build --release
       - name: Cache SDL build
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.vcpkg-root
