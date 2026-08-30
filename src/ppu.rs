@@ -2597,21 +2597,21 @@ impl StateComponent for Ppu {
         self.vram_offset = read_u16(&mut cursor)?;
 
         if format == StateFormat::Full {
-            for index in 0..TILE_COUNT {
+            for slot in &mut self.tiles[..TILE_COUNT] {
                 let mut tile = [0u8; 64];
                 read_into(&mut cursor, &mut tile)?;
-                self.tiles[index] = (&tile[..]).into();
+                *slot = (&tile[..]).into();
             }
-            for index in 0..OBJ_COUNT {
+            for slot in &mut self.obj_data[..OBJ_COUNT] {
                 let mut obj_data = [0u8; 12];
                 read_into(&mut cursor, &mut obj_data)?;
-                self.obj_data[index] = (&obj_data[..]).into();
+                *slot = (&obj_data[..]).into();
             }
             read_into(&mut cursor, &mut self.palettes)?;
-            for index in 0..2 {
+            for slot in &mut self.palettes_color[..2] {
                 let mut palette_color = [0u8; 64];
                 read_into(&mut cursor, &mut palette_color)?;
-                self.palettes_color[index] = palette_color;
+                *slot = palette_color;
             }
         }
 
