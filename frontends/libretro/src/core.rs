@@ -14,7 +14,7 @@ use boytacean::{
     info::Info,
     infoln,
     pad::PadKey,
-    ppu::{DISPLAY_HEIGHT, DISPLAY_WIDTH, FRAME_BUFFER_SIZE},
+    ppu::{DISPLAY_HEIGHT, DISPLAY_SIZE, DISPLAY_WIDTH},
     rom::Cartridge,
     state::{SaveStateFormat, StateManager},
     warnln,
@@ -52,7 +52,7 @@ struct LibRetroInfo {
 
 static mut EMULATOR: Option<GameBoy> = None;
 static mut KEY_STATES: Option<HashMap<RetroJoypad, bool>> = None;
-static mut FRAME_BUFFER: [u32; FRAME_BUFFER_SIZE] = [0x00; FRAME_BUFFER_SIZE];
+static mut FRAME_BUFFER: [u32; DISPLAY_SIZE] = [0x00; DISPLAY_SIZE];
 static mut INFO: LibRetroInfo = LibRetroInfo {
     name: "",
     version: "",

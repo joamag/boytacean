@@ -1266,10 +1266,10 @@ impl Ppu {
         buffer
     }
 
-    pub fn frame_buffer_xrgb8888_u32(&mut self) -> [u32; FRAME_BUFFER_SIZE] {
+    pub fn frame_buffer_xrgb8888_u32(&mut self) -> [u32; DISPLAY_SIZE] {
         let frame_buffer = self.frame_buffer();
-        let mut buffer = [0u32; FRAME_BUFFER_SIZE];
-        for (index, pixel) in buffer.iter_mut().enumerate().take(DISPLAY_SIZE) {
+        let mut buffer = [0u32; DISPLAY_SIZE];
+        for (index, pixel) in buffer.iter_mut().enumerate() {
             let (r, g, b) = (
                 frame_buffer[index * RGB_SIZE],
                 frame_buffer[index * RGB_SIZE + 1],
@@ -1287,10 +1287,10 @@ impl Ppu {
         buffer
     }
 
-    pub fn frame_buffer_rgb1555_u16(&mut self) -> [u16; FRAME_BUFFER_SIZE] {
+    pub fn frame_buffer_rgb1555_u16(&mut self) -> [u16; DISPLAY_SIZE] {
         let frame_buffer = self.frame_buffer();
-        let mut buffer = [0u16; FRAME_BUFFER_SIZE];
-        for (index, pixel) in buffer.iter_mut().enumerate().take(DISPLAY_SIZE) {
+        let mut buffer = [0u16; DISPLAY_SIZE];
+        for (index, pixel) in buffer.iter_mut().enumerate() {
             let (r, g, b) = (
                 frame_buffer[index * RGB_SIZE],
                 frame_buffer[index * RGB_SIZE + 1],
@@ -1317,10 +1317,10 @@ impl Ppu {
         buffer
     }
 
-    pub fn frame_buffer_rgb565_u16(&mut self) -> [u16; FRAME_BUFFER_SIZE] {
+    pub fn frame_buffer_rgb565_u16(&mut self) -> [u16; DISPLAY_SIZE] {
         let frame_buffer = self.frame_buffer();
-        let mut buffer = [0u16; FRAME_BUFFER_SIZE];
-        for (index, pixel) in buffer.iter_mut().enumerate().take(DISPLAY_SIZE) {
+        let mut buffer = [0u16; DISPLAY_SIZE];
+        for (index, pixel) in buffer.iter_mut().enumerate() {
             let (r, g, b) = (
                 frame_buffer[index * RGB_SIZE],
                 frame_buffer[index * RGB_SIZE + 1],
@@ -2666,8 +2666,10 @@ impl Default for Ppu {
 #[cfg(test)]
 mod tests {
     use super::{
-        ObjectData, Ppu, PpuMode, Tile, COLOR_BUFFER_SIZE, FRAME_BUFFER_SIZE, HRAM_SIZE, OAM_SIZE,
-        OBJ_COUNT, SHADE_BUFFER_SIZE, TILE_COUNT, TILE_HEIGHT_I, TILE_WIDTH_I, VRAM_SIZE,
+        rgb888_to_rgb1555_u16, rgb888_to_rgb565_u16, ObjectData, Ppu, PpuMode, Tile,
+        COLOR_BUFFER_SIZE, DISPLAY_SIZE, FRAME_BUFFER_SIZE, HRAM_SIZE, OAM_SIZE, OBJ_COUNT,
+        RGB1555_SIZE, RGB565_SIZE, RGB_SIZE, SHADE_BUFFER_SIZE, TILE_COUNT, TILE_HEIGHT_I,
+        TILE_WIDTH_I, VRAM_SIZE, XRGB8888_SIZE,
     };
     use crate::{
         consts::LCDC_ADDR,
@@ -2786,6 +2788,87 @@ mod tests {
         assert_eq!(ppu.color_buffer[87], 3);
         assert_eq!(ppu.color_buffer[88], 0);
         assert_eq!(ppu.color_buffer[159], 0);
+    }
+
+    /// Fills the frame buffer with a per pixel pattern, switching the
+    /// PPU to CGB mode so that the raw frame buffer is used.
+    fn fill_frame_buffer_pattern(ppu: &mut Ppu) {
+        ppu.set_gb_mode(GameBoyMode::Cgb);
+        for (index, pixel) in ppu.frame_buffer.chunks_mut(RGB_SIZE).enumerate() {
+            pixel.copy_from_slice(&frame_buffer_pixel(index));
+        }
+    }
+
+    /// Obtains the RGB pattern value of the pixel at the provided index,
+    /// the three channels are made to differ from each other and each one
+    /// of them spans the complete 8 bit range, so that both a channel swap
+    /// and a too narrow channel mask are detected.
+    fn frame_buffer_pixel(index: usize) -> [u8; RGB_SIZE] {
+        [index as u8, (index >> 3) as u8, !(index as u8)]
+    }
+
+    /// Tests that the u32 version of the XRGB8888 frame buffer is
+    /// pixel sized and matches the byte version of the conversion.
+    #[test]
+    fn test_frame_buffer_xrgb8888_u32() {
+        let mut ppu = Ppu::default();
+        fill_frame_buffer_pattern(&mut ppu);
+
+        let buffer = ppu.frame_buffer_xrgb8888_u32();
+        let bytes = ppu.frame_buffer_xrgb8888();
+        assert_eq!(buffer.len(), DISPLAY_SIZE);
+        for (index, pixel) in buffer.iter().enumerate() {
+            let [r, g, b] = frame_buffer_pixel(index);
+            assert_eq!(*pixel, ((r as u32) << 16) | ((g as u32) << 8) | b as u32);
+
+            // only the three color channels are compared as the byte
+            // version sets the unused byte to 0xff while the packed
+            // one leaves it unset
+            assert_eq!(
+                &pixel.to_le_bytes()[..RGB_SIZE],
+                &bytes[index * XRGB8888_SIZE..index * XRGB8888_SIZE + RGB_SIZE]
+            );
+        }
+    }
+
+    /// Tests that the u16 version of the RGB1555 frame buffer is
+    /// pixel sized and matches the byte version of the conversion.
+    #[test]
+    fn test_frame_buffer_rgb1555_u16() {
+        let mut ppu = Ppu::default();
+        fill_frame_buffer_pattern(&mut ppu);
+
+        let buffer = ppu.frame_buffer_rgb1555_u16();
+        let bytes = ppu.frame_buffer_rgb1555();
+        assert_eq!(buffer.len(), DISPLAY_SIZE);
+        for (index, pixel) in buffer.iter().enumerate() {
+            let [r, g, b] = frame_buffer_pixel(index);
+            assert_eq!(*pixel, rgb888_to_rgb1555_u16(r, g, b));
+            assert_eq!(
+                &pixel.to_le_bytes()[..],
+                &bytes[index * RGB1555_SIZE..(index + 1) * RGB1555_SIZE]
+            );
+        }
+    }
+
+    /// Tests that the u16 version of the RGB565 frame buffer is
+    /// pixel sized and matches the byte version of the conversion.
+    #[test]
+    fn test_frame_buffer_rgb565_u16() {
+        let mut ppu = Ppu::default();
+        fill_frame_buffer_pattern(&mut ppu);
+
+        let buffer = ppu.frame_buffer_rgb565_u16();
+        let bytes = ppu.frame_buffer_rgb565();
+        assert_eq!(buffer.len(), DISPLAY_SIZE);
+        for (index, pixel) in buffer.iter().enumerate() {
+            let [r, g, b] = frame_buffer_pixel(index);
+            assert_eq!(*pixel, rgb888_to_rgb565_u16(r, g, b));
+            assert_eq!(
+                &pixel.to_le_bytes()[..],
+                &bytes[index * RGB565_SIZE..(index + 1) * RGB565_SIZE]
+            );
+        }
     }
 
     #[test]

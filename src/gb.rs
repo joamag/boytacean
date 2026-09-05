@@ -50,7 +50,7 @@ use crate::{
     mmu::Mmu,
     pad::{Pad, PadKey},
     ppu::{
-        Ppu, PpuMode, Tile, DISPLAY_HEIGHT, DISPLAY_WIDTH, FRAME_BUFFER_RGB1555_SIZE,
+        Ppu, PpuMode, Tile, DISPLAY_HEIGHT, DISPLAY_SIZE, DISPLAY_WIDTH, FRAME_BUFFER_RGB1555_SIZE,
         FRAME_BUFFER_RGB565_SIZE, FRAME_BUFFER_RGBA_SIZE, FRAME_BUFFER_SIZE,
         FRAME_BUFFER_XRGB8888_SIZE,
     },
@@ -1301,7 +1301,7 @@ impl GameBoy {
         self.ppu().frame_buffer_xrgb8888()
     }
 
-    pub fn frame_buffer_xrgb8888_u32(&mut self) -> [u32; FRAME_BUFFER_SIZE] {
+    pub fn frame_buffer_xrgb8888_u32(&mut self) -> [u32; DISPLAY_SIZE] {
         self.ppu().frame_buffer_xrgb8888_u32()
     }
 
@@ -1309,7 +1309,7 @@ impl GameBoy {
         self.ppu().frame_buffer_rgb1555()
     }
 
-    pub fn frame_buffer_rgb1555_u16(&mut self) -> [u16; FRAME_BUFFER_SIZE] {
+    pub fn frame_buffer_rgb1555_u16(&mut self) -> [u16; DISPLAY_SIZE] {
         self.ppu().frame_buffer_rgb1555_u16()
     }
 
@@ -1317,7 +1317,7 @@ impl GameBoy {
         self.ppu().frame_buffer_rgb565()
     }
 
-    pub fn frame_buffer_rgb565_u16(&mut self) -> [u16; FRAME_BUFFER_SIZE] {
+    pub fn frame_buffer_rgb565_u16(&mut self) -> [u16; DISPLAY_SIZE] {
         self.ppu().frame_buffer_rgb565_u16()
     }
 
@@ -1776,7 +1776,8 @@ impl Display for GameBoy {
 
 #[cfg(test)]
 mod tests {
-    use super::GameBoySpeed;
+    use super::{GameBoy, GameBoyMode, GameBoySpeed};
+    use crate::ppu::DISPLAY_SIZE;
 
     /// Tests that the speed shift value is equivalent to a division
     /// by the speed multiplier when normalizing cycle counts.
@@ -1786,6 +1787,37 @@ mod tests {
             for cycles in [0u16, 4, 8, 12, 16, 20, 24] {
                 assert_eq!(cycles >> speed.shift(), cycles / speed.multiplier() as u16);
             }
+        }
+    }
+
+    /// Tests that the pixel packed frame buffers are display sized and
+    /// that each one of them is converted using the expected format.
+    #[test]
+    fn test_frame_buffer_packed() {
+        let mut game_boy = GameBoy::new(Some(GameBoyMode::Dmg));
+
+        // sets a palette with a distinctive first color so that the three
+        // packed formats produce different values for it, the green channel
+        // is high enough to make use of the extra bit it has in RGB565
+        game_boy.ppu().set_palette_colors(&[
+            [0x12, 0xb4, 0x56],
+            [0x9a, 0xbc, 0xde],
+            [0x21, 0x43, 0x65],
+            [0xed, 0xcb, 0xa9],
+        ]);
+
+        let xrgb8888 = game_boy.frame_buffer_xrgb8888_u32();
+        let rgb1555 = game_boy.frame_buffer_rgb1555_u16();
+        let rgb565 = game_boy.frame_buffer_rgb565_u16();
+
+        assert_eq!(xrgb8888.len(), DISPLAY_SIZE);
+        assert_eq!(rgb1555.len(), DISPLAY_SIZE);
+        assert_eq!(rgb565.len(), DISPLAY_SIZE);
+
+        for index in 0..DISPLAY_SIZE {
+            assert_eq!(xrgb8888[index], 0x0012b456, "at index {index}");
+            assert_eq!(rgb1555[index], 0x8aca, "at index {index}");
+            assert_eq!(rgb565[index], 0x15aa, "at index {index}");
         }
     }
 }
