@@ -9,17 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-* `README.md` for the `boytacean-react` package, documenting the components, props, hooks and keys, with a quick start, a complete emulation page example and copy and paste instructions to build one from scratch
+* Documentation for the React package, covering components, hooks and keys with a complete quick start
 
 ### Changed
 
 * Faster and more resilient release builds through caching of native dependencies
+* Smaller and faster pixel packed frame buffers, which no longer carry two thirds of unused space
 
 ### Fixed
 
-* Resolution of the default WASM binary path in `boytacean-core`, which pointed at a `lib` directory that only exists in the repository and therefore failed whenever the package was installed from npm
-* Build of the web front-end, which was broken by the resolution of the WASM binary through a bare specifier, as Parcel resolves those at build time and the `boytacean` package is aliased to a local file
-* CI builds on older Rust versions, which broke when new dependency releases raised their minimum supported Rust version
+* Loading of the default WASM binary when the core package is installed from npm
+* Build of the web front-end after the change in the WASM binary resolution
+* Builds on older Rust versions after dependency releases raised their minimum supported version
 
 ## [0.13.2] - 2026-07-28
 
