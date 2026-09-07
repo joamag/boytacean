@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * Faster and more resilient release builds through caching of native dependencies
 * Smaller and faster pixel packed frame buffers, which no longer carry two thirds of unused space
+* Faster pixel drawing, worth up to 10% more frames per second in Game Boy Color games
 
 ### Fixed
 
