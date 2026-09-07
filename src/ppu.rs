@@ -1237,12 +1237,10 @@ impl Ppu {
             return &self.frame_buffer;
         }
 
-        for (index, pixel) in self.frame_buffer.chunks_mut(RGB_SIZE).enumerate() {
+        for (index, pixel) in self.frame_buffer.chunks_exact_mut(RGB_SIZE).enumerate() {
             let shade_index = self.shade_buffer[index];
             let color = &self.palette_colors[shade_index as usize];
-            pixel[0] = color[0];
-            pixel[1] = color[1];
-            pixel[2] = color[2];
+            pixel.copy_from_slice(color);
         }
 
         self.frame_buffer_index = self.frame_index;
@@ -1363,16 +1361,14 @@ impl Ppu {
     pub fn frame_buffer_palette(&self, palette_colors: &Palette) -> [u8; FRAME_BUFFER_SIZE] {
         if self.gb_mode == GameBoyMode::Dmg {
             let mut buffer = [0u8; FRAME_BUFFER_SIZE];
-            for (index, pixel) in buffer.chunks_mut(RGB_SIZE).enumerate() {
+            for (index, pixel) in buffer.chunks_exact_mut(RGB_SIZE).enumerate() {
                 let shade_index = self.shade_buffer[index];
                 let color = &palette_colors[shade_index as usize];
-                pixel[0] = color[0];
-                pixel[1] = color[1];
-                pixel[2] = color[2];
+                pixel.copy_from_slice(color);
             }
             buffer
         } else {
-            *self.frame_buffer.clone()
+            *self.frame_buffer
         }
     }
 
@@ -1539,10 +1535,8 @@ impl Ppu {
         self.color_buffer.fill(0);
         self.shade_buffer.fill(shade_index);
         self.frame_buffer_index = u16::MAX;
-        for pixel in self.frame_buffer.chunks_mut(RGB_SIZE) {
-            pixel[0] = color[0];
-            pixel[1] = color[1];
-            pixel[2] = color[2];
+        for pixel in self.frame_buffer.chunks_exact_mut(RGB_SIZE) {
+            pixel.copy_from_slice(color);
         }
     }
 
@@ -1956,9 +1950,7 @@ impl Ppu {
             // re-maps the pixel according to the current palette
             // and sets the color pixel in the frame buffer
             let color = &palette[pixel as usize];
-            self.frame_buffer[frame_offset] = color[0];
-            self.frame_buffer[frame_offset + 1] = color[1];
-            self.frame_buffer[frame_offset + 2] = color[2];
+            self.frame_buffer[frame_offset..frame_offset + RGB_SIZE].copy_from_slice(color);
 
             // updates the priority buffer with the current pixel
             // the priority is only set in case the priority of
@@ -2334,9 +2326,9 @@ impl Ppu {
                         // re-maps the pixel according to the object palette
                         // and then sets the color pixel in the frame buffer
                         let color = &palette[pixel as usize];
-                        self.frame_buffer[frame_offset as usize] = color[0];
-                        self.frame_buffer[frame_offset as usize + 1] = color[1];
-                        self.frame_buffer[frame_offset as usize + 2] = color[2];
+                        let frame_offset = frame_offset as usize;
+                        self.frame_buffer[frame_offset..frame_offset + RGB_SIZE]
+                            .copy_from_slice(color);
                     }
                 }
             }
@@ -2666,13 +2658,13 @@ impl Default for Ppu {
 #[cfg(test)]
 mod tests {
     use super::{
-        rgb888_to_rgb1555_u16, rgb888_to_rgb565_u16, ObjectData, Ppu, PpuMode, Tile,
-        COLOR_BUFFER_SIZE, DISPLAY_SIZE, FRAME_BUFFER_SIZE, HRAM_SIZE, OAM_SIZE, OBJ_COUNT,
-        RGB1555_SIZE, RGB565_SIZE, RGB_SIZE, SHADE_BUFFER_SIZE, TILE_COUNT, TILE_HEIGHT_I,
-        TILE_WIDTH_I, VRAM_SIZE, XRGB8888_SIZE,
+        rgb888_to_rgb1555_u16, rgb888_to_rgb565_u16, ObjectData, Palette, Ppu, PpuMode, Tile,
+        COLOR_BUFFER_SIZE, DISPLAY_SIZE, DISPLAY_WIDTH, FRAME_BUFFER_SIZE, HRAM_SIZE, OAM_SIZE,
+        OBJ_COUNT, RGB1555_SIZE, RGB565_SIZE, RGB_SIZE, SHADE_BUFFER_SIZE, TILE_COUNT,
+        TILE_HEIGHT_I, TILE_WIDTH_I, VRAM_SIZE, XRGB8888_SIZE,
     };
     use crate::{
-        consts::LCDC_ADDR,
+        consts::{BGP_ADDR, LCDC_ADDR, OBP0_ADDR, OBP1_ADDR},
         gb::GameBoyMode,
         state::{StateComponent, StateFormat},
     };
@@ -2790,6 +2782,46 @@ mod tests {
         assert_eq!(ppu.color_buffer[159], 0);
     }
 
+    /// Palette with four distinctive colors, used to verify that the
+    /// shade index of each pixel is mapped to the correct color.
+    const TEST_PALETTE: Palette = [
+        [0x12, 0x34, 0x56],
+        [0x9a, 0xbc, 0xde],
+        [0x21, 0x43, 0x65],
+        [0xed, 0xcb, 0xa9],
+    ];
+
+    /// Tests that the DMG frame buffer is expanded from the shade buffer
+    /// using the current palette colors, and that the expansion is only
+    /// run again once a new frame has been drawn.
+    #[test]
+    fn test_frame_buffer_dmg_expansion() {
+        let mut ppu = Ppu::default();
+        ppu.set_palette_colors(&TEST_PALETTE);
+
+        // assigns a different shade to each one of the first four pixels
+        // so that the complete palette is exercised
+        for (index, shade) in ppu.shade_buffer.iter_mut().take(4).enumerate() {
+            *shade = index as u8;
+        }
+
+        let frame_buffer = ppu.frame_buffer();
+        for index in 0..4 {
+            assert_eq!(
+                &frame_buffer[index * RGB_SIZE..(index + 1) * RGB_SIZE],
+                &TEST_PALETTE[index]
+            );
+        }
+
+        // the expansion is cached per frame, so a shade change that is not
+        // followed by a new frame must not be reflected in the frame buffer
+        ppu.shade_buffer[0] = 3;
+        assert_eq!(&ppu.frame_buffer()[0..RGB_SIZE], &TEST_PALETTE[0]);
+
+        ppu.frame_index = ppu.frame_index.wrapping_add(1);
+        assert_eq!(&ppu.frame_buffer()[0..RGB_SIZE], &TEST_PALETTE[3]);
+    }
+
     /// Fills the frame buffer with a per pixel pattern, switching the
     /// PPU to CGB mode so that the raw frame buffer is used.
     fn fill_frame_buffer_pattern(ppu: &mut Ppu) {
@@ -2871,6 +2903,45 @@ mod tests {
         }
     }
 
+    /// Tests that the palette mapping of the frame buffer uses the
+    /// provided palette in DMG mode and the already expanded frame
+    /// buffer in the remaining modes.
+    #[test]
+    fn test_frame_buffer_palette() {
+        let mut ppu = Ppu::default();
+        ppu.shade_buffer[0] = 3;
+
+        let buffer = ppu.frame_buffer_palette(&TEST_PALETTE);
+        assert_eq!(&buffer[0..RGB_SIZE], &TEST_PALETTE[3]);
+        assert_eq!(&buffer[RGB_SIZE..RGB_SIZE * 2], &TEST_PALETTE[0]);
+
+        // in CGB mode the frame buffer is already expanded, so both the
+        // shade buffer and the provided palette must be ignored
+        ppu.set_gb_mode(GameBoyMode::Cgb);
+        ppu.frame_buffer[0] = 0xaa;
+
+        let buffer = ppu.frame_buffer_palette(&TEST_PALETTE);
+        assert_eq!(buffer[0], 0xaa);
+    }
+
+    /// Tests that filling the frame buffer sets every pixel to the color
+    /// of the requested shade and resets the auxiliary buffers.
+    #[test]
+    fn test_fill_frame_buffer() {
+        let mut ppu = Ppu::default();
+        ppu.set_palette_colors(&TEST_PALETTE);
+        ppu.color_buffer[0] = 3;
+
+        ppu.fill_frame_buffer(2);
+
+        assert_eq!(ppu.frame_buffer_index, u16::MAX);
+        assert!(ppu.color_buffer.iter().all(|value| *value == 0));
+        assert!(ppu.shade_buffer.iter().all(|value| *value == 2));
+        for pixel in ppu.frame_buffer.chunks_exact(RGB_SIZE) {
+            assert_eq!(pixel, &TEST_PALETTE[2]);
+        }
+    }
+
     #[test]
     fn test_update_tile_simple() {
         let mut ppu = Ppu::default();
@@ -2897,6 +2968,231 @@ mod tests {
         ppu.update_tile(0x9000, 0x00);
         let result = ppu.tiles()[256].get(0, 0);
         assert_eq!(result, 3);
+    }
+
+    /// Tests that the CGB background rendering maps each tile pixel
+    /// through the color palette selected by the tile attributes and
+    /// writes the resulting color into the frame buffer.
+    #[test]
+    fn test_render_map_cgb() {
+        let mut ppu = Ppu::default();
+        ppu.set_gb_mode(GameBoyMode::Cgb);
+
+        // fills the first tile of the base tile data area (0x8000) with
+        // pixels of the color 1, the remaining tiles are left as color 0
+        for addr in (0x8000..0x8010).step_by(2) {
+            ppu.write(addr, 0xff);
+            ppu.write(addr + 1, 0x00);
+        }
+
+        // sets the color 1 of the first background palette to red, the
+        // palette data is written as a little endian RGB555 value
+        ppu.write(0xff68, 0x80 | 0x02);
+        ppu.write(0xff69, 0x1f);
+        ppu.write(0xff69, 0x00);
+
+        // switches the LCD on with both the background and the base tile
+        // data area (0x8000) selected and runs a complete Mode 3 period
+        ppu.write(LCDC_ADDR, 0x91);
+        ppu.mode = PpuMode::VramRead;
+        ppu.mode_clock = 0;
+        ppu.ly = 0;
+        ppu.clock(172);
+
+        assert_eq!(ppu.mode(), PpuMode::HBlank);
+        assert_eq!(ppu.color_buffer[0], 1);
+        assert_eq!(&ppu.frame_buffer[0..RGB_SIZE], &[0xf8, 0x00, 0x00]);
+        assert_eq!(
+            &ppu.frame_buffer[(DISPLAY_WIDTH - 1) * RGB_SIZE..DISPLAY_WIDTH * RGB_SIZE],
+            &[0xf8, 0x00, 0x00]
+        );
+    }
+
+    /// Tests that the CGB background rendering honours the tile
+    /// attributes, applying the horizontal flip, the tile palette and
+    /// the background to object priority of the tile in drawing.
+    #[test]
+    fn test_render_map_cgb_attributes() {
+        let mut ppu = Ppu::default();
+        ppu.set_gb_mode(GameBoyMode::Cgb);
+
+        // fills the first tile with a single pixel of the color 1 at the
+        // left of every row, making the horizontal flip observable
+        for addr in (0x8000..0x8010).step_by(2) {
+            ppu.write(addr, 0x80);
+            ppu.write(addr + 1, 0x00);
+        }
+
+        // sets the color 1 of the second background palette to green
+        ppu.write(0xff68, 0x80 | 0x0a);
+        ppu.write(0xff69, 0xe0);
+        ppu.write(0xff69, 0x03);
+
+        // assigns the second palette, the horizontal flip and the
+        // priority to the first tile of the background map, the tile
+        // attributes live in the second VRAM bank
+        ppu.write(0xff4f, 0x01);
+        ppu.write(0x9800, 0xa1);
+        ppu.write(0xff4f, 0x00);
+
+        ppu.write(LCDC_ADDR, 0x91);
+        ppu.mode = PpuMode::VramRead;
+        ppu.mode_clock = 0;
+        ppu.ly = 0;
+        ppu.clock(172);
+
+        // the horizontal flip moves the single pixel of the tile from
+        // the left to the right of it
+        assert_eq!(ppu.color_buffer[0], 0);
+        assert_eq!(ppu.color_buffer[7], 1);
+        assert_eq!(
+            &ppu.frame_buffer[7 * RGB_SIZE..8 * RGB_SIZE],
+            &[0x00, 0xf8, 0x00]
+        );
+
+        // the priority is only captured by the pixels that are not
+        // transparent, meaning the ones with a color other than zero
+        assert!(!ppu.priority_buffer[0]);
+        assert!(ppu.priority_buffer[7]);
+    }
+
+    /// Tests that an object is drawn over the background, mapping its
+    /// pixels through the object palette into the frame buffer and
+    /// leaving the background pixels outside of it untouched.
+    #[test]
+    fn test_render_objects() {
+        let mut ppu = Ppu::default();
+        ppu.set_palette_colors(&TEST_PALETTE);
+
+        // fills the second tile of the base tile data area (0x8010) with
+        // pixels of the color 1, the first tile (used by the background)
+        // is left as color 0
+        for addr in (0x8010..0x8020).step_by(2) {
+            ppu.write(addr, 0xff);
+            ppu.write(addr + 1, 0x00);
+        }
+
+        // positions a single object at the top left corner of the display
+        // using the second tile, the Y and X values are offset by the
+        // hardware defined 16 and 8 values
+        ppu.write(0xfe00, 16);
+        ppu.write(0xfe01, 8);
+        ppu.write(0xfe02, 0x01);
+        ppu.write(0xfe03, 0x00);
+
+        // maps the color 1 of the first object palette to the shade 3
+        ppu.write(OBP0_ADDR, 0x0c);
+
+        // switches the LCD on with the background, the objects and the
+        // base tile data area (0x8000) selected
+        ppu.write(LCDC_ADDR, 0x93);
+        ppu.mode = PpuMode::VramRead;
+        ppu.mode_clock = 0;
+        ppu.ly = 0;
+        ppu.clock(172);
+
+        assert_eq!(ppu.mode(), PpuMode::HBlank);
+
+        // the eight pixels of the object are drawn using the shade 3 of
+        // the object palette, while the background keeps the shade 0
+        assert_eq!(ppu.color_buffer[0], 1);
+        assert_eq!(ppu.shade_buffer[0], 3);
+        assert_eq!(&ppu.frame_buffer[0..RGB_SIZE], &TEST_PALETTE[3]);
+        assert_eq!(
+            &ppu.frame_buffer[7 * RGB_SIZE..8 * RGB_SIZE],
+            &TEST_PALETTE[3]
+        );
+
+        assert_eq!(ppu.color_buffer[8], 0);
+        assert_eq!(ppu.shade_buffer[8], 0);
+        assert_eq!(
+            &ppu.frame_buffer[8 * RGB_SIZE..9 * RGB_SIZE],
+            &TEST_PALETTE[0]
+        );
+    }
+
+    /// Tests that an 8x16 object flipped in both axis draws the row of
+    /// the bottom tile that corresponds to the flipped position, using
+    /// the second object palette.
+    #[test]
+    fn test_render_objects_double_height_flipped() {
+        let mut ppu = Ppu::default();
+        ppu.set_palette_colors(&TEST_PALETTE);
+
+        // fills the fourth tile, the bottom one of the object, with a
+        // single pixel of the color 1 at the left of every row
+        for addr in (0x8030..0x8040).step_by(2) {
+            ppu.write(addr, 0x80);
+            ppu.write(addr + 1, 0x00);
+        }
+
+        // positions an 8x16 object flipped in both axis and using the
+        // second object palette, the tiles in use are the 2 and the 3
+        ppu.write(0xfe00, 16);
+        ppu.write(0xfe01, 8);
+        ppu.write(0xfe02, 0x02);
+        ppu.write(0xfe03, 0x70);
+
+        ppu.write(OBP1_ADDR, 0x0c);
+
+        ppu.write(LCDC_ADDR, 0x96);
+        ppu.mode = PpuMode::VramRead;
+        ppu.mode_clock = 0;
+        ppu.ly = 0;
+        ppu.clock(172);
+
+        // the vertical flip selects the last row of the bottom tile for
+        // the first line, while the horizontal flip moves its single
+        // pixel from the left to the right of the object
+        assert_eq!(ppu.color_buffer[0], 0);
+        assert_eq!(ppu.color_buffer[7], 1);
+        assert_eq!(ppu.shade_buffer[7], 3);
+        assert_eq!(
+            &ppu.frame_buffer[7 * RGB_SIZE..8 * RGB_SIZE],
+            &TEST_PALETTE[3]
+        );
+    }
+
+    /// Tests that an object with the background over object flag set is
+    /// not drawn over the background pixels that are not transparent.
+    #[test]
+    fn test_render_objects_bg_priority() {
+        let mut ppu = Ppu::default();
+        ppu.set_palette_colors(&TEST_PALETTE);
+
+        // fills the second tile, used by the background, and the third
+        // tile, used by the object, with pixels of the color 1, the
+        // first tile is left empty as it is the one used by the
+        // remaining (unused) objects of the OAM
+        for addr in (0x8010..0x8030).step_by(2) {
+            ppu.write(addr, 0xff);
+            ppu.write(addr + 1, 0x00);
+        }
+
+        // points the first tile of the background map to the second tile
+        ppu.write(0x9800, 0x01);
+
+        // positions an object that must be drawn behind the background
+        ppu.write(0xfe00, 16);
+        ppu.write(0xfe01, 8);
+        ppu.write(0xfe02, 0x02);
+        ppu.write(0xfe03, 0x80);
+
+        // maps the background color 1 to the shade 1 and the object
+        // color 1 to the shade 3, so that both can be told apart
+        ppu.write(BGP_ADDR, 0x04);
+        ppu.write(OBP0_ADDR, 0x0c);
+
+        ppu.write(LCDC_ADDR, 0x93);
+        ppu.mode = PpuMode::VramRead;
+        ppu.mode_clock = 0;
+        ppu.ly = 0;
+        ppu.clock(172);
+
+        // the background pixel is not transparent, so the shade of the
+        // background is the one kept for the pixel
+        assert_eq!(ppu.color_buffer[0], 1);
+        assert_eq!(ppu.shade_buffer[0], 1);
     }
 
     #[test]
