@@ -298,9 +298,6 @@ mod tests {
         assert!(rgb1555_pixels.is_empty());
     }
 
-    /// Tests that a destination buffer that does not match the size of
-    /// the source one is rejected, as the conversion walks both buffers
-    /// in parallel and would otherwise convert only part of the source.
     #[test]
     #[should_panic(
         expected = "Length of rgb1555_pixels must be two thirds the length of rgb888_pixels"
