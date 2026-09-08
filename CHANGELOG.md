@@ -34,6 +34,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Faster GBA scanline composition, tile fetching and sprite scanning
 * Another round of GBA performance work making commercial games run about 1.5x faster
 * Faster GBA instruction fetching from the main memory regions
+* Lower GBA instruction overhead when running with inactive timers or waiting for the next timer overflow
+* Faster GBA timer overflow handling without losing cascade, interrupt or DirectSound events
 
 ### Fixed
 

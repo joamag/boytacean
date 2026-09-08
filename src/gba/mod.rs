@@ -169,33 +169,11 @@ impl GameBoyAdvance {
         let cycles = self.cpu.step();
 
         // clock timers
-        if self.timer_enabled {
-            let mut remaining = cycles;
-            while remaining > 0 {
-                let batch = remaining.min(self.cpu.bus.timers.cycles_to_next_overflow());
-                let overflows = self.cpu.bus.timers.clock(batch);
-                remaining -= batch;
-                if overflows != 0 {
-                    for i in 0..4 {
-                        if overflows & (1 << i) != 0 {
-                            if self.cpu.bus.timers.timers[i].irq_enable() {
-                                self.cpu.bus.irq.raise_timer(i);
-                            }
-                            // timer overflow triggers DirectSound FIFO
-                            if self.apu_enabled {
-                                self.cpu.bus.apu.timer_overflow(i);
-                                // trigger DMA FIFO refill if needed
-                                for fifo in 0..2 {
-                                    if self.cpu.bus.apu.direct_sound[fifo].timer_id == i
-                                        && self.cpu.bus.apu.direct_sound[fifo].needs_refill()
-                                    {
-                                        self.cpu.bus.dma.trigger_sound_fifo(fifo);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+        if self.timer_enabled && self.cpu.bus.timers.cycles_to_next_overflow() != u32::MAX {
+            if !self.cpu.bus.timers.will_event(cycles) {
+                self.cpu.bus.timers.advance(cycles);
+            } else {
+                self.clock_timers(cycles);
             }
         }
 
@@ -261,6 +239,39 @@ impl GameBoyAdvance {
         }
 
         cycles
+    }
+
+    /// Clocks timers at overflow boundaries, delivering every IRQ
+    /// and DirectSound event without enlarging the instruction path.
+    #[inline(never)]
+    fn clock_timers(&mut self, cycles: u32) {
+        let mut remaining = cycles;
+        while remaining > 0 {
+            let batch = remaining.min(self.cpu.bus.timers.cycles_to_next_overflow());
+            let overflows = self.cpu.bus.timers.clock(batch);
+            remaining -= batch;
+            if overflows != 0 {
+                for i in 0..4 {
+                    if overflows & (1 << i) != 0 {
+                        if self.cpu.bus.timers.timers[i].irq_enable() {
+                            self.cpu.bus.irq.raise_timer(i);
+                        }
+                        // timer overflow triggers DirectSound FIFO
+                        if self.apu_enabled {
+                            self.cpu.bus.apu.timer_overflow(i);
+                            // trigger DMA FIFO refill if needed
+                            for fifo in 0..2 {
+                                if self.cpu.bus.apu.direct_sound[fifo].timer_id == i
+                                    && self.cpu.bus.apu.direct_sound[fifo].needs_refill()
+                                {
+                                    self.cpu.bus.dma.trigger_sound_fifo(fifo);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     /// Processes pending DMA transfers.
@@ -549,6 +560,65 @@ mod tests {
         let mut gba = GameBoyAdvance::new();
         let cycles = gba.clock();
         assert!(cycles >= 1);
+    }
+
+    #[test]
+    fn test_clock_timer_enable_after_idle() {
+        for cascade in [false, true] {
+            let mut gba = GameBoyAdvance::new();
+            for i in 0..16 {
+                gba.cpu.bus.write32(0x0300_0000 + i * 4, 0xE1A00000); // mov r0, r0
+            }
+            gba.cpu.set_reg(15, 0x0300_0000);
+            if cascade {
+                gba.cpu.bus.timers.write_control(1, 0x84);
+            }
+            for _ in 0..10 {
+                assert_eq!(gba.clock(), 1);
+            }
+            assert_eq!(gba.cpu.bus.timers.read_counter(1), 0);
+            gba.cpu.bus.timers.write_reload(0, 0xFFFE);
+            gba.cpu.bus.timers.write_control(0, 0xC0);
+
+            assert_eq!(gba.clock(), 1);
+            assert_eq!(gba.cpu.bus.timers.read_counter(0), 0xFFFF);
+            assert_eq!(gba.cpu.bus.irq.if_(), 0);
+            assert_eq!(gba.clock(), 1);
+            assert_eq!(gba.cpu.bus.timers.read_counter(0), 0xFFFE);
+            assert_eq!(gba.cpu.bus.timers.read_counter(1), u16::from(cascade));
+            assert_eq!(gba.cpu.bus.irq.if_(), 8);
+        }
+    }
+
+    #[test]
+    fn test_clock_timer_boundary() {
+        let mut gba = GameBoyAdvance::new();
+        for i in 0..8 {
+            gba.cpu.bus.write32(0x0300_0000 + i * 4, 0xE1A00000); // mov r0, r0
+        }
+        gba.cpu.set_reg(15, 0x0300_0000);
+        gba.cpu.bus.timers.write_reload(0, 0xFFFC);
+        gba.cpu.bus.timers.write_control(0, 0xC0);
+        gba.cpu.bus.apu.direct_sound[0].write_fifo(0x04030201);
+
+        for _ in 0..3 {
+            assert_eq!(gba.clock(), 1);
+        }
+        assert_eq!(gba.cpu.bus.timers.read_counter(0), 0xFFFF);
+        assert_eq!(gba.cpu.bus.irq.if_(), 0);
+        assert_eq!(gba.cpu.bus.apu.direct_sound[0].fifo_len(), 4);
+
+        assert_eq!(gba.clock(), 1);
+        assert_eq!(gba.cpu.bus.timers.read_counter(0), 0xFFFC);
+        assert_eq!(gba.cpu.bus.irq.if_(), 8);
+        assert_eq!(gba.cpu.bus.apu.direct_sound[0].fifo_len(), 3);
+        assert_eq!(gba.cpu.bus.apu.direct_sound[0].current_sample(), 1);
+
+        gba.cpu.bus.irq.ack_if(8);
+        assert_eq!(gba.clock(), 1);
+        assert_eq!(gba.cpu.bus.timers.read_counter(0), 0xFFFD);
+        assert_eq!(gba.cpu.bus.irq.if_(), 0);
+        assert_eq!(gba.cpu.bus.apu.direct_sound[0].fifo_len(), 3);
     }
 
     #[test]

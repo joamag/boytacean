@@ -120,8 +120,11 @@ impl GbaTimer {
             self.prescaler_counter &= self.prescaler - 1;
             let total = self.counter as u32 + ticks;
             if total >= 0x10000 {
-                let period = 0x10000 - self.reload as u32;
-                self.counter = (self.reload as u32 + (total - 0x10000) % period) as u16;
+                self.counter = self.reload;
+                if total > 0x10000 {
+                    let period = 0x10000 - self.reload as u32;
+                    self.counter = (self.reload as u32 + (total - 0x10000) % period) as u16;
+                }
                 self.overflow = true;
             } else {
                 self.counter = total as u16;
@@ -241,6 +244,19 @@ impl GbaTimers {
         next
     }
 
+    /// Returns whether the given cycles reach the next batch boundary.
+    #[inline(always)]
+    pub fn will_event(&self, cycles: u32) -> bool {
+        self.pending_cycles.saturating_add(cycles) >= self.next_overflow
+    }
+
+    /// Accumulates cycles without processing timer events. Only valid
+    /// when [`Self::will_event`] returned false for the same cycles.
+    #[inline(always)]
+    pub fn advance(&mut self, cycles: u32) {
+        self.pending_cycles = self.pending_cycles.saturating_add(cycles);
+    }
+
     /// Clocks all 4 timers, handling cascade chains.
     ///
     /// Cycles are accumulated and processed in batches bounded by the
@@ -251,7 +267,7 @@ impl GbaTimers {
     /// Returns a bitmask of which timers overflowed (bit 0 = TM0, etc).
     #[inline(always)]
     pub fn clock(&mut self, cycles: u32) -> u8 {
-        self.pending_cycles = self.pending_cycles.saturating_add(cycles);
+        self.advance(cycles);
         if self.pending_cycles < self.next_overflow {
             return 0;
         }
@@ -295,6 +311,7 @@ impl GbaTimers {
             if self.timers[0].clock(batch) {
                 batch_overflows |= 1 << 0;
             }
+            let mut next = self.timers[0].cycles_to_overflow();
 
             // clock timers 1-3 with cascade support
             for i in 1..4 {
@@ -306,11 +323,12 @@ impl GbaTimers {
                 } else if self.timers[i].clock(batch) {
                     batch_overflows |= 1 << i;
                 }
+                next = next.min(self.timers[i].cycles_to_overflow());
             }
 
             overflows |= batch_overflows;
             cycles -= batch;
-            self.next_overflow = self.compute_next_overflow();
+            self.next_overflow = next;
         }
 
         overflows
@@ -387,6 +405,41 @@ mod tests {
         timer.set_control((1 << 7) | (1 << 2)); // enable + cascade
                                                 // cascade timers are not clocked by CPU cycles
         assert!(!timer.clock(1));
+    }
+
+    #[test]
+    fn test_timer_clock_exact_overflow() {
+        for (control, prescaler) in [(0x80, 1), (0x81, 64), (0x82, 256), (0x83, 1024)] {
+            let mut timer = GbaTimer::new();
+            timer.set_reload(0xFFFE);
+            timer.set_control(control);
+
+            assert!(timer.clock(prescaler * 2));
+            assert_eq!(timer.counter(), 0xFFFE);
+            assert!(timer.overflow());
+            assert!(!timer.clock(0));
+            assert_eq!(timer.counter(), 0xFFFE);
+            assert!(!timer.overflow());
+        }
+    }
+
+    #[test]
+    fn test_timer_clock_multiple_overflow_periods() {
+        for (reload, cycles, counter) in [
+            (0xFFFF, 16, 0xFFFF),
+            (0xFFF0, 0x31, 0xFFF1),
+            (0, 0x10001, 1),
+        ] {
+            let mut timer = GbaTimer::new();
+            timer.set_reload(reload);
+            timer.set_control(0x80);
+
+            assert!(timer.clock(cycles));
+            assert_eq!(timer.counter(), counter);
+            assert!(timer.overflow());
+            assert!(!timer.clock(0));
+            assert_eq!(timer.counter(), counter);
+        }
     }
 
     #[test]
@@ -504,6 +557,92 @@ mod tests {
     }
 
     #[test]
+    fn test_timers_will_event() {
+        let mut timers = GbaTimers::new();
+        assert!(!timers.will_event(0));
+        assert!(!timers.will_event(100));
+        timers.write_reload(0, 0xFFF8);
+        timers.write_control(0, 0x80);
+
+        assert!(!timers.will_event(7));
+        assert!(timers.will_event(8));
+        assert!(timers.will_event(9));
+        assert_eq!(timers.read_counter(0), 0xFFF8);
+
+        timers.advance(5);
+        assert!(!timers.will_event(2));
+        assert!(timers.will_event(3));
+        assert!(timers.will_event(u32::MAX));
+        assert_eq!(timers.read_counter(0), 0xFFFD);
+    }
+
+    #[test]
+    fn test_timers_advance() {
+        for (control, prescaler) in [(0x80, 1), (0x81, 64), (0x82, 256), (0x83, 1024)] {
+            let mut timers = GbaTimers::new();
+            timers.write_reload(0, 0xFFFE);
+            timers.write_control(0, control);
+            timers.write_control(1, 0x84);
+
+            assert!(!timers.will_event(prescaler * 2 - 1));
+            timers.advance(prescaler * 2 - 1);
+            assert_eq!(timers.read_counter(0), 0xFFFF);
+            assert_eq!(timers.read_counter(1), 0);
+            assert!(timers.will_event(1));
+            assert_eq!(timers.clock(1), 1);
+            assert_eq!(timers.read_counter(0), 0xFFFE);
+            assert_eq!(timers.read_counter(1), 1);
+        }
+    }
+
+    #[test]
+    fn test_timers_advance_write_reload() {
+        let mut timers = GbaTimers::new();
+        timers.write_reload(0, 0xFFF8);
+        timers.write_control(0, 0x80);
+        timers.advance(4);
+        timers.write_reload(0, 0xFFFE);
+
+        assert_eq!(timers.read_counter(0), 0xFFFC);
+        assert!(!timers.will_event(3));
+        assert!(timers.will_event(4));
+        assert_eq!(timers.clock(4), 1);
+        assert_eq!(timers.read_counter(0), 0xFFFE);
+    }
+
+    #[test]
+    fn test_timers_advance_write_control() {
+        let mut timers = GbaTimers::new();
+        timers.write_reload(0, 0xFFFE);
+        timers.write_control(0, 0x80);
+        timers.advance(1);
+        timers.write_control(0, 0);
+
+        assert_eq!(timers.read_counter(0), 0xFFFF);
+        assert!(!timers.will_event(100));
+        timers.advance(100);
+        timers.write_control(0, 0x80);
+        assert_eq!(timers.read_counter(0), 0xFFFE);
+        assert!(!timers.will_event(1));
+        assert_eq!(timers.clock(2), 1);
+    }
+
+    #[test]
+    fn test_timers_advance_disabled() {
+        let mut timers = GbaTimers::new();
+        assert!(!timers.will_event(u32::MAX - 1));
+        timers.advance(u32::MAX - 1);
+        assert!(timers.will_event(2));
+        assert_eq!(timers.clock(2), 0);
+        assert_eq!(timers.read_counter(0), 0);
+
+        timers.write_control(0, 0x80);
+        assert!(!timers.will_event(1));
+        timers.advance(1);
+        assert_eq!(timers.read_counter(0), 1);
+    }
+
+    #[test]
     fn test_timers_clock_batches_until_overflow() {
         let mut timers = GbaTimers::new();
         timers.write_reload(0, 0xFF00);
@@ -590,6 +729,34 @@ mod tests {
 
         timers.flush();
         assert_eq!(timers.timers[0].counter(), 100);
+    }
+
+    #[test]
+    fn test_timers_run_pending_boundaries() {
+        let mut timers = GbaTimers::new();
+        for (i, reload) in [0xFFF8, 0xFFFB, 0xFFFD, 0xFFFF].iter().enumerate() {
+            timers.write_reload(i, *reload);
+            timers.write_control(i, if i == 3 { 0x84 } else { 0x80 });
+        }
+
+        assert_eq!(timers.cycles_to_next_overflow(), 3);
+        assert_eq!(timers.clock(3), 12);
+        assert_eq!(timers.cycles_to_next_overflow(), 2);
+        assert_eq!(timers.clock(2), 2);
+        assert_eq!(timers.cycles_to_next_overflow(), 1);
+        assert_eq!(timers.clock(1), 12);
+        assert_eq!(timers.cycles_to_next_overflow(), 2);
+        assert_eq!(timers.clock(2), 1);
+        assert_eq!(timers.cycles_to_next_overflow(), 1);
+
+        // disabling the earliest timer removes its cascade events too
+        timers.write_control(2, 0);
+        assert_eq!(timers.cycles_to_next_overflow(), 2);
+        assert_eq!(timers.clock(2), 2);
+        assert_eq!(timers.read_counter(0), 0xFFFA);
+        assert_eq!(timers.read_counter(1), 0xFFFB);
+        assert_eq!(timers.read_counter(2), 0xFFFF);
+        assert_eq!(timers.read_counter(3), 0xFFFF);
     }
 
     #[test]

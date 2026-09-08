@@ -442,17 +442,13 @@ impl Arm7Tdmi {
             }
         }
 
-        // halt wake does not depend on IME or CPSR.I; HLE IntrWait
-        // still waits for its requested interrupt before returning
-        if self.halted
-            && self.bus.intr_wait_flags == 0
-            && self.bus.irq.ie() & self.bus.irq.if_() != 0
-        {
-            self.halted = false;
-        }
-
         if self.halted {
-            return self.halted_cycles();
+            // halt wake does not depend on IME or CPSR.I; HLE IntrWait
+            // still waits for its requested interrupt before returning
+            if self.bus.intr_wait_flags != 0 || self.bus.irq.ie() & self.bus.irq.if_() == 0 {
+                return self.halted_cycles();
+            }
+            self.halted = false;
         }
 
         self.cycles = 0;
@@ -1068,6 +1064,41 @@ mod tests {
     }
 
     #[test]
+    fn test_step_prefetch_before_write() {
+        for thumb in [false, true] {
+            let mut cpu = make_cpu();
+            let addr = 0x0300_0000;
+            let target = addr + if thumb { 4 } else { 8 };
+            if thumb {
+                cpu.set_cpsr(cpu.cpsr() | CPSR_T);
+                cpu.bus.write16(addr, 0x6008); // str r0, [r1]
+                cpu.bus.write16(addr + 2, 0x2201); // mov r2, #1
+                cpu.bus.write16(target, 0x2302); // mov r3, #2
+                cpu.set_reg(0, 0x46C0232A); // mov r3, #42; nop
+            } else {
+                cpu.bus.write32(addr, 0xE5810000); // str r0, [r1]
+                cpu.bus.write32(addr + 4, 0xE3A02001); // mov r2, #1
+                cpu.bus.write32(target, 0xE3A03002); // mov r3, #2
+                cpu.set_reg(0, 0xE3A0302A); // mov r3, #42
+            }
+            cpu.set_reg(1, target);
+            cpu.set_reg(15, addr);
+
+            assert_eq!(cpu.step(), 2);
+            assert_eq!(cpu.bus.read32(target), cpu.reg(0));
+            assert_eq!(cpu.step(), 1);
+            assert_eq!(cpu.reg(2), 1);
+            assert_eq!(cpu.step(), 1);
+            assert_eq!(cpu.reg(3), 2);
+
+            // a pipeline refill observes the instruction written to memory
+            cpu.set_reg(15, target);
+            assert_eq!(cpu.step(), 1);
+            assert_eq!(cpu.reg(3), 42);
+        }
+    }
+
+    #[test]
     fn test_step_halted() {
         let mut cpu = make_cpu();
         cpu.set_halted(true);
@@ -1108,6 +1139,15 @@ mod tests {
                     assert_eq!(cpu.reg(0), 42);
                     assert_eq!(cpu.pc(), addr + if thumb { 8 } else { 16 });
                     assert_eq!(cpu.cpsr(), cpsr);
+                    assert_eq!(cpu.bus.irq.if_(), 1);
+
+                    // the pending request is still delivered when IRQs are unmasked
+                    cpu.bus.irq.set_ime(true);
+                    cpu.set_cpsr(cpu.cpsr() & !CPSR_I);
+                    assert_eq!(cpu.step(), 3);
+                    assert_eq!(cpu.pc(), 0x18);
+                    assert_eq!(cpu.cpsr() & CPSR_MODE_MASK, MODE_IRQ);
+                    assert_eq!(cpu.reg(0), 42);
                     assert_eq!(cpu.bus.irq.if_(), 1);
                 }
             }
