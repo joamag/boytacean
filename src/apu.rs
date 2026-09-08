@@ -420,8 +420,14 @@ impl Apu {
 
         self.tick_ch_all(cycles);
 
-        self.output_timer = self.output_timer.saturating_sub(cycles as i16);
-        if self.output_timer <= 0 {
+        // the same fast path used by the channel timers, the sample is
+        // only created once the timer is reached, which happens orders
+        // of magnitude less often than the clock operation itself
+        if self.output_timer > cycles as i16 {
+            self.output_timer -= cycles as i16;
+        } else {
+            self.output_timer = self.output_timer.saturating_sub(cycles as i16);
+
             profile_count_gb!(apu_samples);
 
             // verifies if we've reached the maximum allowed size for the
@@ -1126,10 +1132,12 @@ impl Apu {
 
     #[inline(always)]
     fn tick_ch1(&mut self, cycles: u16) {
-        self.ch1_timer = self.ch1_timer.saturating_sub(cycles as i16);
-        if self.ch1_timer > 0 {
+        if self.ch1_timer > cycles as i16 {
+            self.ch1_timer -= cycles as i16;
             return;
         }
+
+        self.ch1_timer = self.ch1_timer.saturating_sub(cycles as i16);
 
         if self.ch1_enabled {
             self.ch1_output =
@@ -1148,10 +1156,12 @@ impl Apu {
 
     #[inline(always)]
     fn tick_ch2(&mut self, cycles: u16) {
-        self.ch2_timer = self.ch2_timer.saturating_sub(cycles as i16);
-        if self.ch2_timer > 0 {
+        if self.ch2_timer > cycles as i16 {
+            self.ch2_timer -= cycles as i16;
             return;
         }
+
+        self.ch2_timer = self.ch2_timer.saturating_sub(cycles as i16);
 
         if self.ch2_enabled {
             self.ch2_output =
@@ -1170,10 +1180,12 @@ impl Apu {
 
     #[inline(always)]
     fn tick_ch3(&mut self, cycles: u16) {
-        self.ch3_timer = self.ch3_timer.saturating_sub(cycles as i16);
-        if self.ch3_timer > 0 {
+        if self.ch3_timer > cycles as i16 {
+            self.ch3_timer -= cycles as i16;
             return;
         }
+
+        self.ch3_timer = self.ch3_timer.saturating_sub(cycles as i16);
 
         if self.ch3_enabled && self.ch3_dac {
             let wave_index = self.ch3_position >> 1;
@@ -1199,10 +1211,12 @@ impl Apu {
 
     #[inline(always)]
     fn tick_ch4(&mut self, cycles: u16) {
-        self.ch4_timer = self.ch4_timer.saturating_sub(cycles as i32);
-        if self.ch4_timer > 0 {
+        if self.ch4_timer > cycles as i32 {
+            self.ch4_timer -= cycles as i32;
             return;
         }
+
+        self.ch4_timer = self.ch4_timer.saturating_sub(cycles as i32);
 
         if self.ch4_enabled {
             // obtains the current value of the LFSR based as
@@ -1500,6 +1514,89 @@ impl Default for Apu {
 mod tests {
     use super::{Apu, HighPassFilter};
     use crate::state::StateComponent;
+
+    #[test]
+    fn test_clock_output_timer() {
+        let mut apu = Apu {
+            sound_enabled: true,
+            output_timer: 8,
+            ..Default::default()
+        };
+
+        apu.clock(4);
+        assert_eq!(apu.output_timer, 4);
+        assert!(apu.audio_buffer().is_empty());
+
+        apu.clock(4);
+        assert_eq!(apu.audio_buffer().len(), apu.channels() as usize);
+    }
+
+    #[test]
+    fn test_tick_ch1() {
+        let mut apu = Apu {
+            ch1_timer: 8,
+            ch1_wave_length: 2047,
+            ..Default::default()
+        };
+
+        apu.tick_ch1(4);
+        assert_eq!(apu.ch1_timer, 4);
+        assert_eq!(apu.ch1_sequence, 0);
+
+        apu.tick_ch1(4);
+        assert_eq!(apu.ch1_timer, 4);
+        assert_eq!(apu.ch1_sequence, 1);
+    }
+
+    #[test]
+    fn test_tick_ch2() {
+        let mut apu = Apu {
+            ch2_timer: 8,
+            ch2_wave_length: 2047,
+            ..Default::default()
+        };
+
+        apu.tick_ch2(4);
+        assert_eq!(apu.ch2_timer, 4);
+        assert_eq!(apu.ch2_sequence, 0);
+
+        apu.tick_ch2(4);
+        assert_eq!(apu.ch2_timer, 4);
+        assert_eq!(apu.ch2_sequence, 1);
+    }
+
+    #[test]
+    fn test_tick_ch3() {
+        let mut apu = Apu {
+            ch3_timer: 8,
+            ch3_wave_length: 2047,
+            ..Default::default()
+        };
+
+        apu.tick_ch3(4);
+        assert_eq!(apu.ch3_timer, 4);
+        assert_eq!(apu.ch3_position, 0);
+
+        apu.tick_ch3(4);
+        assert_eq!(apu.ch3_timer, 2);
+        assert_eq!(apu.ch3_position, 1);
+    }
+
+    #[test]
+    fn test_tick_ch4() {
+        let mut apu = Apu {
+            ch4_timer: 8,
+            ch4_divisor: 0,
+            ch4_clock_shift: 0,
+            ..Default::default()
+        };
+
+        apu.tick_ch4(4);
+        assert_eq!(apu.ch4_timer, 4);
+
+        apu.tick_ch4(4);
+        assert_eq!(apu.ch4_timer, 8);
+    }
 
     #[test]
     fn test_trigger_ch1() {

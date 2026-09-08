@@ -652,7 +652,12 @@ impl GameBoy {
     ///
     /// At the end of this execution major synchronization issues
     /// may arise, so use with caution.
+    ///
+    /// The number of clock operations is capped at
+    /// [`MAX_CLOCK_MANY`][GameBoy::MAX_CLOCK_MANY] so that the cycles
+    /// handed over to the components remain in a valid range.
     pub fn clock_many(&mut self, count: usize) -> u16 {
+        let count = count.min(Self::MAX_CLOCK_MANY);
         let mut cycles = 0u16;
         for _ in 0..count {
             cycles += self.cpu_clock() as u16;
@@ -1208,6 +1213,17 @@ impl GameBoy {
     /// The cycles taken to run a complete frame
     /// loop in the Game Boy's PPU (in CPU cycles).
     pub const LCD_CYCLES: u32 = 70224;
+
+    /// The maximum number of cycles that a single CPU clock operation
+    /// may take, the longest instructions are the conditional calls.
+    pub const MAX_CPU_CYCLES: u16 = 24;
+
+    /// The maximum number of CPU clock operations that may be run by a
+    /// single [`clock_many()`][GameBoy::clock_many()] call, making sure
+    /// that the cycles produced by the batch stay within the positive
+    /// range of an `i16`, which is the type used by some of the
+    /// components to keep track of their internal timers.
+    pub const MAX_CLOCK_MANY: usize = (i16::MAX as u16 / Self::MAX_CPU_CYCLES) as usize;
 
     pub fn cpu(&mut self) -> &mut Cpu {
         &mut self.cpu
@@ -1777,7 +1793,10 @@ impl Display for GameBoy {
 #[cfg(test)]
 mod tests {
     use super::{GameBoy, GameBoyMode, GameBoySpeed};
-    use crate::ppu::DISPLAY_SIZE;
+    use crate::{
+        ppu::DISPLAY_SIZE,
+        test::{build_test, TestOptions},
+    };
 
     /// Tests that the speed shift value is equivalent to a division
     /// by the speed multiplier when normalizing cycle counts.
@@ -1788,6 +1807,30 @@ mod tests {
                 assert_eq!(cycles >> speed.shift(), cycles / speed.multiplier() as u16);
             }
         }
+    }
+
+    /// Tests that the batched clock operation is capped, making sure
+    /// that the cycles handed over to the components are kept within
+    /// the positive range of an `i16`.
+    #[test]
+    fn test_clock_many_capped() {
+        let mut game_boy = build_test(TestOptions {
+            ppu_enabled: Some(false),
+            apu_enabled: Some(false),
+            dma_enabled: Some(false),
+            timer_enabled: Some(false),
+            ..Default::default()
+        });
+        game_boy.load_rom_empty().unwrap();
+
+        // runs the CPU from a RAM position, which is filled with zeros
+        // and is therefore decoded as a sequence of NOP instructions
+        game_boy.cpu().set_pc(0xc000);
+
+        let cycles = game_boy.clock_many(usize::MAX);
+
+        assert_eq!(cycles, (GameBoy::MAX_CLOCK_MANY * 4) as u16);
+        assert!(cycles <= i16::MAX as u16);
     }
 
     /// Tests that the pixel packed frame buffers are display sized and
