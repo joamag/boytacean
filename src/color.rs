@@ -1,5 +1,6 @@
 //! Color manipulation functions and constants.
 
+#[cfg(feature = "simd")]
 use boytacean_common::util::copy_fast;
 
 pub const RGB_SIZE: usize = 3;
@@ -84,19 +85,11 @@ pub fn rgb888_to_rgb1555_scalar(rgb888_pixels: &[u8], rgb1555_pixels: &mut [u8])
         rgb888_pixels.len() / 3 == rgb1555_pixels.len() / 2,
         "Length of rgb1555_pixels must be two thirds the length of rgb888_pixels"
     );
-    for index in 0..rgb888_pixels.len() / RGB_SIZE {
-        let (r, g, b) = (
-            rgb888_pixels[index * RGB_SIZE],
-            rgb888_pixels[index * RGB_SIZE + 1],
-            rgb888_pixels[index * RGB_SIZE + 2],
-        );
-        let rgb1555 = rgb888_to_rgb1555(r, g, b);
-        let output_offset = index * RGB1555_SIZE;
-        copy_fast(
-            &rgb1555,
-            &mut rgb1555_pixels[output_offset..output_offset + RGB1555_SIZE],
-            RGB1555_SIZE,
-        )
+    for (rgb888, rgb1555) in rgb888_pixels
+        .chunks_exact(RGB_SIZE)
+        .zip(rgb1555_pixels.chunks_exact_mut(RGB1555_SIZE))
+    {
+        rgb1555.copy_from_slice(&rgb888_to_rgb1555(rgb888[0], rgb888[1], rgb888[2]));
     }
 }
 
@@ -293,6 +286,33 @@ mod tests {
         ];
 
         assert_eq!(rgb1555_pixels, expected_rgb1555);
+    }
+
+    #[test]
+    fn test_rgb888_to_rgb1555_scalar_empty() {
+        let rgb888_pixels: Vec<u8> = vec![];
+        let mut rgb1555_pixels: Vec<u8> = vec![];
+
+        rgb888_to_rgb1555_scalar(&rgb888_pixels, &mut rgb1555_pixels);
+
+        assert!(rgb1555_pixels.is_empty());
+    }
+
+    /// Tests that a destination buffer that does not match the size of
+    /// the source one is rejected, as the conversion walks both buffers
+    /// in parallel and would otherwise convert only part of the source.
+    #[test]
+    #[should_panic(
+        expected = "Length of rgb1555_pixels must be two thirds the length of rgb888_pixels"
+    )]
+    fn test_rgb888_to_rgb1555_scalar_size_mismatch() {
+        let rgb888_pixels: Vec<u8> = vec![
+            255, 000, 000, // Red
+            000, 255, 000, // Green
+        ];
+        let mut rgb1555_pixels: Vec<u8> = vec![0; 2];
+
+        rgb888_to_rgb1555_scalar(&rgb888_pixels, &mut rgb1555_pixels);
     }
 
     #[test]
