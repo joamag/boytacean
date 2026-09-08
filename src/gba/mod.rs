@@ -170,22 +170,27 @@ impl GameBoyAdvance {
 
         // clock timers
         if self.timer_enabled {
-            let overflows = self.cpu.bus.timers.clock(cycles);
-            if overflows != 0 {
-                for i in 0..4 {
-                    if overflows & (1 << i) != 0 {
-                        if self.cpu.bus.timers.timers[i].irq_enable() {
-                            self.cpu.bus.irq.raise_timer(i);
-                        }
-                        // timer overflow triggers DirectSound FIFO
-                        if self.apu_enabled {
-                            self.cpu.bus.apu.timer_overflow(i);
-                            // trigger DMA FIFO refill if needed
-                            for fifo in 0..2 {
-                                if self.cpu.bus.apu.direct_sound[fifo].timer_id == i
-                                    && self.cpu.bus.apu.direct_sound[fifo].needs_refill()
-                                {
-                                    self.cpu.bus.dma.trigger_sound_fifo(fifo);
+            let mut remaining = cycles;
+            while remaining > 0 {
+                let batch = remaining.min(self.cpu.bus.timers.cycles_to_next_overflow());
+                let overflows = self.cpu.bus.timers.clock(batch);
+                remaining -= batch;
+                if overflows != 0 {
+                    for i in 0..4 {
+                        if overflows & (1 << i) != 0 {
+                            if self.cpu.bus.timers.timers[i].irq_enable() {
+                                self.cpu.bus.irq.raise_timer(i);
+                            }
+                            // timer overflow triggers DirectSound FIFO
+                            if self.apu_enabled {
+                                self.cpu.bus.apu.timer_overflow(i);
+                                // trigger DMA FIFO refill if needed
+                                for fifo in 0..2 {
+                                    if self.cpu.bus.apu.direct_sound[fifo].timer_id == i
+                                        && self.cpu.bus.apu.direct_sound[fifo].needs_refill()
+                                    {
+                                        self.cpu.bus.dma.trigger_sound_fifo(fifo);
+                                    }
                                 }
                             }
                         }
@@ -547,6 +552,97 @@ mod tests {
     }
 
     #[test]
+    fn test_clock_multiple_timer_overflows() {
+        for apu_enabled in [false, true] {
+            for irq_enabled in [false, true] {
+                let mut gba = GameBoyAdvance::new();
+                gba.set_apu_enabled(apu_enabled);
+                gba.cpu.bus.write32(0x0300_0000, 0xEAFFFFFE); // b . (3 cycles)
+                gba.cpu.set_reg(15, 0x0300_0000);
+                gba.cpu.bus.timers.write_reload(0, 0xFFFF);
+                gba.cpu
+                    .bus
+                    .timers
+                    .write_control(0, if irq_enabled { 0xC0 } else { 0x80 });
+                gba.cpu.bus.timers.write_reload(1, 0xFFFE);
+                gba.cpu
+                    .bus
+                    .timers
+                    .write_control(1, if irq_enabled { 0xC4 } else { 0x84 });
+                gba.cpu.bus.apu.set_soundcnt_h(0x4000); // select timer 0 for FIFO A, timer 1 for FIFO B
+                for fifo in &mut gba.cpu.bus.apu.direct_sound {
+                    fifo.write_fifo(0x04030201);
+                }
+
+                assert_eq!(gba.clock(), 3);
+                assert_eq!(gba.cpu.bus.timers.read_counter(0), 0xFFFF);
+                assert_eq!(gba.cpu.bus.timers.read_counter(1), 0xFFFF);
+                assert_eq!(gba.cpu.bus.irq.if_(), if irq_enabled { 0x18 } else { 0 });
+                assert_eq!(
+                    gba.cpu.bus.apu.direct_sound[0].fifo_len(),
+                    if apu_enabled { 1 } else { 4 }
+                );
+                assert_eq!(
+                    gba.cpu.bus.apu.direct_sound[1].fifo_len(),
+                    if apu_enabled { 3 } else { 4 }
+                );
+                assert_eq!(
+                    gba.cpu.bus.apu.direct_sound[0].current_sample(),
+                    if apu_enabled { 3 } else { 0 }
+                );
+                assert_eq!(
+                    gba.cpu.bus.apu.direct_sound[1].current_sample(),
+                    if apu_enabled { 1 } else { 0 }
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_clock_multiple_timer_overflows_refill_fifo() {
+        let mut gba = GameBoyAdvance::new();
+        gba.cpu.bus.write32(0x0300_0000, 0xEAFFFFFE); // b . (3 cycles)
+        gba.cpu.set_reg(15, 0x0300_0000);
+        gba.cpu.bus.timers.write_reload(0, 0xFFFF);
+        gba.cpu.bus.timers.write_control(0, 0x80);
+        for _ in 0..5 {
+            gba.cpu.bus.apu.direct_sound[0].write_fifo(0x04030201);
+        }
+        for i in 0..4 {
+            gba.cpu.bus.write32(0x0200_0000 + i * 4, 0x08070605);
+        }
+        gba.cpu.bus.write32(0x0400_00BC, 0x0200_0000);
+        gba.cpu.bus.write32(0x0400_00C0, 0x0400_00A0);
+        gba.cpu.bus.write16(0x0400_00C6, 0xB640); // sound DMA, repeat, 32-bit, fixed destination
+
+        // three overflows leave the FIFO above the refill threshold
+        assert_eq!(gba.clock(), 3);
+        assert_eq!(gba.cpu.bus.apu.direct_sound[0].fifo_len(), 17);
+        assert_eq!(gba.cpu.bus.dma.channels[1].src(), 0x0200_0000);
+
+        // the next instruction consumes three more samples and refills once
+        assert_eq!(gba.clock(), 3);
+        assert_eq!(gba.cpu.bus.apu.direct_sound[0].fifo_len(), 30);
+        assert_eq!(gba.cpu.bus.apu.direct_sound[0].current_sample(), 2);
+        assert_eq!(gba.cpu.bus.dma.channels[1].src(), 0x0200_0010);
+    }
+
+    #[test]
+    fn test_clock_timers_disabled() {
+        let mut gba = GameBoyAdvance::new();
+        gba.set_timer_enabled(false);
+        gba.cpu.bus.timers.write_reload(0, 0xFFFF);
+        gba.cpu.bus.timers.write_control(0, 0xC0);
+        gba.cpu.bus.apu.direct_sound[0].write_fifo(0x04030201);
+
+        gba.clock();
+
+        assert_eq!(gba.cpu.bus.timers.read_counter(0), 0xFFFF);
+        assert_eq!(gba.cpu.bus.irq.if_(), 0);
+        assert_eq!(gba.cpu.bus.apu.direct_sound[0].fifo_len(), 4);
+    }
+
+    #[test]
     fn test_clocks_cycles() {
         let mut gba = GameBoyAdvance::new();
         let elapsed = gba.clocks_cycles(100);
@@ -617,6 +713,36 @@ mod tests {
         gba.clock();
         gba.reset();
         assert_eq!(gba.ppu_frame(), 0);
+    }
+
+    #[test]
+    fn test_reset_preserves_save_data() {
+        for signature in [b"SRAM_V".as_slice(), b"FLASH_V", b"FLASH1M_V", b"EEPROM_V"] {
+            for real_bios in [false, true] {
+                let mut gba = GameBoyAdvance::new();
+                let mut rom = vec![0u8; 512];
+                rom[0xB2] = 0x96;
+                rom[0x100..0x100 + signature.len()].copy_from_slice(signature);
+                gba.load_rom(&rom).unwrap();
+                if real_bios {
+                    gba.load_bios(&vec![0u8; 0x4000]);
+                }
+                let mut data = gba.ram_data_eager();
+                data[0] = 0x42;
+                let last = data.len() - 1;
+                data[last] = 0x24;
+                gba.set_ram_data(data.clone());
+                gba.cpu.bus.write32(0x0200_0000, 0x12345678);
+
+                gba.reset();
+                gba.reset();
+
+                assert_eq!(gba.ram_data_eager(), data);
+                assert!(gba.has_battery());
+                assert_eq!(gba.cpu.bus.read32(0x0200_0000), 0);
+                assert_eq!(gba.cpu.pc(), if real_bios { 0 } else { 0x0800_0000 });
+            }
+        }
     }
 
     #[test]

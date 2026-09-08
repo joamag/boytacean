@@ -442,6 +442,15 @@ impl Arm7Tdmi {
             }
         }
 
+        // halt wake does not depend on IME or CPSR.I; HLE IntrWait
+        // still waits for its requested interrupt before returning
+        if self.halted
+            && self.bus.intr_wait_flags == 0
+            && self.bus.irq.ie() & self.bus.irq.if_() != 0
+        {
+            self.halted = false;
+        }
+
         if self.halted {
             return self.halted_cycles();
         }
@@ -1065,6 +1074,84 @@ mod tests {
         let cycles = cpu.step();
         // idle fast-forward up to the next PPU event boundary
         assert_eq!(cycles, cpu.bus.ppu.cycles_to_next_event());
+    }
+
+    #[test]
+    fn test_step_halt_wakes_with_irq_masked() {
+        for (ime, mask) in [(false, 0), (false, CPSR_I), (true, CPSR_I)] {
+            for thumb in [false, true] {
+                for pipeline_valid in [false, true] {
+                    let mut cpu = make_cpu();
+                    let addr = 0x0300_0000;
+                    cpu.set_cpsr(MODE_SYS | mask | if thumb { CPSR_T } else { 0 });
+                    if thumb {
+                        cpu.bus.write16(addr, 0x2101); // mov r1, #1
+                        cpu.bus.write16(addr + 2, 0x202A); // mov r0, #42
+                    } else {
+                        cpu.bus.write32(addr, 0xE3A01001); // mov r1, #1
+                        cpu.bus.write32(addr + 4, 0xE3A0002A); // mov r0, #42
+                    }
+                    cpu.set_reg(15, addr);
+                    if pipeline_valid {
+                        cpu.step();
+                    } else {
+                        cpu.set_reg(15, addr + if thumb { 2 } else { 4 });
+                    }
+                    cpu.set_halted(true);
+                    cpu.bus.irq.set_ime(ime);
+                    cpu.bus.irq.set_ie(1);
+                    cpu.bus.irq.raise(1);
+                    let cpsr = cpu.cpsr();
+
+                    assert_eq!(cpu.step(), 1);
+                    assert!(!cpu.halted());
+                    assert_eq!(cpu.reg(0), 42);
+                    assert_eq!(cpu.pc(), addr + if thumb { 8 } else { 16 });
+                    assert_eq!(cpu.cpsr(), cpsr);
+                    assert_eq!(cpu.bus.irq.if_(), 1);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_step_halt_requires_enabled_request() {
+        for (ie, if_) in [(0, 1), (1, 0), (1, 2)] {
+            for ime in [false, true] {
+                let mut cpu = make_cpu();
+                cpu.set_halted(true);
+                cpu.bus.irq.set_ie(ie);
+                cpu.bus.irq.raise(if_);
+                cpu.bus.irq.set_ime(ime);
+                let pc = cpu.pc();
+
+                cpu.step();
+
+                assert!(cpu.halted());
+                assert_eq!(cpu.pc(), pc);
+                assert_eq!(cpu.bus.irq.if_(), if_);
+            }
+        }
+    }
+
+    #[test]
+    fn test_step_halt_preserves_intr_wait_with_irq_masked() {
+        for (ime, mask) in [(false, 0), (false, CPSR_I), (true, CPSR_I)] {
+            let mut cpu = make_cpu();
+            cpu.set_cpsr(MODE_SYS | mask);
+            cpu.set_halted(true);
+            cpu.bus.intr_wait_flags = 1;
+            cpu.bus.irq.set_ie(2);
+            cpu.bus.irq.raise(2);
+            cpu.bus.irq.set_ime(ime);
+
+            cpu.step();
+
+            assert!(cpu.halted());
+            assert_eq!(cpu.bus.intr_wait_flags, 1);
+            assert_eq!(cpu.bus.irq.if_(), 2);
+            assert_eq!(cpu.pc(), 0x0800_0000);
+        }
     }
 
     #[test]

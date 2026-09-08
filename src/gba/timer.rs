@@ -205,6 +205,7 @@ impl GbaTimers {
     /// change applies from the current CPU clock position.
     pub fn write_control(&mut self, index: usize, value: u16) {
         self.flush();
+        let value = if index == 0 { value & !(1 << 2) } else { value };
         self.timers[index].set_control(value);
         self.next_overflow = self.compute_next_overflow();
     }
@@ -269,9 +270,10 @@ impl GbaTimers {
     }
 
     /// Runs the accumulated pending cycles through the timers and
-    /// recomputes the next overflow boundary.
+    /// recomputes the next overflow boundary, splitting at each
+    /// overflow so every cascade tick is propagated.
     fn run_pending(&mut self) -> u8 {
-        let cycles = self.pending_cycles;
+        let mut cycles = self.pending_cycles;
         self.pending_cycles = 0;
 
         // fast path: no enabled timer means nothing can tick or overflow
@@ -285,24 +287,31 @@ impl GbaTimers {
 
         let mut overflows = 0u8;
 
-        // clock timer 0 (never cascade)
-        if self.timers[0].clock(cycles) {
-            overflows |= 1 << 0;
-        }
+        while cycles > 0 {
+            let batch = cycles.min(self.next_overflow);
+            let mut batch_overflows = 0u8;
 
-        // clock timers 1-3 with cascade support
-        for i in 1..4 {
-            let prev_overflow = overflows & (1 << (i - 1)) != 0;
-            if self.timers[i].cascade() {
-                if prev_overflow && self.timers[i].cascade_tick() {
-                    overflows |= 1 << i;
-                }
-            } else if self.timers[i].clock(cycles) {
-                overflows |= 1 << i;
+            // clock timer 0 (never cascade)
+            if self.timers[0].clock(batch) {
+                batch_overflows |= 1 << 0;
             }
-        }
 
-        self.next_overflow = self.compute_next_overflow();
+            // clock timers 1-3 with cascade support
+            for i in 1..4 {
+                let prev_overflow = batch_overflows & (1 << (i - 1)) != 0;
+                if self.timers[i].cascade() {
+                    if prev_overflow && self.timers[i].cascade_tick() {
+                        batch_overflows |= 1 << i;
+                    }
+                } else if self.timers[i].clock(batch) {
+                    batch_overflows |= 1 << i;
+                }
+            }
+
+            overflows |= batch_overflows;
+            cycles -= batch;
+            self.next_overflow = self.compute_next_overflow();
+        }
 
         overflows
     }
@@ -459,6 +468,16 @@ mod tests {
     }
 
     #[test]
+    fn test_timers_write_control_timer0_ignores_cascade() {
+        let mut timers = GbaTimers::new();
+        timers.write_control(0, 0x84);
+        assert!(!timers.timers[0].cascade());
+        assert_eq!(timers.timers[0].control(), 0x80);
+        timers.clock(16);
+        assert_eq!(timers.read_counter(0), 16);
+    }
+
+    #[test]
     fn test_timers_cycles_to_next_overflow() {
         let mut timers = GbaTimers::new();
         // no enabled timer means no overflow can happen
@@ -495,6 +514,72 @@ mod tests {
 
         // the boundary cycle itself delivers the overflow
         assert_eq!(timers.clock(1), 1);
+    }
+
+    #[test]
+    fn test_timers_clock_multiple_overflows() {
+        let mut timers = GbaTimers::new();
+        timers.write_reload(0, 0xFFFF);
+        timers.write_control(0, 0x80);
+        timers.write_control(1, 0x84);
+
+        assert_eq!(timers.clock(16), 1);
+        assert_eq!(timers.read_counter(0), 0xFFFF);
+        assert_eq!(timers.read_counter(1), 16);
+        assert_eq!(timers.clock(0), 0);
+        assert_eq!(timers.read_counter(1), 16);
+    }
+
+    #[test]
+    fn test_timers_clock_multiple_cascade_overflows() {
+        let mut timers = GbaTimers::new();
+        timers.write_reload(0, 0xFFFE);
+        timers.write_control(0, 0x80);
+        timers.write_reload(1, 0xFFFD);
+        timers.write_control(1, 0x84);
+        timers.write_reload(2, 0xFFFE);
+        timers.write_control(2, 0x84);
+        timers.write_control(3, 0x84);
+
+        assert_eq!(timers.clock(17), 7);
+        assert_eq!(timers.read_counter(0), 0xFFFF);
+        assert_eq!(timers.read_counter(1), 0xFFFF);
+        assert_eq!(timers.read_counter(2), 0xFFFE);
+        assert_eq!(timers.read_counter(3), 1);
+        assert_eq!(timers.cycles_to_next_overflow(), 1);
+    }
+
+    #[test]
+    fn test_timers_clock_multiple_independent_overflows() {
+        let mut timers = GbaTimers::new();
+        timers.write_reload(0, 0xFFFF);
+        timers.write_control(0, 0x80);
+        timers.write_control(1, 4); // disabled cascade must not tick
+        timers.write_reload(2, 0xFFFC);
+        timers.write_control(2, 0x80);
+        timers.write_control(3, 0x84);
+
+        assert_eq!(timers.clock(9), 5);
+        assert_eq!(timers.read_counter(1), 0);
+        assert_eq!(timers.read_counter(2), 0xFFFD);
+        assert_eq!(timers.read_counter(3), 2);
+    }
+
+    #[test]
+    fn test_timers_clock_multiple_overflows_prescaler() {
+        let mut timers = GbaTimers::new();
+        timers.write_reload(0, 0xFFFE);
+        timers.write_control(0, 0x81);
+        timers.write_control(1, 0x84);
+
+        assert_eq!(timers.clock(63), 0);
+        assert_eq!(timers.clock(258), 1);
+        assert_eq!(timers.read_counter(0), 0xFFFF);
+        assert_eq!(timers.read_counter(1), 2);
+        assert_eq!(timers.cycles_to_next_overflow(), 63);
+        assert_eq!(timers.clock(63), 1);
+        assert_eq!(timers.read_counter(0), 0xFFFE);
+        assert_eq!(timers.read_counter(1), 3);
     }
 
     #[test]

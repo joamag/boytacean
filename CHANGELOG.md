@@ -37,6 +37,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+* GBA reset erasing battery-backed SRAM, Flash and EEPROM save data
+* Incorrect zero flag for GBA long multiply instructions with a nonzero low result word
+* GBA HALT failing to wake on enabled interrupt requests when IME or CPSR masks IRQ entry
+* Lost GBA timer cascade and DirectSound FIFO events when a clock batch spans multiple overflows, and timer 0 incorrectly honoring the unused cascade bit
 * Resolution of the default WASM binary path in `boytacean-core`, which pointed at a `lib` directory that only exists in the repository and therefore failed whenever the package was installed from npm
 * Build of the web front-end, which was broken by the resolution of the WASM binary through a bare specifier, as Parcel resolves those at build time and the `boytacean` package is aliased to a local file
 * Corrupted backgrounds in Golden Sun caused by idle CPU wake timing
