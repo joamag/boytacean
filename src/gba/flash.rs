@@ -330,7 +330,6 @@ impl SaveMedia {
     }
 
     pub fn reset(&mut self) {
-        self.data.fill(0xFF);
         self.state = FlashState::Ready;
         self.bank = 0;
         self.eeprom_state = EepromState::AcceptingCommand;
@@ -771,18 +770,26 @@ mod tests {
     }
 
     #[test]
-    fn test_reset_clears_data() {
+    fn test_reset_preserves_data() {
         let mut save = SaveMedia::new();
         save.save_type = SaveType::Sram;
         save.write8(0x0E00_0000, 0x42);
+        save.write8(0x0E00_7FFF, 0x24);
         save.reset();
-        assert_eq!(save.read8(0x0E00_0000), 0xFF);
+        assert_eq!(save.read8(0x0E00_0000), 0x42);
+        assert_eq!(save.read8(0x0E00_7FFF), 0x24);
+        save.write8(0x0E00_0000, 0x12);
+        assert_eq!(save.read8(0x0E00_0000), 0x12);
     }
 
     #[test]
     fn test_reset_clears_flash_state() {
         let mut save = SaveMedia::new();
         save.save_type = SaveType::Flash64;
+        save.write8(0x0E00_5555, 0xAA);
+        save.write8(0x0E00_2AAA, 0x55);
+        save.write8(0x0E00_5555, 0xA0);
+        save.write8(0x0E00_0000, 0x42);
         // enter chip ID mode
         save.write8(0x0E00_5555, 0xAA);
         save.write8(0x0E00_2AAA, 0x55);
@@ -790,7 +797,87 @@ mod tests {
         assert_eq!(save.read8(0x0E00_0000), 0x62);
         save.reset();
         // should be back to normal reads
-        assert_eq!(save.read8(0x0E00_0000), 0xFF);
+        assert_eq!(save.read8(0x0E00_0000), 0x42);
+    }
+
+    #[test]
+    fn test_reset_preserves_flash_banks() {
+        let mut save = SaveMedia::new();
+        save.save_type = SaveType::Flash128;
+        save.data = vec![0xFFu8; 0x20000];
+
+        for bank in 0..2 {
+            save.write8(0x0E00_5555, 0xAA);
+            save.write8(0x0E00_2AAA, 0x55);
+            save.write8(0x0E00_5555, 0xB0);
+            save.write8(0x0E00_0000, bank);
+            save.write8(0x0E00_5555, 0xAA);
+            save.write8(0x0E00_2AAA, 0x55);
+            save.write8(0x0E00_5555, 0xA0);
+            save.write8(0x0E00_FFFF, 0x42 + bank);
+        }
+
+        // reset cancels an unfinished write and selects bank 0
+        save.write8(0x0E00_5555, 0xAA);
+        save.write8(0x0E00_2AAA, 0x55);
+        save.write8(0x0E00_5555, 0xA0);
+        save.reset();
+        save.write8(0x0E00_FFFF, 0);
+        assert_eq!(save.read8(0x0E00_FFFF), 0x42);
+
+        save.write8(0x0E00_5555, 0xAA);
+        save.write8(0x0E00_2AAA, 0x55);
+        save.write8(0x0E00_5555, 0xB0);
+        save.write8(0x0E00_0000, 1);
+        assert_eq!(save.read8(0x0E00_FFFF), 0x43);
+    }
+
+    #[test]
+    fn test_reset_preserves_eeprom_data() {
+        for (mut save, width, address) in [
+            (make_eeprom_save_6bit(), 6, 63),
+            (make_eeprom_save_14bit(), 14, 1023),
+        ] {
+            let data = 0x1234_5678_9ABC_DEF0;
+            send_bits(&mut save, 0b10, 2);
+            send_bits(&mut save, address, width);
+            send_bits(&mut save, data, 64);
+            send_bits(&mut save, 0, 1);
+
+            // a completed write survives reset before its ready poll
+            save.reset();
+            assert_eq!(save.eeprom_read(), 1);
+            assert_eq!(save.eeprom_addr_width, width);
+            assert_eq!(save.data.len(), if width == 6 { 512 } else { 8192 });
+
+            // an incomplete replacement must not change the saved block
+            send_bits(&mut save, 0b10, 2);
+            send_bits(&mut save, address, width);
+            send_bits(&mut save, 0, 32);
+            save.reset();
+
+            for _ in 0..2 {
+                send_bits(&mut save, 0b11, 2);
+                send_bits(&mut save, address, width);
+                send_bits(&mut save, 0, 1);
+                for _ in 0..4 {
+                    assert_eq!(save.eeprom_read(), 0);
+                }
+                let mut result = 0u64;
+                for _ in 0..64 {
+                    result = (result << 1) | save.eeprom_read() as u64;
+                }
+                assert_eq!(result, data);
+
+                // reset also cancels a partially consumed read
+                send_bits(&mut save, 0b11, 2);
+                send_bits(&mut save, address, width);
+                send_bits(&mut save, 0, 1);
+                save.eeprom_read();
+                save.reset();
+                assert_eq!(save.eeprom_read(), 1);
+            }
+        }
     }
 
     #[test]

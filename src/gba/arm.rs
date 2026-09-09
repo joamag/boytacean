@@ -5,7 +5,7 @@
 
 use crate::gba::{
     bios::handle_swi,
-    consts::{CPSR_MODE_MASK, CPSR_T, MODE_SVC, MODE_UND},
+    consts::{CPSR_MODE_MASK, CPSR_T, CPSR_Z, MODE_SVC, MODE_UND},
     cpu::Arm7Tdmi,
 };
 
@@ -383,8 +383,8 @@ fn arm_multiply_long(cpu: &mut Arm7Tdmi, instr: u32) {
         let hi = (result >> 32) as u32;
         let lo = result as u32;
         cpu.set_nz_flags(hi);
-        if hi == 0 && lo == 0 {
-            // Z already set by set_nz_flags for hi, but need to check lo too
+        if lo != 0 {
+            cpu.set_cpsr(cpu.cpsr() & !CPSR_Z);
         }
     }
 
@@ -964,6 +964,82 @@ mod tests {
         // MUL R2, R0, R1 (E0020190)
         super::execute_arm(&mut cpu, 0xE0020190);
         assert_eq!(cpu.reg(2), 42);
+    }
+
+    #[test]
+    fn test_arm_multiply_long_flags() {
+        // execute UMULLS, UMLALS, SMULLS and SMLALS r2, r3, r0, r1
+        for instr in [0xE0932190, 0xE0B32190, 0xE0D32190, 0xE0F32190] {
+            for (a, b, result) in [(0, 1, 0u64), (1, 1, 1), (0x10000, 0x10000, 0x1_0000_0000)] {
+                let mut cpu = make_cpu();
+                cpu.set_nz_flags(0x80000000);
+                cpu.set_reg(0, a);
+                cpu.set_reg(1, b);
+                super::execute_arm(&mut cpu, instr);
+                assert_eq!(cpu.reg(2), result as u32);
+                assert_eq!(cpu.reg(3), (result >> 32) as u32);
+                assert_eq!(cpu.flag_z(), result == 0);
+                assert!(!cpu.flag_n());
+            }
+        }
+    }
+
+    #[test]
+    fn test_arm_multiply_long_signed_flags() {
+        // execute SMULLS and SMLALS r2, r3, r0, r1
+        for instr in [0xE0D32190, 0xE0F32190] {
+            let mut cpu = make_cpu();
+            cpu.set_nz_flags(0);
+            cpu.set_reg(0, 0xFFFFFFFF);
+            cpu.set_reg(1, 1);
+            super::execute_arm(&mut cpu, instr);
+            assert_eq!(cpu.reg(2), 0xFFFFFFFF);
+            assert_eq!(cpu.reg(3), 0xFFFFFFFF);
+            assert!(cpu.flag_n());
+            assert!(!cpu.flag_z());
+        }
+    }
+
+    #[test]
+    fn test_arm_multiply_long_accumulate_flags() {
+        // execute UMLALS and SMLALS r2, r3, r0, r1
+        for instr in [0xE0B32190, 0xE0F32190] {
+            for (acc, result) in [
+                (0xFFFF_FFFF_FFFF_FFFFu64, 0u64),
+                (0xFFFF_FFFF, 0x1_0000_0000),
+                (0x7FFF_FFFF_FFFF_FFFF, 0x8000_0000_0000_0000),
+                (1, 2),
+            ] {
+                let mut cpu = make_cpu();
+                cpu.set_reg(0, 1);
+                cpu.set_reg(1, 1);
+                cpu.set_reg(2, acc as u32);
+                cpu.set_reg(3, (acc >> 32) as u32);
+                super::execute_arm(&mut cpu, instr);
+                assert_eq!(cpu.reg(2), result as u32);
+                assert_eq!(cpu.reg(3), (result >> 32) as u32);
+                assert_eq!(cpu.flag_z(), result == 0);
+                assert_eq!(cpu.flag_n(), result >> 63 != 0);
+            }
+        }
+    }
+
+    #[test]
+    fn test_arm_multiply_long_without_flags() {
+        // execute UMULL, UMLAL, SMULL and SMLAL r2, r3, r0, r1
+        for instr in [0xE0832190, 0xE0A32190, 0xE0C32190, 0xE0E32190] {
+            let mut cpu = make_cpu();
+            cpu.set_nz_flags(0);
+            cpu.set_flag_c(true);
+            cpu.set_flag_v(true);
+            let cpsr = cpu.cpsr();
+            cpu.set_reg(0, 1);
+            cpu.set_reg(1, 1);
+            super::execute_arm(&mut cpu, instr);
+            assert_eq!(cpu.reg(2), 1);
+            assert_eq!(cpu.reg(3), 0);
+            assert_eq!(cpu.cpsr(), cpsr);
+        }
     }
 
     #[test]
