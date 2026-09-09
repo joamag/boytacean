@@ -1598,8 +1598,9 @@ impl Ppu {
         self.gbc = value;
     }
 
-    /// Fills the frame buffer with pixels of the provided color,
-    /// this method should represent the fastest way of achieving
+    /// Fills the frame buffer with pixels of the provided color.
+    ///
+    /// This method should represent the fastest way of achieving
     /// the fill background with color operation.
     pub fn fill_frame_buffer(&mut self, shade_index: u8) {
         let color = &self.palette_colors[shade_index as usize];
@@ -1624,8 +1625,10 @@ impl Ppu {
     }
 
     /// Updates the internal PPU state (calculated values) according
-    /// to the VRAM values, this should be called whenever the VRAM
-    /// data is replaced (eg: state loading).
+    /// to the VRAM values.
+    ///
+    /// This should be called whenever the VRAM data is replaced
+    /// (eg: state loading).
     pub fn update_vram(&mut self) {
         // "saves" the old values of the VRAM bank and offset
         // as they are going to be needed later, this is required
