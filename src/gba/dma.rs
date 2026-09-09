@@ -280,6 +280,7 @@ impl GbaDma {
         };
 
         // only DMA channels 1 and 2 support sound FIFO (SPECIAL timing)
+        #[allow(clippy::needless_range_loop)]
         for i in 1..=2 {
             let channel = &mut self.channels[i];
             if channel.enabled()
@@ -538,6 +539,43 @@ mod tests {
 
         dma.trigger_sound_fifo(1);
         assert!(dma.channels[2].active());
+    }
+
+    #[test]
+    fn test_dma_sound_fifo_channel_selection() {
+        for (fifo_index, fifo_addr) in [REG_FIFO_A, REG_FIFO_B].iter().enumerate() {
+            let mut dma = GbaDma::new();
+            for (i, channel) in dma.channels.iter_mut().enumerate() {
+                channel.set_dst_reg(*fifo_addr);
+                channel.set_count_reg(16);
+                channel.set_control((1 << 15) | (3 << 12), i);
+            }
+
+            dma.trigger_sound_fifo(fifo_index);
+            for (i, channel) in dma.channels.iter().enumerate() {
+                assert_eq!(channel.active(), i == 1 || i == 2);
+                assert_eq!(channel.remaining(), if i == 1 || i == 2 { 4 } else { 16 });
+            }
+        }
+    }
+
+    #[test]
+    fn test_dma_sound_fifo_disabled_and_other_timing() {
+        for control in [3 << 12, (1 << 15) | (1 << 12), (1 << 15) | (2 << 12)] {
+            let mut dma = GbaDma::new();
+            for (i, channel) in dma.channels.iter_mut().enumerate().take(3).skip(1) {
+                channel.set_dst_reg(REG_FIFO_A);
+                channel.set_count_reg(16);
+                channel.set_control(control, i);
+            }
+
+            let count1 = dma.channels[1].remaining();
+            let count2 = dma.channels[2].remaining();
+            dma.trigger_sound_fifo(0);
+            assert!(!dma.any_active());
+            assert_eq!(dma.channels[1].remaining(), count1);
+            assert_eq!(dma.channels[2].remaining(), count2);
+        }
     }
 
     #[test]

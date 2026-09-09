@@ -314,6 +314,7 @@ impl GbaTimers {
             let mut next = self.timers[0].cycles_to_overflow();
 
             // clock timers 1-3 with cascade support
+            #[allow(clippy::needless_range_loop)]
             for i in 1..4 {
                 let prev_overflow = batch_overflows & (1 << (i - 1)) != 0;
                 if self.timers[i].cascade() {
@@ -755,6 +756,27 @@ mod tests {
         assert_eq!(timers.clock(2), 2);
         assert_eq!(timers.read_counter(0), 0xFFFA);
         assert_eq!(timers.read_counter(1), 0xFFFB);
+        assert_eq!(timers.read_counter(2), 0xFFFF);
+        assert_eq!(timers.read_counter(3), 0xFFFF);
+    }
+
+    #[test]
+    fn test_timers_run_pending_cascade_order() {
+        let mut timers = GbaTimers::new();
+        for i in 0..4 {
+            timers.write_reload(i, 0xFFFF);
+            timers.write_control(i, if i == 0 { 0x80 } else { 0x84 });
+        }
+
+        assert_eq!(timers.clock(3), 15);
+        assert_eq!(timers.read_counter(0), 0xFFFF);
+        assert_eq!(timers.read_counter(1), 0xFFFF);
+        assert_eq!(timers.read_counter(2), 0xFFFF);
+        assert_eq!(timers.read_counter(3), 0xFFFF);
+
+        // a disabled timer breaks the cascade without stopping timer 0
+        timers.write_control(1, 4);
+        assert_eq!(timers.clock(2), 1);
         assert_eq!(timers.read_counter(2), 0xFFFF);
         assert_eq!(timers.read_counter(3), 0xFFFF);
     }

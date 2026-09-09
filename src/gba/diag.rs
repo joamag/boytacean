@@ -234,8 +234,7 @@ pub fn run_audio_diagnostics(gba: &mut GameBoyAdvance, num_frames: u32) {
                 ds_b.debug_pops, ds_b.debug_underflows, ds_b.debug_resets, ds_b.debug_writes,
             );
 
-            for i in 0..2 {
-                let timer = &gba.cpu.bus.timers.timers[i];
+            for (i, timer) in gba.cpu.bus.timers.timers.iter().enumerate().take(2) {
                 if timer.enabled() {
                     let reload = timer.reload();
                     let period = 0x10000u32 - reload as u32;
@@ -264,8 +263,7 @@ pub fn run_audio_diagnostics(gba: &mut GameBoyAdvance, num_frames: u32) {
                 }
             }
 
-            for i in 1..=2 {
-                let ch = &gba.cpu.bus.dma.channels[i];
+            for (i, ch) in gba.cpu.bus.dma.channels.iter().enumerate().take(3).skip(1) {
                 if ch.enabled() {
                     let ts = match ch.timing() {
                         0 => "Imm",
@@ -314,8 +312,7 @@ pub fn run_audio_diagnostics(gba: &mut GameBoyAdvance, num_frames: u32) {
                     if !dma1_s && !dma2_s {
                         println!("  !! No DMA1/2 with SPECIAL timing");
                     }
-                    for j in 1..=2 {
-                        let c = &gba.cpu.bus.dma.channels[j];
+                    for (j, c) in gba.cpu.bus.dma.channels.iter().enumerate().take(3).skip(1) {
                         if c.enabled() && c.timing() == 3 {
                             let d = c.dst_reg();
                             if d != 0x0400_00A0 && d != 0x0400_00A4 {
@@ -477,8 +474,7 @@ fn print_state(gba: &GameBoyAdvance, frame: u32, cycles: u64) {
     );
 
     // print timer state
-    for i in 0..4 {
-        let timer = &cpu.bus.timers.timers[i];
+    for (i, timer) in cpu.bus.timers.timers.iter().enumerate() {
         if timer.enabled() {
             println!(
                 "         | TM{}: cnt={:#06x} reload={:#06x} ctrl={:#06x} cascade={} irq={}",

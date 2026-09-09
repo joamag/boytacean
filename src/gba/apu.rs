@@ -644,6 +644,7 @@ impl GbaApu {
     /// Called when a timer overflows; feeds DirectSound FIFO channels.
     pub fn timer_overflow(&mut self, timer_id: usize) {
         self.flush();
+        #[allow(clippy::needless_range_loop)]
         for i in 0..2 {
             if self.direct_sound[i].timer_id == timer_id {
                 self.direct_sound[i].timer_tick();
@@ -1668,16 +1669,6 @@ mod tests {
     }
 
     #[test]
-    fn test_apu_timer_overflow() {
-        let mut apu = GbaApu::new();
-        apu.direct_sound[0].timer_id = 0;
-        apu.direct_sound[0].write_fifo(0x00000042);
-
-        apu.timer_overflow(0);
-        assert_eq!(apu.direct_sound[0].current_sample, 0x42);
-    }
-
-    #[test]
     fn test_apu_drain_audio_buffer() {
         let mut apu = GbaApu::new();
         apu.set_soundcnt_x(0x80);
@@ -1695,6 +1686,49 @@ mod tests {
         apu.flush();
         apu.clear_audio_buffer();
         assert!(apu.audio_buffer().is_empty());
+    }
+
+    #[test]
+    fn test_apu_timer_overflow() {
+        let mut apu = GbaApu::new();
+        apu.direct_sound[0].timer_id = 0;
+        apu.direct_sound[0].write_fifo(0x00000042);
+
+        apu.timer_overflow(0);
+        assert_eq!(apu.direct_sound[0].current_sample, 0x42);
+    }
+
+    #[test]
+    fn test_apu_timer_overflow_channel_selection() {
+        for timer_a in 0..2 {
+            for timer_b in 0..2 {
+                for timer_id in 0..3 {
+                    let mut apu = GbaApu::new();
+                    apu.direct_sound[0].timer_id = timer_a;
+                    apu.direct_sound[1].timer_id = timer_b;
+                    apu.direct_sound[0].write_fifo(0x01020304);
+                    apu.direct_sound[1].write_fifo(0x05060708);
+
+                    apu.timer_overflow(timer_id);
+                    assert_eq!(
+                        apu.direct_sound[0].current_sample(),
+                        if timer_id == timer_a { 4 } else { 0 }
+                    );
+                    assert_eq!(
+                        apu.direct_sound[1].current_sample(),
+                        if timer_id == timer_b { 8 } else { 0 }
+                    );
+                    assert_eq!(
+                        apu.direct_sound[0].fifo_len(),
+                        if timer_id == timer_a { 3 } else { 4 }
+                    );
+                    assert_eq!(
+                        apu.direct_sound[1].fifo_len(),
+                        if timer_id == timer_b { 3 } else { 4 }
+                    );
+                }
+            }
+        }
     }
 
     #[test]

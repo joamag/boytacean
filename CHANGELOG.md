@@ -47,6 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+* GBA build failures with newer nightly Clippy checks
 * Batched CPU stepping is now bounded, instead of running an unlimited number of instructions
 * Loading of the default WASM binary when the core package is installed from npm
 * Build of the web front-end after the change in the WASM binary resolution
