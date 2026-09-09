@@ -36,9 +36,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Faster GBA instruction fetching from the main memory regions
 * Lower GBA instruction overhead when running with inactive timers or waiting for the next timer overflow
 * Faster GBA timer overflow handling without losing cascade, interrupt or DirectSound events
+* Faster GBA audio batching and square/wave phase advancement while preserving sample and frame sequencer ordering - [#49](https://github.com/joamag/boytacean/issues/49)
+* Lower GBA instruction overhead by handling display events outside the common clock path
 
 ### Fixed
 
+* GBA audio samples using future channel or DirectSound FIFO state when clocking in batches or waiting in HALT - [#49](https://github.com/joamag/boytacean/issues/49)
+* Incorrect GBA wave RAM bank selection, 64-sample starting bank and forced 75% volume rounding - [#50](https://github.com/joamag/boytacean/issues/50)
+* GBA byte writes corrupting display, DMA, timer reload and serial send registers, acknowledging untouched IF bits and updating BIOS interrupt bookkeeping when using a real BIOS - [#51](https://github.com/joamag/boytacean/issues/51)
+* GBA VBlank status remaining set on the final scanline and incorrect odd tile selection for 8bpp sprites in 2D mapping - [#52](https://github.com/joamag/boytacean/issues/52)
 * GBA reset erasing battery-backed SRAM, Flash and EEPROM save data
 * Incorrect zero flag for GBA long multiply instructions with a nonzero low result word
 * GBA HALT failing to wake on enabled interrupt requests when IME or CPSR masks IRQ entry
