@@ -1267,8 +1267,10 @@ impl Ppu {
     pub fn frame_buffer_xrgb8888_u32(&mut self) -> [u32; DISPLAY_SIZE] {
         // in DMG mode the pixels are mapped straight from the shade buffer
         // through the (four color) palette, skipping the expansion of the
-        // complete frame buffer into RGB888 only to pack it again
-        if self.gb_mode == GameBoyMode::Dmg {
+        // complete frame buffer into RGB888 only to pack it again, this is
+        // only done while the frame buffer has not yet been expanded for the
+        // current frame, so that all the formats agree within a frame
+        if self.gb_mode == GameBoyMode::Dmg && self.frame_index != self.frame_buffer_index {
             let palette = self
                 .palette_colors
                 .map(|[r, g, b]| ((r as u32) << 16) | ((g as u32) << 8) | b as u32);
@@ -1344,7 +1346,7 @@ impl Ppu {
     }
 
     pub fn frame_buffer_rgba(&mut self) -> [u8; FRAME_BUFFER_RGBA_SIZE] {
-        if self.gb_mode == GameBoyMode::Dmg {
+        if self.gb_mode == GameBoyMode::Dmg && self.frame_index != self.frame_buffer_index {
             let palette: PaletteAlpha = self.palette_colors.map(|[r, g, b]| [r, g, b, 0xff]);
             let mut buffer = [0u8; FRAME_BUFFER_RGBA_SIZE];
             for (pixel, shade) in buffer
@@ -2987,6 +2989,37 @@ mod tests {
             );
             assert_eq!(pixel[RGB_SIZE], 0xff);
         }
+    }
+
+    /// Tests that once the frame buffer has been expanded for the current
+    /// frame the packed accessors reuse it, so that all the formats agree
+    /// even if the shade buffer changes before the next frame starts.
+    #[test]
+    fn test_frame_buffer_packed_cached() {
+        let mut ppu = Ppu::default();
+        ppu.set_palette_colors(&TEST_PALETTE);
+
+        // expands the frame buffer for the current frame (all pixels use
+        // the shade 0) and then changes a shade without advancing the frame
+        ppu.frame_buffer();
+        ppu.shade_buffer[0] = 3;
+
+        let [r, g, b] = TEST_PALETTE[0];
+        assert_eq!(
+            ppu.frame_buffer_xrgb8888_u32()[0],
+            ((r as u32) << 16) | ((g as u32) << 8) | b as u32
+        );
+        assert_eq!(&ppu.frame_buffer_rgba()[..RGB_SIZE], &TEST_PALETTE[0]);
+
+        // once the frame advances the new shade becomes visible again
+        ppu.frame_index = ppu.frame_index.wrapping_add(1);
+
+        let [r, g, b] = TEST_PALETTE[3];
+        assert_eq!(
+            ppu.frame_buffer_xrgb8888_u32()[0],
+            ((r as u32) << 16) | ((g as u32) << 8) | b as u32
+        );
+        assert_eq!(&ppu.frame_buffer_rgba()[..RGB_SIZE], &TEST_PALETTE[3]);
     }
 
     /// Tests that the palette mapping of the frame buffer uses the
