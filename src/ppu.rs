@@ -1228,6 +1228,11 @@ impl Ppu {
         }
     }
 
+    /// Obtains the RGB frame buffer with the pixels ready to be displayed.
+    ///
+    /// In DMG mode the frame buffer is lazily expanded from the shade
+    /// buffer using the current palette colors, at most once per frame,
+    /// as controlled by the `frame_buffer_index` value.
     pub fn frame_buffer(&mut self) -> &[u8; FRAME_BUFFER_SIZE] {
         if self.gb_mode != GameBoyMode::Dmg {
             return &self.frame_buffer;
@@ -1247,6 +1252,10 @@ impl Ppu {
         &self.frame_buffer
     }
 
+    /// Obtains the frame buffer converted to the XRGB8888 format.
+    ///
+    /// Uses four bytes per pixel in the little endian byte order (blue
+    /// first) with the unused byte set to 0xff.
     pub fn frame_buffer_xrgb8888(&mut self) -> [u8; FRAME_BUFFER_XRGB8888_SIZE] {
         let frame_buffer = self.frame_buffer();
         let mut buffer = [0u8; FRAME_BUFFER_XRGB8888_SIZE];
@@ -1264,6 +1273,11 @@ impl Ppu {
         buffer
     }
 
+    /// Obtains the frame buffer converted to XRGB8888 as 32 bit values.
+    ///
+    /// Uses one 32 bit value per pixel, encoded as 0x00RRGGBB, in DMG
+    /// mode the pixels are mapped straight from the shade buffer whenever
+    /// the frame buffer has not yet been expanded for the current frame.
     pub fn frame_buffer_xrgb8888_u32(&mut self) -> [u32; DISPLAY_SIZE] {
         // in DMG mode the pixels are mapped straight from the shade buffer
         // through the (four color) palette as a performance optimization,
@@ -1295,6 +1309,9 @@ impl Ppu {
         buffer
     }
 
+    /// Obtains the frame buffer converted to the RGB1555 format.
+    ///
+    /// Uses two bytes per pixel in the little endian byte order.
     pub fn frame_buffer_rgb1555(&mut self) -> [u8; FRAME_BUFFER_RGB1555_SIZE] {
         let frame_buffer = self.frame_buffer();
         let mut buffer = [0u8; FRAME_BUFFER_RGB1555_SIZE];
@@ -1302,6 +1319,10 @@ impl Ppu {
         buffer
     }
 
+    /// Obtains the frame buffer converted to RGB1555 as 16 bit values.
+    ///
+    /// Uses one 16 bit value per pixel, matching the byte version of the
+    /// conversion when read in the little endian byte order.
     pub fn frame_buffer_rgb1555_u16(&mut self) -> [u16; DISPLAY_SIZE] {
         let frame_buffer = self.frame_buffer();
         let mut buffer = [0u16; DISPLAY_SIZE];
@@ -1316,6 +1337,9 @@ impl Ppu {
         buffer
     }
 
+    /// Obtains the frame buffer converted to the RGB565 format.
+    ///
+    /// Uses two bytes per pixel in the little endian byte order.
     pub fn frame_buffer_rgb565(&mut self) -> [u8; FRAME_BUFFER_RGB565_SIZE] {
         let frame_buffer = self.frame_buffer();
         let mut buffer = [0u8; FRAME_BUFFER_RGB565_SIZE];
@@ -1332,6 +1356,10 @@ impl Ppu {
         buffer
     }
 
+    /// Obtains the frame buffer converted to RGB565 as 16 bit values.
+    ///
+    /// Uses one 16 bit value per pixel, matching the byte version of the
+    /// conversion when read in the little endian byte order.
     pub fn frame_buffer_rgb565_u16(&mut self) -> [u16; DISPLAY_SIZE] {
         let frame_buffer = self.frame_buffer();
         let mut buffer = [0u16; DISPLAY_SIZE];
@@ -1346,6 +1374,12 @@ impl Ppu {
         buffer
     }
 
+    /// Obtains the frame buffer converted to the RGBA format.
+    ///
+    /// Uses four bytes per pixel with an opaque (0xff) alpha channel, in
+    /// DMG mode the pixels are mapped straight from the shade buffer
+    /// whenever the frame buffer has not yet been expanded for the
+    /// current frame.
     pub fn frame_buffer_rgba(&mut self) -> [u8; FRAME_BUFFER_RGBA_SIZE] {
         // in DMG mode the pixels are mapped straight from the shade buffer
         // through the (four color) palette as a performance optimization,
@@ -1382,15 +1416,17 @@ impl Ppu {
     }
 
     /// Obtains the "raw" version of the frame buffer any custom
-    /// color palette operation applied to it. This is can be an
-    /// extremely slow operation (in DMG devices) and because of
-    /// that should be used carefully.
+    /// color palette operation applied to it.
+    ///
+    /// This is can be an extremely slow operation (in DMG devices)
+    /// and because of that should be used carefully.
     pub fn frame_buffer_raw(&self) -> [u8; FRAME_BUFFER_SIZE] {
         self.frame_buffer_palette(&BASIC_PALETTE)
     }
 
     /// Obtains the frame buffer with the colors mapped according
     /// to the provided palette of colors.
+    ///
     /// This method is very slow and only useful for the DMG mode
     /// which can have its simple colors mapped to palettes.
     pub fn frame_buffer_palette(&self, palette_colors: &Palette) -> [u8; FRAME_BUFFER_SIZE] {
