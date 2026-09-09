@@ -25,14 +25,34 @@ pub const BOOT_SIZE_CGB: usize = 2304;
 pub const RAM_SIZE_DMG: usize = 8192;
 pub const RAM_SIZE_CGB: usize = 32768;
 
+/// Trait representing a component that can be accessed via
+/// the memory bus.
+///
+/// This trait defines the basic interface for any component
+/// that can be/ accessed through the memory bus, including
+/// methods for reading and writing both single and multiple bytes.
 pub trait BusComponent {
+    /// Reads a byte from the specified address.
     fn read(&self, addr: u16) -> u8;
+
+    /// Writes a byte to the specified address.
     fn write(&mut self, addr: u16, value: u8);
+
+    /// Reads multiple bytes starting from the specified address.
+    ///
+    /// This method reads `count` bytes starting from the specified
+    /// `addr` and returns them as a new vector.
     fn read_many(&self, addr: u16, count: usize) -> Vec<u8> {
         (0..count)
             .map(|offset| self.read(addr + offset as u16))
             .collect()
     }
+
+    /// Writes multiple bytes starting from the specified address.
+    ///
+    /// This method should be used when you need to write a sequence
+    /// of bytes defined in the `values` slice to consecutive memory
+    /// locations, starting from the specified address in `addr`.
     fn write_many(&mut self, addr: u16, values: &[u8]) {
         for (offset, &value) in values.iter().enumerate() {
             self.write(addr + offset as u16, value);
@@ -40,6 +60,26 @@ pub trait BusComponent {
     }
 }
 
+/// Represents the Game Boy MMU (Memory Management Unit) and controls
+/// all of the logic behind the memory access and address mapping.
+/// The MMU is responsible for routing the read and write operations
+/// of the CPU to the proper component or memory region.
+///
+/// Should store both the boot ROM and the work RAM together with the
+/// memory mapped components (PPU, APU, DMA, gamepad, timer, serial
+/// and cartridge), forwarding the access operations to them.
+///
+/// Current implementation is compatible with both DMG and CGB.
+///
+/// # Basic usage
+///
+/// ```rust
+/// use boytacean::mmu::Mmu;
+/// let mut mmu = Mmu::default();
+/// mmu.allocate_default();
+/// mmu.write(0xc000, 0x12);
+/// assert_eq!(mmu.read(0xc000), 0x12);
+/// ```
 pub struct Mmu {
     /// Register that controls the interrupts that are considered
     /// to be enabled and should be triggered.

@@ -50,7 +50,7 @@ use crate::{
     mmu::Mmu,
     pad::{Pad, PadKey},
     ppu::{
-        Ppu, PpuMode, Tile, DISPLAY_HEIGHT, DISPLAY_WIDTH, FRAME_BUFFER_RGB1555_SIZE,
+        Ppu, PpuMode, Tile, DISPLAY_HEIGHT, DISPLAY_SIZE, DISPLAY_WIDTH, FRAME_BUFFER_RGB1555_SIZE,
         FRAME_BUFFER_RGB565_SIZE, FRAME_BUFFER_RGBA_SIZE, FRAME_BUFFER_SIZE,
         FRAME_BUFFER_XRGB8888_SIZE,
     },
@@ -652,7 +652,12 @@ impl GameBoy {
     ///
     /// At the end of this execution major synchronization issues
     /// may arise, so use with caution.
+    ///
+    /// The number of clock operations is capped at
+    /// [`MAX_CLOCK_MANY`][GameBoy::MAX_CLOCK_MANY] so that the cycles
+    /// handed over to the components remain in a valid range.
     pub fn clock_many(&mut self, count: usize) -> u16 {
+        let count = count.min(Self::MAX_CLOCK_MANY);
         let mut cycles = 0u16;
         for _ in 0..count {
             cycles += self.cpu_clock() as u16;
@@ -1209,6 +1214,17 @@ impl GameBoy {
     /// loop in the Game Boy's PPU (in CPU cycles).
     pub const LCD_CYCLES: u32 = 70224;
 
+    /// The maximum number of cycles that a single CPU clock operation
+    /// may take, the longest instructions are the conditional calls.
+    pub const MAX_CPU_CYCLES: u16 = 24;
+
+    /// The maximum number of CPU clock operations that may be run by a
+    /// single [`clock_many()`][GameBoy::clock_many()] call, making sure
+    /// that the cycles produced by the batch stay within the positive
+    /// range of an `i16`, which is the type used by some of the
+    /// components to keep track of their internal timers.
+    pub const MAX_CLOCK_MANY: usize = (i16::MAX as u16 / Self::MAX_CPU_CYCLES) as usize;
+
     pub fn cpu(&mut self) -> &mut Cpu {
         &mut self.cpu
     }
@@ -1301,7 +1317,7 @@ impl GameBoy {
         self.ppu().frame_buffer_xrgb8888()
     }
 
-    pub fn frame_buffer_xrgb8888_u32(&mut self) -> [u32; FRAME_BUFFER_SIZE] {
+    pub fn frame_buffer_xrgb8888_u32(&mut self) -> [u32; DISPLAY_SIZE] {
         self.ppu().frame_buffer_xrgb8888_u32()
     }
 
@@ -1309,7 +1325,7 @@ impl GameBoy {
         self.ppu().frame_buffer_rgb1555()
     }
 
-    pub fn frame_buffer_rgb1555_u16(&mut self) -> [u16; FRAME_BUFFER_SIZE] {
+    pub fn frame_buffer_rgb1555_u16(&mut self) -> [u16; DISPLAY_SIZE] {
         self.ppu().frame_buffer_rgb1555_u16()
     }
 
@@ -1317,7 +1333,7 @@ impl GameBoy {
         self.ppu().frame_buffer_rgb565()
     }
 
-    pub fn frame_buffer_rgb565_u16(&mut self) -> [u16; FRAME_BUFFER_SIZE] {
+    pub fn frame_buffer_rgb565_u16(&mut self) -> [u16; DISPLAY_SIZE] {
         self.ppu().frame_buffer_rgb565_u16()
     }
 
@@ -1776,7 +1792,11 @@ impl Display for GameBoy {
 
 #[cfg(test)]
 mod tests {
-    use super::GameBoySpeed;
+    use super::{GameBoy, GameBoyMode, GameBoySpeed};
+    use crate::{
+        ppu::DISPLAY_SIZE,
+        test::{build_test, TestOptions},
+    };
 
     /// Tests that the speed shift value is equivalent to a division
     /// by the speed multiplier when normalizing cycle counts.
@@ -1786,6 +1806,61 @@ mod tests {
             for cycles in [0u16, 4, 8, 12, 16, 20, 24] {
                 assert_eq!(cycles >> speed.shift(), cycles / speed.multiplier() as u16);
             }
+        }
+    }
+
+    /// Tests that the batched clock operation is capped, making sure
+    /// that the cycles handed over to the components are kept within
+    /// the positive range of an `i16`.
+    #[test]
+    fn test_clock_many_capped() {
+        let mut game_boy = build_test(TestOptions {
+            ppu_enabled: Some(false),
+            apu_enabled: Some(false),
+            dma_enabled: Some(false),
+            timer_enabled: Some(false),
+            ..Default::default()
+        });
+        game_boy.load_rom_empty().unwrap();
+
+        // runs the CPU from a RAM position, which is filled with zeros
+        // and is therefore decoded as a sequence of NOP instructions
+        game_boy.cpu().set_pc(0xc000);
+
+        let cycles = game_boy.clock_many(usize::MAX);
+
+        assert_eq!(cycles, (GameBoy::MAX_CLOCK_MANY * 4) as u16);
+        assert!(cycles <= i16::MAX as u16);
+    }
+
+    /// Tests that the pixel packed frame buffers are display sized and
+    /// that each one of them is converted using the expected format.
+    #[test]
+    fn test_frame_buffer_packed() {
+        let mut game_boy = GameBoy::new(Some(GameBoyMode::Dmg));
+
+        // sets a palette with a distinctive first color so that the three
+        // packed formats produce different values for it, the green channel
+        // is high enough to make use of the extra bit it has in RGB565
+        game_boy.ppu().set_palette_colors(&[
+            [0x12, 0xb4, 0x56],
+            [0x9a, 0xbc, 0xde],
+            [0x21, 0x43, 0x65],
+            [0xed, 0xcb, 0xa9],
+        ]);
+
+        let xrgb8888 = game_boy.frame_buffer_xrgb8888_u32();
+        let rgb1555 = game_boy.frame_buffer_rgb1555_u16();
+        let rgb565 = game_boy.frame_buffer_rgb565_u16();
+
+        assert_eq!(xrgb8888.len(), DISPLAY_SIZE);
+        assert_eq!(rgb1555.len(), DISPLAY_SIZE);
+        assert_eq!(rgb565.len(), DISPLAY_SIZE);
+
+        for index in 0..DISPLAY_SIZE {
+            assert_eq!(xrgb8888[index], 0x0012b456, "at index {index}");
+            assert_eq!(rgb1555[index], 0x8aca, "at index {index}");
+            assert_eq!(rgb565[index], 0x15aa, "at index {index}");
         }
     }
 }

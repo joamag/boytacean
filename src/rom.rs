@@ -925,8 +925,8 @@ impl Cartridge {
 
     pub fn checksum(&self) -> u8 {
         let mut sum: u8 = 0;
-        for i in 0x0134..=0x014c {
-            sum = sum.wrapping_sub(self.rom_data[i]).wrapping_sub(1);
+        for byte in &self.rom_data[0x0134..=0x014c] {
+            sum = sum.wrapping_sub(*byte).wrapping_sub(1);
         }
         sum
     }

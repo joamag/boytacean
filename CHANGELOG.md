@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-* `README.md` for the `boytacean-react` package, documenting the components, props, hooks and keys, with a quick start, a complete emulation page example and copy and paste instructions to build one from scratch
+* Documentation for the React package, covering components, hooks and keys with a complete quick start
 * Game Boy Advance (GBA) emulation with ARM7TDMI CPU (ARM and Thumb instruction sets)
 * GBA scanline-based PPU supporting video modes 0-5 with text and affine backgrounds
 * GBA APU with 4 legacy channels and 2 DirectSound PCM FIFO channels
@@ -30,6 +30,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+* Faster and more resilient release builds through caching of native dependencies
+* Smaller and faster pixel packed frame buffers, which no longer carry two thirds of unused space
+* Faster pixel drawing, worth up to 10% more frames per second in Game Boy Color games
+* Frames are converted to the 15 bit color format in about half the time
+* Faster audio emulation, worth up to 18% more frames per second in games with sound
+* Frames are handed to the native and Python front-ends more than twice as fast on the original Game Boy
 * Major GBA emulation performance improvements across memory access, idle CPU handling, audio and video rendering
 * Faster GBA scanline composition, tile fetching and sprite scanning
 * Another round of GBA performance work making commercial games run about 1.5x faster
@@ -41,6 +47,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+* Batched CPU stepping is now bounded, instead of running an unlimited number of instructions
+* Loading of the default WASM binary when the core package is installed from npm
+* Build of the web front-end after the change in the WASM binary resolution
+* Builds on older Rust versions after dependency releases raised their minimum supported version
 * GBA audio samples using future channel or DirectSound FIFO state when clocking in batches or waiting in HALT - [#49](https://github.com/joamag/boytacean/issues/49)
 * Incorrect GBA wave RAM bank selection, 64-sample starting bank and forced 75% volume rounding - [#50](https://github.com/joamag/boytacean/issues/50)
 * GBA byte writes corrupting display, DMA, timer reload and serial send registers, acknowledging untouched IF bits and updating BIOS interrupt bookkeeping when using a real BIOS - [#51](https://github.com/joamag/boytacean/issues/51)
@@ -49,8 +59,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Incorrect zero flag for GBA long multiply instructions with a nonzero low result word
 * GBA HALT failing to wake on enabled interrupt requests when IME or CPSR masks IRQ entry
 * Lost GBA timer cascade and DirectSound FIFO events when a clock batch spans multiple overflows, and timer 0 incorrectly honoring the unused cascade bit
-* Resolution of the default WASM binary path in `boytacean-core`, which pointed at a `lib` directory that only exists in the repository and therefore failed whenever the package was installed from npm
-* Build of the web front-end, which was broken by the resolution of the WASM binary through a bare specifier, as Parcel resolves those at build time and the `boytacean` package is aliased to a local file
 * Corrupted backgrounds in Golden Sun caused by idle CPU wake timing
 * Distorted intro screens in Sonic Advance caused by extra scroll updates during VBlank
 * Random GBA crashes and stack corruption from interrupts taken right after a branch
