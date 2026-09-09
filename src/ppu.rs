@@ -1266,10 +1266,11 @@ impl Ppu {
 
     pub fn frame_buffer_xrgb8888_u32(&mut self) -> [u32; DISPLAY_SIZE] {
         // in DMG mode the pixels are mapped straight from the shade buffer
-        // through the (four color) palette, skipping the expansion of the
-        // complete frame buffer into RGB888 only to pack it again, this is
-        // only done while the frame buffer has not yet been expanded for the
-        // current frame, so that all the formats agree within a frame
+        // through the (four color) palette as a performance optimization,
+        // skipping the expansion of the complete frame buffer into RGB888
+        // only to convert it again, this is only done while the frame buffer
+        // has not yet been expanded for the current frame, so that all the
+        // formats agree within a frame
         if self.gb_mode == GameBoyMode::Dmg && self.frame_index != self.frame_buffer_index {
             let palette = self
                 .palette_colors
@@ -1346,6 +1347,12 @@ impl Ppu {
     }
 
     pub fn frame_buffer_rgba(&mut self) -> [u8; FRAME_BUFFER_RGBA_SIZE] {
+        // in DMG mode the pixels are mapped straight from the shade buffer
+        // through the (four color) palette as a performance optimization,
+        // skipping the expansion of the complete frame buffer into RGB888
+        // only to convert it again, this is only done while the frame buffer
+        // has not yet been expanded for the current frame, so that all the
+        // formats agree within a frame
         if self.gb_mode == GameBoyMode::Dmg && self.frame_index != self.frame_buffer_index {
             let palette: PaletteAlpha = self.palette_colors.map(|[r, g, b]| [r, g, b, 0xff]);
             let mut buffer = [0u8; FRAME_BUFFER_RGBA_SIZE];
