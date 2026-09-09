@@ -50,8 +50,9 @@ pub trait BusComponent {
 
     /// Writes multiple bytes starting from the specified address.
     ///
-    /// This method should be used when you need to write a sequence of bytes
-    /// to consecutive memory locations, starting from the specified address.
+    /// This method should be used when you need to write a sequence
+    /// of bytes defined in the `values` slice to consecutive memory
+    /// locations, starting from the specified address in `addr`.
     fn write_many(&mut self, addr: u16, values: &[u8]) {
         for (offset, &value) in values.iter().enumerate() {
             self.write(addr + offset as u16, value);
@@ -59,6 +60,26 @@ pub trait BusComponent {
     }
 }
 
+/// Represents the Game Boy MMU (Memory Management Unit) and controls
+/// all of the logic behind the memory access and address mapping.
+/// The MMU is responsible for routing the read and write operations
+/// of the CPU to the proper component or memory region.
+///
+/// Should store both the boot ROM and the work RAM together with the
+/// memory mapped components (PPU, APU, DMA, gamepad, timer, serial
+/// and cartridge), forwarding the access operations to them.
+///
+/// Current implementation is compatible with both DMG and CGB.
+///
+/// # Basic usage
+///
+/// ```rust
+/// use boytacean::mmu::Mmu;
+/// let mut mmu = Mmu::default();
+/// mmu.allocate_default();
+/// mmu.write(0xc000, 0x12);
+/// assert_eq!(mmu.read(0xc000), 0x12);
+/// ```
 pub struct Mmu {
     /// Register that controls the interrupts that are considered
     /// to be enabled and should be triggered.
