@@ -25,14 +25,33 @@ pub const BOOT_SIZE_CGB: usize = 2304;
 pub const RAM_SIZE_DMG: usize = 8192;
 pub const RAM_SIZE_CGB: usize = 32768;
 
+/// Trait representing a component that can be accessed via
+/// the memory bus.
+///
+/// This trait defines the basic interface for any component
+/// that can be/ accessed through the memory bus, including
+/// methods for reading and writing both single and multiple bytes.
 pub trait BusComponent {
+    /// Reads a byte from the specified address.
     fn read(&self, addr: u16) -> u8;
+
+    /// Writes a byte to the specified address.
     fn write(&mut self, addr: u16, value: u8);
+
+    /// Reads multiple bytes starting from the specified address.
+    ///
+    /// This method reads `count` bytes starting from the specified
+    /// `addr` and returns them as a new vector.
     fn read_many(&self, addr: u16, count: usize) -> Vec<u8> {
         (0..count)
             .map(|offset| self.read(addr + offset as u16))
             .collect()
     }
+
+    /// Writes multiple bytes starting from the specified address.
+    ///
+    /// This method should be used when you need to write a sequence of bytes
+    /// to consecutive memory locations, starting from the specified address.
     fn write_many(&mut self, addr: u16, values: &[u8]) {
         for (offset, &value) in values.iter().enumerate() {
             self.write(addr + offset as u16, value);
