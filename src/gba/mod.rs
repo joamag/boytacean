@@ -1,0 +1,1164 @@
+//! Game Boy Advance emulation entrypoint and associated structures.
+//!
+//! Provides the [`GameBoyAdvance`] struct as the main entry-point API
+//! for GBA emulation, mirroring the role of [`GameBoy`](crate::gb::GameBoy)
+//! for the original Game Boy.
+
+pub mod apu;
+pub mod arm;
+pub mod bios;
+pub mod bus;
+pub mod consts;
+pub mod cpu;
+pub mod diag;
+pub mod dma;
+pub mod flash;
+pub mod irq;
+pub mod pad;
+pub mod ppu;
+pub mod rom;
+pub mod thumb;
+pub mod timer;
+
+#[cfg(feature = "wasm")]
+use std::panic::{set_hook, take_hook, PanicInfo};
+use std::{
+    collections::VecDeque,
+    fmt::{self, Display, Formatter},
+};
+
+use boytacean_common::error::Error;
+#[cfg(feature = "wasm")]
+use wasm_bindgen::prelude::*;
+
+use self::{
+    bus::GbaBus,
+    consts::{DISPLAY_HEIGHT, DISPLAY_WIDTH, EWRAM_SIZE, IWRAM_SIZE, VRAM_SIZE},
+    cpu::Arm7Tdmi,
+    flash::SaveType,
+    rom::GbaRomInfo,
+};
+use crate::{info::Info, pad::PadKey};
+
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
+pub struct GbaClockFrame {
+    pub cycles: u64,
+    pub frames: u16,
+    frame_buffer: Option<Vec<u8>>,
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
+impl GbaClockFrame {
+    pub fn frame_buffer_eager(&mut self) -> Option<Vec<u8>> {
+        self.frame_buffer.take()
+    }
+}
+
+/// Top level structure that abstracts the usage of the
+/// Game Boy Advance system under the Boytacean emulator.
+///
+/// Should serve as the main entry-point API.
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
+pub struct GameBoyAdvance {
+    /// The ARM7TDMI CPU (includes the memory bus).
+    #[cfg_attr(feature = "wasm", wasm_bindgen(skip))]
+    pub cpu: Arm7Tdmi,
+
+    /// Frame counter tracking completed frames.
+    frame: u64,
+
+    /// If the PPU is enabled, it will be clocked.
+    ppu_enabled: bool,
+
+    /// If the APU is enabled, it will be clocked.
+    apu_enabled: bool,
+
+    /// If DMA is enabled, it will be processed.
+    dma_enabled: bool,
+
+    /// If timers are enabled, they will be clocked.
+    timer_enabled: bool,
+
+    /// ROM information extracted from the header.
+    rom_info: Option<GbaRomInfo>,
+}
+
+impl GameBoyAdvance {
+    /// CPU clock frequency: 16.78 MHz.
+    pub const CPU_FREQ: u32 = consts::CPU_FREQ;
+
+    /// Visual refresh frequency (~59.7275 Hz).
+    pub const VISUAL_FREQ: f32 = consts::VISUAL_FREQ;
+
+    /// Display width in pixels.
+    pub const DISPLAY_WIDTH: usize = DISPLAY_WIDTH;
+
+    /// Display height in pixels.
+    pub const DISPLAY_HEIGHT: usize = DISPLAY_HEIGHT;
+
+    /// Loads a real BIOS ROM from a byte slice.
+    ///
+    /// When loaded, the CPU will boot from address 0x00000000 (BIOS entry)
+    /// and SWI instructions will execute through the real BIOS code.
+    pub fn load_bios(&mut self, data: &[u8]) {
+        self.cpu.bus.load_bios(data);
+
+        // resets CPU to boot from BIOS start (address 0x00000000)
+        // the BIOS will initialize registers, run checksums, and
+        // jump to the ROM entry point at 0x08000000.
+        self.cpu.reset_for_bios_boot();
+    }
+
+    /// Loads a ROM from a byte slice, returning the extracted
+    /// ROM information as a result.
+    pub fn load_rom(&mut self, data: &[u8]) -> Result<GbaRomInfo, Error> {
+        let info = GbaRomInfo::from_data(data)?;
+        self.rom_info = Some(info.clone());
+        self.cpu.bus.load_rom(data);
+        if !self.cpu.bus.use_real_bios {
+            self.cpu.bus.postflg = 1; // mark as post-boot
+            self.cpu.bus.rcnt = 0x8000; // BIOS leaves general-purpose mode
+        }
+        Ok(info)
+    }
+
+    /// Returns the current frame buffer (RGB888).
+    pub fn frame_buffer(&self) -> &[u8] {
+        self.cpu.bus.ppu.frame_buffer()
+    }
+
+    /// Returns a reference to the audio buffer.
+    pub fn audio_buffer(&self) -> &VecDeque<i16> {
+        self.cpu.bus.apu.audio_buffer()
+    }
+
+    /// Returns the ROM information if a ROM has been loaded.
+    pub fn rom_info(&self) -> Option<&GbaRomInfo> {
+        self.rom_info.as_ref()
+    }
+}
+
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
+impl GameBoyAdvance {
+    #[cfg_attr(feature = "wasm", wasm_bindgen(constructor))]
+    pub fn new() -> Self {
+        let bus = GbaBus::new();
+        let cpu = Arm7Tdmi::new(bus);
+        Self {
+            cpu,
+            frame: 0,
+            ppu_enabled: true,
+            apu_enabled: true,
+            dma_enabled: true,
+            timer_enabled: true,
+            rom_info: None,
+        }
+    }
+
+    /// Advances the clock by one CPU instruction, clocking all subsystems.
+    ///
+    /// Returns the number of cycles elapsed during this clock.
+    pub fn clock(&mut self) -> u32 {
+        // handle halt state
+        if self.cpu.bus.halt_requested {
+            self.cpu.set_halted(true);
+            self.cpu.bus.halt_requested = false;
+        }
+
+        // execute one CPU instruction (or idle if halted)
+        let cycles = self.cpu.step();
+
+        // clock timers and APU, stopping at each timer overflow
+        if self.timer_enabled && self.cpu.bus.timers.cycles_to_next_overflow() != u32::MAX {
+            if !self.cpu.bus.timers.will_event(cycles) {
+                self.cpu.bus.timers.advance(cycles);
+                if self.apu_enabled {
+                    self.cpu.bus.apu.clock(cycles);
+                }
+            } else {
+                self.clock_timers(cycles);
+            }
+        } else if self.apu_enabled {
+            self.cpu.bus.apu.clock(cycles);
+        }
+
+        // clocks PPU, retrieves the events that occurred during
+        // this clock to trigger related behavior; the dot counter is
+        // advanced without the full event handling (and its slice
+        // arguments) when no event boundary can be reached
+        if self.ppu_enabled {
+            if !self.cpu.bus.ppu.will_event(cycles) {
+                self.cpu.bus.ppu.advance(cycles);
+            } else {
+                self.clock_ppu(cycles);
+            }
+        }
+
+        // processes DMA transfers
+        if self.dma_enabled && self.cpu.bus.dma.any_active() {
+            self.process_dma();
+        }
+
+        // checks keypad interrupt
+        if self.cpu.bus.pad.int_keypad() {
+            self.cpu.bus.irq.raise_keypad();
+            self.cpu.bus.pad.ack_keypad();
+        }
+
+        cycles
+    }
+
+    /// Clocks timers at overflow boundaries, delivering every IRQ
+    /// and DirectSound event without enlarging the instruction path.
+    #[inline(never)]
+    fn clock_timers(&mut self, cycles: u32) {
+        let clock_apu = self.apu_enabled && self.cpu.bus.apu.soundcnt_x() & 0x80 != 0;
+        if self.apu_enabled && !clock_apu {
+            self.cpu.bus.apu.clock(cycles);
+        }
+        let mut remaining = cycles;
+        while remaining > 0 {
+            let batch = remaining.min(self.cpu.bus.timers.cycles_to_next_overflow());
+            let overflows = self.cpu.bus.timers.clock(batch);
+            remaining -= batch;
+            // generate earlier audio before an overflow changes the FIFO sample
+            if clock_apu {
+                self.cpu.bus.apu.clock(batch);
+            }
+            if overflows != 0 {
+                for i in 0..4 {
+                    if overflows & (1 << i) != 0 {
+                        if self.cpu.bus.timers.timers[i].irq_enable() {
+                            self.cpu.bus.irq.raise_timer(i);
+                        }
+                        // timer overflow triggers DirectSound FIFO
+                        if self.apu_enabled {
+                            self.cpu.bus.apu.timer_overflow(i);
+                            // trigger DMA FIFO refill if needed
+                            for fifo in 0..2 {
+                                if self.cpu.bus.apu.direct_sound[fifo].timer_id == i
+                                    && self.cpu.bus.apu.direct_sound[fifo].needs_refill()
+                                {
+                                    self.cpu.bus.dma.trigger_sound_fifo(fifo);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Clocks the PPU at event boundaries, delivering DMA triggers and IRQs.
+    #[inline(never)]
+    fn clock_ppu(&mut self, cycles: u32) {
+        let events = self.cpu.bus.ppu.clock(
+            cycles,
+            self.cpu.bus.vram.as_slice(),
+            self.cpu.bus.palette.as_slice(),
+            self.cpu.bus.oam.as_slice(),
+        );
+
+        if events & 1 != 0 {
+            // hblank DMA trigger (always fires at hblank)
+            if self.dma_enabled {
+                self.cpu.bus.dma.trigger_hblank();
+            }
+        }
+        if events & 4 != 0 {
+            // hblank IRQ (only when DISPSTAT enables it)
+            self.cpu.bus.irq.raise_hblank();
+        }
+        if events & 2 != 0 {
+            // vblank DMA trigger (always fires at vblank)
+            self.frame = self.cpu.bus.ppu.frame();
+            if self.dma_enabled {
+                self.cpu.bus.dma.trigger_vblank();
+            }
+        }
+        if events & 8 != 0 {
+            // vblank IRQ (only when DISPSTAT enables it)
+            self.cpu.bus.irq.raise_vblank();
+        }
+        if events & 16 != 0 {
+            // delivers VCount match IRQ to the controller, relies on
+            // the IntrWait re-halt check in cpu.rs (gated on CPSR_I==0)
+            // to prevent premature unhalt of VBlankIntrWait callers.
+            self.cpu.bus.irq.raise_vcount();
+        }
+    }
+
+    /// Processes pending DMA transfers.
+    #[inline(never)]
+    fn process_dma(&mut self) {
+        while let Some(index) = self.cpu.bus.dma.highest_active() {
+            let channel = &mut self.cpu.bus.dma.channels[index];
+            if !channel.active() {
+                break;
+            }
+
+            let word32 = channel.word_size();
+            let (src, dst, complete) = channel.step();
+
+            if word32 {
+                let value = self.cpu.bus.read32(src);
+                self.cpu.bus.write32(dst, value);
+            } else {
+                let value = self.cpu.bus.read16(src);
+                self.cpu.bus.write16(dst, value);
+            }
+
+            if complete {
+                if self.cpu.bus.dma.channels[index].irq_enable() {
+                    self.cpu.bus.irq.raise_dma(index);
+                }
+                break;
+            }
+        }
+    }
+
+    /// Clocks the emulator until a full frame is completed.
+    pub fn next_frame(&mut self) -> u64 {
+        if !self.ppu_enabled {
+            return 0;
+        }
+        let mut cycles = 0u64;
+        let last_frame = self.frame;
+        while self.frame == last_frame {
+            cycles += self.clock() as u64;
+        }
+        cycles
+    }
+
+    /// Clocks the emulator for the given number of cycles.
+    pub fn clocks_cycles(&mut self, limit: usize) -> u64 {
+        let mut cycles = 0u64;
+        while cycles < limit as u64 {
+            cycles += self.clock() as u64;
+        }
+        cycles
+    }
+
+    /// Returns the current frame number.
+    pub fn ppu_frame(&self) -> u64 {
+        self.frame
+    }
+
+    /// Clears the audio buffer.
+    pub fn clear_audio_buffer(&mut self) {
+        self.cpu.bus.apu.clear_audio_buffer();
+    }
+
+    pub fn key_press(&mut self, key: PadKey) {
+        self.cpu.bus.pad.key_press(key);
+    }
+
+    pub fn key_lift(&mut self, key: PadKey) {
+        self.cpu.bus.pad.key_lift(key);
+    }
+
+    pub fn set_ppu_enabled(&mut self, value: bool) {
+        self.ppu_enabled = value;
+    }
+
+    pub fn set_apu_enabled(&mut self, value: bool) {
+        self.apu_enabled = value;
+    }
+
+    pub fn set_dma_enabled(&mut self, value: bool) {
+        self.dma_enabled = value;
+    }
+
+    pub fn dma_enabled(&self) -> bool {
+        self.dma_enabled
+    }
+
+    pub fn set_timer_enabled(&mut self, value: bool) {
+        self.timer_enabled = value;
+    }
+
+    pub fn timer_enabled(&self) -> bool {
+        self.timer_enabled
+    }
+
+    pub fn set_all_enabled(&mut self, value: bool) {
+        self.set_ppu_enabled(value);
+        self.set_apu_enabled(value);
+        self.set_dma_enabled(value);
+        self.set_timer_enabled(value);
+    }
+
+    pub fn cpu_freq(&self) -> u32 {
+        Self::CPU_FREQ
+    }
+
+    pub fn visual_freq(&self) -> f32 {
+        Self::VISUAL_FREQ
+    }
+
+    pub fn display_width(&self) -> usize {
+        Self::DISPLAY_WIDTH
+    }
+
+    pub fn display_height(&self) -> usize {
+        Self::DISPLAY_HEIGHT
+    }
+
+    pub fn rom_title(&self) -> String {
+        self.rom_info
+            .as_ref()
+            .map(|info| info.title())
+            .unwrap_or_default()
+    }
+
+    pub fn apu_enabled(&self) -> bool {
+        self.apu_enabled
+    }
+
+    pub fn audio_sampling_rate(&self) -> u32 {
+        32768
+    }
+
+    pub fn audio_channels(&self) -> u8 {
+        2
+    }
+
+    pub fn reset(&mut self) {
+        self.cpu.bus.reset();
+        if self.cpu.bus.use_real_bios {
+            self.cpu.reset_for_bios_boot();
+        } else {
+            self.cpu.reset();
+            self.cpu.bus.postflg = 1; // mark as post-boot
+            self.cpu.bus.rcnt = 0x8000; // BIOS leaves general-purpose mode
+        }
+        self.frame = 0;
+    }
+
+    pub fn clocks_frame_buffer(&mut self, limit: usize) -> GbaClockFrame {
+        let mut cycles = 0_u64;
+        let mut frames = 0_u16;
+        let mut frame_buffer: Option<Vec<u8>> = None;
+        let mut last_frame = self.ppu_frame();
+        while cycles < limit as u64 {
+            cycles += self.clock() as u64;
+            if self.ppu_frame() != last_frame {
+                frame_buffer = Some(self.frame_buffer().to_vec());
+                last_frame = self.ppu_frame();
+                frames += 1;
+            }
+        }
+        GbaClockFrame {
+            cycles,
+            frames,
+            frame_buffer,
+        }
+    }
+
+    pub fn frame_buffer_eager(&self) -> Vec<u8> {
+        self.frame_buffer().to_vec()
+    }
+
+    pub fn audio_buffer_eager(&mut self, clear: bool) -> Vec<i16> {
+        self.cpu.bus.apu.flush();
+        if clear {
+            self.cpu.bus.apu.drain_audio_buffer()
+        } else {
+            self.audio_buffer().iter().copied().collect()
+        }
+    }
+
+    pub fn has_battery(&self) -> bool {
+        self.cpu.bus.save.save_type() != SaveType::None
+    }
+
+    pub fn ram_data_eager(&self) -> Vec<u8> {
+        self.cpu.bus.save.data.clone()
+    }
+
+    pub fn set_ram_data(&mut self, data: Vec<u8>) {
+        let size = if self.cpu.bus.save.save_type() == SaveType::Eeprom && data.len() == 8192 {
+            8192
+        } else {
+            self.cpu.bus.save.data.len()
+        };
+        self.cpu.bus.save.data = data;
+        self.cpu.bus.save.data.resize(size, 0xFF);
+    }
+
+    pub fn ppu_enabled(&self) -> bool {
+        self.ppu_enabled
+    }
+
+    pub fn description(&self, column_length: usize) -> String {
+        let version_l = format!("{:width$}", "Version", width = column_length);
+        let mode_l = format!("{:width$}", "Mode", width = column_length);
+        let boot_rom_l = format!("{:width$}", "Boot ROM", width = column_length);
+        let clock_l = format!("{:width$}", "Clock", width = column_length);
+        let ram_size_l = format!("{:width$}", "RAM Size", width = column_length);
+        let vram_size_l = format!("{:width$}", "VRAM Size", width = column_length);
+        format!(
+            "{}  {}\n{}  {}\n{}  {}\n{}  {:.02} Mhz\n{}  {} KB\n{}  {} KB",
+            version_l,
+            Info::version(),
+            mode_l,
+            "Game Boy Advance",
+            boot_rom_l,
+            if self.cpu.bus.use_real_bios {
+                "Real BIOS"
+            } else {
+                "HLE"
+            },
+            clock_l,
+            Self::CPU_FREQ as f64 / 1_000_000.0,
+            ram_size_l,
+            (EWRAM_SIZE + IWRAM_SIZE) / 1024,
+            vram_size_l,
+            VRAM_SIZE / 1024,
+        )
+    }
+}
+
+#[cfg(feature = "wasm")]
+#[cfg_attr(feature = "wasm", wasm_bindgen)]
+impl GameBoyAdvance {
+    pub fn set_panic_hook_wa() {
+        let prev = take_hook();
+        set_hook(Box::new(move |info| {
+            gba_hook_impl(info);
+            prev(info);
+        }));
+    }
+
+    pub fn load_rom_wa(&mut self, data: &[u8]) -> Result<GbaRomInfo, String> {
+        self.load_rom(data).map_err(|e| e.to_string())
+    }
+
+    pub fn verify_rom_wa(data: &[u8]) -> bool {
+        rom::is_gba_rom(data)
+    }
+}
+
+#[cfg(feature = "wasm")]
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(js_namespace = window, js_name = panic)]
+    fn gba_panic(message: &str);
+}
+
+#[cfg(feature = "wasm")]
+pub fn gba_hook_impl(info: &PanicInfo) {
+    let message = info.to_string();
+    gba_panic(message.as_str());
+}
+
+impl Default for GameBoyAdvance {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Display for GameBoyAdvance {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.description(9))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::GameBoyAdvance;
+    use crate::pad::PadKey;
+
+    #[test]
+    fn test_new_system() {
+        let gba = GameBoyAdvance::new();
+        assert_eq!(gba.display_width(), 240);
+        assert_eq!(gba.display_height(), 160);
+        assert_eq!(gba.cpu_freq(), 16_777_216);
+        assert_eq!(gba.ppu_frame(), 0);
+    }
+
+    #[test]
+    #[allow(clippy::assertions_on_constants)]
+    fn test_constants() {
+        assert_eq!(GameBoyAdvance::CPU_FREQ, 16777216);
+        assert_eq!(GameBoyAdvance::DISPLAY_WIDTH, 240);
+        assert_eq!(GameBoyAdvance::DISPLAY_HEIGHT, 160);
+        assert!(GameBoyAdvance::VISUAL_FREQ > 59.0);
+        assert!(GameBoyAdvance::VISUAL_FREQ < 60.0);
+    }
+
+    #[test]
+    fn test_frame_buffer_size() {
+        let gba = GameBoyAdvance::new();
+        assert_eq!(gba.frame_buffer().len(), 240 * 160 * 3);
+    }
+
+    #[test]
+    fn test_clock() {
+        let mut gba = GameBoyAdvance::new();
+        let cycles = gba.clock();
+        assert!(cycles >= 1);
+    }
+
+    #[test]
+    fn test_clock_timer_enable_after_idle() {
+        for cascade in [false, true] {
+            let mut gba = GameBoyAdvance::new();
+            for i in 0..16 {
+                gba.cpu.bus.write32(0x0300_0000 + i * 4, 0xE1A00000); // mov r0, r0
+            }
+            gba.cpu.set_reg(15, 0x0300_0000);
+            if cascade {
+                gba.cpu.bus.timers.write_control(1, 0x84);
+            }
+            for _ in 0..10 {
+                assert_eq!(gba.clock(), 1);
+            }
+            assert_eq!(gba.cpu.bus.timers.read_counter(1), 0);
+            gba.cpu.bus.timers.write_reload(0, 0xFFFE);
+            gba.cpu.bus.timers.write_control(0, 0xC0);
+
+            assert_eq!(gba.clock(), 1);
+            assert_eq!(gba.cpu.bus.timers.read_counter(0), 0xFFFF);
+            assert_eq!(gba.cpu.bus.irq.if_(), 0);
+            assert_eq!(gba.clock(), 1);
+            assert_eq!(gba.cpu.bus.timers.read_counter(0), 0xFFFE);
+            assert_eq!(gba.cpu.bus.timers.read_counter(1), u16::from(cascade));
+            assert_eq!(gba.cpu.bus.irq.if_(), 8);
+        }
+    }
+
+    #[test]
+    fn test_clock_timer_boundary() {
+        let mut gba = GameBoyAdvance::new();
+        for i in 0..8 {
+            gba.cpu.bus.write32(0x0300_0000 + i * 4, 0xE1A00000); // mov r0, r0
+        }
+        gba.cpu.set_reg(15, 0x0300_0000);
+        gba.cpu.bus.timers.write_reload(0, 0xFFFC);
+        gba.cpu.bus.timers.write_control(0, 0xC0);
+        gba.cpu.bus.apu.direct_sound[0].write_fifo(0x04030201);
+
+        for _ in 0..3 {
+            assert_eq!(gba.clock(), 1);
+        }
+        assert_eq!(gba.cpu.bus.timers.read_counter(0), 0xFFFF);
+        assert_eq!(gba.cpu.bus.irq.if_(), 0);
+        assert_eq!(gba.cpu.bus.apu.direct_sound[0].fifo_len(), 4);
+
+        assert_eq!(gba.clock(), 1);
+        assert_eq!(gba.cpu.bus.timers.read_counter(0), 0xFFFC);
+        assert_eq!(gba.cpu.bus.irq.if_(), 8);
+        assert_eq!(gba.cpu.bus.apu.direct_sound[0].fifo_len(), 3);
+        assert_eq!(gba.cpu.bus.apu.direct_sound[0].current_sample(), 1);
+
+        gba.cpu.bus.irq.ack_if(8);
+        assert_eq!(gba.clock(), 1);
+        assert_eq!(gba.cpu.bus.timers.read_counter(0), 0xFFFD);
+        assert_eq!(gba.cpu.bus.irq.if_(), 0);
+        assert_eq!(gba.cpu.bus.apu.direct_sound[0].fifo_len(), 3);
+    }
+
+    #[test]
+    fn test_clock_multiple_timer_overflows() {
+        for apu_enabled in [false, true] {
+            for irq_enabled in [false, true] {
+                let mut gba = GameBoyAdvance::new();
+                gba.set_apu_enabled(apu_enabled);
+                gba.cpu.bus.write32(0x0300_0000, 0xEAFFFFFE); // b . (3 cycles)
+                gba.cpu.set_reg(15, 0x0300_0000);
+                gba.cpu.bus.timers.write_reload(0, 0xFFFF);
+                gba.cpu
+                    .bus
+                    .timers
+                    .write_control(0, if irq_enabled { 0xC0 } else { 0x80 });
+                gba.cpu.bus.timers.write_reload(1, 0xFFFE);
+                gba.cpu
+                    .bus
+                    .timers
+                    .write_control(1, if irq_enabled { 0xC4 } else { 0x84 });
+                gba.cpu.bus.apu.set_soundcnt_h(0x4000); // select timer 0 for FIFO A, timer 1 for FIFO B
+                for fifo in &mut gba.cpu.bus.apu.direct_sound {
+                    fifo.write_fifo(0x04030201);
+                }
+
+                assert_eq!(gba.clock(), 3);
+                assert_eq!(gba.cpu.bus.timers.read_counter(0), 0xFFFF);
+                assert_eq!(gba.cpu.bus.timers.read_counter(1), 0xFFFF);
+                assert_eq!(gba.cpu.bus.irq.if_(), if irq_enabled { 0x18 } else { 0 });
+                assert_eq!(
+                    gba.cpu.bus.apu.direct_sound[0].fifo_len(),
+                    if apu_enabled { 1 } else { 4 }
+                );
+                assert_eq!(
+                    gba.cpu.bus.apu.direct_sound[1].fifo_len(),
+                    if apu_enabled { 3 } else { 4 }
+                );
+                assert_eq!(
+                    gba.cpu.bus.apu.direct_sound[0].current_sample(),
+                    if apu_enabled { 3 } else { 0 }
+                );
+                assert_eq!(
+                    gba.cpu.bus.apu.direct_sound[1].current_sample(),
+                    if apu_enabled { 1 } else { 0 }
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_clock_multiple_timer_overflows_refill_fifo() {
+        let mut gba = GameBoyAdvance::new();
+        gba.cpu.bus.write32(0x0300_0000, 0xEAFFFFFE); // b . (3 cycles)
+        gba.cpu.set_reg(15, 0x0300_0000);
+        gba.cpu.bus.timers.write_reload(0, 0xFFFF);
+        gba.cpu.bus.timers.write_control(0, 0x80);
+        for _ in 0..5 {
+            gba.cpu.bus.apu.direct_sound[0].write_fifo(0x04030201);
+        }
+        for i in 0..4 {
+            gba.cpu.bus.write32(0x0200_0000 + i * 4, 0x08070605);
+        }
+        gba.cpu.bus.write32(0x0400_00BC, 0x0200_0000);
+        gba.cpu.bus.write32(0x0400_00C0, 0x0400_00A0);
+        gba.cpu.bus.write16(0x0400_00C6, 0xB640); // sound DMA, repeat, 32-bit, fixed destination
+
+        // three overflows leave the FIFO above the refill threshold
+        assert_eq!(gba.clock(), 3);
+        assert_eq!(gba.cpu.bus.apu.direct_sound[0].fifo_len(), 17);
+        assert_eq!(gba.cpu.bus.dma.channels[1].src(), 0x0200_0000);
+
+        // the next instruction consumes three more samples and refills once
+        assert_eq!(gba.clock(), 3);
+        assert_eq!(gba.cpu.bus.apu.direct_sound[0].fifo_len(), 30);
+        assert_eq!(gba.cpu.bus.apu.direct_sound[0].current_sample(), 2);
+        assert_eq!(gba.cpu.bus.dma.channels[1].src(), 0x0200_0010);
+    }
+
+    #[test]
+    fn test_clock_direct_sound_sample_order() {
+        for halted in [false, true] {
+            let mut gba = GameBoyAdvance::new();
+            gba.cpu.bus.write32(0x0300_0000, 0xEAFFFFFE); // b .
+            gba.cpu.set_reg(15, 0x0300_0000);
+            gba.cpu.set_halted(halted);
+            gba.cpu.bus.apu.set_soundcnt_x(0x80);
+            gba.cpu.bus.apu.set_soundcnt_h(0x0304);
+            gba.cpu.bus.apu.direct_sound[0].write_fifo(0x04030201);
+            gba.cpu.bus.timers.write_reload(0, 0xFDA8); // one FIFO sample every 600 cycles
+            gba.cpu.bus.timers.write_control(0, 0x80);
+
+            assert_eq!(gba.clocks_cycles(1800), 1800);
+            assert_eq!(
+                gba.cpu.bus.apu.drain_audio_buffer(),
+                vec![0, 0, 256, 256, 512, 512]
+            );
+            assert_eq!(gba.cpu.bus.apu.direct_sound[0].current_sample(), 3);
+        }
+    }
+
+    #[test]
+    fn test_clock_disabled_dma_does_not_transfer() {
+        let mut gba = GameBoyAdvance::new();
+        gba.cpu.bus.write32(0x0200_0000, 0xDEADBEEF);
+        let channel = &mut gba.cpu.bus.dma.channels[3];
+        channel.set_src_reg(0x0200_0000);
+        channel.set_dst_reg(0x0300_0000);
+        channel.set_count_reg(1);
+        channel.set_control(0xC400, 3);
+        channel.set_control(0x4400, 3);
+        gba.clock();
+        assert_eq!(gba.cpu.bus.read32(0x0300_0000), 0);
+        assert_eq!(gba.cpu.bus.irq.if_(), 0);
+    }
+
+    #[test]
+    fn test_clock_timers_disabled() {
+        let mut gba = GameBoyAdvance::new();
+        gba.set_timer_enabled(false);
+        gba.cpu.bus.timers.write_reload(0, 0xFFFF);
+        gba.cpu.bus.timers.write_control(0, 0xC0);
+        gba.cpu.bus.apu.direct_sound[0].write_fifo(0x04030201);
+
+        gba.clock();
+
+        assert_eq!(gba.cpu.bus.timers.read_counter(0), 0xFFFF);
+        assert_eq!(gba.cpu.bus.irq.if_(), 0);
+        assert_eq!(gba.cpu.bus.apu.direct_sound[0].fifo_len(), 4);
+    }
+
+    #[test]
+    fn test_clock_ppu_events() {
+        for dma_enabled in [false, true] {
+            let mut gba = GameBoyAdvance::new();
+            gba.set_dma_enabled(dma_enabled);
+            gba.cpu.bus.ppu.set_dispcnt(0x80);
+            gba.cpu.bus.ppu.set_dispstat(0xA038);
+            gba.cpu.bus.dma.channels[0].set_control(0xA000, 0);
+            gba.cpu.bus.dma.channels[1].set_control(0x9000, 1);
+
+            gba.clock_ppu(960);
+            assert_eq!(gba.cpu.bus.irq.if_(), 2);
+            assert_eq!(gba.cpu.bus.dma.channels[0].active(), dma_enabled);
+            assert!(!gba.cpu.bus.dma.channels[1].active());
+            assert_eq!(gba.frame, 0);
+            gba.clock_ppu(272);
+            for _ in 1..160 {
+                gba.clock_ppu(1232);
+            }
+            assert_eq!(gba.cpu.bus.ppu.vcount(), 160);
+            assert_eq!(gba.cpu.bus.irq.if_(), 7);
+            assert_eq!(gba.cpu.bus.dma.channels[1].active(), dma_enabled);
+            assert_eq!(gba.frame, 1);
+        }
+    }
+
+    #[test]
+    fn test_process_dma_sound_word_size() {
+        for index in [1, 2] {
+            for fifo in [0, 1] {
+                for word_size in [false, true] {
+                    let mut gba = GameBoyAdvance::new();
+                    for i in 0..16 {
+                        gba.cpu.bus.write8(0x0200_0000 + i, i as u8 + 1);
+                    }
+                    let channel = &mut gba.cpu.bus.dma.channels[index];
+                    channel.set_src_reg(0x0200_0000);
+                    channel.set_dst_reg(0x0400_00A0 + fifo as u32 * 4);
+                    channel.set_count_reg(1);
+                    let control = 0xF200 | if word_size { 1 << 10 } else { 0 };
+                    channel.set_control(control, index);
+                    gba.cpu.bus.dma.trigger_sound_fifo(fifo);
+                    gba.process_dma();
+                    assert_eq!(gba.cpu.bus.dma.channels[index].control(), control);
+                    assert_eq!(gba.cpu.bus.dma.channels[index].src(), 0x0200_0010);
+                    assert!(!gba.cpu.bus.dma.channels[index].active());
+                    assert_eq!(gba.cpu.bus.irq.if_(), 1 << (8 + index));
+                    let sound = &mut gba.cpu.bus.apu.direct_sound[fifo];
+                    assert_eq!(sound.fifo_len(), 16);
+                    for sample in 1..=16 {
+                        sound.timer_tick();
+                        assert_eq!(sound.current_sample(), sample);
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_process_dma_eeprom_packets() {
+        for rom_size in [512, 4 * 1024 * 1024] {
+            for width in [6, 14] {
+                let mut gba = GameBoyAdvance::new();
+                let mut rom = vec![0u8; rom_size];
+                rom[0xB2] = 0x96;
+                rom[0x100..0x108].copy_from_slice(b"EEPROM_V");
+                gba.load_rom(&rom).unwrap();
+                let data = 0x0123456789ABCDEFu64;
+                let addr = if width == 6 { 63 } else { 0x3FFF };
+                for write in [true, false] {
+                    let mut bits = vec![1, if write { 0 } else { 1 }];
+                    for bit in (0..width).rev() {
+                        bits.push((addr >> bit) & 1);
+                    }
+                    if write {
+                        for bit in (0..64).rev() {
+                            bits.push(((data >> bit) & 1) as u16);
+                        }
+                    }
+                    bits.push(0);
+                    for (i, bit) in bits.iter().enumerate() {
+                        gba.cpu.bus.write16(0x0200_0000 + i as u32 * 2, *bit);
+                    }
+                    gba.cpu.bus.write32(0x0400_00D4, 0x0200_0000);
+                    gba.cpu.bus.write32(0x0400_00D8, 0x0D00_0000);
+                    gba.cpu.bus.write16(0x0400_00DC, bits.len() as u16);
+                    gba.cpu.bus.write16(0x0400_00DE, 0x8040);
+                    gba.process_dma();
+                    if write {
+                        let size = if width == 6 { 512 } else { 8192 };
+                        assert_eq!(gba.cpu.bus.save.data.len(), size);
+                        assert_eq!(&gba.cpu.bus.save.data[size - 8..], &data.to_be_bytes());
+                        assert_eq!(gba.cpu.bus.read16(0x0D00_0000), 1);
+                    }
+                }
+                gba.cpu.bus.write32(0x0400_00D4, 0x0D00_0000);
+                gba.cpu.bus.write32(0x0400_00D8, 0x0300_0000);
+                gba.cpu.bus.write16(0x0400_00DC, 68);
+                gba.cpu.bus.write16(0x0400_00DE, 0x8100);
+                gba.process_dma();
+                for i in 0..68 {
+                    let expected = if i < 4 {
+                        0
+                    } else {
+                        ((data >> (67 - i)) & 1) as u16
+                    };
+                    assert_eq!(gba.cpu.bus.read16(0x0300_0000 + i * 2), expected);
+                }
+                assert_eq!(gba.cpu.bus.read16(0x0D00_0000), 1);
+            }
+        }
+    }
+
+    #[test]
+    fn test_next_frame() {
+        let mut gba = GameBoyAdvance::new();
+        gba.set_ppu_enabled(false);
+        let pc = gba.cpu.pc();
+        assert_eq!(gba.next_frame(), 0);
+        assert_eq!(gba.ppu_frame(), 0);
+        assert_eq!(gba.cpu.pc(), pc);
+        gba.set_ppu_enabled(true);
+        assert!(gba.next_frame() > 0);
+        assert_eq!(gba.ppu_frame(), 1);
+    }
+
+    #[test]
+    fn test_clocks_cycles() {
+        let mut gba = GameBoyAdvance::new();
+        let elapsed = gba.clocks_cycles(100);
+        assert!(elapsed >= 100);
+    }
+
+    #[test]
+    fn test_audio_buffer() {
+        let gba = GameBoyAdvance::new();
+        assert!(gba.audio_buffer().is_empty());
+    }
+
+    #[test]
+    fn test_clear_audio_buffer() {
+        let mut gba = GameBoyAdvance::new();
+        gba.clear_audio_buffer();
+        assert!(gba.audio_buffer().is_empty());
+    }
+
+    #[test]
+    fn test_key_press_and_lift() {
+        let mut gba = GameBoyAdvance::new();
+        gba.key_press(PadKey::A);
+        gba.key_lift(PadKey::A);
+    }
+
+    #[test]
+    fn test_set_ppu_enabled() {
+        let mut gba = GameBoyAdvance::new();
+        gba.set_ppu_enabled(false);
+        gba.clock();
+        gba.set_ppu_enabled(true);
+    }
+
+    #[test]
+    fn test_set_apu_enabled() {
+        let mut gba = GameBoyAdvance::new();
+        gba.set_apu_enabled(false);
+        gba.clock();
+        gba.set_apu_enabled(true);
+    }
+
+    #[test]
+    fn test_set_dma_enabled() {
+        let mut gba = GameBoyAdvance::new();
+        gba.set_dma_enabled(false);
+        gba.clock();
+        gba.set_dma_enabled(true);
+    }
+
+    #[test]
+    fn test_set_timer_enabled() {
+        let mut gba = GameBoyAdvance::new();
+        gba.set_timer_enabled(false);
+        gba.clock();
+        gba.set_timer_enabled(true);
+    }
+
+    #[test]
+    fn test_set_all_enabled() {
+        let mut gba = GameBoyAdvance::new();
+        for enabled in [false, true] {
+            gba.set_all_enabled(enabled);
+            assert_eq!(gba.ppu_enabled, enabled);
+            assert_eq!(gba.apu_enabled, enabled);
+            assert_eq!(gba.dma_enabled, enabled);
+            assert_eq!(gba.timer_enabled, enabled);
+        }
+    }
+
+    #[test]
+    fn test_visual_freq() {
+        let gba = GameBoyAdvance::new();
+        assert!(gba.visual_freq() > 59.0);
+    }
+
+    #[test]
+    fn test_reset() {
+        let mut gba = GameBoyAdvance::new();
+        gba.clock();
+        gba.reset();
+        assert_eq!(gba.ppu_frame(), 0);
+    }
+
+    #[test]
+    fn test_reset_preserves_save_data() {
+        for signature in [b"SRAM_V".as_slice(), b"FLASH_V", b"FLASH1M_V", b"EEPROM_V"] {
+            for real_bios in [false, true] {
+                let mut gba = GameBoyAdvance::new();
+                let mut rom = vec![0u8; 512];
+                rom[0xB2] = 0x96;
+                rom[0x100..0x100 + signature.len()].copy_from_slice(signature);
+                gba.load_rom(&rom).unwrap();
+                if real_bios {
+                    gba.load_bios(&vec![0u8; 0x4000]);
+                }
+                let mut data = gba.ram_data_eager();
+                data[0] = 0x42;
+                let last = data.len() - 1;
+                data[last] = 0x24;
+                gba.set_ram_data(data.clone());
+                gba.cpu.bus.write32(0x0200_0000, 0x12345678);
+
+                gba.reset();
+                gba.reset();
+
+                assert_eq!(gba.ram_data_eager(), data);
+                assert!(gba.has_battery());
+                assert_eq!(gba.cpu.bus.read32(0x0200_0000), 0);
+                assert_eq!(gba.cpu.pc(), if real_bios { 0 } else { 0x0800_0000 });
+            }
+        }
+    }
+
+    #[test]
+    fn test_default() {
+        let gba = GameBoyAdvance::default();
+        assert_eq!(gba.display_width(), 240);
+    }
+
+    #[test]
+    fn test_load_bios() {
+        let mut gba = GameBoyAdvance::new();
+        let bios = vec![0u8; 0x4000];
+        gba.load_bios(&bios);
+        assert!(gba.cpu.bus.use_real_bios);
+        // after loading BIOS, CPU boots from 0x00 in SVC mode
+        assert_eq!(gba.cpu.pc(), 0x0000_0000);
+        assert_eq!(gba.cpu.cpsr() & 0x1F, 0x13); // MODE_SVC
+    }
+
+    #[test]
+    fn test_load_bios_after_rom() {
+        let mut gba = GameBoyAdvance::new();
+        // load a minimal ROM first
+        let rom = vec![0u8; 256];
+        let _ = gba.load_rom(&rom);
+        assert_eq!(gba.cpu.pc(), 0x0800_0000);
+
+        // loading BIOS resets PC to 0x00
+        let bios = vec![0u8; 0x4000];
+        gba.load_bios(&bios);
+        assert_eq!(gba.cpu.pc(), 0x0000_0000);
+    }
+
+    #[test]
+    fn test_load_rom_post_boot_state() {
+        let mut gba = GameBoyAdvance::new();
+        let mut rom = vec![0u8; 512];
+        rom[0xB2] = 0x96;
+        let _ = gba.load_rom(&rom);
+        // HLE boot leaves the post-BIOS register state: POSTFLG set
+        // and RCNT in general-purpose mode
+        assert_eq!(gba.cpu.bus.read16(0x0400_0300), 1);
+        assert_eq!(gba.cpu.bus.read16(0x0400_0134), 0x8000);
+    }
+
+    #[test]
+    fn test_has_battery_none() {
+        let gba = GameBoyAdvance::new();
+        assert!(!gba.has_battery());
+    }
+
+    #[test]
+    fn test_has_battery_sram() {
+        let mut gba = GameBoyAdvance::new();
+        let mut rom = vec![0u8; 512];
+        rom[0xB2] = 0x96;
+        rom[0x100..0x106].copy_from_slice(b"SRAM_V");
+        let _ = gba.load_rom(&rom);
+        assert!(gba.has_battery());
+    }
+
+    #[test]
+    fn test_ram_data_eager() {
+        let gba = GameBoyAdvance::new();
+        let ram = gba.ram_data_eager();
+        assert!(!ram.is_empty());
+    }
+
+    #[test]
+    fn test_set_ram_data() {
+        let mut gba = GameBoyAdvance::new();
+        let mut rom = vec![0u8; 512];
+        rom[0xB2] = 0x96;
+        rom[0x100..0x106].copy_from_slice(b"SRAM_V");
+        let _ = gba.load_rom(&rom);
+
+        let mut ram = gba.ram_data_eager();
+        ram[0] = 0x42;
+        ram[1] = 0xAB;
+        gba.set_ram_data(ram);
+
+        let restored = gba.ram_data_eager();
+        assert_eq!(restored[0], 0x42);
+        assert_eq!(restored[1], 0xAB);
+    }
+
+    #[test]
+    fn test_set_ram_data_invalid_size() {
+        for signature in [b"SRAM_V".as_slice(), b"FLASH1M_V", b"EEPROM_V"] {
+            let mut gba = GameBoyAdvance::new();
+            gba.cpu.bus.save.detect_save_type(signature);
+            let size = gba.ram_data_eager().len();
+            gba.set_ram_data(vec![]);
+            assert_eq!(gba.ram_data_eager(), vec![0xFF; size]);
+            assert_eq!(gba.cpu.bus.save.read8(0x0E00_0000), 0xFF);
+            gba.set_ram_data(vec![0x42]);
+            assert_eq!(gba.ram_data_eager()[0], 0x42);
+            assert_eq!(gba.ram_data_eager()[size - 1], 0xFF);
+            gba.set_ram_data(vec![0x24; size + 1]);
+            assert_eq!(gba.ram_data_eager(), vec![0x24; size]);
+        }
+    }
+
+    #[test]
+    fn test_set_ram_data_large_eeprom() {
+        let mut gba = GameBoyAdvance::new();
+        gba.cpu.bus.save.detect_save_type(b"EEPROM_V");
+        gba.set_ram_data(vec![0x42; 8192]);
+        gba.cpu.bus.save.start_eeprom_transfer(17);
+        gba.reset();
+        assert_eq!(gba.ram_data_eager(), vec![0x42; 8192]);
+    }
+
+    #[test]
+    fn test_vcount_irq_delivered_on_match() {
+        use crate::gba::consts::{IRQ_VCOUNT, REG_DISPSTAT};
+
+        let mut gba = GameBoyAdvance::new();
+        // set LYC = 0 and enable VCount IRQ (bit 5) in DISPSTAT
+        // DISPSTAT bits [8:15] = LYC, bit 5 = VCount IRQ enable
+        gba.cpu.bus.write16(REG_DISPSTAT, 1 << 5);
+        // enable VCount in IE and set IME
+        gba.cpu.bus.irq.set_ie(IRQ_VCOUNT);
+        gba.cpu.bus.irq.set_ime(true);
+
+        // PPU starts at vcount=0, so after a full scanline the vcount
+        // wraps and eventually matches LYC=0; clock enough cycles
+        // to complete at least one full frame (228 scanlines × 1232 dots)
+        let total: usize = 228 * 1232;
+        gba.clocks_cycles(total);
+
+        // VCount IRQ should have been raised in IF at some point
+        assert!(gba.cpu.bus.irq.if_() & IRQ_VCOUNT != 0);
+    }
+}

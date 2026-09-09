@@ -71,6 +71,7 @@ impl From<PadSelection> for u8 {
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum PadKey {
     Up,
     Down,
@@ -80,6 +81,8 @@ pub enum PadKey {
     Select,
     A,
     B,
+    L,
+    R,
 }
 
 impl PadKey {
@@ -93,6 +96,8 @@ impl PadKey {
             6 => PadKey::Select,
             7 => PadKey::A,
             8 => PadKey::B,
+            9 => PadKey::L,
+            10 => PadKey::R,
             _ => panic!("Invalid pad key value: {value}"),
         }
     }
@@ -196,6 +201,7 @@ impl Pad {
             PadKey::Select => self.select = true,
             PadKey::A => self.a = true,
             PadKey::B => self.b = true,
+            PadKey::L | PadKey::R => return,
         }
 
         // signals that a JoyPad interrupt is pending to be
@@ -213,6 +219,7 @@ impl Pad {
             PadKey::Select => self.select = false,
             PadKey::A => self.a = false,
             PadKey::B => self.b = false,
+            PadKey::L | PadKey::R => {}
         }
     }
 

@@ -1,4 +1,3 @@
-import { DISPLAY_HEIGHT, DISPLAY_WIDTH } from "boytacean-core";
 import React, { CSSProperties, FC, useEffect, useRef } from "react";
 
 import { useBoytacean } from "./boytacean-context";
@@ -29,6 +28,10 @@ export const BoytaceanScreen: FC<BoytaceanScreenProps> = ({
     const { core } = useBoytacean();
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
+    // the dimensions are obtained from the core itself, so that the
+    // display of both the Game Boy and the GBA is properly sized
+    const { width, height } = core.dimensions;
+
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
@@ -36,10 +39,7 @@ export const BoytaceanScreen: FC<BoytaceanScreenProps> = ({
         const context = canvas.getContext("2d");
         if (!context) return;
 
-        const imageData = context.createImageData(
-            DISPLAY_WIDTH,
-            DISPLAY_HEIGHT
-        );
+        const imageData = context.createImageData(width, height);
         const buffer = imageData.data;
 
         const onFrame = () => {
@@ -63,17 +63,17 @@ export const BoytaceanScreen: FC<BoytaceanScreenProps> = ({
         return () => {
             core.unbind("frame", onFrame);
         };
-    }, [core]);
+    }, [core, width, height]);
 
     return (
         <canvas
             ref={canvasRef}
             className={className}
-            width={DISPLAY_WIDTH}
-            height={DISPLAY_HEIGHT}
+            width={width}
+            height={height}
             style={{
-                width: DISPLAY_WIDTH * scale,
-                height: DISPLAY_HEIGHT * scale,
+                width: width * scale,
+                height: height * scale,
                 imageRendering: "pixelated",
                 ...style
             }}

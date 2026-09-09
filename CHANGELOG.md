@@ -10,6 +10,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 * Documentation for the React package, covering components, hooks and keys with a complete quick start
+* Game Boy Advance (GBA) emulation with ARM7TDMI CPU (ARM and Thumb instruction sets)
+* GBA scanline-based PPU supporting video modes 0-5 with text and affine backgrounds
+* GBA APU with 4 legacy channels and 2 DirectSound PCM FIFO channels
+* GBA DMA controller with 4 channels and priority-based transfers
+* GBA timer hardware with prescaler and cascade support
+* GBA keypad input handling with interrupt control (KEYINPUT/KEYCNT)
+* GBA BIOS HLE for common SWI calls (Div, Sqrt, CpuSet, LZ77, RLUnComp, etc.)
+* GBA interrupt controller (IE, IF, IME) with per-source enable/acknowledge
+* GBA ROM header parsing, checksum validation, and auto-detection via the cartridge header
+* `System` enum for unified frontend integration of Game Boy and GBA emulators
+* GBA web frontend integration with WASM bindings and auto-detection via ROM URL
+* `GbaEmulator` TypeScript class for running GBA ROMs in the browser
+* `PadKey::L` and `PadKey::R` shoulder button variants for GBA input
+* Basic GBA link port emulation with no-partner behavior
+* Headless `GbaCore` in the `boytacean-core` package, carrying the GBA emulation logic without any React, EmuKit UI or bundler-specific dependency
+* Support for the GBA in the `boytacean-react` package, through a `system` property that selects the core to be built and falls back to the inference of the system from the extension of the ROM
+* Mapping of the `Q` and `W` keys to the shoulder buttons of the GBA in the default key mapping of the React package
+* GBA shoulder buttons in the on-screen React game pad
 
 ### Changed
 
@@ -19,13 +37,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Frames are converted to the 15 bit color format in about half the time
 * Faster audio emulation, worth up to 18% more frames per second in games with sound
 * Frames are handed to the native and Python front-ends more than twice as fast on the original Game Boy
+* Major GBA emulation performance improvements across memory access, idle CPU handling, audio and video rendering
+* Faster GBA scanline composition, tile fetching and sprite scanning
+* Another round of GBA performance work making commercial games run about 1.5x faster
+* Faster GBA instruction fetching from the main memory regions
+* Lower GBA instruction overhead when running with inactive timers or waiting for the next timer overflow
+* Faster GBA timer overflow handling without losing cascade, interrupt or DirectSound events
+* Faster GBA audio batching and square/wave phase advancement while preserving sample and frame sequencer ordering - [#49](https://github.com/joamag/boytacean/issues/49)
+* Lower GBA instruction overhead by handling display events outside the common clock path
 
 ### Fixed
 
+* GBA BIOS division overflow, malformed LZ77 back-references, CpuFastSet rounding and missing RegisterRamReset I/O handling
+* GBA BIOS memory mirroring, CPU reset cycle state and bitmap backgrounds ignoring the BG2 enable flag
+* GBA DMA3 repeat counts, cancelled transfers and DirectSound DMA transfer width
+* GBA Flash bank allocation, save protocol state after loading another ROM, EEPROM capacity detection and truncated save files
+* GBA battery save loading and storage in the SDL frontend, including saving on exit and ROM changes
+* Switching between Game Boy and GBA ROMs in the SDL frontend and React provider
+* SDL software rendering requiring an OpenGL-capable video driver
+* GBA CPU-only benchmark hangs and diagnostic file error handling, temporary paths, audio flushing and cycle reporting
+* Game Boy ROM loading through the unified system constructor and checksum validation with truncated GBA headers
+* GBA build failures with newer nightly Clippy checks
 * Batched CPU stepping is now bounded, instead of running an unlimited number of instructions
 * Loading of the default WASM binary when the core package is installed from npm
 * Build of the web front-end after the change in the WASM binary resolution
 * Builds on older Rust versions after dependency releases raised their minimum supported version
+* GBA audio samples using future channel or DirectSound FIFO state when clocking in batches or waiting in HALT - [#49](https://github.com/joamag/boytacean/issues/49)
+* Incorrect GBA wave RAM bank selection, 64-sample starting bank and forced 75% volume rounding - [#50](https://github.com/joamag/boytacean/issues/50)
+* GBA byte writes corrupting display, DMA, timer reload and serial send registers, acknowledging untouched IF bits and updating BIOS interrupt bookkeeping when using a real BIOS - [#51](https://github.com/joamag/boytacean/issues/51)
+* GBA VBlank status remaining set on the final scanline and incorrect odd tile selection for 8bpp sprites in 2D mapping - [#52](https://github.com/joamag/boytacean/issues/52)
+* GBA reset erasing battery-backed SRAM, Flash and EEPROM save data
+* Incorrect zero flag for GBA long multiply instructions with a nonzero low result word
+* GBA HALT failing to wake on enabled interrupt requests when IME or CPSR masks IRQ entry
+* Lost GBA timer cascade and DirectSound FIFO events when a clock batch spans multiple overflows, and timer 0 incorrectly honoring the unused cascade bit
+* Corrupted backgrounds in Golden Sun caused by idle CPU wake timing
+* Distorted intro screens in Sonic Advance caused by extra scroll updates during VBlank
+* Random GBA crashes and stack corruption from interrupts taken right after a branch
+* Advance Wars 1 and 2 crashing at boot due to broken software reset handling
+* GBA games seeing a phantom link partner during the multiplayer probe at boot
 
 ## [0.13.2] - 2026-07-28
 

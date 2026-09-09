@@ -16,7 +16,11 @@ export const KEYS_MAP: Record<string, string> = {
     a: "A",
     s: "B",
     A: "A",
-    S: "B"
+    S: "B",
+    q: "L",
+    w: "R",
+    Q: "L",
+    W: "R"
 };
 
 type BoytaceanKeyboardProps = {
