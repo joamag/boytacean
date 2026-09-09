@@ -212,7 +212,7 @@ impl GbaPpu {
     pub fn dispstat(&self) -> u16 {
         let mut value = self.dispstat & 0xFF38;
         // set vblank flag (bit 0)
-        if self.vcount >= DISPLAY_HEIGHT as u16 {
+        if self.vcount >= DISPLAY_HEIGHT as u16 && self.vcount < 227 {
             value |= 1;
         }
         // set hblank flag (bit 1)
@@ -256,20 +256,40 @@ impl GbaPpu {
         self.bg_vofs[index] = value & 0x01FF;
     }
 
+    pub fn bg_pa(&self, index: usize) -> u16 {
+        self.bg_pa[index] as u16
+    }
+
     pub fn set_bg_pa(&mut self, index: usize, value: u16) {
         self.bg_pa[index] = value as i16;
+    }
+
+    pub fn bg_pb(&self, index: usize) -> u16 {
+        self.bg_pb[index] as u16
     }
 
     pub fn set_bg_pb(&mut self, index: usize, value: u16) {
         self.bg_pb[index] = value as i16;
     }
 
+    pub fn bg_pc(&self, index: usize) -> u16 {
+        self.bg_pc[index] as u16
+    }
+
     pub fn set_bg_pc(&mut self, index: usize, value: u16) {
         self.bg_pc[index] = value as i16;
     }
 
+    pub fn bg_pd(&self, index: usize) -> u16 {
+        self.bg_pd[index] as u16
+    }
+
     pub fn set_bg_pd(&mut self, index: usize, value: u16) {
         self.bg_pd[index] = value as i16;
+    }
+
+    pub fn bg_ref_x_raw(&self, index: usize) -> u32 {
+        self.bg_ref_x_raw[index]
     }
 
     pub fn set_bg_ref_x_lo(&mut self, index: usize, value: u16) {
@@ -280,6 +300,10 @@ impl GbaPpu {
     pub fn set_bg_ref_x_hi(&mut self, index: usize, value: u16) {
         self.bg_ref_x_raw[index] = (self.bg_ref_x_raw[index] & 0x0000FFFF) | ((value as u32) << 16);
         self.apply_bg_ref_x(index);
+    }
+
+    pub fn bg_ref_y_raw(&self, index: usize) -> u32 {
+        self.bg_ref_y_raw[index]
     }
 
     pub fn set_bg_ref_y_lo(&mut self, index: usize, value: u16) {
@@ -305,8 +329,16 @@ impl GbaPpu {
         self.bg_ref_y[index] = signed;
     }
 
+    pub fn winh(&self, index: usize) -> u16 {
+        self.winh[index]
+    }
+
     pub fn set_winh(&mut self, index: usize, value: u16) {
         self.winh[index] = value;
+    }
+
+    pub fn winv(&self, index: usize) -> u16 {
+        self.winv[index]
     }
 
     pub fn set_winv(&mut self, index: usize, value: u16) {
@@ -345,8 +377,16 @@ impl GbaPpu {
         self.bldalpha = value;
     }
 
+    pub fn bldy(&self) -> u16 {
+        self.bldy
+    }
+
     pub fn set_bldy(&mut self, value: u16) {
         self.bldy = value;
+    }
+
+    pub fn mosaic(&self) -> u16 {
+        self.mosaic
     }
 
     pub fn set_mosaic(&mut self, value: u16) {
@@ -1642,7 +1682,7 @@ impl GbaPpu {
             let tile_offset = if mapping_1d {
                 tile_number + tile_y_offset * (width / 8) * 2 + tile_x * 2
             } else {
-                tile_number + tile_y_offset * 32 + tile_x * 2
+                (tile_number & !1) + tile_y_offset * 32 + tile_x * 2
             };
             let byte_offset = obj_base + tile_offset * 32 + (py % 8) * 8 + (px % 8);
             if byte_offset < vram.len() {
@@ -1821,6 +1861,26 @@ mod tests {
     }
 
     #[test]
+    fn test_dispstat_vblank_last_line() {
+        let mut ppu = GbaPpu::new();
+        let vram = vec![0; 0x18000];
+        let palette = vec![0; 0x400];
+        let oam = vec![0; 0x400];
+        ppu.set_dispcnt(0x80);
+        for _ in 0..226 {
+            ppu.clock(CYCLES_PER_SCANLINE, &vram, &palette, &oam);
+        }
+        assert_eq!(ppu.vcount(), 226);
+        assert_eq!(ppu.dispstat() & 1, 1);
+        ppu.clock(CYCLES_PER_SCANLINE, &vram, &palette, &oam);
+        assert_eq!(ppu.vcount(), 227);
+        assert_eq!(ppu.dispstat() & 1, 0);
+        ppu.clock(CYCLES_PER_SCANLINE, &vram, &palette, &oam);
+        assert_eq!(ppu.vcount(), 0);
+        assert_eq!(ppu.dispstat() & 1, 0);
+    }
+
+    #[test]
     fn test_dispstat_hblank_flag() {
         let mut ppu = GbaPpu::new();
         let vram = vec![0u8; 0x18000];
@@ -1861,6 +1921,10 @@ mod tests {
         assert_eq!(ppu.bg_pb[0], 0x0200);
         assert_eq!(ppu.bg_pc[0], 0x0300);
         assert_eq!(ppu.bg_pd[0], 0x0400);
+        assert_eq!(ppu.bg_pa(0), 0x0100);
+        assert_eq!(ppu.bg_pb(0), 0x0200);
+        assert_eq!(ppu.bg_pc(0), 0x0300);
+        assert_eq!(ppu.bg_pd(0), 0x0400);
     }
 
     #[test]
@@ -1872,6 +1936,8 @@ mod tests {
         ppu.set_bg_ref_y_hi(0, 0x0000);
         assert_eq!(ppu.bg_ref_x[0], 0x1000);
         assert_eq!(ppu.bg_ref_y[0], 0x2000);
+        assert_eq!(ppu.bg_ref_x_raw(0), 0x1000);
+        assert_eq!(ppu.bg_ref_y_raw(0), 0x2000);
     }
 
     #[test]
@@ -1883,6 +1949,8 @@ mod tests {
         ppu.set_winout(0x5678);
         assert_eq!(ppu.winh[0], 0xA050);
         assert_eq!(ppu.winv[0], 0xC030);
+        assert_eq!(ppu.winh(0), 0xA050);
+        assert_eq!(ppu.winv(0), 0xC030);
         assert_eq!(ppu.winin, 0x1234);
         assert_eq!(ppu.winout, 0x5678);
     }
@@ -1896,6 +1964,7 @@ mod tests {
         assert_eq!(ppu.bldcnt, 0x00FF);
         assert_eq!(ppu.bldalpha, 0x1010);
         assert_eq!(ppu.bldy, 0x0010);
+        assert_eq!(ppu.bldy(), 0x0010);
     }
 
     #[test]
@@ -1903,6 +1972,7 @@ mod tests {
         let mut ppu = GbaPpu::new();
         ppu.set_mosaic(0x0303);
         assert_eq!(ppu.mosaic, 0x0303);
+        assert_eq!(ppu.mosaic(), 0x0303);
     }
 
     #[test]
@@ -2335,6 +2405,53 @@ mod tests {
 
         let idx = ppu.read_obj_pixel(&vram, 0, 3, 0, 8, true, true, obj_base);
         assert_eq!(idx, 42);
+    }
+
+    #[test]
+    fn test_read_obj_pixel_8bpp_tile_alignment() {
+        let ppu = GbaPpu::new();
+        let mut vram = vec![0u8; 0x18000];
+        vram[0x10000..0x10020].fill(1);
+        vram[0x10020..0x10040].fill(2);
+        vram[0x10400..0x10420].fill(3);
+        vram[0x10420..0x10440].fill(4);
+
+        for tile in [0, 1] {
+            assert_eq!(
+                ppu.read_obj_pixel(&vram, tile, 0, 0, 16, true, false, 0x10000),
+                1
+            );
+            assert_eq!(
+                ppu.read_obj_pixel(&vram, tile, 7, 7, 16, true, false, 0x10000),
+                2
+            );
+            assert_eq!(
+                ppu.read_obj_pixel(&vram, tile, 0, 8, 16, true, false, 0x10000),
+                3
+            );
+            assert_eq!(
+                ppu.read_obj_pixel(&vram, tile, 7, 15, 16, true, false, 0x10000),
+                4
+            );
+        }
+        // the low bit still selects a distinct tile in 4bpp mode
+        assert_eq!(
+            ppu.read_obj_pixel(&vram, 1, 0, 0, 8, false, false, 0x10000),
+            2
+        );
+    }
+
+    #[test]
+    fn test_read_obj_pixel_out_of_bounds() {
+        let ppu = GbaPpu::new();
+        for is_8bpp in [false, true] {
+            for mapping_1d in [false, true] {
+                assert_eq!(
+                    ppu.read_obj_pixel(&[], 1, 7, 7, 8, is_8bpp, mapping_1d, 0x10000),
+                    0
+                );
+            }
+        }
     }
 
     #[test]

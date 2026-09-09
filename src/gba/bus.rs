@@ -712,9 +712,59 @@ impl GbaBus {
             return;
         }
 
-        // for other registers, do a read-modify-write of the 16-bit register
+        // preserve the written latch for write-only registers, not the CPU read value
         let aligned = addr & !1;
-        let old = self.read_io16(aligned);
+        let old = match aligned {
+            REG_BG0HOFS => self.ppu.bg_hofs(0),
+            REG_BG0VOFS => self.ppu.bg_vofs(0),
+            REG_BG1HOFS => self.ppu.bg_hofs(1),
+            REG_BG1VOFS => self.ppu.bg_vofs(1),
+            REG_BG2HOFS => self.ppu.bg_hofs(2),
+            REG_BG2VOFS => self.ppu.bg_vofs(2),
+            REG_BG3HOFS => self.ppu.bg_hofs(3),
+            REG_BG3VOFS => self.ppu.bg_vofs(3),
+            REG_BG2PA => self.ppu.bg_pa(0),
+            REG_BG2PB => self.ppu.bg_pb(0),
+            REG_BG2PC => self.ppu.bg_pc(0),
+            REG_BG2PD => self.ppu.bg_pd(0),
+            REG_BG3PA => self.ppu.bg_pa(1),
+            REG_BG3PB => self.ppu.bg_pb(1),
+            REG_BG3PC => self.ppu.bg_pc(1),
+            REG_BG3PD => self.ppu.bg_pd(1),
+            REG_BG2X => self.ppu.bg_ref_x_raw(0) as u16,
+            a if a == REG_BG2X + 2 => (self.ppu.bg_ref_x_raw(0) >> 16) as u16,
+            REG_BG2Y => self.ppu.bg_ref_y_raw(0) as u16,
+            a if a == REG_BG2Y + 2 => (self.ppu.bg_ref_y_raw(0) >> 16) as u16,
+            REG_BG3X => self.ppu.bg_ref_x_raw(1) as u16,
+            a if a == REG_BG3X + 2 => (self.ppu.bg_ref_x_raw(1) >> 16) as u16,
+            REG_BG3Y => self.ppu.bg_ref_y_raw(1) as u16,
+            a if a == REG_BG3Y + 2 => (self.ppu.bg_ref_y_raw(1) >> 16) as u16,
+            REG_WIN0H => self.ppu.winh(0),
+            REG_WIN1H => self.ppu.winh(1),
+            REG_WIN0V => self.ppu.winv(0),
+            REG_WIN1V => self.ppu.winv(1),
+            REG_MOSAIC => self.ppu.mosaic(),
+            REG_BLDY => self.ppu.bldy(),
+            REG_TM0CNT_L => self.timers.timers[0].reload(),
+            REG_TM1CNT_L => self.timers.timers[1].reload(),
+            REG_TM2CNT_L => self.timers.timers[2].reload(),
+            REG_TM3CNT_L => self.timers.timers[3].reload(),
+            REG_IF => 0,
+            REG_SIOMLT_SEND => self.siomlt_send,
+            REG_DMA0SAD..=REG_DMA3CNT_H => {
+                let offset = aligned - REG_DMA0SAD;
+                let channel = &self.dma.channels[(offset / 12) as usize];
+                match offset % 12 {
+                    0 => channel.src_reg() as u16,
+                    2 => (channel.src_reg() >> 16) as u16,
+                    4 => channel.dst_reg() as u16,
+                    6 => (channel.dst_reg() >> 16) as u16,
+                    8 => channel.count_reg(),
+                    _ => channel.control(),
+                }
+            }
+            _ => self.read_io16(aligned),
+        };
         let new_value = if addr & 1 == 0 {
             (old & 0xFF00) | value as u16
         } else {
@@ -789,12 +839,10 @@ impl GbaBus {
             REG_KEYCNT => self.pad.set_keycnt(value),
             REG_IE => self.irq.set_ie(value),
             REG_IF => {
-                // Before acknowledging, compute which interrupts were both
-                // enabled and pending — these are the ones being serviced.
-                // Update IntrCheck at 0x03007FF8 (IWRAM mirror) so that
-                // games using VBlankIntrWait / IntrWait can detect them.
+                // the HLE BIOS records serviced interrupts for IntrWait;
+                // a real BIOS maintains IntrCheck in its own IRQ handler
                 let serviced = self.irq.ie() & self.irq.if_() & value;
-                if serviced != 0 {
+                if !self.use_real_bios && serviced != 0 {
                     let offset = (0x03007FF8u32 & 0x7FFF) as usize;
                     let old = u16::from_le_bytes([self.iwram[offset], self.iwram[offset + 1]]);
                     let new_val = old | serviced;
@@ -985,10 +1033,13 @@ impl Default for GbaBus {
 mod tests {
     use super::GbaBus;
     use crate::gba::consts::{
-        IRQ_SERIAL, REG_BLDALPHA, REG_BLDCNT, REG_DISPCNT, REG_DMA1CNT_H, REG_DMA1CNT_L,
-        REG_DMA1DAD, REG_DMA1SAD, REG_FIFO_A, REG_IE, REG_IF, REG_IME, REG_KEYINPUT, REG_RCNT,
-        REG_SIOCNT, REG_SIOMLT_SEND, REG_SIOMULTI0, REG_SIOMULTI1, REG_SIOMULTI3, REG_SOUNDCNT_H,
-        REG_SOUNDCNT_L, REG_SOUNDCNT_X, REG_TM0CNT_H, REG_TM0CNT_L, REG_WININ, REG_WINOUT,
+        IRQ_SERIAL, REG_BG2PA, REG_BG2PB, REG_BG2PC, REG_BG2PD, REG_BG2X, REG_BG2Y, REG_BG3PA,
+        REG_BG3PB, REG_BG3PC, REG_BG3PD, REG_BG3X, REG_BG3Y, REG_BLDALPHA, REG_BLDCNT, REG_BLDY,
+        REG_DISPCNT, REG_DMA0SAD, REG_DMA1CNT_H, REG_DMA1CNT_L, REG_DMA1DAD, REG_DMA1SAD,
+        REG_FIFO_A, REG_IE, REG_IF, REG_IME, REG_KEYINPUT, REG_MOSAIC, REG_RCNT, REG_SIOCNT,
+        REG_SIOMLT_SEND, REG_SIOMULTI0, REG_SIOMULTI1, REG_SIOMULTI3, REG_SOUNDCNT_H,
+        REG_SOUNDCNT_L, REG_SOUNDCNT_X, REG_TM0CNT_H, REG_TM0CNT_L, REG_WIN0H, REG_WIN0V,
+        REG_WIN1H, REG_WIN1V, REG_WININ, REG_WINOUT,
     };
 
     #[test]
@@ -1507,6 +1558,36 @@ mod tests {
     }
 
     #[test]
+    fn test_io_8bit_write_sound() {
+        let mut bus = GbaBus::new();
+        bus.write16(REG_SOUNDCNT_X, 0x80);
+        bus.write16(REG_SOUNDCNT_L, 0x1177);
+        bus.write16(REG_SOUNDCNT_H, 2);
+        bus.write8(0x0400_0062, 0x80);
+        bus.write8(0x0400_0063, 0xF0);
+        bus.write8(0x0400_0064, 0xFD);
+        bus.write8(0x0400_0065, 0x87);
+        assert_eq!(bus.read16(REG_SOUNDCNT_X) & 1, 1);
+
+        // the first 511 cycles use the old frequency, leaving the duty output low
+        bus.apu.clock(511);
+        bus.write8(0x0400_0064, 0xFF);
+        bus.apu.clock(1);
+        assert_eq!(bus.apu.drain_audio_buffer(), vec![0, 0]);
+        bus.write8(0x0400_0063, 0);
+        assert_eq!(bus.read16(REG_SOUNDCNT_X) & 1, 0);
+    }
+
+    #[test]
+    fn test_io_8bit_write_haltcnt() {
+        let mut bus = GbaBus::new();
+        bus.write8(0x0400_0300, 1);
+        bus.write8(0x0400_0301, 0);
+        assert!(bus.halt_requested);
+        assert_eq!(bus.postflg, 1);
+    }
+
+    #[test]
     fn test_io_8bit_write_preserves_other_byte() {
         let mut bus = GbaBus::new();
         bus.write16(REG_WININ, 0x3F1F);
@@ -1514,6 +1595,203 @@ mod tests {
         bus.write8(REG_WININ, 0x00);
         // high byte should be preserved via read-modify-write
         assert_eq!(bus.read16(REG_WININ), 0x3F00);
+    }
+
+    #[test]
+    fn test_io_8bit_write_scroll() {
+        for index in 0..4 {
+            for vertical in [false, true] {
+                let mut bus = GbaBus::new();
+                let addr = 0x0400_0010 + index as u32 * 4 + if vertical { 2 } else { 0 };
+                bus.write16(addr, 0x123);
+                bus.write8(addr + 1, 1);
+                assert_eq!(
+                    if vertical {
+                        bus.ppu.bg_vofs(index)
+                    } else {
+                        bus.ppu.bg_hofs(index)
+                    },
+                    0x123
+                );
+                bus.write8(addr, 0x56);
+                assert_eq!(
+                    if vertical {
+                        bus.ppu.bg_vofs(index)
+                    } else {
+                        bus.ppu.bg_hofs(index)
+                    },
+                    0x156
+                );
+                bus.write8(addr + 1, 0xFE);
+                assert_eq!(
+                    if vertical {
+                        bus.ppu.bg_vofs(index)
+                    } else {
+                        bus.ppu.bg_hofs(index)
+                    },
+                    0x56
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_io_8bit_write_display_latches() {
+        let mut bus = GbaBus::new();
+        for (index, addr) in [
+            REG_BG2PA, REG_BG2PB, REG_BG2PC, REG_BG2PD, REG_BG3PA, REG_BG3PB, REG_BG3PC, REG_BG3PD,
+            REG_WIN0H, REG_WIN1H, REG_WIN0V, REG_WIN1V, REG_MOSAIC, REG_BLDY,
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            bus.write16(addr, 0x1234);
+            for (offset, value, expected) in [(0, 0xAB, 0x12AB), (1, 0xCD, 0xCDAB)] {
+                bus.write8(addr + offset, value);
+                let values = [
+                    bus.ppu.bg_pa(0),
+                    bus.ppu.bg_pb(0),
+                    bus.ppu.bg_pc(0),
+                    bus.ppu.bg_pd(0),
+                    bus.ppu.bg_pa(1),
+                    bus.ppu.bg_pb(1),
+                    bus.ppu.bg_pc(1),
+                    bus.ppu.bg_pd(1),
+                    bus.ppu.winh(0),
+                    bus.ppu.winh(1),
+                    bus.ppu.winv(0),
+                    bus.ppu.winv(1),
+                    bus.ppu.mosaic(),
+                    bus.ppu.bldy(),
+                ];
+                assert_eq!(values[index], expected);
+            }
+        }
+    }
+
+    #[test]
+    fn test_io_8bit_write_affine_reference() {
+        for (index, addr) in [REG_BG2X, REG_BG2Y, REG_BG3X, REG_BG3Y]
+            .into_iter()
+            .enumerate()
+        {
+            let mut bus = GbaBus::new();
+            bus.write32(addr, 0x01234567);
+            bus.ppu.set_bg_pb(index / 2, 0x0100);
+            bus.ppu.set_bg_pd(index / 2, 0x0200);
+            bus.ppu
+                .clock(1232, &bus.vram[..], &bus.palette[..], &bus.oam[..]);
+
+            // byte writes use the programmed reference, not the scanline accumulator
+            for (offset, value, expected) in [
+                (0, 0x89, 0x01234589),
+                (1, 0xAB, 0x0123AB89),
+                (2, 0xCD, 0x01CDAB89),
+                (3, 0x0F, 0x0FCDAB89),
+            ] {
+                bus.write8(addr + offset, value);
+                assert_eq!(
+                    if index & 1 == 0 {
+                        bus.ppu.bg_ref_x_raw(index / 2)
+                    } else {
+                        bus.ppu.bg_ref_y_raw(index / 2)
+                    },
+                    expected
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_io_8bit_write_if() {
+        for high in [false, true] {
+            let mut bus = GbaBus::new();
+            bus.irq.set_ie(0x0101);
+            bus.irq.raise(0x0101);
+            bus.write8(REG_IF + u32::from(high), 1);
+            assert_eq!(bus.irq.if_(), if high { 1 } else { 0x100 });
+            assert_eq!(bus.read16(0x0300_7FF8), if high { 0x100 } else { 1 });
+            bus.write8(REG_IF + u32::from(high), 0);
+            assert_eq!(bus.irq.if_(), if high { 1 } else { 0x100 });
+        }
+    }
+
+    #[test]
+    fn test_io_8bit_write_timer_reload() {
+        for index in 0..4 {
+            let mut bus = GbaBus::new();
+            let addr = REG_TM0CNT_L + index as u32 * 4;
+            bus.write16(addr, 0x1234);
+            bus.write16(addr + 2, 0x80);
+            bus.timers.clock(0x222);
+            bus.write8(addr, 0xAB);
+            assert_eq!(bus.timers.timers[index].reload(), 0x12AB);
+            assert_eq!(bus.timers.read_counter(index), 0x1456);
+            bus.write8(addr + 1, 0xCD);
+            assert_eq!(bus.timers.timers[index].reload(), 0xCDAB);
+            assert_eq!(bus.timers.read_counter(index), 0x1456);
+            bus.write16(addr + 2, 0);
+            bus.write16(addr + 2, 0x80);
+            assert_eq!(bus.timers.read_counter(index), 0xCDAB);
+        }
+    }
+
+    #[test]
+    fn test_io_8bit_write_dma() {
+        for index in 0..4 {
+            let mut bus = GbaBus::new();
+            let addr = REG_DMA0SAD + index as u32 * 12;
+            for (offset, value) in [
+                (0, 0x34),
+                (1, 0x12),
+                (2, 0x00),
+                (3, 0x02),
+                (4, 0x78),
+                (5, 0x56),
+                (6, 0x00),
+                (7, 0x03),
+                (8, 0xBC),
+                (9, 0x0A),
+                (10, 0x40),
+                (11, 0x84),
+            ] {
+                bus.write8(addr + offset, value);
+            }
+            let channel = &bus.dma.channels[index];
+            assert_eq!(channel.src_reg(), 0x02001234);
+            assert_eq!(channel.dst_reg(), 0x03005678);
+            assert_eq!(channel.count_reg(), 0x0ABC);
+            assert_eq!(channel.control(), 0x8440);
+            assert_eq!(channel.src(), 0x02001234);
+            assert_eq!(channel.dst(), 0x03005678);
+            assert!(channel.active());
+        }
+    }
+
+    #[test]
+    fn test_io_8bit_write_serial_send() {
+        let mut bus = GbaBus::new();
+        bus.write16(REG_SIOMLT_SEND, 0x1234);
+        bus.write8(REG_SIOMLT_SEND, 0xAB);
+        bus.write8(REG_SIOMLT_SEND + 1, 0xCD);
+        bus.write16(REG_SIOCNT, 0x2080);
+        assert_eq!(bus.read16(REG_SIOMULTI0), 0xCDAB);
+        assert_eq!(bus.read16(REG_SIOMLT_SEND), 0xFFFF);
+    }
+
+    #[test]
+    fn test_reg_if_real_bios_preserves_intrcheck() {
+        let mut bus = GbaBus::new();
+        bus.load_bios(&[0; 0x4000]);
+        bus.write16(0x0300_7FF8, 0x1234);
+        bus.irq.set_ie(0x0101);
+        bus.irq.raise(0x0101);
+        bus.write16(REG_IF, 1);
+        assert_eq!(bus.irq.if_(), 0x100);
+        assert_eq!(bus.read16(0x0300_7FF8), 0x1234);
+        bus.write8(REG_IF + 1, 1);
+        assert_eq!(bus.irq.if_(), 0);
+        assert_eq!(bus.read16(0x0300_7FF8), 0x1234);
     }
 
     #[test]

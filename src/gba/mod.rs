@@ -168,13 +168,18 @@ impl GameBoyAdvance {
         // execute one CPU instruction (or idle if halted)
         let cycles = self.cpu.step();
 
-        // clock timers
+        // clock timers and APU, stopping at each timer overflow
         if self.timer_enabled && self.cpu.bus.timers.cycles_to_next_overflow() != u32::MAX {
             if !self.cpu.bus.timers.will_event(cycles) {
                 self.cpu.bus.timers.advance(cycles);
+                if self.apu_enabled {
+                    self.cpu.bus.apu.clock(cycles);
+                }
             } else {
                 self.clock_timers(cycles);
             }
+        } else if self.apu_enabled {
+            self.cpu.bus.apu.clock(cycles);
         }
 
         // clocks PPU, retrieves the events that occurred during
@@ -185,46 +190,8 @@ impl GameBoyAdvance {
             if !self.cpu.bus.ppu.will_event(cycles) {
                 self.cpu.bus.ppu.advance(cycles);
             } else {
-                let events = self.cpu.bus.ppu.clock(
-                    cycles,
-                    self.cpu.bus.vram.as_slice(),
-                    self.cpu.bus.palette.as_slice(),
-                    self.cpu.bus.oam.as_slice(),
-                );
-
-                if events & 1 != 0 {
-                    // hblank DMA trigger (always fires at hblank)
-                    if self.dma_enabled {
-                        self.cpu.bus.dma.trigger_hblank();
-                    }
-                }
-                if events & 4 != 0 {
-                    // hblank IRQ (only when DISPSTAT enables it)
-                    self.cpu.bus.irq.raise_hblank();
-                }
-                if events & 2 != 0 {
-                    // vblank DMA trigger (always fires at vblank)
-                    self.frame = self.cpu.bus.ppu.frame();
-                    if self.dma_enabled {
-                        self.cpu.bus.dma.trigger_vblank();
-                    }
-                }
-                if events & 8 != 0 {
-                    // vblank IRQ (only when DISPSTAT enables it)
-                    self.cpu.bus.irq.raise_vblank();
-                }
-                if events & 16 != 0 {
-                    // delivers VCount match IRQ to the controller, relies on
-                    // the IntrWait re-halt check in cpu.rs (gated on CPSR_I==0)
-                    // to prevent premature unhalt of VBlankIntrWait callers.
-                    self.cpu.bus.irq.raise_vcount();
-                }
+                self.clock_ppu(cycles);
             }
-        }
-
-        // clocks APU
-        if self.apu_enabled {
-            self.cpu.bus.apu.clock(cycles);
         }
 
         // processes DMA transfers
@@ -245,11 +212,19 @@ impl GameBoyAdvance {
     /// and DirectSound event without enlarging the instruction path.
     #[inline(never)]
     fn clock_timers(&mut self, cycles: u32) {
+        let clock_apu = self.apu_enabled && self.cpu.bus.apu.soundcnt_x() & 0x80 != 0;
+        if self.apu_enabled && !clock_apu {
+            self.cpu.bus.apu.clock(cycles);
+        }
         let mut remaining = cycles;
         while remaining > 0 {
             let batch = remaining.min(self.cpu.bus.timers.cycles_to_next_overflow());
             let overflows = self.cpu.bus.timers.clock(batch);
             remaining -= batch;
+            // generate earlier audio before an overflow changes the FIFO sample
+            if clock_apu {
+                self.cpu.bus.apu.clock(batch);
+            }
             if overflows != 0 {
                 for i in 0..4 {
                     if overflows & (1 << i) != 0 {
@@ -271,6 +246,45 @@ impl GameBoyAdvance {
                     }
                 }
             }
+        }
+    }
+
+    /// Clocks the PPU at event boundaries, delivering DMA triggers and IRQs.
+    #[inline(never)]
+    fn clock_ppu(&mut self, cycles: u32) {
+        let events = self.cpu.bus.ppu.clock(
+            cycles,
+            self.cpu.bus.vram.as_slice(),
+            self.cpu.bus.palette.as_slice(),
+            self.cpu.bus.oam.as_slice(),
+        );
+
+        if events & 1 != 0 {
+            // hblank DMA trigger (always fires at hblank)
+            if self.dma_enabled {
+                self.cpu.bus.dma.trigger_hblank();
+            }
+        }
+        if events & 4 != 0 {
+            // hblank IRQ (only when DISPSTAT enables it)
+            self.cpu.bus.irq.raise_hblank();
+        }
+        if events & 2 != 0 {
+            // vblank DMA trigger (always fires at vblank)
+            self.frame = self.cpu.bus.ppu.frame();
+            if self.dma_enabled {
+                self.cpu.bus.dma.trigger_vblank();
+            }
+        }
+        if events & 8 != 0 {
+            // vblank IRQ (only when DISPSTAT enables it)
+            self.cpu.bus.irq.raise_vblank();
+        }
+        if events & 16 != 0 {
+            // delivers VCount match IRQ to the controller, relies on
+            // the IntrWait re-halt check in cpu.rs (gated on CPSR_I==0)
+            // to prevent premature unhalt of VBlankIntrWait callers.
+            self.cpu.bus.irq.raise_vcount();
         }
     }
 
@@ -698,6 +712,28 @@ mod tests {
     }
 
     #[test]
+    fn test_clock_direct_sound_sample_order() {
+        for halted in [false, true] {
+            let mut gba = GameBoyAdvance::new();
+            gba.cpu.bus.write32(0x0300_0000, 0xEAFFFFFE); // b .
+            gba.cpu.set_reg(15, 0x0300_0000);
+            gba.cpu.set_halted(halted);
+            gba.cpu.bus.apu.set_soundcnt_x(0x80);
+            gba.cpu.bus.apu.set_soundcnt_h(0x0304);
+            gba.cpu.bus.apu.direct_sound[0].write_fifo(0x04030201);
+            gba.cpu.bus.timers.write_reload(0, 0xFDA8); // one FIFO sample every 600 cycles
+            gba.cpu.bus.timers.write_control(0, 0x80);
+
+            assert_eq!(gba.clocks_cycles(1800), 1800);
+            assert_eq!(
+                gba.cpu.bus.apu.drain_audio_buffer(),
+                vec![0, 0, 256, 256, 512, 512]
+            );
+            assert_eq!(gba.cpu.bus.apu.direct_sound[0].current_sample(), 3);
+        }
+    }
+
+    #[test]
     fn test_clock_timers_disabled() {
         let mut gba = GameBoyAdvance::new();
         gba.set_timer_enabled(false);
@@ -710,6 +746,32 @@ mod tests {
         assert_eq!(gba.cpu.bus.timers.read_counter(0), 0xFFFF);
         assert_eq!(gba.cpu.bus.irq.if_(), 0);
         assert_eq!(gba.cpu.bus.apu.direct_sound[0].fifo_len(), 4);
+    }
+
+    #[test]
+    fn test_clock_ppu_events() {
+        for dma_enabled in [false, true] {
+            let mut gba = GameBoyAdvance::new();
+            gba.set_dma_enabled(dma_enabled);
+            gba.cpu.bus.ppu.set_dispcnt(0x80);
+            gba.cpu.bus.ppu.set_dispstat(0xA038);
+            gba.cpu.bus.dma.channels[0].set_control(0xA000, 0);
+            gba.cpu.bus.dma.channels[1].set_control(0x9000, 1);
+
+            gba.clock_ppu(960);
+            assert_eq!(gba.cpu.bus.irq.if_(), 2);
+            assert_eq!(gba.cpu.bus.dma.channels[0].active(), dma_enabled);
+            assert!(!gba.cpu.bus.dma.channels[1].active());
+            assert_eq!(gba.frame, 0);
+            gba.clock_ppu(272);
+            for _ in 1..160 {
+                gba.clock_ppu(1232);
+            }
+            assert_eq!(gba.cpu.bus.ppu.vcount(), 160);
+            assert_eq!(gba.cpu.bus.irq.if_(), 7);
+            assert_eq!(gba.cpu.bus.dma.channels[1].active(), dma_enabled);
+            assert_eq!(gba.frame, 1);
+        }
     }
 
     #[test]

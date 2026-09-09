@@ -13,11 +13,6 @@ use crate::warnln;
 /// Sampling rate for audio output in Hz.
 const SAMPLING_RATE: u32 = 32768;
 
-/// Number of CPU cycles accumulated before the APU channels are
-/// clocked, small enough to stay well below the sample period
-/// (~512 cycles) while amortizing the per instruction call cost.
-const APU_BATCH_CYCLES: u32 = 64;
-
 /// Duty cycle waveforms for square wave channels.
 ///
 /// Each row represents one of 4 duty cycles (12.5%, 25%, 50%, 75%)
@@ -605,22 +600,14 @@ impl GbaApu {
     // -- wave RAM --
 
     pub fn wave_ram(&self) -> &[u8; 16] {
-        // CPU accesses the bank NOT currently being played
-        let bank = if self.wave_dimension {
-            1 - self.wave_bank
-        } else {
-            self.wave_bank
-        };
+        // the CPU accesses the bank opposite the selected playback bank
+        let bank = 1 - self.wave_bank;
         &self.wave_ram[bank as usize]
     }
 
     pub fn read_wave_ram(&self, offset: usize) -> u8 {
         if offset < 16 {
-            let bank = if self.wave_dimension {
-                1 - self.wave_bank
-            } else {
-                self.wave_bank
-            };
+            let bank = 1 - self.wave_bank;
             self.wave_ram[bank as usize][offset]
         } else {
             0
@@ -629,11 +616,7 @@ impl GbaApu {
 
     pub fn write_wave_ram(&mut self, offset: usize, value: u8) {
         if offset < 16 {
-            let bank = if self.wave_dimension {
-                1 - self.wave_bank
-            } else {
-                self.wave_bank
-            };
+            let bank = 1 - self.wave_bank;
             self.wave_ram[bank as usize][offset] = value;
         }
     }
@@ -683,7 +666,7 @@ impl GbaApu {
         }
 
         self.pending_cycles += cycles;
-        if self.pending_cycles >= APU_BATCH_CYCLES {
+        if self.pending_cycles >= self.sample_period - self.sample_counter {
             self.run_pending();
         }
     }
@@ -699,25 +682,28 @@ impl GbaApu {
     /// Runs the accumulated pending cycles through the channels,
     /// frame sequencer and sample generation.
     fn run_pending(&mut self) {
-        let cycles = self.pending_cycles;
+        let mut cycles = self.pending_cycles;
         self.pending_cycles = 0;
-
-        // clock legacy channel frequency timers
-        self.tick_channels(cycles);
-
-        // update frame sequencer (512 Hz)
-        self.sequencer_counter += cycles;
         let sequencer_period = super::consts::CPU_FREQ / 512;
-        while self.sequencer_counter >= sequencer_period {
-            self.sequencer_counter -= sequencer_period;
-            self.clock_frame_sequencer();
-        }
 
-        // generate output samples at the configured rate
-        self.sample_counter += cycles;
-        while self.sample_counter >= self.sample_period {
-            self.sample_counter -= self.sample_period;
-            self.generate_sample();
+        while cycles > 0 {
+            // stop at each event so samples never use future channel state
+            let batch = cycles
+                .min(self.sample_period - self.sample_counter)
+                .min(sequencer_period - self.sequencer_counter);
+            self.tick_channels(batch);
+            self.sequencer_counter += batch;
+            self.sample_counter += batch;
+            cycles -= batch;
+
+            if self.sequencer_counter == sequencer_period {
+                self.sequencer_counter = 0;
+                self.clock_frame_sequencer();
+            }
+            if self.sample_counter == self.sample_period {
+                self.sample_counter = 0;
+                self.generate_sample();
+            }
         }
     }
 
@@ -876,8 +862,11 @@ impl GbaApu {
 
         // channel 1 (square with sweep)
         self.ch1_timer -= cycles_i32;
-        while self.ch1_timer <= 0 {
-            self.ch1_timer += (2048 - self.ch1_wave_length as i32) * 16;
+        if self.ch1_timer <= 0 {
+            let period = (2048 - self.ch1_wave_length as i32) * 16;
+            let ticks = 1 - self.ch1_timer / period;
+            self.ch1_timer += ticks * period;
+            self.ch1_sequence = (self.ch1_sequence as i32 + ticks - 1) as u8 & 7;
             if self.ch1_enabled && self.ch1_dac {
                 self.ch1_output =
                     if DUTY_TABLE[self.ch1_wave_duty as usize][self.ch1_sequence as usize] == 1 {
@@ -893,8 +882,11 @@ impl GbaApu {
 
         // channel 2 (square)
         self.ch2_timer -= cycles_i32;
-        while self.ch2_timer <= 0 {
-            self.ch2_timer += (2048 - self.ch2_wave_length as i32) * 16;
+        if self.ch2_timer <= 0 {
+            let period = (2048 - self.ch2_wave_length as i32) * 16;
+            let ticks = 1 - self.ch2_timer / period;
+            self.ch2_timer += ticks * period;
+            self.ch2_sequence = (self.ch2_sequence as i32 + ticks - 1) as u8 & 7;
             if self.ch2_enabled && self.ch2_dac {
                 self.ch2_output =
                     if DUTY_TABLE[self.ch2_wave_duty as usize][self.ch2_sequence as usize] == 1 {
@@ -910,12 +902,19 @@ impl GbaApu {
 
         // channel 3 (wave)
         self.ch3_timer -= cycles_i32;
-        while self.ch3_timer <= 0 {
-            self.ch3_timer += (2048 - self.ch3_wave_length as i32) * 8;
+        if self.ch3_timer <= 0 {
+            let period = (2048 - self.ch3_wave_length as i32) * 8;
+            let ticks = 1 - self.ch3_timer / period;
+            self.ch3_timer += ticks * period;
+            let max_pos = if self.wave_dimension && self.ch3_enabled && self.ch3_dac {
+                63
+            } else {
+                31
+            };
+            self.ch3_position = (self.ch3_position as i32 + ticks - 1) as u8 & max_pos;
             if self.ch3_enabled && self.ch3_dac {
-                let max_pos = if self.wave_dimension { 63 } else { 31 };
                 let bank = if self.wave_dimension {
-                    (self.ch3_position >> 5) as usize
+                    (self.wave_bank ^ (self.ch3_position >> 5)) as usize
                 } else {
                     self.wave_bank as usize
                 };
@@ -930,8 +929,8 @@ impl GbaApu {
 
                 // apply volume level
                 if self.ch3_force_volume {
-                    // GBA extension: 75% volume (shift right 1, then add quarter)
-                    sample = (sample >> 1) + (sample >> 2);
+                    // apply 75% volume before rounding down
+                    sample = (sample * 3) >> 2;
                 } else if self.ch3_output_level > 0 {
                     sample >>= self.ch3_output_level - 1;
                 } else {
@@ -939,32 +938,31 @@ impl GbaApu {
                 }
 
                 self.ch3_output = sample;
-                self.ch3_position = if self.ch3_position >= max_pos {
-                    0
-                } else {
-                    self.ch3_position + 1
-                };
             } else {
                 self.ch3_output = 0;
-                self.ch3_position = (self.ch3_position + 1) & 31;
             }
+            self.ch3_position = (self.ch3_position + 1) & max_pos;
         }
 
         // channel 4 (noise)
         self.ch4_timer -= cycles_i32;
-        while self.ch4_timer <= 0 {
-            self.ch4_timer +=
+        if self.ch4_timer <= 0 {
+            let period =
                 ((CH4_DIVISORS[self.ch4_divisor as usize] as i32) << self.ch4_clock_shift) * 4;
+            let ticks = 1 - self.ch4_timer / period;
+            self.ch4_timer += ticks * period;
             if self.ch4_enabled && self.ch4_dac {
-                let xor_result =
-                    ((self.ch4_lfsr & 0x0001) ^ ((self.ch4_lfsr >> 1) & 0x0001)) == 0x0001;
-                self.ch4_lfsr >>= 1;
-                self.ch4_lfsr |= if xor_result { 1 << 14 } else { 0 };
-                if self.ch4_width_mode {
-                    self.ch4_lfsr &= 0xFFBF;
-                    self.ch4_lfsr |= if xor_result { 0x40 } else { 0 };
+                for _ in 0..ticks {
+                    let xor_result =
+                        ((self.ch4_lfsr & 0x0001) ^ ((self.ch4_lfsr >> 1) & 0x0001)) == 0x0001;
+                    self.ch4_lfsr >>= 1;
+                    self.ch4_lfsr |= if xor_result { 1 << 14 } else { 0 };
+                    if self.ch4_width_mode {
+                        self.ch4_lfsr &= 0xFFBF;
+                        self.ch4_lfsr |= if xor_result { 0x40 } else { 0 };
+                    }
+                    self.ch4_output = if xor_result { self.ch4_volume } else { 0 };
                 }
-                self.ch4_output = if xor_result { self.ch4_volume } else { 0 };
             } else {
                 self.ch4_output = 0;
             }
@@ -1471,7 +1469,7 @@ impl Default for GbaApu {
 
 #[cfg(test)]
 mod tests {
-    use super::{DirectSoundChannel, GbaApu, APU_BATCH_CYCLES};
+    use super::{DirectSoundChannel, GbaApu};
 
     #[test]
     fn test_direct_sound_new() {
@@ -1643,6 +1641,33 @@ mod tests {
     }
 
     #[test]
+    fn test_apu_wave_ram_bank_selection() {
+        for dimension in [false, true] {
+            for bank in 0..2 {
+                let mut apu = GbaApu::new();
+                apu.set_soundcnt_x(0x80);
+                apu.write_channel_reg(0x70, (bank << 6) | if dimension { 0x20 } else { 0 });
+                apu.write_wave_ram(0, 0x12);
+                apu.write_wave_ram(15, 0xAB);
+                apu.write_wave_ram(16, 0xFF);
+
+                let access_bank = 1 - bank as usize;
+                assert_eq!(apu.wave_ram[access_bank][0], 0x12);
+                assert_eq!(apu.wave_ram[access_bank][15], 0xAB);
+                assert_eq!(apu.wave_ram[bank as usize], [0; 16]);
+                assert_eq!(apu.wave_ram(), &apu.wave_ram[access_bank]);
+                assert_eq!(apu.read_wave_ram(0), 0x12);
+                assert_eq!(apu.read_wave_ram(15), 0xAB);
+
+                // changing the dimension does not change the CPU access bank
+                apu.write_channel_reg(0x70, (bank << 6) | if dimension { 0 } else { 0x20 });
+                assert_eq!(apu.read_wave_ram(0), 0x12);
+                assert_eq!(apu.read_wave_ram(15), 0xAB);
+            }
+        }
+    }
+
+    #[test]
     fn test_apu_timer_overflow() {
         let mut apu = GbaApu::new();
         apu.direct_sound[0].timer_id = 0;
@@ -1686,8 +1711,8 @@ mod tests {
         apu.set_soundcnt_x(0x80);
 
         // below the batch threshold cycles are only accumulated
-        apu.clock(APU_BATCH_CYCLES - 1);
-        assert_eq!(apu.pending_cycles, APU_BATCH_CYCLES - 1);
+        apu.clock(apu.sample_period - 1);
+        assert_eq!(apu.pending_cycles, apu.sample_period - 1);
 
         // reaching the threshold processes the accumulated cycles
         apu.clock(1);
@@ -1723,6 +1748,222 @@ mod tests {
         apu.flush();
         assert_eq!(apu.sequencer_step, 0);
         assert_eq!(apu.pending_cycles, 0);
+    }
+
+    #[test]
+    fn test_apu_run_pending_sample_order() {
+        let mut apu = GbaApu::new();
+        apu.set_soundcnt_x(0x80);
+        apu.set_soundcnt_l(0x4477);
+        apu.set_soundcnt_h(2);
+        apu.wave_ram[0].fill(0x12);
+        apu.write_channel_reg(0x70, 0x80);
+        apu.write_channel_reg(0x73, 0x20);
+        apu.write_channel_reg(0x74, 0xC0);
+        apu.write_channel_reg(0x75, 0x87); // one wave digit per output sample
+
+        apu.clock(1536);
+        assert_eq!(
+            apu.drain_audio_buffer(),
+            vec![1024, 1024, 2048, 2048, 1024, 1024]
+        );
+        assert_eq!(apu.ch3_position, 3);
+        assert_eq!(apu.sample_counter, 0);
+    }
+
+    #[test]
+    fn test_apu_run_pending_partitions() {
+        let make_apu = || {
+            let mut apu = GbaApu::new();
+            apu.set_soundcnt_x(0x80);
+            apu.set_soundcnt_l(0xFF77);
+            apu.set_soundcnt_h(2);
+            apu.wave_ram[0].fill(0x12);
+            apu.wave_ram[1].fill(0xAB);
+            for (addr, value) in [
+                (0x60, 0x11),
+                (0x62, 0xBE),
+                (0x63, 0x91),
+                (0x64, 0xD0),
+                (0x65, 0xC5),
+                (0x68, 0x40),
+                (0x69, 0x49),
+                (0x6C, 0xFF),
+                (0x6D, 0x87),
+                (0x70, 0xE0),
+                (0x73, 0x20),
+                (0x74, 0xE0),
+                (0x75, 0x87),
+                (0x79, 0x51),
+                (0x7C, 0x09),
+                (0x7D, 0x80),
+            ] {
+                apu.write_channel_reg(addr, value);
+            }
+            apu
+        };
+        let cycles = 32768 * 9 + 73;
+        let mut reference = make_apu();
+        for _ in 0..cycles {
+            reference.clock(1);
+            reference.flush();
+        }
+        let samples = reference.drain_audio_buffer();
+
+        for batch in [1, 7, 63, 64, 65, 511, 512, 960, 32769, cycles] {
+            let mut apu = make_apu();
+            let mut remaining = cycles;
+            while remaining > 0 {
+                let count = remaining.min(batch);
+                apu.clock(count);
+                remaining -= count;
+            }
+            assert_eq!(apu.drain_audio_buffer(), samples);
+            assert_eq!(apu.ch1_timer, reference.ch1_timer);
+            assert_eq!(apu.ch2_timer, reference.ch2_timer);
+            assert_eq!(apu.ch3_timer, reference.ch3_timer);
+            assert_eq!(apu.ch4_timer, reference.ch4_timer);
+            assert_eq!(apu.ch1_sequence, reference.ch1_sequence);
+            assert_eq!(apu.ch2_sequence, reference.ch2_sequence);
+            assert_eq!(apu.ch3_position, reference.ch3_position);
+            assert_eq!(apu.ch4_lfsr, reference.ch4_lfsr);
+            assert_eq!(apu.sequencer_step, reference.sequencer_step);
+            assert_eq!(apu.sequencer_counter, reference.sequencer_counter);
+            assert_eq!(apu.sample_counter, reference.sample_counter);
+            assert_eq!(apu.soundcnt_x(), reference.soundcnt_x());
+        }
+    }
+
+    #[test]
+    fn test_apu_tick_channels_partitions() {
+        for frequency in [0, 1024, 2047] {
+            for enabled in [false, true] {
+                for dac in [false, true] {
+                    for width_mode in [false, true] {
+                        let make_apu = || {
+                            let mut apu = GbaApu::new();
+                            apu.ch1_wave_length = frequency;
+                            apu.ch2_wave_length = frequency;
+                            apu.ch3_wave_length = frequency;
+                            apu.ch1_enabled = enabled;
+                            apu.ch2_enabled = enabled;
+                            apu.ch3_enabled = enabled;
+                            apu.ch4_enabled = enabled;
+                            apu.ch1_dac = dac;
+                            apu.ch2_dac = dac;
+                            apu.ch3_dac = dac;
+                            apu.ch4_dac = dac;
+                            apu.ch1_volume = 11;
+                            apu.ch2_volume = 9;
+                            apu.ch4_volume = 7;
+                            apu.ch1_wave_duty = 2;
+                            apu.ch2_wave_duty = 3;
+                            apu.ch1_sequence = 5;
+                            apu.ch2_sequence = 7;
+                            apu.ch3_position = 30;
+                            apu.ch3_output_level = 1;
+                            apu.wave_bank = 1;
+                            apu.wave_dimension = true;
+                            apu.wave_ram[0].fill(0x12);
+                            apu.wave_ram[1].fill(0xAB);
+                            apu.ch4_width_mode = width_mode;
+                            apu
+                        };
+                        let mut reference = make_apu();
+                        let mut apu = make_apu();
+                        for _ in 0..65537 {
+                            reference.tick_channels(1);
+                        }
+                        apu.tick_channels(65537);
+
+                        assert_eq!(apu.ch1_timer, reference.ch1_timer);
+                        assert_eq!(apu.ch2_timer, reference.ch2_timer);
+                        assert_eq!(apu.ch3_timer, reference.ch3_timer);
+                        assert_eq!(apu.ch4_timer, reference.ch4_timer);
+                        assert_eq!(apu.ch1_sequence, reference.ch1_sequence);
+                        assert_eq!(apu.ch2_sequence, reference.ch2_sequence);
+                        assert_eq!(apu.ch3_position, reference.ch3_position);
+                        assert_eq!(apu.ch4_lfsr, reference.ch4_lfsr);
+                        assert_eq!(apu.ch1_output, reference.ch1_output);
+                        assert_eq!(apu.ch2_output, reference.ch2_output);
+                        assert_eq!(apu.ch3_output, reference.ch3_output);
+                        assert_eq!(apu.ch4_output, reference.ch4_output);
+
+                        // a zero-cycle call must not advance the resulting phases
+                        apu.tick_channels(0);
+                        assert_eq!(apu.ch1_sequence, reference.ch1_sequence);
+                        assert_eq!(apu.ch2_sequence, reference.ch2_sequence);
+                        assert_eq!(apu.ch3_position, reference.ch3_position);
+                        assert_eq!(apu.ch4_lfsr, reference.ch4_lfsr);
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_apu_tick_channels_wave_banks() {
+        for dimension in [false, true] {
+            for bank in 0..2 {
+                let mut apu = GbaApu::new();
+                apu.wave_ram[0].fill(0x12);
+                apu.wave_ram[1].fill(0xAB);
+                apu.write_channel_reg(0x70, 0x80 | (bank << 6) | if dimension { 0x20 } else { 0 });
+                apu.write_channel_reg(0x73, 0x20);
+                apu.write_channel_reg(0x74, 0xFF);
+                apu.write_channel_reg(0x75, 0x87);
+
+                for digit in 0..130 {
+                    apu.tick_channels(8);
+                    let playing_bank = bank ^ if dimension { (digit / 32) & 1 } else { 0 };
+                    let expected = if playing_bank == 0 { 1 } else { 10 } + (digit & 1);
+                    assert_eq!(apu.ch3_output, expected);
+                    assert_eq!(apu.ch3_timer, 8);
+                    assert_eq!(
+                        apu.ch3_position,
+                        (digit + 1) & if dimension { 63 } else { 31 }
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_apu_tick_channels_wave_volume() {
+        for output_level in 0..4 {
+            for sample in 0..16 {
+                let mut apu = GbaApu::new();
+                apu.wave_ram[0].fill((sample << 4) | sample);
+                apu.write_channel_reg(0x70, 0x80);
+                apu.write_channel_reg(0x73, output_level << 5);
+                apu.write_channel_reg(0x74, 0xFF);
+                apu.write_channel_reg(0x75, 0x87);
+
+                apu.tick_channels(8);
+                assert_eq!(
+                    apu.ch3_output,
+                    [0, sample, sample / 2, sample / 4][output_level as usize]
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_apu_tick_channels_wave_force_volume() {
+        let expected = [0, 0, 1, 2, 3, 3, 4, 5, 6, 6, 7, 8, 9, 9, 10, 11];
+        for output_level in 0..4 {
+            for sample in 0..16 {
+                let mut apu = GbaApu::new();
+                apu.wave_ram[0].fill((sample << 4) | sample);
+                apu.write_channel_reg(0x70, 0x80);
+                apu.write_channel_reg(0x73, 0x80 | (output_level << 5));
+                apu.write_channel_reg(0x74, 0xFF);
+                apu.write_channel_reg(0x75, 0x87);
+
+                apu.tick_channels(8);
+                assert_eq!(apu.ch3_output, expected[sample as usize]);
+            }
+        }
     }
 
     #[test]
