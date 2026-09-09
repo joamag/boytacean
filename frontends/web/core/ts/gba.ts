@@ -371,7 +371,7 @@ export class GbaCore extends EmulatorLogic {
         this.trigger("booted");
     }
 
-    setRom(name: string, data: Uint8Array, romInfo: GbaRomInfo) {
+    setRom(name: string, data: Uint8Array, romInfo: GbaRomInfo | null) {
         this.romName = name;
         this.romData = data;
         this.romSize = data.length;

@@ -239,7 +239,7 @@ impl GbaBus {
     #[inline(always)]
     pub fn read8(&mut self, addr: u32) -> u8 {
         match addr >> 24 {
-            0x00 => {
+            0x00 if addr < BIOS_SIZE as u32 => {
                 let offset = (addr & 0x3FFF) as usize;
                 if self.bios_readable {
                     self.bios[offset]
@@ -283,7 +283,7 @@ impl GbaBus {
     pub fn read16(&mut self, addr: u32) -> u16 {
         let addr = addr & !1;
         match addr >> 24 {
-            0x00 => {
+            0x00 if addr < BIOS_SIZE as u32 => {
                 let offset = (addr & 0x3FFE) as usize;
                 if self.bios_readable {
                     u16::from_le_bytes(self.bios[offset..offset + 2].try_into().unwrap())
@@ -341,7 +341,7 @@ impl GbaBus {
     pub fn read32(&mut self, addr: u32) -> u32 {
         let addr = addr & !3;
         match addr >> 24 {
-            0x00 => {
+            0x00 if addr < BIOS_SIZE as u32 => {
                 let offset = (addr & 0x3FFC) as usize;
                 if self.bios_readable {
                     u32::from_le_bytes(self.bios[offset..offset + 4].try_into().unwrap())
@@ -835,7 +835,16 @@ impl GbaBus {
             REG_DMA2CNT_L => self.dma.channels[2].set_count_reg(value),
             REG_DMA2CNT_H => self.dma.channels[2].set_control(value, 2),
             REG_DMA3CNT_L => self.dma.channels[3].set_count_reg(value),
-            REG_DMA3CNT_H => self.dma.channels[3].set_control(value, 3),
+            REG_DMA3CNT_H => {
+                let channel = &mut self.dma.channels[3];
+                if !channel.enabled()
+                    && value & (1 << 15) != 0
+                    && self.save.is_eeprom_addr(channel.dst_reg())
+                {
+                    self.save.start_eeprom_transfer(channel.count_reg());
+                }
+                channel.set_control(value, 3);
+            }
             REG_KEYCNT => self.pad.set_keycnt(value),
             REG_IE => self.irq.set_ie(value),
             REG_IF => {
@@ -1049,6 +1058,49 @@ mod tests {
         assert_eq!(bus.ewram.len(), 0x40000);
         assert_eq!(bus.iwram.len(), 0x8000);
         assert!(!bus.halt_requested);
+    }
+
+    #[test]
+    fn test_bios_read_bounds() {
+        let mut bus = GbaBus::new();
+        bus.bios.fill(0xAB);
+        bus.update_bios_value(0x12345678);
+        for readable in [false, true] {
+            bus.bios_readable = readable;
+            for addr in [0, 0x3FFF] {
+                assert_eq!(
+                    bus.read8(addr),
+                    if readable {
+                        0xAB
+                    } else if addr == 0 {
+                        0x78
+                    } else {
+                        0x12
+                    }
+                );
+                assert_eq!(
+                    bus.read16(addr),
+                    if readable {
+                        0xABAB
+                    } else if addr == 0 {
+                        0x5678
+                    } else {
+                        0x1234
+                    }
+                );
+                assert_eq!(
+                    bus.read32(addr),
+                    if readable { 0xABABABAB } else { 0x12345678 }
+                );
+            }
+            for addr in [0x4000, 0x8000, 0x00FFFFFF] {
+                assert_eq!(bus.read8(addr), 0);
+                assert_eq!(bus.read16(addr), 0);
+                assert_eq!(bus.read32(addr), 0);
+                assert_eq!(bus.fetch16(addr), 0);
+                assert_eq!(bus.fetch32(addr), 0);
+            }
+        }
     }
 
     #[test]

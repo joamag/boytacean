@@ -111,6 +111,8 @@ impl SaveMedia {
     pub fn detect_save_type(&mut self, rom: &[u8]) {
         self.save_type = detect_from_rom(rom);
         self.rom_size = rom.len();
+        self.reset();
+        self.eeprom_addr_width = 0;
         match self.save_type {
             SaveType::Sram => {
                 self.data = vec![0xFFu8; 0x8000]; // 32KB SRAM
@@ -119,7 +121,12 @@ impl SaveMedia {
                 // start with 512B; auto-detect 8KB on first access
                 self.data = vec![0xFFu8; EEPROM_SIZE_4K];
             }
-            _ => {}
+            SaveType::Flash128 => {
+                self.data = vec![0xFFu8; 0x20000]; // 128KB flash
+            }
+            _ => {
+                self.data = vec![0xFFu8; SRAM_SIZE];
+            }
         }
     }
 
@@ -170,7 +177,7 @@ impl SaveMedia {
 
     /// Checks if an address in the 0x0D region maps to EEPROM.
     pub fn is_eeprom_addr(&self, addr: u32) -> bool {
-        if self.save_type != SaveType::Eeprom {
+        if self.save_type != SaveType::Eeprom || (addr >> 24) != 0x0D {
             return false;
         }
         // for ROMs <= 16MB, the entire 0x0D region is EEPROM
@@ -178,7 +185,25 @@ impl SaveMedia {
         if self.rom_size > 16 * 1024 * 1024 {
             addr >= 0x0DFF_FF00
         } else {
-            (addr >> 24) == 0x0D
+            true
+        }
+    }
+
+    /// Detects EEPROM address width from the DMA request length.
+    pub fn start_eeprom_transfer(&mut self, count: u16) {
+        if self.save_type != SaveType::Eeprom || self.eeprom_addr_width != 0 {
+            return;
+        }
+        match count {
+            9 | 73 => {
+                self.eeprom_addr_width = 6;
+                self.data.resize(EEPROM_SIZE_4K, 0xFF);
+            }
+            17 | 81 => {
+                self.eeprom_addr_width = 14;
+                self.data.resize(EEPROM_SIZE_64K, 0xFF);
+            }
+            _ => {}
         }
     }
 
@@ -243,14 +268,15 @@ impl SaveMedia {
                     let expected = self.eeprom_expected_addr_width();
                     if addr_bits == expected + 1 {
                         self.eeprom_addr =
-                            ((self.eeprom_buffer >> 1) & ((1u64 << expected) - 1)) as u16;
+                            ((self.eeprom_buffer >> 1) & ((1u64 << expected.min(10)) - 1)) as u16;
                         self.eeprom_start_read();
                     }
                 } else if cmd == 0x02 {
                     // write: "10" + N address bits, then transition to data collection
                     let expected = self.eeprom_expected_addr_width();
                     if addr_bits == expected {
-                        self.eeprom_addr = (self.eeprom_buffer & ((1u64 << expected) - 1)) as u16;
+                        self.eeprom_addr =
+                            (self.eeprom_buffer & ((1u64 << expected.min(10)) - 1)) as u16;
                         self.eeprom_state = EepromState::CollectingWriteData;
                         self.eeprom_buffer = 0;
                         self.eeprom_bits = 0;
@@ -278,22 +304,12 @@ impl SaveMedia {
         }
     }
 
-    /// Returns the expected EEPROM address width, auto-detecting on first use.
-    fn eeprom_expected_addr_width(&mut self) -> u8 {
+    /// Returns the detected EEPROM address width, defaulting to 512B.
+    fn eeprom_expected_addr_width(&self) -> u8 {
         if self.eeprom_addr_width != 0 {
             return self.eeprom_addr_width;
         }
-        // auto-detect based on ROM size:
-        // ROMs > 16Mbit (2MB) use 14-bit addressing (8KB EEPROM)
-        // ROMs <= 16Mbit use 6-bit addressing (512B EEPROM)
-        if self.rom_size > 2 * 1024 * 1024 {
-            self.eeprom_addr_width = 14;
-            self.data.resize(EEPROM_SIZE_64K, 0xFF);
-            14
-        } else {
-            self.eeprom_addr_width = 6;
-            6
-        }
+        6
     }
 
     /// Loads 8 bytes from the EEPROM at the current address into the read buffer.
@@ -534,6 +550,58 @@ mod tests {
         rom[0x100..0x106].copy_from_slice(b"SRAM_V");
         save.detect_save_type(&rom);
         assert_eq!(save.save_type(), SaveType::Sram);
+    }
+
+    #[test]
+    fn test_detect_save_type_resets_media() {
+        let mut save = SaveMedia::new();
+        for (signature, save_type, size) in [
+            (b"FLASH1M_V".as_slice(), SaveType::Flash128, 0x20000),
+            (b"SRAM_V".as_slice(), SaveType::Sram, 0x8000),
+            (b"FLASH_V".as_slice(), SaveType::Flash64, 0x10000),
+            (b"EEPROM_V".as_slice(), SaveType::Eeprom, 512),
+            (b"".as_slice(), SaveType::None, SRAM_SIZE),
+        ] {
+            save.bank = 1;
+            save.state = FlashState::Write;
+            save.eeprom_state = EepromState::CollectingWriteData;
+            save.eeprom_addr_width = 14;
+            save.eeprom_bits = 32;
+            save.data.fill(0);
+            save.detect_save_type(signature);
+            assert_eq!(save.save_type(), save_type);
+            assert_eq!(save.data.len(), size);
+            assert!(save.data.iter().all(|&b| b == 0xFF));
+            assert_eq!(save.bank, 0);
+            assert_eq!(save.state, FlashState::Ready);
+            assert_eq!(save.eeprom_state, EepromState::AcceptingCommand);
+            assert_eq!(save.eeprom_addr_width, 0);
+            assert_eq!(save.eeprom_bits, 0);
+        }
+    }
+
+    #[test]
+    fn test_detect_save_type_flash128_banks() {
+        let mut save = SaveMedia::new();
+        save.detect_save_type(b"FLASH1M_V");
+        for bank in [0, 1] {
+            for (addr, value) in [
+                (0x5555, 0xAA),
+                (0x2AAA, 0x55),
+                (0x5555, 0xB0),
+                (0, bank),
+                (0x5555, 0xAA),
+                (0x2AAA, 0x55),
+                (0x5555, 0xA0),
+                (0xFFFF, bank + 1),
+            ] {
+                save.write8(0x0E00_0000 + addr, value);
+            }
+            assert_eq!(save.read8(0x0E00_FFFF), bank + 1);
+        }
+        save.reset();
+        assert_eq!(save.read8(0x0E00_FFFF), 1);
+        assert_eq!(save.data[0x1FFFF], 2);
     }
 
     #[test]
@@ -973,6 +1041,8 @@ mod tests {
     fn test_is_eeprom_addr_not_eeprom() {
         let save = SaveMedia::new();
         assert!(!save.is_eeprom_addr(0x0D00_0000));
+        assert!(!save.is_eeprom_addr(0x0E00_0000));
+        assert!(!save.is_eeprom_addr(0xFFFF_FFFF));
     }
 
     #[test]
@@ -999,23 +1069,62 @@ mod tests {
         assert!(!save.is_eeprom_addr(0x0D00_0000));
     }
 
+    #[test]
+    fn test_start_eeprom_transfer() {
+        for rom_size in [512, 4 * 1024 * 1024] {
+            for (count, width, size) in [(9, 6, 512), (17, 14, 8192), (73, 6, 512), (81, 14, 8192)]
+            {
+                let mut save = SaveMedia::new();
+                let mut rom = vec![0u8; rom_size];
+                rom[..8].copy_from_slice(b"EEPROM_V");
+                save.detect_save_type(&rom);
+                save.data[0] = 0x42;
+                save.start_eeprom_transfer(count);
+                assert_eq!(save.eeprom_addr_width, width);
+                assert_eq!(save.data.len(), size);
+                assert_eq!(save.data[0], 0x42);
+                save.reset();
+                save.start_eeprom_transfer(if width == 6 { 17 } else { 9 });
+                assert_eq!(save.eeprom_addr_width, width);
+                assert_eq!(save.data.len(), size);
+                assert_eq!(save.data[0], 0x42);
+            }
+        }
+    }
+
+    #[test]
+    fn test_start_eeprom_transfer_ignores_other_packets() {
+        let mut save = SaveMedia::new();
+        save.start_eeprom_transfer(17);
+        assert_eq!(save.eeprom_addr_width, 0);
+        assert_eq!(save.data.len(), SRAM_SIZE);
+        save.detect_save_type(b"EEPROM_V");
+        for count in [0, 1, 8, 16, 68, 72, 80, 82] {
+            save.start_eeprom_transfer(count);
+            assert_eq!(save.eeprom_addr_width, 0);
+            assert_eq!(save.data.len(), 512);
+        }
+    }
+
     // --- EEPROM read/write protocol tests ---
 
-    /// Creates a small-ROM EEPROM save (6-bit addressing, 512B).
+    /// Creates an EEPROM save with a 9-halfword read request (512B).
     fn make_eeprom_save_6bit() -> SaveMedia {
         let mut save = SaveMedia::new();
-        let mut rom = vec![0u8; 1024 * 1024]; // 1MB ROM -> 6-bit
+        let mut rom = vec![0u8; 1024 * 1024];
         rom[0x100..0x108].copy_from_slice(b"EEPROM_V");
         save.detect_save_type(&rom);
+        save.start_eeprom_transfer(9);
         save
     }
 
-    /// Creates a large-ROM EEPROM save (14-bit addressing, 8KB).
+    /// Creates an EEPROM save with a 17-halfword read request (8KB).
     fn make_eeprom_save_14bit() -> SaveMedia {
         let mut save = SaveMedia::new();
-        let mut rom = vec![0u8; 4 * 1024 * 1024]; // 4MB ROM -> 14-bit
+        let mut rom = vec![0u8; 4 * 1024 * 1024];
         rom[0x100..0x108].copy_from_slice(b"EEPROM_V");
         save.detect_save_type(&rom);
+        save.start_eeprom_transfer(17);
         save
     }
 
@@ -1207,10 +1316,8 @@ mod tests {
     }
 
     #[test]
-    fn test_eeprom_addr_width_auto_detect_small_rom() {
+    fn test_eeprom_addr_width_6bit() {
         let mut save = make_eeprom_save_6bit();
-        assert_eq!(save.eeprom_addr_width, 0); // not yet detected
-                                               // trigger detection via first command
         send_bits(&mut save, 0b11, 2); // read command
         send_bits(&mut save, 0, 6);
         send_bits(&mut save, 0, 1);
@@ -1218,9 +1325,8 @@ mod tests {
     }
 
     #[test]
-    fn test_eeprom_addr_width_auto_detect_large_rom() {
+    fn test_eeprom_addr_width_14bit() {
         let mut save = make_eeprom_save_14bit();
-        assert_eq!(save.eeprom_addr_width, 0); // not yet detected
         send_bits(&mut save, 0b11, 2); // read command
         send_bits(&mut save, 0, 14);
         send_bits(&mut save, 0, 1);

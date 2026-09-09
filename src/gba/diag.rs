@@ -4,9 +4,11 @@
 //! execution, including CPU registers, PPU configuration, timer state, IRQ
 //! status, and BG tilemap contents. The main entry point [`run_diagnostics`]
 //! runs a ROM for a given number of frames, printing detailed state at key
-//! frames and saving frame buffer snapshots as PPM images to `/tmp/`.
+//! frames and saving frame buffer snapshots as PPM images to the temporary directory.
 
-use std::{fs::File, io::Write};
+use std::{env::temp_dir, fs::File, io::Write, path::Path};
+
+use boytacean_common::error::Error;
 
 use crate::{gba::GameBoyAdvance, pad::PadKey};
 
@@ -31,10 +33,10 @@ pub fn run_diagnostics(gba: &mut GameBoyAdvance, num_frames: u32) {
             gba.key_lift(PadKey::Start);
         }
 
-        gba.next_frame();
+        let cycles = gba.next_frame();
 
         if frame < 15 || frame == num_frames - 1 {
-            print_state(gba, frame, 0);
+            print_state(gba, frame, cycles);
             let handler = gba.cpu.bus.read32(0x03FF_FFFC);
             let intrcheck = gba.cpu.bus.read16(0x0300_7FF8);
             let iwf = gba.cpu.bus.intr_wait_flags;
@@ -66,7 +68,10 @@ pub fn run_diagnostics(gba: &mut GameBoyAdvance, num_frames: u32) {
                 }
                 println!();
             }
-            save_frame_buffer_ppm(gba, &format!("/tmp/gba_frame_{frame}.ppm"));
+            let path = temp_dir().join(format!("gba_frame_{frame}.ppm"));
+            if let Err(error) = save_frame_buffer_ppm(gba, &path) {
+                eprintln!("Error saving frame buffer: {error}");
+            }
         }
 
         // Analyze BG rendering at frame 2000
@@ -110,6 +115,7 @@ pub fn run_audio_diagnostics(gba: &mut GameBoyAdvance, num_frames: u32) {
         gba.cpu.bus.apu.direct_sound[1].reset_debug_counters();
         gba.clear_audio_buffer();
         gba.next_frame();
+        gba.cpu.bus.apu.flush();
 
         let soundcnt_h = gba.cpu.bus.apu.soundcnt_h();
         let soundcnt_x = gba.cpu.bus.apu.soundcnt_x();
@@ -378,41 +384,49 @@ pub fn run_audio_diagnostics(gba: &mut GameBoyAdvance, num_frames: u32) {
     }
 
     // write WAV file
-    let wav_path = "/tmp/gba_audio_diag.wav";
-    if let Ok(mut f) = File::create(wav_path) {
-        let sample_rate: u32 = 32768;
-        let channels: u16 = 2;
-        let bits_per_sample: u16 = 16;
-        let byte_rate = sample_rate * channels as u32 * bits_per_sample as u32 / 8;
-        let block_align = channels * bits_per_sample / 8;
-        let data_size = all_samples.len() as u32 * 2;
-        let file_size = 36 + data_size;
-
-        // RIFF header
-        let _ = f.write_all(b"RIFF");
-        let _ = f.write_all(&file_size.to_le_bytes());
-        let _ = f.write_all(b"WAVE");
-        // fmt chunk
-        let _ = f.write_all(b"fmt ");
-        let _ = f.write_all(&16u32.to_le_bytes());
-        let _ = f.write_all(&1u16.to_le_bytes()); // PCM
-        let _ = f.write_all(&channels.to_le_bytes());
-        let _ = f.write_all(&sample_rate.to_le_bytes());
-        let _ = f.write_all(&byte_rate.to_le_bytes());
-        let _ = f.write_all(&block_align.to_le_bytes());
-        let _ = f.write_all(&bits_per_sample.to_le_bytes());
-        // data chunk
-        let _ = f.write_all(b"data");
-        let _ = f.write_all(&data_size.to_le_bytes());
-        for &sample in &all_samples {
-            let _ = f.write_all(&sample.to_le_bytes());
-        }
-        println!(
-            "\n  WAV written to {wav_path} ({} samples, {:.1}s)",
-            all_samples.len() / 2,
-            all_samples.len() as f64 / 2.0 / sample_rate as f64
-        );
+    let wav_path = temp_dir().join("gba_audio_diag.wav");
+    if let Err(error) = save_audio_wav(&all_samples, &wav_path) {
+        eprintln!("Error saving audio: {error}");
     }
+}
+
+/// Saves signed stereo samples as a PCM WAV file.
+fn save_audio_wav(samples: &[i16], path: &Path) -> Result<(), Error> {
+    let mut file = File::create(path)?;
+    let sample_rate: u32 = 32768;
+    let channels: u16 = 2;
+    let bits_per_sample: u16 = 16;
+    let byte_rate = sample_rate * channels as u32 * bits_per_sample as u32 / 8;
+    let block_align = channels * bits_per_sample / 8;
+    let data_size = samples.len() as u32 * 2;
+    let file_size = 36 + data_size;
+
+    // riff header
+    file.write_all(b"RIFF")?;
+    file.write_all(&file_size.to_le_bytes())?;
+    file.write_all(b"WAVE")?;
+    // fmt chunk
+    file.write_all(b"fmt ")?;
+    file.write_all(&16u32.to_le_bytes())?;
+    file.write_all(&1u16.to_le_bytes())?; // pcm
+    file.write_all(&channels.to_le_bytes())?;
+    file.write_all(&sample_rate.to_le_bytes())?;
+    file.write_all(&byte_rate.to_le_bytes())?;
+    file.write_all(&block_align.to_le_bytes())?;
+    file.write_all(&bits_per_sample.to_le_bytes())?;
+    // data chunk
+    file.write_all(b"data")?;
+    file.write_all(&data_size.to_le_bytes())?;
+    for &sample in samples {
+        file.write_all(&sample.to_le_bytes())?;
+    }
+    println!(
+        "\n  WAV written to {} ({} samples, {:.1}s)",
+        path.display(),
+        samples.len() / 2,
+        samples.len() as f64 / 2.0 / sample_rate as f64
+    );
+    Ok(())
 }
 
 /// Prints a snapshot of the GBA's CPU, display, IRQ, timer state, etc.
@@ -568,11 +582,113 @@ fn analyze_bg_rendering(gba: &GameBoyAdvance) {
 ///
 /// Writes a 240x160 raw RGB image to the given path, useful for
 /// visual inspection and automated image comparison tests.
-fn save_frame_buffer_ppm(gba: &GameBoyAdvance, path: &str) {
+fn save_frame_buffer_ppm(gba: &GameBoyAdvance, path: &Path) -> Result<(), Error> {
     let frame_buffer = gba.frame_buffer();
-    let mut file = File::create(path).expect("Failed to create PPM file");
-    write!(file, "P6\n240 160\n255\n").expect("Failed to write PPM header");
-    file.write_all(frame_buffer)
-        .expect("Failed to write PPM data");
-    println!("Frame buffer saved to {path}");
+    let mut file = File::create(path)?;
+    write!(file, "P6\n240 160\n255\n")?;
+    file.write_all(frame_buffer)?;
+    println!("Frame buffer saved to {}", path.display());
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        env::temp_dir,
+        fs::{read, remove_file},
+    };
+
+    use super::{run_audio_diagnostics, run_diagnostics, save_audio_wav, save_frame_buffer_ppm};
+    use crate::gba::GameBoyAdvance;
+
+    #[test]
+    fn test_run_diagnostics() {
+        let mut gba = GameBoyAdvance::new();
+        run_diagnostics(&mut gba, 1);
+        assert_eq!(gba.ppu_frame(), 1);
+        let path = temp_dir().join("gba_frame_0.ppm");
+        let data = read(&path).unwrap();
+        assert_eq!(&data[..15], b"P6\n240 160\n255\n");
+        assert_eq!(&data[15..], gba.frame_buffer());
+        remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn test_run_audio_diagnostics() {
+        let mut gba = GameBoyAdvance::new();
+        gba.cpu.bus.apu.set_soundcnt_x(0x80);
+        gba.cpu.bus.apu.set_soundcnt_h(0x0304);
+        gba.cpu.bus.apu.direct_sound[0].write_fifo(0x04030201);
+        gba.cpu.bus.timers.write_reload(0, 0xFDA8);
+        gba.cpu.bus.timers.write_control(0, 0x80);
+        run_audio_diagnostics(&mut gba, 1);
+        assert_eq!(gba.ppu_frame(), 1);
+        let path = temp_dir().join("gba_audio_diag.wav");
+        let data = read(&path).unwrap();
+        assert_eq!(&data[..4], b"RIFF");
+        assert!(data.len() > 44);
+        remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn test_save_audio_wav() {
+        let path = temp_dir().join("boytacean_gba_audio_test.wav");
+        for samples in [vec![], vec![i16::MIN, i16::MAX, -1, 0]] {
+            save_audio_wav(&samples, &path).unwrap();
+            let data = read(&path).unwrap();
+            assert_eq!(data.len(), 44 + samples.len() * 2);
+            assert_eq!(&data[..4], b"RIFF");
+            assert_eq!(&data[4..8], &((data.len() - 8) as u32).to_le_bytes());
+            assert_eq!(&data[8..16], b"WAVEfmt ");
+            assert_eq!(&data[16..24], &[16, 0, 0, 0, 1, 0, 2, 0]);
+            assert_eq!(&data[24..28], &32768u32.to_le_bytes());
+            assert_eq!(&data[28..32], &131072u32.to_le_bytes());
+            assert_eq!(&data[32..36], &[4, 0, 16, 0]);
+            assert_eq!(&data[36..40], b"data");
+            assert_eq!(&data[40..44], &((samples.len() * 2) as u32).to_le_bytes());
+            for (i, sample) in samples.iter().enumerate() {
+                assert_eq!(&data[44 + i * 2..46 + i * 2], &sample.to_le_bytes());
+            }
+        }
+        remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn test_save_audio_wav_create_error() {
+        assert!(save_audio_wav(&[1, 2], &temp_dir()).is_err());
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn test_save_audio_wav_write_error() {
+        assert!(save_audio_wav(&[1, 2], std::path::Path::new("/dev/full")).is_err());
+    }
+
+    #[test]
+    fn test_save_frame_buffer_ppm() {
+        let path = temp_dir().join("boytacean_gba_frame_test.ppm");
+        let mut gba = GameBoyAdvance::new();
+        gba.cpu.bus.ppu.set_dispcnt(0x80);
+        gba.next_frame();
+        save_frame_buffer_ppm(&gba, &path).unwrap();
+        let data = read(&path).unwrap();
+        assert_eq!(&data[..15], b"P6\n240 160\n255\n");
+        assert_eq!(data.len(), 15 + 240 * 160 * 3);
+        assert!(data[15..].iter().all(|&b| b == 0xFF));
+        remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn test_save_frame_buffer_ppm_create_error() {
+        assert!(save_frame_buffer_ppm(&GameBoyAdvance::new(), &temp_dir()).is_err());
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn test_save_frame_buffer_ppm_write_error() {
+        assert!(
+            save_frame_buffer_ppm(&GameBoyAdvance::new(), std::path::Path::new("/dev/full"))
+                .is_err()
+        );
+    }
 }

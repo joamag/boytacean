@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * GBA keypad input handling with interrupt control (KEYINPUT/KEYCNT)
 * GBA BIOS HLE for common SWI calls (Div, Sqrt, CpuSet, LZ77, RLUnComp, etc.)
 * GBA interrupt controller (IE, IF, IME) with per-source enable/acknowledge
-* GBA ROM header parsing, checksum validation, and auto-detection via fixed byte
+* GBA ROM header parsing, checksum validation, and auto-detection via the cartridge header
 * `System` enum for unified frontend integration of Game Boy and GBA emulators
 * GBA web frontend integration with WASM bindings and auto-detection via ROM URL
 * `GbaEmulator` TypeScript class for running GBA ROMs in the browser
@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Headless `GbaCore` in the `boytacean-core` package, carrying the GBA emulation logic without any React, EmuKit UI or bundler-specific dependency
 * Support for the GBA in the `boytacean-react` package, through a `system` property that selects the core to be built and falls back to the inference of the system from the extension of the ROM
 * Mapping of the `Q` and `W` keys to the shoulder buttons of the GBA in the default key mapping of the React package
+* GBA shoulder buttons in the on-screen React game pad
 
 ### Changed
 
@@ -47,6 +48,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+* GBA BIOS division overflow, malformed LZ77 back-references, CpuFastSet rounding and missing RegisterRamReset I/O handling
+* GBA BIOS memory mirroring, CPU reset cycle state and bitmap backgrounds ignoring the BG2 enable flag
+* GBA DMA3 repeat counts, cancelled transfers and DirectSound DMA transfer width
+* GBA Flash bank allocation, save protocol state after loading another ROM, EEPROM capacity detection and truncated save files
+* GBA battery save loading and storage in the SDL frontend, including saving on exit and ROM changes
+* Switching between Game Boy and GBA ROMs in the SDL frontend and React provider
+* SDL software rendering requiring an OpenGL-capable video driver
+* GBA CPU-only benchmark hangs and diagnostic file error handling, temporary paths, audio flushing and cycle reporting
+* Game Boy ROM loading through the unified system constructor and checksum validation with truncated GBA headers
 * GBA build failures with newer nightly Clippy checks
 * Batched CPU stepping is now bounded, instead of running an unlimited number of instructions
 * Loading of the default WASM binary when the core package is installed from npm

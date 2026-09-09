@@ -51,6 +51,16 @@ describe("GameBoyCore", function () {
         cores.forEach((core) => releaseCore(core));
     });
 
+    describe("#setRom()", function () {
+        it("should be able to stage a ROM before its header is parsed", () => {
+            const core = buildCore();
+            core.setRom("pocket.gb", new Uint8Array([1, 2, 3]), null);
+            assert.strictEqual(core.loadedRomName, "pocket.gb");
+            assert.strictEqual(core.loadedRomSize, 3);
+            assert.strictEqual(core.instance, null);
+        });
+    });
+
     describe("#instance", function () {
         it("should be able to start without a Game Boy instance", () => {
             assert.strictEqual(buildCore().instance, null);

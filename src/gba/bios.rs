@@ -131,6 +131,50 @@ fn swi_register_ram_reset(cpu: &mut Arm7Tdmi) {
             cpu.bus_write32(addr, 0);
         }
     }
+
+    // bit 5: reset serial communication registers
+    if flags & (1 << 5) != 0 {
+        cpu.bus_write16(0x0400_0128, 0);
+        cpu.bus_write16(0x0400_0134, 0x8000);
+        cpu.bus_write16(0x0400_012A, 0);
+        cpu.bus_write16(0x0400_0140, 0);
+        cpu.bus_write32(0x0400_0150, 0);
+        cpu.bus_write32(0x0400_0154, 0);
+    }
+
+    // bit 6: reset sound registers and both wave RAM banks
+    if flags & (1 << 6) != 0 {
+        for bank in [0x40, 0] {
+            cpu.bus_write16(0x0400_0070, bank);
+            for addr in (0x0400_0090u32..0x0400_00A0).step_by(4) {
+                cpu.bus_write32(addr, 0);
+            }
+        }
+        for addr in (0x0400_0060u32..0x0400_0086).step_by(2) {
+            cpu.bus_write16(addr, 0);
+        }
+        cpu.bus_write16(0x0400_0088, 0x0200);
+    }
+
+    // bit 7: reset the remaining display, DMA, timer, and interrupt registers
+    if flags & (1 << 7) != 0 {
+        for addr in (0x0400_0004u32..0x0400_0056).step_by(2) {
+            cpu.bus_write16(addr, 0);
+        }
+        for addr in [0x0400_0020, 0x0400_0026, 0x0400_0030, 0x0400_0036] {
+            cpu.bus_write16(addr, 0x0100);
+        }
+        for addr in (0x0400_00B0u32..0x0400_00E0).step_by(2) {
+            cpu.bus_write16(addr, 0);
+        }
+        for addr in (0x0400_0100u32..0x0400_0110).step_by(2) {
+            cpu.bus_write16(addr, 0);
+        }
+        cpu.bus_write16(0x0400_0200, 0);
+        cpu.bus_write16(0x0400_0202, 0xFFFF);
+        cpu.bus_write16(0x0400_0204, 0);
+        cpu.bus_write16(0x0400_0208, 0);
+    }
 }
 
 /// SWI 0x02: Halt - halts the CPU until an interrupt occurs.
@@ -203,8 +247,8 @@ fn swi_div(cpu: &mut Arm7Tdmi) {
         return;
     }
 
-    let result = num / den;
-    let remainder = num % den;
+    let result = num.wrapping_div(den);
+    let remainder = num.wrapping_rem(den);
 
     cpu.set_reg(0, result as u32);
     cpu.set_reg(1, remainder as u32);
@@ -225,8 +269,8 @@ fn swi_div_arm(cpu: &mut Arm7Tdmi) {
         return;
     }
 
-    let result = num / den;
-    let remainder = num % den;
+    let result = num.wrapping_div(den);
+    let remainder = num.wrapping_rem(den);
 
     cpu.set_reg(0, result as u32);
     cpu.set_reg(1, remainder as u32);
@@ -307,7 +351,7 @@ fn swi_cpu_fast_set(cpu: &mut Arm7Tdmi) {
     let dst = cpu.reg(1);
     let control = cpu.reg(2);
 
-    let count = (control & 0x001FFFFF) & !7; // round down to 8-word boundary
+    let count = ((control & 0x001FFFFF) + 7) & !7; // round up to 8-word boundary
     let is_fill = control & (1 << 24) != 0;
 
     let fill_value = if is_fill { cpu.bus_read32(src) } else { 0 };
@@ -495,6 +539,11 @@ fn lz77_decomp(cpu: &mut Arm7Tdmi, vram_mode: bool) {
 
                 let length = ((b1 >> 4) + 3) as usize;
                 let offset = (((b1 & 0x0F) << 8) | b2) as usize + 1;
+
+                if offset > buffer.len() {
+                    warnln!("Invalid LZ77 back-reference offset {}", offset);
+                    return;
+                }
 
                 for _ in 0..length {
                     if bytes_written >= decomp_size {
@@ -884,6 +933,134 @@ mod tests {
     }
 
     #[test]
+    fn test_swi_register_ram_reset_memory_flags() {
+        for flags in [0, 1, 2, 4, 8, 16, 31, 0xFF] {
+            let mut cpu = make_cpu();
+            for (addr, size) in [
+                (0x0200_0000, 0x40000),
+                (0x0300_0000, 0x7E00),
+                (0x0500_0000, 0x400),
+                (0x0600_0000, 0x18000),
+                (0x0700_0000, 0x400),
+            ] {
+                cpu.bus_write32(addr, 0xDEADBEEF);
+                cpu.bus_write32(addr + size - 4, 0xDEADBEEF);
+            }
+            cpu.bus_write32(0x0300_7E00, 0x12345678);
+            cpu.set_reg(0, flags);
+            handle_swi(&mut cpu, 0x01);
+            for (index, (addr, size)) in [
+                (0x0200_0000, 0x40000),
+                (0x0300_0000, 0x7E00),
+                (0x0500_0000, 0x400),
+                (0x0600_0000, 0x18000),
+                (0x0700_0000, 0x400),
+            ]
+            .iter()
+            .enumerate()
+            {
+                let expected = if flags & (1 << index) != 0 {
+                    0
+                } else {
+                    0xDEADBEEF
+                };
+                assert_eq!(cpu.bus_read32(*addr), expected);
+                assert_eq!(cpu.bus_read32(addr + size - 4), expected);
+            }
+            assert_eq!(cpu.bus_read32(0x0300_7E00), 0x12345678);
+        }
+    }
+
+    #[test]
+    fn test_swi_register_ram_reset_io_flags() {
+        for flags in [0, 0x20, 0x40, 0x80, 0xE0] {
+            let mut cpu = make_cpu();
+            cpu.bus_write16(0x0400_0128, 0x4000);
+            cpu.bus_write16(0x0400_0134, 0);
+            cpu.bus_write16(0x0400_012A, 0x1234);
+            cpu.bus_write16(0x0400_0080, 0x1177);
+            cpu.bus_write16(0x0400_0082, 0x0304);
+            cpu.bus_write16(0x0400_0084, 0x80);
+            cpu.bus_write16(0x0400_0088, 0x0100);
+            for bank in [0x40, 0] {
+                cpu.bus_write16(0x0400_0070, bank);
+                for addr in (0x0400_0090..0x0400_00A0).step_by(4) {
+                    cpu.bus_write32(addr, 0xDEADBEEF);
+                }
+            }
+            cpu.bus_write16(0x0400_0008, 0x1234);
+            cpu.bus_write16(0x0400_0010, 42);
+            cpu.bus_write16(0x0400_0020, 0x1234);
+            cpu.bus_write16(0x0400_0048, 0x3F3F);
+            cpu.bus_write16(0x0400_004C, 0x1234);
+            cpu.bus_write16(0x0400_0050, 0x1234);
+            cpu.bus_write32(0x0400_00B0, 0x0200_0000);
+            cpu.bus_write16(0x0400_00B8, 2);
+            cpu.bus_write16(0x0400_00BA, 0x8000);
+            cpu.bus_write16(0x0400_0100, 0x1234);
+            cpu.bus_write16(0x0400_0102, 0x80);
+            cpu.bus_write16(0x0400_0200, 1);
+            cpu.bus.irq.raise_vblank();
+            cpu.bus_write16(0x0400_0204, 0x1234);
+            cpu.bus_write16(0x0400_0208, 1);
+            cpu.set_reg(0, flags);
+            handle_swi(&mut cpu, 0x01);
+
+            let serial = flags & 0x20 != 0;
+            assert_eq!(cpu.bus_read16(0x0400_0128), if serial { 4 } else { 0x4004 });
+            assert_eq!(cpu.bus_read16(0x0400_0134), if serial { 0x8000 } else { 0 });
+            cpu.bus_write16(0x0400_0134, 0);
+            cpu.bus_write16(0x0400_0128, 0x2080);
+            assert_eq!(cpu.bus_read16(0x0400_0120), if serial { 0 } else { 0x1234 });
+            let sound = flags & 0x40 != 0;
+            assert_eq!(cpu.bus.apu.soundcnt_l(), if sound { 0 } else { 0x1177 });
+            assert_eq!(cpu.bus.apu.soundcnt_h(), if sound { 0 } else { 0x0304 });
+            assert_eq!(cpu.bus.apu.soundcnt_x(), if sound { 0x70 } else { 0xF0 });
+            assert_eq!(cpu.bus.apu.soundbias(), if sound { 0x0200 } else { 0x0100 });
+            for bank in [0x40, 0] {
+                cpu.bus_write16(0x0400_0070, bank);
+                assert_eq!(
+                    cpu.bus_read32(0x0400_0090),
+                    if sound { 0 } else { 0xDEADBEEF }
+                );
+                assert_eq!(
+                    cpu.bus_read32(0x0400_009C),
+                    if sound { 0 } else { 0xDEADBEEF }
+                );
+            }
+            let other = flags & 0x80 != 0;
+            assert_eq!(cpu.bus_read16(0x0400_0000), 0x0080);
+            assert_eq!(cpu.bus_read16(0x0400_0008), if other { 0 } else { 0x1234 });
+            assert_eq!(cpu.bus.ppu.bg_hofs(0), if other { 0 } else { 42 });
+            assert_eq!(cpu.bus.ppu.bg_pa(0), if other { 0x0100 } else { 0x1234 });
+            assert_eq!(cpu.bus.ppu.bg_pd(0), 0x0100);
+            assert_eq!(cpu.bus.ppu.bg_pa(1), 0x0100);
+            assert_eq!(cpu.bus.ppu.bg_pd(1), 0x0100);
+            assert_eq!(cpu.bus.ppu.winin(), if other { 0 } else { 0x3F3F });
+            assert_eq!(cpu.bus.ppu.mosaic(), if other { 0 } else { 0x1234 });
+            assert_eq!(cpu.bus.ppu.bldcnt(), if other { 0 } else { 0x1234 });
+            assert_eq!(
+                cpu.bus.dma.channels[0].src_reg(),
+                if other { 0 } else { 0x0200_0000 }
+            );
+            assert_eq!(
+                cpu.bus.dma.channels[0].count_reg(),
+                if other { 0 } else { 2 }
+            );
+            assert_eq!(cpu.bus.dma.channels[0].active(), !other);
+            assert_eq!(
+                cpu.bus.timers.timers[0].reload(),
+                if other { 0 } else { 0x1234 }
+            );
+            assert_eq!(cpu.bus.timers.timers[0].enabled(), !other);
+            assert_eq!(cpu.bus_read16(0x0400_0200), if other { 0 } else { 1 });
+            assert_eq!(cpu.bus_read16(0x0400_0202), if other { 0 } else { 1 });
+            assert_eq!(cpu.bus_read16(0x0400_0204), if other { 0 } else { 0x1234 });
+            assert_eq!(cpu.bus_read16(0x0400_0208), if other { 0 } else { 1 });
+        }
+    }
+
+    #[test]
     fn test_swi_div() {
         let mut cpu = make_cpu();
         cpu.set_reg(0, 10);
@@ -923,6 +1100,35 @@ mod tests {
         handle_swi(&mut cpu, 0x07);
         assert_eq!(cpu.reg(0) as i32, 3);
         assert_eq!(cpu.reg(1) as i32, 1);
+    }
+
+    #[test]
+    fn test_swi_div_signed_limits() {
+        for comment in [0x06, 0x07] {
+            for (num, den, quotient, remainder) in [
+                (i32::MIN, -1, i32::MIN, 0),
+                (i32::MIN, 1, i32::MIN, 0),
+                (i32::MIN, i32::MAX, -1, -1),
+                (i32::MAX, -1, -i32::MAX, 0),
+                (10, -3, -3, 1),
+                (-10, -3, 3, -1),
+                (0, -1, 0, 0),
+                (i32::MIN, 0, 0, i32::MIN),
+            ] {
+                let mut cpu = make_cpu();
+                let (r0, r1) = if comment == 0x06 {
+                    (num, den)
+                } else {
+                    (den, num)
+                };
+                cpu.set_reg(0, r0 as u32);
+                cpu.set_reg(1, r1 as u32);
+                assert!(!handle_swi(&mut cpu, comment));
+                assert_eq!(cpu.reg(0) as i32, quotient);
+                assert_eq!(cpu.reg(1) as i32, remainder);
+                assert_eq!(cpu.reg(3), quotient.unsigned_abs());
+            }
+        }
     }
 
     #[test]
@@ -1057,6 +1263,30 @@ mod tests {
     }
 
     #[test]
+    fn test_swi_cpu_fast_set_rounds_up() {
+        for (count, rounded) in [(0, 0), (1, 8), (7, 8), (8, 8), (9, 16)] {
+            for fill in [false, true] {
+                let mut cpu = make_cpu();
+                for i in 0..17 {
+                    cpu.bus_write32(0x0200_0000 + i * 4, i + 1);
+                    cpu.bus_write32(0x0200_1000 + i * 4, 0xDEADBEEF);
+                }
+                cpu.set_reg(0, 0x0200_0000);
+                cpu.set_reg(1, 0x0200_1000);
+                cpu.set_reg(2, count | if fill { 1 << 24 } else { 0 });
+                handle_swi(&mut cpu, 0x0C);
+                for i in 0..rounded {
+                    assert_eq!(
+                        cpu.bus_read32(0x0200_1000 + i * 4),
+                        if fill { 1 } else { i + 1 }
+                    );
+                }
+                assert_eq!(cpu.bus_read32(0x0200_1000 + rounded * 4), 0xDEADBEEF);
+            }
+        }
+    }
+
+    #[test]
     fn test_swi_get_bios_checksum() {
         let mut cpu = make_cpu();
         handle_swi(&mut cpu, 0x0D);
@@ -1108,6 +1338,58 @@ mod tests {
 
         // nibble 0x3 + offset 1 = 4, nibble 0x5 + offset 1 = 6
         assert_eq!(cpu.bus_read32(0x0200_1000), 0x00000604);
+    }
+
+    #[test]
+    fn test_swi_lz77_decomp() {
+        for (comment, dst) in [(0x11, 0x0200_1000), (0x12, 0x0600_0000)] {
+            for (data, expected) in [
+                (vec![0x10, 0, 0, 0], vec![]),
+                (vec![0x10, 3, 0, 0, 0, 1, 2, 3], vec![1, 2, 3]),
+                (vec![0x10, 6, 0, 0, 0x40, 0xAB, 0xF0, 0], vec![0xAB; 6]),
+                (vec![0x10, 5, 0, 0, 0x40, 0xAB, 0x10, 0], vec![0xAB; 5]),
+            ] {
+                let mut cpu = make_cpu();
+                for (i, byte) in data.iter().enumerate() {
+                    cpu.bus_write8(0x0200_0000 + i as u32, *byte);
+                }
+                cpu.bus_write16(dst + 8, 0xBEEF);
+                cpu.set_reg(0, 0x0200_0000);
+                cpu.set_reg(1, dst);
+                handle_swi(&mut cpu, comment);
+                for (i, byte) in expected.iter().enumerate() {
+                    assert_eq!(cpu.bus_read8(dst + i as u32), *byte);
+                }
+                assert_eq!(cpu.bus_read8(dst + expected.len() as u32), 0);
+                assert_eq!(cpu.bus_read16(dst + 8), 0xBEEF);
+            }
+        }
+    }
+
+    #[test]
+    fn test_swi_lz77_decomp_invalid_offset() {
+        for (comment, dst) in [(0x11, 0x0200_1000), (0x12, 0x0600_0000)] {
+            for data in [
+                vec![0x10, 4, 0, 0, 0x80, 0, 0],
+                vec![0x10, 4, 0, 0, 0x40, 0xAB, 0, 1],
+                vec![0x10, 4, 0, 0, 0x40, 0xAB, 0x0F, 0xFF],
+            ] {
+                let mut cpu = make_cpu();
+                for (i, byte) in data.iter().enumerate() {
+                    cpu.bus_write8(0x0200_0000 + i as u32, *byte);
+                }
+                cpu.bus_write32(dst, 0xDEADBEEF);
+                cpu.set_reg(0, 0x0200_0000);
+                cpu.set_reg(1, dst);
+                assert!(!handle_swi(&mut cpu, comment));
+                let expected = if comment == 0x11 && data[4] == 0x40 {
+                    0xDEADBEAB
+                } else {
+                    0xDEADBEEF
+                };
+                assert_eq!(cpu.bus_read32(dst), expected);
+            }
+        }
     }
 
     #[test]

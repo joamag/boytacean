@@ -39,6 +39,12 @@ pub struct DmaChannel {
     /// Control register (DMA*CNT_H).
     control: u16,
 
+    /// Index of this DMA channel (0-3).
+    channel_index: u8,
+
+    /// Effective transfer flags (bit 0: 32-bit, bit 1: DirectSound).
+    transfer_flags: u8,
+
     /// Internal latched source address.
     src: u32,
 
@@ -59,6 +65,8 @@ impl DmaChannel {
             dst_reg: 0,
             count_reg: 0,
             control: 0,
+            channel_index: 0,
+            transfer_flags: 0,
             src: 0,
             dst: 0,
             count: 0,
@@ -97,7 +105,16 @@ impl DmaChannel {
     pub fn set_control(&mut self, value: u16, channel_index: usize) {
         let was_enabled = self.control & (1 << 15) != 0;
         self.control = value;
+        self.channel_index = channel_index as u8;
+        self.transfer_flags = ((value >> 10) & 1) as u8;
+        if (channel_index == 1 || channel_index == 2) && self.timing() == DMA_TIMING_SPECIAL {
+            self.transfer_flags = 3;
+        }
         let now_enabled = value & (1 << 15) != 0;
+
+        if !now_enabled {
+            self.active = false;
+        }
 
         // latch registers when transitioning from disabled to enabled
         if !was_enabled && now_enabled {
@@ -139,7 +156,7 @@ impl DmaChannel {
 
     pub fn word_size(&self) -> bool {
         // false = 16-bit, true = 32-bit
-        self.control & (1 << 10) != 0
+        self.transfer_flags & 1 != 0
     }
 
     pub fn repeat(&self) -> bool {
@@ -191,8 +208,7 @@ impl DmaChannel {
         }
 
         // updates destination address (sound DMA forces Fixed destination)
-        let is_sound_dma = self.timing() == DMA_TIMING_SPECIAL;
-        if !is_sound_dma {
+        if self.transfer_flags & 2 == 0 {
             match self.dst_control() {
                 DmaAddrControl::Increment => self.dst = self.dst.wrapping_add(step),
                 DmaAddrControl::Decrement => self.dst = self.dst.wrapping_sub(step),
@@ -209,7 +225,11 @@ impl DmaChannel {
             if self.repeat() && self.timing() != DMA_TIMING_IMMEDIATE {
                 // re-latch count (and dst if IncrementReload)
                 self.count = if self.count_reg == 0 {
-                    0x4000 // simplified; DMA3 would be 0x10000
+                    if self.channel_index == 3 {
+                        0x10000
+                    } else {
+                        0x4000
+                    }
                 } else {
                     self.count_reg as u32
                 };
@@ -327,7 +347,9 @@ impl Default for GbaDma {
 #[cfg(test)]
 mod tests {
     use super::{DmaAddrControl, DmaChannel, GbaDma};
-    use crate::gba::consts::{REG_FIFO_A, REG_FIFO_B};
+    use crate::gba::consts::{
+        DMA_TIMING_HBLANK, DMA_TIMING_IMMEDIATE, DMA_TIMING_SPECIAL, REG_FIFO_A, REG_FIFO_B,
+    };
 
     #[test]
     fn test_dma_channel_new() {
@@ -338,6 +360,7 @@ mod tests {
         assert_eq!(ch.control(), 0);
         assert!(!ch.active());
         assert!(!ch.enabled());
+        assert!(!ch.word_size());
     }
 
     #[test]
@@ -349,6 +372,74 @@ mod tests {
         assert_eq!(ch.src_reg(), 0x0800_0000);
         assert_eq!(ch.dst_reg(), 0x0600_0000);
         assert_eq!(ch.count_reg(), 256);
+    }
+
+    #[test]
+    fn test_dma_set_control_disable() {
+        for index in 0..4 {
+            for timing in [DMA_TIMING_IMMEDIATE, DMA_TIMING_HBLANK] {
+                let mut ch = DmaChannel::new();
+                ch.set_src_reg(0x0200_0000);
+                ch.set_dst_reg(0x0300_0000);
+                ch.set_count_reg(2);
+                let control = (1 << 15) | (timing << 12);
+                ch.set_control(control, index);
+                ch.set_active(true);
+                ch.step();
+                ch.set_control(control & !(1 << 15), index);
+                assert!(!ch.active());
+                assert!(!ch.enabled());
+                ch.set_src_reg(0x0200_1000);
+                ch.set_control(control, index);
+                assert_eq!(ch.src(), 0x0200_1000);
+                assert_eq!(ch.dst(), 0x0300_0000);
+                assert_eq!(ch.remaining(), 2);
+                assert_eq!(ch.active(), timing == DMA_TIMING_IMMEDIATE);
+            }
+        }
+    }
+
+    #[test]
+    fn test_dma_set_control_sound_mode() {
+        for index in [1, 2] {
+            let mut ch = DmaChannel::new();
+            ch.set_src_reg(0x0200_0000);
+            ch.set_dst_reg(0x0400_00A0);
+            ch.set_count_reg(2);
+            ch.set_control(0xB000, index);
+            ch.step();
+            assert_eq!(ch.src(), 0x0200_0004);
+            assert_eq!(ch.dst(), 0x0400_00A0);
+            ch.set_control(0x8000, index);
+            assert!(!ch.word_size());
+            ch.step();
+            assert_eq!(ch.src(), 0x0200_0006);
+            assert_eq!(ch.dst(), 0x0400_00A2);
+            ch.set_control(0xB000, index);
+            assert!(ch.word_size());
+            ch.step();
+            assert_eq!(ch.src(), 0x0200_0004);
+            assert_eq!(ch.dst(), 0x0400_00A0);
+        }
+    }
+
+    #[test]
+    fn test_dma_word_size_sound() {
+        for index in 0..4 {
+            for word_size in [false, true] {
+                let mut ch = DmaChannel::new();
+                let control =
+                    (1 << 15) | (DMA_TIMING_SPECIAL << 12) | if word_size { 1 << 10 } else { 0 };
+                ch.set_control(control, index);
+                assert_eq!(ch.word_size(), word_size || index == 1 || index == 2);
+                assert_eq!(ch.control(), control);
+                let control = control & !(DMA_TIMING_SPECIAL << 12);
+                ch.set_control(control, index);
+                assert_eq!(ch.word_size(), word_size);
+                ch.set_control(control ^ (1 << 10), index);
+                assert_eq!(ch.word_size(), !word_size);
+            }
+        }
     }
 
     #[test]
@@ -440,6 +531,55 @@ mod tests {
         ch3.set_count_reg(0);
         ch3.set_control(1 << 15, 3); // channel 3
         assert_eq!(ch3.remaining(), 0x10000);
+    }
+
+    #[test]
+    fn test_dma_step_repeat_count() {
+        for index in 0..4 {
+            for count in [0, 2] {
+                let mut ch = DmaChannel::new();
+                ch.set_dst_reg(0x0300_0000);
+                ch.set_count_reg(count);
+                ch.set_control(
+                    (1 << 15) | (DMA_TIMING_HBLANK << 12) | (1 << 9) | (3 << 5),
+                    index,
+                );
+                let expected = if count != 0 {
+                    count as u32
+                } else if index == 3 {
+                    0x10000
+                } else {
+                    0x4000
+                };
+                for _ in 0..2 {
+                    ch.set_active(true);
+                    for i in 0..expected {
+                        assert_eq!(ch.step().2, i == expected - 1);
+                    }
+                    assert_eq!(ch.remaining(), expected);
+                    assert_eq!(ch.dst(), 0x0300_0000);
+                    assert!(!ch.active());
+                    assert!(ch.enabled());
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_dma_step_special_destination() {
+        for index in 0..4 {
+            let mut ch = DmaChannel::new();
+            ch.set_src_reg(0x0200_0000);
+            ch.set_dst_reg(REG_FIFO_A);
+            ch.set_count_reg(4);
+            ch.set_control((1 << 15) | (DMA_TIMING_SPECIAL << 12), index);
+            for _ in 0..4 {
+                ch.step();
+            }
+            let sound = index == 1 || index == 2;
+            assert_eq!(ch.src(), 0x0200_0000 + if sound { 16 } else { 8 });
+            assert_eq!(ch.dst(), REG_FIFO_A + if sound { 0 } else { 8 });
+        }
     }
 
     #[test]

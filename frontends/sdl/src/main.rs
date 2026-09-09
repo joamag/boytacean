@@ -27,7 +27,7 @@ use boytacean::{
 };
 use boytacean_common::{
     error::Error,
-    util::{read_file, replace_ext, write_file},
+    util::{read_file, replace_ext},
 };
 use chrono::Utc;
 use clap::Parser;
@@ -101,6 +101,9 @@ pub struct Emulator {
     /// auto mode, meaning that the mode should be inferred
     /// from the ROM file.
     auto_mode: bool,
+
+    /// Game Boy mode to use when automatic detection is disabled.
+    gb_mode: GameBoyMode,
 
     /// Flag that controls if the emulator should run in an
     /// unlimited mode, meaning that no speed limit is imposed.
@@ -180,9 +183,15 @@ impl Emulator {
         let logic_frequency = system.cpu_freq();
         let visual_frequency = system.visual_freq();
         let volume = if system.is_gba() { VOLUME_GBA } else { VOLUME };
+        let gb_mode = if let System::Gb(gb) = &system {
+            gb.mode()
+        } else {
+            GameBoyMode::Dmg
+        };
         Self {
             system,
             auto_mode: options.auto_mode.unwrap_or(true),
+            gb_mode,
             unlimited: options.unlimited.unwrap_or(false),
             sdl: None,
             audio: None,
@@ -312,6 +321,9 @@ impl Emulator {
     }
 
     pub fn stop(&mut self) {
+        if let Err(error) = self.system.save_ram_file(&self.ram_path) {
+            println!("Error saving RAM: {error}");
+        }
         if let System::Gb(gb) = &self.system {
             gb.unset_diag();
         }
@@ -342,6 +354,82 @@ impl Emulator {
             .to_str()
             .unwrap()
             .to_string();
+        Ok(())
+    }
+
+    /// Switches to the system required by a new ROM and resets the emulation.
+    pub fn switch_rom(&mut self, path: &str) -> Result<(), Error> {
+        let data = read_file(path)?;
+        let mut system = System::from_rom(&data)?;
+        self.system.save_ram_file(&self.ram_path)?;
+        if self.system.is_gba() == system.is_gba() {
+            if let System::Gb(gb) = &mut self.system {
+                if self.auto_mode {
+                    gb.set_mode(Cartridge::from_data(&data)?.gb_mode());
+                }
+                gb.reset();
+                gb.load(true)?;
+            } else {
+                self.system.reset();
+            }
+            self.load_rom(Some(path))?;
+            if let Some(audio) = &self.audio {
+                audio.device.clear();
+            }
+            return Ok(());
+        }
+        if let System::Gb(gb) = &mut system {
+            let mode = if self.auto_mode {
+                gb.rom_i().gb_mode()
+            } else {
+                self.gb_mode
+            };
+            gb.set_mode(mode);
+            gb.load(true)?;
+        }
+        system.set_ppu_enabled(self.system.ppu_enabled());
+        system.set_apu_enabled(self.system.apu_enabled());
+        system.set_dma_enabled(self.system.dma_enabled());
+        system.set_timer_enabled(self.system.timer_enabled());
+
+        let previous = std::mem::replace(&mut self.system, system);
+        if let Err(error) = self.load_rom(Some(path)) {
+            self.system = previous;
+            return Err(error);
+        }
+        if let System::Gb(gb) = &previous {
+            gb.unset_diag();
+        }
+        self.logic_frequency = self.system.cpu_freq();
+        self.visual_frequency = self.system.visual_freq();
+        self.volume = if self.system.is_gba() {
+            VOLUME_GBA
+        } else {
+            VOLUME
+        };
+        self.next_tick_time = 0.0;
+        self.next_tick_time_i = 0;
+        self.start_base();
+
+        if let Some(audio) = &self.audio {
+            audio.device.clear();
+            if previous.audio_sampling_rate() != self.system.audio_sampling_rate()
+                || previous.audio_channels() != self.system.audio_channels()
+            {
+                self.audio = None;
+                self.start_audio(&sdl2::init().unwrap());
+            }
+        }
+        if let Some(sdl) = &mut self.sdl {
+            if let Some(canvas) = &mut sdl.canvas {
+                canvas
+                    .set_logical_size(
+                        self.system.display_width() as u32,
+                        self.system.display_height() as u32,
+                    )
+                    .unwrap();
+            }
+        }
         Ok(())
     }
 
@@ -477,7 +565,7 @@ impl Emulator {
     pub fn run(&mut self) {
         // obtains the dimensions of the display that are going
         // to be used for the graphics rendering
-        let (width, height) = (self.system.display_width(), self.system.display_height());
+        let (mut width, mut height) = (self.system.display_width(), self.system.display_height());
 
         // updates the icon of the window to reflect the image
         // and style of the emulator
@@ -524,7 +612,7 @@ impl Emulator {
 
         // calculates the rate as visual cycles that will take from
         // the current visual frequency to re-save the battery backed RAM
-        let store_count = (self.visual_frequency * STORE_RATE as f32).round() as u32;
+        let mut store_count = (self.visual_frequency * STORE_RATE as f32).round() as u32;
 
         // starts the variable that will control the number of cycles that
         // are going to move (because of overflow) from one tick to another
@@ -549,10 +637,9 @@ impl Emulator {
             // in case the current counter is a multiple of the store rate
             // then we've reached the time to re-save the battery backed RAM
             // into a *.sav file in the file system
-            if let System::Gb(gb) = &mut self.system {
-                if counter % store_count == 0 && gb.rom().has_battery() {
-                    let ram_data = gb.rom().ram_data();
-                    write_file(&self.ram_path, ram_data, None).unwrap();
+            if counter % store_count == 0 {
+                if let Err(error) = self.system.save_ram_file(&self.ram_path) {
+                    println!("Error saving RAM: {error}");
                 }
             }
 
@@ -701,17 +788,26 @@ Drag & drop ROM file: Load new ROM and reset system\n===========================
                         }
                     }
                     Event::DropFile { filename, .. } => {
-                        if let System::Gb(gb) = &mut self.system {
-                            if self.auto_mode {
-                                let mode = Cartridge::from_file(&filename).unwrap().gb_mode();
-                                gb.set_mode(mode);
-                            }
-                            gb.reset();
-                            gb.load(true).unwrap();
-                        } else {
-                            self.system.reset();
+                        if let Err(error) = self.switch_rom(&filename) {
+                            println!("Error loading ROM: {error}");
+                            continue;
                         }
-                        self.load_rom(Some(&filename)).unwrap();
+                        width = self.system.display_width();
+                        height = self.system.display_height();
+                        if let Some(texture_creator) = &texture_creator {
+                            texture = Some(
+                                texture_creator
+                                    .create_texture_streaming(
+                                        PixelFormatEnum::RGB24,
+                                        width as u32,
+                                        height as u32,
+                                    )
+                                    .unwrap(),
+                            );
+                        }
+                        pending_cycles = 0;
+                        counter = 0;
+                        store_count = (self.visual_frequency * STORE_RATE as f32).round() as u32;
                     }
                     _ => (),
                 }
@@ -1198,7 +1294,7 @@ fn main() -> Result<(), Box<dyn StdError>> {
         System::Gb(game_boy)
     };
 
-    let auto_mode = !is_gba && args.mode == "auto";
+    let auto_mode = args.mode == "auto";
 
     // creates a new generic emulator structure then starts
     // both the video and audio sub-systems, loads default
@@ -1214,6 +1310,9 @@ fn main() -> Result<(), Box<dyn StdError>> {
         },
     };
     let mut emulator = Emulator::new(system, options);
+    if args.mode != "auto" {
+        emulator.gb_mode = GameBoyMode::from_string(&args.mode);
+    }
     emulator.start(SCREEN_SCALE);
     emulator.load_rom(Some(&args.rom_path))?;
     if !is_gba {

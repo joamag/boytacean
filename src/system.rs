@@ -65,7 +65,9 @@ impl System {
             gba.load_rom(data)?;
             Ok(System::Gba(gba))
         } else {
-            Ok(System::Gb(GameBoy::new(None)))
+            let mut gb = GameBoy::new(None);
+            gb.load_rom(data, None)?;
+            Ok(System::Gb(gb))
         }
     }
 
@@ -180,6 +182,9 @@ impl System {
             System::Gba(gba) => {
                 let data = boytacean_common::util::read_file(path)?;
                 let info = gba.load_rom(&data)?;
+                if let Some(ram_path) = ram_path {
+                    gba.set_ram_data(boytacean_common::util::read_file(ram_path)?);
+                }
                 Ok(RomInfo {
                     title: info.title(),
                     description: info.description(9),
@@ -188,10 +193,30 @@ impl System {
         }
     }
 
+    pub fn save_ram_file(&self, path: &str) -> Result<(), Error> {
+        match self {
+            System::Gb(gb) if gb.rom_i().has_battery() => {
+                boytacean_common::util::write_file(path, gb.rom_i().ram_data(), None)?;
+            }
+            System::Gba(gba) if gba.has_battery() => {
+                boytacean_common::util::write_file(path, &gba.cpu.bus.save.data, None)?;
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
     pub fn set_ppu_enabled(&mut self, value: bool) {
         match self {
             System::Gb(gb) => gb.set_ppu_enabled(value),
             System::Gba(gba) => gba.set_ppu_enabled(value),
+        }
+    }
+
+    pub fn ppu_enabled(&self) -> bool {
+        match self {
+            System::Gb(gb) => gb.ppu_enabled(),
+            System::Gba(gba) => gba.ppu_enabled(),
         }
     }
 
@@ -216,6 +241,13 @@ impl System {
         }
     }
 
+    pub fn dma_enabled(&self) -> bool {
+        match self {
+            System::Gb(gb) => gb.dma_enabled(),
+            System::Gba(gba) => gba.dma_enabled(),
+        }
+    }
+
     pub fn set_timer_enabled(&mut self, value: bool) {
         match self {
             System::Gb(gb) => gb.set_timer_enabled(value),
@@ -223,15 +255,17 @@ impl System {
         }
     }
 
+    pub fn timer_enabled(&self) -> bool {
+        match self {
+            System::Gb(gb) => gb.timer_enabled(),
+            System::Gba(gba) => gba.timer_enabled(),
+        }
+    }
+
     pub fn set_all_enabled(&mut self, value: bool) {
         match self {
             System::Gb(gb) => gb.set_all_enabled(value),
-            System::Gba(gba) => {
-                gba.set_ppu_enabled(value);
-                gba.set_apu_enabled(value);
-                gba.set_dma_enabled(value);
-                gba.set_timer_enabled(value);
-            }
+            System::Gba(gba) => gba.set_all_enabled(value),
         }
     }
 
@@ -287,6 +321,11 @@ impl System {
 
 #[cfg(test)]
 mod tests {
+    use std::{
+        env::temp_dir,
+        fs::{read, remove_file, write},
+    };
+
     use super::System;
     use crate::{gb::GameBoy, gba::GameBoyAdvance, pad::PadKey};
 
@@ -310,17 +349,27 @@ mod tests {
 
     #[test]
     fn test_from_rom_gb() {
-        let data = vec![0u8; 0x200];
+        let mut data = include_bytes!("../res/roms/demo/pocket.gb").to_vec();
+        data[0xB2] = 0x96;
         let system = System::from_rom(&data).unwrap();
-        assert!(system.is_gb());
+        if let System::Gb(gb) = system {
+            assert_eq!(gb.rom_i().title(), "POCKET-DEMO");
+            assert_eq!(gb.rom_i().read(0xB2), 0x96);
+        } else {
+            panic!("Expected Game Boy system");
+        }
     }
 
     #[test]
     fn test_from_rom_gba() {
-        let mut data = vec![0u8; 0x200];
-        data[0xB2] = 0x96;
-        let system = System::from_rom(&data).unwrap();
+        let data = include_bytes!("../res/roms.gba/test/jsmolka_gba-tests/ppu_stripes.gba");
+        let system = System::from_rom(data).unwrap();
         assert!(system.is_gba());
+    }
+
+    #[test]
+    fn test_from_rom_invalid() {
+        assert!(System::from_rom(&[]).is_err());
     }
 
     #[test]
@@ -385,6 +434,119 @@ mod tests {
         let mut system = System::Gba(GameBoyAdvance::new());
         system.key_press(PadKey::A);
         system.key_lift(PadKey::A);
+    }
+
+    #[test]
+    fn test_load_rom_file_save_data() {
+        let rom_path = temp_dir().join("boytacean_system_save_test.rom");
+        let ram_path = temp_dir().join("boytacean_system_save_test.sav");
+        for signature in [
+            b"SRAM_V".as_slice(),
+            b"FLASH_V",
+            b"FLASH1M_V",
+            b"EEPROM_V",
+            b"GB",
+        ] {
+            let gb = signature == b"GB";
+            let mut data = if gb {
+                include_bytes!("../res/roms/demo/pocket.gb").to_vec()
+            } else {
+                let mut data = vec![0u8; 512];
+                data[0xB2] = 0x96;
+                data[0x100..0x100 + signature.len()].copy_from_slice(signature);
+                data
+            };
+            if gb {
+                data[0x147] = 0x1B; // mbc5+ram+battery
+                data[0x149] = 0x03; // 32kb ram
+            }
+            write(&rom_path, data).unwrap();
+            let mut system = if gb {
+                System::Gb(GameBoy::new(None))
+            } else {
+                System::Gba(GameBoyAdvance::new())
+            };
+            let info = system
+                .load_rom_file(rom_path.to_str().unwrap(), None)
+                .unwrap();
+            assert!(!info.description().is_empty());
+            let mut ram = match &mut system {
+                System::Gb(gb) => gb.ram_data_eager(),
+                System::Gba(gba) => gba.ram_data_eager(),
+            };
+            ram[0] = 0x42;
+            let last = ram.len() - 1;
+            ram[last] = 0x24;
+            match &mut system {
+                System::Gb(gb) => gb.set_ram_data(ram.clone()),
+                System::Gba(gba) => gba.set_ram_data(ram.clone()),
+            }
+            system.save_ram_file(ram_path.to_str().unwrap()).unwrap();
+            assert_eq!(read(&ram_path).unwrap(), ram);
+            system
+                .load_rom_file(rom_path.to_str().unwrap(), Some(ram_path.to_str().unwrap()))
+                .unwrap();
+            let restored = match &mut system {
+                System::Gb(gb) => gb.ram_data_eager(),
+                System::Gba(gba) => gba.ram_data_eager(),
+            };
+            assert_eq!(restored, ram);
+            assert!(system.save_ram_file(temp_dir().to_str().unwrap()).is_err());
+            assert!(system
+                .load_rom_file(
+                    rom_path.to_str().unwrap(),
+                    Some(temp_dir().to_str().unwrap())
+                )
+                .is_err());
+        }
+        remove_file(rom_path).unwrap();
+        remove_file(ram_path).unwrap();
+    }
+
+    #[test]
+    fn test_load_rom_file_errors() {
+        let mut system = System::Gba(GameBoyAdvance::new());
+        assert!(system
+            .load_rom_file(temp_dir().to_str().unwrap(), None)
+            .is_err());
+        let path = temp_dir().join("boytacean_system_invalid_rom_test.gba");
+        write(&path, [0]).unwrap();
+        assert!(system.load_rom_file(path.to_str().unwrap(), None).is_err());
+        remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn test_save_ram_file_without_battery() {
+        for system in [
+            System::Gb(GameBoy::new(None)),
+            System::Gba(GameBoyAdvance::new()),
+        ] {
+            assert!(system.save_ram_file(temp_dir().to_str().unwrap()).is_ok());
+        }
+    }
+
+    #[test]
+    fn test_set_all_enabled() {
+        for mut system in [
+            System::Gb(GameBoy::new(None)),
+            System::Gba(GameBoyAdvance::new()),
+        ] {
+            for enabled in [false, true] {
+                system.set_all_enabled(enabled);
+                assert_eq!(system.ppu_enabled(), enabled);
+                assert_eq!(system.apu_enabled(), enabled);
+                assert_eq!(system.dma_enabled(), enabled);
+                assert_eq!(system.timer_enabled(), enabled);
+                match &system {
+                    System::Gb(gb) => {
+                        assert_eq!(gb.ppu_enabled(), enabled);
+                        assert_eq!(gb.dma_enabled(), enabled);
+                        assert_eq!(gb.timer_enabled(), enabled);
+                    }
+                    System::Gba(gba) => assert_eq!(gba.ppu_enabled(), enabled),
+                }
+            }
+        }
     }
 
     #[test]

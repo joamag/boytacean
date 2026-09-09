@@ -8,7 +8,7 @@
 
 use std::{env, time::Instant};
 
-use boytacean::gba::GameBoyAdvance;
+use boytacean::gba::{consts::CYCLES_PER_FRAME, GameBoyAdvance};
 
 const DEFAULT_FRAMES: u32 = 300;
 const GBA_CPU_FREQ: f64 = 16777216.0;
@@ -18,6 +18,14 @@ fn print_usage() {
         "Usage: gba-bench <rom.gba> [num_frames] [--warmup <frames>] [--runs <n>] [--cpu-only]"
     );
     eprintln!("If num_frames is not specified, defaults to {DEFAULT_FRAMES}");
+}
+
+fn clock_frame(gba: &mut GameBoyAdvance, cpu_only: bool) -> u64 {
+    if cpu_only {
+        gba.clocks_cycles(CYCLES_PER_FRAME as usize)
+    } else {
+        gba.next_frame()
+    }
 }
 
 fn main() {
@@ -71,15 +79,12 @@ fn main() {
     println!();
 
     if cpu_only {
-        gba.set_ppu_enabled(false);
-        gba.set_apu_enabled(false);
-        gba.set_dma_enabled(false);
-        gba.set_timer_enabled(false);
+        gba.set_all_enabled(false);
     }
 
     // warmup: run frames without measuring to get past boot/menu
     for _ in 0..warmup_frames {
-        gba.next_frame();
+        clock_frame(&mut gba, cpu_only);
     }
 
     let mut results = Vec::with_capacity(runs as usize);
@@ -89,7 +94,7 @@ fn main() {
         let start = Instant::now();
 
         for _ in 0..num_frames {
-            total_cycles += gba.next_frame();
+            total_cycles += clock_frame(&mut gba, cpu_only);
         }
 
         let elapsed = start.elapsed();
@@ -115,4 +120,29 @@ fn main() {
     let speedup = avg / (GBA_CPU_FREQ / 1_000_000.0);
 
     println!("Summary: avg {avg:.2} MHz, min {min:.2}, max {max:.2} ({speedup:.2}x realtime)");
+}
+
+#[cfg(test)]
+mod tests {
+    use boytacean::gba::GameBoyAdvance;
+
+    use super::{clock_frame, CYCLES_PER_FRAME};
+
+    #[test]
+    fn test_clock_frame() {
+        let mut gba = GameBoyAdvance::new();
+        assert!(clock_frame(&mut gba, false) > 0);
+        assert_eq!(gba.ppu_frame(), 1);
+    }
+
+    #[test]
+    fn test_clock_frame_cpu_only() {
+        let mut gba = GameBoyAdvance::new();
+        gba.set_all_enabled(false);
+        let pc = gba.cpu.pc();
+        assert!(clock_frame(&mut gba, true) >= CYCLES_PER_FRAME as u64);
+        assert_ne!(gba.cpu.pc(), pc);
+        assert_eq!(gba.ppu_frame(), 0);
+        assert!(gba.audio_buffer().is_empty());
+    }
 }

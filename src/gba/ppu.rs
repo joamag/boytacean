@@ -992,19 +992,22 @@ impl GbaPpu {
     /// Mode 3: single 240x160 bitmap, 15-bit direct color (BG2 with affine).
     fn render_mode3(&mut self, line: usize, vram: &[u8], palette: &[u8], oam: &[u8]) {
         let layers: [(usize, u8, usize); 1] = [(2, 3, 0)];
-        self.render_composited(line, &layers, vram, palette, oam);
+        let count = usize::from(self.dispcnt & (1 << 10) != 0);
+        self.render_composited(line, &layers[..count], vram, palette, oam);
     }
 
     /// Mode 4: single 240x160 bitmap, 8-bit palette indexed, double buffered (BG2 with affine).
     fn render_mode4(&mut self, line: usize, vram: &[u8], palette: &[u8], oam: &[u8]) {
         let layers: [(usize, u8, usize); 1] = [(2, 4, 0)];
-        self.render_composited(line, &layers, vram, palette, oam);
+        let count = usize::from(self.dispcnt & (1 << 10) != 0);
+        self.render_composited(line, &layers[..count], vram, palette, oam);
     }
 
     /// Mode 5: 160x128 bitmap, 15-bit direct color, double buffered (BG2 with affine).
     fn render_mode5(&mut self, line: usize, vram: &[u8], palette: &[u8], oam: &[u8]) {
         let layers: [(usize, u8, usize); 1] = [(2, 5, 0)];
-        self.render_composited(line, &layers, vram, palette, oam);
+        let count = usize::from(self.dispcnt & (1 << 10) != 0);
+        self.render_composited(line, &layers[..count], vram, palette, oam);
     }
 
     /// Collects bitmap background pixels with BG2 affine transform.
@@ -2700,6 +2703,13 @@ mod tests {
         assert_eq!(fb[0], 0xF8); // R
         assert_eq!(fb[1], 0x00); // G
         assert_eq!(fb[2], 0x00); // B
+
+        ppu.set_dispcnt(3);
+        ppu.render_mode3(0, &vram, &palette, &oam);
+        assert_eq!(&ppu.frame_buffer()[..3], &[0, 0, 0]);
+        ppu.set_dispcnt(0x0403);
+        ppu.render_mode3(0, &vram, &palette, &oam);
+        assert_eq!(&ppu.frame_buffer()[..3], &[0xF8, 0, 0]);
     }
 
     #[test]
@@ -2840,6 +2850,13 @@ mod tests {
         assert_eq!(fb[0], 0x00); // R
         assert_eq!(fb[1], 0xF8); // G
         assert_eq!(fb[2], 0x00); // B
+
+        ppu.set_dispcnt(4);
+        ppu.render_mode4(0, &vram, &palette, &oam);
+        assert_eq!(&ppu.frame_buffer()[..3], &[0, 0, 0]);
+        ppu.set_dispcnt(0x0404);
+        ppu.render_mode4(0, &vram, &palette, &oam);
+        assert_eq!(&ppu.frame_buffer()[..3], &[0, 0xF8, 0]);
     }
 
     #[test]
@@ -2863,6 +2880,13 @@ mod tests {
         assert_eq!(fb[0], 0x00); // R
         assert_eq!(fb[1], 0x00); // G
         assert_eq!(fb[2], 0xF8); // B
+
+        ppu.set_dispcnt(5);
+        ppu.render_mode5(0, &vram, &palette, &oam);
+        assert_eq!(&ppu.frame_buffer()[..3], &[0, 0, 0]);
+        ppu.set_dispcnt(0x0405);
+        ppu.render_mode5(0, &vram, &palette, &oam);
+        assert_eq!(&ppu.frame_buffer()[..3], &[0, 0, 0xF8]);
     }
 
     #[test]
@@ -2910,6 +2934,15 @@ mod tests {
         assert_eq!(fb[offset], 0x00); // R=0 (blue)
         assert_eq!(fb[offset + 1], 0x00); // G=0
         assert_eq!(fb[offset + 2], 0xF8); // B=0xF8
+
+        for mode in [3, 4, 5] {
+            ppu.set_dispcnt(mode | (1 << 12) | (1 << 6));
+            ppu.render_scanline(&vram, &palette, &oam);
+            assert_eq!(&ppu.frame_buffer()[offset..offset + 3], &[0, 0, 0xF8]);
+            ppu.set_dispcnt(mode);
+            ppu.render_scanline(&vram, &palette, &oam);
+            assert_eq!(&ppu.frame_buffer()[offset..offset + 3], &[0, 0, 0]);
+        }
     }
 
     #[test]

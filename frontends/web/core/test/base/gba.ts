@@ -32,6 +32,17 @@ describe("GbaCore", function () {
         cores.forEach((core) => releaseGbaCore(core));
     });
 
+    describe("#setRom()", function () {
+        it("should be able to stage a ROM before its header is parsed", () => {
+            const core = buildCore();
+            core.setRom("game.gba", new Uint8Array([1, 2, 3]), null);
+            assert.strictEqual(core.loadedRomName, "game.gba");
+            assert.strictEqual(core.loadedRomSize, 3);
+            assert.strictEqual(core.loadedRomInfo, null);
+            assert.strictEqual(core.instance, null);
+        });
+    });
+
     describe("#instance", function () {
         it("should be able to start without a GBA instance", () => {
             assert.strictEqual(buildCore().instance, null);

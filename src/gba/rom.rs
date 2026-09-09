@@ -17,6 +17,20 @@ const HEADER_CHECKSUM: usize = 0x0BD;
 /// Minimum valid ROM size (must at least contain the header).
 const MIN_ROM_SIZE: usize = 0xC0;
 
+/// Nintendo logo stored in the cartridge header.
+const NINTENDO_LOGO: [u8; 156] = [
+    0x24, 0xFF, 0xAE, 0x51, 0x69, 0x9A, 0xA2, 0x21, 0x3D, 0x84, 0x82, 0x0A, 0x84, 0xE4, 0x09, 0xAD,
+    0x11, 0x24, 0x8B, 0x98, 0xC0, 0x81, 0x7F, 0x21, 0xA3, 0x52, 0xBE, 0x19, 0x93, 0x09, 0xCE, 0x20,
+    0x10, 0x46, 0x4A, 0x4A, 0xF8, 0x27, 0x31, 0xEC, 0x58, 0xC7, 0xE8, 0x33, 0x82, 0xE3, 0xCE, 0xBF,
+    0x85, 0xF4, 0xDF, 0x94, 0xCE, 0x4B, 0x09, 0xC1, 0x94, 0x56, 0x8A, 0xC0, 0x13, 0x72, 0xA7, 0xFC,
+    0x9F, 0x84, 0x4D, 0x73, 0xA3, 0xCA, 0x9A, 0x61, 0x58, 0x97, 0xA3, 0x27, 0xFC, 0x03, 0x98, 0x76,
+    0x23, 0x1D, 0xC7, 0x61, 0x03, 0x04, 0xAE, 0x56, 0xBF, 0x38, 0x84, 0x00, 0x40, 0xA7, 0x0E, 0xFD,
+    0xFF, 0x52, 0xFE, 0x03, 0x6F, 0x95, 0x30, 0xF1, 0x97, 0xFB, 0xC0, 0x85, 0x60, 0xD6, 0x80, 0x25,
+    0xA9, 0x63, 0xBE, 0x03, 0x01, 0x4E, 0x38, 0xE2, 0xF9, 0xA2, 0x34, 0xFF, 0xBB, 0x3E, 0x03, 0x44,
+    0x78, 0x00, 0x90, 0xCB, 0x88, 0x11, 0x3A, 0x94, 0x65, 0xC0, 0x7C, 0x63, 0x87, 0xF0, 0x3C, 0xAF,
+    0xD6, 0x25, 0xE4, 0x8B, 0x38, 0x0A, 0xAC, 0x72, 0x21, 0xD4, 0xF8, 0x07,
+];
+
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 #[derive(Clone)]
 pub struct GbaRomInfo {
@@ -34,7 +48,7 @@ impl GbaRomInfo {
             return Err(Error::RomSize);
         }
 
-        if !is_gba_rom(data) {
+        if data[HEADER_FIXED_VALUE] != 0x96 {
             return Err(Error::InvalidData);
         }
 
@@ -65,7 +79,7 @@ impl GbaRomInfo {
 
     /// Validates the header checksum against the computed value.
     pub fn validate_checksum(&self, data: &[u8]) -> bool {
-        compute_checksum(data) == self.header_checksum
+        data.len() >= MIN_ROM_SIZE && compute_checksum(data) == self.header_checksum
     }
 }
 
@@ -128,10 +142,12 @@ impl Display for GbaRomInfo {
     }
 }
 
-/// Checks if the provided data is a GBA ROM by examining
-/// the fixed value at offset 0xB2 (must be 0x96).
+/// Checks the fixed value, Nintendo logo, and checksum to detect a GBA ROM.
 pub fn is_gba_rom(data: &[u8]) -> bool {
-    data.len() >= MIN_ROM_SIZE && data[HEADER_FIXED_VALUE] == 0x96
+    data.len() >= MIN_ROM_SIZE
+        && data[HEADER_FIXED_VALUE] == 0x96
+        && data[0x04..0xA0] == NINTENDO_LOGO
+        && compute_checksum(data) == data[HEADER_CHECKSUM]
 }
 
 /// Computes the header checksum for validation.
@@ -145,10 +161,11 @@ fn compute_checksum(data: &[u8]) -> u8 {
 
 #[cfg(test)]
 mod tests {
-    use super::{compute_checksum, is_gba_rom, GbaRomInfo};
+    use super::{compute_checksum, is_gba_rom, GbaRomInfo, NINTENDO_LOGO};
 
     fn make_gba_rom(title: &str, game_code: &str, maker_code: &str) -> Vec<u8> {
         let mut data = vec![0u8; 0x200];
+        data[0x04..0xA0].copy_from_slice(&NINTENDO_LOGO);
         data[0xB2] = 0x96; // fixed value
 
         // write title (12 bytes at 0xA0)
@@ -184,9 +201,21 @@ mod tests {
 
     #[test]
     fn test_is_gba_rom_valid() {
-        let mut data = vec![0u8; 0xC0];
-        data[0xB2] = 0x96;
+        let data = make_gba_rom("TESTGAME", "ATST", "01");
         assert!(is_gba_rom(&data));
+    }
+
+    #[test]
+    fn test_is_gba_rom_invalid_header() {
+        let data = make_gba_rom("TESTGAME", "ATST", "01");
+        for offset in [0x04, 0x9F, 0xA0, 0xB2, 0xBD] {
+            let mut invalid = data.clone();
+            invalid[offset] ^= 1;
+            assert!(!is_gba_rom(&invalid));
+        }
+        let mut gb = include_bytes!("../../res/roms/demo/pocket.gb").to_vec();
+        gb[0xB2] = 0x96;
+        assert!(!is_gba_rom(&gb));
     }
 
     #[test]
@@ -213,10 +242,21 @@ mod tests {
     }
 
     #[test]
+    fn test_from_data_homebrew() {
+        let mut data = vec![0u8; 0xC0];
+        data[0xB2] = 0x96;
+        assert!(GbaRomInfo::from_data(&data).is_ok());
+        assert!(!is_gba_rom(&data));
+    }
+
+    #[test]
     fn test_validate_checksum() {
         let data = make_gba_rom("TESTGAME", "ATST", "01");
         let info = GbaRomInfo::from_data(&data).unwrap();
         assert!(info.validate_checksum(&data));
+        for size in [0, 0xA0, 0xBD, 0xBF] {
+            assert!(!info.validate_checksum(&data[..size]));
+        }
     }
 
     #[test]

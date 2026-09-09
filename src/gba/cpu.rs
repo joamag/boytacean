@@ -138,6 +138,7 @@ impl Arm7Tdmi {
     /// The real BIOS will initialize all registers and stack pointers,
     /// then jump to the ROM entry point.
     pub fn reset_for_bios_boot(&mut self) {
+        self.cycles = 0;
         self.regs = [0; 16];
         self.cpsr = MODE_SVC | CPSR_I; // ARM state, SVC mode, IRQs disabled
         self.spsr = [0; 5];
@@ -831,6 +832,7 @@ impl Arm7Tdmi {
     }
 
     pub fn reset(&mut self) {
+        self.cycles = 0;
         self.regs = [0; 16];
         self.cpsr = MODE_SYS;
         self.spsr = [0; 5];
@@ -862,6 +864,23 @@ mod tests {
         assert_eq!(cpu.cpsr() & CPSR_MODE_MASK, MODE_SYS);
         assert!(!cpu.halted());
         assert!(!cpu.in_thumb_mode());
+    }
+
+    #[test]
+    fn test_reset_for_bios_boot() {
+        let mut cpu = make_cpu();
+        cpu.set_reg(0, 0x12345678);
+        cpu.step();
+        assert!(cpu.cycles > 0);
+        cpu.set_halted(true);
+        cpu.reset_for_bios_boot();
+        assert_eq!(cpu.cycles, 0);
+        assert_eq!(cpu.reg(0), 0);
+        assert!(!cpu.halted());
+        assert_eq!(cpu.pc(), 0x0000_0000);
+        assert_eq!(cpu.cpsr() & CPSR_MODE_MASK, MODE_SVC);
+        assert!(cpu.cpsr() & CPSR_I != 0); // IRQs disabled
+        assert!(cpu.cpsr() & CPSR_T == 0); // ARM mode
     }
 
     #[test]
@@ -1198,27 +1217,16 @@ mod tests {
     fn test_reset() {
         let mut cpu = make_cpu();
         cpu.set_reg(0, 0x12345678);
+        cpu.step();
+        assert!(cpu.cycles > 0);
         cpu.set_halted(true);
         cpu.reset();
+        assert_eq!(cpu.cycles, 0);
         assert_eq!(cpu.reg(0), 0);
         assert!(!cpu.halted());
         assert_eq!(cpu.pc(), 0x0800_0000);
         assert_eq!(cpu.reg(13), 0x0300_7F00); // SP_SYS
         assert_eq!(cpu.cpsr() & CPSR_MODE_MASK, MODE_SYS);
-    }
-
-    #[test]
-    fn test_reset_for_bios_boot() {
-        let mut cpu = make_cpu();
-        cpu.set_reg(0, 0x12345678);
-        cpu.set_halted(true);
-        cpu.reset_for_bios_boot();
-        assert_eq!(cpu.reg(0), 0);
-        assert!(!cpu.halted());
-        assert_eq!(cpu.pc(), 0x0000_0000);
-        assert_eq!(cpu.cpsr() & CPSR_MODE_MASK, MODE_SVC);
-        assert!(cpu.cpsr() & CPSR_I != 0); // IRQs disabled
-        assert!(cpu.cpsr() & CPSR_T == 0); // ARM mode
     }
 
     #[test]
