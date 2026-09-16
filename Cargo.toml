@@ -41,6 +41,7 @@ criterion = "0.5"
 chrono = "0.4"
 regex = "1"
 built = { version = "0.7", features = ["cargo-lock"] }
+idna_adapter = "~1.1"
 
 [profile.release]
 debug = false
