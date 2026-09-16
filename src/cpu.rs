@@ -37,6 +37,29 @@ pub const PREFIX: u8 = 0xcb;
 
 pub type Instruction = &'static (fn(&mut Cpu), u8, &'static str);
 
+/// Represents the Game Boy CPU (Sharp LR35902) and controls all of
+/// the logic behind the fetching, decoding and execution of the
+/// instructions. The CPU is responsible for driving the emulation,
+/// as the remaining components are clocked from the cycles it takes.
+///
+/// Should store the complete set of registers and flags together
+/// with the MMU (Memory Management Unit), used for all the memory
+/// bus access operations. The instruction set implementation lives
+/// in the `inst` module.
+///
+/// Current implementation is compatible with both DMG and CGB.
+///
+/// # Basic usage
+///
+/// ```rust
+/// use boytacean::cpu::Cpu;
+/// let mut cpu = Cpu::default();
+/// cpu.boot();
+/// cpu.mmu.allocate_default();
+/// cpu.pc = 0xc000;
+/// let cycles = cpu.clock();
+/// assert_eq!(cycles, 4);
+/// ```
 pub struct Cpu {
     pub pc: u16,
     pub sp: u16,
