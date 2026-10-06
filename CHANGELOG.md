@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Build of the web front-end after the change in the WASM binary resolution
 * Builds on older Rust versions after dependency releases raised their minimum supported version
 * Builds on Rust 1.86 after a new release of a Unicode dependency, which is no longer used
+* Web front-end builds in GitHub Actions after a new release of a build dependency rejected the cache location of the build containers
 
 ## [0.13.2] - 2026-07-28
 

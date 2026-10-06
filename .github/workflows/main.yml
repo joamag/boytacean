@@ -89,6 +89,8 @@ jobs:
         node-version: ["18"]
     runs-on: ubuntu-latest
     container: rust:${{ matrix.rust-version }}
+    env:
+      SWC_NATIVE_BINDING_CACHE: /tmp/swc
     steps:
       - name: Checkout code from repository
         uses: actions/checkout@v6
