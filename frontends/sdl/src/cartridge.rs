@@ -2,12 +2,16 @@
 //! GBxCart RW connected to a serial port.
 
 use std::{
+    fs::remove_file,
     io::{stdout, Write},
     path::Path,
     time::Duration,
 };
 
-use boytacean_common::{error::Error, util::write_file};
+use boytacean_common::{
+    error::Error,
+    util::{read_file, write_file},
+};
 use boytacean_dumper::{
     dumper::Dumper,
     gbxcart::{BAUD_RATE, USB_PRODUCT_ID, USB_VENDOR_ID},
@@ -74,14 +78,25 @@ fn write_files(
     let (rom_name, ram_name) = file_paths(title);
     let rom_path = directory.join(rom_name).to_string_lossy().into_owned();
     let ram_path = directory.join(ram_name).to_string_lossy().into_owned();
+
+    // another game with a similar title may have been loaded from its
+    // cartridge before, whose save must not be used for this one
+    if Path::new(&rom_path).exists() && read_file(&rom_path)? != rom_data {
+        return Err(Error::CustomError(format!(
+            "A different ROM was loaded from a cartridge as {rom_path}, move it and its save away to load this one"
+        )));
+    }
     write_file(&rom_path, rom_data, None)?;
     if let Some(ram_data) = ram_data {
         if Path::new(&ram_path).exists() {
             println!(
                 "Using the existing save {ram_path}, delete it to use the save in the cartridge"
             );
-        } else {
-            write_file(&ram_path, ram_data, None)?;
+        } else if let Err(err) = write_file(&ram_path, ram_data, None) {
+            // removes the incomplete save (if any), so that it's not
+            // taken as the save of the game the next time it's loaded
+            remove_file(&ram_path).ok();
+            return Err(err);
         }
     }
     Ok(rom_path)
@@ -200,6 +215,47 @@ mod tests {
     }
 
     #[test]
+    fn test_write_files_other_rom() {
+        // the titles of both games share the same file names, but the
+        // save of the first must never be used for the second
+        let directory = temp_dir();
+        let rom_path = write_files(
+            &directory,
+            "BOYTACEAN OTHER TEST",
+            &[0x01, 0x02, 0x03],
+            Some(&[0x04, 0x05]),
+        )
+        .unwrap();
+        let ram_path = directory.join("boytacean-other-test.cartridge.sav");
+        let result = write_files(
+            &directory,
+            "BOYTACEAN-OTHER-TEST",
+            &[0x09, 0x09, 0x09],
+            Some(&[0x07]),
+        );
+        assert_eq!(
+            result,
+            Err(Error::CustomError(format!(
+                "A different ROM was loaded from a cartridge as {rom_path}, move it and its save away to load this one"
+            )))
+        );
+        assert_eq!(read(&rom_path).unwrap(), vec![0x01, 0x02, 0x03]);
+        assert_eq!(read(&ram_path).unwrap(), vec![0x04, 0x05]);
+
+        // the same game keeps on being loaded with its existing save
+        let result = write_files(
+            &directory,
+            "BOYTACEAN OTHER TEST",
+            &[0x01, 0x02, 0x03],
+            Some(&[0x06]),
+        );
+        assert_eq!(result, Ok(rom_path.clone()));
+        assert_eq!(read(&ram_path).unwrap(), vec![0x04, 0x05]);
+        remove_file(rom_path).unwrap();
+        remove_file(ram_path).unwrap();
+    }
+
+    #[test]
     fn test_write_files_no_save() {
         let directory = temp_dir();
         let rom_path = write_files(&directory, "BOYTACEAN NO SAVE TEST", &[0x01], None).unwrap();
@@ -212,16 +268,14 @@ mod tests {
 
     #[test]
     fn test_write_files_invalid_directory() {
-        let result = write_files(
-            Path::new("/dev/boytacean-none"),
-            "BOYTACEAN INVALID TEST",
-            &[0x01],
-            None,
-        );
+        let directory = Path::new("/dev/boytacean-none");
+        let result = write_files(directory, "BOYTACEAN INVALID TEST", &[0x01], None);
+        let rom_path = directory.join("boytacean-invalid-test.cartridge.gb");
         assert_eq!(
             result,
-            Err(Error::CustomError(String::from(
-                "Failed to create file: /dev/boytacean-none/boytacean-invalid-test.cartridge.gb"
+            Err(Error::CustomError(format!(
+                "Failed to create file: {}",
+                rom_path.to_string_lossy()
             )))
         );
     }
