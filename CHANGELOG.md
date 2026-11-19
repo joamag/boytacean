@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Builds on Rust 1.86 after a new release of a Unicode dependency, which is no longer used
 * Web front-end builds in GitHub Actions after a new release of a build dependency rejected the cache location of the build containers
 * SDL, documentation, Windows and Mac builds in GitHub Actions after new releases of the dependencies of a build tool required a newer Rust version
+* Nightly documentation builds in GitHub Actions after a new Clippy check on the stack usage of debug builds
 
 ## [0.13.2] - 2026-07-28
 
