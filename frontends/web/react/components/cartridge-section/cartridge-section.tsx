@@ -47,12 +47,11 @@ export const CartridgeSection: FC<CartridgeSectionProps> = ({
             );
         } catch (err) {
             // closing the port selection without choosing a port is
-            // not an error, there's nothing to be reported
-            if ((err as Error).name !== "NotFoundError") {
-                emulator.handlers.showToast?.(
-                    `${(err as Error).message}`,
-                    true
-                );
+            // not an error, there's nothing to be reported, errors of
+            // the WASM package are thrown as strings
+            const error = err instanceof Error ? err : new Error(String(err));
+            if (error.name !== "NotFoundError") {
+                emulator.handlers.showToast?.(`${error.message}`, true);
             }
         } finally {
             setPercentage(undefined);

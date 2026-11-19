@@ -173,6 +173,11 @@ export const readCartridge = async (
             }
             onProgress?.(active.progress());
         }
+
+        // waits for every byte (eg: the final release of the cartridge
+        // bus) to reach the device, as closing the port discards the
+        // bytes that are still buffered
+        await writer.close();
         return { dump: active.finish_wa(), device: active.device() };
     } finally {
         // cancels any pending read before releasing the stream locks,

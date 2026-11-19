@@ -509,7 +509,7 @@ export class GameBoyCore extends EmulatorLogic {
             // starts running
             await this.pause();
             await this.boot({
-                romName: dump.title(),
+                romName: dump.title() || "cartridge.gb",
                 romData: dump.rom_data_eager(),
                 reuse: false,
                 restore: false

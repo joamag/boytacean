@@ -79,6 +79,7 @@ class FakeDumper implements CartridgeDumper {
 type FakePort = CartridgePort & {
     written: number[][];
     baudRate?: number;
+    flushed: boolean;
     closed: boolean;
     end: () => void;
 };
@@ -95,6 +96,7 @@ const buildPort = (steps: Step[]): FakePort => {
     let index = 0;
     const port: FakePort = {
         written: [],
+        flushed: false,
         closed: false,
         readable: new ReadableStream<Uint8Array>({
             start: (value) => {
@@ -108,6 +110,9 @@ const buildPort = (steps: Step[]): FakePort => {
                 step?.reply.forEach((data) =>
                     controller.enqueue(new Uint8Array(data))
                 );
+            },
+            close: () => {
+                port.flushed = true;
             }
         }),
         open: async ({ baudRate }) => {
@@ -221,6 +226,7 @@ describe("Cartridge", function () {
             assert.deepStrictEqual(progress, [1 / 3, 2 / 3, 1]);
             assert.strictEqual(dumper.exchangesFreed, 3);
             assert.strictEqual(dumper.freed, true);
+            assert.strictEqual(port.flushed, true);
             assert.strictEqual(port.closed, true);
         });
 
@@ -307,6 +313,7 @@ describe("Cartridge", function () {
             assert.deepStrictEqual(port.written, [[0xa1]]);
             assert.strictEqual(dumper.exchangesFreed, 1);
             assert.strictEqual(dumper.freed, true);
+            assert.strictEqual(port.flushed, false);
             assert.strictEqual(port.closed, true);
         });
 
