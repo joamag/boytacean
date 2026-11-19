@@ -1,4 +1,6 @@
 pub mod audio;
+#[cfg(feature = "cartridge")]
+pub mod cartridge;
 pub mod data;
 pub mod sdl;
 pub mod shader;
@@ -1076,6 +1078,14 @@ struct Args {
 
     #[arg(long, default_value_t = String::from(""), help = "Fragment shader to use")]
     shader: String,
+
+    #[cfg(feature = "cartridge")]
+    #[arg(
+        long,
+        default_value_t = String::from(""),
+        help = "Serial port of a GBxCart RW (or auto) to load the game from its cartridge"
+    )]
+    cartridge: String,
 }
 
 fn run(args: Args, emulator: &mut Emulator) {
@@ -1102,6 +1112,18 @@ fn main() -> Result<(), Box<dyn StdError>> {
     // parses the provided command line arguments and uses them to
     // obtain structured values
     let args = Args::parse();
+
+    // in case a GBxCart RW is provided the cartridge in it is dumped
+    // into a ROM file that is then loaded as any other ROM file
+    #[cfg(feature = "cartridge")]
+    let args = if args.cartridge.is_empty() {
+        args
+    } else {
+        Args {
+            rom_path: cartridge::dump_cartridge(&args.cartridge)?,
+            ..args
+        }
+    };
 
     // in case the default ROM path is provided and the file does not
     // exist then fails gracefully

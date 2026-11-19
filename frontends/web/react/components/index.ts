@@ -1,4 +1,5 @@
 export * from "./audio-gb/audio-gb";
+export * from "./cartridge-section/cartridge-section";
 export * from "./debug/debug";
 export * from "./game-playlist/game-playlist";
 export * from "./help/help";

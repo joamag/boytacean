@@ -17,7 +17,7 @@ crate-type = ["cdylib", "rlib"]
 
 [features]
 default = []
-wasm = ["wasm-bindgen", "js-sys", "boytacean-common/wasm"]
+wasm = ["wasm-bindgen", "js-sys", "boytacean-common/wasm", "boytacean-dumper/wasm"]
 python = ["pyo3", "boytacean-common/python"]
 simd = ["boytacean-encoding/simd", "boytacean-hashing/simd"]
 debug = []
@@ -28,6 +28,7 @@ gen-mock = []
 
 [dependencies]
 boytacean-common = { path = "crates/common", version = "0.13.2" }
+boytacean-dumper = { path = "crates/dumper", version = "0.13.2", optional = true }
 boytacean-encoding = { path = "crates/encoding", version = "0.13.2" }
 boytacean-hashing = { path = "crates/hashing", version = "0.13.2" }
 wasm-bindgen = { version = "0.2", optional = true }
@@ -68,6 +69,7 @@ members = [
     "frontends/libretro",
     "frontends/sdl",
     "crates/common",
+    "crates/dumper",
     "crates/encoding",
     "crates/hashing"
 ]

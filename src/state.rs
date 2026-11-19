@@ -2262,6 +2262,7 @@ impl StateManager {
     /// stored in raw RGB format.
     ///
     /// This operation is currently only supported for the BOS format.
+    #[allow(clippy::large_unopt_stack_frames)]
     pub fn thumbnail(data: &[u8], format: Option<SaveStateFormat>) -> Result<Vec<u8>, Error> {
         let format = match format {
             Some(format) => format,

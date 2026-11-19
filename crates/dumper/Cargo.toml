@@ -1,0 +1,15 @@
+[package]
+name = "boytacean-dumper"
+description = "Cartridge dumping library for Boytacen."
+version = "0.13.2"
+authors = ["João Magalhães <joamag@gmail.com>"]
+license = "Apache-2.0"
+edition = "2021"
+rust-version = "1.86.0"
+
+[features]
+wasm = ["wasm-bindgen", "boytacean-common/wasm"]
+
+[dependencies]
+boytacean-common = { path = "../common", version = "0.13.2" }
+wasm-bindgen = { version = "0.2", optional = true }

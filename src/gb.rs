@@ -548,6 +548,7 @@ pub struct GameBoy {
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 impl GameBoy {
     #[cfg_attr(feature = "wasm", wasm_bindgen(constructor))]
+    #[allow(clippy::large_unopt_stack_frames)]
     pub fn new(mode: Option<GameBoyMode>) -> Self {
         let mode = mode.unwrap_or(GameBoyMode::Dmg);
         let gbc = Arc::new(Mutex::new(GameBoyConfig {
