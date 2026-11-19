@@ -68,6 +68,7 @@ members = [
     "frontends/libretro",
     "frontends/sdl",
     "crates/common",
+    "crates/dumper",
     "crates/encoding",
     "crates/hashing"
 ]
