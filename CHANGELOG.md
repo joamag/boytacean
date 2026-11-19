@@ -24,6 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 * Batched CPU stepping is now bounded, instead of running an unlimited number of instructions
+* MBC2 RAM is mirrored across its whole address range, as in the real hardware
+* Loading of ROM + RAM cartridges, and of saves smaller than the RAM of their cartridge
 * Loading of the default WASM binary when the core package is installed from npm
 * Build of the web front-end after the change in the WASM binary resolution
 * Builds on older Rust versions after dependency releases raised their minimum supported version
