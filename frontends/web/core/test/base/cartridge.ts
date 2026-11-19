@@ -188,10 +188,14 @@ describe("Cartridge", function () {
 
         it("should be able to request a port of a GBxCart RW", async () => {
             const port = buildPort([]);
+            const other = Object.assign(buildPort([]), {
+                getInfo: () => ({ usbVendorId: 0x0403, usbProductId: 0x6001 })
+            });
             let filters: unknown;
             Object.defineProperty(globalThis, "navigator", {
                 value: {
                     serial: {
+                        getPorts: async () => [other],
                         requestPort: async (options: { filters: unknown }) => {
                             filters = options.filters;
                             return port;
@@ -202,6 +206,30 @@ describe("Cartridge", function () {
             });
             assert.strictEqual(await requestCartridgePort(), port);
             assert.deepStrictEqual(filters, CARTRIDGE_FILTERS);
+        });
+
+        it("should be able to reuse a port granted before", async () => {
+            const other = Object.assign(buildPort([]), {
+                getInfo: () => ({})
+            });
+            const port = Object.assign(buildPort([]), {
+                getInfo: () => ({ usbVendorId: 0x1a86, usbProductId: 0x7523 })
+            });
+            let requested = false;
+            Object.defineProperty(globalThis, "navigator", {
+                value: {
+                    serial: {
+                        getPorts: async () => [other, port],
+                        requestPort: async () => {
+                            requested = true;
+                            return other;
+                        }
+                    }
+                },
+                configurable: true
+            });
+            assert.strictEqual(await requestCartridgePort(), port);
+            assert.strictEqual(requested, false);
         });
     });
 

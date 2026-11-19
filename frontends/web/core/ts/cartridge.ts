@@ -102,22 +102,39 @@ export const hasCartridgeSupport = (): boolean => {
 };
 
 /**
- * Asks the user to select the serial port of a GBxCart RW, which
- * must be called as the result of a user gesture.
+ * Obtains the serial port of a GBxCart RW, reusing a port granted
+ * before or else asking the user to select one, which must be
+ * called as the result of a user gesture.
  *
- * @returns The serial port selected by the user.
+ * @returns The serial port granted before or selected by the user.
  */
 export const requestCartridgePort = async (): Promise<CartridgePort> => {
+    type SerialPort = CartridgePort & {
+        getInfo(): { usbVendorId?: number; usbProductId?: number };
+    };
     const serial = (
         navigator as unknown as {
             serial: {
+                getPorts(): Promise<SerialPort[]>;
                 requestPort(options: {
                     filters: typeof CARTRIDGE_FILTERS;
-                }): Promise<CartridgePort>;
+                }): Promise<SerialPort>;
             };
         }
     ).serial;
-    return await serial.requestPort({ filters: CARTRIDGE_FILTERS });
+
+    // reuses the port of a GBxCart RW that has been granted before,
+    // so that the user only has to select the device once
+    const ports = await serial.getPorts();
+    const port = ports.find((port) => {
+        const { usbVendorId, usbProductId } = port.getInfo();
+        return CARTRIDGE_FILTERS.some(
+            (filter) =>
+                filter.usbVendorId === usbVendorId &&
+                filter.usbProductId === usbProductId
+        );
+    });
+    return port ?? (await serial.requestPort({ filters: CARTRIDGE_FILTERS }));
 };
 
 /**
