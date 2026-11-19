@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 * Documentation for the React package, covering components, hooks and keys with a complete quick start
+* Games can be loaded straight from their cartridge with a GBxCart RW, in the web and SDL front-ends - [#54](https://github.com/joamag/boytacean/issues/54)
 
 ### Changed
 
@@ -23,11 +24,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 * Batched CPU stepping is now bounded, instead of running an unlimited number of instructions
+* MBC2 RAM is mirrored across its whole address range, as in the real hardware
+* Loading of ROM + RAM cartridges, and of saves smaller than the RAM of their cartridge
 * Loading of the default WASM binary when the core package is installed from npm
 * Build of the web front-end after the change in the WASM binary resolution
 * Builds on older Rust versions after dependency releases raised their minimum supported version
 * Builds on Rust 1.86 after a new release of a Unicode dependency, which is no longer used
 * Web front-end builds in GitHub Actions after a new release of a build dependency rejected the cache location of the build containers
+* SDL, documentation, Windows and Mac builds in GitHub Actions after new releases of the dependencies of a build tool required a newer Rust version
+* Nightly documentation builds in GitHub Actions after a new Clippy check on the stack usage of debug builds
 
 ## [0.13.2] - 2026-07-28
 

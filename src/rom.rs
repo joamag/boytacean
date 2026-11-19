@@ -519,6 +519,8 @@ impl Cartridge {
     pub fn mbc(&self) -> Result<&'static Mbc, Error> {
         Ok(match self.rom_type() {
             RomType::RomOnly => &NO_MBC,
+            RomType::RomRam => &NO_MBC,
+            RomType::RomRamBattery => &NO_MBC,
             RomType::Mbc1 => &MBC1,
             RomType::Mbc1Ram => &MBC1,
             RomType::Mbc1RamBattery => &MBC1,
@@ -915,8 +917,13 @@ impl Cartridge {
         self.ram_data.clone()
     }
 
+    /// Sets the RAM data of the cartridge, keeping at least the size of
+    /// the allocated RAM, as a save can be smaller than it (eg: the 512
+    /// bytes of the MBC2) and the RAM is accessed without bound checks.
     pub fn set_ram_data(&mut self, data: &[u8]) {
-        self.ram_data = data.to_vec();
+        let mut ram_data = data.to_vec();
+        ram_data.resize(max(data.len(), self.ram_data.len()), 0x00);
+        self.ram_data = ram_data;
     }
 
     pub fn clear_ram_data(&mut self) {
@@ -1131,7 +1138,7 @@ pub static MBC2: Mbc = Mbc {
             // 0xA000–0xA1FF — Built-in RAM
             0xa000..=0xa1ff => rom.ram_data[rom.ram_offset + (addr - 0xa000) as usize],
             // 0xA200–0xBFFF — 15 "echoes" of A000–A1FF
-            0xa200..=0xbfff => rom.ram_data[rom.ram_offset + (addr - 0xa200) as usize],
+            0xa200..=0xbfff => rom.ram_data[rom.ram_offset + (addr & 0x01ff) as usize],
             _ => {
                 warnln!("Reading from unknown Cartridge RAM location 0x{:04x}", addr);
                 #[allow(unreachable_code)]
@@ -1151,7 +1158,7 @@ pub static MBC2: Mbc = Mbc {
             // 0xA000–0xA1FF — Built-in RAM
             0xa000..=0xa1ff => rom.ram_data[rom.ram_offset + (addr - 0xa000) as usize] = value,
             // 0xA200–0xBFFF — 15 "echoes" of A000–A1FF
-            0xa200..=0xbfff => rom.ram_data[rom.ram_offset + (addr - 0xa200) as usize] = value,
+            0xa200..=0xbfff => rom.ram_data[rom.ram_offset + (addr & 0x01ff) as usize] = value,
             _ => warnln!("Writing to unknown Cartridge RAM location 0x{:04x}", addr),
         }
     },
@@ -1330,6 +1337,38 @@ mod tests {
     use super::{Cartridge, RomType};
 
     #[test]
+    fn test_read_mbc2_echo() {
+        let mut data = vec![0; 0x8000];
+        data[0x0147] = 0x06;
+        let mut rom = Cartridge::from_data(&data).unwrap();
+        rom.set_ram_enabled(true);
+        rom.set_ram_data(&[0x0a; 512]);
+        assert_eq!(rom.read(0xa000), 0x0a);
+        assert_eq!(rom.read(0xa1ff), 0x0a);
+
+        // the 512 bytes of the MBC2 RAM are echoed up to 0xbfff, so
+        // that every echo reads and writes the same bytes
+        rom.write(0xa400, 0x05);
+        assert_eq!(rom.read(0xa000), 0x05);
+        assert_eq!(rom.read(0xa200), 0x05);
+        assert_eq!(rom.read(0xbe00), 0x05);
+        assert_eq!(rom.read(0xbfff), 0x0a);
+    }
+
+    #[test]
+    fn test_mbc_rom_ram() {
+        for rom_type in [0x08, 0x09] {
+            let mut data = vec![0; 0x8000];
+            data[0x0147] = rom_type;
+            data[0x0149] = 0x02;
+            let mut rom = Cartridge::from_data(&data).unwrap();
+            assert_eq!(rom.mbc().unwrap().name, "No MBC");
+            rom.write(0xa000, 0x42);
+            assert_eq!(rom.read(0xa000), 0x42);
+        }
+    }
+
+    #[test]
     fn test_has_rumble() {
         let mut rom = Cartridge::new();
         rom.set_data(&vec![0; 0x8000]).unwrap();
@@ -1352,5 +1391,26 @@ mod tests {
     fn test_title_empty_when_unloaded() {
         let rom = Cartridge::new();
         assert_eq!(rom.title(), "");
+    }
+
+    #[test]
+    fn test_set_ram_data() {
+        let mut rom = Cartridge::new();
+        rom.set_data(&vec![0; 0x8000]).unwrap();
+        rom.set_ram_data(&[0x01; 0x8000]);
+        assert_eq!(rom.ram_data(), &vec![0x01; 0x8000]);
+    }
+
+    #[test]
+    fn test_set_ram_data_short() {
+        // a save smaller than the allocated RAM (eg: the 512 bytes of
+        // the MBC2 or a 2 KB RAM) keeps the size of the allocated RAM
+        let mut rom = Cartridge::new();
+        rom.set_data(&vec![0; 0x8000]).unwrap();
+        rom.set_ram_data(&[0x01; 2048]);
+        assert_eq!(rom.ram_data().len(), 8192);
+        assert_eq!(&rom.ram_data()[..2048], &[0x01; 2048]);
+        assert_eq!(&rom.ram_data()[2048..], &[0x00; 6144]);
+        assert_eq!(rom.read(0xbfff), 0x00);
     }
 }
