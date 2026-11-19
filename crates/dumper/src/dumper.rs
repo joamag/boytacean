@@ -366,7 +366,15 @@ impl Dumper {
             0
         };
         let ram_banks = mapper.ram_banks(ram_size);
-        if ram_banks > mapper.max_ram_banks() {
+
+        // the rumble motor takes the highest bit of the RAM bank number
+        // of the MBC5, halving the RAM banks that can be addressed
+        let max_ram_banks = if header.has_rumble() {
+            mapper.max_ram_banks() / 2
+        } else {
+            mapper.max_ram_banks()
+        };
+        if ram_banks > max_ram_banks {
             return Err(Error::CustomError(format!(
                 "Unsupported RAM size for {}: {ram_banks} banks",
                 mapper.description()
@@ -1065,6 +1073,17 @@ mod tests {
     }
 
     #[test]
+    fn test_feed_unsupported_ram_size_rumble() {
+        let mut device = FakeDevice::new(Mapper::Mbc5, build_rom(0x1e, 0x00, 0x04), vec![]);
+        assert_eq!(
+            dump(&mut device).err(),
+            Some(Error::CustomError(String::from(
+                "Unsupported RAM size for MBC5: 16 banks"
+            )))
+        );
+    }
+
+    #[test]
     fn test_finish_incomplete() {
         let mut dumper = Dumper::new();
         assert_eq!(
@@ -1204,6 +1223,16 @@ mod tests {
         let mut device = FakeDevice::new(Mapper::Mbc5, rom.clone(), ram.clone());
         let dump = dump(&mut device).unwrap();
         assert_eq!(dump.rom_data().len(), 512 * ROM_BANK_SIZE);
+        assert_eq!(dump.rom_data(), &rom);
+        assert_eq!(dump.ram_data(), Some(&ram));
+    }
+
+    #[test]
+    fn test_run_mbc5_rumble() {
+        let rom = build_rom(0x1e, 0x02, 0x05);
+        let ram = build_ram(RAM_BANK_SIZE * 8);
+        let mut device = FakeDevice::new(Mapper::Mbc5, rom.clone(), ram.clone());
+        let dump = dump(&mut device).unwrap();
         assert_eq!(dump.rom_data(), &rom);
         assert_eq!(dump.ram_data(), Some(&ram));
     }

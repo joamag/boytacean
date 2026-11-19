@@ -100,6 +100,12 @@ impl Header {
         )
     }
 
+    /// If the cartridge has a rumble motor, which takes the highest bit
+    /// of the RAM bank number of its MBC5.
+    pub fn has_rumble(&self) -> bool {
+        matches!(self.cartridge_type(), 0x1c..=0x1e)
+    }
+
     /// Checks the Nintendo logo and the header checksum, which fail when
     /// there's no cartridge or when the connection to it is not stable.
     pub fn is_valid(&self) -> bool {
@@ -283,6 +289,24 @@ mod tests {
             let data = build_header(b"GAME", cartridge_type, 0x00, 0x00);
             let header = Header::from_data(&data).unwrap();
             assert!(!header.has_battery());
+        }
+    }
+
+    #[test]
+    fn test_has_rumble() {
+        for cartridge_type in [0x1c, 0x1d, 0x1e] {
+            let data = build_header(b"GAME", cartridge_type, 0x00, 0x00);
+            let header = Header::from_data(&data).unwrap();
+            assert!(header.has_rumble());
+        }
+    }
+
+    #[test]
+    fn test_has_rumble_none() {
+        for cartridge_type in [0x00, 0x03, 0x13, 0x19, 0x1a, 0x1b, 0x22] {
+            let data = build_header(b"GAME", cartridge_type, 0x00, 0x00);
+            let header = Header::from_data(&data).unwrap();
+            assert!(!header.has_rumble());
         }
     }
 
