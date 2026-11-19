@@ -21,9 +21,6 @@ const TIMEOUT: Duration = Duration::from_secs(2);
 /// Dumps the cartridge in the GBxCart RW at the provided serial port
 /// (`auto` finds it) into a ROM file in the current directory, so that
 /// it can be loaded as any other ROM file, returning its path.
-///
-/// The save in the cartridge is only written when there's no save for
-/// it yet, so that the progress made in the emulator is never lost.
 pub fn dump_cartridge(port: &str) -> Result<String, Error> {
     let port = if port == "auto" {
         find_port()?
@@ -55,9 +52,30 @@ pub fn dump_cartridge(port: &str) -> Result<String, Error> {
         println!("The ROM checksum does not match its header, usual for reproduction cartridges");
     }
 
-    let (rom_path, ram_path) = file_paths(&dump.title());
-    write_file(&rom_path, dump.rom_data(), None)?;
-    if let Some(ram_data) = dump.ram_data() {
+    write_files(
+        Path::new("."),
+        &dump.title(),
+        dump.rom_data(),
+        dump.ram_data().map(Vec::as_slice),
+    )
+}
+
+/// Writes the ROM and the save (if any) of a cartridge into files in
+/// the provided directory, returning the path of the ROM file.
+///
+/// The save in the cartridge is only written when there's no save for
+/// it yet, so that the progress made in the emulator is never lost.
+fn write_files(
+    directory: &Path,
+    title: &str,
+    rom_data: &[u8],
+    ram_data: Option<&[u8]>,
+) -> Result<String, Error> {
+    let (rom_name, ram_name) = file_paths(title);
+    let rom_path = directory.join(rom_name).to_string_lossy().into_owned();
+    let ram_path = directory.join(ram_name).to_string_lossy().into_owned();
+    write_file(&rom_path, rom_data, None)?;
+    if let Some(ram_data) = ram_data {
         if Path::new(&ram_path).exists() {
             println!(
                 "Using the existing save {ram_path}, delete it to use the save in the cartridge"
@@ -110,9 +128,16 @@ fn file_paths(title: &str) -> (String, String) {
 
 #[cfg(test)]
 mod tests {
+    use std::{
+        env::temp_dir,
+        fs::{read, remove_file, write},
+        path::Path,
+    };
+
+    use boytacean_common::error::Error;
     use serialport::{SerialPortType, UsbPortInfo};
 
-    use super::{file_paths, is_gbxcart};
+    use super::{dump_cartridge, file_paths, is_gbxcart, write_files};
 
     fn build_usb_port(vid: u16, pid: u16) -> SerialPortType {
         SerialPortType::UsbPort(UsbPortInfo {
@@ -122,6 +147,83 @@ mod tests {
             manufacturer: None,
             product: None,
         })
+    }
+
+    #[test]
+    fn test_dump_cartridge_invalid_port() {
+        let result = dump_cartridge("/dev/boytacean-none");
+        assert!(matches!(
+            result,
+            Err(Error::IoError(message)) if message.starts_with("Failed to open /dev/boytacean-none: ")
+        ));
+    }
+
+    #[test]
+    fn test_write_files() {
+        let directory = temp_dir();
+        let rom_path = write_files(
+            &directory,
+            "BOYTACEAN WRITE TEST",
+            &[0x01, 0x02, 0x03],
+            Some(&[0x04, 0x05]),
+        )
+        .unwrap();
+        let ram_path = directory.join("boytacean-write-test.cartridge.sav");
+        assert_eq!(
+            Path::new(&rom_path),
+            directory.join("boytacean-write-test.cartridge.gb")
+        );
+        assert_eq!(read(&rom_path).unwrap(), vec![0x01, 0x02, 0x03]);
+        assert_eq!(read(&ram_path).unwrap(), vec![0x04, 0x05]);
+        remove_file(rom_path).unwrap();
+        remove_file(ram_path).unwrap();
+    }
+
+    #[test]
+    fn test_write_files_existing_save() {
+        // the save already in place holds the progress made in the
+        // emulator, which must never be replaced by the cartridge one
+        let directory = temp_dir();
+        let ram_path = directory.join("boytacean-existing-test.cartridge.sav");
+        write(&ram_path, [0x0a, 0x0b, 0x0c]).unwrap();
+        let rom_path = write_files(
+            &directory,
+            "BOYTACEAN EXISTING TEST",
+            &[0x01, 0x02, 0x03],
+            Some(&[0x04, 0x05]),
+        )
+        .unwrap();
+        assert_eq!(read(&rom_path).unwrap(), vec![0x01, 0x02, 0x03]);
+        assert_eq!(read(&ram_path).unwrap(), vec![0x0a, 0x0b, 0x0c]);
+        remove_file(rom_path).unwrap();
+        remove_file(ram_path).unwrap();
+    }
+
+    #[test]
+    fn test_write_files_no_save() {
+        let directory = temp_dir();
+        let rom_path = write_files(&directory, "BOYTACEAN NO SAVE TEST", &[0x01], None).unwrap();
+        assert_eq!(read(&rom_path).unwrap(), vec![0x01]);
+        assert!(!directory
+            .join("boytacean-no-save-test.cartridge.sav")
+            .exists());
+        remove_file(rom_path).unwrap();
+    }
+
+    #[test]
+    fn test_write_files_invalid_directory() {
+        let result = write_files(
+            Path::new("/dev/boytacean-none"),
+            "BOYTACEAN INVALID TEST",
+            &[0x01],
+            None,
+        );
+        assert_eq!(
+            result,
+            Err(Error::CustomError(String::from(
+                "Failed to create file: /dev/boytacean-none/boytacean-invalid-test.cartridge.gb"
+            )))
+        );
     }
 
     #[test]
