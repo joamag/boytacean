@@ -80,26 +80,35 @@ fn write_files(
     let ram_path = directory.join(ram_name).to_string_lossy().into_owned();
 
     // another game with a similar title may have been loaded from its
-    // cartridge before, whose save must not be used for this one
-    if Path::new(&rom_path).exists() && read_file(&rom_path)? != rom_data {
+    // cartridge before, whose save must not be used for this one, while
+    // the same ROM is left untouched
+    if !Path::new(&rom_path).exists() {
+        write_new_file(&rom_path, rom_data)?;
+    } else if read_file(&rom_path)? != rom_data {
         return Err(Error::CustomError(format!(
             "A different ROM was loaded from a cartridge as {rom_path}, move it and its save away to load this one"
         )));
     }
-    write_file(&rom_path, rom_data, None)?;
     if let Some(ram_data) = ram_data {
         if Path::new(&ram_path).exists() {
             println!(
                 "Using the existing save {ram_path}, delete it to use the save in the cartridge"
             );
-        } else if let Err(err) = write_file(&ram_path, ram_data, None) {
-            // removes the incomplete save (if any), so that it's not
-            // taken as the save of the game the next time it's loaded
-            remove_file(&ram_path).ok();
-            return Err(err);
+        } else {
+            write_new_file(&ram_path, ram_data)?;
         }
     }
     Ok(rom_path)
+}
+
+/// Writes the data into a new file, removing the file in case the write
+/// fails, so that an incomplete file is never taken as a complete one.
+fn write_new_file(path: &str, data: &[u8]) -> Result<(), Error> {
+    if let Err(err) = write_file(path, data, None) {
+        remove_file(path).ok();
+        return Err(err);
+    }
+    Ok(())
 }
 
 /// Finds the serial port of the first GBxCart RW connected, by the
@@ -145,14 +154,26 @@ fn file_paths(title: &str) -> (String, String) {
 mod tests {
     use std::{
         env::temp_dir,
-        fs::{read, remove_file, write},
-        path::Path,
+        fs::{create_dir_all, read, remove_dir_all, write},
+        path::{Path, PathBuf},
+        process,
     };
 
     use boytacean_common::error::Error;
     use serialport::{SerialPortType, UsbPortInfo};
 
-    use super::{dump_cartridge, file_paths, is_gbxcart, write_files};
+    use super::{dump_cartridge, file_paths, is_gbxcart, write_files, write_new_file};
+
+    /// Builds an empty directory for the files of a test, unique to the
+    /// test and to the process running it, so that runs never collide.
+    fn build_directory(name: &str) -> PathBuf {
+        let directory = temp_dir().join(format!("boytacean-{name}-{}", process::id()));
+        if directory.exists() {
+            remove_dir_all(&directory).unwrap();
+        }
+        create_dir_all(&directory).unwrap();
+        directory
+    }
 
     fn build_usb_port(vid: u16, pid: u16) -> SerialPortType {
         SerialPortType::UsbPort(UsbPortInfo {
@@ -175,7 +196,7 @@ mod tests {
 
     #[test]
     fn test_write_files() {
-        let directory = temp_dir();
+        let directory = build_directory("cartridge-write");
         let rom_path = write_files(
             &directory,
             "BOYTACEAN WRITE TEST",
@@ -190,15 +211,14 @@ mod tests {
         );
         assert_eq!(read(&rom_path).unwrap(), vec![0x01, 0x02, 0x03]);
         assert_eq!(read(&ram_path).unwrap(), vec![0x04, 0x05]);
-        remove_file(rom_path).unwrap();
-        remove_file(ram_path).unwrap();
+        remove_dir_all(directory).unwrap();
     }
 
     #[test]
     fn test_write_files_existing_save() {
         // the save already in place holds the progress made in the
         // emulator, which must never be replaced by the cartridge one
-        let directory = temp_dir();
+        let directory = build_directory("cartridge-existing");
         let ram_path = directory.join("boytacean-existing-test.cartridge.sav");
         write(&ram_path, [0x0a, 0x0b, 0x0c]).unwrap();
         let rom_path = write_files(
@@ -210,15 +230,14 @@ mod tests {
         .unwrap();
         assert_eq!(read(&rom_path).unwrap(), vec![0x01, 0x02, 0x03]);
         assert_eq!(read(&ram_path).unwrap(), vec![0x0a, 0x0b, 0x0c]);
-        remove_file(rom_path).unwrap();
-        remove_file(ram_path).unwrap();
+        remove_dir_all(directory).unwrap();
     }
 
     #[test]
     fn test_write_files_other_rom() {
         // the titles of both games share the same file names, but the
         // save of the first must never be used for the second
-        let directory = temp_dir();
+        let directory = build_directory("cartridge-other");
         let rom_path = write_files(
             &directory,
             "BOYTACEAN OTHER TEST",
@@ -251,19 +270,18 @@ mod tests {
         );
         assert_eq!(result, Ok(rom_path.clone()));
         assert_eq!(read(&ram_path).unwrap(), vec![0x04, 0x05]);
-        remove_file(rom_path).unwrap();
-        remove_file(ram_path).unwrap();
+        remove_dir_all(directory).unwrap();
     }
 
     #[test]
     fn test_write_files_no_save() {
-        let directory = temp_dir();
+        let directory = build_directory("cartridge-no-save");
         let rom_path = write_files(&directory, "BOYTACEAN NO SAVE TEST", &[0x01], None).unwrap();
         assert_eq!(read(&rom_path).unwrap(), vec![0x01]);
         assert!(!directory
             .join("boytacean-no-save-test.cartridge.sav")
             .exists());
-        remove_file(rom_path).unwrap();
+        remove_dir_all(directory).unwrap();
     }
 
     #[test]
@@ -278,6 +296,29 @@ mod tests {
                 rom_path.to_string_lossy()
             )))
         );
+    }
+
+    #[test]
+    fn test_write_new_file() {
+        let directory = build_directory("cartridge-new");
+        let path = directory
+            .join("boytacean.gb")
+            .to_string_lossy()
+            .into_owned();
+        write_new_file(&path, &[0x01, 0x02]).unwrap();
+        assert_eq!(read(&path).unwrap(), vec![0x01, 0x02]);
+        remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn test_write_new_file_invalid() {
+        let path = Path::new("/dev/boytacean-none").join("boytacean.gb");
+        let path = path.to_string_lossy();
+        assert_eq!(
+            write_new_file(&path, &[0x01]),
+            Err(Error::CustomError(format!("Failed to create file: {path}")))
+        );
+        assert!(!Path::new(path.as_ref()).exists());
     }
 
     #[test]
