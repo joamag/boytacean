@@ -18,6 +18,14 @@ pub const ROM_BANK_SIZE: usize = 16384;
 /// The size in bytes of a RAM bank.
 pub const RAM_BANK_SIZE: usize = 8192;
 
+/// The Nintendo logo, that every cartridge holds at `0x0104` to
+/// `0x0133` for the boot ROM to check it.
+pub const NINTENDO_LOGO: [u8; 48] = [
+    0xce, 0xed, 0x66, 0x66, 0xcc, 0x0d, 0x00, 0x0b, 0x03, 0x73, 0x00, 0x83, 0x00, 0x0c, 0x00, 0x0d,
+    0x00, 0x08, 0x11, 0x1f, 0x88, 0x89, 0x00, 0x0e, 0xdc, 0xcc, 0x6e, 0xe6, 0xdd, 0xdd, 0xd9, 0x99,
+    0xbb, 0xbb, 0x67, 0x63, 0x6e, 0x0e, 0xec, 0xcc, 0xdd, 0xdc, 0x99, 0x9f, 0xbb, 0xb9, 0x33, 0x3e,
+];
+
 pub struct Header {
     data: [u8; HEADER_SIZE],
 }
@@ -92,13 +100,13 @@ impl Header {
         )
     }
 
-    /// Checks the header checksum, which fails when there's no
-    /// cartridge or when the connection to it is not stable.
+    /// Checks the Nintendo logo and the header checksum, which fail when
+    /// there's no cartridge or when the connection to it is not stable.
     pub fn is_valid(&self) -> bool {
         let checksum = self.data[0x34..0x4d]
             .iter()
             .fold(0u8, |sum, &byte| sum.wrapping_sub(byte).wrapping_sub(1));
-        checksum == self.data[0x4d]
+        self.data[0x04..0x34] == NINTENDO_LOGO && checksum == self.data[0x4d]
     }
 
     pub fn global_checksum(&self) -> u16 {
@@ -121,12 +129,13 @@ impl Header {
 mod tests {
     use boytacean_common::error::Error;
 
-    use super::{Header, HEADER_SIZE};
+    use super::{Header, HEADER_SIZE, NINTENDO_LOGO};
 
     /// Builds a header with the provided title, cartridge type and
     /// ROM and RAM size bytes, with a valid header checksum.
     fn build_header(title: &[u8], cartridge_type: u8, rom_size: u8, ram_size: u8) -> Vec<u8> {
         let mut data = vec![0x00; HEADER_SIZE];
+        data[0x04..0x34].copy_from_slice(&NINTENDO_LOGO);
         data[0x34..0x34 + title.len()].copy_from_slice(title);
         data[0x47] = cartridge_type;
         data[0x48] = rom_size;
@@ -288,6 +297,14 @@ mod tests {
     fn test_is_valid_mismatch() {
         let mut data = build_header(b"TETRIS", 0x00, 0x00, 0x00);
         data[0x4d] = data[0x4d].wrapping_add(1);
+        let header = Header::from_data(&data).unwrap();
+        assert!(!header.is_valid());
+    }
+
+    #[test]
+    fn test_is_valid_logo() {
+        let mut data = build_header(b"TETRIS", 0x00, 0x00, 0x00);
+        data[0x18] ^= 0x01;
         let header = Header::from_data(&data).unwrap();
         assert!(!header.is_valid());
     }

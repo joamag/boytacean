@@ -220,8 +220,14 @@ impl Dumper {
         (self.rom_data.len() + self.ram_data.len()) as f32 / total as f32
     }
 
+    /// If the dump is complete, with every command run and all of the
+    /// ROM and RAM of the cartridge read.
     pub fn is_finished(&self) -> bool {
-        self.header.is_some() && self.commands.is_empty() && self.pending.is_none()
+        self.header.is_some()
+            && self.commands.is_empty()
+            && self.pending.is_none()
+            && self.rom_data.len() == self.rom_size
+            && self.ram_data.len() == self.ram_size
     }
 
     /// The description of the device, once its firmware is known.
@@ -348,11 +354,24 @@ impl Dumper {
         }
         let mapper = Mapper::from_cartridge_type(header.cartridge_type())?;
         let rom_banks = header.rom_banks()?;
+        if rom_banks > mapper.max_rom_banks() {
+            return Err(Error::CustomError(format!(
+                "Unsupported ROM size for {}: {rom_banks} banks",
+                mapper.description()
+            )));
+        }
         let ram_size = if header.has_battery() {
             mapper.ram_size(header.ram_size()?)
         } else {
             0
         };
+        let ram_banks = mapper.ram_banks(ram_size);
+        if ram_banks > mapper.max_ram_banks() {
+            return Err(Error::CustomError(format!(
+                "Unsupported RAM size for {}: {ram_banks} banks",
+                mapper.description()
+            )));
+        }
 
         // reads every ROM bank through the bank switching of the MBC
         for bank in 0..rom_banks {
@@ -369,7 +388,7 @@ impl Dumper {
         // must be pulsed for the RAM to reply
         if ram_size > 0 {
             self.push_writes(&mapper.ram_enable_writes());
-            for bank in 0..mapper.ram_banks(ram_size) {
+            for bank in 0..ram_banks {
                 let size = (ram_size - bank as usize * RAM_BANK_SIZE).min(RAM_BANK_SIZE);
                 self.push_writes(&mapper.ram_bank_writes(bank));
                 self.push_read(RAM_BANK_ADDRESS, CHUNK_SIZE, ACCESS_MODE_RAM_READ);
@@ -446,7 +465,7 @@ mod tests {
             ACCESS_MODE_RAM_READ, DMG_CART_READ, DMG_CART_WRITE, DMG_MBC_RESET, QUERY_FW_INFO,
             SET_ADDR_AS_INPUTS, SET_MODE_DMG, SET_VARIABLE, SET_VOLTAGE_5V,
         },
-        header::{RAM_BANK_SIZE, ROM_BANK_SIZE},
+        header::{NINTENDO_LOGO, RAM_BANK_SIZE, ROM_BANK_SIZE},
         mapper::Mapper,
     };
 
@@ -664,7 +683,15 @@ mod tests {
         let mut rom: Vec<u8> = (0..banks * ROM_BANK_SIZE)
             .map(|index| ((index / ROM_BANK_SIZE) as u8) ^ ((index >> 4) as u8))
             .collect();
+
+        // the number of each bank in its first bytes, so that no two
+        // banks are the same (eg: the banks 0x001 and 0x101 of MBC5)
+        for bank in 0..banks {
+            let offset = bank * ROM_BANK_SIZE;
+            rom[offset..offset + 2].copy_from_slice(&(bank as u16).to_be_bytes());
+        }
         rom[0x0100..0x0150].fill(0x00);
+        rom[0x0104..0x0134].copy_from_slice(&NINTENDO_LOGO);
         rom[0x0134..0x0138].copy_from_slice(b"GAME");
         rom[0x0147] = cartridge_type;
         rom[0x0148] = rom_size;
@@ -1016,8 +1043,59 @@ mod tests {
     }
 
     #[test]
+    fn test_feed_unsupported_rom_size() {
+        let mut device = FakeDevice::new(Mapper::Mbc2, build_rom(0x06, 0x04, 0x00), vec![]);
+        assert_eq!(
+            dump(&mut device).err(),
+            Some(Error::CustomError(String::from(
+                "Unsupported ROM size for MBC2: 32 banks"
+            )))
+        );
+    }
+
+    #[test]
+    fn test_feed_unsupported_ram_size() {
+        let mut device = FakeDevice::new(Mapper::Mbc1, build_rom(0x03, 0x00, 0x05), vec![]);
+        assert_eq!(
+            dump(&mut device).err(),
+            Some(Error::CustomError(String::from(
+                "Unsupported RAM size for MBC1: 8 banks"
+            )))
+        );
+    }
+
+    #[test]
     fn test_finish_incomplete() {
         let mut dumper = Dumper::new();
+        assert_eq!(
+            dumper.finish().err(),
+            Some(Error::CustomError(String::from(
+                "The dump of the cartridge is not complete"
+            )))
+        );
+    }
+
+    #[test]
+    fn test_finish_failed_reply() {
+        let mut device = FakeDevice::new(Mapper::NoMbc, build_rom(0x00, 0x00, 0x00), vec![]);
+        let mut dumper = Dumper::new();
+        let exchange = advance(&mut dumper, &mut device, CHUNK_SIZE);
+        device.write_all(exchange.send()).unwrap();
+        let mut data = vec![0x00; CHUNK_SIZE];
+        device.read_exact(&mut data).unwrap();
+        assert_eq!(
+            dumper.feed(&data[1..]).err(),
+            Some(Error::DataError(String::from(
+                "Expected 64 bytes from the device, got 63"
+            )))
+        );
+
+        // a caller that carries on after the failed reply must not get
+        // a dump that misses the bytes of that reply
+        while let Some(exchange) = dumper.next_exchange() {
+            complete(&mut dumper, &mut device, exchange);
+        }
+        assert!(!dumper.is_finished());
         assert_eq!(
             dumper.finish().err(),
             Some(Error::CustomError(String::from(

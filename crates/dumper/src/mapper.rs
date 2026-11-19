@@ -136,6 +136,29 @@ impl Mapper {
     pub fn ram_banks(&self, ram_size: usize) -> u8 {
         ram_size.div_ceil(RAM_BANK_SIZE) as u8
     }
+
+    /// The number of ROM banks that the bank switching of the mapper
+    /// can address, a header declaring more can't be trusted.
+    pub fn max_rom_banks(&self) -> u16 {
+        match self {
+            Mapper::NoMbc => 2,
+            Mapper::Mbc1 => 128,
+            Mapper::Mbc2 => 16,
+            Mapper::Mbc3 => 256,
+            Mapper::Mbc5 => 512,
+        }
+    }
+
+    /// The number of RAM banks that the bank switching of the mapper
+    /// can address, a header declaring more can't be trusted.
+    pub fn max_ram_banks(&self) -> u8 {
+        match self {
+            Mapper::NoMbc | Mapper::Mbc2 => 1,
+            Mapper::Mbc1 => 4,
+            Mapper::Mbc3 => 8,
+            Mapper::Mbc5 => 16,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -351,5 +374,23 @@ mod tests {
         assert_eq!(Mapper::Mbc1.ram_banks(8192), 1);
         assert_eq!(Mapper::Mbc3.ram_banks(32768), 4);
         assert_eq!(Mapper::Mbc5.ram_banks(131072), 16);
+    }
+
+    #[test]
+    fn test_max_rom_banks() {
+        assert_eq!(Mapper::NoMbc.max_rom_banks(), 2);
+        assert_eq!(Mapper::Mbc1.max_rom_banks(), 128);
+        assert_eq!(Mapper::Mbc2.max_rom_banks(), 16);
+        assert_eq!(Mapper::Mbc3.max_rom_banks(), 256);
+        assert_eq!(Mapper::Mbc5.max_rom_banks(), 512);
+    }
+
+    #[test]
+    fn test_max_ram_banks() {
+        assert_eq!(Mapper::NoMbc.max_ram_banks(), 1);
+        assert_eq!(Mapper::Mbc1.max_ram_banks(), 4);
+        assert_eq!(Mapper::Mbc2.max_ram_banks(), 1);
+        assert_eq!(Mapper::Mbc3.max_ram_banks(), 8);
+        assert_eq!(Mapper::Mbc5.max_ram_banks(), 16);
     }
 }
