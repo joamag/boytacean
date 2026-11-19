@@ -166,7 +166,7 @@ jobs:
             vcpkg-${{ runner.os }}-${{ matrix.rust-version }}-
             vcpkg-${{ runner.os }}-
       - name: Install SDL dependencies
-        run: cd frontends/sdl && cargo install cargo-vcpkg && cargo vcpkg -v build
+        run: cd frontends/sdl && cargo install cargo-vcpkg --locked && cargo vcpkg -v build
       - name: Verify Rust code format
         run: cd frontends/sdl && cargo fmt --all -- --check
       - name: Verify Rust code linting
@@ -332,7 +332,7 @@ jobs:
             vcpkg-${{ runner.os }}-${{ matrix.rust-image }}-
             vcpkg-${{ runner.os }}-
       - name: Install SDL dependencies
-        run: cd frontends/sdl && cargo install cargo-vcpkg && cargo vcpkg -v build
+        run: cd frontends/sdl && cargo install cargo-vcpkg --locked && cargo vcpkg -v build
       - name: Verify Rust code format
         run: cd frontends/sdl && cargo fmt --all -- --check
       - name: Verify Rust code linting
