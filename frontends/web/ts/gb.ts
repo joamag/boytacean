@@ -13,10 +13,11 @@ import {
 } from "emukit";
 import { loadAsync } from "jszip";
 
-import { GameBoyCore } from "../core";
+import { GameBoyCore, hasCartridgeSupport } from "../core";
 import { Info } from "../lib/boytacean";
 import info from "../package.json";
 import {
+    CartridgeSection,
     DebugAudio,
     DebugGeneral,
     DebugSettings,
@@ -164,6 +165,13 @@ export class GameboyEmulator extends GameBoyCore implements Emulator {
                 node: SerialSection({ emulator: this })
             }
         ];
+        if (hasCartridgeSupport()) {
+            _sections.push({
+                name: "Cartridge",
+                icon: require("../res/cartridge.svg"),
+                node: CartridgeSection({ emulator: this })
+            });
+        }
         if (this._playlistUrl) {
             _sections.push({
                 name: "Playlist",
