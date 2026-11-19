@@ -2,7 +2,7 @@
 //! GBxCart RW connected to a serial port.
 
 use std::{
-    fs::remove_file,
+    fs::{remove_file, rename},
     io::{stdout, Write},
     path::Path,
     time::Duration,
@@ -101,14 +101,19 @@ fn write_files(
     Ok(rom_path)
 }
 
-/// Writes the data into a new file, removing the file in case the write
-/// fails, so that an incomplete file is never taken as a complete one.
+/// Writes the data into a new file through a temporary file, that is
+/// only renamed into place once written, so that an incomplete file (eg:
+/// of a failed or interrupted write) is never taken as a complete one.
 fn write_new_file(path: &str, data: &[u8]) -> Result<(), Error> {
-    if let Err(err) = write_file(path, data, None) {
-        remove_file(path).ok();
+    let part_path = format!("{path}.part");
+    if let Err(err) = write_file(&part_path, data, None) {
+        remove_file(&part_path).ok();
         return Err(err);
     }
-    Ok(())
+    rename(&part_path, path).map_err(|err| {
+        remove_file(&part_path).ok();
+        Error::IoError(format!("Failed to rename {part_path}: {err}"))
+    })
 }
 
 /// Finds the serial port of the first GBxCart RW connected, by the
@@ -292,7 +297,7 @@ mod tests {
         assert_eq!(
             result,
             Err(Error::CustomError(format!(
-                "Failed to create file: {}",
+                "Failed to create file: {}.part",
                 rom_path.to_string_lossy()
             )))
         );
@@ -300,13 +305,17 @@ mod tests {
 
     #[test]
     fn test_write_new_file() {
+        // the temporary file left by an interrupted write is replaced,
+        // and no temporary file is left once the file is in place
         let directory = build_directory("cartridge-new");
         let path = directory
             .join("boytacean.gb")
             .to_string_lossy()
             .into_owned();
+        write(format!("{path}.part"), [0x0f]).unwrap();
         write_new_file(&path, &[0x01, 0x02]).unwrap();
         assert_eq!(read(&path).unwrap(), vec![0x01, 0x02]);
+        assert!(!Path::new(&format!("{path}.part")).exists());
         remove_dir_all(directory).unwrap();
     }
 
@@ -316,9 +325,30 @@ mod tests {
         let path = path.to_string_lossy();
         assert_eq!(
             write_new_file(&path, &[0x01]),
-            Err(Error::CustomError(format!("Failed to create file: {path}")))
+            Err(Error::CustomError(format!(
+                "Failed to create file: {path}.part"
+            )))
         );
         assert!(!Path::new(path.as_ref()).exists());
+    }
+
+    #[test]
+    fn test_write_new_file_rename() {
+        // a directory in place of the file makes the rename fail, which
+        // must not leave the temporary file behind
+        let directory = build_directory("cartridge-rename");
+        let path = directory
+            .join("boytacean.gb")
+            .to_string_lossy()
+            .into_owned();
+        create_dir_all(&path).unwrap();
+        let result = write_new_file(&path, &[0x01]);
+        assert!(matches!(
+            result,
+            Err(Error::IoError(message)) if message.starts_with(&format!("Failed to rename {path}.part: "))
+        ));
+        assert!(!Path::new(&format!("{path}.part")).exists());
+        remove_dir_all(directory).unwrap();
     }
 
     #[test]
