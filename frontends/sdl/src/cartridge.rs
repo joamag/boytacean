@@ -5,6 +5,7 @@ use std::{
     fs::{remove_file, rename},
     io::{stdout, Write},
     path::Path,
+    process,
     time::Duration,
 };
 
@@ -101,11 +102,12 @@ fn write_files(
     Ok(rom_path)
 }
 
-/// Writes the data into a new file through a temporary file, that is
-/// only renamed into place once written, so that an incomplete file (eg:
-/// of a failed or interrupted write) is never taken as a complete one.
+/// Writes the data into a new file through a temporary file (of this
+/// process alone), that is only renamed into place once written, so that
+/// an incomplete file (eg: of a failed or interrupted write) is never
+/// taken as a complete one.
 fn write_new_file(path: &str, data: &[u8]) -> Result<(), Error> {
-    let part_path = format!("{path}.part");
+    let part_path = format!("{path}.{}.part", process::id());
     if let Err(err) = write_file(&part_path, data, None) {
         remove_file(&part_path).ok();
         return Err(err);
@@ -297,8 +299,9 @@ mod tests {
         assert_eq!(
             result,
             Err(Error::CustomError(format!(
-                "Failed to create file: {}.part",
-                rom_path.to_string_lossy()
+                "Failed to create file: {}.{}.part",
+                rom_path.to_string_lossy(),
+                process::id()
             )))
         );
     }
@@ -312,10 +315,11 @@ mod tests {
             .join("boytacean.gb")
             .to_string_lossy()
             .into_owned();
-        write(format!("{path}.part"), [0x0f]).unwrap();
+        let part_path = format!("{path}.{}.part", process::id());
+        write(&part_path, [0x0f]).unwrap();
         write_new_file(&path, &[0x01, 0x02]).unwrap();
         assert_eq!(read(&path).unwrap(), vec![0x01, 0x02]);
-        assert!(!Path::new(&format!("{path}.part")).exists());
+        assert!(!Path::new(&part_path).exists());
         remove_dir_all(directory).unwrap();
     }
 
@@ -326,7 +330,8 @@ mod tests {
         assert_eq!(
             write_new_file(&path, &[0x01]),
             Err(Error::CustomError(format!(
-                "Failed to create file: {path}.part"
+                "Failed to create file: {path}.{}.part",
+                process::id()
             )))
         );
         assert!(!Path::new(path.as_ref()).exists());
@@ -341,13 +346,14 @@ mod tests {
             .join("boytacean.gb")
             .to_string_lossy()
             .into_owned();
+        let part_path = format!("{path}.{}.part", process::id());
         create_dir_all(&path).unwrap();
         let result = write_new_file(&path, &[0x01]);
         assert!(matches!(
             result,
-            Err(Error::IoError(message)) if message.starts_with(&format!("Failed to rename {path}.part: "))
+            Err(Error::IoError(message)) if message.starts_with(&format!("Failed to rename {part_path}: "))
         ));
-        assert!(!Path::new(&format!("{path}.part")).exists());
+        assert!(!Path::new(&part_path).exists());
         remove_dir_all(directory).unwrap();
     }
 
