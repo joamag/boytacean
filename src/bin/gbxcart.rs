@@ -92,11 +92,17 @@ fn print_progress(label: &str) -> impl FnMut(f32) + '_ {
     }
 }
 
-/// Writes the data into a new file, refusing to replace an existing one.
-fn write_output(path: &str, data: &[u8]) -> Result<(), Box<dyn Error>> {
+/// Checks that there's no file at the path, never to replace one.
+fn check_output(path: &str) -> Result<(), Box<dyn Error>> {
     if Path::new(path).exists() {
         return Err(format!("The file {path} already exists, move it away first").into());
     }
+    Ok(())
+}
+
+/// Writes the data into a new file, refusing to replace an existing one.
+fn write_output(path: &str, data: &[u8]) -> Result<(), Box<dyn Error>> {
+    check_output(path)?;
     write_new_file(path, data)?;
     println!("Wrote {path}");
     Ok(())
@@ -129,6 +135,13 @@ fn dump<T: Read + Write>(
     }
     if !dump.checksum_valid() {
         println!("The ROM checksum does not match its header, usual for reproduction cartridges");
+    }
+
+    // checks every file before writing any of them, so that an existing
+    // save never leaves the ROM written without its save
+    check_output(path)?;
+    if dump.ram_data().is_some() {
+        check_output(&save_path(path))?;
     }
     write_output(path, dump.rom_data())?;
     if let Some(ram_data) = dump.ram_data() {
@@ -231,7 +244,9 @@ mod tests {
 
     use boytacean_cartridge::header::NINTENDO_LOGO;
 
-    use super::{dump, flash, info, parse_args, save_path, write_output, Options, BACKUP_FILE};
+    use super::{
+        check_output, dump, flash, info, parse_args, save_path, write_output, Options, BACKUP_FILE,
+    };
 
     /// The reply to the firmware query of a GBxCart RW v1.3 running
     /// the L1 firmware, as captured from the device.
@@ -432,6 +447,19 @@ mod tests {
     }
 
     #[test]
+    fn test_check_output() {
+        let directory = build_directory("gbxcart-check");
+        let path = directory.join("game.gb").to_string_lossy().into_owned();
+        check_output(&path).unwrap();
+        write(&path, [0x0a]).unwrap();
+        assert_eq!(
+            check_output(&path).unwrap_err().to_string(),
+            format!("The file {path} already exists, move it away first")
+        );
+        remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
     fn test_write_output() {
         let directory = build_directory("gbxcart-output");
         let path = directory.join("game.gb").to_string_lossy().into_owned();
@@ -491,6 +519,26 @@ mod tests {
             .to_string()
             .ends_with("already exists, move it away first"));
         assert_eq!(read(directory.join("game.gb")).unwrap(), vec![0x0a]);
+        remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn test_dump_existing_save() {
+        // an existing save stops the dump before the ROM is written, so
+        // that a retry once it's moved away writes both
+        let directory = build_directory("gbxcart-existing-save");
+        write(directory.join("game.sav"), [0x0a]).unwrap();
+        let rom = build_rom(0x03, 0x02);
+        let ram = vec![0x55; 0x2000];
+        let mut transport = Replay::new(dump_replies(&rom, &ram));
+        let options = build_options("dump", &directory.join("game.gb"), None, false);
+        let result = dump(&mut transport, "/dev/ttyUSB0", &options);
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .ends_with("game.sav already exists, move it away first"));
+        assert!(!directory.join("game.gb").exists());
+        assert_eq!(read(directory.join("game.sav")).unwrap(), vec![0x0a]);
         remove_dir_all(directory).unwrap();
     }
 
