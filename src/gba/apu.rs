@@ -6,7 +6,7 @@
 //! with GBA-specific extensions for volume control, stereo panning,
 //! and dual-bank wave RAM.
 
-use std::collections::VecDeque;
+use std::{collections::VecDeque, mem};
 
 use crate::{
     gba::consts::{
@@ -535,6 +535,12 @@ impl GbaApu {
     }
 
     pub fn set_soundcnt_l(&mut self, value: u16) {
+        // in case the sound is disabled then ignores writes, the
+        // register is read-only until the sound is re-enabled
+        if self.soundcnt_x & 0x80 == 0 {
+            return;
+        }
+
         // bits 3 and 7 are unused and read as zero
         self.soundcnt_l = value & 0xFF77;
     }
@@ -590,11 +596,15 @@ impl GbaApu {
     pub fn set_soundcnt_x(&mut self, value: u16) {
         self.soundcnt_x = value & 0x80;
         if value & 0x80 == 0 {
-            // master disable - turn off all channels
-            self.ch1_enabled = false;
-            self.ch2_enabled = false;
-            self.ch3_enabled = false;
-            self.ch4_enabled = false;
+            // master disable resets the channels and the PSG registers
+            // (0x04000060-0x04000081) to zero, keeping SOUNDCNT_H,
+            // SOUNDBIAS, the wave RAM and the DirectSound FIFOs
+            let apu = mem::take(self);
+            self.soundcnt_h = apu.soundcnt_h;
+            self.soundbias = apu.soundbias;
+            self.wave_ram = apu.wave_ram;
+            self.direct_sound = apu.direct_sound;
+            self.audio_buffer = apu.audio_buffer;
         }
     }
 
@@ -1211,6 +1221,12 @@ impl GbaApu {
     /// including trigger logic, DAC gating, length enable edge cases,
     /// and envelope/sweep parameter loading.
     pub fn write_channel_reg(&mut self, addr: u32, value: u8) {
+        // in case the sound is disabled then ignores writes, the
+        // registers are read-only until the sound is re-enabled
+        if self.soundcnt_x & 0x80 == 0 {
+            return;
+        }
+
         match addr {
             // -- channel 1: square with sweep --
 
@@ -1603,6 +1619,7 @@ mod tests {
     #[test]
     fn test_apu_soundcnt_registers() {
         let mut apu = GbaApu::new();
+        apu.set_soundcnt_x(0x80);
         apu.set_soundcnt_l(0x1234);
         assert_eq!(apu.soundcnt_l(), 0x1234);
 
@@ -1711,6 +1728,54 @@ mod tests {
     }
 
     #[test]
+    fn test_master_disable_resets_registers() {
+        let mut apu = GbaApu::new();
+        apu.set_soundcnt_x(0x80);
+        apu.set_soundcnt_l(0xFF77);
+        apu.set_soundcnt_h(0x770F);
+        apu.set_soundbias(0x4200);
+        apu.write_wave_ram(0, 0xAB);
+        apu.direct_sound[0].write_fifo(0x04030201);
+        for addr in 0x0400_0060..0x0400_0080 {
+            apu.write_channel_reg(addr, 0xFF);
+        }
+        apu.sequencer_step = 5;
+
+        // the PSG registers (0x04000060-0x04000081) are zeroed
+        apu.set_soundcnt_x(0x00);
+        for addr in 0x0400_0060..0x0400_0080 {
+            assert_eq!(apu.read_channel_reg(addr), 0);
+        }
+        assert_eq!(apu.soundcnt_l(), 0);
+        assert_eq!(apu.soundcnt_x(), 0);
+        assert_eq!(apu.sequencer_step, 0);
+
+        // the DirectSound control, bias, wave RAM and FIFOs are kept
+        assert_eq!(apu.soundcnt_h(), 0x770F);
+        assert_eq!(apu.soundbias(), 0x4200);
+        assert_eq!(apu.read_wave_ram(0), 0xAB);
+        assert_eq!(apu.direct_sound[0].fifo_len(), 4);
+        assert!(apu.direct_sound[0].volume_full());
+    }
+
+    #[test]
+    fn test_master_disable_ignores_writes() {
+        let mut apu = GbaApu::new();
+        apu.set_soundcnt_x(0x80);
+        apu.write_channel_reg(0x0400_0063, 0xF0);
+        apu.set_soundcnt_x(0x00);
+
+        // the PSG registers are read-only while the sound is off
+        apu.set_soundcnt_l(0xFF77);
+        apu.write_channel_reg(0x0400_0065, 0x80);
+        assert_eq!(apu.soundcnt_l(), 0);
+
+        // re-enabling the sound does not play a stale channel
+        apu.set_soundcnt_x(0x80);
+        assert_eq!(apu.soundcnt_x(), 0x80);
+    }
+
+    #[test]
     fn test_apu_wave_ram() {
         let mut apu = GbaApu::new();
         apu.write_wave_ram(0, 0xAB);
@@ -1748,6 +1813,7 @@ mod tests {
     #[test]
     fn test_wave_bank_selection() {
         let mut apu = GbaApu::new();
+        apu.set_soundcnt_x(0x80);
 
         // select bank 1 for CPU access
         apu.write_channel_reg(0x0400_0070, 0xC0);
@@ -1767,6 +1833,7 @@ mod tests {
     #[test]
     fn test_wave_dimension_mode() {
         let mut apu = GbaApu::new();
+        apu.set_soundcnt_x(0x80);
 
         // enable dimension mode (bit 5)
         apu.write_channel_reg(0x0400_0070, 0xA0);
@@ -2443,6 +2510,7 @@ mod tests {
         for dimension in [false, true] {
             for bank in 0..2 {
                 let mut apu = GbaApu::new();
+                apu.set_soundcnt_x(0x80);
                 apu.wave_ram[0].fill(0x12);
                 apu.wave_ram[1].fill(0xAB);
                 apu.write_channel_reg(
@@ -2473,6 +2541,7 @@ mod tests {
         for output_level in 0..4 {
             for sample in 0..16 {
                 let mut apu = GbaApu::new();
+                apu.set_soundcnt_x(0x80);
                 apu.wave_ram[0].fill((sample << 4) | sample);
                 apu.write_channel_reg(0x0400_0070, 0x80);
                 apu.write_channel_reg(0x0400_0073, output_level << 5);
@@ -2494,6 +2563,7 @@ mod tests {
         for output_level in 0..4 {
             for sample in 0..16 {
                 let mut apu = GbaApu::new();
+                apu.set_soundcnt_x(0x80);
                 apu.wave_ram[0].fill((sample << 4) | sample);
                 apu.write_channel_reg(0x0400_0070, 0x80);
                 apu.write_channel_reg(0x0400_0073, 0x80 | (output_level << 5));
@@ -2584,6 +2654,7 @@ mod tests {
     #[test]
     fn test_channel_register_readback() {
         let mut apu = GbaApu::new();
+        apu.set_soundcnt_x(0x80);
 
         // write sweep: pace=3, decrease, slope=5
         apu.write_channel_reg(0x0400_0060, 0x3D);
@@ -2603,6 +2674,7 @@ mod tests {
     #[test]
     fn test_ch2_register_readback() {
         let mut apu = GbaApu::new();
+        apu.set_soundcnt_x(0x80);
 
         // write CH2 envelope: volume=0xC, decrease, pace=5
         apu.write_channel_reg(0x0400_0069, 0xC5);
@@ -2615,6 +2687,7 @@ mod tests {
     #[test]
     fn test_ch3_register_readback() {
         let mut apu = GbaApu::new();
+        apu.set_soundcnt_x(0x80);
 
         // enable DAC + dimension + bank 1
         apu.write_channel_reg(0x0400_0070, 0xE0);
@@ -2627,6 +2700,7 @@ mod tests {
     #[test]
     fn test_ch4_register_readback() {
         let mut apu = GbaApu::new();
+        apu.set_soundcnt_x(0x80);
 
         // set polynomial: divisor=3, width=7-bit, shift=5
         apu.write_channel_reg(0x0400_007C, 0x5B);
@@ -2768,8 +2842,8 @@ mod tests {
     #[test]
     fn test_apu_reset() {
         let mut apu = GbaApu::new();
-        apu.set_soundcnt_l(0x1234);
         apu.set_soundcnt_x(0x80);
+        apu.set_soundcnt_l(0x1234);
         apu.reset();
         assert_eq!(apu.soundcnt_l(), 0);
         assert_eq!(apu.soundcnt_x() & 0x80, 0);

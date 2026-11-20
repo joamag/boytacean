@@ -1047,9 +1047,9 @@ mod tests {
             cpu.bus_write16(0x0400_0128, 0x4000);
             cpu.bus_write16(0x0400_0134, 0);
             cpu.bus_write16(0x0400_012A, 0x1234);
+            cpu.bus_write16(0x0400_0084, 0x80);
             cpu.bus_write16(0x0400_0080, 0x1177);
             cpu.bus_write16(0x0400_0082, 0x0304);
-            cpu.bus_write16(0x0400_0084, 0x80);
             cpu.bus_write16(0x0400_0088, 0x0100);
             for bank in [0x40, 0] {
                 cpu.bus_write16(0x0400_0070, bank);
