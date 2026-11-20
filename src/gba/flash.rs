@@ -34,7 +34,7 @@ enum EepromState {
     ReadingData,
     /// Collecting 64 data bits + stop bit for write.
     CollectingWriteData,
-    /// Write pending, reads return 0 until ready.
+    /// Write committed (instantly), the next read returns 1 (ready).
     WritePending,
 }
 
@@ -281,7 +281,7 @@ impl SaveMedia {
                         self.eeprom_buffer = 0;
                         self.eeprom_bits = 0;
                     }
-                } else if self.eeprom_bits >= 2 {
+                } else {
                     // invalid command, reset
                     self.eeprom_bits = 0;
                     self.eeprom_buffer = 0;
@@ -922,6 +922,30 @@ mod tests {
         send_bits(&mut save, 0, 14);
         send_bits(&mut save, 0, 1);
         assert_eq!(save.eeprom_addr_width, 14);
+    }
+
+    #[test]
+    fn test_eeprom_write_invalid_command() {
+        let mut save = make_eeprom_save_6bit();
+        save.data[8..16].copy_from_slice(&[0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE, 0xF0]);
+        for command in [0b00, 0b01] {
+            // an invalid command is dropped after its two bits, so
+            // that the next request is parsed from scratch
+            send_bits(&mut save, command, 2);
+            assert_eq!(save.eeprom_state, EepromState::AcceptingCommand);
+            assert_eq!(save.eeprom_bits, 0);
+            send_bits(&mut save, 0b11, 2);
+            send_bits(&mut save, 1, 6);
+            send_bits(&mut save, 0, 1);
+            for _ in 0..4 {
+                assert_eq!(save.eeprom_read(), 0);
+            }
+            let mut result = 0u64;
+            for _ in 0..64 {
+                result = (result << 1) | save.eeprom_read() as u64;
+            }
+            assert_eq!(result, 0x1234_5678_9ABC_DEF0);
+        }
     }
 
     #[test]
