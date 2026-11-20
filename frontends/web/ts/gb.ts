@@ -28,6 +28,7 @@ import {
     TestSection
 } from "../react";
 
+import { GbaEmulator } from "./gba";
 import { fetchPlaylist, Playlist } from "./playlist";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -323,7 +324,7 @@ export class GameboyEmulator extends GameBoyCore implements Emulator {
 
 declare global {
     interface Window {
-        emulator: GameboyEmulator;
+        emulator: GameboyEmulator | GbaEmulator;
     }
 
     interface Console {
