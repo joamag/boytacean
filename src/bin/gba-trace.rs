@@ -105,7 +105,7 @@ fn trace(gba: &mut GameBoyAdvance, options: &Options) -> u64 {
     let mut ring = vec![TraceEntry::default(); RING_SIZE];
     let mut ring_pos = 0usize;
     let mut ring_len = 0usize;
-    let mut prev_watch = options.watch.map(|addr| gba.cpu.bus.read32(addr));
+    let mut prev_watch = options.watch.map(|addr| read_watch(gba, addr));
     let mut instr_count = 0u64;
 
     while gba.ppu_frame() < options.frames {
@@ -177,11 +177,7 @@ fn trace(gba: &mut GameBoyAdvance, options: &Options) -> u64 {
         // of the corrupted value); IO addresses dump the ring instead so
         // the code path into the first write can be inspected
         if let (Some(addr), Some(prev)) = (options.watch, prev_watch) {
-            let value = if addr >> 24 == 0x04 {
-                gba.cpu.bus.read16(addr) as u32
-            } else {
-                gba.cpu.bus.read32(addr)
-            };
+            let value = read_watch(gba, addr);
             if value != prev {
                 println!(
                     "-- frame {} instr {}: [{:#010x}] {:#010x} -> {:#010x} (PC={:#010x})",
@@ -210,6 +206,17 @@ fn trace(gba: &mut GameBoyAdvance, options: &Options) -> u64 {
     dump_regs(gba);
     dump_ppu(gba);
     instr_count
+}
+
+/// Reads the watched value at the address, a halfword for the IO
+/// registers (so that the next register is not taken as part of it)
+/// and a word otherwise.
+fn read_watch(gba: &mut GameBoyAdvance, addr: u32) -> u32 {
+    if addr >> 24 == 0x04 {
+        gba.cpu.bus.read16(addr) as u32
+    } else {
+        gba.cpu.bus.read32(addr)
+    }
 }
 
 /// Dumps the IO and BIOS work RAM state relevant at ROM entry.
@@ -339,7 +346,7 @@ mod tests {
 
     use boytacean::gba::GameBoyAdvance;
 
-    use super::{load, parse_address, parse_args, trace, Options, DEFAULT_FRAMES};
+    use super::{load, parse_address, parse_args, read_watch, trace, Options, DEFAULT_FRAMES};
 
     /// The test ROM loaded by the tests, relative to the package root.
     const ROM_PATH: &str = "res/roms.gba/test/jsmolka_gba-tests/arm.gba";
@@ -557,5 +564,26 @@ mod tests {
         );
         assert_eq!(gba.ppu_frame(), 0);
         assert_eq!(gba.cpu.bus.ppu.dispcnt(), 0x0100);
+    }
+
+    #[test]
+    fn test_trace_watch_io_halfword() {
+        // an IO register is watched as a halfword from its first value,
+        // the next register (IF after IE) never being taken as a change
+        let mut gba = build_gba(&[NOP, LOOP]);
+        gba.cpu.bus.irq.raise(0x0001);
+        trace(&mut gba, &build_options(1, Some(0x0400_0200), None));
+        assert_eq!(gba.ppu_frame(), 1);
+    }
+
+    #[test]
+    fn test_read_watch() {
+        let mut gba = GameBoyAdvance::new();
+        gba.cpu.bus.irq.set_ie(0x0001);
+        gba.cpu.bus.irq.raise(0x0002);
+        gba.cpu.bus.write32(0x0300_0000, 0x1234_5678);
+        assert_eq!(read_watch(&mut gba, 0x0400_0200), 0x0001);
+        assert_eq!(read_watch(&mut gba, 0x0400_0202), 0x0002);
+        assert_eq!(read_watch(&mut gba, 0x0300_0000), 0x1234_5678);
     }
 }
