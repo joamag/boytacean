@@ -2075,6 +2075,223 @@ mod tests {
     }
 
     #[test]
+    fn test_video_mode() {
+        assert_eq!(VideoMode::from_u16(0), VideoMode::Mode0);
+        assert_eq!(VideoMode::from_u16(1), VideoMode::Mode1);
+        assert_eq!(VideoMode::from_u16(2), VideoMode::Mode2);
+        assert_eq!(VideoMode::from_u16(3), VideoMode::Mode3);
+        assert_eq!(VideoMode::from_u16(4), VideoMode::Mode4);
+        assert_eq!(VideoMode::from_u16(5), VideoMode::Mode5);
+        assert_eq!(VideoMode::from_u16(0x0403), VideoMode::Mode3);
+    }
+
+    #[test]
+    fn test_windows_enabled() {
+        let mut ppu = GbaPpu::new();
+        assert!(!ppu.windows_enabled());
+        ppu.set_dispcnt(1 << 13); // WIN0
+        assert!(ppu.windows_enabled());
+        ppu.set_dispcnt(1 << 14); // WIN1
+        assert!(ppu.windows_enabled());
+        ppu.set_dispcnt(1 << 15); // OBJ window
+        assert!(ppu.windows_enabled());
+    }
+
+    #[test]
+    fn test_window_mask_no_windows() {
+        let ppu = GbaPpu::new();
+        // no windows enabled: all bits set
+        assert_eq!(ppu.window_mask_with_obj(0, 0, false), 0x3F);
+    }
+
+    #[test]
+    fn test_window_mask_win0_inside() {
+        let mut ppu = GbaPpu::new();
+        ppu.set_dispcnt(1 << 13); // enable WIN0
+        ppu.set_winh(0, (10 << 8) | 50);
+        ppu.set_winv(0, 160);
+        ppu.set_winin(0x0015); // WIN0: BG0 + BG2 + OBJ
+        ppu.set_winout(0x003F);
+
+        assert_eq!(ppu.window_mask_with_obj(20, 10, false), 0x15);
+    }
+
+    #[test]
+    fn test_window_mask_outside() {
+        let mut ppu = GbaPpu::new();
+        ppu.set_dispcnt(1 << 13); // enable WIN0
+        ppu.set_winh(0, (10 << 8) | 50);
+        ppu.set_winv(0, 160);
+        ppu.set_winin(0x0015);
+        ppu.set_winout(0x002A); // WINOUT: BG1 + BG3 + blend
+
+        assert_eq!(ppu.window_mask_with_obj(100, 10, false), 0x2A);
+    }
+
+    #[test]
+    fn test_window_mask_obj_window() {
+        let mut ppu = GbaPpu::new();
+        ppu.set_dispcnt((1 << 15) | (1 << 13)); // OBJ WIN + WIN0
+        ppu.set_winh(0, (10 << 8) | 20);
+        ppu.set_winv(0, 160);
+        ppu.set_winin(0x001F);
+        ppu.set_winout(0x0A00 | 0x0001); // OBJ WIN: bits 8-13, WINOUT: BG0 only
+
+        // outside WIN0, in OBJ window
+        assert_eq!(ppu.window_mask_with_obj(100, 10, true), 0x0A);
+    }
+
+    #[test]
+    fn test_pixel_in_window() {
+        let mut ppu = GbaPpu::new();
+        // WIN0: x=[10,50), y=[20,40)
+        ppu.set_winh(0, (10 << 8) | 50);
+        ppu.set_winv(0, (20 << 8) | 40);
+
+        assert!(ppu.pixel_in_window(10, 20, 0));
+        assert!(ppu.pixel_in_window(49, 39, 0));
+        assert!(!ppu.pixel_in_window(50, 20, 0)); // x out of range
+        assert!(!ppu.pixel_in_window(10, 40, 0)); // y out of range
+        assert!(!ppu.pixel_in_window(9, 20, 0)); // x before start
+    }
+
+    #[test]
+    fn test_pixel_in_window_wrap() {
+        let mut ppu = GbaPpu::new();
+        // wrapping window: x2 < x1
+        ppu.set_winh(0, (200 << 8) | 50);
+        ppu.set_winv(0, 160);
+
+        assert!(ppu.pixel_in_window(210, 80, 0)); // past x1
+        assert!(ppu.pixel_in_window(30, 80, 0)); // before x2
+        assert!(!ppu.pixel_in_window(100, 80, 0)); // between x2 and x1
+    }
+
+    #[test]
+    fn test_x_in_window() {
+        let mut ppu = GbaPpu::new();
+        // WIN0: x=[10,50)
+        ppu.set_winh(0, (10 << 8) | 50);
+
+        assert!(ppu.x_in_window(10, 0));
+        assert!(ppu.x_in_window(49, 0));
+        assert!(!ppu.x_in_window(50, 0)); // x out of range
+        assert!(!ppu.x_in_window(9, 0)); // x before start
+    }
+
+    #[test]
+    fn test_line_in_window() {
+        let mut ppu = GbaPpu::new();
+        // WIN0: y=[20,40)
+        ppu.set_winv(0, (20 << 8) | 40);
+
+        assert!(ppu.line_in_window(20, 0));
+        assert!(ppu.line_in_window(39, 0));
+        assert!(!ppu.line_in_window(40, 0)); // y out of range
+        assert!(!ppu.line_in_window(19, 0)); // y before start
+    }
+
+    #[test]
+    fn test_blend_mode() {
+        let mut ppu = GbaPpu::new();
+        ppu.set_bldcnt(0 << 6);
+        assert_eq!(ppu.blend_mode(), BlendMode::None);
+        ppu.set_bldcnt(1 << 6);
+        assert_eq!(ppu.blend_mode(), BlendMode::Alpha);
+        ppu.set_bldcnt(2 << 6);
+        assert_eq!(ppu.blend_mode(), BlendMode::BrightnessInc);
+        ppu.set_bldcnt(3 << 6);
+        assert_eq!(ppu.blend_mode(), BlendMode::BrightnessDec);
+    }
+
+    #[test]
+    fn test_is_blend_target1() {
+        let mut ppu = GbaPpu::new();
+        ppu.set_bldcnt(1 << 0 | 1 << 4); // BG0 + OBJ
+        assert!(ppu.is_blend_target1(Layer::Bg0));
+        assert!(!ppu.is_blend_target1(Layer::Bg1));
+        assert!(ppu.is_blend_target1(Layer::Obj));
+        assert!(!ppu.is_blend_target1(Layer::Backdrop));
+    }
+
+    #[test]
+    fn test_is_blend_target2() {
+        let mut ppu = GbaPpu::new();
+        ppu.set_bldcnt(1 << 9 | 1 << 13); // BG1 + Backdrop (second target)
+        assert!(!ppu.is_blend_target2(Layer::Bg0));
+        assert!(ppu.is_blend_target2(Layer::Bg1));
+        assert!(ppu.is_blend_target2(Layer::Backdrop));
+    }
+
+    #[test]
+    fn test_blend_alpha() {
+        let mut ppu = GbaPpu::new();
+        // EVA=16, EVB=0 -> result = color1
+        ppu.set_bldalpha(0x0010);
+        let white = 0x7FFF;
+        let black = 0x0000;
+        assert_eq!(ppu.blend_alpha(white, black), white);
+
+        // EVA=0, EVB=16 -> result = color2
+        ppu.set_bldalpha(0x1000);
+        assert_eq!(ppu.blend_alpha(white, black), black);
+
+        // EVA=8, EVB=8 -> 50% blend
+        ppu.set_bldalpha(0x0808);
+        let red = 0x001F; // R=31, G=0, B=0
+        let result = ppu.blend_alpha(red, black);
+        let r = result & 0x1F;
+        assert_eq!(r, 15); // 31 * 8 / 16 = 15
+    }
+
+    #[test]
+    fn test_blend_brighten() {
+        let mut ppu = GbaPpu::new();
+        // EVY=16 -> full white
+        ppu.set_bldy(16);
+        let black = 0x0000;
+        assert_eq!(ppu.blend_brighten(black), 0x7FFF);
+
+        // EVY=0 -> no change
+        ppu.set_bldy(0);
+        let red = 0x001F;
+        assert_eq!(ppu.blend_brighten(red), red);
+    }
+
+    #[test]
+    fn test_blend_darken() {
+        let mut ppu = GbaPpu::new();
+        // EVY=16 -> full black
+        ppu.set_bldy(16);
+        let white = 0x7FFF;
+        assert_eq!(ppu.blend_darken(white), 0x0000);
+
+        // EVY=0 -> no change
+        ppu.set_bldy(0);
+        assert_eq!(ppu.blend_darken(white), white);
+    }
+
+    #[test]
+    fn test_obj_mosaic_horizontal() {
+        let mut ppu = GbaPpu::new();
+        ppu.set_mosaic(0x0300); // OBJ mosaic H=4 (bits 8-11 = 3 -> size 4)
+        assert_eq!(ppu.apply_obj_mosaic(0, true), 0);
+        assert_eq!(ppu.apply_obj_mosaic(3, true), 0);
+        assert_eq!(ppu.apply_obj_mosaic(4, true), 4);
+        assert_eq!(ppu.apply_obj_mosaic(7, true), 4);
+    }
+
+    #[test]
+    fn test_obj_mosaic_vertical() {
+        let mut ppu = GbaPpu::new();
+        ppu.set_mosaic(0x3000); // OBJ mosaic V=4 (bits 12-15 = 3 -> size 4)
+        assert_eq!(ppu.apply_obj_mosaic(0, false), 0);
+        assert_eq!(ppu.apply_obj_mosaic(3, false), 0);
+        assert_eq!(ppu.apply_obj_mosaic(4, false), 4);
+        assert_eq!(ppu.apply_obj_mosaic(7, false), 4);
+    }
+
+    #[test]
     fn test_cycles_to_next_event() {
         let mut ppu = GbaPpu::new();
         let vram = vec![0u8; 0x18000];
@@ -2190,357 +2407,731 @@ mod tests {
     }
 
     #[test]
-    fn test_reset() {
+    fn test_affine_ref_no_advance_on_frame_wrap() {
         let mut ppu = GbaPpu::new();
-        ppu.set_dispcnt(0x1234);
         let vram = vec![0u8; 0x18000];
         let palette = vec![0u8; 0x400];
         let oam = vec![0u8; 0x400];
+
+        // set BG2 reference point and PB/PD
+        ppu.set_bg_ref_x_lo(0, 0x1000);
+        ppu.set_bg_ref_x_hi(0, 0x0000);
+        ppu.set_bg_ref_y_lo(0, 0x2000);
+        ppu.set_bg_ref_y_hi(0, 0x0000);
+        ppu.set_bg_pb(0, 0x0100); // PB = 1.0 in 8.8 fixed point
+        ppu.set_bg_pd(0, 0x0100); // PD = 1.0 in 8.8 fixed point
+
+        // clock through a full frame (228 scanlines)
         for _ in 0..228 {
             ppu.clock(CYCLES_PER_SCANLINE, &vram, &palette, &oam);
         }
-        ppu.set_winh(0, 0xA050);
-        ppu.set_winv(1, 0xC030);
-        ppu.set_winin(0x1234);
-        ppu.set_winout(0x5678);
-        ppu.set_bldcnt(0x00FF);
-        ppu.set_bldalpha(0x1010);
-        ppu.set_bldy(0x0010);
-        ppu.set_mosaic(0x0303);
-        ppu.reset();
-        assert_eq!(ppu.dispcnt(), 0);
-        assert_eq!(ppu.frame(), 0);
-        assert_eq!(ppu.vcount(), 0);
-        assert_eq!(ppu.winh(0), 0);
-        assert_eq!(ppu.winv(1), 0);
-        assert_eq!(ppu.winin(), 0);
-        assert_eq!(ppu.winout(), 0);
-        assert_eq!(ppu.bldcnt(), 0);
-        assert_eq!(ppu.bldalpha(), 0);
-        assert_eq!(ppu.bldy(), 0);
-        assert_eq!(ppu.mosaic(), 0);
+
+        // at VBlank (line 160), reference points are latched from write values;
+        // after wrapping to line 0, the ref point should NOT have been advanced
+        // (the advance only happens after rendering lines 0-159)
+        assert_eq!(ppu.bg_ref_x[0], 0x1000);
+        assert_eq!(ppu.bg_ref_y[0], 0x2000);
     }
 
     #[test]
-    fn test_bgr555_to_rgb888() {
-        let (r, g, b) = bgr555_to_rgb888(0x7FFF);
-        assert_eq!(r, 0xF8);
-        assert_eq!(g, 0xF8);
-        assert_eq!(b, 0xF8);
-
-        let (r, g, b) = bgr555_to_rgb888(0x0000);
-        assert_eq!(r, 0);
-        assert_eq!(g, 0);
-        assert_eq!(b, 0);
-
-        let (r, g, b) = bgr555_to_rgb888(0x001F);
-        assert_eq!(r, 0xF8);
-        assert_eq!(g, 0);
-        assert_eq!(b, 0);
-    }
-
-    #[test]
-    fn test_bgr555_pure_green() {
-        let (r, g, b) = bgr555_to_rgb888(0x03E0);
-        assert_eq!(r, 0);
-        assert_eq!(g, 0xF8);
-        assert_eq!(b, 0);
-    }
-
-    #[test]
-    fn test_bgr555_pure_blue() {
-        let (r, g, b) = bgr555_to_rgb888(0x7C00);
-        assert_eq!(r, 0);
-        assert_eq!(g, 0);
-        assert_eq!(b, 0xF8);
-    }
-
-    #[test]
-    fn test_obj_dimensions() {
-        assert_eq!(obj_dimensions(0, 0), (8, 8));
-        assert_eq!(obj_dimensions(0, 1), (16, 16));
-        assert_eq!(obj_dimensions(0, 2), (32, 32));
-        assert_eq!(obj_dimensions(0, 3), (64, 64));
-        assert_eq!(obj_dimensions(1, 0), (16, 8));
-        assert_eq!(obj_dimensions(1, 1), (32, 8));
-        assert_eq!(obj_dimensions(1, 2), (32, 16));
-        assert_eq!(obj_dimensions(1, 3), (64, 32));
-        assert_eq!(obj_dimensions(2, 0), (8, 16));
-        assert_eq!(obj_dimensions(2, 1), (8, 32));
-        assert_eq!(obj_dimensions(2, 2), (16, 32));
-        assert_eq!(obj_dimensions(2, 3), (32, 64));
-        assert_eq!(obj_dimensions(3, 0), (8, 8));
-    }
-
-    #[test]
-    fn test_video_mode() {
-        assert_eq!(VideoMode::from_u16(0), VideoMode::Mode0);
-        assert_eq!(VideoMode::from_u16(1), VideoMode::Mode1);
-        assert_eq!(VideoMode::from_u16(2), VideoMode::Mode2);
-        assert_eq!(VideoMode::from_u16(3), VideoMode::Mode3);
-        assert_eq!(VideoMode::from_u16(4), VideoMode::Mode4);
-        assert_eq!(VideoMode::from_u16(5), VideoMode::Mode5);
-        assert_eq!(VideoMode::from_u16(0x0403), VideoMode::Mode3);
-    }
-
-    #[test]
-    fn test_windows_enabled() {
+    fn test_affine_ref_advances_after_visible_line() {
         let mut ppu = GbaPpu::new();
-        assert!(!ppu.windows_enabled());
-        ppu.set_dispcnt(1 << 13); // WIN0
-        assert!(ppu.windows_enabled());
-        ppu.set_dispcnt(1 << 14); // WIN1
-        assert!(ppu.windows_enabled());
-        ppu.set_dispcnt(1 << 15); // OBJ window
-        assert!(ppu.windows_enabled());
+        let vram = vec![0u8; 0x18000];
+        let palette = vec![0u8; 0x400];
+        let oam = vec![0u8; 0x400];
+
+        ppu.set_bg_ref_x_lo(0, 0x0000);
+        ppu.set_bg_ref_x_hi(0, 0x0000);
+        ppu.set_bg_pb(0, 0x0100); // PB = 1.0
+
+        // clock line 0 (render + end of scanline advances vcount to 1)
+        ppu.clock(CYCLES_PER_SCANLINE, &vram, &palette, &oam);
+
+        // after rendering line 0 and advancing to line 1, ref_x should be 0 + 0x100
+        assert_eq!(ppu.bg_ref_x[0], 0x0100);
     }
 
     #[test]
-    fn test_pixel_in_window() {
+    fn test_affine_ref_hblank_write() {
         let mut ppu = GbaPpu::new();
-        // WIN0: x=[10,50), y=[20,40)
-        ppu.set_winh(0, (10 << 8) | 50);
-        ppu.set_winv(0, (20 << 8) | 40);
+        let vram = vec![0u8; 0x18000];
+        let palette = vec![0u8; 0x400];
+        let oam = vec![0u8; 0x400];
 
-        assert!(ppu.pixel_in_window(10, 20, 0));
-        assert!(ppu.pixel_in_window(49, 39, 0));
-        assert!(!ppu.pixel_in_window(50, 20, 0)); // x out of range
-        assert!(!ppu.pixel_in_window(10, 40, 0)); // y out of range
-        assert!(!ppu.pixel_in_window(9, 20, 0)); // x before start
+        ppu.set_bg_ref_x_lo(0, 0x0000);
+        ppu.set_bg_ref_x_hi(0, 0x0000);
+        ppu.set_bg_pb(0, 0x0100); // PB = 1.0
+
+        // the reference point is stepped as soon as line 0 is drawn,
+        // so that a write in its HBlank (eg: by an HBlank DMA) sets
+        // the reference point of line 1 as it is
+        ppu.clock(VISIBLE_DOTS, &vram, &palette, &oam);
+        assert_eq!(ppu.bg_ref_x[0], 0x0100);
+        ppu.set_bg_ref_x_lo(0, 0x0800);
+        ppu.clock(CYCLES_PER_SCANLINE - VISIBLE_DOTS, &vram, &palette, &oam);
+        assert_eq!(ppu.vcount(), 1);
+        assert_eq!(ppu.bg_ref_x[0], 0x0800);
     }
 
     #[test]
-    fn test_pixel_in_window_wrap() {
+    fn test_vcount_match_event() {
         let mut ppu = GbaPpu::new();
-        // wrapping window: x2 < x1
-        ppu.set_winh(0, (200 << 8) | 50);
-        ppu.set_winv(0, 160);
+        let vram = vec![0u8; 0x18000];
+        let palette = vec![0u8; 0x400];
+        let oam = vec![0u8; 0x400];
 
-        assert!(ppu.pixel_in_window(210, 80, 0)); // past x1
-        assert!(ppu.pixel_in_window(30, 80, 0)); // before x2
-        assert!(!ppu.pixel_in_window(100, 80, 0)); // between x2 and x1
-    }
+        // set LYC=5, enable vcount match IRQ (DISPSTAT bit 5)
+        ppu.set_dispstat((5 << 8) | (1 << 5));
 
-    #[test]
-    fn test_x_in_window() {
-        let mut ppu = GbaPpu::new();
-        // WIN0: x=[10,50)
-        ppu.set_winh(0, (10 << 8) | 50);
-
-        assert!(ppu.x_in_window(10, 0));
-        assert!(ppu.x_in_window(49, 0));
-        assert!(!ppu.x_in_window(50, 0)); // x out of range
-        assert!(!ppu.x_in_window(9, 0)); // x before start
-    }
-
-    #[test]
-    fn test_line_in_window() {
-        let mut ppu = GbaPpu::new();
-        // WIN0: y=[20,40)
-        ppu.set_winv(0, (20 << 8) | 40);
-
-        assert!(ppu.line_in_window(20, 0));
-        assert!(ppu.line_in_window(39, 0));
-        assert!(!ppu.line_in_window(40, 0)); // y out of range
-        assert!(!ppu.line_in_window(19, 0)); // y before start
-    }
-
-    #[test]
-    fn test_window_mask_no_windows() {
-        let ppu = GbaPpu::new();
-        // no windows enabled: all bits set
-        assert_eq!(ppu.window_mask_with_obj(0, 0, false), 0x3F);
-    }
-
-    #[test]
-    fn test_window_mask_win0_inside() {
-        let mut ppu = GbaPpu::new();
-        ppu.set_dispcnt(1 << 13); // enable WIN0
-        ppu.set_winh(0, (10 << 8) | 50);
-        ppu.set_winv(0, 160);
-        ppu.set_winin(0x0015); // WIN0: BG0 + BG2 + OBJ
-        ppu.set_winout(0x003F);
-
-        assert_eq!(ppu.window_mask_with_obj(20, 10, false), 0x15);
-    }
-
-    #[test]
-    fn test_window_mask_outside() {
-        let mut ppu = GbaPpu::new();
-        ppu.set_dispcnt(1 << 13); // enable WIN0
-        ppu.set_winh(0, (10 << 8) | 50);
-        ppu.set_winv(0, 160);
-        ppu.set_winin(0x0015);
-        ppu.set_winout(0x002A); // WINOUT: BG1 + BG3 + blend
-
-        assert_eq!(ppu.window_mask_with_obj(100, 10, false), 0x2A);
-    }
-
-    #[test]
-    fn test_window_mask_obj_window() {
-        let mut ppu = GbaPpu::new();
-        ppu.set_dispcnt((1 << 15) | (1 << 13)); // OBJ WIN + WIN0
-        ppu.set_winh(0, (10 << 8) | 20);
-        ppu.set_winv(0, 160);
-        ppu.set_winin(0x001F);
-        ppu.set_winout(0x0A00 | 0x0001); // OBJ WIN: bits 8-13, WINOUT: BG0 only
-
-        // outside WIN0, in OBJ window
-        assert_eq!(ppu.window_mask_with_obj(100, 10, true), 0x0A);
-    }
-
-    #[test]
-    fn test_blend_mode() {
-        let mut ppu = GbaPpu::new();
-        ppu.set_bldcnt(0 << 6);
-        assert_eq!(ppu.blend_mode(), BlendMode::None);
-        ppu.set_bldcnt(1 << 6);
-        assert_eq!(ppu.blend_mode(), BlendMode::Alpha);
-        ppu.set_bldcnt(2 << 6);
-        assert_eq!(ppu.blend_mode(), BlendMode::BrightnessInc);
-        ppu.set_bldcnt(3 << 6);
-        assert_eq!(ppu.blend_mode(), BlendMode::BrightnessDec);
-    }
-
-    #[test]
-    fn test_is_blend_target1() {
-        let mut ppu = GbaPpu::new();
-        ppu.set_bldcnt(1 << 0 | 1 << 4); // BG0 + OBJ
-        assert!(ppu.is_blend_target1(Layer::Bg0));
-        assert!(!ppu.is_blend_target1(Layer::Bg1));
-        assert!(ppu.is_blend_target1(Layer::Obj));
-        assert!(!ppu.is_blend_target1(Layer::Backdrop));
-    }
-
-    #[test]
-    fn test_is_blend_target2() {
-        let mut ppu = GbaPpu::new();
-        ppu.set_bldcnt(1 << 9 | 1 << 13); // BG1 + Backdrop (second target)
-        assert!(!ppu.is_blend_target2(Layer::Bg0));
-        assert!(ppu.is_blend_target2(Layer::Bg1));
-        assert!(ppu.is_blend_target2(Layer::Backdrop));
-    }
-
-    #[test]
-    fn test_blend_alpha() {
-        let mut ppu = GbaPpu::new();
-        // EVA=16, EVB=0 -> result = color1
-        ppu.set_bldalpha(0x0010);
-        let white = 0x7FFF;
-        let black = 0x0000;
-        assert_eq!(ppu.blend_alpha(white, black), white);
-
-        // EVA=0, EVB=16 -> result = color2
-        ppu.set_bldalpha(0x1000);
-        assert_eq!(ppu.blend_alpha(white, black), black);
-
-        // EVA=8, EVB=8 -> 50% blend
-        ppu.set_bldalpha(0x0808);
-        let red = 0x001F; // R=31, G=0, B=0
-        let result = ppu.blend_alpha(red, black);
-        let r = result & 0x1F;
-        assert_eq!(r, 15); // 31 * 8 / 16 = 15
-    }
-
-    #[test]
-    fn test_blend_brighten() {
-        let mut ppu = GbaPpu::new();
-        // EVY=16 -> full white
-        ppu.set_bldy(16);
-        let black = 0x0000;
-        assert_eq!(ppu.blend_brighten(black), 0x7FFF);
-
-        // EVY=0 -> no change
-        ppu.set_bldy(0);
-        let red = 0x001F;
-        assert_eq!(ppu.blend_brighten(red), red);
-    }
-
-    #[test]
-    fn test_blend_darken() {
-        let mut ppu = GbaPpu::new();
-        // EVY=16 -> full black
-        ppu.set_bldy(16);
-        let white = 0x7FFF;
-        assert_eq!(ppu.blend_darken(white), 0x0000);
-
-        // EVY=0 -> no change
-        ppu.set_bldy(0);
-        assert_eq!(ppu.blend_darken(white), white);
-    }
-
-    #[test]
-    fn test_read_obj_pixel_4bpp() {
-        let ppu = GbaPpu::new();
-        let mut vram = vec![0u8; 0x18000];
-        // place a 4bpp pixel at tile 0, px=(0,0): low nibble = 5
-        let obj_base = 0x10000;
-        vram[obj_base] = 0x05;
-
-        let idx = ppu.read_obj_pixel(&vram, 0, 0, 0, 8, false, true, obj_base);
-        assert_eq!(idx, 5);
-
-        // high nibble at px=(1,0) = 0xA
-        vram[obj_base] = 0xA5;
-        let idx = ppu.read_obj_pixel(&vram, 0, 1, 0, 8, false, true, obj_base);
-        assert_eq!(idx, 0x0A);
-    }
-
-    #[test]
-    fn test_read_obj_pixel_8bpp() {
-        let ppu = GbaPpu::new();
-        let mut vram = vec![0u8; 0x18000];
-        let obj_base = 0x10000;
-        vram[obj_base + 3] = 42;
-
-        let idx = ppu.read_obj_pixel(&vram, 0, 3, 0, 8, true, true, obj_base);
-        assert_eq!(idx, 42);
-    }
-
-    #[test]
-    fn test_read_obj_pixel_8bpp_tile_alignment() {
-        let ppu = GbaPpu::new();
-        let mut vram = vec![0u8; 0x18000];
-        vram[0x10000..0x10020].fill(1);
-        vram[0x10020..0x10040].fill(2);
-        vram[0x10400..0x10420].fill(3);
-        vram[0x10420..0x10440].fill(4);
-
-        for tile in [0, 1] {
-            assert_eq!(
-                ppu.read_obj_pixel(&vram, tile, 0, 0, 16, true, false, 0x10000),
-                1
-            );
-            assert_eq!(
-                ppu.read_obj_pixel(&vram, tile, 7, 7, 16, true, false, 0x10000),
-                2
-            );
-            assert_eq!(
-                ppu.read_obj_pixel(&vram, tile, 0, 8, 16, true, false, 0x10000),
-                3
-            );
-            assert_eq!(
-                ppu.read_obj_pixel(&vram, tile, 7, 15, 16, true, false, 0x10000),
-                4
-            );
-        }
-        // the low bit still selects a distinct tile in 4bpp mode
-        assert_eq!(
-            ppu.read_obj_pixel(&vram, 1, 0, 0, 8, false, false, 0x10000),
-            2
-        );
-    }
-
-    #[test]
-    fn test_read_obj_pixel_out_of_bounds() {
-        let ppu = GbaPpu::new();
-        for is_8bpp in [false, true] {
-            for mapping_1d in [false, true] {
-                assert_eq!(
-                    ppu.read_obj_pixel(&[], 1, 7, 7, 8, is_8bpp, mapping_1d, 0x10000),
-                    0
-                );
+        // clock through lines 0-4 (vcount goes 0->1->2->3->4->5)
+        let mut vcount_event = false;
+        for _ in 0..5 {
+            let events = ppu.clock(CYCLES_PER_SCANLINE, &vram, &palette, &oam);
+            if events & 16 != 0 {
+                vcount_event = true;
             }
+        }
+        assert!(vcount_event);
+        assert!(ppu.int_vcount());
+    }
+
+    #[test]
+    fn test_vcount_match_no_event_without_enable() {
+        let mut ppu = GbaPpu::new();
+        let vram = vec![0u8; 0x18000];
+        let palette = vec![0u8; 0x400];
+        let oam = vec![0u8; 0x400];
+
+        // set LYC=1, but do NOT enable vcount match IRQ
+        ppu.set_dispstat(1 << 8);
+
+        let events = ppu.clock(CYCLES_PER_SCANLINE, &vram, &palette, &oam);
+        assert_eq!(events & 16, 0);
+        assert!(!ppu.int_vcount());
+    }
+
+    #[test]
+    fn test_render_single_bg_backdrop_fast_path() {
+        let mut ppu = GbaPpu::new();
+        // mode 4, BG2 enabled only (no OBJ, windows or blending),
+        // taking the single layer composition fast path
+        ppu.set_dispcnt(0x0404);
+
+        let mut vram = vec![0u8; 0x18000];
+        let mut palette = vec![0u8; 0x400];
+        let oam = vec![0u8; 0x400];
+
+        // set backdrop to red
+        let red: u16 = 0x001F;
+        palette[0] = (red & 0xFF) as u8;
+        palette[1] = ((red >> 8) & 0xFF) as u8;
+
+        // palette index 5 = green, used by the pixel at (1, 0);
+        // pixel at (0, 0) keeps index 0 (transparent)
+        let green: u16 = 0x03E0;
+        palette[5 * 2] = (green & 0xFF) as u8;
+        palette[5 * 2 + 1] = ((green >> 8) & 0xFF) as u8;
+        vram[1] = 5;
+
+        ppu.clock(VISIBLE_DOTS, &vram, &palette, &oam);
+
+        // transparent pixel shows the backdrop, opaque pixel the BG color
+        let fb = ppu.frame_buffer();
+        assert_eq!(fb[0], 0xF8); // R (backdrop)
+        assert_eq!(fb[1], 0x00); // G
+        assert_eq!(fb[3], 0x00); // R
+        assert_eq!(fb[4], 0xF8); // G (bg pixel)
+    }
+
+    #[test]
+    fn test_render_composited_windows() {
+        let mut ppu = GbaPpu::new();
+        let mut vram = vec![0u8; 0x18000];
+        let mut palette = vec![0u8; 0x400];
+        let mut oam = vec![0u8; 0x400];
+        build_text_bgs(&mut ppu, &mut vram, &mut palette, &mut oam);
+
+        // sprite 0 at x=48 as part of the OBJ window
+        build_sprite(&mut oam, 0, 2 << 10, 48, 0);
+
+        // WIN0 over x 0-15 showing BG1, WIN1 over x 16-31 showing
+        // nothing, the OBJ window showing BG1 and the outside both BGs
+        ppu.set_dispcnt(0xF000 | (1 << 6) | (1 << 8) | (1 << 9));
+        ppu.set_winh(0, 16);
+        ppu.set_winv(0, 160);
+        ppu.set_winh(1, (16 << 8) | 32);
+        ppu.set_winv(1, 160);
+        ppu.set_winin(0x0002);
+        ppu.set_winout(0x0203);
+        ppu.render_scanline(&vram, &palette, &oam);
+
+        assert_eq!(line_pixel(&ppu, 0), [0, 0xF8, 0]);
+        assert_eq!(line_pixel(&ppu, 16), [0, 0, 0]);
+        assert_eq!(line_pixel(&ppu, 48), [0, 0xF8, 0]);
+        assert_eq!(line_pixel(&ppu, 40), [0xF8, 0, 0]);
+    }
+
+    #[test]
+    fn test_render_composited_blending() {
+        let mut ppu = GbaPpu::new();
+        let mut vram = vec![0u8; 0x18000];
+        let mut palette = vec![0u8; 0x400];
+        let mut oam = vec![0u8; 0x400];
+        build_text_bgs(&mut ppu, &mut vram, &mut palette, &mut oam);
+
+        // sprite 0 in blue over x 0-7 with priority 1, between BG0 and
+        // BG1 (moved to priority 2)
+        ppu.set_bgcnt(1, (9 << 8) | 2);
+        build_sprite(&mut oam, 0, 0, 0, 1 << 10);
+        ppu.set_dispcnt((1 << 6) | (1 << 8) | (1 << 9) | (1 << 12));
+
+        // alpha blending of BG0 (target 1) at half over the sprite
+        // (target 2) at half, but not over BG1 (not a target)
+        ppu.set_bldcnt((1 << 6) | 0x01 | (1 << 12));
+        ppu.set_bldalpha(0x0808);
+        ppu.render_scanline(&vram, &palette, &oam);
+        assert_eq!(line_pixel(&ppu, 0), [0x78, 0, 0x78]);
+        assert_eq!(line_pixel(&ppu, 8), [0xF8, 0, 0]);
+
+        // full brightness increase and decrease of BG0 (target 1)
+        ppu.set_bldy(16);
+        ppu.set_bldcnt((2 << 6) | 0x01);
+        ppu.render_scanline(&vram, &palette, &oam);
+        assert_eq!(line_pixel(&ppu, 8), [0xF8, 0xF8, 0xF8]);
+        ppu.set_bldcnt((3 << 6) | 0x01);
+        ppu.render_scanline(&vram, &palette, &oam);
+        assert_eq!(line_pixel(&ppu, 8), [0, 0, 0]);
+
+        // a top layer that isn't target 1 is left as it is
+        for bldcnt in [(1 << 6) | 0x02 | (1 << 9), (2 << 6) | 0x02, (3 << 6) | 0x02] {
+            ppu.set_bldcnt(bldcnt);
+            ppu.render_scanline(&vram, &palette, &oam);
+            assert_eq!(line_pixel(&ppu, 8), [0xF8, 0, 0]);
+        }
+    }
+
+    #[test]
+    fn test_render_composited_semi_transparent() {
+        let mut ppu = GbaPpu::new();
+        let mut vram = vec![0u8; 0x18000];
+        let mut palette = vec![0u8; 0x400];
+        let mut oam = vec![0u8; 0x400];
+        build_text_bgs(&mut ppu, &mut vram, &mut palette, &mut oam);
+
+        // sprite 0 in blue over x 0-7, semi-transparent and on top
+        build_sprite(&mut oam, 0, 1 << 10, 0, 0);
+        ppu.set_dispcnt((1 << 6) | (1 << 8) | (1 << 12));
+
+        // alpha blended over BG0 (target 2) whatever the color effect
+        ppu.set_bldcnt(1 << 8);
+        ppu.set_bldalpha(0x0808);
+        ppu.render_scanline(&vram, &palette, &oam);
+        assert_eq!(line_pixel(&ppu, 0), [0x78, 0, 0x78]);
+        assert_eq!(line_pixel(&ppu, 8), [0xF8, 0, 0]);
+
+        // drawn as it is over a layer that isn't target 2
+        ppu.set_bldcnt(0);
+        ppu.render_scanline(&vram, &palette, &oam);
+        assert_eq!(line_pixel(&ppu, 0), [0, 0, 0xF8]);
+    }
+
+    #[test]
+    fn test_priority_obj_wins_on_equal() {
+        let mut ppu = GbaPpu::new();
+        // mode 0, BG0 enabled, OBJ enabled, 1D mapping
+        ppu.set_dispcnt(0x0100 | (1 << 12) | (1 << 6));
+        ppu.set_bgcnt(0, 0x0000); // BG0 priority 0
+
+        let mut vram = vec![0u8; 0x18000];
+        let mut palette = vec![0u8; 0x400];
+        let mut oam = vec![0u8; 0x400];
+
+        // BG0 tile: palette index 1 at (0,0)
+        // char base 0, screen base 0, 4bpp
+        // tile 0 at screen base: tile number 1
+        vram[0] = 1; // map entry: tile 1
+        vram[1] = 0;
+        // tile 1 data at char_base + 1*32: pixel 0 = color 1
+        vram[32] = 0x01;
+        // BG palette color 1 = red
+        let red: u16 = 0x001F;
+        palette[2] = (red & 0xFF) as u8;
+        palette[3] = ((red >> 8) & 0xFF) as u8;
+
+        // sprite at (0, 0), priority 0
+        let attr0: u16 = 0;
+        let attr1: u16 = 0;
+        let attr2: u16 = 0; // priority 0
+        oam[0] = (attr0 & 0xFF) as u8;
+        oam[1] = ((attr0 >> 8) & 0xFF) as u8;
+        oam[2] = (attr1 & 0xFF) as u8;
+        oam[3] = ((attr1 >> 8) & 0xFF) as u8;
+        oam[4] = (attr2 & 0xFF) as u8;
+        oam[5] = ((attr2 >> 8) & 0xFF) as u8;
+
+        // OBJ pixel: color index 1
+        vram[0x10000] = 0x01;
+        // OBJ palette color 1 = blue
+        let blue: u16 = 0x7C00;
+        palette[0x202] = (blue & 0xFF) as u8;
+        palette[0x203] = ((blue >> 8) & 0xFF) as u8;
+
+        ppu.clock(VISIBLE_DOTS, &vram, &palette, &oam);
+
+        let fb = ppu.frame_buffer();
+        // OBJ should win on equal priority
+        assert_eq!(fb[0], 0x00); // R=0 (blue)
+        assert_eq!(fb[1], 0x00); // G=0
+        assert_eq!(fb[2], 0xF8); // B
+    }
+
+    #[test]
+    fn test_render_mode0_bg_priority_order() {
+        let mut ppu = GbaPpu::new();
+        // mode 0, BG0 and BG1 enabled
+        ppu.set_dispcnt((1 << 8) | (1 << 9));
+        // BG0: priority 1, char base 0, screen base block 8
+        ppu.set_bgcnt(0, (8 << 8) | 1);
+        // BG1: priority 0, char base 0, screen base block 9
+        ppu.set_bgcnt(1, 9 << 8);
+
+        let mut vram = vec![0u8; 0x18000];
+        let mut palette = vec![0u8; 0x400];
+        let oam = vec![0u8; 0x400];
+
+        // both maps use tile 1 at (0, 0), BG1 selects palette bank 1
+        vram[8 * 0x800] = 0x01;
+        vram[9 * 0x800] = 0x01;
+        vram[9 * 0x800 + 1] = 0x10;
+
+        // tile 1 (4bpp) row 0 filled with color index 1
+        for byte in vram.iter_mut().skip(32).take(4) {
+            *byte = 0x11;
+        }
+
+        // bank 0 color 1 = red, bank 1 color 1 = green
+        let red: u16 = 0x001F;
+        palette[2] = (red & 0xFF) as u8;
+        palette[3] = ((red >> 8) & 0xFF) as u8;
+        let green: u16 = 0x03E0;
+        palette[17 * 2] = (green & 0xFF) as u8;
+        palette[17 * 2 + 1] = ((green >> 8) & 0xFF) as u8;
+
+        ppu.clock(VISIBLE_DOTS, &vram, &palette, &oam);
+
+        // BG1 (green) wins with the lower priority value despite
+        // the higher BG index
+        let fb = ppu.frame_buffer();
+        assert_eq!(fb[0], 0x00); // R
+        assert_eq!(fb[1], 0xF8); // G
+        assert_eq!(fb[2], 0x00); // B
+    }
+
+    #[test]
+    fn test_render_mode0_bg_priority_tiebreak() {
+        let mut ppu = GbaPpu::new();
+        // mode 0, BG0 and BG1 enabled, both with priority 0
+        ppu.set_dispcnt((1 << 8) | (1 << 9));
+        ppu.set_bgcnt(0, 8 << 8);
+        ppu.set_bgcnt(1, 9 << 8);
+
+        let mut vram = vec![0u8; 0x18000];
+        let mut palette = vec![0u8; 0x400];
+        let oam = vec![0u8; 0x400];
+
+        // both maps use tile 1 at (0, 0), BG1 selects palette bank 1
+        vram[8 * 0x800] = 0x01;
+        vram[9 * 0x800] = 0x01;
+        vram[9 * 0x800 + 1] = 0x10;
+
+        // tile 1 (4bpp) row 0 filled with color index 1
+        for byte in vram.iter_mut().skip(32).take(4) {
+            *byte = 0x11;
+        }
+
+        // bank 0 color 1 = red, bank 1 color 1 = green
+        let red: u16 = 0x001F;
+        palette[2] = (red & 0xFF) as u8;
+        palette[3] = ((red >> 8) & 0xFF) as u8;
+        let green: u16 = 0x03E0;
+        palette[17 * 2] = (green & 0xFF) as u8;
+        palette[17 * 2 + 1] = ((green >> 8) & 0xFF) as u8;
+
+        ppu.clock(VISIBLE_DOTS, &vram, &palette, &oam);
+
+        // on equal priority the lower BG index (BG0, red) wins
+        let fb = ppu.frame_buffer();
+        assert_eq!(fb[0], 0xF8); // R
+        assert_eq!(fb[1], 0x00); // G
+        assert_eq!(fb[2], 0x00); // B
+    }
+
+    #[test]
+    fn test_render_mode1_mode2() {
+        let mut ppu = GbaPpu::new();
+        let mut vram = vec![0u8; 0x18000];
+        let mut palette = vec![0u8; 0x400];
+        let oam = vec![0u8; 0x400];
+        palette[2] = 0x1F;
+        palette[4] = 0xE0;
+        palette[5] = 0x03;
+
+        // the affine maps at screen bases 0 and 1 use the tiles 1 (red)
+        // and 2 (green) of char base 1 (8bpp)
+        vram[..0x100].fill(1);
+        vram[0x800..0x900].fill(2);
+        vram[0x4040..0x4080].fill(0x01);
+        vram[0x4080..0x40C0].fill(0x02);
+
+        // the text map of BG0 at screen base 24 uses tile 1 (green) of
+        // char base 2 (4bpp), BG1 is transparent
+        vram[0x8020..0x8040].fill(0x22);
+        for index in 0..1024 {
+            vram[0xC000 + index * 2] = 1;
+        }
+        ppu.set_bgcnt(1, (2 << 2) | (25 << 8) | 3);
+
+        // mode 1: BG0 (text) and BG2 (affine), the top one by priority
+        ppu.set_dispcnt(1 | (1 << 8) | (1 << 9) | (1 << 10));
+        for (bg0_priority, bg2_priority, color) in [(1, 0, [0xF8, 0, 0]), (0, 1, [0, 0xF8, 0])] {
+            ppu.set_bgcnt(0, (2 << 2) | (24 << 8) | bg0_priority);
+            ppu.set_bgcnt(2, (1 << 2) | bg2_priority);
+            ppu.render_scanline(&vram, &palette, &oam);
+            assert_eq!(line_pixel(&ppu, 0), color);
+        }
+
+        // mode 2: BG2 and BG3 (both affine), the top one by priority
+        ppu.set_dispcnt(2 | (1 << 10) | (1 << 11));
+        for (bg2_priority, bg3_priority, color) in [(0, 1, [0xF8, 0, 0]), (1, 0, [0, 0xF8, 0])] {
+            ppu.set_bgcnt(2, (1 << 2) | bg2_priority);
+            ppu.set_bgcnt(3, (1 << 2) | (1 << 8) | bg3_priority);
+            ppu.render_scanline(&vram, &palette, &oam);
+            assert_eq!(line_pixel(&ppu, 0), color);
+        }
+    }
+
+    #[test]
+    fn test_render_mode3_bitmap_composited() {
+        let mut ppu = GbaPpu::new();
+        // mode 3, BG2 enabled, OBJ enabled, 1D mapping
+        ppu.set_dispcnt(0x0403 | (1 << 12) | (1 << 6));
+
+        let mut vram = vec![0u8; 0x18000];
+        let mut palette = vec![0u8; 0x400];
+        let oam = vec![0u8; 0x400];
+
+        // set backdrop to black
+        palette[0] = 0x00;
+        palette[1] = 0x00;
+
+        // place a red pixel at (0, 0) in mode 3 bitmap
+        let color: u16 = 0x001F; // red
+        vram[0] = (color & 0xFF) as u8;
+        vram[1] = ((color >> 8) & 0xFF) as u8;
+
+        // render line 0
+        ppu.clock(VISIBLE_DOTS, &vram, &palette, &oam);
+
+        // verify the pixel was rendered as red (RGB888)
+        let fb = ppu.frame_buffer();
+        assert_eq!(fb[0], 0xF8); // R
+        assert_eq!(fb[1], 0x00); // G
+        assert_eq!(fb[2], 0x00); // B
+
+        // drawing line 0 stepped the reference point to the one of
+        // line 1, so it's restored to draw line 0 again
+        ppu.set_bg_ref_y_lo(0, 0);
+        ppu.set_dispcnt(3);
+        ppu.render_mode3(0, &vram, &palette, &oam);
+        assert_eq!(&ppu.frame_buffer()[..3], &[0, 0, 0]);
+        ppu.set_dispcnt(0x0403);
+        ppu.render_mode3(0, &vram, &palette, &oam);
+        assert_eq!(&ppu.frame_buffer()[..3], &[0xF8, 0, 0]);
+    }
+
+    #[test]
+    fn test_render_mode3_mosaic() {
+        let mut ppu = GbaPpu::new();
+        let mut vram = vec![0u8; 0x18000];
+        let palette = vec![0u8; 0x400];
+        let oam = vec![0u8; 0x400];
+
+        // distinct reds for the first pixels of lines 0 and 2
+        for x in 0..4 {
+            vram[x * 2] = (x + 1) as u8;
+            vram[(2 * DISPLAY_WIDTH + x) * 2] = (x + 5) as u8;
+        }
+
+        // mode 3 with the mosaic of BG2, in blocks of 4x4 pixels
+        ppu.set_dispcnt(0x0403);
+        ppu.set_bgcnt(2, 1 << 6);
+        ppu.set_mosaic(0x0033);
+
+        // line 0 repeats its first pixel across the block
+        ppu.clock(VISIBLE_DOTS, &vram, &palette, &oam);
+        for x in 0..4 {
+            assert_eq!(&ppu.frame_buffer()[x * 3..x * 3 + 3], &[8, 0, 0]);
+        }
+
+        // line 2 repeats line 0, the first line of its block
+        ppu.clock(CYCLES_PER_SCANLINE - VISIBLE_DOTS, &vram, &palette, &oam);
+        ppu.clock(CYCLES_PER_SCANLINE, &vram, &palette, &oam);
+        ppu.clock(VISIBLE_DOTS, &vram, &palette, &oam);
+        let offset = 2 * DISPLAY_WIDTH * 3;
+        assert_eq!(&ppu.frame_buffer()[offset..offset + 3], &[8, 0, 0]);
+    }
+
+    #[test]
+    fn test_render_mode4_bitmap_composited() {
+        let mut ppu = GbaPpu::new();
+        // mode 4, BG2 enabled
+        ppu.set_dispcnt(0x0404);
+
+        let mut vram = vec![0u8; 0x18000];
+        let mut palette = vec![0u8; 0x400];
+        let oam = vec![0u8; 0x400];
+
+        // palette index 5 = green
+        let green: u16 = 0x03E0;
+        palette[5 * 2] = (green & 0xFF) as u8;
+        palette[5 * 2 + 1] = ((green >> 8) & 0xFF) as u8;
+
+        // pixel at (0, 0) uses palette index 5
+        vram[0] = 5;
+
+        ppu.clock(VISIBLE_DOTS, &vram, &palette, &oam);
+
+        let fb = ppu.frame_buffer();
+        assert_eq!(fb[0], 0x00); // R
+        assert_eq!(fb[1], 0xF8); // G
+        assert_eq!(fb[2], 0x00); // B
+
+        // drawing line 0 stepped the reference point to the one of
+        // line 1, so it's restored to draw line 0 again
+        ppu.set_bg_ref_y_lo(0, 0);
+        ppu.set_dispcnt(4);
+        ppu.render_mode4(0, &vram, &palette, &oam);
+        assert_eq!(&ppu.frame_buffer()[..3], &[0, 0, 0]);
+        ppu.set_dispcnt(0x0404);
+        ppu.render_mode4(0, &vram, &palette, &oam);
+        assert_eq!(&ppu.frame_buffer()[..3], &[0, 0xF8, 0]);
+    }
+
+    #[test]
+    fn test_render_mode5_bitmap_composited() {
+        let mut ppu = GbaPpu::new();
+        // mode 5, BG2 enabled
+        ppu.set_dispcnt(0x0405);
+
+        let mut vram = vec![0u8; 0x18000];
+        let palette = vec![0u8; 0x400];
+        let oam = vec![0u8; 0x400];
+
+        // place blue pixel at (0, 0) in mode 5
+        let blue: u16 = 0x7C00;
+        vram[0] = (blue & 0xFF) as u8;
+        vram[1] = ((blue >> 8) & 0xFF) as u8;
+
+        ppu.clock(VISIBLE_DOTS, &vram, &palette, &oam);
+
+        let fb = ppu.frame_buffer();
+        assert_eq!(fb[0], 0x00); // R
+        assert_eq!(fb[1], 0x00); // G
+        assert_eq!(fb[2], 0xF8); // B
+
+        // drawing line 0 stepped the reference point to the one of
+        // line 1, so it's restored to draw line 0 again
+        ppu.set_bg_ref_y_lo(0, 0);
+        ppu.set_dispcnt(5);
+        ppu.render_mode5(0, &vram, &palette, &oam);
+        assert_eq!(&ppu.frame_buffer()[..3], &[0, 0, 0]);
+        ppu.set_dispcnt(0x0405);
+        ppu.render_mode5(0, &vram, &palette, &oam);
+        assert_eq!(&ppu.frame_buffer()[..3], &[0, 0, 0xF8]);
+    }
+
+    #[test]
+    fn test_render_bg_obj_vram() {
+        let mut ppu = GbaPpu::new();
+        let mut vram = vec![0u8; 0x18000];
+        let mut palette = vec![0u8; 0x400];
+        let oam = vec![0u8; 0x400];
+
+        // BG palette color 1 in red, and the OBJ VRAM full of it
+        palette[2] = 0x1F;
+        vram[0x10000..].fill(0x01);
+
+        // text BG0, 8bpp, char base 3 (0xC000): tile 256 would start at
+        // 0x10000, past the VRAM that the backgrounds address
+        ppu.set_dispcnt(1 << 8);
+        ppu.set_bgcnt(0, (3 << 2) | (1 << 7));
+        vram[1] = 0x01;
+        ppu.render_scanline(&vram, &palette, &oam);
+        assert_eq!(&ppu.frame_buffer()[..3], &[0, 0, 0]);
+
+        // affine BG2 with a 1024x1024 map at screen base 31 (0xF800):
+        // its 17th row of tiles (texture line 128) would be read from
+        // 0x10000, while tile 1 of char base 0 is red
+        vram[64..128].fill(0x01);
+        ppu.set_dispcnt(2 | (1 << 10));
+        ppu.set_bgcnt(2, (31 << 8) | (3 << 14));
+        ppu.set_bg_ref_y_lo(0, 128 << 8);
+        ppu.render_scanline(&vram, &palette, &oam);
+        assert_eq!(&ppu.frame_buffer()[..3], &[0, 0, 0]);
+    }
+
+    #[test]
+    fn test_collect_text_bg_screen_sizes() {
+        let mut ppu = GbaPpu::new();
+        let mut vram = vec![0u8; 0x18000];
+        let mut palette = vec![0u8; 0x400];
+
+        // the first entry of each of the 4 screen blocks of the map at
+        // screen base 8 uses a tile of its own color (1-4)
+        for block in 0..4 {
+            palette[(block + 1) * 2] = (block + 1) as u8;
+            vram[0x20 * (block + 1)..0x20 * (block + 2)].fill(0x11 * (block + 1) as u8);
+            vram[0x4000 + block * 0x800] = (block + 1) as u8;
+        }
+
+        for (size, hofs, vofs, block) in [
+            (0, 0, 0, 0),
+            (1, 256, 0, 1),
+            (2, 0, 256, 1),
+            (3, 256, 0, 1),
+            (3, 0, 256, 2),
+            (3, 256, 256, 3),
+        ] {
+            ppu.set_bgcnt(0, (size << 14) | (8 << 8));
+            ppu.set_bg_hofs(0, hofs);
+            ppu.set_bg_vofs(0, vofs);
+            let mut pixels = [BG_NO_PIXEL; DISPLAY_WIDTH];
+            ppu.collect_text_bg(0, 0, &vram, &palette, &mut pixels);
+            assert_eq!(pixels[0], block as u16 + 1);
+        }
+    }
+
+    #[test]
+    fn test_collect_text_bg_flips() {
+        let mut ppu = GbaPpu::new();
+        let mut vram = vec![0u8; 0x18000];
+        let mut palette = vec![0u8; 0x400];
+        for color in 1..4 {
+            palette[color * 2] = color as u8;
+        }
+
+        // tile 1 with pixel (0, 0) in color 1, (7, 0) in color 2 and
+        // (0, 7) in color 3, in 4bpp and then in 8bpp
+        vram[0x20] = 0x01;
+        vram[0x23] = 0x20;
+        vram[0x3C] = 0x03;
+        for (bgcnt, is_8bpp) in [(8 << 8, false), ((8 << 8) | (1 << 7), true)] {
+            if is_8bpp {
+                vram[0x40] = 1;
+                vram[0x47] = 2;
+                vram[0x78] = 3;
+            }
+            ppu.set_bgcnt(0, bgcnt);
+
+            // the first entry of the map, as it is, flipped horizontally
+            // and flipped vertically
+            for (entry, color) in [(0x0001u16, 1), (0x0401, 2), (0x0801, 3)] {
+                vram[0x4000..0x4002].copy_from_slice(&entry.to_le_bytes());
+                let mut pixels = [BG_NO_PIXEL; DISPLAY_WIDTH];
+                ppu.collect_text_bg(0, 0, &vram, &palette, &mut pixels);
+                assert_eq!(pixels[0], color);
+            }
+        }
+    }
+
+    #[test]
+    fn test_collect_text_bg_mosaic() {
+        let mut ppu = GbaPpu::new();
+        let mut vram = vec![0u8; 0x18000];
+        let mut palette = vec![0u8; 0x400];
+        for color in 1..10 {
+            palette[color * 2] = color as u8;
+        }
+
+        // tile 1 with the pixels of row 0 in colors 1-8 and pixel (0, 7)
+        // in color 9, in 4bpp and in 8bpp, used by the whole map
+        vram[0x20..0x24].copy_from_slice(&[0x21, 0x43, 0x65, 0x87]);
+        vram[0x3C] = 0x09;
+        vram[0x40..0x48].copy_from_slice(&[1, 2, 3, 4, 5, 6, 7, 8]);
+        vram[0x78] = 9;
+
+        // blocks of 4 pixels repeat their first pixel
+        ppu.set_mosaic(0x0003);
+        for bgcnt in [(8 << 8) | (1 << 6), (8 << 8) | (1 << 6) | (1 << 7)] {
+            ppu.set_bgcnt(0, bgcnt);
+            for (entry, colors) in [
+                (0x0001u16, [1, 1, 1, 1, 5]),
+                (0x0401, [8, 8, 8, 8, 4]),
+                (0x0801, [9, 9, 9, 9, 0]),
+            ] {
+                for index in 0..32 {
+                    vram[0x4000 + index * 2..0x4002 + index * 2]
+                        .copy_from_slice(&entry.to_le_bytes());
+                }
+                let mut pixels = [BG_NO_PIXEL; DISPLAY_WIDTH];
+                ppu.collect_text_bg(0, 0, &vram, &palette, &mut pixels);
+                for (x, color) in colors.iter().enumerate() {
+                    let expected = if *color == 0 { BG_NO_PIXEL } else { *color };
+                    assert_eq!(pixels[x], expected);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_collect_affine_bg_wraparound() {
+        let mut ppu = GbaPpu::new();
+        let mut vram = vec![0u8; 0x18000];
+        let mut palette = vec![0u8; 0x400];
+        palette[2] = 0x1F;
+
+        // the last column of row 0 of the 128x128 map uses tile 1 of
+        // char base 1, in color 1
+        vram[15] = 1;
+        vram[0x4040..0x4080].fill(0x01);
+
+        // a reference point 8 pixels left of the map (-8.0)
+        ppu.set_bg_ref_x_lo(0, 0xF800);
+        ppu.set_bg_ref_x_hi(0, 0x0FFF);
+
+        // transparent without the wraparound, the last column with it
+        ppu.set_bgcnt(2, 1 << 2);
+        let mut pixels = [BG_NO_PIXEL; DISPLAY_WIDTH];
+        ppu.collect_affine_bg(0, 2, &vram, &palette, &mut pixels);
+        assert_eq!(pixels[0], BG_NO_PIXEL);
+        ppu.set_bgcnt(2, (1 << 2) | (1 << 13));
+        ppu.collect_affine_bg(0, 2, &vram, &palette, &mut pixels);
+        assert_eq!(pixels[0], 0x001F);
+    }
+
+    #[test]
+    fn test_collect_affine_bg_map_sizes() {
+        // the last column of row 0 of each map size uses tile 1 of char
+        // base 1, in color 1, past the end of the smaller maps
+        for (size, tiles) in [(1u16, 32usize), (2, 64), (3, 128)] {
+            let mut ppu = GbaPpu::new();
+            let mut vram = vec![0u8; 0x18000];
+            let mut palette = vec![0u8; 0x400];
+            palette[2] = 0x1F;
+            vram[tiles - 1] = 1;
+            vram[0x4040..0x4080].fill(0x01);
+
+            let ref_x = ((tiles - 1) * 8 * 256) as u32;
+            ppu.set_bg_ref_x_lo(0, (ref_x & 0xFFFF) as u16);
+            ppu.set_bg_ref_x_hi(0, (ref_x >> 16) as u16);
+
+            let mut pixels = [BG_NO_PIXEL; DISPLAY_WIDTH];
+            ppu.set_bgcnt(2, 1 << 2);
+            ppu.collect_affine_bg(0, 2, &vram, &palette, &mut pixels);
+            assert_eq!(pixels[0], BG_NO_PIXEL);
+            ppu.set_bgcnt(2, (1 << 2) | (size << 14));
+            ppu.collect_affine_bg(0, 2, &vram, &palette, &mut pixels);
+            assert_eq!(pixels[0], 0x001F);
         }
     }
 
@@ -2834,26 +3425,6 @@ mod tests {
     }
 
     #[test]
-    fn test_obj_mosaic_horizontal() {
-        let mut ppu = GbaPpu::new();
-        ppu.set_mosaic(0x0300); // OBJ mosaic H=4 (bits 8-11 = 3 -> size 4)
-        assert_eq!(ppu.apply_obj_mosaic(0, true), 0);
-        assert_eq!(ppu.apply_obj_mosaic(3, true), 0);
-        assert_eq!(ppu.apply_obj_mosaic(4, true), 4);
-        assert_eq!(ppu.apply_obj_mosaic(7, true), 4);
-    }
-
-    #[test]
-    fn test_obj_mosaic_vertical() {
-        let mut ppu = GbaPpu::new();
-        ppu.set_mosaic(0x3000); // OBJ mosaic V=4 (bits 12-15 = 3 -> size 4)
-        assert_eq!(ppu.apply_obj_mosaic(0, false), 0);
-        assert_eq!(ppu.apply_obj_mosaic(3, false), 0);
-        assert_eq!(ppu.apply_obj_mosaic(4, false), 4);
-        assert_eq!(ppu.apply_obj_mosaic(7, false), 4);
-    }
-
-    #[test]
     fn test_collect_sprites_mosaic_vertical() {
         let mut ppu = GbaPpu::new();
         ppu.set_dispcnt(1 << 6); // 1D mapping
@@ -2917,364 +3488,6 @@ mod tests {
         );
         assert!(obj_has_pixel[0]);
         assert_eq!(obj_pixels[0].0, 0x001F); // still red (line 0 data via mosaic)
-    }
-
-    #[test]
-    fn test_render_mode3_bitmap_composited() {
-        let mut ppu = GbaPpu::new();
-        // mode 3, BG2 enabled, OBJ enabled, 1D mapping
-        ppu.set_dispcnt(0x0403 | (1 << 12) | (1 << 6));
-
-        let mut vram = vec![0u8; 0x18000];
-        let mut palette = vec![0u8; 0x400];
-        let oam = vec![0u8; 0x400];
-
-        // set backdrop to black
-        palette[0] = 0x00;
-        palette[1] = 0x00;
-
-        // place a red pixel at (0, 0) in mode 3 bitmap
-        let color: u16 = 0x001F; // red
-        vram[0] = (color & 0xFF) as u8;
-        vram[1] = ((color >> 8) & 0xFF) as u8;
-
-        // render line 0
-        ppu.clock(VISIBLE_DOTS, &vram, &palette, &oam);
-
-        // verify the pixel was rendered as red (RGB888)
-        let fb = ppu.frame_buffer();
-        assert_eq!(fb[0], 0xF8); // R
-        assert_eq!(fb[1], 0x00); // G
-        assert_eq!(fb[2], 0x00); // B
-
-        // drawing line 0 stepped the reference point to the one of
-        // line 1, so it's restored to draw line 0 again
-        ppu.set_bg_ref_y_lo(0, 0);
-        ppu.set_dispcnt(3);
-        ppu.render_mode3(0, &vram, &palette, &oam);
-        assert_eq!(&ppu.frame_buffer()[..3], &[0, 0, 0]);
-        ppu.set_dispcnt(0x0403);
-        ppu.render_mode3(0, &vram, &palette, &oam);
-        assert_eq!(&ppu.frame_buffer()[..3], &[0xF8, 0, 0]);
-    }
-
-    #[test]
-    fn test_render_single_bg_backdrop_fast_path() {
-        let mut ppu = GbaPpu::new();
-        // mode 4, BG2 enabled only (no OBJ, windows or blending),
-        // taking the single layer composition fast path
-        ppu.set_dispcnt(0x0404);
-
-        let mut vram = vec![0u8; 0x18000];
-        let mut palette = vec![0u8; 0x400];
-        let oam = vec![0u8; 0x400];
-
-        // set backdrop to red
-        let red: u16 = 0x001F;
-        palette[0] = (red & 0xFF) as u8;
-        palette[1] = ((red >> 8) & 0xFF) as u8;
-
-        // palette index 5 = green, used by the pixel at (1, 0);
-        // pixel at (0, 0) keeps index 0 (transparent)
-        let green: u16 = 0x03E0;
-        palette[5 * 2] = (green & 0xFF) as u8;
-        palette[5 * 2 + 1] = ((green >> 8) & 0xFF) as u8;
-        vram[1] = 5;
-
-        ppu.clock(VISIBLE_DOTS, &vram, &palette, &oam);
-
-        // transparent pixel shows the backdrop, opaque pixel the BG color
-        let fb = ppu.frame_buffer();
-        assert_eq!(fb[0], 0xF8); // R (backdrop)
-        assert_eq!(fb[1], 0x00); // G
-        assert_eq!(fb[3], 0x00); // R
-        assert_eq!(fb[4], 0xF8); // G (bg pixel)
-    }
-
-    #[test]
-    fn test_render_mode0_bg_priority_order() {
-        let mut ppu = GbaPpu::new();
-        // mode 0, BG0 and BG1 enabled
-        ppu.set_dispcnt((1 << 8) | (1 << 9));
-        // BG0: priority 1, char base 0, screen base block 8
-        ppu.set_bgcnt(0, (8 << 8) | 1);
-        // BG1: priority 0, char base 0, screen base block 9
-        ppu.set_bgcnt(1, 9 << 8);
-
-        let mut vram = vec![0u8; 0x18000];
-        let mut palette = vec![0u8; 0x400];
-        let oam = vec![0u8; 0x400];
-
-        // both maps use tile 1 at (0, 0), BG1 selects palette bank 1
-        vram[8 * 0x800] = 0x01;
-        vram[9 * 0x800] = 0x01;
-        vram[9 * 0x800 + 1] = 0x10;
-
-        // tile 1 (4bpp) row 0 filled with color index 1
-        for byte in vram.iter_mut().skip(32).take(4) {
-            *byte = 0x11;
-        }
-
-        // bank 0 color 1 = red, bank 1 color 1 = green
-        let red: u16 = 0x001F;
-        palette[2] = (red & 0xFF) as u8;
-        palette[3] = ((red >> 8) & 0xFF) as u8;
-        let green: u16 = 0x03E0;
-        palette[17 * 2] = (green & 0xFF) as u8;
-        palette[17 * 2 + 1] = ((green >> 8) & 0xFF) as u8;
-
-        ppu.clock(VISIBLE_DOTS, &vram, &palette, &oam);
-
-        // BG1 (green) wins with the lower priority value despite
-        // the higher BG index
-        let fb = ppu.frame_buffer();
-        assert_eq!(fb[0], 0x00); // R
-        assert_eq!(fb[1], 0xF8); // G
-        assert_eq!(fb[2], 0x00); // B
-    }
-
-    #[test]
-    fn test_render_mode0_bg_priority_tiebreak() {
-        let mut ppu = GbaPpu::new();
-        // mode 0, BG0 and BG1 enabled, both with priority 0
-        ppu.set_dispcnt((1 << 8) | (1 << 9));
-        ppu.set_bgcnt(0, 8 << 8);
-        ppu.set_bgcnt(1, 9 << 8);
-
-        let mut vram = vec![0u8; 0x18000];
-        let mut palette = vec![0u8; 0x400];
-        let oam = vec![0u8; 0x400];
-
-        // both maps use tile 1 at (0, 0), BG1 selects palette bank 1
-        vram[8 * 0x800] = 0x01;
-        vram[9 * 0x800] = 0x01;
-        vram[9 * 0x800 + 1] = 0x10;
-
-        // tile 1 (4bpp) row 0 filled with color index 1
-        for byte in vram.iter_mut().skip(32).take(4) {
-            *byte = 0x11;
-        }
-
-        // bank 0 color 1 = red, bank 1 color 1 = green
-        let red: u16 = 0x001F;
-        palette[2] = (red & 0xFF) as u8;
-        palette[3] = ((red >> 8) & 0xFF) as u8;
-        let green: u16 = 0x03E0;
-        palette[17 * 2] = (green & 0xFF) as u8;
-        palette[17 * 2 + 1] = ((green >> 8) & 0xFF) as u8;
-
-        ppu.clock(VISIBLE_DOTS, &vram, &palette, &oam);
-
-        // on equal priority the lower BG index (BG0, red) wins
-        let fb = ppu.frame_buffer();
-        assert_eq!(fb[0], 0xF8); // R
-        assert_eq!(fb[1], 0x00); // G
-        assert_eq!(fb[2], 0x00); // B
-    }
-
-    #[test]
-    fn test_render_composited_windows() {
-        let mut ppu = GbaPpu::new();
-        let mut vram = vec![0u8; 0x18000];
-        let mut palette = vec![0u8; 0x400];
-        let mut oam = vec![0u8; 0x400];
-        build_text_bgs(&mut ppu, &mut vram, &mut palette, &mut oam);
-
-        // sprite 0 at x=48 as part of the OBJ window
-        build_sprite(&mut oam, 0, 2 << 10, 48, 0);
-
-        // WIN0 over x 0-15 showing BG1, WIN1 over x 16-31 showing
-        // nothing, the OBJ window showing BG1 and the outside both BGs
-        ppu.set_dispcnt(0xF000 | (1 << 6) | (1 << 8) | (1 << 9));
-        ppu.set_winh(0, 16);
-        ppu.set_winv(0, 160);
-        ppu.set_winh(1, (16 << 8) | 32);
-        ppu.set_winv(1, 160);
-        ppu.set_winin(0x0002);
-        ppu.set_winout(0x0203);
-        ppu.render_scanline(&vram, &palette, &oam);
-
-        assert_eq!(line_pixel(&ppu, 0), [0, 0xF8, 0]);
-        assert_eq!(line_pixel(&ppu, 16), [0, 0, 0]);
-        assert_eq!(line_pixel(&ppu, 48), [0, 0xF8, 0]);
-        assert_eq!(line_pixel(&ppu, 40), [0xF8, 0, 0]);
-    }
-
-    #[test]
-    fn test_render_composited_blending() {
-        let mut ppu = GbaPpu::new();
-        let mut vram = vec![0u8; 0x18000];
-        let mut palette = vec![0u8; 0x400];
-        let mut oam = vec![0u8; 0x400];
-        build_text_bgs(&mut ppu, &mut vram, &mut palette, &mut oam);
-
-        // sprite 0 in blue over x 0-7 with priority 1, between BG0 and
-        // BG1 (moved to priority 2)
-        ppu.set_bgcnt(1, (9 << 8) | 2);
-        build_sprite(&mut oam, 0, 0, 0, 1 << 10);
-        ppu.set_dispcnt((1 << 6) | (1 << 8) | (1 << 9) | (1 << 12));
-
-        // alpha blending of BG0 (target 1) at half over the sprite
-        // (target 2) at half, but not over BG1 (not a target)
-        ppu.set_bldcnt((1 << 6) | 0x01 | (1 << 12));
-        ppu.set_bldalpha(0x0808);
-        ppu.render_scanline(&vram, &palette, &oam);
-        assert_eq!(line_pixel(&ppu, 0), [0x78, 0, 0x78]);
-        assert_eq!(line_pixel(&ppu, 8), [0xF8, 0, 0]);
-
-        // full brightness increase and decrease of BG0 (target 1)
-        ppu.set_bldy(16);
-        ppu.set_bldcnt((2 << 6) | 0x01);
-        ppu.render_scanline(&vram, &palette, &oam);
-        assert_eq!(line_pixel(&ppu, 8), [0xF8, 0xF8, 0xF8]);
-        ppu.set_bldcnt((3 << 6) | 0x01);
-        ppu.render_scanline(&vram, &palette, &oam);
-        assert_eq!(line_pixel(&ppu, 8), [0, 0, 0]);
-
-        // a top layer that isn't target 1 is left as it is
-        for bldcnt in [(1 << 6) | 0x02 | (1 << 9), (2 << 6) | 0x02, (3 << 6) | 0x02] {
-            ppu.set_bldcnt(bldcnt);
-            ppu.render_scanline(&vram, &palette, &oam);
-            assert_eq!(line_pixel(&ppu, 8), [0xF8, 0, 0]);
-        }
-    }
-
-    #[test]
-    fn test_render_composited_semi_transparent() {
-        let mut ppu = GbaPpu::new();
-        let mut vram = vec![0u8; 0x18000];
-        let mut palette = vec![0u8; 0x400];
-        let mut oam = vec![0u8; 0x400];
-        build_text_bgs(&mut ppu, &mut vram, &mut palette, &mut oam);
-
-        // sprite 0 in blue over x 0-7, semi-transparent and on top
-        build_sprite(&mut oam, 0, 1 << 10, 0, 0);
-        ppu.set_dispcnt((1 << 6) | (1 << 8) | (1 << 12));
-
-        // alpha blended over BG0 (target 2) whatever the color effect
-        ppu.set_bldcnt(1 << 8);
-        ppu.set_bldalpha(0x0808);
-        ppu.render_scanline(&vram, &palette, &oam);
-        assert_eq!(line_pixel(&ppu, 0), [0x78, 0, 0x78]);
-        assert_eq!(line_pixel(&ppu, 8), [0xF8, 0, 0]);
-
-        // drawn as it is over a layer that isn't target 2
-        ppu.set_bldcnt(0);
-        ppu.render_scanline(&vram, &palette, &oam);
-        assert_eq!(line_pixel(&ppu, 0), [0, 0, 0xF8]);
-    }
-
-    #[test]
-    fn test_render_mode1_mode2() {
-        let mut ppu = GbaPpu::new();
-        let mut vram = vec![0u8; 0x18000];
-        let mut palette = vec![0u8; 0x400];
-        let oam = vec![0u8; 0x400];
-        palette[2] = 0x1F;
-        palette[4] = 0xE0;
-        palette[5] = 0x03;
-
-        // the affine maps at screen bases 0 and 1 use the tiles 1 (red)
-        // and 2 (green) of char base 1 (8bpp)
-        vram[..0x100].fill(1);
-        vram[0x800..0x900].fill(2);
-        vram[0x4040..0x4080].fill(0x01);
-        vram[0x4080..0x40C0].fill(0x02);
-
-        // the text map of BG0 at screen base 24 uses tile 1 (green) of
-        // char base 2 (4bpp), BG1 is transparent
-        vram[0x8020..0x8040].fill(0x22);
-        for index in 0..1024 {
-            vram[0xC000 + index * 2] = 1;
-        }
-        ppu.set_bgcnt(1, (2 << 2) | (25 << 8) | 3);
-
-        // mode 1: BG0 (text) and BG2 (affine), the top one by priority
-        ppu.set_dispcnt(1 | (1 << 8) | (1 << 9) | (1 << 10));
-        for (bg0_priority, bg2_priority, color) in [(1, 0, [0xF8, 0, 0]), (0, 1, [0, 0xF8, 0])] {
-            ppu.set_bgcnt(0, (2 << 2) | (24 << 8) | bg0_priority);
-            ppu.set_bgcnt(2, (1 << 2) | bg2_priority);
-            ppu.render_scanline(&vram, &palette, &oam);
-            assert_eq!(line_pixel(&ppu, 0), color);
-        }
-
-        // mode 2: BG2 and BG3 (both affine), the top one by priority
-        ppu.set_dispcnt(2 | (1 << 10) | (1 << 11));
-        for (bg2_priority, bg3_priority, color) in [(0, 1, [0xF8, 0, 0]), (1, 0, [0, 0xF8, 0])] {
-            ppu.set_bgcnt(2, (1 << 2) | bg2_priority);
-            ppu.set_bgcnt(3, (1 << 2) | (1 << 8) | bg3_priority);
-            ppu.render_scanline(&vram, &palette, &oam);
-            assert_eq!(line_pixel(&ppu, 0), color);
-        }
-    }
-
-    #[test]
-    fn test_render_mode4_bitmap_composited() {
-        let mut ppu = GbaPpu::new();
-        // mode 4, BG2 enabled
-        ppu.set_dispcnt(0x0404);
-
-        let mut vram = vec![0u8; 0x18000];
-        let mut palette = vec![0u8; 0x400];
-        let oam = vec![0u8; 0x400];
-
-        // palette index 5 = green
-        let green: u16 = 0x03E0;
-        palette[5 * 2] = (green & 0xFF) as u8;
-        palette[5 * 2 + 1] = ((green >> 8) & 0xFF) as u8;
-
-        // pixel at (0, 0) uses palette index 5
-        vram[0] = 5;
-
-        ppu.clock(VISIBLE_DOTS, &vram, &palette, &oam);
-
-        let fb = ppu.frame_buffer();
-        assert_eq!(fb[0], 0x00); // R
-        assert_eq!(fb[1], 0xF8); // G
-        assert_eq!(fb[2], 0x00); // B
-
-        // drawing line 0 stepped the reference point to the one of
-        // line 1, so it's restored to draw line 0 again
-        ppu.set_bg_ref_y_lo(0, 0);
-        ppu.set_dispcnt(4);
-        ppu.render_mode4(0, &vram, &palette, &oam);
-        assert_eq!(&ppu.frame_buffer()[..3], &[0, 0, 0]);
-        ppu.set_dispcnt(0x0404);
-        ppu.render_mode4(0, &vram, &palette, &oam);
-        assert_eq!(&ppu.frame_buffer()[..3], &[0, 0xF8, 0]);
-    }
-
-    #[test]
-    fn test_render_mode5_bitmap_composited() {
-        let mut ppu = GbaPpu::new();
-        // mode 5, BG2 enabled
-        ppu.set_dispcnt(0x0405);
-
-        let mut vram = vec![0u8; 0x18000];
-        let palette = vec![0u8; 0x400];
-        let oam = vec![0u8; 0x400];
-
-        // place blue pixel at (0, 0) in mode 5
-        let blue: u16 = 0x7C00;
-        vram[0] = (blue & 0xFF) as u8;
-        vram[1] = ((blue >> 8) & 0xFF) as u8;
-
-        ppu.clock(VISIBLE_DOTS, &vram, &palette, &oam);
-
-        let fb = ppu.frame_buffer();
-        assert_eq!(fb[0], 0x00); // R
-        assert_eq!(fb[1], 0x00); // G
-        assert_eq!(fb[2], 0xF8); // B
-
-        // drawing line 0 stepped the reference point to the one of
-        // line 1, so it's restored to draw line 0 again
-        ppu.set_bg_ref_y_lo(0, 0);
-        ppu.set_dispcnt(5);
-        ppu.render_mode5(0, &vram, &palette, &oam);
-        assert_eq!(&ppu.frame_buffer()[..3], &[0, 0, 0]);
-        ppu.set_dispcnt(0x0405);
-        ppu.render_mode5(0, &vram, &palette, &oam);
-        assert_eq!(&ppu.frame_buffer()[..3], &[0, 0, 0xF8]);
     }
 
     #[test]
@@ -3364,373 +3577,160 @@ mod tests {
     }
 
     #[test]
-    fn test_render_mode3_mosaic() {
-        let mut ppu = GbaPpu::new();
+    fn test_read_obj_pixel_4bpp() {
+        let ppu = GbaPpu::new();
         let mut vram = vec![0u8; 0x18000];
-        let palette = vec![0u8; 0x400];
-        let oam = vec![0u8; 0x400];
+        // place a 4bpp pixel at tile 0, px=(0,0): low nibble = 5
+        let obj_base = 0x10000;
+        vram[obj_base] = 0x05;
 
-        // distinct reds for the first pixels of lines 0 and 2
-        for x in 0..4 {
-            vram[x * 2] = (x + 1) as u8;
-            vram[(2 * DISPLAY_WIDTH + x) * 2] = (x + 5) as u8;
-        }
+        let idx = ppu.read_obj_pixel(&vram, 0, 0, 0, 8, false, true, obj_base);
+        assert_eq!(idx, 5);
 
-        // mode 3 with the mosaic of BG2, in blocks of 4x4 pixels
-        ppu.set_dispcnt(0x0403);
-        ppu.set_bgcnt(2, 1 << 6);
-        ppu.set_mosaic(0x0033);
-
-        // line 0 repeats its first pixel across the block
-        ppu.clock(VISIBLE_DOTS, &vram, &palette, &oam);
-        for x in 0..4 {
-            assert_eq!(&ppu.frame_buffer()[x * 3..x * 3 + 3], &[8, 0, 0]);
-        }
-
-        // line 2 repeats line 0, the first line of its block
-        ppu.clock(CYCLES_PER_SCANLINE - VISIBLE_DOTS, &vram, &palette, &oam);
-        ppu.clock(CYCLES_PER_SCANLINE, &vram, &palette, &oam);
-        ppu.clock(VISIBLE_DOTS, &vram, &palette, &oam);
-        let offset = 2 * DISPLAY_WIDTH * 3;
-        assert_eq!(&ppu.frame_buffer()[offset..offset + 3], &[8, 0, 0]);
+        // high nibble at px=(1,0) = 0xA
+        vram[obj_base] = 0xA5;
+        let idx = ppu.read_obj_pixel(&vram, 0, 1, 0, 8, false, true, obj_base);
+        assert_eq!(idx, 0x0A);
     }
 
     #[test]
-    fn test_render_bg_obj_vram() {
-        let mut ppu = GbaPpu::new();
+    fn test_read_obj_pixel_8bpp() {
+        let ppu = GbaPpu::new();
         let mut vram = vec![0u8; 0x18000];
-        let mut palette = vec![0u8; 0x400];
-        let oam = vec![0u8; 0x400];
+        let obj_base = 0x10000;
+        vram[obj_base + 3] = 42;
 
-        // BG palette color 1 in red, and the OBJ VRAM full of it
-        palette[2] = 0x1F;
-        vram[0x10000..].fill(0x01);
-
-        // text BG0, 8bpp, char base 3 (0xC000): tile 256 would start at
-        // 0x10000, past the VRAM that the backgrounds address
-        ppu.set_dispcnt(1 << 8);
-        ppu.set_bgcnt(0, (3 << 2) | (1 << 7));
-        vram[1] = 0x01;
-        ppu.render_scanline(&vram, &palette, &oam);
-        assert_eq!(&ppu.frame_buffer()[..3], &[0, 0, 0]);
-
-        // affine BG2 with a 1024x1024 map at screen base 31 (0xF800):
-        // its 17th row of tiles (texture line 128) would be read from
-        // 0x10000, while tile 1 of char base 0 is red
-        vram[64..128].fill(0x01);
-        ppu.set_dispcnt(2 | (1 << 10));
-        ppu.set_bgcnt(2, (31 << 8) | (3 << 14));
-        ppu.set_bg_ref_y_lo(0, 128 << 8);
-        ppu.render_scanline(&vram, &palette, &oam);
-        assert_eq!(&ppu.frame_buffer()[..3], &[0, 0, 0]);
+        let idx = ppu.read_obj_pixel(&vram, 0, 3, 0, 8, true, true, obj_base);
+        assert_eq!(idx, 42);
     }
 
     #[test]
-    fn test_collect_text_bg_screen_sizes() {
-        let mut ppu = GbaPpu::new();
+    fn test_read_obj_pixel_8bpp_tile_alignment() {
+        let ppu = GbaPpu::new();
         let mut vram = vec![0u8; 0x18000];
-        let mut palette = vec![0u8; 0x400];
+        vram[0x10000..0x10020].fill(1);
+        vram[0x10020..0x10040].fill(2);
+        vram[0x10400..0x10420].fill(3);
+        vram[0x10420..0x10440].fill(4);
 
-        // the first entry of each of the 4 screen blocks of the map at
-        // screen base 8 uses a tile of its own color (1-4)
-        for block in 0..4 {
-            palette[(block + 1) * 2] = (block + 1) as u8;
-            vram[0x20 * (block + 1)..0x20 * (block + 2)].fill(0x11 * (block + 1) as u8);
-            vram[0x4000 + block * 0x800] = (block + 1) as u8;
+        for tile in [0, 1] {
+            assert_eq!(
+                ppu.read_obj_pixel(&vram, tile, 0, 0, 16, true, false, 0x10000),
+                1
+            );
+            assert_eq!(
+                ppu.read_obj_pixel(&vram, tile, 7, 7, 16, true, false, 0x10000),
+                2
+            );
+            assert_eq!(
+                ppu.read_obj_pixel(&vram, tile, 0, 8, 16, true, false, 0x10000),
+                3
+            );
+            assert_eq!(
+                ppu.read_obj_pixel(&vram, tile, 7, 15, 16, true, false, 0x10000),
+                4
+            );
         }
-
-        for (size, hofs, vofs, block) in [
-            (0, 0, 0, 0),
-            (1, 256, 0, 1),
-            (2, 0, 256, 1),
-            (3, 256, 0, 1),
-            (3, 0, 256, 2),
-            (3, 256, 256, 3),
-        ] {
-            ppu.set_bgcnt(0, (size << 14) | (8 << 8));
-            ppu.set_bg_hofs(0, hofs);
-            ppu.set_bg_vofs(0, vofs);
-            let mut pixels = [BG_NO_PIXEL; DISPLAY_WIDTH];
-            ppu.collect_text_bg(0, 0, &vram, &palette, &mut pixels);
-            assert_eq!(pixels[0], block as u16 + 1);
-        }
+        // the low bit still selects a distinct tile in 4bpp mode
+        assert_eq!(
+            ppu.read_obj_pixel(&vram, 1, 0, 0, 8, false, false, 0x10000),
+            2
+        );
     }
 
     #[test]
-    fn test_collect_text_bg_flips() {
-        let mut ppu = GbaPpu::new();
-        let mut vram = vec![0u8; 0x18000];
-        let mut palette = vec![0u8; 0x400];
-        for color in 1..4 {
-            palette[color * 2] = color as u8;
-        }
-
-        // tile 1 with pixel (0, 0) in color 1, (7, 0) in color 2 and
-        // (0, 7) in color 3, in 4bpp and then in 8bpp
-        vram[0x20] = 0x01;
-        vram[0x23] = 0x20;
-        vram[0x3C] = 0x03;
-        for (bgcnt, is_8bpp) in [(8 << 8, false), ((8 << 8) | (1 << 7), true)] {
-            if is_8bpp {
-                vram[0x40] = 1;
-                vram[0x47] = 2;
-                vram[0x78] = 3;
-            }
-            ppu.set_bgcnt(0, bgcnt);
-
-            // the first entry of the map, as it is, flipped horizontally
-            // and flipped vertically
-            for (entry, color) in [(0x0001u16, 1), (0x0401, 2), (0x0801, 3)] {
-                vram[0x4000..0x4002].copy_from_slice(&entry.to_le_bytes());
-                let mut pixels = [BG_NO_PIXEL; DISPLAY_WIDTH];
-                ppu.collect_text_bg(0, 0, &vram, &palette, &mut pixels);
-                assert_eq!(pixels[0], color);
+    fn test_read_obj_pixel_out_of_bounds() {
+        let ppu = GbaPpu::new();
+        for is_8bpp in [false, true] {
+            for mapping_1d in [false, true] {
+                assert_eq!(
+                    ppu.read_obj_pixel(&[], 1, 7, 7, 8, is_8bpp, mapping_1d, 0x10000),
+                    0
+                );
             }
         }
     }
 
     #[test]
-    fn test_collect_text_bg_mosaic() {
+    fn test_reset() {
         let mut ppu = GbaPpu::new();
-        let mut vram = vec![0u8; 0x18000];
-        let mut palette = vec![0u8; 0x400];
-        for color in 1..10 {
-            palette[color * 2] = color as u8;
-        }
-
-        // tile 1 with the pixels of row 0 in colors 1-8 and pixel (0, 7)
-        // in color 9, in 4bpp and in 8bpp, used by the whole map
-        vram[0x20..0x24].copy_from_slice(&[0x21, 0x43, 0x65, 0x87]);
-        vram[0x3C] = 0x09;
-        vram[0x40..0x48].copy_from_slice(&[1, 2, 3, 4, 5, 6, 7, 8]);
-        vram[0x78] = 9;
-
-        // blocks of 4 pixels repeat their first pixel
-        ppu.set_mosaic(0x0003);
-        for bgcnt in [(8 << 8) | (1 << 6), (8 << 8) | (1 << 6) | (1 << 7)] {
-            ppu.set_bgcnt(0, bgcnt);
-            for (entry, colors) in [
-                (0x0001u16, [1, 1, 1, 1, 5]),
-                (0x0401, [8, 8, 8, 8, 4]),
-                (0x0801, [9, 9, 9, 9, 0]),
-            ] {
-                for index in 0..32 {
-                    vram[0x4000 + index * 2..0x4002 + index * 2]
-                        .copy_from_slice(&entry.to_le_bytes());
-                }
-                let mut pixels = [BG_NO_PIXEL; DISPLAY_WIDTH];
-                ppu.collect_text_bg(0, 0, &vram, &palette, &mut pixels);
-                for (x, color) in colors.iter().enumerate() {
-                    let expected = if *color == 0 { BG_NO_PIXEL } else { *color };
-                    assert_eq!(pixels[x], expected);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_collect_affine_bg_wraparound() {
-        let mut ppu = GbaPpu::new();
-        let mut vram = vec![0u8; 0x18000];
-        let mut palette = vec![0u8; 0x400];
-        palette[2] = 0x1F;
-
-        // the last column of row 0 of the 128x128 map uses tile 1 of
-        // char base 1, in color 1
-        vram[15] = 1;
-        vram[0x4040..0x4080].fill(0x01);
-
-        // a reference point 8 pixels left of the map (-8.0)
-        ppu.set_bg_ref_x_lo(0, 0xF800);
-        ppu.set_bg_ref_x_hi(0, 0x0FFF);
-
-        // transparent without the wraparound, the last column with it
-        ppu.set_bgcnt(2, 1 << 2);
-        let mut pixels = [BG_NO_PIXEL; DISPLAY_WIDTH];
-        ppu.collect_affine_bg(0, 2, &vram, &palette, &mut pixels);
-        assert_eq!(pixels[0], BG_NO_PIXEL);
-        ppu.set_bgcnt(2, (1 << 2) | (1 << 13));
-        ppu.collect_affine_bg(0, 2, &vram, &palette, &mut pixels);
-        assert_eq!(pixels[0], 0x001F);
-    }
-
-    #[test]
-    fn test_collect_affine_bg_map_sizes() {
-        // the last column of row 0 of each map size uses tile 1 of char
-        // base 1, in color 1, past the end of the smaller maps
-        for (size, tiles) in [(1u16, 32usize), (2, 64), (3, 128)] {
-            let mut ppu = GbaPpu::new();
-            let mut vram = vec![0u8; 0x18000];
-            let mut palette = vec![0u8; 0x400];
-            palette[2] = 0x1F;
-            vram[tiles - 1] = 1;
-            vram[0x4040..0x4080].fill(0x01);
-
-            let ref_x = ((tiles - 1) * 8 * 256) as u32;
-            ppu.set_bg_ref_x_lo(0, (ref_x & 0xFFFF) as u16);
-            ppu.set_bg_ref_x_hi(0, (ref_x >> 16) as u16);
-
-            let mut pixels = [BG_NO_PIXEL; DISPLAY_WIDTH];
-            ppu.set_bgcnt(2, 1 << 2);
-            ppu.collect_affine_bg(0, 2, &vram, &palette, &mut pixels);
-            assert_eq!(pixels[0], BG_NO_PIXEL);
-            ppu.set_bgcnt(2, (1 << 2) | (size << 14));
-            ppu.collect_affine_bg(0, 2, &vram, &palette, &mut pixels);
-            assert_eq!(pixels[0], 0x001F);
-        }
-    }
-
-    #[test]
-    fn test_affine_ref_no_advance_on_frame_wrap() {
-        let mut ppu = GbaPpu::new();
+        ppu.set_dispcnt(0x1234);
         let vram = vec![0u8; 0x18000];
         let palette = vec![0u8; 0x400];
         let oam = vec![0u8; 0x400];
-
-        // set BG2 reference point and PB/PD
-        ppu.set_bg_ref_x_lo(0, 0x1000);
-        ppu.set_bg_ref_x_hi(0, 0x0000);
-        ppu.set_bg_ref_y_lo(0, 0x2000);
-        ppu.set_bg_ref_y_hi(0, 0x0000);
-        ppu.set_bg_pb(0, 0x0100); // PB = 1.0 in 8.8 fixed point
-        ppu.set_bg_pd(0, 0x0100); // PD = 1.0 in 8.8 fixed point
-
-        // clock through a full frame (228 scanlines)
         for _ in 0..228 {
             ppu.clock(CYCLES_PER_SCANLINE, &vram, &palette, &oam);
         }
-
-        // at VBlank (line 160), reference points are latched from write values;
-        // after wrapping to line 0, the ref point should NOT have been advanced
-        // (the advance only happens after rendering lines 0-159)
-        assert_eq!(ppu.bg_ref_x[0], 0x1000);
-        assert_eq!(ppu.bg_ref_y[0], 0x2000);
+        ppu.set_winh(0, 0xA050);
+        ppu.set_winv(1, 0xC030);
+        ppu.set_winin(0x1234);
+        ppu.set_winout(0x5678);
+        ppu.set_bldcnt(0x00FF);
+        ppu.set_bldalpha(0x1010);
+        ppu.set_bldy(0x0010);
+        ppu.set_mosaic(0x0303);
+        ppu.reset();
+        assert_eq!(ppu.dispcnt(), 0);
+        assert_eq!(ppu.frame(), 0);
+        assert_eq!(ppu.vcount(), 0);
+        assert_eq!(ppu.winh(0), 0);
+        assert_eq!(ppu.winv(1), 0);
+        assert_eq!(ppu.winin(), 0);
+        assert_eq!(ppu.winout(), 0);
+        assert_eq!(ppu.bldcnt(), 0);
+        assert_eq!(ppu.bldalpha(), 0);
+        assert_eq!(ppu.bldy(), 0);
+        assert_eq!(ppu.mosaic(), 0);
     }
 
     #[test]
-    fn test_affine_ref_advances_after_visible_line() {
-        let mut ppu = GbaPpu::new();
-        let vram = vec![0u8; 0x18000];
-        let palette = vec![0u8; 0x400];
-        let oam = vec![0u8; 0x400];
-
-        ppu.set_bg_ref_x_lo(0, 0x0000);
-        ppu.set_bg_ref_x_hi(0, 0x0000);
-        ppu.set_bg_pb(0, 0x0100); // PB = 1.0
-
-        // clock line 0 (render + end of scanline advances vcount to 1)
-        ppu.clock(CYCLES_PER_SCANLINE, &vram, &palette, &oam);
-
-        // after rendering line 0 and advancing to line 1, ref_x should be 0 + 0x100
-        assert_eq!(ppu.bg_ref_x[0], 0x0100);
+    fn test_obj_dimensions() {
+        assert_eq!(obj_dimensions(0, 0), (8, 8));
+        assert_eq!(obj_dimensions(0, 1), (16, 16));
+        assert_eq!(obj_dimensions(0, 2), (32, 32));
+        assert_eq!(obj_dimensions(0, 3), (64, 64));
+        assert_eq!(obj_dimensions(1, 0), (16, 8));
+        assert_eq!(obj_dimensions(1, 1), (32, 8));
+        assert_eq!(obj_dimensions(1, 2), (32, 16));
+        assert_eq!(obj_dimensions(1, 3), (64, 32));
+        assert_eq!(obj_dimensions(2, 0), (8, 16));
+        assert_eq!(obj_dimensions(2, 1), (8, 32));
+        assert_eq!(obj_dimensions(2, 2), (16, 32));
+        assert_eq!(obj_dimensions(2, 3), (32, 64));
+        assert_eq!(obj_dimensions(3, 0), (8, 8));
     }
 
     #[test]
-    fn test_affine_ref_hblank_write() {
-        let mut ppu = GbaPpu::new();
-        let vram = vec![0u8; 0x18000];
-        let palette = vec![0u8; 0x400];
-        let oam = vec![0u8; 0x400];
+    fn test_bgr555_to_rgb888() {
+        let (r, g, b) = bgr555_to_rgb888(0x7FFF);
+        assert_eq!(r, 0xF8);
+        assert_eq!(g, 0xF8);
+        assert_eq!(b, 0xF8);
 
-        ppu.set_bg_ref_x_lo(0, 0x0000);
-        ppu.set_bg_ref_x_hi(0, 0x0000);
-        ppu.set_bg_pb(0, 0x0100); // PB = 1.0
+        let (r, g, b) = bgr555_to_rgb888(0x0000);
+        assert_eq!(r, 0);
+        assert_eq!(g, 0);
+        assert_eq!(b, 0);
 
-        // the reference point is stepped as soon as line 0 is drawn,
-        // so that a write in its HBlank (eg: by an HBlank DMA) sets
-        // the reference point of line 1 as it is
-        ppu.clock(VISIBLE_DOTS, &vram, &palette, &oam);
-        assert_eq!(ppu.bg_ref_x[0], 0x0100);
-        ppu.set_bg_ref_x_lo(0, 0x0800);
-        ppu.clock(CYCLES_PER_SCANLINE - VISIBLE_DOTS, &vram, &palette, &oam);
-        assert_eq!(ppu.vcount(), 1);
-        assert_eq!(ppu.bg_ref_x[0], 0x0800);
+        let (r, g, b) = bgr555_to_rgb888(0x001F);
+        assert_eq!(r, 0xF8);
+        assert_eq!(g, 0);
+        assert_eq!(b, 0);
     }
 
     #[test]
-    fn test_vcount_match_event() {
-        let mut ppu = GbaPpu::new();
-        let vram = vec![0u8; 0x18000];
-        let palette = vec![0u8; 0x400];
-        let oam = vec![0u8; 0x400];
-
-        // set LYC=5, enable vcount match IRQ (DISPSTAT bit 5)
-        ppu.set_dispstat((5 << 8) | (1 << 5));
-
-        // clock through lines 0-4 (vcount goes 0->1->2->3->4->5)
-        let mut vcount_event = false;
-        for _ in 0..5 {
-            let events = ppu.clock(CYCLES_PER_SCANLINE, &vram, &palette, &oam);
-            if events & 16 != 0 {
-                vcount_event = true;
-            }
-        }
-        assert!(vcount_event);
-        assert!(ppu.int_vcount());
+    fn test_bgr555_pure_green() {
+        let (r, g, b) = bgr555_to_rgb888(0x03E0);
+        assert_eq!(r, 0);
+        assert_eq!(g, 0xF8);
+        assert_eq!(b, 0);
     }
 
     #[test]
-    fn test_vcount_match_no_event_without_enable() {
-        let mut ppu = GbaPpu::new();
-        let vram = vec![0u8; 0x18000];
-        let palette = vec![0u8; 0x400];
-        let oam = vec![0u8; 0x400];
-
-        // set LYC=1, but do NOT enable vcount match IRQ
-        ppu.set_dispstat(1 << 8);
-
-        let events = ppu.clock(CYCLES_PER_SCANLINE, &vram, &palette, &oam);
-        assert_eq!(events & 16, 0);
-        assert!(!ppu.int_vcount());
-    }
-
-    #[test]
-    fn test_priority_obj_wins_on_equal() {
-        let mut ppu = GbaPpu::new();
-        // mode 0, BG0 enabled, OBJ enabled, 1D mapping
-        ppu.set_dispcnt(0x0100 | (1 << 12) | (1 << 6));
-        ppu.set_bgcnt(0, 0x0000); // BG0 priority 0
-
-        let mut vram = vec![0u8; 0x18000];
-        let mut palette = vec![0u8; 0x400];
-        let mut oam = vec![0u8; 0x400];
-
-        // BG0 tile: palette index 1 at (0,0)
-        // char base 0, screen base 0, 4bpp
-        // tile 0 at screen base: tile number 1
-        vram[0] = 1; // map entry: tile 1
-        vram[1] = 0;
-        // tile 1 data at char_base + 1*32: pixel 0 = color 1
-        vram[32] = 0x01;
-        // BG palette color 1 = red
-        let red: u16 = 0x001F;
-        palette[2] = (red & 0xFF) as u8;
-        palette[3] = ((red >> 8) & 0xFF) as u8;
-
-        // sprite at (0, 0), priority 0
-        let attr0: u16 = 0;
-        let attr1: u16 = 0;
-        let attr2: u16 = 0; // priority 0
-        oam[0] = (attr0 & 0xFF) as u8;
-        oam[1] = ((attr0 >> 8) & 0xFF) as u8;
-        oam[2] = (attr1 & 0xFF) as u8;
-        oam[3] = ((attr1 >> 8) & 0xFF) as u8;
-        oam[4] = (attr2 & 0xFF) as u8;
-        oam[5] = ((attr2 >> 8) & 0xFF) as u8;
-
-        // OBJ pixel: color index 1
-        vram[0x10000] = 0x01;
-        // OBJ palette color 1 = blue
-        let blue: u16 = 0x7C00;
-        palette[0x202] = (blue & 0xFF) as u8;
-        palette[0x203] = ((blue >> 8) & 0xFF) as u8;
-
-        ppu.clock(VISIBLE_DOTS, &vram, &palette, &oam);
-
-        let fb = ppu.frame_buffer();
-        // OBJ should win on equal priority
-        assert_eq!(fb[0], 0x00); // R=0 (blue)
-        assert_eq!(fb[1], 0x00); // G=0
-        assert_eq!(fb[2], 0xF8); // B
+    fn test_bgr555_pure_blue() {
+        let (r, g, b) = bgr555_to_rgb888(0x7C00);
+        assert_eq!(r, 0);
+        assert_eq!(g, 0);
+        assert_eq!(b, 0xF8);
     }
 }
