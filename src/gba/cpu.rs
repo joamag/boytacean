@@ -5,6 +5,7 @@
 //! and interrupt handling.
 
 use crate::{
+    assert_pedantic_gb,
     gba::{
         arm::execute_arm,
         bus::GbaBus,
@@ -99,10 +100,6 @@ pub struct Arm7Tdmi {
     /// the BIOS wait loop resumes after each serviced IRQ.
     intr_wait_pc: u32,
 
-    /// Infinite loop detection: previous PC and repeat count.
-    prev_pc: u32,
-    same_pc_count: u32,
-
     /// Pipeline state for prefetched instruction.
     pipeline: [u32; 2],
     pipeline_valid: bool,
@@ -120,8 +117,6 @@ impl Arm7Tdmi {
             halted: false,
             halt_deadlock_warned: false,
             intr_wait_pc: 0,
-            prev_pc: 0xFFFF_FFFF,
-            same_pc_count: 0,
             pipeline: [0; 2],
             pipeline_valid: false,
         };
@@ -151,8 +146,6 @@ impl Arm7Tdmi {
         self.halted = false;
         self.halt_deadlock_warned = false;
         self.intr_wait_pc = 0;
-        self.prev_pc = 0xFFFF_FFFF;
-        self.same_pc_count = 0;
         self.pipeline_valid = false;
         // PC = 0: start executing from BIOS entry point
         self.regs[15] = 0x0000_0000;
@@ -474,45 +467,17 @@ impl Arm7Tdmi {
 
         self.cycles = 0;
 
-        // warns if executing from unmapped or unusual memory regions;
-        // with a flushed pipeline regs[15] holds the execution address
-        // directly, otherwise it carries the pipeline prefetch offset
-        let exec_pc = if !self.pipeline_valid {
-            self.regs[15]
-        } else if self.in_thumb_mode() {
-            self.regs[15].wrapping_sub(4)
-        } else {
-            self.regs[15].wrapping_sub(8)
-        };
-        let exec_region = exec_pc >> 24;
-        match exec_region {
-            0x00 if exec_pc < 0x4000 => {} // BIOS
-            0x02 => {}                     // EWRAM
-            0x03 => {}                     // IWRAM
-            0x08..=0x0D => {}              // ROM
-            _ => {
-                warnln!(
-                    "GBA: executing from unmapped memory region at PC={:#010x}",
-                    exec_pc
-                );
-            }
-        }
-
-        // infinite loop detection: same PC for many consecutive steps
-        // cost: one comparison + conditional increment per step (negligible)
-        if exec_pc == self.prev_pc {
-            self.same_pc_count = self.same_pc_count.saturating_add(1);
-            if self.same_pc_count == 64 {
-                warnln!(
-                    "GBA: infinite loop detected at PC={:#010x} (CPSR={:#010x})",
-                    exec_pc,
-                    self.cpsr
-                );
-            }
-        } else {
-            self.prev_pc = exec_pc;
-            self.same_pc_count = 0;
-        }
+        // runs a series of assertions to guarantee CPU execution
+        // state (code in BIOS, EWRAM, IWRAM or ROM), only if pedantic
+        // mode is set
+        assert_pedantic_gb!(
+            matches!(
+                self.exec_pc(),
+                0x0000_0000..=0x0000_3FFF | 0x0200_0000..=0x03FF_FFFF | 0x0800_0000..=0x0DFF_FFFF
+            ),
+            "Invalid PC area at 0x{:08x}",
+            self.exec_pc()
+        );
 
         let instr = self.fetch();
 
@@ -1663,35 +1628,6 @@ mod tests {
     }
 
     // -- crash detection tests --
-
-    #[test]
-    fn test_infinite_loop_counter_increments() {
-        let mut cpu = make_cpu();
-        // place a NOP (MOV R0, R0) at 0x08000000
-        cpu.bus.write32(0x0800_0000, 0xE1A00000); // MOV R0, R0
-                                                  // also need next instructions for pipeline
-        cpu.bus.write32(0x0800_0004, 0xE1A00000);
-        cpu.bus.write32(0x0800_0008, 0xE1A00000);
-
-        // PC starts at 0x08000000 by default (post-boot state)
-        // first step resets prev_pc
-        cpu.step();
-        assert_eq!(cpu.same_pc_count, 0);
-    }
-
-    #[test]
-    fn test_infinite_loop_counter_resets_on_different_pc() {
-        let mut cpu = make_cpu();
-        // place two different NOPs at sequential addresses
-        cpu.bus.write32(0x0800_0000, 0xE1A00000);
-        cpu.bus.write32(0x0800_0004, 0xE1A00000);
-        cpu.bus.write32(0x0800_0008, 0xE1A00000);
-        cpu.bus.write32(0x0800_000C, 0xE1A00000);
-
-        cpu.step(); // executes 0x08000000
-        cpu.step(); // executes 0x08000004 — different PC
-        assert_eq!(cpu.same_pc_count, 0);
-    }
 
     #[test]
     fn test_halt_deadlock_warned_flag_set_on_ie_zero() {
