@@ -15,7 +15,7 @@ use crate::{
         },
         thumb::execute_thumb,
     },
-    warnln,
+    panic_gb, warnln,
 };
 
 /// Index mapping for banked SPSR: FIQ=0, SVC=1, ABT=2, IRQ=3, UND=4.
@@ -187,7 +187,7 @@ impl Arm7Tdmi {
                     self.banked.usr[i - 8]
                 }
             }
-            _ => 0,
+            _ => panic_gb!("Invalid register index: {}", i),
         }
     }
 
@@ -215,7 +215,7 @@ impl Arm7Tdmi {
                 self.regs[15] = value;
                 self.flush_pipeline();
             }
-            _ => {}
+            _ => panic_gb!("Invalid register index: {}", i),
         }
     }
 
@@ -577,7 +577,7 @@ impl Arm7Tdmi {
             0xD => self.flag_z() || self.flag_n() != self.flag_v(),  // LE
             0xE => true,                                             // AL
             0xF => false,                                            // NV (reserved)
-            _ => unreachable!(),
+            _ => panic_gb!("Invalid condition code: {}", cond),
         }
     }
 

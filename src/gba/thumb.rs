@@ -2,10 +2,13 @@
 //!
 //! Implements all 19 Thumb instruction formats used by the GBA.
 
-use crate::gba::{
-    bios::handle_swi,
-    consts::{CPSR_I, CPSR_MODE_MASK, CPSR_T, MODE_SVC},
-    cpu::Arm7Tdmi,
+use crate::{
+    gba::{
+        bios::handle_swi,
+        consts::{CPSR_I, CPSR_MODE_MASK, CPSR_T, MODE_SVC},
+        cpu::Arm7Tdmi,
+    },
+    panic_gb,
 };
 
 /// Executes a single Thumb (16-bit) instruction, dispatching to the
@@ -88,9 +91,7 @@ pub fn execute_thumb(cpu: &mut Arm7Tdmi, instr: u16) {
                 thumb_long_branch(cpu, instr);
             }
         }
-        _ => {
-            cpu.cycles = 1;
-        }
+        _ => panic_gb!("Invalid Thumb instruction: {:#06x}", instr),
     }
 }
 
@@ -182,7 +183,7 @@ fn thumb_imm_op(cpu: &mut Arm7Tdmi, instr: u16) {
             cpu.set_flag_c(!borrow);
             cpu.set_flag_v(((op1 ^ imm) & (op1 ^ r)) >> 31 != 0);
         }
-        _ => unreachable!(),
+        _ => panic_gb!("Invalid immediate operation: {}", op),
     }
 
     cpu.cycles = 1;
@@ -321,7 +322,7 @@ fn thumb_alu(cpu: &mut Arm7Tdmi, instr: u16) {
             cpu.set_reg(rd, r);
             cpu.set_nz_flags(r);
         }
-        _ => {}
+        _ => panic_gb!("Invalid ALU operation: {}", op),
     }
 
     cpu.cycles = 1;
@@ -367,7 +368,7 @@ fn thumb_hi_reg(cpu: &mut Arm7Tdmi, instr: u16) {
                 cpu.set_reg(15, addr & !3);
             }
         }
-        _ => {}
+        _ => panic_gb!("Invalid hi register operation: {}", op),
     }
 
     cpu.cycles = 1;
@@ -448,7 +449,7 @@ fn thumb_load_store_reg(cpu: &mut Arm7Tdmi, instr: u16) {
             };
             cpu.set_reg(rd, value);
         }
-        _ => {}
+        _ => panic_gb!("Invalid load/store opcode: {}", opcode),
     }
 
     cpu.cycles = if opcode >= 0b011 { 3 } else { 2 };

@@ -3,10 +3,13 @@
 //! Uses a lookup table indexed by bits [27:20] and [7:4] of the
 //! instruction for fast dispatch.
 
-use crate::gba::{
-    bios::handle_swi,
-    consts::{CPSR_I, CPSR_MODE_MASK, CPSR_T, CPSR_Z, MODE_SVC, MODE_UND, MODE_USR},
-    cpu::Arm7Tdmi,
+use crate::{
+    gba::{
+        bios::handle_swi,
+        consts::{CPSR_I, CPSR_MODE_MASK, CPSR_T, CPSR_Z, MODE_SVC, MODE_UND, MODE_USR},
+        cpu::Arm7Tdmi,
+    },
+    panic_gb,
 };
 
 /// Executes a single ARM (32-bit) instruction, checking its condition
@@ -300,7 +303,7 @@ fn arm_data_processing(cpu: &mut Arm7Tdmi, instr: u32) {
             }
             Some(r)
         }
-        _ => None,
+        _ => panic_gb!("Invalid data processing opcode: {}", opcode),
     };
 
     if let Some(value) = result {
@@ -471,7 +474,7 @@ fn arm_halfword_transfer(cpu: &mut Arm7Tdmi, instr: u32) {
                     cpu.bus_read16(addr) as i16 as i32 as u32
                 }
             }
-            _ => 0,
+            _ => panic_gb!("Invalid halfword transfer type: {}", sh),
         };
         cpu.set_reg(rd, value);
     } else {
