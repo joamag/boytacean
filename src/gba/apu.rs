@@ -854,24 +854,36 @@ impl GbaApu {
     /// Ticks channel 1 frequency sweep at 128 Hz.
     #[inline(always)]
     fn tick_ch1_sweep(&mut self) {
-        if self.ch1_sweep_pace == 0 {
+        if !self.ch1_sweep_enabled || self.ch1_sweep_pace == 0 {
             return;
         }
         self.ch1_sweep_sequence += 1;
         if self.ch1_sweep_sequence >= self.ch1_sweep_pace {
-            let delta = self.ch1_sweep_shadow >> self.ch1_sweep_slope as u16;
-            if self.ch1_sweep_decrease {
-                self.ch1_sweep_shadow = self.ch1_sweep_shadow.saturating_sub(delta);
-            } else {
-                self.ch1_sweep_shadow = self.ch1_sweep_shadow.saturating_add(delta);
-            }
-            if self.ch1_sweep_shadow > 0x07FF {
+            // the new frequency is only written back with a non-zero
+            // slope, then checked again for overflow (not written back)
+            let frequency = self.ch1_sweep_frequency();
+            if frequency > 0x07FF {
                 self.ch1_enabled = false;
-                self.ch1_sweep_shadow = 0x07FF;
-            } else {
-                self.ch1_wave_length = self.ch1_sweep_shadow;
+            } else if self.ch1_sweep_slope > 0 {
+                self.ch1_sweep_shadow = frequency;
+                self.ch1_wave_length = frequency;
+                if self.ch1_sweep_frequency() > 0x07FF {
+                    self.ch1_enabled = false;
+                }
             }
             self.ch1_sweep_sequence = 0;
+        }
+    }
+
+    /// Calculates the next channel 1 sweep frequency from the shadow
+    /// register, a value above 0x7FF means an overflow.
+    #[inline(always)]
+    fn ch1_sweep_frequency(&self) -> u16 {
+        let delta = self.ch1_sweep_shadow >> self.ch1_sweep_slope;
+        if self.ch1_sweep_decrease {
+            self.ch1_sweep_shadow.saturating_sub(delta)
+        } else {
+            self.ch1_sweep_shadow.saturating_add(delta)
         }
     }
 
@@ -1079,16 +1091,8 @@ impl GbaApu {
         }
 
         // overflow check on sweep
-        if self.ch1_sweep_slope > 0 {
-            let delta = self.ch1_sweep_shadow >> self.ch1_sweep_slope;
-            let new_freq = if self.ch1_sweep_decrease {
-                self.ch1_sweep_shadow.saturating_sub(delta)
-            } else {
-                self.ch1_sweep_shadow.saturating_add(delta)
-            };
-            if new_freq > 0x07FF {
-                self.ch1_enabled = false;
-            }
+        if self.ch1_sweep_slope > 0 && self.ch1_sweep_frequency() > 0x07FF {
+            self.ch1_enabled = false;
         }
     }
 
@@ -2436,6 +2440,80 @@ mod tests {
 
         // frequency should not change with pace=0
         assert_eq!(apu.ch1_sweep_shadow, original);
+    }
+
+    #[test]
+    fn test_sweep_zero_slope_keeps_frequency() {
+        for sweep in [0x10, 0x18] {
+            let mut apu = GbaApu::new();
+            apu.set_soundcnt_x(0x80);
+
+            // sweep: pace=1, increase or decrease, slope=0
+            apu.write_channel_reg(0x0400_0060, sweep);
+            apu.write_channel_reg(0x0400_0063, 0xF0);
+            // set frequency = 0x300
+            apu.write_channel_reg(0x0400_0064, 0x00);
+            apu.write_channel_reg(0x0400_0065, 0x83);
+
+            let sequencer_period = CPU_FREQ / 512;
+            apu.sequencer_step = 2;
+            apu.sequencer_counter = sequencer_period - 1;
+            apu.clock(1);
+            apu.flush();
+
+            // the overflow check runs, the frequency is not written back
+            assert!(apu.ch1_enabled);
+            assert_eq!(apu.ch1_sweep_shadow, 0x300);
+            assert_eq!(apu.ch1_wave_length, 0x300);
+        }
+    }
+
+    #[test]
+    fn test_sweep_second_overflow_disables_channel() {
+        let mut apu = GbaApu::new();
+        apu.set_soundcnt_x(0x80);
+
+        // sweep: pace=1, increase, slope=1
+        apu.write_channel_reg(0x0400_0060, 0x11);
+        apu.write_channel_reg(0x0400_0063, 0xF0);
+        // set frequency = 0x500, the trigger check sees 0x780
+        apu.write_channel_reg(0x0400_0064, 0x00);
+        apu.write_channel_reg(0x0400_0065, 0x85);
+        assert!(apu.ch1_enabled);
+
+        let sequencer_period = CPU_FREQ / 512;
+        apu.sequencer_step = 2;
+        apu.sequencer_counter = sequencer_period - 1;
+        apu.clock(1);
+        apu.flush();
+
+        // 0x780 is written back, the second check sees 0xB40 > 0x7FF
+        assert_eq!(apu.ch1_wave_length, 0x780);
+        assert!(!apu.ch1_enabled);
+    }
+
+    #[test]
+    fn test_sweep_disabled_on_trigger() {
+        let mut apu = GbaApu::new();
+        apu.set_soundcnt_x(0x80);
+
+        // trigger with pace=0 and slope=0, leaving the sweep disabled
+        apu.write_channel_reg(0x0400_0063, 0xF0);
+        apu.write_channel_reg(0x0400_0064, 0x00);
+        apu.write_channel_reg(0x0400_0065, 0x81);
+
+        // sweep: pace=1, increase, slope=1 written after the trigger
+        apu.write_channel_reg(0x0400_0060, 0x11);
+
+        let sequencer_period = CPU_FREQ / 512;
+        apu.sequencer_step = 2;
+        apu.sequencer_counter = sequencer_period - 1;
+        apu.clock(1);
+        apu.flush();
+
+        // the sweep only runs once enabled by a trigger
+        assert_eq!(apu.ch1_wave_length, 0x100);
+        assert!(apu.ch1_enabled);
     }
 
     #[test]
