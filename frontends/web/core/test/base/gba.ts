@@ -3,7 +3,7 @@ import { readFile } from "fs/promises";
 import { resolve } from "path";
 import { pathToFileURL } from "url";
 
-import { logger, LogLevel } from "emukit/logic";
+import { bufferToBase64, logger, LogLevel } from "emukit/logic";
 
 import { GbaCore, releaseGbaCore } from "../../ts/gba";
 import { NullStorageAdapter, StorageAdapter } from "../../ts/storage";
@@ -59,6 +59,20 @@ const buildCore = (
     cores.push(core);
     return core;
 };
+
+/**
+ * Builds a storage adapter backed by the provided in memory items,
+ * allowing the persistence operations of the core to be verified.
+ *
+ * @param items The in memory items to be used as the storage.
+ * @returns The storage adapter backed by the items.
+ */
+const buildStorage = (items: Record<string, string>): StorageAdapter => ({
+    getItem: (key: string) => (key in items ? items[key] : null),
+    setItem: (key: string, value: string) => {
+        items[key] = value;
+    }
+});
 
 /**
  * Fetches the file at the provided URL from the local file system,
@@ -169,6 +183,23 @@ describe("GbaCore", function () {
             assert.strictEqual(core.imageBuffer.length, 240 * 160 * 3);
         });
 
+        it("should be able to flush the RAM of a battery backed ROM", async () => {
+            const items: Record<string, string> = {};
+            const core = buildCore(buildStorage(items));
+            await core.boot({
+                romName: "sram.gba",
+                romData: await readRom(SRAM_ROM_URL)
+            });
+            await core.tick({ cycles: FRAME_CYCLES });
+            assert.deepStrictEqual(Object.keys(items), []);
+            await core.tick({ cycles: FLUSH_CYCLES });
+            assert.deepStrictEqual(Object.keys(items), ["gba:1337:GBA Tests"]);
+            assert.strictEqual(
+                items["gba:1337:GBA Tests"],
+                bufferToBase64(core.instance?.ram_data_eager() ?? [])
+            );
+        });
+
         it("should be able to survive a failing storage adapter", async () => {
             const core = buildCore({
                 getItem: () => null,
@@ -260,6 +291,45 @@ describe("GbaCore", function () {
                 reuse: false
             });
             assert.notStrictEqual(core.instance, instance);
+        });
+
+        it("should be able to restore the RAM of a battery backed ROM", async () => {
+            const core = buildCore(
+                buildStorage({
+                    "gba:1337:GBA Tests": bufferToBase64(
+                        new Uint8Array([0x12, 0x34, 0x56, 0x78])
+                    )
+                })
+            );
+            await core.boot({
+                romName: "sram.gba",
+                romData: await readRom(SRAM_ROM_URL)
+            });
+            const ramData = core.instance?.ram_data_eager() ?? [];
+            assert.strictEqual(ramData.length, 32768);
+            assert.deepStrictEqual(
+                Array.from(ramData.slice(0, 5)),
+                [0x12, 0x34, 0x56, 0x78, 0xff]
+            );
+        });
+
+        it("should be able to ignore the RAM of a Game Boy ROM with the same title", async () => {
+            const core = buildCore(
+                buildStorage({
+                    "GBA Tests": bufferToBase64(
+                        new Uint8Array([0x12, 0x34, 0x56, 0x78])
+                    )
+                })
+            );
+            await core.boot({
+                romName: "sram.gba",
+                romData: await readRom(SRAM_ROM_URL)
+            });
+            const ramData = core.instance?.ram_data_eager() ?? [];
+            assert.notDeepStrictEqual(
+                Array.from(ramData.slice(0, 4)),
+                [0x12, 0x34, 0x56, 0x78]
+            );
         });
 
         it("should be able to reject an invalid ROM", async () => {

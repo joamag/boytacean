@@ -513,13 +513,24 @@ export class GbaCore extends EmulatorLogic {
     }
 
     /**
+     * The name of the item under which the RAM of the current ROM is
+     * kept in the storage adapter, namespaced away from the Game Boy
+     * saves and keyed by both the game code and the title of the ROM,
+     * as the title alone is shared by many ROMs (eg: homebrew).
+     */
+    protected get ramKey(): string {
+        const gameCode = this.romInfoI?.game_code() ?? "";
+        const title = this.romInfoI?.title() ?? "";
+        return `gba:${gameCode}:${title}`;
+    }
+
+    /**
      * Tries for save/flush the current machine RAM into the
      * storage adapter, so that it can be latter restored.
      */
     protected saveRam() {
-        if (!this.gba) return;
+        if (!this.gba || !this.romInfoI) return;
         if (!this.gba.has_battery()) return;
-        const title = this.gba.rom_title();
         const ramData = this.gba.ram_data_eager();
         const ramDataB64 = bufferToBase64(ramData);
 
@@ -527,7 +538,7 @@ export class GbaCore extends EmulatorLogic {
         // operation, meaning that a failing adapter (eg: exhausted
         // quota) would otherwise break the emulation loop
         try {
-            this.storage.setItem(title, ramDataB64);
+            this.storage.setItem(this.ramKey, ramDataB64);
         } catch (err) {
             this.logger.warn(`Failed to save RAM data (${err})`);
         }
@@ -535,12 +546,12 @@ export class GbaCore extends EmulatorLogic {
 
     /**
      * Tries to load game RAM from the storage adapter using the
-     * current ROM title as the name of the item and decoding it
-     * using Base64.
+     * RAM key of the current ROM as the name of the item and
+     * decoding it using Base64.
      */
     protected loadRam() {
-        if (!this.gba) return;
-        const ramDataB64 = this.storage.getItem(this.gba.rom_title());
+        if (!this.gba || !this.romInfoI) return;
+        const ramDataB64 = this.storage.getItem(this.ramKey);
         if (!ramDataB64) return;
         const ramData = base64ToBuffer(ramDataB64);
         this.gba.set_ram_data(ramData);
