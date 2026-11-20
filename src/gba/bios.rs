@@ -1307,6 +1307,25 @@ mod tests {
     }
 
     #[test]
+    fn test_swi_sqrt_rounds_down() {
+        for (value, root) in [
+            (1, 1),
+            (2, 1),
+            (3, 1),
+            (15, 3),
+            (16, 4),
+            (0xFFFE_0000, 0xFFFE),
+            (0xFFFE_0001, 0xFFFF),
+            (u32::MAX, 0xFFFF),
+        ] {
+            let mut cpu = make_cpu();
+            cpu.set_reg(0, value);
+            handle_swi(&mut cpu, 0x08);
+            assert_eq!(cpu.reg(0), root);
+        }
+    }
+
+    #[test]
     fn test_swi_arctan() {
         // tan(PI / 4) = 1.0 (0x4000) maps to PI / 4 (0x2000), with the
         // results of the BIOS polynomial sign extended to 32 bits
@@ -1381,6 +1400,39 @@ mod tests {
         handle_swi(&mut cpu, 0x0B);
         assert_eq!(cpu.bus_read32(0x0200_1000), 0xDEADBEEF);
         assert_eq!(cpu.bus_read32(0x0200_100C), 0xDEADBEEF);
+    }
+
+    #[test]
+    fn test_swi_cpu_set_fill_16bit() {
+        let mut cpu = make_cpu();
+        cpu.bus_write16(0x0200_0000, 0xBEEF);
+        cpu.bus_write16(0x0200_0002, 0x1234);
+        cpu.set_reg(0, 0x0200_0000);
+        cpu.set_reg(1, 0x0600_0000);
+        cpu.set_reg(2, 3 | (1 << 24));
+        handle_swi(&mut cpu, 0x0B);
+        // the source halfword is repeated, the source is not advanced
+        for i in 0..3 {
+            assert_eq!(cpu.bus_read16(0x0600_0000 + i * 2), 0xBEEF);
+        }
+        assert_eq!(cpu.bus_read16(0x0600_0006), 0);
+    }
+
+    #[test]
+    fn test_swi_cpu_set_copy_32bit() {
+        let mut cpu = make_cpu();
+        for i in 0..4 {
+            cpu.bus_write32(0x0200_0000 + i * 4, 0x1111_1111 * (i + 1));
+        }
+        cpu.set_reg(0, 0x0200_0000);
+        cpu.set_reg(1, 0x0300_0000);
+        // bits 21-23 are not part of the word count
+        cpu.set_reg(2, 3 | (7 << 21) | (1 << 26));
+        handle_swi(&mut cpu, 0x0B);
+        for i in 0..3 {
+            assert_eq!(cpu.bus_read32(0x0300_0000 + i * 4), 0x1111_1111 * (i + 1));
+        }
+        assert_eq!(cpu.bus_read32(0x0300_000C), 0);
     }
 
     #[test]
@@ -1725,6 +1777,38 @@ mod tests {
     }
 
     #[test]
+    fn test_swi_rl_decomp() {
+        for (comment, dst) in [(0x14, 0x0200_1000), (0x15, 0x0600_0000)] {
+            // compressed (N-3) and uncompressed (N-1) runs, including
+            // the longest compressed run and runs cut at the data size
+            for (data, expected) in [
+                (vec![0x30, 0, 0, 0], vec![]),
+                (
+                    vec![0x30, 6, 0, 0, 0x81, 0xAA, 0x01, 1, 2],
+                    vec![0xAA, 0xAA, 0xAA, 0xAA, 1, 2],
+                ),
+                (vec![0x30, 130, 0, 0, 0xFF, 0x11], vec![0x11; 130]),
+                (vec![0x30, 6, 0, 0, 0x85, 0xBB], vec![0xBB; 6]),
+                (vec![0x30, 2, 0, 0, 0x03, 9, 8, 7, 6], vec![9, 8]),
+            ] {
+                let mut cpu = make_cpu();
+                for (i, byte) in data.iter().enumerate() {
+                    cpu.bus_write8(0x0200_0000 + i as u32, *byte);
+                }
+                cpu.bus_write16(dst + 0x100, 0xBEEF);
+                cpu.set_reg(0, 0x0200_0000);
+                cpu.set_reg(1, dst);
+                assert!(!handle_swi(&mut cpu, comment));
+                for (i, byte) in expected.iter().enumerate() {
+                    assert_eq!(cpu.bus_read8(dst + i as u32), *byte);
+                }
+                assert_eq!(cpu.bus_read8(dst + expected.len() as u32), 0);
+                assert_eq!(cpu.bus_read16(dst + 0x100), 0xBEEF);
+            }
+        }
+    }
+
+    #[test]
     fn test_swi_diff_unfilt8_wram() {
         let mut cpu = make_cpu();
 
@@ -1745,6 +1829,29 @@ mod tests {
         assert_eq!(cpu.bus_read8(0x0200_1001), 15);
         assert_eq!(cpu.bus_read8(0x0200_1002), 18);
         assert_eq!(cpu.bus_read8(0x0200_1003), 20);
+    }
+
+    #[test]
+    fn test_swi_diff_unfilt8_vram() {
+        let mut cpu = make_cpu();
+
+        // header: type=0x81 (8-bit diff), size=4
+        cpu.bus_write32(0x0200_0000, 0x00000481);
+        // deltas: 10, 5, -10, -1
+        cpu.bus_write8(0x0200_0004, 10);
+        cpu.bus_write8(0x0200_0005, 5);
+        cpu.bus_write8(0x0200_0006, 0xF6);
+        cpu.bus_write8(0x0200_0007, 0xFF);
+        cpu.bus_write16(0x0600_0004, 0xBEEF);
+
+        cpu.set_reg(0, 0x0200_0000);
+        cpu.set_reg(1, 0x0600_0000);
+        handle_swi(&mut cpu, 0x17);
+
+        // accumulated (wrapping): 10, 15, 5, 4, written as halfwords
+        assert_eq!(cpu.bus_read16(0x0600_0000), 0x0F0A);
+        assert_eq!(cpu.bus_read16(0x0600_0002), 0x0405);
+        assert_eq!(cpu.bus_read16(0x0600_0004), 0xBEEF);
     }
 
     #[test]
