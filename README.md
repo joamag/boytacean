@@ -16,6 +16,7 @@ A Game Boy emulator that is written in Rust 🦀.
 * Serial Data Transfer ([Link Cable](https://en.wikipedia.org/wiki/Game_Link_Cable)) support
 * [Game Boy Printer](https://en.wikipedia.org/wiki/Game_Boy_Printer) emulation
 * Support for multiple MBCs: MBC1, MBC2, MBC3, and MBC5
+* Cartridge dumping with a [GBxCart RW](https://www.gbxcart.com), to play games straight from their cartridge in the Web and SDL front-ends, with ROM flashing to flash cartridges coming in [#59](https://github.com/joamag/boytacean/issues/59)
 * Save state support using the [BESS Specification](https://github.com/LIJI32/SameBoy/blob/master/BESS.md) for cross-compatibility with other emulators
 * Cheat support using [Game Genie](https://en.wikipedia.org/wiki/Game_Genie) and [GameShark](https://pt.wikipedia.org/wiki/GameShark) codes
 * Variable CPU clock speed
