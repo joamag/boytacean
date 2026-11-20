@@ -78,12 +78,12 @@ mod tests {
 
     #[test]
     fn test_open_port_auto() {
-        // the device is either found and opened (when connected), found
-        // and failing to open (eg: open in another program) or the lack
-        // of it is reported, never another error
+        // the device is either found and opened (when connected), the
+        // ports fail to be listed or opened (eg: open in another program)
+        // or the lack of it is reported, never another error
         match open_port("auto") {
             Ok((_, port)) => assert!(Path::new(&port).exists()),
-            Err(Error::IoError(message)) => assert!(message.starts_with("Failed to open ")),
+            Err(Error::IoError(_)) => {}
             Err(err) => assert_eq!(
                 err,
                 Error::CustomError(String::from(
