@@ -243,10 +243,12 @@ fn swi_div(cpu: &mut Arm7Tdmi) {
     let den = cpu.reg(1) as i32;
 
     if den == 0 {
-        // division by zero: return 0
-        cpu.set_reg(0, 0);
+        // division by zero: the BIOS returns a quotient of 1 with the
+        // sign of the numerator (it hangs when the numerator is above
+        // one in magnitude, never relied upon by games)
+        cpu.set_reg(0, if num < 0 { -1i32 as u32 } else { 1 });
         cpu.set_reg(1, num as u32);
-        cpu.set_reg(3, 0);
+        cpu.set_reg(3, 1);
         return;
     }
 
@@ -266,9 +268,9 @@ fn swi_div_arm(cpu: &mut Arm7Tdmi) {
     let num = cpu.reg(1) as i32;
 
     if den == 0 {
-        cpu.set_reg(0, 0);
+        cpu.set_reg(0, if num < 0 { -1i32 as u32 } else { 1 });
         cpu.set_reg(1, num as u32);
-        cpu.set_reg(3, 0);
+        cpu.set_reg(3, 1);
         return;
     }
 
@@ -1240,8 +1242,10 @@ mod tests {
         cpu.set_reg(0, 42);
         cpu.set_reg(1, 0);
         handle_swi(&mut cpu, 0x06);
-        assert_eq!(cpu.reg(0), 0);
-        assert_eq!(cpu.reg(3), 0);
+        // the BIOS returns a quotient of 1 with the sign of the numerator
+        assert_eq!(cpu.reg(0), 1);
+        assert_eq!(cpu.reg(1), 42);
+        assert_eq!(cpu.reg(3), 1);
     }
 
     #[test]
@@ -1265,7 +1269,10 @@ mod tests {
                 (10, -3, -3, 1),
                 (-10, -3, 3, -1),
                 (0, -1, 0, 0),
-                (i32::MIN, 0, 0, i32::MIN),
+                (0, 0, 1, 0),
+                (1, 0, 1, 1),
+                (-1, 0, -1, -1),
+                (i32::MIN, 0, -1, i32::MIN),
             ] {
                 let mut cpu = make_cpu();
                 let (r0, r1) = if comment == 0x06 {
