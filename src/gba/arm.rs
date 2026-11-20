@@ -634,9 +634,6 @@ fn arm_block_transfer(cpu: &mut Arm7Tdmi, instr: u32) {
                 addr = addr.wrapping_add(4);
             }
         }
-        if load_psr && reg_list & (1 << 15) != 0 {
-            cpu.restore_cpsr();
-        }
     } else {
         // for STM with writeback and base in rlist: if base is not the
         // lowest register, store the written-back value instead of original
@@ -675,6 +672,12 @@ fn arm_block_transfer(cpu: &mut Arm7Tdmi, instr: u32) {
             base.wrapping_sub(count * 4)
         };
         cpu.set_reg(rn, new_base);
+    }
+
+    // LDM with S bit and PC restores CPSR from SPSR only after the
+    // writeback, so that the base of the exception mode is updated
+    if is_load && load_psr && reg_list & (1 << 15) != 0 {
+        cpu.restore_cpsr();
     }
 
     cpu.cycles = count + if is_load { 2 } else { 1 };
@@ -821,7 +824,11 @@ fn arm_swi(cpu: &mut Arm7Tdmi, instr: u32) {
 
 #[cfg(test)]
 mod tests {
-    use crate::gba::{bus::GbaBus, cpu::Arm7Tdmi};
+    use crate::gba::{
+        bus::GbaBus,
+        consts::{CPSR_I, MODE_IRQ, MODE_SYS},
+        cpu::Arm7Tdmi,
+    };
 
     fn make_cpu() -> Arm7Tdmi {
         Arm7Tdmi::new(GbaBus::new())
@@ -1337,6 +1344,32 @@ mod tests {
 
         // Should store USR R8 = 32, not FIQ R8 = 64
         assert_eq!(cpu.bus_read32(mem), 32);
+    }
+
+    #[test]
+    fn test_arm_ldm_pc_restores_cpsr_after_writeback() {
+        // LDM with S bit and PC writes the base back to the registers
+        // of the exception mode before restoring CPSR from SPSR
+        let mut cpu = make_cpu();
+        let base = 0x0300_7F80u32;
+        let target = 0x0800_0100u32;
+        for (i, value) in [1, 2, 3, 4, target].iter().enumerate() {
+            cpu.bus_write32(base + i as u32 * 4, *value);
+        }
+        cpu.set_cpsr(MODE_IRQ | CPSR_I);
+        cpu.set_spsr(MODE_SYS);
+        cpu.set_reg(13, base);
+
+        // LDMFD SP!, {R0-R3, PC}^ -> E8FD800F
+        super::execute_arm(&mut cpu, 0xE8FD800F);
+
+        assert_eq!(cpu.cpsr(), MODE_SYS);
+        assert_eq!(cpu.pc(), target);
+        assert_eq!(cpu.reg(0), 1);
+        assert_eq!(cpu.reg(3), 4);
+        assert_eq!(cpu.reg(13), 0x0300_7F00); // SP_sys untouched
+        cpu.set_cpsr(MODE_IRQ | CPSR_I);
+        assert_eq!(cpu.reg(13), base + 20); // SP_irq written back
     }
 
     #[test]
