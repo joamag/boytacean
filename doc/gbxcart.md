@@ -10,35 +10,35 @@ The device shows up as a CH340 USB serial converter (`1a86:7523`) and talks at 1
 
 Every command starts with a single byte, some of them followed by arguments (big endian), and the reply (if any) has a fixed size.
 
-| Byte | Name | Arguments | Reply |
-| ---- | ---- | --------- | ----- |
-| `0xA1` | `QUERY_FW_INFO` | | 9 bytes: length (8), kind (`L`), version (u16), PCB version (4 for v1.3), build timestamp (u32) |
-| `0xA3` | `SET_MODE_DMG` | | |
-| `0xA4` | `SET_VOLTAGE_3_3V` | | |
-| `0xA5` | `SET_VOLTAGE_5V` | | |
-| `0xA6` | `SET_VARIABLE` | size (1), key (u32), value (u32) | |
-| `0xA7` | `SET_FLASH_COMMANDS` | `01 02 01`, then 6 commands of address (u32) and value (u16) | |
-| `0xA8` | `SET_ADDR_AS_INPUTS` | | |
-| `0xB1` | `DMG_CART_READ` | | `TRANSFER_SIZE` bytes read from `ADDRESS`, which then moves past them |
-| `0xB2` | `DMG_CART_WRITE` | address (u32), value (1) | |
-| `0xB4` | `DMG_MBC_RESET` | | `0x01` |
-| `0xD1` | `DMG_FLASH_WRITE` | address (u32), value (1) | |
-| `0xD3` | `DMG_FLASH_PROGRAM` | `TRANSFER_SIZE` bytes of data | `0x01` once programmed |
+| Byte   | Name                 | Arguments                                                    | Reply                                                                                           |
+| ------ | -------------------- | ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| `0xA1` | `QUERY_FW_INFO`      |                                                              | 9 bytes: length (8), kind (`L`), version (u16), PCB version (4 for v1.3), build timestamp (u32) |
+| `0xA3` | `SET_MODE_DMG`       |                                                              |                                                                                                 |
+| `0xA4` | `SET_VOLTAGE_3_3V`   |                                                              |                                                                                                 |
+| `0xA5` | `SET_VOLTAGE_5V`     |                                                              |                                                                                                 |
+| `0xA6` | `SET_VARIABLE`       | size (1), key (u32), value (u32)                             |                                                                                                 |
+| `0xA7` | `SET_FLASH_COMMANDS` | `01 02 01`, then 6 commands of address (u32) and value (u16) |                                                                                                 |
+| `0xA8` | `SET_ADDR_AS_INPUTS` |                                                              |                                                                                                 |
+| `0xB1` | `DMG_CART_READ`      |                                                              | `TRANSFER_SIZE` bytes read from `ADDRESS`, which then moves past them                           |
+| `0xB2` | `DMG_CART_WRITE`     | address (u32), value (1)                                     |                                                                                                 |
+| `0xB4` | `DMG_MBC_RESET`      |                                                              | `0x01`                                                                                          |
+| `0xD1` | `DMG_FLASH_WRITE`    | address (u32), value (1)                                     |                                                                                                 |
+| `0xD3` | `DMG_FLASH_PROGRAM`  | `TRANSFER_SIZE` bytes of data                                | `0x01` once programmed                                                                          |
 
 The variables set with `SET_VARIABLE`, identified by their size and key:
 
-| Size | Key | Name | Use |
-| ---- | ---- | ---- | --- |
-| 1 | `0x00` | `CART_MODE` | 1 for Game Boy cartridges |
-| 1 | `0x01` | `DMG_ACCESS_MODE` | 1 to read the ROM, 3 to read the RAM |
-| 1 | `0x05` | `FLASH_PROGRAM_MODE` | must be 0 for `DMG_FLASH_PROGRAM` to program and reply as described |
-| 1 | `0x08` | `DMG_READ_CS_PULSE` | 1 while reading the RAM, which needs the chip select pulsed |
-| 1 | `0x09` | `DMG_WRITE_CS_PULSE` | 0 |
-| 1 | `0x0B` | `DMG_READ_METHOD` | 1 |
-| 2 | `0x00` | `TRANSFER_SIZE` | number of bytes of each read or program |
-| 2 | `0x01` | `FLASH_BUFFER_SIZE` | size of the write buffer of the flash chip (from its CFI table) |
-| 2 | `0x02` | `DMG_ROM_BANK` | ROM bank selected in the MBC, set right after selecting it |
-| 4 | `0x00` | `ADDRESS` | address of the next read or program |
+| Size | Key    | Name                 | Use                                                                 |
+| ---- | ------ | -------------------- | ------------------------------------------------------------------- |
+| 1    | `0x00` | `CART_MODE`          | 1 for Game Boy cartridges                                           |
+| 1    | `0x01` | `DMG_ACCESS_MODE`    | 1 to read the ROM, 3 to read the RAM                                |
+| 1    | `0x05` | `FLASH_PROGRAM_MODE` | must be 0 for `DMG_FLASH_PROGRAM` to program and reply as described |
+| 1    | `0x08` | `DMG_READ_CS_PULSE`  | 1 while reading the RAM, which needs the chip select pulsed         |
+| 1    | `0x09` | `DMG_WRITE_CS_PULSE` | 0                                                                   |
+| 1    | `0x0B` | `DMG_READ_METHOD`    | 1                                                                   |
+| 2    | `0x00` | `TRANSFER_SIZE`      | number of bytes of each read or program                             |
+| 2    | `0x01` | `FLASH_BUFFER_SIZE`  | size of the write buffer of the flash chip (from its CFI table)     |
+| 2    | `0x02` | `DMG_ROM_BANK`       | ROM bank selected in the MBC, set right after selecting it          |
+| 4    | `0x00` | `ADDRESS`            | address of the next read or program                                 |
 
 ## Reading
 
