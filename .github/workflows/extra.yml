@@ -40,7 +40,7 @@ jobs:
           cd frontends/sdl
           cargo test
       - name: Test All
-        run: cargo test --all
+        run: cargo test --all --features cartridge
       - name: Build SDL
         run: |
           cd frontends/sdl
@@ -84,7 +84,7 @@ jobs:
           cd frontends/sdl
           cargo test
       - name: Test All
-        run: cargo test --all
+        run: cargo test --all --features cartridge
       - name: Build SDL
         run: |
           cd frontends/sdl
