@@ -20,6 +20,7 @@ use crate::{
     gb::{AudioProvider, GameBoy},
     gba::{rom::is_gba_rom, GameBoyAdvance},
     pad::PadKey,
+    rom::Cartridge,
 };
 
 /// ROM/Cartridge information returned by [`System::load_rom_file`].
@@ -58,15 +59,21 @@ pub enum System {
 
 impl System {
     /// Detects the system type from the ROM data and creates
-    /// the appropriate emulator instance.
+    /// the appropriate emulator instance, ready to be run.
+    ///
+    /// The Game Boy runs in the mode preferred by the cartridge
+    /// (CGB for CGB compatible cartridges) and starts with the
+    /// default boot ROM of that mode.
     pub fn from_rom(data: &[u8]) -> Result<Self, Error> {
         if is_gba_rom(data) {
             let mut gba = GameBoyAdvance::new();
             gba.load_rom(data)?;
             Ok(System::Gba(gba))
         } else {
-            let mut gb = GameBoy::new(None);
-            gb.load_rom(data, None)?;
+            let rom = Cartridge::from_data(data)?;
+            let mut gb = GameBoy::new(Some(rom.gb_mode()));
+            gb.load(true)?;
+            gb.load_cartridge(rom)?;
             Ok(System::Gb(gb))
         }
     }
@@ -327,7 +334,11 @@ mod tests {
     };
 
     use super::System;
-    use crate::{gb::GameBoy, gba::GameBoyAdvance, pad::PadKey};
+    use crate::{
+        gb::{GameBoy, GameBoyMode},
+        gba::GameBoyAdvance,
+        pad::PadKey,
+    };
 
     #[test]
     fn test_from_rom_gb() {
@@ -337,9 +348,25 @@ mod tests {
         if let System::Gb(gb) = system {
             assert_eq!(gb.rom_i().title(), "POCKET-DEMO");
             assert_eq!(gb.rom_i().read(0xB2), 0x96);
+            assert_eq!(gb.mode(), GameBoyMode::Dmg);
         } else {
             panic!("Expected Game Boy system");
         }
+    }
+
+    #[test]
+    fn test_from_rom_gb_cgb() {
+        let data = include_bytes!("../res/roms/test/blargg/cpu/cpu_instrs.gb");
+        let mut system = System::from_rom(data).unwrap();
+        if let System::Gb(gb) = &system {
+            assert_eq!(gb.mode(), GameBoyMode::Cgb);
+        } else {
+            panic!("Expected Game Boy system");
+        }
+
+        // the system is ready to run, starting with the boot ROM
+        assert!(system.next_frame() > 0);
+        assert_eq!(system.ppu_frame(), 1);
     }
 
     #[test]
