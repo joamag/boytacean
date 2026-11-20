@@ -429,6 +429,10 @@ pub struct GbaApu {
     /// Output audio buffer (interleaved stereo i16 samples).
     audio_buffer: VecDeque<i16>,
 
+    /// Maximum number of entries in the audio buffer, one second
+    /// of interleaved stereo samples.
+    audio_buffer_max: usize,
+
     /// Sample counter for timing audio output.
     sample_counter: u32,
 
@@ -522,6 +526,7 @@ impl GbaApu {
             sequencer_step: 0,
 
             audio_buffer: VecDeque::with_capacity(4096),
+            audio_buffer_max: SAMPLING_RATE as usize * 2,
             sample_counter: 0,
             sample_period: CPU_FREQ / SAMPLING_RATE,
             pending_cycles: 0,
@@ -1064,6 +1069,14 @@ impl GbaApu {
         let left = (left * 64).clamp(-32768, 32767) as i16;
         let right = (right * 64).clamp(-32768, 32767) as i16;
 
+        // verifies if we've reached the maximum allowed size for the
+        // audio buffer and if that's the case the oldest stereo sample
+        // is removed from the buffer (avoiding overflow)
+        if self.audio_buffer.len() >= self.audio_buffer_max {
+            self.audio_buffer.pop_front();
+            self.audio_buffer.pop_front();
+        }
+
         self.audio_buffer.push_back(left);
         self.audio_buffer.push_back(right);
     }
@@ -1481,7 +1494,7 @@ impl Default for GbaApu {
 
 #[cfg(test)]
 mod tests {
-    use super::{DirectSoundChannel, GbaApu};
+    use super::{DirectSoundChannel, GbaApu, SAMPLING_RATE};
     use crate::gba::consts::{CPU_FREQ, CYCLES_PER_FRAME};
 
     #[test]
@@ -2677,6 +2690,28 @@ mod tests {
 
         // should have at least 2 samples (left, right)
         assert!(apu.audio_buffer().len() >= 2);
+    }
+
+    #[test]
+    fn test_generate_sample_buffer_max() {
+        let mut apu = GbaApu::new();
+        apu.set_soundcnt_h(0x0304);
+        apu.direct_sound[0].write_fifo(0x01);
+
+        // the buffer holds up to one second of stereo samples
+        for _ in 0..SAMPLING_RATE {
+            apu.generate_sample();
+        }
+        assert_eq!(apu.audio_buffer().len(), SAMPLING_RATE as usize * 2);
+
+        // a full buffer drops the oldest stereo sample for the newest
+        apu.direct_sound[0].timer_tick();
+        apu.generate_sample();
+        let buffer = apu.audio_buffer();
+        assert_eq!(buffer.len(), SAMPLING_RATE as usize * 2);
+        assert_eq!(buffer[buffer.len() - 3], 0);
+        assert_eq!(buffer[buffer.len() - 2], 256);
+        assert_eq!(buffer[buffer.len() - 1], 256);
     }
 
     #[test]
