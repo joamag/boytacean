@@ -162,6 +162,7 @@ jobs:
       - name: Install Python dependencies
         run: |
           python3 -m venv venv
+          venv/bin/pip install --upgrade pip
           venv/bin/pip install -r requirements.txt pytest numpy
       - name: Build Python library
         run: venv/bin/pip install --no-build-isolation -e .
