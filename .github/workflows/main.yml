@@ -174,7 +174,7 @@ jobs:
       - name: Run unit tests
         run: cd frontends/sdl && cargo test
       - name: Run all unit tests
-        run: cargo test --all --features cartridge
+        run: cargo test --all --features cartridge,profile
       - name: Build development version
         run: cd frontends/sdl && cargo build
       - name: Build release version
