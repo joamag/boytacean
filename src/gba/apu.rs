@@ -113,7 +113,7 @@ impl DirectSoundChannel {
         }
     }
 
-    /// Returns true if the FIFO needs refilling (fewer than 16 bytes).
+    /// Returns true if the FIFO needs refilling (16 bytes or fewer).
     pub fn needs_refill(&self) -> bool {
         self.fifo.len() <= 16
     }
@@ -1032,9 +1032,8 @@ impl GbaApu {
             + (ch3 & -((panning >> 14) & 1))
             + (ch4 & -((panning >> 15) & 1));
 
-        // Scale PSG sum by 8 (matches mGBA's <<= 3 and NanoBoyAdvance's
-        // ×8 waveform amplitude). Without this, PSG is 16x too quiet
-        // relative to DirectSound channels.
+        // scales the PSG sum by 8 (0-120 per channel), placing it on
+        // the same 10-bit mixer scale as the DirectSound channels
         legacy_right <<= 3;
         legacy_left <<= 3;
 
@@ -1044,8 +1043,8 @@ impl GbaApu {
         legacy_right *= right_vol;
         legacy_left *= left_vol;
 
-        // SOUNDCNT_H bits 0-1: legacy volume ratio (0=25%, 1=50%, 2=100%)
-        // mGBA uses shift = 4 - volume (not 2 - volume)
+        // SOUNDCNT_H bits 0-1: legacy volume ratio (0=25%, 1=50%, 2=100%),
+        // applied as a right shift by 4, 3 or 2 of the scaled sum
         let legacy_volume = ((self.soundcnt_h & 0x03) as i32).min(2);
         let legacy_shift = 4 - legacy_volume;
         legacy_right >>= legacy_shift;
@@ -1057,15 +1056,16 @@ impl GbaApu {
         let ds_b_left = self.direct_sound[1].output_left() as i32;
         let ds_b_right = self.direct_sound[1].output_right() as i32;
 
-        // GBA hardware mixer: add SOUNDBIAS, clamp to 10-bit DAC, subtract bias.
-        // This matches NanoBoyAdvance and mGBA's mixing pipeline.
+        // hardware mixer: adds SOUNDBIAS, clamps to the 10-bit DAC
+        // range (0-0x3FF) and removes the bias again
         let bias = (self.soundbias & 0x3FF) as i32;
         let raw_left = legacy_left + ds_a_left + ds_b_left + bias;
         let raw_right = legacy_right + ds_a_right + ds_b_right + bias;
         let left = raw_left.clamp(0, 0x3FF) - bias;
         let right = raw_right.clamp(0, 0x3FF) - bias;
 
-        // Scale from 10-bit signed (±512) to i16 range (×64)
+        // scales from the 10-bit signed range (-512 to 511) to the
+        // i16 range (x64)
         let left = (left * 64).clamp(-32768, 32767) as i16;
         let right = (right * 64).clamp(-32768, 32767) as i16;
 

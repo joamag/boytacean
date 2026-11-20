@@ -315,7 +315,7 @@ impl GbaDma {
     /// Triggers sound FIFO DMA (special timing, channels 1-2).
     ///
     /// On real hardware, sound DMA forces 4-word (32-bit) transfers
-    /// to the FIFO register. Only channels whose latched destination
+    /// to the FIFO register. Only channels whose destination register
     /// matches the requested FIFO address are triggered.
     pub fn trigger_sound_fifo(&mut self, fifo_index: usize) {
         let fifo_addr = if fifo_index == 0 {
@@ -750,7 +750,7 @@ mod tests {
         // both FIFOs can be triggered independently without cross-contamination
         let mut dma = GbaDma::new();
 
-        // DMA1 → FIFO A, DMA2 → FIFO B
+        // DMA1 to FIFO A, DMA2 to FIFO B
         dma.channels[1].set_src_reg(0x0300_5000);
         dma.channels[1].set_dst_reg(REG_FIFO_A);
         dma.channels[1].set_count_reg(4);
