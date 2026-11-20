@@ -104,7 +104,10 @@ impl DmaChannel {
 
     pub fn set_control(&mut self, value: u16, channel_index: usize) {
         let was_enabled = self.control & (1 << 15) != 0;
-        self.control = value;
+
+        // bits 0-4 are unused and the game pak DRQ (bit 11) is
+        // DMA3 only, both read as zero
+        self.control = value & if channel_index == 3 { 0xFFE0 } else { 0xF7E0 };
         self.channel_index = channel_index as u8;
         self.transfer_flags = ((value >> 10) & 1) as u8;
         if (channel_index == 1 || channel_index == 2) && self.timing() == DMA_TIMING_SPECIAL {
@@ -118,18 +121,9 @@ impl DmaChannel {
 
         // latch registers when transitioning from disabled to enabled
         if !was_enabled && now_enabled {
-            self.src = self.src_reg;
-            self.dst = self.dst_reg;
-            self.count = if self.count_reg == 0 {
-                // 0 means max count (0x4000 for DMA0-2, 0x10000 for DMA3)
-                if channel_index == 3 {
-                    0x10000
-                } else {
-                    0x4000
-                }
-            } else {
-                self.count_reg as u32
-            };
+            self.src = self.latch_src();
+            self.dst = self.latch_dst();
+            self.count = self.latch_count();
 
             // start immediately if timing mode is immediate
             if self.timing() == DMA_TIMING_IMMEDIATE {
@@ -224,17 +218,9 @@ impl DmaChannel {
             self.active = false;
             if self.repeat() && self.timing() != DMA_TIMING_IMMEDIATE {
                 // re-latch count (and dst if IncrementReload)
-                self.count = if self.count_reg == 0 {
-                    if self.channel_index == 3 {
-                        0x10000
-                    } else {
-                        0x4000
-                    }
-                } else {
-                    self.count_reg as u32
-                };
+                self.count = self.latch_count();
                 if self.dst_control() == DmaAddrControl::IncrementReload {
-                    self.dst = self.dst_reg;
+                    self.dst = self.latch_dst();
                 }
             } else {
                 // disable the channel
@@ -243,6 +229,45 @@ impl DmaChannel {
         }
 
         (src_addr, dst_addr, complete)
+    }
+
+    /// Returns the source register masked to the source address
+    /// width, 27 bits for DMA0 (internal memory only) and 28 bits
+    /// for DMA1-3.
+    fn latch_src(&self) -> u32 {
+        let mask = if self.channel_index == 0 {
+            0x07FF_FFFF
+        } else {
+            0x0FFF_FFFF
+        };
+        self.src_reg & mask
+    }
+
+    /// Returns the destination register masked to the destination
+    /// address width, 27 bits for DMA0-2 (internal memory only) and
+    /// 28 bits for DMA3.
+    fn latch_dst(&self) -> u32 {
+        let mask = if self.channel_index == 3 {
+            0x0FFF_FFFF
+        } else {
+            0x07FF_FFFF
+        };
+        self.dst_reg & mask
+    }
+
+    /// Returns the word count register masked to the count width,
+    /// 14 bits for DMA0-2 and 16 bits for DMA3, where 0 means the
+    /// max count (0x4000 for DMA0-2, 0x10000 for DMA3).
+    fn latch_count(&self) -> u32 {
+        let mask = if self.channel_index == 3 {
+            0xFFFF
+        } else {
+            0x3FFF
+        };
+        match self.count_reg as u32 & mask {
+            0 => mask + 1,
+            count => count,
+        }
     }
 }
 
@@ -451,6 +476,26 @@ mod tests {
     }
 
     #[test]
+    fn test_dma_set_control_masks() {
+        for index in 0..4 {
+            let mut ch = DmaChannel::new();
+            ch.set_src_reg(0xFFFF_FFFF);
+            ch.set_dst_reg(0xFFFF_FFFF);
+            ch.set_count_reg(0xC000);
+            ch.set_control(!(DMA_TIMING_SPECIAL << 12), index);
+
+            // bits 0-4 are unused and the game pak DRQ (11) is DMA3 only
+            assert_eq!(ch.control(), if index == 3 { 0xCFE0 } else { 0xC7E0 });
+
+            // DMA0 only reads and DMA0-2 only write the internal memory
+            // (27 bits), the count of DMA0-2 is 14 bits (0 is the max)
+            assert_eq!(ch.src(), if index == 0 { 0x07FF_FFFF } else { 0x0FFF_FFFF });
+            assert_eq!(ch.dst(), if index == 3 { 0x0FFF_FFFF } else { 0x07FF_FFFF });
+            assert_eq!(ch.remaining(), if index == 3 { 0xC000 } else { 0x4000 });
+        }
+    }
+
+    #[test]
     fn test_dma_immediate_trigger() {
         let mut dma = GbaDma::new();
         dma.channels[0].set_src_reg(0x0800_0000);
@@ -576,6 +621,29 @@ mod tests {
                     assert!(ch.enabled());
                 }
             }
+        }
+    }
+
+    #[test]
+    fn test_dma_step_repeat_masks() {
+        for index in 0..4 {
+            let mut ch = DmaChannel::new();
+            ch.set_dst_reg(0xFF00_0000);
+            ch.set_count_reg(0x8002);
+            ch.set_control(
+                (1 << 15) | (DMA_TIMING_HBLANK << 12) | (1 << 9) | (3 << 5),
+                index,
+            );
+
+            // the repeat re-latches the masked count and destination
+            let count = if index == 3 { 0x8002 } else { 2 };
+            let dst = if index == 3 { 0x0F00_0000 } else { 0x0700_0000 };
+            ch.set_active(true);
+            for _ in 0..count {
+                ch.step();
+            }
+            assert_eq!(ch.remaining(), count);
+            assert_eq!(ch.dst(), dst);
         }
     }
 
