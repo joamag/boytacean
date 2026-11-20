@@ -37,7 +37,10 @@ impl GbaPad {
     }
 
     pub fn set_keycnt(&mut self, value: u16) {
-        self.keycnt = value;
+        // bits 10-13 are unused, keys already held when the
+        // interrupt is enabled are able to trigger it right away
+        self.keycnt = value & 0xC3FF;
+        self.check_interrupt();
     }
 
     pub fn int_keypad(&self) -> bool {
@@ -123,7 +126,35 @@ mod tests {
     fn test_keycnt() {
         let mut pad = GbaPad::new();
         pad.set_keycnt(0x1234);
-        assert_eq!(pad.keycnt(), 0x1234);
+        assert_eq!(pad.keycnt(), 0x0234); // bits 10-13 unused
+        pad.set_keycnt(0xFFFF);
+        assert_eq!(pad.keycnt(), 0xC3FF);
+    }
+
+    #[test]
+    fn test_set_keycnt() {
+        let mut pad = GbaPad::new();
+        pad.key_press(PadKey::A);
+        pad.key_press(PadKey::B);
+
+        // enabling the IRQ while A+B are held triggers it (AND mode)
+        pad.set_keycnt((1 << 14) | (1 << 15) | 0x0003);
+        assert!(pad.int_keypad());
+
+        // only A held does not meet the AND condition
+        pad.ack_keypad();
+        pad.key_lift(PadKey::B);
+        pad.set_keycnt((1 << 14) | (1 << 15) | 0x0003);
+        assert!(!pad.int_keypad());
+
+        // only A held meets the OR condition
+        pad.set_keycnt((1 << 14) | 0x0003);
+        assert!(pad.int_keypad());
+
+        // no IRQ without the enable bit
+        pad.ack_keypad();
+        pad.set_keycnt(0x0003);
+        assert!(!pad.int_keypad());
     }
 
     #[test]

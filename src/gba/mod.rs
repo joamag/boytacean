@@ -567,7 +567,10 @@ impl Display for GameBoyAdvance {
 #[cfg(test)]
 mod tests {
     use super::GameBoyAdvance;
-    use crate::pad::PadKey;
+    use crate::{
+        gba::consts::{IRQ_KEYPAD, REG_KEYCNT},
+        pad::PadKey,
+    };
 
     #[test]
     #[allow(clippy::assertions_on_constants)]
@@ -829,6 +832,20 @@ mod tests {
         assert_eq!(gba.cpu.bus.timers.read_counter(0), 0xFFFF);
         assert_eq!(gba.cpu.bus.irq.if_(), 0);
         assert_eq!(gba.cpu.bus.apu.direct_sound[0].fifo_len(), 4);
+    }
+
+    #[test]
+    fn test_clock_keypad_irq() {
+        let mut gba = GameBoyAdvance::new();
+        gba.key_press(PadKey::A);
+        gba.key_press(PadKey::B);
+
+        // enabling the AND mode IRQ while A+B are already held
+        gba.cpu.bus.write16(REG_KEYCNT, 0xC003);
+        assert_eq!(gba.cpu.bus.read16(REG_KEYCNT), 0xC003);
+        gba.clock();
+        assert_eq!(gba.cpu.bus.irq.if_() & IRQ_KEYPAD, IRQ_KEYPAD);
+        assert!(!gba.cpu.bus.pad.int_keypad());
     }
 
     #[test]
