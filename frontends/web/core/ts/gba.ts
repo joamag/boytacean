@@ -7,6 +7,7 @@ import {
 } from "boytacean";
 import {
     base64ToBuffer,
+    BenchmarkResult,
     bufferToBase64,
     EmulatorLogic,
     PixelFormat,
@@ -444,6 +445,16 @@ export class GbaCore extends EmulatorLogic {
         this.trigger("frequency", value);
     }
 
+    get displayFrequency(): number {
+        return this.visualFrequency;
+    }
+
+    set displayFrequency(value: number) {
+        value = Math.max(value, 0);
+        this.visualFrequency = value;
+        this.trigger("display-frequency", value);
+    }
+
     /**
      * The name of the ROM that is currently loaded in the machine,
      * null in case no ROM has been loaded yet.
@@ -502,14 +513,42 @@ export class GbaCore extends EmulatorLogic {
 
     pauseAudio() {
         this.gba?.set_apu_enabled(false);
+        this.trigger("audio-state", { state: "paused", stateBool: false });
     }
 
     resumeAudio() {
         this.gba?.set_apu_enabled(true);
+        this.trigger("audio-state", { state: "resumed", stateBool: true });
     }
 
     getAudioState(): boolean {
         return this.gba?.apu_enabled() ?? false;
+    }
+
+    benchmark(count = 50000000): BenchmarkResult {
+        let cycles = 0;
+        this.pause();
+        try {
+            const initial = EmulatorLogic.now();
+            for (let i = 0; i < count; i++) {
+                cycles += this.gba?.clock() ?? 0;
+            }
+            const delta = (EmulatorLogic.now() - initial) / 1000;
+            const frequency_mhz = cycles / delta / 1000 / 1000;
+            return {
+                delta: delta,
+                count: count,
+                cycles: cycles,
+                frequency_mhz: frequency_mhz
+            };
+        } finally {
+            this.resume();
+        }
+    }
+
+    onBackground(background: string) {
+        this.extraSettings.background = background;
+        this.storeSettings();
     }
 
     /**

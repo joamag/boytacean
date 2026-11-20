@@ -443,6 +443,29 @@ describe("GbaCore", function () {
         });
     });
 
+    describe("#displayFrequency", function () {
+        it("should be able to default to the GBA display frequency", () => {
+            assert.strictEqual(buildCore().displayFrequency, 59.7275);
+        });
+
+        it("should be able to change the display frequency", () => {
+            const core = buildCore();
+            const values: unknown[] = [];
+            core.bind("display-frequency", (_owner, value) =>
+                values.push(value)
+            );
+            core.displayFrequency = 30;
+            assert.strictEqual(core.displayFrequency, 30);
+            assert.deepStrictEqual(values, [30]);
+        });
+
+        it("should be able to clamp a negative display frequency", () => {
+            const core = buildCore();
+            core.displayFrequency = -1;
+            assert.strictEqual(core.displayFrequency, 0);
+        });
+    });
+
     describe("#loadedRomName", function () {
         it("should be able to start without a ROM name", () => {
             assert.strictEqual(buildCore().loadedRomName, null);
@@ -524,8 +547,13 @@ describe("GbaCore", function () {
         it("should be able to disable the APU", async () => {
             const core = buildCore();
             await core.boot({ loadRom: true, romPath: NONE_ROM_URL });
+            const states: unknown[] = [];
+            core.bind("audio-state", (_owner, state) => states.push(state));
             core.pauseAudio();
             assert.strictEqual(core.getAudioState(), false);
+            assert.deepStrictEqual(states, [
+                { state: "paused", stateBool: false }
+            ]);
         });
     });
 
@@ -534,14 +562,40 @@ describe("GbaCore", function () {
             const core = buildCore();
             await core.boot({ loadRom: true, romPath: NONE_ROM_URL });
             core.pauseAudio();
+            const states: unknown[] = [];
+            core.bind("audio-state", (_owner, state) => states.push(state));
             core.resumeAudio();
             assert.strictEqual(core.getAudioState(), true);
+            assert.deepStrictEqual(states, [
+                { state: "resumed", stateBool: true }
+            ]);
         });
     });
 
     describe("#getAudioState()", function () {
         it("should be able to report a disabled APU when idle", () => {
             assert.strictEqual(buildCore().getAudioState(), false);
+        });
+    });
+
+    describe("#benchmark()", function () {
+        it("should be able to measure the clock of the GBA", async () => {
+            const core = buildCore();
+            await core.boot({ loadRom: true, romPath: NONE_ROM_URL });
+            const result = core.benchmark(1000);
+            assert.strictEqual(result.count, 1000);
+            assert.ok(result.cycles >= 1000);
+            assert.ok(result.frequency_mhz > 0);
+        });
+    });
+
+    describe("#onBackground()", function () {
+        it("should be able to store the background in the settings", () => {
+            const items: Record<string, string> = {};
+            buildCore(buildStorage(items)).onBackground("264653");
+            assert.deepStrictEqual(JSON.parse(items["settings"]), {
+                background: "264653"
+            });
         });
     });
 });
