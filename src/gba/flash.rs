@@ -1,7 +1,7 @@
 //! GBA cartridge save media emulation.
 //!
 //! Supports SRAM (direct byte read/write), Flash (64KB/128KB)
-//! with the standard command protocol used by Sanyo/SST chips,
+//! with the standard command protocol of the Panasonic/Sanyo chips,
 //! and EEPROM (512B/8KB) with the serial DMA-based protocol.
 
 use crate::gba::consts::SRAM_SIZE;
@@ -17,9 +17,9 @@ pub enum SaveType {
     None,
     /// 32KB SRAM (direct byte access).
     Sram,
-    /// 64KB flash (Sanyo LE39FW512).
+    /// 64KB flash (Panasonic MN63F805MNP).
     Flash64,
-    /// 128KB flash (Sanyo LE39FW1024, bank-switched).
+    /// 128KB flash (Sanyo LE26FV10N1TS, bank-switched).
     Flash128,
     /// EEPROM (512B or 8KB, serial DMA protocol).
     Eeprom,
@@ -369,13 +369,13 @@ impl SaveMedia {
     fn chip_id(&self, offset: usize) -> u8 {
         match self.save_type {
             SaveType::Flash64 => match offset {
-                0 => 0x62, // manufacturer (Sanyo)
-                1 => 0x13, // device (LE39FW512)
+                0 => 0x32, // manufacturer (Panasonic)
+                1 => 0x1B, // device (MN63F805MNP)
                 _ => 0,
             },
             SaveType::Flash128 => match offset {
                 0 => 0x62, // manufacturer (Sanyo)
-                1 => 0x13, // device (LE39FW1024)
+                1 => 0x13, // device (LE26FV10N1TS)
                 _ => 0,
             },
             _ => 0,
@@ -947,7 +947,7 @@ mod tests {
         save.write8(0x0E00_5555, 0xAA);
         save.write8(0x0E00_2AAA, 0x55);
         save.write8(0x0E00_5555, 0x90);
-        assert_eq!(save.read8(0x0E00_0000), 0x62);
+        assert_eq!(save.read8(0x0E00_0000), 0x32);
         save.reset();
         // should be back to normal reads
         assert_eq!(save.read8(0x0E00_0000), 0x42);
@@ -1055,8 +1055,22 @@ mod tests {
         save.write8(0x0E00_5555, 0xAA);
         save.write8(0x0E00_2AAA, 0x55);
         save.write8(0x0E00_5555, 0x90);
+        // Panasonic MN63F805MNP, recognized by the 64KB flash libraries
+        assert_eq!(save.read8(0x0E00_0000), 0x32);
+        assert_eq!(save.read8(0x0E00_0001), 0x1B);
+    }
+
+    #[test]
+    fn test_flash128_chip_id_enter() {
+        let mut save = SaveMedia::new();
+        save.detect_save_type(b"FLASH1M_V");
+        save.write8(0x0E00_5555, 0xAA);
+        save.write8(0x0E00_2AAA, 0x55);
+        save.write8(0x0E00_5555, 0x90);
+        // Sanyo LE26FV10N1TS, recognized by the 128KB flash library
         assert_eq!(save.read8(0x0E00_0000), 0x62);
         assert_eq!(save.read8(0x0E00_0001), 0x13);
+        assert_eq!(save.read8(0x0E00_0002), 0xFF);
     }
 
     #[test]
