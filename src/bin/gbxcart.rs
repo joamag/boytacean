@@ -212,13 +212,18 @@ fn flash<T: Read + Write>(
     }
 
     // an interrupted or failed flashing never damages the cartridge, as
-    // flashing it again always recovers it, which is told to the user
-    println!("Flashing can be run again at any point, if it's interrupted");
+    // flashing it again (without a backup of the partly flashed contents)
+    // always recovers it, which is told to the user
+    let recovery = match &options.backup {
+        Some(backup) => {
+            format!("flash it again with --no-backup to recover it, keeping its backup in {backup}")
+        }
+        None => String::from("flash it again with --no-backup to recover it"),
+    };
+    println!("If flashing gets interrupted, {recovery}");
     flasher
         .run(transport, print_progress("Flashing cartridge"))
-        .map_err(|err| {
-            format!("Failed to flash the cartridge ({err}), flashing it again recovers it")
-        })?;
+        .map_err(|err| format!("Failed to flash the cartridge ({err}), {recovery}"))?;
     println!();
     println!("Flashed {path} into the {chip}");
     Ok(())
@@ -589,24 +594,44 @@ mod tests {
 
     #[test]
     fn test_flash_failure() {
-        // a failed flashing tells that flashing it again recovers it
+        // a flashing that fails after the backup tells how to recover the
+        // cartridge, flashing it again without a new backup (as the backup
+        // file exists already), which then recovers it
         let directory = build_directory("gbxcart-failure");
+        let old_rom = build_rom(0x00, 0x00);
         let rom = build_rom(0x19, 0x00);
         write(directory.join("game.gb"), &rom).unwrap();
+        let backup = directory.join("backup.gb");
         let mut replies = probe_replies(true);
+        replies.extend(dump_replies(&old_rom, &[]));
+        let start = replies.len();
         replies.extend(flash_replies(&rom));
 
-        // past the probe of the tool, the probe of the flashing and the
-        // erase of the first two sectors is the first acknowledgement
-        let program = probe_replies(true).len() * 2 + 4;
-        replies[program] = 0x00;
+        // past the probe of the flashing and the erase of the first two
+        // sectors is the first acknowledgement of a program
+        replies[start + probe_replies(true).len() + 4] = 0x00;
         let mut transport = Replay::new(replies);
-        let options = build_options("flash", &directory.join("game.gb"), None, true);
+        let options = build_options("flash", &directory.join("game.gb"), Some(&backup), true);
         let result = flash(&mut transport, "/dev/ttyUSB0", &options);
         assert_eq!(
             result.unwrap_err().to_string(),
-            "Failed to flash the cartridge (Data error: Failed to program the flash chip at 0x000000), flashing it again recovers it"
+            format!(
+                "Failed to flash the cartridge (Data error: Failed to program the flash chip at 0x000000), flash it again with --no-backup to recover it, keeping its backup in {}",
+                backup.to_string_lossy()
+            )
         );
+        assert_eq!(read(&backup).unwrap(), old_rom);
+
+        let result = flash(&mut Replay::new(vec![]), "/dev/ttyUSB0", &options);
+        assert!(result.unwrap_err().to_string().ends_with("use --backup"));
+
+        let mut replies = probe_replies(true);
+        replies.extend(flash_replies(&rom));
+        let mut transport = Replay::new(replies);
+        let options = build_options("flash", &directory.join("game.gb"), None, true);
+        flash(&mut transport, "/dev/ttyUSB0", &options).unwrap();
+        assert!(transport.replies.is_empty());
+        assert_eq!(read(&backup).unwrap(), old_rom);
         remove_dir_all(directory).unwrap();
     }
 
