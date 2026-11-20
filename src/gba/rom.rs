@@ -31,6 +31,11 @@ const NINTENDO_LOGO: [u8; 156] = [
     0xD6, 0x25, 0xE4, 0x8B, 0x38, 0x0A, 0xAC, 0x72, 0x21, 0xD4, 0xF8, 0x07,
 ];
 
+/// Structure that defines the header information of a
+/// Game Boy Advance cartridge ROM.
+///
+/// Parsed from the 192 bytes header at the start of the ROM,
+/// homebrew images with an invalid logo or checksum are accepted.
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
 #[derive(Clone)]
 pub struct GbaRomInfo {
@@ -75,11 +80,6 @@ impl GbaRomInfo {
             header_checksum,
             rom_size: data.len(),
         })
-    }
-
-    /// Validates the header checksum against the computed value.
-    pub fn validate_checksum(&self, data: &[u8]) -> bool {
-        data.len() >= MIN_ROM_SIZE && compute_checksum(data) == self.header_checksum
     }
 }
 
@@ -195,6 +195,7 @@ mod tests {
         assert_eq!(info.game_code(), "ATST");
         assert_eq!(info.maker_code(), "01");
         assert_eq!(info.software_version(), 1);
+        assert_eq!(info.header_checksum(), data[0xBD]);
         assert_eq!(info.rom_size(), 0x200);
     }
 
@@ -216,16 +217,6 @@ mod tests {
         data[0xB2] = 0x96;
         assert!(GbaRomInfo::from_data(&data).is_ok());
         assert!(!is_gba_rom(&data));
-    }
-
-    #[test]
-    fn test_validate_checksum() {
-        let data = make_gba_rom("TESTGAME", "ATST", "01");
-        let info = GbaRomInfo::from_data(&data).unwrap();
-        assert!(info.validate_checksum(&data));
-        for size in [0, 0xA0, 0xBD, 0xBF] {
-            assert!(!info.validate_checksum(&data[..size]));
-        }
     }
 
     #[test]
