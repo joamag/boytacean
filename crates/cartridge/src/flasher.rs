@@ -268,6 +268,12 @@ impl Flasher {
         self.commands
             .push_back(Command::with_reply(vec![DMG_MBC_RESET], 1, Target::Ack));
         self.push(set_variable(FLASH_PROGRAM_MODE, 0x00));
+
+        // reads the start of the cartridge before writing to it, as the
+        // writes don't reach the cartridge until the first read once its
+        // address lines were released (eg: at the end of a previous run)
+        self.push_read(0x0000, CHUNK_SIZE, ACCESS_MODE_ROM_READ);
+        self.push_reads(1, CHUNK_SIZE, Target::None);
         self.push_flash_writes(&cfi_writes());
         self.push_read(0x0000, CHUNK_SIZE, ACCESS_MODE_ROM_READ);
         self.push_reads(CFI_SIZE / CHUNK_SIZE, CHUNK_SIZE, Target::Cfi);
@@ -492,6 +498,7 @@ mod tests {
         voltages: Vec<u8>,
         broken_byte: Option<usize>,
         failed_program: bool,
+        driven: bool,
         input: Vec<u8>,
         output: VecDeque<u8>,
         commands: Vec<u8>,
@@ -521,6 +528,7 @@ mod tests {
                 voltages: vec![],
                 broken_byte: None,
                 failed_program: false,
+                driven: false,
                 input: vec![],
                 output: VecDeque::new(),
                 commands: vec![],
@@ -626,7 +634,8 @@ mod tests {
                 match command[0] {
                     QUERY_FW_INFO => self.output.extend(self.firmware.clone()),
                     SET_VOLTAGE_3_3V | SET_VOLTAGE_5V => self.voltages.push(command[0]),
-                    SET_MODE_DMG | SET_ADDR_AS_INPUTS => {}
+                    SET_MODE_DMG => {}
+                    SET_ADDR_AS_INPUTS => self.driven = false,
                     SET_VARIABLE => {
                         let key =
                             u32::from_be_bytes([command[2], command[3], command[4], command[5]]);
@@ -642,6 +651,7 @@ mod tests {
                         }
                     }
                     SET_FLASH_COMMANDS => self.flash_commands = command[1..].to_vec(),
+                    DMG_CART_WRITE | DMG_FLASH_WRITE if !self.driven => {}
                     DMG_CART_WRITE => {
                         let address =
                             u32::from_be_bytes([command[1], command[2], command[3], command[4]]);
@@ -666,6 +676,7 @@ mod tests {
                         self.output.push_back(0x01);
                     }
                     DMG_CART_READ => {
+                        self.driven = true;
                         for index in 0..self.transfer_size as u32 {
                             let byte = self.read(self.address + index);
                             self.output.push_back(byte);
