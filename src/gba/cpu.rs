@@ -811,6 +811,7 @@ impl Arm7Tdmi {
         self.spsr = [0; 5];
         self.banked = BankedRegisters::new();
         self.halted = false;
+        self.halt_deadlock_warned = false;
         self.intr_wait_pc = 0;
         self.pipeline_valid = false;
 
@@ -894,10 +895,14 @@ mod tests {
         cpu.step();
         assert!(cpu.cycles > 0);
         cpu.set_halted(true);
+        cpu.halt_deadlock_warned = true;
+        cpu.intr_wait_pc = 0x0800_0004;
         cpu.reset_for_bios_boot();
         assert_eq!(cpu.cycles, 0);
         assert_eq!(cpu.reg(0), 0);
         assert!(!cpu.halted());
+        assert!(!cpu.halt_deadlock_warned);
+        assert_eq!(cpu.intr_wait_pc, 0);
         assert_eq!(cpu.pc(), 0x0000_0000);
         assert_eq!(cpu.cpsr() & CPSR_MODE_MASK, MODE_SVC);
         assert!(cpu.cpsr() & CPSR_I != 0); // IRQs disabled
@@ -1838,10 +1843,14 @@ mod tests {
         cpu.step();
         assert!(cpu.cycles > 0);
         cpu.set_halted(true);
+        cpu.halt_deadlock_warned = true;
+        cpu.intr_wait_pc = 0x0800_0004;
         cpu.reset();
         assert_eq!(cpu.cycles, 0);
         assert_eq!(cpu.reg(0), 0);
         assert!(!cpu.halted());
+        assert!(!cpu.halt_deadlock_warned);
+        assert_eq!(cpu.intr_wait_pc, 0);
         assert_eq!(cpu.pc(), 0x0800_0000);
         assert_eq!(cpu.reg(13), 0x0300_7F00); // SP_SYS
         assert_eq!(cpu.cpsr() & CPSR_MODE_MASK, MODE_SYS);
