@@ -63,6 +63,8 @@ Flash cartridges hold a NOR flash chip behind an MBC5 compatible mapper. The who
 6. Every bank is read back and compared with the ROM.
 7. `SET_VOLTAGE_5V` and `SET_ADDR_AS_INPUTS`.
 
+Any failure once the chip is detected (a ROM that doesn't fit, an erase timeout, a refused program or a failed verification) resets the chip, then sends `SET_VOLTAGE_5V` and `SET_ADDR_AS_INPUTS`, leaving the cartridge readable. An interrupted or failed flashing leaves the chip partly erased and programmed, which flashing it again recovers, as long as nothing replaces the backup of the original contents: the retry is made with `--no-backup` once that backup is kept safe (also as the cartridge may no longer have a valid header to back up), as in `gbxcart flash game.gb --yes --no-backup`, or `gbxcart flash cartridge.backup.gb --yes --no-backup` to restore the original contents.
+
 Measured on a 4 MiB flash cartridge (CFI ID `01 7E`, 8 sectors of 8 KiB then 63 of 64 KiB, 32 byte write buffer): erasing a sector takes about 0.1 s, and programming runs at about 28 KiB/s (9 ms per 256 bytes), so a 4 MiB ROM takes about 2.5 minutes.
 
 ## Unknowns
