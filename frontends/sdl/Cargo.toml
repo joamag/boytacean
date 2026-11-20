@@ -14,7 +14,7 @@ slow = []
 debug = ["boytacean/debug"]
 pedantic = ["boytacean/pedantic"]
 cpulog = ["boytacean/cpulog"]
-cartridge = ["boytacean-cartridge", "serialport"]
+cartridge = ["boytacean-cartridge/serial"]
 
 [dependencies]
 boytacean = { path = "../..", version = "0.13.2" }
@@ -24,7 +24,6 @@ clap = { version = "4", features = ["derive"] }
 image = "0.24"
 chrono = "0.4"
 gl = "0.14"
-serialport = { version = "4", default-features = false, optional = true }
 
 [dependencies.sdl2]
 version = "0.36"

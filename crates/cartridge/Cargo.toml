@@ -9,7 +9,9 @@ rust-version = "1.86.0"
 
 [features]
 wasm = ["wasm-bindgen", "boytacean-common/wasm"]
+serial = ["serialport"]
 
 [dependencies]
 boytacean-common = { path = "../common", version = "0.13.2" }
 wasm-bindgen = { version = "0.2", optional = true }
+serialport = { version = "4", default-features = false, optional = true }

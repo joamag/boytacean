@@ -5,9 +5,10 @@
 
 use std::{
     cell::RefCell,
-    fs::File,
+    fs::{remove_file, rename, File},
     io::{BufWriter, Read, Write},
     path::Path,
+    process,
     rc::Rc,
     sync::{Arc, Mutex},
 };
@@ -51,6 +52,22 @@ pub fn write_file(path: &str, data: &[u8], flush: Option<bool>) -> Result<(), Er
             .map_err(|_| Error::CustomError(format!("Failed to flush file: {path}")))?;
     }
     Ok(())
+}
+
+/// Writes the data into a new file through a temporary file (of this
+/// process alone), that is only renamed into place once written, so that
+/// an incomplete file (eg: of a failed or interrupted write) is never
+/// taken as a complete one.
+pub fn write_new_file(path: &str, data: &[u8]) -> Result<(), Error> {
+    let part_path = format!("{path}.{}.part", process::id());
+    if let Err(err) = write_file(&part_path, data, None) {
+        remove_file(&part_path).ok();
+        return Err(err);
+    }
+    rename(&part_path, path).map_err(|err| {
+        remove_file(&part_path).ok();
+        Error::IoError(format!("Failed to rename {part_path}: {err}"))
+    })
 }
 
 /// Replaces the extension in the given path with the provided extension.
@@ -219,11 +236,75 @@ pub fn timestamp() -> u64 {
 mod tests {
     use std::{
         env::temp_dir,
-        fs::{read, remove_file},
-        path::Path,
+        fs::{create_dir_all, read, remove_dir_all, remove_file, write},
+        path::{Path, PathBuf},
+        process,
     };
 
-    use super::{capitalize, replace_ext, save_bmp};
+    use super::{capitalize, replace_ext, save_bmp, write_new_file};
+    use crate::error::Error;
+
+    /// Builds an empty directory for the files of a test, unique to the
+    /// test and to the process running it, so that runs never collide.
+    fn build_directory(name: &str) -> PathBuf {
+        let directory = temp_dir().join(format!("boytacean-{name}-{}", process::id()));
+        if directory.exists() {
+            remove_dir_all(&directory).unwrap();
+        }
+        create_dir_all(&directory).unwrap();
+        directory
+    }
+
+    #[test]
+    fn test_write_new_file() {
+        // the temporary file left by an interrupted write is replaced,
+        // and no temporary file is left once the file is in place
+        let directory = build_directory("util-new");
+        let path = directory
+            .join("boytacean.gb")
+            .to_string_lossy()
+            .into_owned();
+        let part_path = format!("{path}.{}.part", process::id());
+        write(&part_path, [0x0f]).unwrap();
+        write_new_file(&path, &[0x01, 0x02]).unwrap();
+        assert_eq!(read(&path).unwrap(), vec![0x01, 0x02]);
+        assert!(!Path::new(&part_path).exists());
+        remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn test_write_new_file_invalid() {
+        let path = Path::new("/dev/boytacean-none").join("boytacean.gb");
+        let path = path.to_string_lossy();
+        assert_eq!(
+            write_new_file(&path, &[0x01]),
+            Err(Error::CustomError(format!(
+                "Failed to create file: {path}.{}.part",
+                process::id()
+            )))
+        );
+        assert!(!Path::new(path.as_ref()).exists());
+    }
+
+    #[test]
+    fn test_write_new_file_rename() {
+        // a directory in place of the file makes the rename fail, which
+        // must not leave the temporary file behind
+        let directory = build_directory("util-rename");
+        let path = directory
+            .join("boytacean.gb")
+            .to_string_lossy()
+            .into_owned();
+        let part_path = format!("{path}.{}.part", process::id());
+        create_dir_all(&path).unwrap();
+        let result = write_new_file(&path, &[0x01]);
+        assert!(matches!(
+            result,
+            Err(Error::IoError(message)) if message.starts_with(&format!("Failed to rename {part_path}: "))
+        ));
+        assert!(!Path::new(&part_path).exists());
+        remove_dir_all(directory).unwrap();
+    }
 
     #[test]
     fn test_change_extension() {
