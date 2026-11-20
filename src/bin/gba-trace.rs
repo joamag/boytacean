@@ -531,6 +531,19 @@ mod tests {
     }
 
     #[test]
+    fn test_trace_until_pc_thumb() {
+        // stops at a THUMB address, reached through a branch into the
+        // THUMB state (add r0, pc, #1; bx r0; b .)
+        let mut gba = build_gba(&[0xE28F_0001, 0xE12F_FF10, 0x0000_E7FE]);
+        assert_eq!(
+            trace(&mut gba, &build_options(1, None, Some(0x0800_0008))),
+            2
+        );
+        assert_eq!(gba.ppu_frame(), 0);
+        assert_ne!(gba.cpu.cpsr() & 0x20, 0);
+    }
+
+    #[test]
     fn test_trace_watch() {
         // the changes of a memory word are reported without stopping,
         // even when clearing the IRQ handler of the BIOS (mov r0,
