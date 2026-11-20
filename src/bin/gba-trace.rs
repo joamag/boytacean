@@ -105,7 +105,6 @@ fn trace(gba: &mut GameBoyAdvance, options: &Options) -> u64 {
     let mut ring = vec![TraceEntry::default(); RING_SIZE];
     let mut ring_pos = 0usize;
     let mut ring_len = 0usize;
-    let mut prev_handler = 0u32;
     let mut prev_watch = options.watch.map(|addr| gba.cpu.bus.read32(addr));
     let mut instr_count = 0u64;
 
@@ -168,26 +167,6 @@ fn trace(gba: &mut GameBoyAdvance, options: &Options) -> u64 {
             dump_ring(&ring, ring_pos, ring_len);
             dump_regs(gba);
             return instr_count;
-        }
-
-        let handler = gba.cpu.bus.read32(0x03FF_FFFC);
-        if handler != prev_handler {
-            println!(
-                "-- frame {} instr {}: IRQ handler {:#010x} -> {:#010x} (PC={:#010x})",
-                gba.ppu_frame(),
-                instr_count,
-                prev_handler,
-                handler,
-                exec_pc
-            );
-            // the handler being cleared after boot is the corruption
-            // signature under investigation — dump the path that did it
-            if prev_handler != 0 && handler == 0 {
-                dump_ring(&ring, ring_pos, ring_len);
-                dump_regs(gba);
-                return instr_count;
-            }
-            prev_handler = handler;
         }
 
         gba.clock();
@@ -548,20 +527,22 @@ mod tests {
 
     #[test]
     fn test_trace_watch() {
-        // the changes of a memory word are reported without stopping
-        // (mov r0, #0x03000000; mov r1, #5; str r1, [r0]; mov r1, #6;
-        // str r1, [r0])
+        // the changes of a memory word are reported without stopping,
+        // even when clearing the IRQ handler of the BIOS (mov r0,
+        // #0x04000000; sub r0, r0, #4; mov r1, #5; str r1, [r0];
+        // mov r1, #0; str r1, [r0])
         let mut gba = build_gba(&[
-            0xE3A0_0403,
+            0xE3A0_0404,
+            0xE240_0004,
             0xE3A0_1005,
             0xE580_1000,
-            0xE3A0_1006,
+            0xE3A0_1000,
             0xE580_1000,
             LOOP,
         ]);
-        trace(&mut gba, &build_options(1, Some(0x0300_0000), None));
+        trace(&mut gba, &build_options(1, Some(0x03FF_FFFC), None));
         assert_eq!(gba.ppu_frame(), 1);
-        assert_eq!(gba.cpu.bus.read32(0x0300_0000), 6);
+        assert_eq!(gba.cpu.reg(1), 0);
     }
 
     #[test]
