@@ -1020,10 +1020,14 @@ impl GbaBus {
         self.pad = GbaPad::new();
         self.irq = IrqController::new();
         self.waitcnt = 0;
+        self.siocnt = 0;
+        self.siomlt_send = 0;
+        self.siomulti0 = 0xFFFF;
+        self.rcnt = 0;
         self.postflg = 0;
         self.halt_requested = false;
         self.intr_wait_flags = 0;
-        self.bios_value = 0;
+        self.bios_value = 0xE129F000; // value left by the BIOS startup
         self.bios_readable = false;
     }
 
@@ -2303,9 +2307,22 @@ mod tests {
         let mut bus = GbaBus::new();
         bus.write32(0x0200_0000, 0xDEADBEEF);
         bus.halt_requested = true;
+        bus.update_bios_value(0x12345678);
+        bus.write16(REG_SIOMLT_SEND, 0x1234);
+        bus.write16(REG_SIOCNT, 0x2083);
+        bus.write16(REG_RCNT, 0x8000);
         bus.reset();
         assert_eq!(bus.read32(0x0200_0000), 0);
         assert!(!bus.halt_requested);
+
+        // BIOS open bus and serial state match a cold boot
+        assert_eq!(bus.read32(0x0000_0000), 0xE129F000);
+        assert_eq!(bus.read16(REG_SIOCNT), 1 << 2);
+        assert_eq!(bus.read16(REG_SIOMULTI0), 0xFFFF);
+        assert_eq!(bus.read16(REG_RCNT), 0);
+        bus.write8(REG_SIOMLT_SEND, 0xAB);
+        bus.write16(REG_SIOCNT, 0x2080);
+        assert_eq!(bus.read16(REG_SIOMULTI0), 0x00AB);
     }
 
     #[test]
