@@ -341,6 +341,27 @@ mod tests {
     };
 
     #[test]
+    fn test_rom_info() {
+        for (mut system, path, title) in [
+            (
+                System::Gb(GameBoy::new(None)),
+                "res/roms/demo/pocket.gb",
+                "POCKET-DEMO",
+            ),
+            (
+                System::Gba(GameBoyAdvance::new()),
+                "res/roms.gba/test/jsmolka_gba-tests/ppu_stripes.gba",
+                "GBA Tests",
+            ),
+        ] {
+            let info = system.load_rom_file(path, None).unwrap();
+            assert_eq!(info.title(), title);
+            assert!(info.description().contains(title));
+            assert_eq!(format!("{info}"), info.description());
+        }
+    }
+
+    #[test]
     fn test_from_rom_gb() {
         let mut data = include_bytes!("../res/roms/demo/pocket.gb").to_vec();
         data[0xB2] = 0x96;
@@ -412,9 +433,22 @@ mod tests {
     }
 
     #[test]
+    fn test_visual_freq_gb() {
+        let system = System::Gb(GameBoy::new(None));
+        assert_eq!(system.visual_freq(), GameBoy::VISUAL_FREQ);
+    }
+
+    #[test]
     fn test_visual_freq_gba() {
         let system = System::Gba(GameBoyAdvance::new());
         assert!(system.visual_freq() > 59.0);
+    }
+
+    #[test]
+    fn test_clock_gb() {
+        let mut system = System::from_rom(include_bytes!("../res/roms/demo/pocket.gb")).unwrap();
+        let cycles = system.clock();
+        assert!(cycles >= 4);
     }
 
     #[test]
@@ -425,10 +459,36 @@ mod tests {
     }
 
     #[test]
+    fn test_next_frame() {
+        for data in [
+            include_bytes!("../res/roms/demo/pocket.gb").as_slice(),
+            include_bytes!("../res/roms.gba/test/jsmolka_gba-tests/ppu_stripes.gba"),
+        ] {
+            let mut system = System::from_rom(data).unwrap();
+            assert_eq!(system.ppu_frame(), 0);
+            assert!(system.next_frame() > 0);
+            assert_eq!(system.ppu_frame(), 1);
+        }
+    }
+
+    #[test]
+    fn test_clocks_cycles_gb() {
+        let mut system = System::from_rom(include_bytes!("../res/roms/demo/pocket.gb")).unwrap();
+        let elapsed = system.clocks_cycles(100);
+        assert!(elapsed >= 100);
+    }
+
+    #[test]
     fn test_clocks_cycles_gba() {
         let mut system = System::Gba(GameBoyAdvance::new());
         let elapsed = system.clocks_cycles(100);
         assert!(elapsed >= 100);
+    }
+
+    #[test]
+    fn test_frame_buffer_gb() {
+        let mut system = System::Gb(GameBoy::new(None));
+        assert_eq!(system.frame_buffer().len(), 160 * 144 * 3);
     }
 
     #[test]
@@ -450,6 +510,15 @@ mod tests {
     }
 
     #[test]
+    fn test_clear_audio_buffer_gb() {
+        let mut system = System::from_rom(include_bytes!("../res/roms/demo/pocket.gb")).unwrap();
+        system.next_frame();
+        assert!(!system.audio_buffer().is_empty());
+        system.clear_audio_buffer();
+        assert!(system.audio_buffer().is_empty());
+    }
+
+    #[test]
     fn test_clear_audio_buffer_gba() {
         let mut system = System::Gba(GameBoyAdvance::new());
         system.clear_audio_buffer();
@@ -457,10 +526,32 @@ mod tests {
     }
 
     #[test]
+    fn test_key_press_lift_gb() {
+        let mut system = System::Gb(GameBoy::new(None));
+        if let System::Gb(gb) = &mut system {
+            gb.pad().write(0xff00, 0x10); // selects the action keys
+        }
+        system.key_press(PadKey::A);
+        if let System::Gb(gb) = &system {
+            assert_eq!(gb.pad_i().read(0xff00) & 0x01, 0x00);
+        }
+        system.key_lift(PadKey::A);
+        if let System::Gb(gb) = &system {
+            assert_eq!(gb.pad_i().read(0xff00) & 0x01, 0x01);
+        }
+    }
+
+    #[test]
     fn test_key_press_lift_gba() {
         let mut system = System::Gba(GameBoyAdvance::new());
         system.key_press(PadKey::A);
+        if let System::Gba(gba) = &system {
+            assert_eq!(gba.cpu.bus.pad.keyinput() & 0x01, 0x00);
+        }
         system.key_lift(PadKey::A);
+        if let System::Gba(gba) = &system {
+            assert_eq!(gba.cpu.bus.pad.keyinput() & 0x01, 0x01);
+        }
     }
 
     #[test]
@@ -553,6 +644,58 @@ mod tests {
     }
 
     #[test]
+    fn test_set_ppu_enabled() {
+        for mut system in [
+            System::Gb(GameBoy::new(None)),
+            System::Gba(GameBoyAdvance::new()),
+        ] {
+            for enabled in [false, true] {
+                system.set_ppu_enabled(enabled);
+                assert_eq!(system.ppu_enabled(), enabled);
+            }
+        }
+    }
+
+    #[test]
+    fn test_set_apu_enabled() {
+        for mut system in [
+            System::Gb(GameBoy::new(None)),
+            System::Gba(GameBoyAdvance::new()),
+        ] {
+            for enabled in [false, true] {
+                system.set_apu_enabled(enabled);
+                assert_eq!(system.apu_enabled(), enabled);
+            }
+        }
+    }
+
+    #[test]
+    fn test_set_dma_enabled() {
+        for mut system in [
+            System::Gb(GameBoy::new(None)),
+            System::Gba(GameBoyAdvance::new()),
+        ] {
+            for enabled in [false, true] {
+                system.set_dma_enabled(enabled);
+                assert_eq!(system.dma_enabled(), enabled);
+            }
+        }
+    }
+
+    #[test]
+    fn test_set_timer_enabled() {
+        for mut system in [
+            System::Gb(GameBoy::new(None)),
+            System::Gba(GameBoyAdvance::new()),
+        ] {
+            for enabled in [false, true] {
+                system.set_timer_enabled(enabled);
+                assert_eq!(system.timer_enabled(), enabled);
+            }
+        }
+    }
+
+    #[test]
     fn test_set_all_enabled() {
         for mut system in [
             System::Gb(GameBoy::new(None)),
@@ -574,6 +717,70 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn test_multiplier() {
+        for data in [
+            include_bytes!("../res/roms/demo/pocket.gb").as_slice(),
+            include_bytes!("../res/roms.gba/test/jsmolka_gba-tests/ppu_stripes.gba"),
+        ] {
+            let system = System::from_rom(data).unwrap();
+            assert_eq!(system.multiplier(), 1);
+        }
+    }
+
+    #[test]
+    fn test_audio_sampling_rate() {
+        let system = System::Gb(GameBoy::new(None));
+        assert_eq!(system.audio_sampling_rate(), 44100);
+        let system = System::Gba(GameBoyAdvance::new());
+        assert_eq!(system.audio_sampling_rate(), 32768);
+    }
+
+    #[test]
+    fn test_audio_channels() {
+        for system in [
+            System::Gb(GameBoy::new(None)),
+            System::Gba(GameBoyAdvance::new()),
+        ] {
+            assert_eq!(system.audio_channels(), 2);
+        }
+    }
+
+    #[test]
+    fn test_description_debug() {
+        let system = System::from_rom(include_bytes!("../res/roms/demo/pocket.gb")).unwrap();
+        if let System::Gb(gb) = &system {
+            assert_eq!(system.description_debug(), gb.description_debug());
+        }
+        let system = System::from_rom(include_bytes!(
+            "../res/roms.gba/test/jsmolka_gba-tests/ppu_stripes.gba"
+        ))
+        .unwrap();
+        assert_eq!(
+            system.description_debug(),
+            "GBA [GBA Tests] CPU: 16777216 Hz, PPU: 59.73 Hz"
+        );
+    }
+
+    #[test]
+    fn test_rom_title() {
+        let system = System::from_rom(include_bytes!("../res/roms/demo/pocket.gb")).unwrap();
+        assert_eq!(system.rom_title(), "POCKET-DEMO");
+        let system = System::from_rom(include_bytes!(
+            "../res/roms.gba/test/jsmolka_gba-tests/ppu_stripes.gba"
+        ))
+        .unwrap();
+        assert_eq!(system.rom_title(), "GBA Tests");
+    }
+
+    #[test]
+    fn test_reset_gb() {
+        let mut system = System::from_rom(include_bytes!("../res/roms/demo/pocket.gb")).unwrap();
+        system.next_frame();
+        system.reset();
+        assert_eq!(system.ppu_frame(), 0);
     }
 
     #[test]
