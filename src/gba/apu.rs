@@ -8,7 +8,14 @@
 
 use std::collections::VecDeque;
 
-use crate::warnln;
+use crate::{
+    gba::consts::{
+        CPU_FREQ, REG_SOUND1CNT_H, REG_SOUND1CNT_L, REG_SOUND1CNT_X, REG_SOUND2CNT_H,
+        REG_SOUND2CNT_L, REG_SOUND3CNT_H, REG_SOUND3CNT_L, REG_SOUND3CNT_X, REG_SOUND4CNT_H,
+        REG_SOUND4CNT_L,
+    },
+    warnln,
+};
 
 /// Sampling rate for audio output in Hz.
 const SAMPLING_RATE: u32 = 32768;
@@ -516,7 +523,7 @@ impl GbaApu {
 
             audio_buffer: VecDeque::with_capacity(4096),
             sample_counter: 0,
-            sample_period: super::consts::CPU_FREQ / SAMPLING_RATE,
+            sample_period: CPU_FREQ / SAMPLING_RATE,
             pending_cycles: 0,
         }
     }
@@ -685,7 +692,7 @@ impl GbaApu {
     fn run_pending(&mut self) {
         let mut cycles = self.pending_cycles;
         self.pending_cycles = 0;
-        let sequencer_period = super::consts::CPU_FREQ / 512;
+        let sequencer_period = CPU_FREQ / 512;
 
         while cycles > 0 {
             // stop at each event so samples never use future channel state
@@ -1133,81 +1140,84 @@ impl GbaApu {
     /// Some bits are write-only and return fixed values. The register
     /// layout follows the GBA memory map at 0x04000060-0x0400007D.
     pub fn read_channel_reg(&self, addr: u32) -> u8 {
-        let offset = addr & 0xFF;
-        match offset {
+        match addr {
             // SOUND1CNT_L (0x60): sweep
-            0x60 => {
+            REG_SOUND1CNT_L => {
                 (self.ch1_sweep_slope & 0x07)
                     | (if self.ch1_sweep_decrease { 0x08 } else { 0x00 })
                     | ((self.ch1_sweep_pace & 0x07) << 4)
                     | 0x80
             }
-            0x61 => 0,
             // SOUND1CNT_H (0x62): duty/length
-            0x62 => (self.ch1_wave_duty << 6) | 0x3F,
+            REG_SOUND1CNT_H => (self.ch1_wave_duty << 6) | 0x3F,
             // SOUND1CNT_H (0x63): envelope
-            0x63 => {
+            a if a == REG_SOUND1CNT_H + 1 => {
                 (self.ch1_envelope_pace & 0x07)
                     | ((self.ch1_envelope_direction & 0x01) << 3)
                     | ((self.ch1_initial_volume & 0x0F) << 4)
             }
             // SOUND1CNT_X (0x64): frequency low (write-only)
-            0x64 => 0xFF,
+            REG_SOUND1CNT_X => 0xFF,
             // SOUND1CNT_X (0x65): frequency high + control
-            0x65 => (if self.ch1_length_enabled { 0x40 } else { 0x00 }) | 0xBF,
+            a if a == REG_SOUND1CNT_X + 1 => {
+                (if self.ch1_length_enabled { 0x40 } else { 0x00 }) | 0xBF
+            }
 
             // SOUND2CNT_L (0x68): duty/length
-            0x68 => (self.ch2_wave_duty << 6) | 0x3F,
+            REG_SOUND2CNT_L => (self.ch2_wave_duty << 6) | 0x3F,
             // SOUND2CNT_L (0x69): envelope
-            0x69 => {
+            a if a == REG_SOUND2CNT_L + 1 => {
                 (self.ch2_envelope_pace & 0x07)
                     | ((self.ch2_envelope_direction & 0x01) << 3)
                     | ((self.ch2_initial_volume & 0x0F) << 4)
             }
-            0x6A | 0x6B => 0,
             // SOUND2CNT_H (0x6C): frequency low (write-only)
-            0x6C => 0xFF,
+            REG_SOUND2CNT_H => 0xFF,
             // SOUND2CNT_H (0x6D): frequency high + control
-            0x6D => (if self.ch2_length_enabled { 0x40 } else { 0x00 }) | 0xBF,
+            a if a == REG_SOUND2CNT_H + 1 => {
+                (if self.ch2_length_enabled { 0x40 } else { 0x00 }) | 0xBF
+            }
 
             // SOUND3CNT_L (0x70): DAC enable + wave bank
-            0x70 => {
+            REG_SOUND3CNT_L => {
                 (if self.wave_dimension { 0x20 } else { 0x00 })
                     | ((self.wave_bank & 1) << 6)
                     | (if self.ch3_dac { 0x80 } else { 0x00 })
                     | 0x1F
             }
-            0x71 => 0,
             // SOUND3CNT_H (0x72): length (write-only)
-            0x72 => 0xFF,
+            REG_SOUND3CNT_H => 0xFF,
             // SOUND3CNT_H (0x73): volume
-            0x73 => {
+            a if a == REG_SOUND3CNT_H + 1 => {
                 ((self.ch3_output_level & 0x03) << 5)
                     | (if self.ch3_force_volume { 0x80 } else { 0x00 })
                     | 0x1F
             }
             // SOUND3CNT_X (0x74): frequency low (write-only)
-            0x74 => 0xFF,
+            REG_SOUND3CNT_X => 0xFF,
             // SOUND3CNT_X (0x75): frequency high + control
-            0x75 => (if self.ch3_length_enabled { 0x40 } else { 0x00 }) | 0xBF,
+            a if a == REG_SOUND3CNT_X + 1 => {
+                (if self.ch3_length_enabled { 0x40 } else { 0x00 }) | 0xBF
+            }
 
             // SOUND4CNT_L (0x78): length (write-only)
-            0x78 => 0xFF,
+            REG_SOUND4CNT_L => 0xFF,
             // SOUND4CNT_L (0x79): envelope
-            0x79 => {
+            a if a == REG_SOUND4CNT_L + 1 => {
                 (self.ch4_envelope_pace & 0x07)
                     | ((self.ch4_envelope_direction & 0x01) << 3)
                     | ((self.ch4_initial_volume & 0x0F) << 4)
             }
-            0x7A | 0x7B => 0,
             // SOUND4CNT_H (0x7C): polynomial counter
-            0x7C => {
+            REG_SOUND4CNT_H => {
                 (self.ch4_divisor & 0x07)
                     | (if self.ch4_width_mode { 0x08 } else { 0x00 })
                     | ((self.ch4_clock_shift & 0x0F) << 4)
             }
             // SOUND4CNT_H (0x7D): control
-            0x7D => (if self.ch4_length_enabled { 0x40 } else { 0x00 }) | 0xBF,
+            a if a == REG_SOUND4CNT_H + 1 => {
+                (if self.ch4_length_enabled { 0x40 } else { 0x00 }) | 0xBF
+            }
 
             _ => 0,
         }
@@ -1219,12 +1229,11 @@ impl GbaApu {
     /// including trigger logic, DAC gating, length enable edge cases,
     /// and envelope/sweep parameter loading.
     pub fn write_channel_reg(&mut self, addr: u32, value: u8) {
-        let offset = addr & 0xFF;
-        match offset {
+        match addr {
             // -- channel 1: square with sweep --
 
             // SOUND1CNT_L (0x60): sweep parameters
-            0x60 => {
+            REG_SOUND1CNT_L => {
                 self.ch1_sweep_slope = value & 0x07;
                 self.ch1_sweep_decrease = value & 0x08 != 0;
                 self.ch1_sweep_pace = (value >> 4) & 0x07;
@@ -1232,13 +1241,13 @@ impl GbaApu {
             }
 
             // SOUND1CNT_H low (0x62): duty cycle + length
-            0x62 => {
+            REG_SOUND1CNT_H => {
                 self.ch1_length_timer = 64 - (value & 0x3F);
                 self.ch1_wave_duty = (value >> 6) & 0x03;
             }
 
             // SOUND1CNT_H high (0x63): envelope parameters
-            0x63 => {
+            a if a == REG_SOUND1CNT_H + 1 => {
                 self.ch1_envelope_pace = value & 0x07;
                 self.ch1_envelope_direction = (value >> 3) & 0x01;
                 self.ch1_initial_volume = (value >> 4) & 0x0F;
@@ -1254,12 +1263,12 @@ impl GbaApu {
             }
 
             // SOUND1CNT_X low (0x64): frequency low byte
-            0x64 => {
+            REG_SOUND1CNT_X => {
                 self.ch1_wave_length = (self.ch1_wave_length & 0xFF00) | value as u16;
             }
 
             // SOUND1CNT_X high (0x65): frequency high + length enable + trigger
-            0x65 => {
+            a if a == REG_SOUND1CNT_X + 1 => {
                 let length_trigger = value & 0x40 != 0;
                 let trigger = value & 0x80 != 0;
                 let length_edge = length_trigger && !self.ch1_length_enabled;
@@ -1289,13 +1298,13 @@ impl GbaApu {
             // -- channel 2: square --
 
             // SOUND2CNT_L low (0x68): duty cycle + length
-            0x68 => {
+            REG_SOUND2CNT_L => {
                 self.ch2_length_timer = 64 - (value & 0x3F);
                 self.ch2_wave_duty = (value >> 6) & 0x03;
             }
 
             // SOUND2CNT_L high (0x69): envelope parameters
-            0x69 => {
+            a if a == REG_SOUND2CNT_L + 1 => {
                 self.ch2_envelope_pace = value & 0x07;
                 self.ch2_envelope_direction = (value >> 3) & 0x01;
                 self.ch2_initial_volume = (value >> 4) & 0x0F;
@@ -1310,12 +1319,12 @@ impl GbaApu {
             }
 
             // SOUND2CNT_H low (0x6C): frequency low byte
-            0x6C => {
+            REG_SOUND2CNT_H => {
                 self.ch2_wave_length = (self.ch2_wave_length & 0xFF00) | value as u16;
             }
 
             // SOUND2CNT_H high (0x6D): frequency high + length enable + trigger
-            0x6D => {
+            a if a == REG_SOUND2CNT_H + 1 => {
                 let length_trigger = value & 0x40 != 0;
                 let trigger = value & 0x80 != 0;
                 let length_edge = length_trigger && !self.ch2_length_enabled;
@@ -1344,7 +1353,7 @@ impl GbaApu {
             // -- channel 3: wave --
 
             // SOUND3CNT_L low (0x70): DAC enable + wave bank control
-            0x70 => {
+            REG_SOUND3CNT_L => {
                 self.wave_dimension = value & 0x20 != 0;
                 self.wave_bank = (value >> 6) & 1;
                 self.ch3_dac = value & 0x80 != 0;
@@ -1354,23 +1363,23 @@ impl GbaApu {
             }
 
             // SOUND3CNT_H low (0x72): length
-            0x72 => {
+            REG_SOUND3CNT_H => {
                 self.ch3_length_timer = 256 - value as u16;
             }
 
             // SOUND3CNT_H high (0x73): volume + force 75%
-            0x73 => {
+            a if a == REG_SOUND3CNT_H + 1 => {
                 self.ch3_output_level = (value >> 5) & 0x03;
                 self.ch3_force_volume = value & 0x80 != 0;
             }
 
             // SOUND3CNT_X low (0x74): frequency low byte
-            0x74 => {
+            REG_SOUND3CNT_X => {
                 self.ch3_wave_length = (self.ch3_wave_length & 0xFF00) | value as u16;
             }
 
             // SOUND3CNT_X high (0x75): frequency high + length enable + trigger
-            0x75 => {
+            a if a == REG_SOUND3CNT_X + 1 => {
                 let length_trigger = value & 0x40 != 0;
                 let trigger = value & 0x80 != 0;
                 let length_edge = length_trigger && !self.ch3_length_enabled;
@@ -1399,12 +1408,12 @@ impl GbaApu {
             // -- channel 4: noise --
 
             // SOUND4CNT_L low (0x78): length
-            0x78 => {
+            REG_SOUND4CNT_L => {
                 self.ch4_length_timer = 64 - (value & 0x3F);
             }
 
             // SOUND4CNT_L high (0x79): envelope parameters
-            0x79 => {
+            a if a == REG_SOUND4CNT_L + 1 => {
                 self.ch4_envelope_pace = value & 0x07;
                 self.ch4_envelope_direction = (value >> 3) & 0x01;
                 self.ch4_initial_volume = (value >> 4) & 0x0F;
@@ -1419,14 +1428,14 @@ impl GbaApu {
             }
 
             // SOUND4CNT_H low (0x7C): polynomial counter
-            0x7C => {
+            REG_SOUND4CNT_H => {
                 self.ch4_divisor = value & 0x07;
                 self.ch4_width_mode = value & 0x08 != 0;
                 self.ch4_clock_shift = (value >> 4) & 0x0F;
             }
 
             // SOUND4CNT_H high (0x7D): control + trigger
-            0x7D => {
+            a if a == REG_SOUND4CNT_H + 1 => {
                 let length_trigger = value & 0x40 != 0;
                 let trigger = value & 0x80 != 0;
                 let length_edge = length_trigger && !self.ch4_length_enabled;
@@ -1451,7 +1460,7 @@ impl GbaApu {
             }
 
             _ => {
-                warnln!("Unhandled APU register write at offset 0x{:02X}", offset);
+                warnln!("Unhandled APU register write at 0x{:08X}", addr);
             }
         }
     }
@@ -1471,6 +1480,7 @@ impl Default for GbaApu {
 #[cfg(test)]
 mod tests {
     use super::{DirectSoundChannel, GbaApu};
+    use crate::gba::consts::{CPU_FREQ, CYCLES_PER_FRAME};
 
     #[test]
     fn test_direct_sound_new() {
@@ -1724,7 +1734,7 @@ mod tests {
             for bank in 0..2 {
                 let mut apu = GbaApu::new();
                 apu.set_soundcnt_x(0x80);
-                apu.write_channel_reg(0x70, (bank << 6) | if dimension { 0x20 } else { 0 });
+                apu.write_channel_reg(0x0400_0070, (bank << 6) | if dimension { 0x20 } else { 0 });
                 apu.write_wave_ram(0, 0x12);
                 apu.write_wave_ram(15, 0xAB);
                 apu.write_wave_ram(16, 0xFF);
@@ -1738,7 +1748,7 @@ mod tests {
                 assert_eq!(apu.read_wave_ram(15), 0xAB);
 
                 // changing the dimension does not change the CPU access bank
-                apu.write_channel_reg(0x70, (bank << 6) | if dimension { 0 } else { 0x20 });
+                apu.write_channel_reg(0x0400_0070, (bank << 6) | if dimension { 0 } else { 0x20 });
                 assert_eq!(apu.read_wave_ram(0), 0x12);
                 assert_eq!(apu.read_wave_ram(15), 0xAB);
             }
@@ -1893,7 +1903,7 @@ mod tests {
         // clock for exactly one frame (280896 cycles)
         // at 32768 Hz and 16.78 MHz, expect ~547 samples per frame
         // each sample is 2 entries (stereo)
-        apu.clock(super::super::consts::CYCLES_PER_FRAME);
+        apu.clock(CYCLES_PER_FRAME);
         apu.flush();
 
         let sample_count = apu.audio_buffer().len() / 2;
@@ -1908,7 +1918,7 @@ mod tests {
         apu.set_soundcnt_x(0x80);
 
         // advance to one cycle before an envelope tick (step 7)
-        let sequencer_period = super::super::consts::CPU_FREQ / 512;
+        let sequencer_period = CPU_FREQ / 512;
         apu.sequencer_step = 7;
         apu.sequencer_counter = sequencer_period - 1;
 
@@ -1927,10 +1937,10 @@ mod tests {
         apu.set_soundcnt_l(0x4477);
         apu.set_soundcnt_h(2);
         apu.wave_ram[0].fill(0x12);
-        apu.write_channel_reg(0x70, 0x80);
-        apu.write_channel_reg(0x73, 0x20);
-        apu.write_channel_reg(0x74, 0xC0);
-        apu.write_channel_reg(0x75, 0x87); // one wave digit per output sample
+        apu.write_channel_reg(0x0400_0070, 0x80);
+        apu.write_channel_reg(0x0400_0073, 0x20);
+        apu.write_channel_reg(0x0400_0074, 0xC0);
+        apu.write_channel_reg(0x0400_0075, 0x87); // one wave digit per output sample
 
         apu.clock(1536);
         assert_eq!(
@@ -1951,22 +1961,22 @@ mod tests {
             apu.wave_ram[0].fill(0x12);
             apu.wave_ram[1].fill(0xAB);
             for (addr, value) in [
-                (0x60, 0x11),
-                (0x62, 0xBE),
-                (0x63, 0x91),
-                (0x64, 0xD0),
-                (0x65, 0xC5),
-                (0x68, 0x40),
-                (0x69, 0x49),
-                (0x6C, 0xFF),
-                (0x6D, 0x87),
-                (0x70, 0xE0),
-                (0x73, 0x20),
-                (0x74, 0xE0),
-                (0x75, 0x87),
-                (0x79, 0x51),
-                (0x7C, 0x09),
-                (0x7D, 0x80),
+                (0x0400_0060, 0x11),
+                (0x0400_0062, 0xBE),
+                (0x0400_0063, 0x91),
+                (0x0400_0064, 0xD0),
+                (0x0400_0065, 0xC5),
+                (0x0400_0068, 0x40),
+                (0x0400_0069, 0x49),
+                (0x0400_006C, 0xFF),
+                (0x0400_006D, 0x87),
+                (0x0400_0070, 0xE0),
+                (0x0400_0073, 0x20),
+                (0x0400_0074, 0xE0),
+                (0x0400_0075, 0x87),
+                (0x0400_0079, 0x51),
+                (0x0400_007C, 0x09),
+                (0x0400_007D, 0x80),
             ] {
                 apu.write_channel_reg(addr, value);
             }
@@ -2022,7 +2032,7 @@ mod tests {
 
         // clock enough to tick the frame sequencer at step 0 (length tick)
         // 512 Hz = CPU_FREQ/512 cycles per tick
-        let sequencer_period = super::super::consts::CPU_FREQ / 512;
+        let sequencer_period = CPU_FREQ / 512;
         // advance to a length step (step 0)
         // first we need to reach step 0 in the sequencer
         apu.sequencer_step = 0; // step 0 dispatches length tick
@@ -2050,7 +2060,7 @@ mod tests {
         assert!(!apu.ch1_length_enabled);
 
         // tick length step, should NOT disable channel
-        let sequencer_period = super::super::consts::CPU_FREQ / 512;
+        let sequencer_period = CPU_FREQ / 512;
         apu.sequencer_step = 0;
         apu.sequencer_counter = sequencer_period - 1;
         apu.clock(1);
@@ -2075,7 +2085,7 @@ mod tests {
         assert_eq!(apu.ch2_length_timer, 1);
 
         // tick length to disable channel
-        let sequencer_period = super::super::consts::CPU_FREQ / 512;
+        let sequencer_period = CPU_FREQ / 512;
         apu.sequencer_step = 0;
         apu.sequencer_counter = sequencer_period - 1;
         apu.clock(1);
@@ -2099,7 +2109,7 @@ mod tests {
         assert!(apu.ch3_enabled);
         assert_eq!(apu.ch3_length_timer, 1);
 
-        let sequencer_period = super::super::consts::CPU_FREQ / 512;
+        let sequencer_period = CPU_FREQ / 512;
         apu.sequencer_step = 0;
         apu.sequencer_counter = sequencer_period - 1;
         apu.clock(1);
@@ -2123,7 +2133,7 @@ mod tests {
         assert!(apu.ch4_enabled);
         assert_eq!(apu.ch4_length_timer, 1);
 
-        let sequencer_period = super::super::consts::CPU_FREQ / 512;
+        let sequencer_period = CPU_FREQ / 512;
         apu.sequencer_step = 0;
         apu.sequencer_counter = sequencer_period - 1;
         apu.clock(1);
@@ -2145,7 +2155,7 @@ mod tests {
         assert_eq!(apu.ch1_volume, 15);
 
         // advance to step 7 (envelope tick)
-        let sequencer_period = super::super::consts::CPU_FREQ / 512;
+        let sequencer_period = CPU_FREQ / 512;
         apu.sequencer_step = 7; // step 7 dispatches envelope tick
         apu.sequencer_counter = sequencer_period - 1;
         apu.clock(1);
@@ -2166,7 +2176,7 @@ mod tests {
 
         assert_eq!(apu.ch1_volume, 5);
 
-        let sequencer_period = super::super::consts::CPU_FREQ / 512;
+        let sequencer_period = CPU_FREQ / 512;
         apu.sequencer_step = 7; // step 7 dispatches envelope tick
         apu.sequencer_counter = sequencer_period - 1;
         apu.clock(1);
@@ -2188,7 +2198,7 @@ mod tests {
         assert_eq!(apu.ch1_volume, 1);
 
         // tick envelope
-        let sequencer_period = super::super::consts::CPU_FREQ / 512;
+        let sequencer_period = CPU_FREQ / 512;
         apu.sequencer_step = 7;
         apu.sequencer_counter = sequencer_period - 1;
         apu.clock(1);
@@ -2218,7 +2228,7 @@ mod tests {
 
         assert_eq!(apu.ch1_volume, 14);
 
-        let sequencer_period = super::super::consts::CPU_FREQ / 512;
+        let sequencer_period = CPU_FREQ / 512;
         apu.sequencer_step = 7;
         apu.sequencer_counter = sequencer_period - 1;
         apu.clock(1);
@@ -2241,7 +2251,7 @@ mod tests {
         assert_eq!(apu.ch1_volume, 10);
 
         // tick envelope, should not change volume
-        let sequencer_period = super::super::consts::CPU_FREQ / 512;
+        let sequencer_period = CPU_FREQ / 512;
         apu.sequencer_step = 7;
         apu.sequencer_counter = sequencer_period - 1;
         apu.clock(1);
@@ -2262,7 +2272,7 @@ mod tests {
 
         assert_eq!(apu.ch4_volume, 8);
 
-        let sequencer_period = super::super::consts::CPU_FREQ / 512;
+        let sequencer_period = CPU_FREQ / 512;
         apu.sequencer_step = 7;
         apu.sequencer_counter = sequencer_period - 1;
         apu.clock(1);
@@ -2287,7 +2297,7 @@ mod tests {
         assert_eq!(apu.ch1_sweep_shadow, 0x100);
 
         // sweep ticks at steps 2 and 6
-        let sequencer_period = super::super::consts::CPU_FREQ / 512;
+        let sequencer_period = CPU_FREQ / 512;
         apu.sequencer_step = 2; // step 2 dispatches sweep + length
         apu.sequencer_counter = sequencer_period - 1;
         apu.clock(1);
@@ -2313,7 +2323,7 @@ mod tests {
 
         assert!(apu.ch1_enabled);
 
-        let sequencer_period = super::super::consts::CPU_FREQ / 512;
+        let sequencer_period = CPU_FREQ / 512;
         apu.sequencer_step = 2; // step 2 dispatches sweep + length
         apu.sequencer_counter = sequencer_period - 1;
         apu.clock(1);
@@ -2338,7 +2348,7 @@ mod tests {
 
         assert_eq!(apu.ch1_sweep_shadow, 0x200);
 
-        let sequencer_period = super::super::consts::CPU_FREQ / 512;
+        let sequencer_period = CPU_FREQ / 512;
         apu.sequencer_step = 2;
         apu.sequencer_counter = sequencer_period - 1;
         apu.clock(1);
@@ -2361,7 +2371,7 @@ mod tests {
 
         let original = apu.ch1_sweep_shadow;
 
-        let sequencer_period = super::super::consts::CPU_FREQ / 512;
+        let sequencer_period = CPU_FREQ / 512;
         apu.sequencer_step = 2;
         apu.sequencer_counter = sequencer_period - 1;
         apu.clock(1);
@@ -2445,10 +2455,13 @@ mod tests {
                 let mut apu = GbaApu::new();
                 apu.wave_ram[0].fill(0x12);
                 apu.wave_ram[1].fill(0xAB);
-                apu.write_channel_reg(0x70, 0x80 | (bank << 6) | if dimension { 0x20 } else { 0 });
-                apu.write_channel_reg(0x73, 0x20);
-                apu.write_channel_reg(0x74, 0xFF);
-                apu.write_channel_reg(0x75, 0x87);
+                apu.write_channel_reg(
+                    0x0400_0070,
+                    0x80 | (bank << 6) | if dimension { 0x20 } else { 0 },
+                );
+                apu.write_channel_reg(0x0400_0073, 0x20);
+                apu.write_channel_reg(0x0400_0074, 0xFF);
+                apu.write_channel_reg(0x0400_0075, 0x87);
 
                 for digit in 0..130 {
                     apu.tick_channels(8);
@@ -2471,10 +2484,10 @@ mod tests {
             for sample in 0..16 {
                 let mut apu = GbaApu::new();
                 apu.wave_ram[0].fill((sample << 4) | sample);
-                apu.write_channel_reg(0x70, 0x80);
-                apu.write_channel_reg(0x73, output_level << 5);
-                apu.write_channel_reg(0x74, 0xFF);
-                apu.write_channel_reg(0x75, 0x87);
+                apu.write_channel_reg(0x0400_0070, 0x80);
+                apu.write_channel_reg(0x0400_0073, output_level << 5);
+                apu.write_channel_reg(0x0400_0074, 0xFF);
+                apu.write_channel_reg(0x0400_0075, 0x87);
 
                 apu.tick_channels(8);
                 assert_eq!(
@@ -2492,10 +2505,10 @@ mod tests {
             for sample in 0..16 {
                 let mut apu = GbaApu::new();
                 apu.wave_ram[0].fill((sample << 4) | sample);
-                apu.write_channel_reg(0x70, 0x80);
-                apu.write_channel_reg(0x73, 0x80 | (output_level << 5));
-                apu.write_channel_reg(0x74, 0xFF);
-                apu.write_channel_reg(0x75, 0x87);
+                apu.write_channel_reg(0x0400_0070, 0x80);
+                apu.write_channel_reg(0x0400_0073, 0x80 | (output_level << 5));
+                apu.write_channel_reg(0x0400_0074, 0xFF);
+                apu.write_channel_reg(0x0400_0075, 0x87);
 
                 apu.tick_channels(8);
                 assert_eq!(apu.ch3_output, expected[sample as usize]);
@@ -2520,7 +2533,7 @@ mod tests {
         apu.write_channel_reg(0x0400_0065, 0x83);
 
         // clock enough to generate a sample
-        let sample_period = super::super::consts::CPU_FREQ / 32768;
+        let sample_period = CPU_FREQ / 32768;
         apu.clock(sample_period + 1);
         apu.flush();
 
