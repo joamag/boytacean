@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Frames are converted to the 15 bit color format in about half the time
 * Faster audio emulation, worth up to 18% more frames per second in games with sound
 * Frames are handed to the native and Python front-ends more than twice as fast on the original Game Boy
+* Faster CPU emulation, worth up to 7% more frames per second natively and up to 24% on the web
 
 ### Fixed
 

@@ -423,6 +423,7 @@ impl Mmu {
         }
     }
 
+    #[inline(always)]
     pub fn read(&self, addr: u16) -> u8 {
         profile_read_gb!(addr);
         match addr {
@@ -537,6 +538,7 @@ impl Mmu {
         }
     }
 
+    #[inline(always)]
     pub fn write(&mut self, addr: u16, value: u8) {
         profile_write_gb!(addr);
         match addr {
