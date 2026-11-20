@@ -19,7 +19,7 @@ use boytacean_common::error::Error;
 use crate::{
     dumper::{Exchange, CHUNK_SIZE},
     flash::{
-        bank_writes, cfi_writes, program_commands, reset_writes, sector_erase_writes, Chip,
+        bank_writes, cfi_writes, is_cfi, program_commands, reset_writes, sector_erase_writes, Chip,
         CFI_SIZE, ERASED, MAX_BANKS,
     },
     gbxcart::{
@@ -296,15 +296,16 @@ impl Flasher {
         }
         self.detected = true;
 
-        // a probe tells that there's no flash chip that can be flashed
-        // (no chip at all) instead of failing, as nothing is written
-        let chip = match (Chip::from_cfi(&self.cfi), &self.rom) {
-            (Ok(chip), _) => chip,
-            (Err(_), None) => {
-                self.push(vec![SET_VOLTAGE_5V, SET_ADDR_AS_INPUTS]);
-                return Ok(());
-            }
-            (Err(err), Some(_)) => {
+        // a probe tells that there's no flash chip (no CFI table at all)
+        // instead of failing, as nothing is written, while a flash chip
+        // that can't be flashed always fails with the reason why
+        if self.rom.is_none() && !is_cfi(&self.cfi) {
+            self.push(vec![SET_VOLTAGE_5V, SET_ADDR_AS_INPUTS]);
+            return Ok(());
+        }
+        let chip = match Chip::from_cfi(&self.cfi) {
+            Ok(chip) => chip,
+            Err(err) => {
                 self.fail(err);
                 return Ok(());
             }
@@ -829,6 +830,25 @@ mod tests {
         assert!(flasher.is_finished());
         assert_eq!(device.flash, build_rom(2));
         assert_eq!(device.voltages, vec![SET_VOLTAGE_3_3V, SET_VOLTAGE_5V]);
+    }
+
+    #[test]
+    fn test_probe_unsupported_chip() {
+        // a flash chip that can't be flashed is reported with the reason
+        // why, rather than as no chip at all
+        let mut device = FakeDevice::new(build_flash());
+        device.cfi[3] = 0x01;
+        let mut flasher = Flasher::probe();
+        assert_eq!(
+            flasher.run(&mut device, |_| {}).err(),
+            Some(Error::CustomError(String::from(
+                "Unsupported flash command set: 0x0001"
+            )))
+        );
+        assert_eq!(flasher.chip(), None);
+        assert!(!device.cfi_mode);
+        assert_eq!(device.voltages.last(), Some(&SET_VOLTAGE_5V));
+        assert_eq!(device.commands.last(), Some(&SET_ADDR_AS_INPUTS));
     }
 
     #[test]

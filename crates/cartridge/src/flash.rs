@@ -39,6 +39,12 @@ pub fn cfi_writes() -> Vec<BusWrite> {
     vec![(0x00aa, 0x98)]
 }
 
+/// If the provided bytes are the CFI table of a flash chip, starting
+/// with `QRY`, as cartridges without one reply with their ROM instead.
+pub fn is_cfi(data: &[u8]) -> bool {
+    data.len() == CFI_SIZE && [data[0x20], data[0x22], data[0x24]] == *b"QRY"
+}
+
 /// The writes that erase the sector at the provided address.
 pub fn sector_erase_writes(address: u16) -> Vec<BusWrite> {
     vec![
@@ -91,7 +97,7 @@ impl Chip {
         }
         let value = |offset: usize| data[offset * 2];
         let word = |offset: usize| u16::from_le_bytes([value(offset), value(offset + 1)]);
-        if [value(0x10), value(0x11), value(0x12)] != *b"QRY" {
+        if !is_cfi(data) {
             return Err(Error::CustomError(String::from(
                 "No flash chip found, the cartridge can't be flashed",
             )));
@@ -195,7 +201,7 @@ mod tests {
     use boytacean_common::error::Error;
 
     use super::{
-        bank_writes, cfi_writes, program_commands, reset_writes, sector_erase_writes, Chip,
+        bank_writes, cfi_writes, is_cfi, program_commands, reset_writes, sector_erase_writes, Chip,
         CFI_SIZE, ERASE_TIMEOUT,
     };
 
@@ -226,6 +232,18 @@ mod tests {
     #[test]
     fn test_cfi_writes() {
         assert_eq!(cfi_writes(), vec![(0x00aa, 0x98)]);
+    }
+
+    #[test]
+    fn test_is_cfi() {
+        assert!(is_cfi(&build_cfi(&CFI_4MB)));
+        let mut values = CFI_4MB;
+        values[2] = 0x58;
+        assert!(!is_cfi(&build_cfi(&values)));
+        assert!(!is_cfi(&[0xff; CFI_SIZE]));
+        assert!(!is_cfi(&[0x00; CFI_SIZE]));
+        assert!(!is_cfi(&build_cfi(&CFI_4MB)[..CFI_SIZE - 1]));
+        assert!(!is_cfi(&[]));
     }
 
     #[test]
