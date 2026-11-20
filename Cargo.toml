@@ -88,6 +88,18 @@ name = "bosc-thumbnail"
 path = "src/bin/bosc-thumbnail.rs"
 
 [[bin]]
+name = "gba-bench"
+path = "src/bin/gba-bench.rs"
+
+[[bin]]
+name = "gba-diag"
+path = "src/bin/gba-diag.rs"
+
+[[bin]]
+name = "gba-trace"
+path = "src/bin/gba-trace.rs"
+
+[[bin]]
 name = "gbxcart"
 path = "src/bin/gbxcart.rs"
 required-features = ["cartridge"]
