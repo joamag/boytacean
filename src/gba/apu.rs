@@ -537,7 +537,7 @@ impl GbaApu {
     }
 
     pub fn set_soundcnt_h(&mut self, value: u16) {
-        // store without FIFO reset strobe bits (11, 15) — they are
+        // store without FIFO reset strobe bits (11, 15), they are
         // write-only one-shot actions, not persistent state
         self.soundcnt_h = value & !((1 << 11) | (1 << 15));
 
@@ -2279,8 +2279,6 @@ mod tests {
         assert_eq!(apu.read_wave_ram(0), 0xCD);
     }
 
-    // -- trigger tests for each channel --
-
     #[test]
     fn test_ch2_trigger_and_length() {
         let mut apu = GbaApu::new();
@@ -2354,8 +2352,6 @@ mod tests {
         assert!(!apu.ch4_enabled);
     }
 
-    // -- length counter edge cases --
-
     #[test]
     fn test_length_counter_does_not_tick_when_disabled() {
         let mut apu = GbaApu::new();
@@ -2371,7 +2367,7 @@ mod tests {
         assert!(apu.ch1_enabled);
         assert!(!apu.ch1_length_enabled);
 
-        // tick length step — should NOT disable channel
+        // tick length step, should NOT disable channel
         let sequencer_period = super::super::consts::CPU_FREQ / 512;
         apu.sequencer_step = 0;
         apu.sequencer_counter = sequencer_period - 1;
@@ -2398,8 +2394,6 @@ mod tests {
         assert!(apu.ch1_length_timer > 0);
     }
 
-    // -- envelope edge cases --
-
     #[test]
     fn test_envelope_stops_at_zero() {
         let mut apu = GbaApu::new();
@@ -2422,7 +2416,7 @@ mod tests {
         assert_eq!(apu.ch1_volume, 0);
         assert!(!apu.ch1_envelope_enabled);
 
-        // tick again — should stay at 0
+        // tick again, should stay at 0
         apu.sequencer_step = 7;
         apu.sequencer_counter = sequencer_period - 1;
         apu.clock(1);
@@ -2465,7 +2459,7 @@ mod tests {
 
         assert_eq!(apu.ch1_volume, 10);
 
-        // tick envelope — should not change volume
+        // tick envelope, should not change volume
         let sequencer_period = super::super::consts::CPU_FREQ / 512;
         apu.sequencer_step = 7;
         apu.sequencer_counter = sequencer_period - 1;
@@ -2495,8 +2489,6 @@ mod tests {
 
         assert_eq!(apu.ch4_volume, 7);
     }
-
-    // -- sweep edge cases --
 
     #[test]
     fn test_sweep_decrease() {
@@ -2546,8 +2538,6 @@ mod tests {
         assert_eq!(apu.ch1_sweep_shadow, original);
     }
 
-    // -- DAC gating for remaining channels --
-
     #[test]
     fn test_dac_gating_ch2() {
         let mut apu = GbaApu::new();
@@ -2589,8 +2579,6 @@ mod tests {
         // channel should not be enabled with DAC off
         assert!(!apu.ch1_enabled);
     }
-
-    // -- register readback for all channels --
 
     #[test]
     fn test_ch2_register_readback() {
@@ -2639,8 +2627,6 @@ mod tests {
         assert_eq!(apu.read_channel_reg(0x0400_0078), 0xFF);
     }
 
-    // -- CH4 width mode --
-
     #[test]
     fn test_ch4_width_mode_7bit() {
         let mut apu = GbaApu::new();
@@ -2654,8 +2640,6 @@ mod tests {
         assert!(apu.ch4_width_mode);
         assert_eq!(apu.ch4_lfsr, 0x7FFF);
     }
-
-    // -- master disable --
 
     #[test]
     fn test_master_disable_stops_all_channels() {
@@ -2685,8 +2669,6 @@ mod tests {
         assert!(!apu.ch3_enabled);
         assert!(!apu.ch4_enabled);
     }
-
-    // -- soundcnt_x status bits --
 
     #[test]
     fn test_soundcnt_x_status_bits() {
@@ -2720,8 +2702,6 @@ mod tests {
         assert_eq!(apu.soundcnt_x(), 0x8F | 0x70);
     }
 
-    // -- wave dimension mode --
-
     #[test]
     fn test_wave_dimension_mode() {
         let mut apu = GbaApu::new();
@@ -2745,10 +2725,6 @@ mod tests {
         assert_eq!(apu.read_wave_ram(0), 0x34);
     }
 
-    // -- high-pass filter --
-
-    // -- FIFO empty behavior --
-
     #[test]
     fn test_fifo_empty_keeps_last_sample() {
         let mut channel = DirectSoundChannel::new();
@@ -2760,12 +2736,10 @@ mod tests {
             assert_eq!(channel.current_sample, 0x42);
         }
 
-        // tick again with empty FIFO — should keep last sample
+        // tick again with empty FIFO, should keep last sample
         channel.timer_tick();
         assert_eq!(channel.current_sample, 0x42);
     }
-
-    // -- clock generates correct number of samples --
 
     #[test]
     fn test_clock_sample_generation_rate() {

@@ -521,7 +521,8 @@ mod tests {
         ch.set_src_reg(0x0200_0000);
         ch.set_dst_reg(0x0600_0000);
         ch.set_count_reg(0); // 0 = max count
-                             // enable, immediate
+
+        // enable, immediate
         ch.set_control(1 << 15, 0);
         assert_eq!(ch.remaining(), 0x4000); // channel 0
 
@@ -893,7 +894,7 @@ mod tests {
 
     #[test]
     fn test_dma_sound_fifo_src_continues_across_triggers() {
-        // source address is NOT re-latched on repeat — it continues advancing
+        // source address is NOT re-latched on repeat, it continues advancing
         let mut dma = GbaDma::new();
         dma.channels[1].set_src_reg(0x0300_5000);
         dma.channels[1].set_dst_reg(REG_FIFO_A);

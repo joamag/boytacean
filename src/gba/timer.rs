@@ -404,7 +404,8 @@ mod tests {
         let mut timer = GbaTimer::new();
         timer.set_reload(0xFFFF);
         timer.set_control((1 << 7) | (1 << 2)); // enable + cascade
-                                                // cascade timers are not clocked by CPU cycles
+
+        // cascade timers are not clocked by CPU cycles
         assert!(!timer.clock(1));
     }
 
