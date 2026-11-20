@@ -50,6 +50,8 @@ pub fn is_gbxcart(port_type: &SerialPortType) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+
     use boytacean_common::error::Error;
     use serialport::{SerialPortType, UsbPortInfo};
 
@@ -72,6 +74,21 @@ mod tests {
             result,
             Err(Error::IoError(message)) if message.starts_with("Failed to open /dev/boytacean-none: ")
         ));
+    }
+
+    #[test]
+    fn test_open_port_auto() {
+        // the device is either found and opened (when connected) or
+        // the lack of it is reported, never another error
+        match open_port("auto") {
+            Ok((_, port)) => assert!(Path::new(&port).exists()),
+            Err(err) => assert_eq!(
+                err,
+                Error::CustomError(String::from(
+                    "No GBxCart RW found, connect it or provide its serial port"
+                ))
+            ),
+        }
     }
 
     #[test]
