@@ -501,46 +501,39 @@ fn find_bytes(haystack: &[u8], needle: &[u8]) -> Option<usize> {
 mod tests {
     use super::*;
 
+    /// Creates an EEPROM save with a 9-halfword read request (512B).
+    fn make_eeprom_save_6bit() -> SaveMedia {
+        let mut save = SaveMedia::new();
+        let mut rom = vec![0u8; 1024 * 1024];
+        rom[0x100..0x108].copy_from_slice(b"EEPROM_V");
+        save.detect_save_type(&rom);
+        save.start_eeprom_transfer(9);
+        save
+    }
+
+    /// Creates an EEPROM save with a 17-halfword read request (8KB).
+    fn make_eeprom_save_14bit() -> SaveMedia {
+        let mut save = SaveMedia::new();
+        let mut rom = vec![0u8; 4 * 1024 * 1024];
+        rom[0x100..0x108].copy_from_slice(b"EEPROM_V");
+        save.detect_save_type(&rom);
+        save.start_eeprom_transfer(17);
+        save
+    }
+
+    /// Sends a sequence of bits to the EEPROM (MSB first).
+    fn send_bits(save: &mut SaveMedia, value: u64, count: u8) {
+        for i in (0..count).rev() {
+            save.eeprom_write(((value >> i) & 1) as u16);
+        }
+    }
+
     #[test]
     fn test_new() {
         let save = SaveMedia::new();
         assert_eq!(save.save_type(), SaveType::None);
         assert_eq!(save.data.len(), SRAM_SIZE);
         assert!(save.data.iter().all(|&b| b == 0xFF));
-    }
-
-    #[test]
-    fn test_detect_save_type_none() {
-        let rom = vec![0u8; 512];
-        assert_eq!(detect_from_rom(&rom), SaveType::None);
-    }
-
-    #[test]
-    fn test_detect_save_type_sram() {
-        let mut rom = vec![0u8; 512];
-        rom[0x100..0x106].copy_from_slice(b"SRAM_V");
-        assert_eq!(detect_from_rom(&rom), SaveType::Sram);
-    }
-
-    #[test]
-    fn test_detect_save_type_flash64_flash_v() {
-        let mut rom = vec![0u8; 512];
-        rom[0x100..0x107].copy_from_slice(b"FLASH_V");
-        assert_eq!(detect_from_rom(&rom), SaveType::Flash64);
-    }
-
-    #[test]
-    fn test_detect_save_type_flash64_flash512_v() {
-        let mut rom = vec![0u8; 512];
-        rom[0x100..0x10A].copy_from_slice(b"FLASH512_V");
-        assert_eq!(detect_from_rom(&rom), SaveType::Flash64);
-    }
-
-    #[test]
-    fn test_detect_save_type_flash128() {
-        let mut rom = vec![0u8; 512];
-        rom[0x100..0x109].copy_from_slice(b"FLASH1M_V");
-        assert_eq!(detect_from_rom(&rom), SaveType::Flash128);
     }
 
     #[test]
@@ -605,6 +598,25 @@ mod tests {
     }
 
     #[test]
+    fn test_detect_eeprom_initializes_data() {
+        let mut save = SaveMedia::new();
+        let mut rom = vec![0u8; 512];
+        rom[0x100..0x108].copy_from_slice(b"EEPROM_V");
+        save.detect_save_type(&rom);
+        assert_eq!(save.save_type(), SaveType::Eeprom);
+        assert_eq!(save.data.len(), EEPROM_SIZE_4K);
+    }
+
+    #[test]
+    fn test_detect_eeprom_stores_rom_size() {
+        let mut save = SaveMedia::new();
+        let mut rom = vec![0u8; 4 * 1024 * 1024];
+        rom[0x100..0x108].copy_from_slice(b"EEPROM_V");
+        save.detect_save_type(&rom);
+        assert_eq!(save.rom_size, 4 * 1024 * 1024);
+    }
+
+    #[test]
     fn test_read8_none_returns_ff() {
         let save = SaveMedia::new();
         assert_eq!(save.read8(0x0E00_0000), 0xFF);
@@ -659,182 +671,255 @@ mod tests {
     }
 
     #[test]
-    fn test_flash64_write_requires_command() {
-        let mut save = SaveMedia::new();
-        save.save_type = SaveType::Flash64;
-        // raw write without command sequence should not modify data
-        save.write8(0x0E00_0000, 0x42);
-        assert_eq!(save.read8(0x0E00_0000), 0xFF);
+    fn test_is_eeprom_addr_not_eeprom() {
+        let save = SaveMedia::new();
+        assert!(!save.is_eeprom_addr(0x0D00_0000));
+        assert!(!save.is_eeprom_addr(0x0E00_0000));
+        assert!(!save.is_eeprom_addr(0xFFFF_FFFF));
     }
 
     #[test]
-    fn test_flash64_write_byte() {
+    fn test_is_eeprom_addr_small_rom() {
         let mut save = SaveMedia::new();
-        save.save_type = SaveType::Flash64;
-        save.write8(0x0E00_5555, 0xAA);
-        save.write8(0x0E00_2AAA, 0x55);
-        save.write8(0x0E00_5555, 0xA0);
-        save.write8(0x0E00_0000, 0x42);
-        assert_eq!(save.read8(0x0E00_0000), 0x42);
+        let mut rom = vec![0u8; 4 * 1024 * 1024]; // 4MB ROM
+        rom[0x100..0x108].copy_from_slice(b"EEPROM_V");
+        save.detect_save_type(&rom);
+        // entire 0x0D region is EEPROM for ROMs <= 16MB
+        assert!(save.is_eeprom_addr(0x0D00_0000));
+        assert!(save.is_eeprom_addr(0x0DFF_FFFF));
+        // 0x0C is still ROM
+        assert!(!save.is_eeprom_addr(0x0C00_0000));
     }
 
     #[test]
-    fn test_flash64_write_only_clears_bits() {
+    fn test_is_eeprom_addr_large_rom() {
         let mut save = SaveMedia::new();
-        save.save_type = SaveType::Flash64;
-        // write 0x0F (clears upper nibble from 0xFF)
-        save.write8(0x0E00_5555, 0xAA);
-        save.write8(0x0E00_2AAA, 0x55);
-        save.write8(0x0E00_5555, 0xA0);
-        save.write8(0x0E00_0000, 0x0F);
-        assert_eq!(save.read8(0x0E00_0000), 0x0F);
-        // writing 0xF0 should AND with 0x0F -> 0x00
-        save.write8(0x0E00_5555, 0xAA);
-        save.write8(0x0E00_2AAA, 0x55);
-        save.write8(0x0E00_5555, 0xA0);
-        save.write8(0x0E00_0000, 0xF0);
-        assert_eq!(save.read8(0x0E00_0000), 0x00);
+        save.save_type = SaveType::Eeprom;
+        save.rom_size = 32 * 1024 * 1024; // 32MB ROM
+                                          // only top of 0x0D region is EEPROM
+        assert!(save.is_eeprom_addr(0x0DFF_FF00));
+        assert!(save.is_eeprom_addr(0x0DFF_FFFE));
+        assert!(!save.is_eeprom_addr(0x0D00_0000));
     }
 
     #[test]
-    fn test_flash64_write_single_byte_only() {
-        let mut save = SaveMedia::new();
-        save.save_type = SaveType::Flash64;
-        // first byte write after 0xA0 programs, second goes nowhere
-        save.write8(0x0E00_5555, 0xAA);
-        save.write8(0x0E00_2AAA, 0x55);
-        save.write8(0x0E00_5555, 0xA0);
-        save.write8(0x0E00_0000, 0x11);
-        save.write8(0x0E00_0001, 0x22); // should be ignored (state back to Ready)
-        assert_eq!(save.read8(0x0E00_0000), 0x11);
-        assert_eq!(save.read8(0x0E00_0001), 0xFF);
+    fn test_start_eeprom_transfer() {
+        for rom_size in [512, 4 * 1024 * 1024] {
+            for (count, width, size) in [(9, 6, 512), (17, 14, 8192), (73, 6, 512), (81, 14, 8192)]
+            {
+                let mut save = SaveMedia::new();
+                let mut rom = vec![0u8; rom_size];
+                rom[..8].copy_from_slice(b"EEPROM_V");
+                save.detect_save_type(&rom);
+                save.data[0] = 0x42;
+                save.start_eeprom_transfer(count);
+                assert_eq!(save.eeprom_addr_width, width);
+                assert_eq!(save.data.len(), size);
+                assert_eq!(save.data[0], 0x42);
+                save.reset();
+                save.start_eeprom_transfer(if width == 6 { 17 } else { 9 });
+                assert_eq!(save.eeprom_addr_width, width);
+                assert_eq!(save.data.len(), size);
+                assert_eq!(save.data[0], 0x42);
+            }
+        }
     }
 
     #[test]
-    fn test_flash64_chip_erase() {
+    fn test_start_eeprom_transfer_ignores_other_packets() {
         let mut save = SaveMedia::new();
-        save.save_type = SaveType::Flash64;
-        // write two bytes at different offsets
-        save.write8(0x0E00_5555, 0xAA);
-        save.write8(0x0E00_2AAA, 0x55);
-        save.write8(0x0E00_5555, 0xA0);
-        save.write8(0x0E00_0000, 0x00);
-
-        save.write8(0x0E00_5555, 0xAA);
-        save.write8(0x0E00_2AAA, 0x55);
-        save.write8(0x0E00_5555, 0xA0);
-        save.write8(0x0E00_1000, 0x00);
-
-        assert_eq!(save.read8(0x0E00_0000), 0x00);
-        assert_eq!(save.read8(0x0E00_1000), 0x00);
-
-        // chip erase: 0x80 + 0x10
-        save.write8(0x0E00_5555, 0xAA);
-        save.write8(0x0E00_2AAA, 0x55);
-        save.write8(0x0E00_5555, 0x80);
-        save.write8(0x0E00_5555, 0xAA);
-        save.write8(0x0E00_2AAA, 0x55);
-        save.write8(0x0E00_5555, 0x10);
-
-        assert_eq!(save.read8(0x0E00_0000), 0xFF);
-        assert_eq!(save.read8(0x0E00_1000), 0xFF);
+        save.start_eeprom_transfer(17);
+        assert_eq!(save.eeprom_addr_width, 0);
+        assert_eq!(save.data.len(), SRAM_SIZE);
+        save.detect_save_type(b"EEPROM_V");
+        for count in [0, 1, 8, 16, 68, 72, 80, 82] {
+            save.start_eeprom_transfer(count);
+            assert_eq!(save.eeprom_addr_width, 0);
+            assert_eq!(save.data.len(), 512);
+        }
     }
 
     #[test]
-    fn test_flash64_sector_erase() {
-        let mut save = SaveMedia::new();
-        save.save_type = SaveType::Flash64;
-        // write bytes in sector 0 (0x0000) and sector 1 (0x1000)
-        save.write8(0x0E00_5555, 0xAA);
-        save.write8(0x0E00_2AAA, 0x55);
-        save.write8(0x0E00_5555, 0xA0);
-        save.write8(0x0E00_0000, 0x00);
-
-        save.write8(0x0E00_5555, 0xAA);
-        save.write8(0x0E00_2AAA, 0x55);
-        save.write8(0x0E00_5555, 0xA0);
-        save.write8(0x0E00_1000, 0x00);
-
-        // sector erase sector 0 only: 0x80 + 0x30 @ sector base
-        save.write8(0x0E00_5555, 0xAA);
-        save.write8(0x0E00_2AAA, 0x55);
-        save.write8(0x0E00_5555, 0x80);
-        save.write8(0x0E00_5555, 0xAA);
-        save.write8(0x0E00_2AAA, 0x55);
-        save.write8(0x0E00_0000, 0x30);
-
-        assert_eq!(save.read8(0x0E00_0000), 0xFF);
-        // sector 1 untouched
-        assert_eq!(save.read8(0x0E00_1000), 0x00);
+    fn test_eeprom_idle_read_returns_1() {
+        let mut save = make_eeprom_save_6bit();
+        // reading before any command returns 1
+        assert_eq!(save.eeprom_read(), 1);
     }
 
     #[test]
-    fn test_flash64_chip_id_enter() {
-        let mut save = SaveMedia::new();
-        save.save_type = SaveType::Flash64;
-        save.write8(0x0E00_5555, 0xAA);
-        save.write8(0x0E00_2AAA, 0x55);
-        save.write8(0x0E00_5555, 0x90);
-        assert_eq!(save.read8(0x0E00_0000), 0x62);
-        assert_eq!(save.read8(0x0E00_0001), 0x13);
+    fn test_eeprom_write_and_read_back() {
+        let mut save = make_eeprom_save_6bit();
+
+        // write command: "10" + 6-bit addr (0) + 64 data bits + 1 stop bit
+        send_bits(&mut save, 0b10, 2); // write command
+        send_bits(&mut save, 0, 6); // address 0
+
+        // now in CollectingWriteData state, send 64 data bits + stop
+        let test_data: u64 = 0xDEADBEEF_CAFEBABE;
+        send_bits(&mut save, test_data, 64);
+        send_bits(&mut save, 0, 1); // stop bit
+
+        // write should be pending, read returns 1 (ready)
+        assert_eq!(save.eeprom_read(), 1);
+
+        // now read back: "11" + 6-bit addr (0) + 1 stop bit
+        send_bits(&mut save, 0b11, 2); // read command
+        send_bits(&mut save, 0, 6); // address 0
+        send_bits(&mut save, 0, 1); // stop bit
+
+        // read 68 bits: 4 dummy + 64 data
+        let mut result = 0u64;
+        for _ in 0..4 {
+            save.eeprom_read(); // dummy bits
+        }
+        for _ in 0..64 {
+            result = (result << 1) | save.eeprom_read() as u64;
+        }
+
+        assert_eq!(result, test_data);
     }
 
     #[test]
-    fn test_flash64_chip_id_exit_f0() {
-        let mut save = SaveMedia::new();
-        save.save_type = SaveType::Flash64;
-        save.write8(0x0E00_5555, 0xAA);
-        save.write8(0x0E00_2AAA, 0x55);
-        save.write8(0x0E00_5555, 0x90);
-        // exit with raw 0xF0
-        save.write8(0x0E00_0000, 0xF0);
-        assert_eq!(save.read8(0x0E00_0000), 0xFF);
+    fn test_eeprom_read_unwritten_returns_ff() {
+        let mut save = make_eeprom_save_6bit();
+
+        // read address 1 (never written)
+        send_bits(&mut save, 0b11, 2); // read command
+        send_bits(&mut save, 1, 6); // address 1
+        send_bits(&mut save, 0, 1); // stop bit
+
+        // skip 4 dummy bits
+        for _ in 0..4 {
+            save.eeprom_read();
+        }
+        // read 64 data bits - should all be 1 (0xFF fill)
+        let mut result = 0u64;
+        for _ in 0..64 {
+            result = (result << 1) | save.eeprom_read() as u64;
+        }
+        assert_eq!(result, 0xFFFF_FFFF_FFFF_FFFF);
     }
 
     #[test]
-    fn test_flash64_chip_id_exit_command() {
-        let mut save = SaveMedia::new();
-        save.save_type = SaveType::Flash64;
-        save.write8(0x0E00_5555, 0xAA);
-        save.write8(0x0E00_2AAA, 0x55);
-        save.write8(0x0E00_5555, 0x90);
-        // exit via full command sequence
-        save.write8(0x0E00_5555, 0xAA);
-        save.write8(0x0E00_2AAA, 0x55);
-        save.write8(0x0E00_5555, 0xF0);
-        assert_eq!(save.read8(0x0E00_0000), 0xFF);
+    fn test_eeprom_write_different_addresses() {
+        let mut save = make_eeprom_save_6bit();
+
+        // write 0xAAAA... to address 0
+        send_bits(&mut save, 0b10, 2);
+        send_bits(&mut save, 0, 6);
+        send_bits(&mut save, 0xAAAA_AAAA_AAAA_AAAA, 64);
+        send_bits(&mut save, 0, 1);
+        save.eeprom_read(); // ack write
+
+        // write 0x5555... to address 1
+        send_bits(&mut save, 0b10, 2);
+        send_bits(&mut save, 1, 6);
+        send_bits(&mut save, 0x5555_5555_5555_5555, 64);
+        send_bits(&mut save, 0, 1);
+        save.eeprom_read(); // ack write
+
+        // verify address 0
+        send_bits(&mut save, 0b11, 2);
+        send_bits(&mut save, 0, 6);
+        send_bits(&mut save, 0, 1);
+        for _ in 0..4 {
+            save.eeprom_read();
+        }
+        let mut result = 0u64;
+        for _ in 0..64 {
+            result = (result << 1) | save.eeprom_read() as u64;
+        }
+        assert_eq!(result, 0xAAAA_AAAA_AAAA_AAAA);
+
+        // verify address 1
+        send_bits(&mut save, 0b11, 2);
+        send_bits(&mut save, 1, 6);
+        send_bits(&mut save, 0, 1);
+        for _ in 0..4 {
+            save.eeprom_read();
+        }
+        let mut result2 = 0u64;
+        for _ in 0..64 {
+            result2 = (result2 << 1) | save.eeprom_read() as u64;
+        }
+        assert_eq!(result2, 0x5555_5555_5555_5555);
     }
 
     #[test]
-    fn test_flash64_chip_id_data_still_readable() {
-        let mut save = SaveMedia::new();
-        save.save_type = SaveType::Flash64;
-        // write a byte at offset 0x10
-        save.write8(0x0E00_5555, 0xAA);
-        save.write8(0x0E00_2AAA, 0x55);
-        save.write8(0x0E00_5555, 0xA0);
-        save.write8(0x0E00_0010, 0x42);
-        // enter chip ID mode
-        save.write8(0x0E00_5555, 0xAA);
-        save.write8(0x0E00_2AAA, 0x55);
-        save.write8(0x0E00_5555, 0x90);
-        // offsets >= 2 still read flash data
-        assert_eq!(save.read8(0x0E00_0010), 0x42);
+    fn test_eeprom_write_overwrite() {
+        let mut save = make_eeprom_save_6bit();
+
+        // write data to address 0
+        send_bits(&mut save, 0b10, 2);
+        send_bits(&mut save, 0, 6);
+        send_bits(&mut save, 0x1234_5678_9ABC_DEF0, 64);
+        send_bits(&mut save, 0, 1);
+        save.eeprom_read();
+
+        // overwrite address 0 with different data
+        send_bits(&mut save, 0b10, 2);
+        send_bits(&mut save, 0, 6);
+        send_bits(&mut save, 0xFEDC_BA98_7654_3210, 64);
+        send_bits(&mut save, 0, 1);
+        save.eeprom_read();
+
+        // read back - should be the new data
+        send_bits(&mut save, 0b11, 2);
+        send_bits(&mut save, 0, 6);
+        send_bits(&mut save, 0, 1);
+        for _ in 0..4 {
+            save.eeprom_read();
+        }
+        let mut result = 0u64;
+        for _ in 0..64 {
+            result = (result << 1) | save.eeprom_read() as u64;
+        }
+        assert_eq!(result, 0xFEDC_BA98_7654_3210);
     }
 
     #[test]
-    fn test_flash64_incomplete_command_resets() {
-        let mut save = SaveMedia::new();
-        save.save_type = SaveType::Flash64;
-        // start a command but send wrong second byte
-        save.write8(0x0E00_5555, 0xAA);
-        save.write8(0x0E00_0000, 0x55); // wrong address, should reset
-                                        // now try a normal write - should still require full command
-        save.write8(0x0E00_5555, 0xAA);
-        save.write8(0x0E00_2AAA, 0x55);
-        save.write8(0x0E00_5555, 0xA0);
-        save.write8(0x0E00_0000, 0x42);
-        assert_eq!(save.read8(0x0E00_0000), 0x42);
+    fn test_eeprom_14bit_write_and_read_back() {
+        let mut save = make_eeprom_save_14bit();
+        // data starts at 512B, gets resized to 8KB on first EEPROM access
+
+        // write command: "10" + 14-bit addr (0) + 64 data bits + 1 stop bit
+        send_bits(&mut save, 0b10, 2);
+        send_bits(&mut save, 0, 14); // address 0
+        let test_data: u64 = 0xDEADBEEF_CAFEBABE;
+        send_bits(&mut save, test_data, 64);
+        send_bits(&mut save, 0, 1); // stop bit
+        assert_eq!(save.eeprom_read(), 1); // ack
+
+        // read back: "11" + 14-bit addr (0) + 1 stop bit
+        send_bits(&mut save, 0b11, 2);
+        send_bits(&mut save, 0, 14);
+        send_bits(&mut save, 0, 1);
+        for _ in 0..4 {
+            save.eeprom_read(); // dummy
+        }
+        let mut result = 0u64;
+        for _ in 0..64 {
+            result = (result << 1) | save.eeprom_read() as u64;
+        }
+        assert_eq!(result, test_data);
+    }
+
+    #[test]
+    fn test_eeprom_addr_width_6bit() {
+        let mut save = make_eeprom_save_6bit();
+        send_bits(&mut save, 0b11, 2); // read command
+        send_bits(&mut save, 0, 6);
+        send_bits(&mut save, 0, 1);
+        assert_eq!(save.eeprom_addr_width, 6);
+    }
+
+    #[test]
+    fn test_eeprom_addr_width_14bit() {
+        let mut save = make_eeprom_save_14bit();
+        send_bits(&mut save, 0b11, 2); // read command
+        send_bits(&mut save, 0, 14);
+        send_bits(&mut save, 0, 1);
+        assert_eq!(save.eeprom_addr_width, 14);
     }
 
     #[test]
@@ -949,6 +1034,200 @@ mod tests {
     }
 
     #[test]
+    fn test_eeprom_reset_clears_state() {
+        let mut save = make_eeprom_save_6bit();
+
+        // start a write command
+        send_bits(&mut save, 0b10, 2);
+        send_bits(&mut save, 0, 6);
+        // reset mid-operation
+        save.reset();
+
+        assert_eq!(save.eeprom_state, EepromState::AcceptingCommand);
+        assert_eq!(save.eeprom_bits, 0);
+        assert_eq!(save.eeprom_read_bits, 0);
+    }
+
+    #[test]
+    fn test_flash64_chip_id_enter() {
+        let mut save = SaveMedia::new();
+        save.save_type = SaveType::Flash64;
+        save.write8(0x0E00_5555, 0xAA);
+        save.write8(0x0E00_2AAA, 0x55);
+        save.write8(0x0E00_5555, 0x90);
+        assert_eq!(save.read8(0x0E00_0000), 0x62);
+        assert_eq!(save.read8(0x0E00_0001), 0x13);
+    }
+
+    #[test]
+    fn test_flash64_chip_id_exit_f0() {
+        let mut save = SaveMedia::new();
+        save.save_type = SaveType::Flash64;
+        save.write8(0x0E00_5555, 0xAA);
+        save.write8(0x0E00_2AAA, 0x55);
+        save.write8(0x0E00_5555, 0x90);
+        // exit with raw 0xF0
+        save.write8(0x0E00_0000, 0xF0);
+        assert_eq!(save.read8(0x0E00_0000), 0xFF);
+    }
+
+    #[test]
+    fn test_flash64_chip_id_exit_command() {
+        let mut save = SaveMedia::new();
+        save.save_type = SaveType::Flash64;
+        save.write8(0x0E00_5555, 0xAA);
+        save.write8(0x0E00_2AAA, 0x55);
+        save.write8(0x0E00_5555, 0x90);
+        // exit via full command sequence
+        save.write8(0x0E00_5555, 0xAA);
+        save.write8(0x0E00_2AAA, 0x55);
+        save.write8(0x0E00_5555, 0xF0);
+        assert_eq!(save.read8(0x0E00_0000), 0xFF);
+    }
+
+    #[test]
+    fn test_flash64_chip_id_data_still_readable() {
+        let mut save = SaveMedia::new();
+        save.save_type = SaveType::Flash64;
+        // write a byte at offset 0x10
+        save.write8(0x0E00_5555, 0xAA);
+        save.write8(0x0E00_2AAA, 0x55);
+        save.write8(0x0E00_5555, 0xA0);
+        save.write8(0x0E00_0010, 0x42);
+        // enter chip ID mode
+        save.write8(0x0E00_5555, 0xAA);
+        save.write8(0x0E00_2AAA, 0x55);
+        save.write8(0x0E00_5555, 0x90);
+        // offsets >= 2 still read flash data
+        assert_eq!(save.read8(0x0E00_0010), 0x42);
+    }
+
+    #[test]
+    fn test_flash64_write_requires_command() {
+        let mut save = SaveMedia::new();
+        save.save_type = SaveType::Flash64;
+        // raw write without command sequence should not modify data
+        save.write8(0x0E00_0000, 0x42);
+        assert_eq!(save.read8(0x0E00_0000), 0xFF);
+    }
+
+    #[test]
+    fn test_flash64_write_byte() {
+        let mut save = SaveMedia::new();
+        save.save_type = SaveType::Flash64;
+        save.write8(0x0E00_5555, 0xAA);
+        save.write8(0x0E00_2AAA, 0x55);
+        save.write8(0x0E00_5555, 0xA0);
+        save.write8(0x0E00_0000, 0x42);
+        assert_eq!(save.read8(0x0E00_0000), 0x42);
+    }
+
+    #[test]
+    fn test_flash64_write_only_clears_bits() {
+        let mut save = SaveMedia::new();
+        save.save_type = SaveType::Flash64;
+        // write 0x0F (clears upper nibble from 0xFF)
+        save.write8(0x0E00_5555, 0xAA);
+        save.write8(0x0E00_2AAA, 0x55);
+        save.write8(0x0E00_5555, 0xA0);
+        save.write8(0x0E00_0000, 0x0F);
+        assert_eq!(save.read8(0x0E00_0000), 0x0F);
+        // writing 0xF0 should AND with 0x0F -> 0x00
+        save.write8(0x0E00_5555, 0xAA);
+        save.write8(0x0E00_2AAA, 0x55);
+        save.write8(0x0E00_5555, 0xA0);
+        save.write8(0x0E00_0000, 0xF0);
+        assert_eq!(save.read8(0x0E00_0000), 0x00);
+    }
+
+    #[test]
+    fn test_flash64_write_single_byte_only() {
+        let mut save = SaveMedia::new();
+        save.save_type = SaveType::Flash64;
+        // first byte write after 0xA0 programs, second goes nowhere
+        save.write8(0x0E00_5555, 0xAA);
+        save.write8(0x0E00_2AAA, 0x55);
+        save.write8(0x0E00_5555, 0xA0);
+        save.write8(0x0E00_0000, 0x11);
+        save.write8(0x0E00_0001, 0x22); // should be ignored (state back to Ready)
+        assert_eq!(save.read8(0x0E00_0000), 0x11);
+        assert_eq!(save.read8(0x0E00_0001), 0xFF);
+    }
+
+    #[test]
+    fn test_flash64_chip_erase() {
+        let mut save = SaveMedia::new();
+        save.save_type = SaveType::Flash64;
+        // write two bytes at different offsets
+        save.write8(0x0E00_5555, 0xAA);
+        save.write8(0x0E00_2AAA, 0x55);
+        save.write8(0x0E00_5555, 0xA0);
+        save.write8(0x0E00_0000, 0x00);
+
+        save.write8(0x0E00_5555, 0xAA);
+        save.write8(0x0E00_2AAA, 0x55);
+        save.write8(0x0E00_5555, 0xA0);
+        save.write8(0x0E00_1000, 0x00);
+
+        assert_eq!(save.read8(0x0E00_0000), 0x00);
+        assert_eq!(save.read8(0x0E00_1000), 0x00);
+
+        // chip erase: 0x80 + 0x10
+        save.write8(0x0E00_5555, 0xAA);
+        save.write8(0x0E00_2AAA, 0x55);
+        save.write8(0x0E00_5555, 0x80);
+        save.write8(0x0E00_5555, 0xAA);
+        save.write8(0x0E00_2AAA, 0x55);
+        save.write8(0x0E00_5555, 0x10);
+
+        assert_eq!(save.read8(0x0E00_0000), 0xFF);
+        assert_eq!(save.read8(0x0E00_1000), 0xFF);
+    }
+
+    #[test]
+    fn test_flash64_sector_erase() {
+        let mut save = SaveMedia::new();
+        save.save_type = SaveType::Flash64;
+        // write bytes in sector 0 (0x0000) and sector 1 (0x1000)
+        save.write8(0x0E00_5555, 0xAA);
+        save.write8(0x0E00_2AAA, 0x55);
+        save.write8(0x0E00_5555, 0xA0);
+        save.write8(0x0E00_0000, 0x00);
+
+        save.write8(0x0E00_5555, 0xAA);
+        save.write8(0x0E00_2AAA, 0x55);
+        save.write8(0x0E00_5555, 0xA0);
+        save.write8(0x0E00_1000, 0x00);
+
+        // sector erase sector 0 only: 0x80 + 0x30 @ sector base
+        save.write8(0x0E00_5555, 0xAA);
+        save.write8(0x0E00_2AAA, 0x55);
+        save.write8(0x0E00_5555, 0x80);
+        save.write8(0x0E00_5555, 0xAA);
+        save.write8(0x0E00_2AAA, 0x55);
+        save.write8(0x0E00_0000, 0x30);
+
+        assert_eq!(save.read8(0x0E00_0000), 0xFF);
+        // sector 1 untouched
+        assert_eq!(save.read8(0x0E00_1000), 0x00);
+    }
+
+    #[test]
+    fn test_flash64_incomplete_command_resets() {
+        let mut save = SaveMedia::new();
+        save.save_type = SaveType::Flash64;
+        // start a command but send wrong second byte
+        save.write8(0x0E00_5555, 0xAA);
+        save.write8(0x0E00_0000, 0x55); // wrong address, should reset
+                                        // now try a normal write - should still require full command
+        save.write8(0x0E00_5555, 0xAA);
+        save.write8(0x0E00_2AAA, 0x55);
+        save.write8(0x0E00_5555, 0xA0);
+        save.write8(0x0E00_0000, 0x42);
+        assert_eq!(save.read8(0x0E00_0000), 0x42);
+    }
+
+    #[test]
     fn test_flash128_bank_select() {
         let mut save = SaveMedia::new();
         save.save_type = SaveType::Flash128;
@@ -992,14 +1271,46 @@ mod tests {
     }
 
     #[test]
+    fn test_detect_save_type_none() {
+        let rom = vec![0u8; 512];
+        assert_eq!(detect_from_rom(&rom), SaveType::None);
+    }
+
+    #[test]
+    fn test_detect_save_type_sram() {
+        let mut rom = vec![0u8; 512];
+        rom[0x100..0x106].copy_from_slice(b"SRAM_V");
+        assert_eq!(detect_from_rom(&rom), SaveType::Sram);
+    }
+
+    #[test]
+    fn test_detect_save_type_flash64_flash_v() {
+        let mut rom = vec![0u8; 512];
+        rom[0x100..0x107].copy_from_slice(b"FLASH_V");
+        assert_eq!(detect_from_rom(&rom), SaveType::Flash64);
+    }
+
+    #[test]
+    fn test_detect_save_type_flash64_flash512_v() {
+        let mut rom = vec![0u8; 512];
+        rom[0x100..0x10A].copy_from_slice(b"FLASH512_V");
+        assert_eq!(detect_from_rom(&rom), SaveType::Flash64);
+    }
+
+    #[test]
+    fn test_detect_save_type_flash128() {
+        let mut rom = vec![0u8; 512];
+        rom[0x100..0x109].copy_from_slice(b"FLASH1M_V");
+        assert_eq!(detect_from_rom(&rom), SaveType::Flash128);
+    }
+
+    #[test]
     fn test_detect_flash1m_takes_priority_over_flash512() {
         let mut rom = vec![0u8; 1024];
         rom[0x100..0x10A].copy_from_slice(b"FLASH512_V");
         rom[0x200..0x209].copy_from_slice(b"FLASH1M_V");
         assert_eq!(detect_from_rom(&rom), SaveType::Flash128);
     }
-
-    // --- EEPROM detection tests ---
 
     #[test]
     fn test_detect_save_type_eeprom() {
@@ -1014,322 +1325,5 @@ mod tests {
         rom[0x100..0x106].copy_from_slice(b"SRAM_V");
         rom[0x200..0x208].copy_from_slice(b"EEPROM_V");
         assert_eq!(detect_from_rom(&rom), SaveType::Eeprom);
-    }
-
-    #[test]
-    fn test_detect_eeprom_initializes_data() {
-        let mut save = SaveMedia::new();
-        let mut rom = vec![0u8; 512];
-        rom[0x100..0x108].copy_from_slice(b"EEPROM_V");
-        save.detect_save_type(&rom);
-        assert_eq!(save.save_type(), SaveType::Eeprom);
-        assert_eq!(save.data.len(), EEPROM_SIZE_4K);
-    }
-
-    #[test]
-    fn test_detect_eeprom_stores_rom_size() {
-        let mut save = SaveMedia::new();
-        let mut rom = vec![0u8; 4 * 1024 * 1024];
-        rom[0x100..0x108].copy_from_slice(b"EEPROM_V");
-        save.detect_save_type(&rom);
-        assert_eq!(save.rom_size, 4 * 1024 * 1024);
-    }
-
-    // --- EEPROM address detection tests ---
-
-    #[test]
-    fn test_is_eeprom_addr_not_eeprom() {
-        let save = SaveMedia::new();
-        assert!(!save.is_eeprom_addr(0x0D00_0000));
-        assert!(!save.is_eeprom_addr(0x0E00_0000));
-        assert!(!save.is_eeprom_addr(0xFFFF_FFFF));
-    }
-
-    #[test]
-    fn test_is_eeprom_addr_small_rom() {
-        let mut save = SaveMedia::new();
-        let mut rom = vec![0u8; 4 * 1024 * 1024]; // 4MB ROM
-        rom[0x100..0x108].copy_from_slice(b"EEPROM_V");
-        save.detect_save_type(&rom);
-        // entire 0x0D region is EEPROM for ROMs <= 16MB
-        assert!(save.is_eeprom_addr(0x0D00_0000));
-        assert!(save.is_eeprom_addr(0x0DFF_FFFF));
-        // 0x0C is still ROM
-        assert!(!save.is_eeprom_addr(0x0C00_0000));
-    }
-
-    #[test]
-    fn test_is_eeprom_addr_large_rom() {
-        let mut save = SaveMedia::new();
-        save.save_type = SaveType::Eeprom;
-        save.rom_size = 32 * 1024 * 1024; // 32MB ROM
-                                          // only top of 0x0D region is EEPROM
-        assert!(save.is_eeprom_addr(0x0DFF_FF00));
-        assert!(save.is_eeprom_addr(0x0DFF_FFFE));
-        assert!(!save.is_eeprom_addr(0x0D00_0000));
-    }
-
-    #[test]
-    fn test_start_eeprom_transfer() {
-        for rom_size in [512, 4 * 1024 * 1024] {
-            for (count, width, size) in [(9, 6, 512), (17, 14, 8192), (73, 6, 512), (81, 14, 8192)]
-            {
-                let mut save = SaveMedia::new();
-                let mut rom = vec![0u8; rom_size];
-                rom[..8].copy_from_slice(b"EEPROM_V");
-                save.detect_save_type(&rom);
-                save.data[0] = 0x42;
-                save.start_eeprom_transfer(count);
-                assert_eq!(save.eeprom_addr_width, width);
-                assert_eq!(save.data.len(), size);
-                assert_eq!(save.data[0], 0x42);
-                save.reset();
-                save.start_eeprom_transfer(if width == 6 { 17 } else { 9 });
-                assert_eq!(save.eeprom_addr_width, width);
-                assert_eq!(save.data.len(), size);
-                assert_eq!(save.data[0], 0x42);
-            }
-        }
-    }
-
-    #[test]
-    fn test_start_eeprom_transfer_ignores_other_packets() {
-        let mut save = SaveMedia::new();
-        save.start_eeprom_transfer(17);
-        assert_eq!(save.eeprom_addr_width, 0);
-        assert_eq!(save.data.len(), SRAM_SIZE);
-        save.detect_save_type(b"EEPROM_V");
-        for count in [0, 1, 8, 16, 68, 72, 80, 82] {
-            save.start_eeprom_transfer(count);
-            assert_eq!(save.eeprom_addr_width, 0);
-            assert_eq!(save.data.len(), 512);
-        }
-    }
-
-    // --- EEPROM read/write protocol tests ---
-
-    /// Creates an EEPROM save with a 9-halfword read request (512B).
-    fn make_eeprom_save_6bit() -> SaveMedia {
-        let mut save = SaveMedia::new();
-        let mut rom = vec![0u8; 1024 * 1024];
-        rom[0x100..0x108].copy_from_slice(b"EEPROM_V");
-        save.detect_save_type(&rom);
-        save.start_eeprom_transfer(9);
-        save
-    }
-
-    /// Creates an EEPROM save with a 17-halfword read request (8KB).
-    fn make_eeprom_save_14bit() -> SaveMedia {
-        let mut save = SaveMedia::new();
-        let mut rom = vec![0u8; 4 * 1024 * 1024];
-        rom[0x100..0x108].copy_from_slice(b"EEPROM_V");
-        save.detect_save_type(&rom);
-        save.start_eeprom_transfer(17);
-        save
-    }
-
-    /// Sends a sequence of bits to the EEPROM (MSB first).
-    fn send_bits(save: &mut SaveMedia, value: u64, count: u8) {
-        for i in (0..count).rev() {
-            save.eeprom_write(((value >> i) & 1) as u16);
-        }
-    }
-
-    #[test]
-    fn test_eeprom_write_and_read_back() {
-        let mut save = make_eeprom_save_6bit();
-
-        // write command: "10" + 6-bit addr (0) + 64 data bits + 1 stop bit
-        send_bits(&mut save, 0b10, 2); // write command
-        send_bits(&mut save, 0, 6); // address 0
-
-        // now in CollectingWriteData state, send 64 data bits + stop
-        let test_data: u64 = 0xDEADBEEF_CAFEBABE;
-        send_bits(&mut save, test_data, 64);
-        send_bits(&mut save, 0, 1); // stop bit
-
-        // write should be pending, read returns 1 (ready)
-        assert_eq!(save.eeprom_read(), 1);
-
-        // now read back: "11" + 6-bit addr (0) + 1 stop bit
-        send_bits(&mut save, 0b11, 2); // read command
-        send_bits(&mut save, 0, 6); // address 0
-        send_bits(&mut save, 0, 1); // stop bit
-
-        // read 68 bits: 4 dummy + 64 data
-        let mut result = 0u64;
-        for _ in 0..4 {
-            save.eeprom_read(); // dummy bits
-        }
-        for _ in 0..64 {
-            result = (result << 1) | save.eeprom_read() as u64;
-        }
-
-        assert_eq!(result, test_data);
-    }
-
-    #[test]
-    fn test_eeprom_read_unwritten_returns_ff() {
-        let mut save = make_eeprom_save_6bit();
-
-        // read address 1 (never written)
-        send_bits(&mut save, 0b11, 2); // read command
-        send_bits(&mut save, 1, 6); // address 1
-        send_bits(&mut save, 0, 1); // stop bit
-
-        // skip 4 dummy bits
-        for _ in 0..4 {
-            save.eeprom_read();
-        }
-        // read 64 data bits - should all be 1 (0xFF fill)
-        let mut result = 0u64;
-        for _ in 0..64 {
-            result = (result << 1) | save.eeprom_read() as u64;
-        }
-        assert_eq!(result, 0xFFFF_FFFF_FFFF_FFFF);
-    }
-
-    #[test]
-    fn test_eeprom_write_different_addresses() {
-        let mut save = make_eeprom_save_6bit();
-
-        // write 0xAAAA... to address 0
-        send_bits(&mut save, 0b10, 2);
-        send_bits(&mut save, 0, 6);
-        send_bits(&mut save, 0xAAAA_AAAA_AAAA_AAAA, 64);
-        send_bits(&mut save, 0, 1);
-        save.eeprom_read(); // ack write
-
-        // write 0x5555... to address 1
-        send_bits(&mut save, 0b10, 2);
-        send_bits(&mut save, 1, 6);
-        send_bits(&mut save, 0x5555_5555_5555_5555, 64);
-        send_bits(&mut save, 0, 1);
-        save.eeprom_read(); // ack write
-
-        // verify address 0
-        send_bits(&mut save, 0b11, 2);
-        send_bits(&mut save, 0, 6);
-        send_bits(&mut save, 0, 1);
-        for _ in 0..4 {
-            save.eeprom_read();
-        }
-        let mut result = 0u64;
-        for _ in 0..64 {
-            result = (result << 1) | save.eeprom_read() as u64;
-        }
-        assert_eq!(result, 0xAAAA_AAAA_AAAA_AAAA);
-
-        // verify address 1
-        send_bits(&mut save, 0b11, 2);
-        send_bits(&mut save, 1, 6);
-        send_bits(&mut save, 0, 1);
-        for _ in 0..4 {
-            save.eeprom_read();
-        }
-        let mut result2 = 0u64;
-        for _ in 0..64 {
-            result2 = (result2 << 1) | save.eeprom_read() as u64;
-        }
-        assert_eq!(result2, 0x5555_5555_5555_5555);
-    }
-
-    #[test]
-    fn test_eeprom_reset_clears_state() {
-        let mut save = make_eeprom_save_6bit();
-
-        // start a write command
-        send_bits(&mut save, 0b10, 2);
-        send_bits(&mut save, 0, 6);
-        // reset mid-operation
-        save.reset();
-
-        assert_eq!(save.eeprom_state, EepromState::AcceptingCommand);
-        assert_eq!(save.eeprom_bits, 0);
-        assert_eq!(save.eeprom_read_bits, 0);
-    }
-
-    #[test]
-    fn test_eeprom_idle_read_returns_1() {
-        let mut save = make_eeprom_save_6bit();
-        // reading before any command returns 1
-        assert_eq!(save.eeprom_read(), 1);
-    }
-
-    #[test]
-    fn test_eeprom_write_overwrite() {
-        let mut save = make_eeprom_save_6bit();
-
-        // write data to address 0
-        send_bits(&mut save, 0b10, 2);
-        send_bits(&mut save, 0, 6);
-        send_bits(&mut save, 0x1234_5678_9ABC_DEF0, 64);
-        send_bits(&mut save, 0, 1);
-        save.eeprom_read();
-
-        // overwrite address 0 with different data
-        send_bits(&mut save, 0b10, 2);
-        send_bits(&mut save, 0, 6);
-        send_bits(&mut save, 0xFEDC_BA98_7654_3210, 64);
-        send_bits(&mut save, 0, 1);
-        save.eeprom_read();
-
-        // read back - should be the new data
-        send_bits(&mut save, 0b11, 2);
-        send_bits(&mut save, 0, 6);
-        send_bits(&mut save, 0, 1);
-        for _ in 0..4 {
-            save.eeprom_read();
-        }
-        let mut result = 0u64;
-        for _ in 0..64 {
-            result = (result << 1) | save.eeprom_read() as u64;
-        }
-        assert_eq!(result, 0xFEDC_BA98_7654_3210);
-    }
-
-    #[test]
-    fn test_eeprom_14bit_write_and_read_back() {
-        let mut save = make_eeprom_save_14bit();
-        // data starts at 512B, gets resized to 8KB on first EEPROM access
-
-        // write command: "10" + 14-bit addr (0) + 64 data bits + 1 stop bit
-        send_bits(&mut save, 0b10, 2);
-        send_bits(&mut save, 0, 14); // address 0
-        let test_data: u64 = 0xDEADBEEF_CAFEBABE;
-        send_bits(&mut save, test_data, 64);
-        send_bits(&mut save, 0, 1); // stop bit
-        assert_eq!(save.eeprom_read(), 1); // ack
-
-        // read back: "11" + 14-bit addr (0) + 1 stop bit
-        send_bits(&mut save, 0b11, 2);
-        send_bits(&mut save, 0, 14);
-        send_bits(&mut save, 0, 1);
-        for _ in 0..4 {
-            save.eeprom_read(); // dummy
-        }
-        let mut result = 0u64;
-        for _ in 0..64 {
-            result = (result << 1) | save.eeprom_read() as u64;
-        }
-        assert_eq!(result, test_data);
-    }
-
-    #[test]
-    fn test_eeprom_addr_width_6bit() {
-        let mut save = make_eeprom_save_6bit();
-        send_bits(&mut save, 0b11, 2); // read command
-        send_bits(&mut save, 0, 6);
-        send_bits(&mut save, 0, 1);
-        assert_eq!(save.eeprom_addr_width, 6);
-    }
-
-    #[test]
-    fn test_eeprom_addr_width_14bit() {
-        let mut save = make_eeprom_save_14bit();
-        send_bits(&mut save, 0b11, 2); // read command
-        send_bits(&mut save, 0, 14);
-        send_bits(&mut save, 0, 1);
-        assert_eq!(save.eeprom_addr_width, 14);
     }
 }

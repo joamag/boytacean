@@ -188,37 +188,6 @@ mod tests {
     }
 
     #[test]
-    fn test_is_gba_rom_too_small() {
-        let data = vec![0u8; 32];
-        assert!(!is_gba_rom(&data));
-    }
-
-    #[test]
-    fn test_is_gba_rom_no_fixed_value() {
-        let data = vec![0u8; 0xC0];
-        assert!(!is_gba_rom(&data));
-    }
-
-    #[test]
-    fn test_is_gba_rom_valid() {
-        let data = make_gba_rom("TESTGAME", "ATST", "01");
-        assert!(is_gba_rom(&data));
-    }
-
-    #[test]
-    fn test_is_gba_rom_invalid_header() {
-        let data = make_gba_rom("TESTGAME", "ATST", "01");
-        for offset in [0x04, 0x9F, 0xA0, 0xB2, 0xBD] {
-            let mut invalid = data.clone();
-            invalid[offset] ^= 1;
-            assert!(!is_gba_rom(&invalid));
-        }
-        let mut gb = include_bytes!("../../res/roms/demo/pocket.gb").to_vec();
-        gb[0xB2] = 0x96;
-        assert!(!is_gba_rom(&gb));
-    }
-
-    #[test]
     fn test_from_data() {
         let data = make_gba_rom("TESTGAME", "ATST", "01");
         let info = GbaRomInfo::from_data(&data).unwrap();
@@ -266,5 +235,36 @@ mod tests {
         let display = format!("{}", info);
         assert!(display.contains("MYGAME"));
         assert!(display.contains("AMGP"));
+    }
+
+    #[test]
+    fn test_is_gba_rom_too_small() {
+        let data = vec![0u8; 32];
+        assert!(!is_gba_rom(&data));
+    }
+
+    #[test]
+    fn test_is_gba_rom_no_fixed_value() {
+        let data = vec![0u8; 0xC0];
+        assert!(!is_gba_rom(&data));
+    }
+
+    #[test]
+    fn test_is_gba_rom_valid() {
+        let data = make_gba_rom("TESTGAME", "ATST", "01");
+        assert!(is_gba_rom(&data));
+    }
+
+    #[test]
+    fn test_is_gba_rom_invalid_header() {
+        let data = make_gba_rom("TESTGAME", "ATST", "01");
+        for offset in [0x04, 0x9F, 0xA0, 0xB2, 0xBD] {
+            let mut invalid = data.clone();
+            invalid[offset] ^= 1;
+            assert!(!is_gba_rom(&invalid));
+        }
+        let mut gb = include_bytes!("../../res/roms/demo/pocket.gb").to_vec();
+        gb[0xB2] = 0x96;
+        assert!(!is_gba_rom(&gb));
     }
 }

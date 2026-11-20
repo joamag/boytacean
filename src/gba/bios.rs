@@ -877,6 +877,12 @@ mod tests {
     }
 
     #[test]
+    fn test_swi_unknown() {
+        let mut cpu = make_cpu();
+        handle_swi(&mut cpu, 0xFF);
+    }
+
+    #[test]
     fn test_swi_soft_reset() {
         let mut cpu = make_cpu();
         for reg in 0..=12 {
@@ -1061,6 +1067,82 @@ mod tests {
     }
 
     #[test]
+    fn test_swi_halt() {
+        let mut cpu = make_cpu();
+        assert!(!cpu.halted());
+        handle_swi(&mut cpu, 0x02);
+        assert!(cpu.halted());
+    }
+
+    #[test]
+    fn test_swi_intr_wait_sets_flags_and_halts() {
+        let mut cpu = make_cpu();
+        cpu.set_reg(0, 1); // discard_old = true
+        cpu.set_reg(1, 0x04); // wait for VCount (bit 2)
+        handle_swi(&mut cpu, 0x04);
+        assert!(cpu.halted());
+        assert_eq!(cpu.bus.intr_wait_flags, 0x04);
+    }
+
+    #[test]
+    fn test_swi_intr_wait_discard_old_clears_intr_check() {
+        let mut cpu = make_cpu();
+        // pre-set VCount and VBlank in IntrCheck
+        let offset = (0x0300_7FF8u32 & 0x7FFF) as usize;
+        cpu.bus.iwram[offset] = 0x05; // VBlank | VCount
+        cpu.bus.iwram[offset + 1] = 0x00;
+
+        cpu.set_reg(0, 1); // discard_old = true
+        cpu.set_reg(1, 0x04); // wait for VCount
+        handle_swi(&mut cpu, 0x04);
+
+        // VCount bit cleared, VBlank preserved
+        let check = u16::from_le_bytes([cpu.bus.iwram[offset], cpu.bus.iwram[offset + 1]]);
+        assert_eq!(check, 0x01);
+    }
+
+    #[test]
+    fn test_swi_intr_wait_no_discard_preserves_intr_check() {
+        let mut cpu = make_cpu();
+        // pre-set VCount in IntrCheck
+        let offset = (0x0300_7FF8u32 & 0x7FFF) as usize;
+        cpu.bus.iwram[offset] = 0x04; // VCount
+        cpu.bus.iwram[offset + 1] = 0x00;
+
+        cpu.set_reg(0, 0); // discard_old = false
+        cpu.set_reg(1, 0x04); // wait for VCount
+        handle_swi(&mut cpu, 0x04);
+
+        // IntrCheck unchanged (discard_old == 0)
+        let check = u16::from_le_bytes([cpu.bus.iwram[offset], cpu.bus.iwram[offset + 1]]);
+        assert_eq!(check, 0x04);
+    }
+
+    #[test]
+    fn test_swi_vblank_intr_wait() {
+        let mut cpu = make_cpu();
+        handle_swi(&mut cpu, 0x05);
+        assert!(cpu.halted());
+        // should set intr_wait_flags to VBlank (bit 0)
+        assert_eq!(cpu.bus.intr_wait_flags, 1);
+    }
+
+    #[test]
+    fn test_swi_vblank_intr_wait_clears_intr_check() {
+        let mut cpu = make_cpu();
+        // pre-set VBlank bit in IntrCheck at 0x03007FF8
+        let offset = (0x0300_7FF8u32 & 0x7FFF) as usize;
+        cpu.bus.iwram[offset] = 0x03; // VBlank | HBlank
+        cpu.bus.iwram[offset + 1] = 0x00;
+
+        handle_swi(&mut cpu, 0x05);
+
+        // VBlank bit should be cleared, HBlank preserved
+        let check = u16::from_le_bytes([cpu.bus.iwram[offset], cpu.bus.iwram[offset + 1]]);
+        assert_eq!(check, 0x02); // only HBlank remains
+    }
+
+    #[test]
     fn test_swi_div() {
         let mut cpu = make_cpu();
         cpu.set_reg(0, 10);
@@ -1145,82 +1227,6 @@ mod tests {
         cpu.set_reg(0, 0);
         handle_swi(&mut cpu, 0x08);
         assert_eq!(cpu.reg(0), 0);
-    }
-
-    #[test]
-    fn test_swi_halt() {
-        let mut cpu = make_cpu();
-        assert!(!cpu.halted());
-        handle_swi(&mut cpu, 0x02);
-        assert!(cpu.halted());
-    }
-
-    #[test]
-    fn test_swi_vblank_intr_wait() {
-        let mut cpu = make_cpu();
-        handle_swi(&mut cpu, 0x05);
-        assert!(cpu.halted());
-        // should set intr_wait_flags to VBlank (bit 0)
-        assert_eq!(cpu.bus.intr_wait_flags, 1);
-    }
-
-    #[test]
-    fn test_swi_vblank_intr_wait_clears_intr_check() {
-        let mut cpu = make_cpu();
-        // pre-set VBlank bit in IntrCheck at 0x03007FF8
-        let offset = (0x0300_7FF8u32 & 0x7FFF) as usize;
-        cpu.bus.iwram[offset] = 0x03; // VBlank | HBlank
-        cpu.bus.iwram[offset + 1] = 0x00;
-
-        handle_swi(&mut cpu, 0x05);
-
-        // VBlank bit should be cleared, HBlank preserved
-        let check = u16::from_le_bytes([cpu.bus.iwram[offset], cpu.bus.iwram[offset + 1]]);
-        assert_eq!(check, 0x02); // only HBlank remains
-    }
-
-    #[test]
-    fn test_swi_intr_wait_sets_flags_and_halts() {
-        let mut cpu = make_cpu();
-        cpu.set_reg(0, 1); // discard_old = true
-        cpu.set_reg(1, 0x04); // wait for VCount (bit 2)
-        handle_swi(&mut cpu, 0x04);
-        assert!(cpu.halted());
-        assert_eq!(cpu.bus.intr_wait_flags, 0x04);
-    }
-
-    #[test]
-    fn test_swi_intr_wait_discard_old_clears_intr_check() {
-        let mut cpu = make_cpu();
-        // pre-set VCount and VBlank in IntrCheck
-        let offset = (0x0300_7FF8u32 & 0x7FFF) as usize;
-        cpu.bus.iwram[offset] = 0x05; // VBlank | VCount
-        cpu.bus.iwram[offset + 1] = 0x00;
-
-        cpu.set_reg(0, 1); // discard_old = true
-        cpu.set_reg(1, 0x04); // wait for VCount
-        handle_swi(&mut cpu, 0x04);
-
-        // VCount bit cleared, VBlank preserved
-        let check = u16::from_le_bytes([cpu.bus.iwram[offset], cpu.bus.iwram[offset + 1]]);
-        assert_eq!(check, 0x01);
-    }
-
-    #[test]
-    fn test_swi_intr_wait_no_discard_preserves_intr_check() {
-        let mut cpu = make_cpu();
-        // pre-set VCount in IntrCheck
-        let offset = (0x0300_7FF8u32 & 0x7FFF) as usize;
-        cpu.bus.iwram[offset] = 0x04; // VCount
-        cpu.bus.iwram[offset + 1] = 0x00;
-
-        cpu.set_reg(0, 0); // discard_old = false
-        cpu.set_reg(1, 0x04); // wait for VCount
-        handle_swi(&mut cpu, 0x04);
-
-        // IntrCheck unchanged (discard_old == 0)
-        let check = u16::from_le_bytes([cpu.bus.iwram[offset], cpu.bus.iwram[offset + 1]]);
-        assert_eq!(check, 0x04);
     }
 
     #[test]
@@ -1480,11 +1486,5 @@ mod tests {
 
         // one octave up doubles the frequency
         assert_eq!(cpu.reg(0), 14080);
-    }
-
-    #[test]
-    fn test_swi_unknown() {
-        let mut cpu = make_cpu();
-        handle_swi(&mut cpu, 0xFF);
     }
 }
