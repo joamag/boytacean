@@ -535,7 +535,8 @@ impl GbaApu {
     }
 
     pub fn set_soundcnt_l(&mut self, value: u16) {
-        self.soundcnt_l = value;
+        // bits 3 and 7 are unused and read as zero
+        self.soundcnt_l = value & 0xFF77;
     }
 
     pub fn soundcnt_h(&self) -> u16 {
@@ -545,8 +546,9 @@ impl GbaApu {
 
     pub fn set_soundcnt_h(&mut self, value: u16) {
         // store without FIFO reset strobe bits (11, 15), they are
-        // write-only one-shot actions, not persistent state
-        self.soundcnt_h = value & !((1 << 11) | (1 << 15));
+        // write-only one-shot actions, not persistent state, nor
+        // the unused bits (4-7) that read as zero
+        self.soundcnt_h = value & 0x770F;
 
         // configure DirectSound channels from SOUNDCNT_H
         self.direct_sound[0].volume_full = value & (1 << 2) != 0;
@@ -582,7 +584,7 @@ impl GbaApu {
         if self.ch4_enabled && self.ch4_dac {
             value |= 8;
         }
-        value | 0x70
+        value
     }
 
     pub fn set_soundcnt_x(&mut self, value: u16) {
@@ -601,7 +603,8 @@ impl GbaApu {
     }
 
     pub fn set_soundbias(&mut self, value: u16) {
-        self.soundbias = value;
+        // bits 0 and 10-13 are unused and read as zero
+        self.soundbias = value & 0xC3FE;
     }
 
     // -- wave RAM --
@@ -1137,8 +1140,8 @@ impl GbaApu {
 
     /// Reads a legacy channel register.
     ///
-    /// Some bits are write-only and return fixed values. The register
-    /// layout follows the GBA memory map at 0x04000060-0x0400007D.
+    /// Write-only and unused bits read as zero. The register layout
+    /// follows the GBA memory map at 0x04000060-0x0400007D.
     pub fn read_channel_reg(&self, addr: u32) -> u8 {
         match addr {
             // SOUND1CNT_L (0x60): sweep
@@ -1146,63 +1149,44 @@ impl GbaApu {
                 (self.ch1_sweep_slope & 0x07)
                     | (if self.ch1_sweep_decrease { 0x08 } else { 0x00 })
                     | ((self.ch1_sweep_pace & 0x07) << 4)
-                    | 0x80
             }
-            // SOUND1CNT_H (0x62): duty/length
-            REG_SOUND1CNT_H => (self.ch1_wave_duty << 6) | 0x3F,
+            // SOUND1CNT_H (0x62): duty (length is write-only)
+            REG_SOUND1CNT_H => self.ch1_wave_duty << 6,
             // SOUND1CNT_H (0x63): envelope
             a if a == REG_SOUND1CNT_H + 1 => {
                 (self.ch1_envelope_pace & 0x07)
                     | ((self.ch1_envelope_direction & 0x01) << 3)
                     | ((self.ch1_initial_volume & 0x0F) << 4)
             }
-            // SOUND1CNT_X (0x64): frequency low (write-only)
-            REG_SOUND1CNT_X => 0xFF,
-            // SOUND1CNT_X (0x65): frequency high + control
-            a if a == REG_SOUND1CNT_X + 1 => {
-                (if self.ch1_length_enabled { 0x40 } else { 0x00 }) | 0xBF
-            }
+            // SOUND1CNT_X (0x65): length enable (frequency is write-only)
+            a if a == REG_SOUND1CNT_X + 1 && self.ch1_length_enabled => 0x40,
 
-            // SOUND2CNT_L (0x68): duty/length
-            REG_SOUND2CNT_L => (self.ch2_wave_duty << 6) | 0x3F,
+            // SOUND2CNT_L (0x68): duty (length is write-only)
+            REG_SOUND2CNT_L => self.ch2_wave_duty << 6,
             // SOUND2CNT_L (0x69): envelope
             a if a == REG_SOUND2CNT_L + 1 => {
                 (self.ch2_envelope_pace & 0x07)
                     | ((self.ch2_envelope_direction & 0x01) << 3)
                     | ((self.ch2_initial_volume & 0x0F) << 4)
             }
-            // SOUND2CNT_H (0x6C): frequency low (write-only)
-            REG_SOUND2CNT_H => 0xFF,
-            // SOUND2CNT_H (0x6D): frequency high + control
-            a if a == REG_SOUND2CNT_H + 1 => {
-                (if self.ch2_length_enabled { 0x40 } else { 0x00 }) | 0xBF
-            }
+            // SOUND2CNT_H (0x6D): length enable (frequency is write-only)
+            a if a == REG_SOUND2CNT_H + 1 && self.ch2_length_enabled => 0x40,
 
             // SOUND3CNT_L (0x70): DAC enable + wave bank
             REG_SOUND3CNT_L => {
                 (if self.wave_dimension { 0x20 } else { 0x00 })
                     | ((self.wave_bank & 1) << 6)
                     | (if self.ch3_dac { 0x80 } else { 0x00 })
-                    | 0x1F
             }
-            // SOUND3CNT_H (0x72): length (write-only)
-            REG_SOUND3CNT_H => 0xFF,
-            // SOUND3CNT_H (0x73): volume
+            // SOUND3CNT_H (0x73): volume (length is write-only)
             a if a == REG_SOUND3CNT_H + 1 => {
                 ((self.ch3_output_level & 0x03) << 5)
                     | (if self.ch3_force_volume { 0x80 } else { 0x00 })
-                    | 0x1F
             }
-            // SOUND3CNT_X (0x74): frequency low (write-only)
-            REG_SOUND3CNT_X => 0xFF,
-            // SOUND3CNT_X (0x75): frequency high + control
-            a if a == REG_SOUND3CNT_X + 1 => {
-                (if self.ch3_length_enabled { 0x40 } else { 0x00 }) | 0xBF
-            }
+            // SOUND3CNT_X (0x75): length enable (frequency is write-only)
+            a if a == REG_SOUND3CNT_X + 1 && self.ch3_length_enabled => 0x40,
 
-            // SOUND4CNT_L (0x78): length (write-only)
-            REG_SOUND4CNT_L => 0xFF,
-            // SOUND4CNT_L (0x79): envelope
+            // SOUND4CNT_L (0x79): envelope (length is write-only)
             a if a == REG_SOUND4CNT_L + 1 => {
                 (self.ch4_envelope_pace & 0x07)
                     | ((self.ch4_envelope_direction & 0x01) << 3)
@@ -1214,10 +1198,8 @@ impl GbaApu {
                     | (if self.ch4_width_mode { 0x08 } else { 0x00 })
                     | ((self.ch4_clock_shift & 0x0F) << 4)
             }
-            // SOUND4CNT_H (0x7D): control
-            a if a == REG_SOUND4CNT_H + 1 => {
-                (if self.ch4_length_enabled { 0x40 } else { 0x00 }) | 0xBF
-            }
+            // SOUND4CNT_H (0x7D): length enable
+            a if a == REG_SOUND4CNT_H + 1 && self.ch4_length_enabled => 0x40,
 
             _ => 0,
         }
@@ -1626,6 +1608,14 @@ mod tests {
 
         apu.set_soundbias(0x300);
         assert_eq!(apu.soundbias(), 0x300);
+
+        // unused bits read as zero
+        apu.set_soundcnt_l(0xFFFF);
+        assert_eq!(apu.soundcnt_l(), 0xFF77);
+        apu.set_soundcnt_h(0xFFFF);
+        assert_eq!(apu.soundcnt_h(), 0x770F);
+        apu.set_soundbias(0xFFFF);
+        assert_eq!(apu.soundbias(), 0xC3FE);
     }
 
     #[test]
@@ -1677,8 +1667,8 @@ mod tests {
         apu.write_channel_reg(0x0400_007D, 0x80);
         assert_eq!(apu.soundcnt_x() & 0x08, 8);
 
-        // all four + master + unused bits
-        assert_eq!(apu.soundcnt_x(), 0x8F | 0x70);
+        // all four + master, unused bits read as zero
+        assert_eq!(apu.soundcnt_x(), 0x8F);
     }
 
     #[test]
@@ -2647,14 +2637,28 @@ mod tests {
     }
 
     #[test]
-    fn test_frequency_write_only_readback() {
-        let apu = GbaApu::new();
+    fn test_write_only_readback() {
+        let mut apu = GbaApu::new();
+        apu.set_soundcnt_x(0x80);
+        for addr in 0x0400_0060..0x0400_0080 {
+            apu.write_channel_reg(addr, 0xFF);
+        }
 
-        // frequency low bytes are write-only, read as 0xFF
-        assert_eq!(apu.read_channel_reg(0x0400_0064), 0xFF);
-        assert_eq!(apu.read_channel_reg(0x0400_006C), 0xFF);
-        assert_eq!(apu.read_channel_reg(0x0400_0074), 0xFF);
-        assert_eq!(apu.read_channel_reg(0x0400_0078), 0xFF);
+        // write-only (length, frequency) and unused bits read as zero
+        let readable = [
+            0x7F, 0x00, 0xC0, 0xFF, 0x00, 0x40, 0x00, 0x00, // SOUND1CNT
+            0xC0, 0xFF, 0x00, 0x00, 0x00, 0x40, 0x00, 0x00, // SOUND2CNT
+            0xE0, 0x00, 0x00, 0xE0, 0x00, 0x40, 0x00, 0x00, // SOUND3CNT
+            0x00, 0xFF, 0x00, 0x00, 0xFF, 0x40, 0x00, 0x00, // SOUND4CNT
+        ];
+        for (offset, value) in readable.iter().enumerate() {
+            assert_eq!(apu.read_channel_reg(0x0400_0060 + offset as u32), *value);
+        }
+
+        // a read-modify-write of the volume keeps the full length
+        let value = apu.read_channel_reg(0x0400_0072);
+        apu.write_channel_reg(0x0400_0072, value);
+        assert_eq!(apu.ch3_length_timer, 256);
     }
 
     #[test]

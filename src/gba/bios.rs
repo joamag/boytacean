@@ -1084,7 +1084,7 @@ mod tests {
             let sound = flags & 0x40 != 0;
             assert_eq!(cpu.bus.apu.soundcnt_l(), if sound { 0 } else { 0x1177 });
             assert_eq!(cpu.bus.apu.soundcnt_h(), if sound { 0 } else { 0x0304 });
-            assert_eq!(cpu.bus.apu.soundcnt_x(), if sound { 0x70 } else { 0xF0 });
+            assert_eq!(cpu.bus.apu.soundcnt_x(), if sound { 0 } else { 0x80 });
             assert_eq!(cpu.bus.apu.soundbias(), if sound { 0x0200 } else { 0x0100 });
             for bank in [0x40, 0] {
                 cpu.bus_write16(0x0400_0070, bank);

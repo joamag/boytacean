@@ -68,7 +68,8 @@ impl GbaTimer {
 
     pub fn set_control(&mut self, value: u16) {
         let was_enabled = self.enabled;
-        self.control = value;
+        // bits 3-5 and 8-15 are unused and read as zero
+        self.control = value & 0x00C7;
         self.enabled = value & (1 << 7) != 0;
         self.irq_enable = value & (1 << 6) != 0;
         self.cascade = value & (1 << 2) != 0;
@@ -378,6 +379,10 @@ mod tests {
         assert!(timer.enabled());
         assert!(timer.irq_enable());
         assert!(timer.cascade());
+
+        // unused bits read as zero
+        timer.set_control(0xFFFF);
+        assert_eq!(timer.control(), 0x00C7);
     }
 
     #[test]
