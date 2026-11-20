@@ -182,9 +182,12 @@ fn swi_halt(cpu: &mut Arm7Tdmi) {
     cpu.set_halted(true);
 }
 
-/// SWI 0x03: Stop - low-power stop mode (treat as halt).
+/// SWI 0x03: Stop - switches into the very low power stop mode.
+///
+/// The real BIOS writes 0x80 to HALTCNT, so the request is handed
+/// to the bus exactly as a direct register write.
 fn swi_stop(cpu: &mut Arm7Tdmi) {
-    cpu.set_halted(true);
+    cpu.bus_write8(0x0400_0301, 0x80);
 }
 
 /// SWI 0x04: IntrWait — halts until the requested interrupt flags
@@ -1126,6 +1129,19 @@ mod tests {
         assert!(!cpu.halted());
         handle_swi(&mut cpu, 0x02);
         assert!(cpu.halted());
+    }
+
+    #[test]
+    fn test_swi_stop() {
+        // the BIOS enters stop mode by writing 0x80 to HALTCNT, so the
+        // SWI must leave the system as that register write does
+        let mut cpu = make_cpu();
+        let mut expected = make_cpu();
+        expected.bus_write8(0x0400_0301, 0x80);
+        assert!(!handle_swi(&mut cpu, 0x03));
+        assert_eq!(cpu.halted(), expected.halted());
+        assert_eq!(cpu.bus.halt_requested, expected.bus.halt_requested);
+        assert_eq!(cpu.bus.intr_wait_flags, 0);
     }
 
     #[test]
