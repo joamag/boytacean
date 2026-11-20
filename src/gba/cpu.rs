@@ -495,28 +495,24 @@ impl Arm7Tdmi {
         // the fetch stage reads from PC at the same time as the execute
         // stage runs the current instruction, so self-modifying code that
         // writes to upcoming instruction addresses does not affect the
-        // already-fetched pipeline contents.
-        let prefetched = if self.pipeline_valid {
-            let value = if self.regs[15] < 0x4000 {
-                // (rare) fetch inside the BIOS region: makes the BIOS
-                // readable for the fetch and updates the protection value
-                self.bus.bios_readable = true;
-                let value = if self.in_thumb_mode() {
-                    self.bus.read16(self.regs[15]) as u32
-                } else {
-                    self.bus.read32(self.regs[15])
-                };
-                self.fetch_bios_guard(self.regs[15], value);
-                self.bus.bios_readable = false;
-                value
-            } else if self.in_thumb_mode() {
-                self.bus.fetch16(self.regs[15]) as u32
+        // already-fetched pipeline contents (that fetch() always leaves
+        // filled).
+        let prefetched = if self.regs[15] < 0x4000 {
+            // (rare) fetch inside the BIOS region: makes the BIOS
+            // readable for the fetch and updates the protection value
+            self.bus.bios_readable = true;
+            let value = if self.in_thumb_mode() {
+                self.bus.read16(self.regs[15]) as u32
             } else {
-                self.bus.fetch32(self.regs[15])
+                self.bus.read32(self.regs[15])
             };
-            Some(value)
+            self.fetch_bios_guard(self.regs[15], value);
+            self.bus.bios_readable = false;
+            value
+        } else if self.in_thumb_mode() {
+            self.bus.fetch16(self.regs[15]) as u32
         } else {
-            None
+            self.bus.fetch32(self.regs[15])
         };
 
         // allows BIOS data reads while executing BIOS code
@@ -538,9 +534,7 @@ impl Arm7Tdmi {
         // commits the prefetched value into the pipeline (if not flushed)
         if self.pipeline_valid {
             self.pipeline[0] = self.pipeline[1];
-            if let Some(value) = prefetched {
-                self.pipeline[1] = value;
-            }
+            self.pipeline[1] = prefetched;
             if self.in_thumb_mode() {
                 self.regs[15] = self.regs[15].wrapping_add(2);
             } else {
