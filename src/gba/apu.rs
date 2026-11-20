@@ -12,7 +12,7 @@ use crate::{
     gba::consts::{
         CPU_FREQ, REG_SOUND1CNT_H, REG_SOUND1CNT_L, REG_SOUND1CNT_X, REG_SOUND2CNT_H,
         REG_SOUND2CNT_L, REG_SOUND3CNT_H, REG_SOUND3CNT_L, REG_SOUND3CNT_X, REG_SOUND4CNT_H,
-        REG_SOUND4CNT_L,
+        REG_SOUND4CNT_L, REG_SOUNDCNT_L,
     },
     warnln,
 };
@@ -1236,7 +1236,7 @@ impl GbaApu {
     ///
     /// Handles the GBA register layout at 0x04000060-0x0400007D,
     /// including trigger logic, DAC gating, length enable edge cases,
-    /// and envelope/sweep parameter loading.
+    /// and envelope/sweep parameter loading, unused bytes are ignored.
     pub fn write_channel_reg(&mut self, addr: u32, value: u8) {
         // in case the sound is disabled then ignores writes, the
         // registers are read-only until the sound is re-enabled
@@ -1473,6 +1473,9 @@ impl GbaApu {
                     self.ch4_enabled = false;
                 }
             }
+
+            // unused bytes of the channel registers
+            a if (REG_SOUND1CNT_L..REG_SOUNDCNT_L).contains(&a) => (),
 
             _ => {
                 warnln!("Unhandled APU register write at 0x{:08X}", addr);
@@ -2950,6 +2953,34 @@ mod tests {
 
         // channel should not be enabled with DAC off
         assert!(!apu.ch1_enabled);
+    }
+
+    #[test]
+    fn test_write_unused_bytes() {
+        let mut apu = GbaApu::new();
+        apu.set_soundcnt_x(0x80);
+
+        // the unused bytes of the channel registers ignore writes
+        for addr in [
+            0x0400_0061,
+            0x0400_0066,
+            0x0400_0067,
+            0x0400_006A,
+            0x0400_006B,
+            0x0400_006E,
+            0x0400_006F,
+            0x0400_0071,
+            0x0400_0076,
+            0x0400_0077,
+            0x0400_007A,
+            0x0400_007B,
+            0x0400_007E,
+            0x0400_007F,
+        ] {
+            apu.write_channel_reg(addr, 0xFF);
+            assert_eq!(apu.read_channel_reg(addr), 0);
+        }
+        assert_eq!(apu.soundcnt_x(), 0x80);
     }
 
     #[test]
