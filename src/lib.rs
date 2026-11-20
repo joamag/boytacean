@@ -29,4 +29,4 @@ pub mod timer;
 pub mod py;
 
 #[cfg(feature = "wasm")]
-pub use boytacean_dumper;
+pub use boytacean_cartridge;

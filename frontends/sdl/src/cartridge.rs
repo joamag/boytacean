@@ -9,13 +9,13 @@ use std::{
     time::Duration,
 };
 
+use boytacean_cartridge::{
+    dumper::Dumper,
+    gbxcart::{BAUD_RATE, USB_PRODUCT_ID, USB_VENDOR_ID},
+};
 use boytacean_common::{
     error::Error,
     util::{read_file, write_file},
-};
-use boytacean_dumper::{
-    dumper::Dumper,
-    gbxcart::{BAUD_RATE, USB_PRODUCT_ID, USB_VENDOR_ID},
 };
 use serialport::{available_ports, SerialPortType};
 
