@@ -14,12 +14,12 @@ slow = []
 debug = ["boytacean/debug"]
 pedantic = ["boytacean/pedantic"]
 cpulog = ["boytacean/cpulog"]
-cartridge = ["boytacean-dumper", "serialport"]
+cartridge = ["boytacean-cartridge", "serialport"]
 
 [dependencies]
 boytacean = { path = "../..", version = "0.13.2" }
+boytacean-cartridge = { path = "../../crates/cartridge", version = "0.13.2", optional = true }
 boytacean-common = { path = "../../crates/common", version = "0.13.2" }
-boytacean-dumper = { path = "../../crates/dumper", version = "0.13.2", optional = true }
 clap = { version = "4", features = ["derive"] }
 image = "0.24"
 chrono = "0.4"

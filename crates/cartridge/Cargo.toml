@@ -1,5 +1,5 @@
 [package]
-name = "boytacean-dumper"
+name = "boytacean-cartridge"
 description = "Cartridge dumping library for Boytacen."
 version = "0.13.2"
 authors = ["João Magalhães <joamag@gmail.com>"]
