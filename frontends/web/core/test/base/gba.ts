@@ -3,7 +3,13 @@ import { readFile } from "fs/promises";
 import { resolve } from "path";
 import { pathToFileURL } from "url";
 
-import { bufferToBase64, logger, LogLevel } from "emukit/logic";
+import {
+    bufferToBase64,
+    logger,
+    LogLevel,
+    TickMode,
+    TickParams
+} from "emukit/logic";
 
 import { GbaCore, releaseGbaCore } from "../../ts/gba";
 import { NullStorageAdapter, StorageAdapter } from "../../ts/storage";
@@ -37,6 +43,19 @@ const FRAME_CYCLES = 280896;
  * to the storage adapter (5 seconds of emulation).
  */
 const FLUSH_CYCLES = 16777216 * 5;
+
+/**
+ * Builds the parameters of a synced tick operation that clocks the
+ * provided number of cycles.
+ *
+ * @param cycles The number of cycles to be clocked by the tick.
+ * @returns The parameters of the tick operation.
+ */
+const buildTick = (cycles: number): TickParams => ({
+    mode: TickMode.Synced,
+    cycles: cycles,
+    visualRatio: 1
+});
 
 /**
  * The set of cores that have been built by a test, released after it
@@ -159,7 +178,7 @@ describe("GbaCore", function () {
             const core = buildCore();
             let ticks = 0;
             core.bind("tick", () => ticks++);
-            await core.tick({ cycles: FRAME_CYCLES });
+            await core.tick(buildTick(FRAME_CYCLES));
             assert.strictEqual(ticks, 0);
         });
 
@@ -177,7 +196,7 @@ describe("GbaCore", function () {
             core.bind("tick", (_owner, params) => {
                 cycles += (params as { cycles: number }).cycles;
             });
-            await core.tick({ cycles: FRAME_CYCLES * 2 });
+            await core.tick(buildTick(FRAME_CYCLES * 2));
             assert.ok(frames >= 1);
             assert.ok(cycles >= FRAME_CYCLES * 2);
             assert.strictEqual(core.imageBuffer.length, 240 * 160 * 3);
@@ -190,13 +209,15 @@ describe("GbaCore", function () {
                 romName: "sram.gba",
                 romData: await readRom(SRAM_ROM_URL)
             });
-            await core.tick({ cycles: FRAME_CYCLES });
+            await core.tick(buildTick(FRAME_CYCLES));
             assert.deepStrictEqual(Object.keys(items), []);
-            await core.tick({ cycles: FLUSH_CYCLES });
+            await core.tick(buildTick(FLUSH_CYCLES));
             assert.deepStrictEqual(Object.keys(items), ["gba:1337:GBA Tests"]);
             assert.strictEqual(
                 items["gba:1337:GBA Tests"],
-                bufferToBase64(core.instance?.ram_data_eager() ?? [])
+                bufferToBase64(
+                    core.instance?.ram_data_eager() ?? new Uint8Array()
+                )
             );
         });
 
@@ -212,11 +233,11 @@ describe("GbaCore", function () {
                 romData: await readRom(SRAM_ROM_URL)
             });
             const warnings = await captureWarnings(() =>
-                core.tick({ cycles: FLUSH_CYCLES })
+                core.tick(buildTick(FLUSH_CYCLES))
             );
             assert.strictEqual(warnings.length, 1);
             assert.match(warnings[0], /Failed to save RAM data/);
-            await core.tick({ cycles: FRAME_CYCLES });
+            await core.tick(buildTick(FRAME_CYCLES));
         });
     });
 
