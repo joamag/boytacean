@@ -120,6 +120,24 @@ mod tests {
     }
 
     #[test]
+    fn test_keycnt() {
+        let mut pad = GbaPad::new();
+        pad.set_keycnt(0x1234);
+        assert_eq!(pad.keycnt(), 0x1234);
+    }
+
+    #[test]
+    fn test_ack_keypad() {
+        let mut pad = GbaPad::new();
+        pad.set_keycnt((1 << 14) | 0x0001);
+        pad.key_press(PadKey::A);
+        assert!(pad.int_keypad());
+
+        pad.ack_keypad();
+        assert!(!pad.int_keypad());
+    }
+
+    #[test]
     fn test_key_press_and_lift() {
         let mut pad = GbaPad::new();
         assert_eq!(pad.keyinput(), 0x03FF);
@@ -170,13 +188,6 @@ mod tests {
     }
 
     #[test]
-    fn test_keycnt() {
-        let mut pad = GbaPad::new();
-        pad.set_keycnt(0x1234);
-        assert_eq!(pad.keycnt(), 0x1234);
-    }
-
-    #[test]
     fn test_interrupt_or_mode() {
         let mut pad = GbaPad::new();
         // enable IRQ, OR mode, mask A button (bit 0)
@@ -198,17 +209,6 @@ mod tests {
 
         pad.key_press(PadKey::B);
         assert!(pad.int_keypad()); // both pressed
-    }
-
-    #[test]
-    fn test_ack_keypad() {
-        let mut pad = GbaPad::new();
-        pad.set_keycnt((1 << 14) | 0x0001);
-        pad.key_press(PadKey::A);
-        assert!(pad.int_keypad());
-
-        pad.ack_keypad();
-        assert!(!pad.int_keypad());
     }
 
     #[test]

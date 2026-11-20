@@ -570,15 +570,6 @@ mod tests {
     use crate::pad::PadKey;
 
     #[test]
-    fn test_new_system() {
-        let gba = GameBoyAdvance::new();
-        assert_eq!(gba.display_width(), 240);
-        assert_eq!(gba.display_height(), 160);
-        assert_eq!(gba.cpu_freq(), 16_777_216);
-        assert_eq!(gba.ppu_frame(), 0);
-    }
-
-    #[test]
     #[allow(clippy::assertions_on_constants)]
     fn test_constants() {
         assert_eq!(GameBoyAdvance::CPU_FREQ, 16777216);
@@ -589,9 +580,61 @@ mod tests {
     }
 
     #[test]
+    fn test_load_bios() {
+        let mut gba = GameBoyAdvance::new();
+        let bios = vec![0u8; 0x4000];
+        gba.load_bios(&bios);
+        assert!(gba.cpu.bus.use_real_bios);
+        // after loading BIOS, CPU boots from 0x00 in SVC mode
+        assert_eq!(gba.cpu.pc(), 0x0000_0000);
+        assert_eq!(gba.cpu.cpsr() & 0x1F, 0x13); // MODE_SVC
+    }
+
+    #[test]
+    fn test_load_bios_after_rom() {
+        let mut gba = GameBoyAdvance::new();
+        // load a minimal ROM first
+        let rom = vec![0u8; 256];
+        let _ = gba.load_rom(&rom);
+        assert_eq!(gba.cpu.pc(), 0x0800_0000);
+
+        // loading BIOS resets PC to 0x00
+        let bios = vec![0u8; 0x4000];
+        gba.load_bios(&bios);
+        assert_eq!(gba.cpu.pc(), 0x0000_0000);
+    }
+
+    #[test]
+    fn test_load_rom_post_boot_state() {
+        let mut gba = GameBoyAdvance::new();
+        let mut rom = vec![0u8; 512];
+        rom[0xB2] = 0x96;
+        let _ = gba.load_rom(&rom);
+        // HLE boot leaves the post-BIOS register state: POSTFLG set
+        // and RCNT in general-purpose mode
+        assert_eq!(gba.cpu.bus.read16(0x0400_0300), 1);
+        assert_eq!(gba.cpu.bus.read16(0x0400_0134), 0x8000);
+    }
+
+    #[test]
     fn test_frame_buffer_size() {
         let gba = GameBoyAdvance::new();
         assert_eq!(gba.frame_buffer().len(), 240 * 160 * 3);
+    }
+
+    #[test]
+    fn test_audio_buffer() {
+        let gba = GameBoyAdvance::new();
+        assert!(gba.audio_buffer().is_empty());
+    }
+
+    #[test]
+    fn test_new_system() {
+        let gba = GameBoyAdvance::new();
+        assert_eq!(gba.display_width(), 240);
+        assert_eq!(gba.display_height(), 160);
+        assert_eq!(gba.cpu_freq(), 16_777_216);
+        assert_eq!(gba.ppu_frame(), 0);
     }
 
     #[test]
@@ -815,6 +858,28 @@ mod tests {
     }
 
     #[test]
+    fn test_vcount_irq_delivered_on_match() {
+        use crate::gba::consts::{IRQ_VCOUNT, REG_DISPSTAT};
+
+        let mut gba = GameBoyAdvance::new();
+        // set LYC = 0 and enable VCount IRQ (bit 5) in DISPSTAT
+        // DISPSTAT bits [8:15] = LYC, bit 5 = VCount IRQ enable
+        gba.cpu.bus.write16(REG_DISPSTAT, 1 << 5);
+        // enable VCount in IE and set IME
+        gba.cpu.bus.irq.set_ie(IRQ_VCOUNT);
+        gba.cpu.bus.irq.set_ime(true);
+
+        // PPU starts at vcount=0, so after a full scanline the vcount
+        // wraps and eventually matches LYC=0; clock enough cycles
+        // to complete at least one full frame (228 scanlines × 1232 dots)
+        let total: usize = 228 * 1232;
+        gba.clocks_cycles(total);
+
+        // VCount IRQ should have been raised in IF at some point
+        assert!(gba.cpu.bus.irq.if_() & IRQ_VCOUNT != 0);
+    }
+
+    #[test]
     fn test_process_dma_sound_word_size() {
         for index in [1, 2] {
             for fifo in [0, 1] {
@@ -922,12 +987,6 @@ mod tests {
     }
 
     #[test]
-    fn test_audio_buffer() {
-        let gba = GameBoyAdvance::new();
-        assert!(gba.audio_buffer().is_empty());
-    }
-
-    #[test]
     fn test_clear_audio_buffer() {
         let mut gba = GameBoyAdvance::new();
         gba.clear_audio_buffer();
@@ -1030,49 +1089,6 @@ mod tests {
     }
 
     #[test]
-    fn test_default() {
-        let gba = GameBoyAdvance::default();
-        assert_eq!(gba.display_width(), 240);
-    }
-
-    #[test]
-    fn test_load_bios() {
-        let mut gba = GameBoyAdvance::new();
-        let bios = vec![0u8; 0x4000];
-        gba.load_bios(&bios);
-        assert!(gba.cpu.bus.use_real_bios);
-        // after loading BIOS, CPU boots from 0x00 in SVC mode
-        assert_eq!(gba.cpu.pc(), 0x0000_0000);
-        assert_eq!(gba.cpu.cpsr() & 0x1F, 0x13); // MODE_SVC
-    }
-
-    #[test]
-    fn test_load_bios_after_rom() {
-        let mut gba = GameBoyAdvance::new();
-        // load a minimal ROM first
-        let rom = vec![0u8; 256];
-        let _ = gba.load_rom(&rom);
-        assert_eq!(gba.cpu.pc(), 0x0800_0000);
-
-        // loading BIOS resets PC to 0x00
-        let bios = vec![0u8; 0x4000];
-        gba.load_bios(&bios);
-        assert_eq!(gba.cpu.pc(), 0x0000_0000);
-    }
-
-    #[test]
-    fn test_load_rom_post_boot_state() {
-        let mut gba = GameBoyAdvance::new();
-        let mut rom = vec![0u8; 512];
-        rom[0xB2] = 0x96;
-        let _ = gba.load_rom(&rom);
-        // HLE boot leaves the post-BIOS register state: POSTFLG set
-        // and RCNT in general-purpose mode
-        assert_eq!(gba.cpu.bus.read16(0x0400_0300), 1);
-        assert_eq!(gba.cpu.bus.read16(0x0400_0134), 0x8000);
-    }
-
-    #[test]
     fn test_has_battery_none() {
         let gba = GameBoyAdvance::new();
         assert!(!gba.has_battery());
@@ -1141,24 +1157,8 @@ mod tests {
     }
 
     #[test]
-    fn test_vcount_irq_delivered_on_match() {
-        use crate::gba::consts::{IRQ_VCOUNT, REG_DISPSTAT};
-
-        let mut gba = GameBoyAdvance::new();
-        // set LYC = 0 and enable VCount IRQ (bit 5) in DISPSTAT
-        // DISPSTAT bits [8:15] = LYC, bit 5 = VCount IRQ enable
-        gba.cpu.bus.write16(REG_DISPSTAT, 1 << 5);
-        // enable VCount in IE and set IME
-        gba.cpu.bus.irq.set_ie(IRQ_VCOUNT);
-        gba.cpu.bus.irq.set_ime(true);
-
-        // PPU starts at vcount=0, so after a full scanline the vcount
-        // wraps and eventually matches LYC=0; clock enough cycles
-        // to complete at least one full frame (228 scanlines × 1232 dots)
-        let total: usize = 228 * 1232;
-        gba.clocks_cycles(total);
-
-        // VCount IRQ should have been raised in IF at some point
-        assert!(gba.cpu.bus.irq.if_() & IRQ_VCOUNT != 0);
+    fn test_default() {
+        let gba = GameBoyAdvance::default();
+        assert_eq!(gba.display_width(), 240);
     }
 }

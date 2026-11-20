@@ -330,24 +330,6 @@ mod tests {
     use crate::{gb::GameBoy, gba::GameBoyAdvance, pad::PadKey};
 
     #[test]
-    fn test_system_gb() {
-        let system = System::Gb(GameBoy::new(None));
-        assert!(system.is_gb());
-        assert!(!system.is_gba());
-        assert_eq!(system.display_width(), 160);
-        assert_eq!(system.display_height(), 144);
-    }
-
-    #[test]
-    fn test_system_gba() {
-        let system = System::Gba(GameBoyAdvance::new());
-        assert!(system.is_gba());
-        assert!(!system.is_gb());
-        assert_eq!(system.display_width(), 240);
-        assert_eq!(system.display_height(), 160);
-    }
-
-    #[test]
     fn test_from_rom_gb() {
         let mut data = include_bytes!("../res/roms/demo/pocket.gb").to_vec();
         data[0xB2] = 0x96;
@@ -370,6 +352,24 @@ mod tests {
     #[test]
     fn test_from_rom_invalid() {
         assert!(System::from_rom(&[]).is_err());
+    }
+
+    #[test]
+    fn test_system_gb() {
+        let system = System::Gb(GameBoy::new(None));
+        assert!(system.is_gb());
+        assert!(!system.is_gba());
+        assert_eq!(system.display_width(), 160);
+        assert_eq!(system.display_height(), 144);
+    }
+
+    #[test]
+    fn test_system_gba() {
+        let system = System::Gba(GameBoyAdvance::new());
+        assert!(system.is_gba());
+        assert!(!system.is_gb());
+        assert_eq!(system.display_width(), 240);
+        assert_eq!(system.display_height(), 160);
     }
 
     #[test]

@@ -1061,6 +1061,103 @@ mod tests {
     }
 
     #[test]
+    fn test_intr_wait_flags_default_zero() {
+        let bus = GbaBus::new();
+        assert_eq!(bus.intr_wait_flags, 0);
+    }
+
+    #[test]
+    fn test_bios_init_startup_value() {
+        let mut bus = GbaBus::new();
+        // after init, bios_value matches real GBA post-boot value
+        assert_eq!(bus.read32(0x0000_0000), 0xE129F000);
+    }
+
+    #[test]
+    fn test_bios_irq_handler_stubs() {
+        let mut bus = GbaBus::new();
+        bus.bios_readable = true;
+        // verify IRQ handler stub at 0x128-0x13C
+        assert_eq!(bus.read32(0x0000_0128), 0xE92D500F); // STMFD SP!, {R0-R3, R12, LR}
+        assert_eq!(bus.read32(0x0000_012C), 0xE3A00301); // MOV R0, #0x04000000
+        assert_eq!(bus.read32(0x0000_0130), 0xE28FE000); // ADD LR, PC, #0
+        assert_eq!(bus.read32(0x0000_0134), 0xE510F004); // LDR PC, [R0, #-4]
+        assert_eq!(bus.read32(0x0000_0138), 0xE8BD500F); // LDMFD SP!, {R0-R3, R12, LR}
+        assert_eq!(bus.read32(0x0000_013C), 0xE25EF004); // SUBS PC, LR, #4
+    }
+
+    #[test]
+    fn test_bios_swi_protection_value() {
+        let mut bus = GbaBus::new();
+        bus.bios_readable = true;
+        // real BIOS value at SWI return area
+        assert_eq!(bus.read32(0x0000_0190), 0xE3A02004);
+    }
+
+    #[test]
+    fn test_bios_irq_vector_branches_to_handler() {
+        let mut bus = GbaBus::new();
+        bus.bios_readable = true;
+        // IRQ vector at 0x18 should be a branch to 0x128
+        let instr = bus.read32(0x0000_0018);
+        // B #offset: 0xEA000042 -> offset = 0x42 * 4 + 8 = 0x110
+        // target = 0x18 + 0x110 = 0x128
+        assert_eq!(instr, 0xEA000042);
+    }
+
+    #[test]
+    fn test_load_bios() {
+        let mut bus = GbaBus::new();
+        assert!(!bus.use_real_bios);
+        let bios = vec![0x42u8; 0x4000];
+        bus.load_bios(&bios);
+        assert!(bus.use_real_bios);
+        bus.bios_readable = true;
+        assert_eq!(bus.read8(0x0000_0000), 0x42);
+    }
+
+    #[test]
+    fn test_load_bios_replaces_stubs() {
+        let mut bus = GbaBus::new();
+        bus.bios_readable = true;
+        // HLE stubs place IRQ vector at 0x18
+        assert_eq!(bus.read32(0x0000_0018), 0xEA000042);
+
+        // loading a real BIOS overwrites stubs
+        let mut bios = vec![0u8; 0x4000];
+        bios[0x18] = 0xAA;
+        bios[0x19] = 0xBB;
+        bios[0x1A] = 0xCC;
+        bios[0x1B] = 0xDD;
+        bus.load_bios(&bios);
+        assert_eq!(bus.read32(0x0000_0018), 0xDDCCBBAA);
+    }
+
+    #[test]
+    fn test_load_bios_use_real_bios_default_false() {
+        let bus = GbaBus::new();
+        assert!(!bus.use_real_bios);
+    }
+
+    #[test]
+    fn test_load_rom_detects_save_type() {
+        let mut bus = GbaBus::new();
+        let mut rom = vec![0u8; 512];
+        rom[0x100..0x106].copy_from_slice(b"SRAM_V");
+        bus.load_rom(&rom);
+        assert_eq!(bus.save.save_type(), crate::gba::flash::SaveType::Sram);
+    }
+
+    #[test]
+    fn test_eeprom_detection_via_load_rom() {
+        let mut bus = GbaBus::new();
+        let mut rom = vec![0u8; 512];
+        rom[0x100..0x108].copy_from_slice(b"EEPROM_V");
+        bus.load_rom(&rom);
+        assert_eq!(bus.save.save_type(), crate::gba::flash::SaveType::Eeprom);
+    }
+
+    #[test]
     fn test_bios_read_bounds() {
         let mut bus = GbaBus::new();
         bus.bios.fill(0xAB);
@@ -1155,48 +1252,10 @@ mod tests {
     }
 
     #[test]
-    fn test_fetch_matches_read() {
-        let mut bus = GbaBus::new();
-        bus.load_rom(&[0x12, 0x34, 0x56, 0x78]);
-        bus.write16(0x0200_0010, 0xAABB);
-        bus.write32(0x0300_0020, 0x1122_3344);
-
-        // fast path regions agree with the generic reads
-        assert_eq!(bus.fetch16(0x0800_0000), bus.read16(0x0800_0000));
-        assert_eq!(bus.fetch32(0x0800_0000), bus.read32(0x0800_0000));
-        assert_eq!(bus.fetch16(0x0200_0010), 0xAABB);
-        assert_eq!(bus.fetch32(0x0300_0020), 0x1122_3344);
-
-        // other regions fall back to the generic reads
-        assert_eq!(bus.fetch16(0x0600_0000), bus.read16(0x0600_0000));
-        assert_eq!(bus.fetch32(0x0600_0000), bus.read32(0x0600_0000));
-    }
-
-    #[test]
-    fn test_fetch_open_bus() {
-        let mut bus = GbaBus::new();
-        bus.load_rom(&[0x12, 0x34]);
-        // open bus: 16-bit ROM bus returns halfword addresses
-        assert_eq!(
-            bus.fetch16(0x0800_0010),
-            ((0x0800_0010u32 / 2) & 0xFFFF) as u16
-        );
-        assert_eq!(bus.fetch32(0x0800_0010), bus.read32(0x0800_0010));
-    }
-
-    #[test]
     fn test_palette_read_write() {
         let mut bus = GbaBus::new();
         bus.write16(0x0500_0000, 0x7FFF);
         assert_eq!(bus.read16(0x0500_0000), 0x7FFF);
-    }
-
-    #[test]
-    fn test_palette_8bit_mirror() {
-        let mut bus = GbaBus::new();
-        bus.write8(0x0500_0000, 0x42);
-        assert_eq!(bus.read8(0x0500_0000), 0x42);
-        assert_eq!(bus.read8(0x0500_0001), 0x42);
     }
 
     #[test]
@@ -1235,6 +1294,40 @@ mod tests {
     }
 
     #[test]
+    fn test_no_save_type_returns_ff() {
+        let mut bus = GbaBus::new();
+        assert_eq!(bus.read8(0x0E00_0000), 0xFF);
+    }
+
+    #[test]
+    fn test_unmapped_read() {
+        let mut bus = GbaBus::new();
+        assert_eq!(bus.read8(0x1000_0000), 0);
+    }
+
+    #[test]
+    fn test_bios_protection_read8_returns_bios_value() {
+        let mut bus = GbaBus::new();
+        assert_eq!(bus.read8(0x0000_0000), 0x00); // byte 0 of 0xE129F000
+        assert_eq!(bus.read8(0x0000_0001), 0xF0); // byte 1
+        assert_eq!(bus.read8(0x0000_0002), 0x29); // byte 2
+        assert_eq!(bus.read8(0x0000_0003), 0xE1); // byte 3
+    }
+
+    #[test]
+    fn test_eeprom_rom_region_reads_rom() {
+        let mut bus = GbaBus::new();
+        let mut rom = vec![0u8; 512];
+        rom[0x100..0x108].copy_from_slice(b"EEPROM_V");
+        rom[0..4].copy_from_slice(&[0x12, 0x34, 0x56, 0x78]);
+        bus.load_rom(&rom);
+        // regular ROM regions read cartridge data even with EEPROM saves
+        assert_eq!(bus.read32(0x0800_0000), 0x78563412);
+        assert_eq!(bus.read16(0x0800_0000), 0x3412);
+        assert_eq!(bus.read8(0x0800_0000), 0x12);
+    }
+
+    #[test]
     fn test_sram_16bit_read_duplicates_byte() {
         let mut bus = GbaBus::new();
         let mut rom = vec![0u8; 512];
@@ -1242,6 +1335,49 @@ mod tests {
         bus.load_rom(&rom);
         bus.write8(0x0E00_0000, 0x42);
         assert_eq!(bus.read16(0x0E00_0000), 0x4242);
+    }
+
+    #[test]
+    fn test_flash64_16bit_read_duplicates_byte() {
+        let mut bus = GbaBus::new();
+        let mut rom = vec![0u8; 512];
+        rom[0x100..0x107].copy_from_slice(b"FLASH_V");
+        bus.load_rom(&rom);
+        bus.write8(0x0E00_5555, 0xAA);
+        bus.write8(0x0E00_2AAA, 0x55);
+        bus.write8(0x0E00_5555, 0xA0);
+        bus.write8(0x0E00_0000, 0x42);
+        assert_eq!(bus.read16(0x0E00_0000), 0x4242);
+    }
+
+    #[test]
+    fn test_bios_protection_read16_returns_bios_value() {
+        let mut bus = GbaBus::new();
+        // low halfword of bios_value (0xE129F000)
+        assert_eq!(bus.read16(0x0000_0000), 0xF000);
+        // high halfword (addr & 2 = 2, shift by 16)
+        assert_eq!(bus.read16(0x0000_0002), 0xE129);
+    }
+
+    #[test]
+    fn test_eeprom_read16_at_0x0d_returns_eeprom() {
+        let mut bus = GbaBus::new();
+        let mut rom = vec![0u8; 4 * 1024 * 1024];
+        rom[0x100..0x108].copy_from_slice(b"EEPROM_V");
+        bus.load_rom(&rom);
+        // reading from 0x0D region should go through EEPROM (returns 1 when idle)
+        let val = bus.read16(0x0D00_0000);
+        assert_eq!(val & 1, 1);
+    }
+
+    #[test]
+    fn test_non_eeprom_rom_read_at_0x0d() {
+        let mut bus = GbaBus::new();
+        let mut rom = vec![0u8; 512];
+        rom[0x100..0x106].copy_from_slice(b"SRAM_V");
+        bus.load_rom(&rom);
+        // 0x0D region for non-EEPROM games reads ROM (returns 0 past end)
+        assert_eq!(bus.read16(0x0D00_0000), 0);
     }
 
     #[test]
@@ -1255,33 +1391,75 @@ mod tests {
     }
 
     #[test]
-    fn test_sram_16bit_write_selects_byte_lane() {
+    fn test_io_32bit_read() {
         let mut bus = GbaBus::new();
-        let mut rom = vec![0u8; 512];
-        rom[0x100..0x106].copy_from_slice(b"SRAM_V");
-        bus.load_rom(&rom);
-        bus.write16(0x0E00_0000, 0xAABB);
-        // byte lane 0 (even addr) -> low byte 0xBB
-        assert_eq!(bus.read8(0x0E00_0000), 0xBB);
-        // odd address -> high byte
-        bus.write16(0x0E00_0001, 0xAABB);
-        assert_eq!(bus.read8(0x0E00_0001), 0xAA);
+        bus.write16(REG_DISPCNT, 0x1234);
+        let val = bus.read32(REG_DISPCNT);
+        assert_eq!(val & 0xFFFF, 0x1234);
     }
 
     #[test]
-    fn test_sram_32bit_write_selects_byte_lane() {
+    fn test_bios_protection_read32_returns_bios_value() {
         let mut bus = GbaBus::new();
-        let mut rom = vec![0u8; 512];
-        rom[0x100..0x106].copy_from_slice(b"SRAM_V");
-        bus.load_rom(&rom);
-        bus.write32(0x0E00_0000, 0xAABBCCDD);
-        assert_eq!(bus.read8(0x0E00_0000), 0xDD);
-        bus.write32(0x0E00_0001, 0xAABBCCDD);
-        assert_eq!(bus.read8(0x0E00_0001), 0xCC);
-        bus.write32(0x0E00_0002, 0xAABBCCDD);
-        assert_eq!(bus.read8(0x0E00_0002), 0xBB);
-        bus.write32(0x0E00_0003, 0xAABBCCDD);
-        assert_eq!(bus.read8(0x0E00_0003), 0xAA);
+        // bios_readable is false by default; reading BIOS should return bios_value
+        assert_eq!(bus.read32(0x0000_0000), 0xE129F000);
+    }
+
+    #[test]
+    fn test_bios_readable_allows_direct_access() {
+        let mut bus = GbaBus::new();
+        bus.bios_readable = true;
+        // IRQ vector at 0x18 = 0xEA000042 (branch to 0x128)
+        assert_eq!(bus.read32(0x0000_0018), 0xEA000042);
+        bus.bios_readable = false;
+        // with protection, returns bios_value instead
+        assert_eq!(bus.read32(0x0000_0018), 0xE129F000);
+    }
+
+    #[test]
+    fn test_iwram_mirror_0x03fffffc() {
+        let mut bus = GbaBus::new();
+        // write to 0x03007FFC, read from 0x03FFFFFC (IWRAM mirror)
+        bus.write32(0x0300_7FFC, 0x12345678);
+        assert_eq!(bus.read32(0x03FF_FFFC), 0x12345678);
+    }
+
+    #[test]
+    fn test_fetch_matches_read() {
+        let mut bus = GbaBus::new();
+        bus.load_rom(&[0x12, 0x34, 0x56, 0x78]);
+        bus.write16(0x0200_0010, 0xAABB);
+        bus.write32(0x0300_0020, 0x1122_3344);
+
+        // fast path regions agree with the generic reads
+        assert_eq!(bus.fetch16(0x0800_0000), bus.read16(0x0800_0000));
+        assert_eq!(bus.fetch32(0x0800_0000), bus.read32(0x0800_0000));
+        assert_eq!(bus.fetch16(0x0200_0010), 0xAABB);
+        assert_eq!(bus.fetch32(0x0300_0020), 0x1122_3344);
+
+        // other regions fall back to the generic reads
+        assert_eq!(bus.fetch16(0x0600_0000), bus.read16(0x0600_0000));
+        assert_eq!(bus.fetch32(0x0600_0000), bus.read32(0x0600_0000));
+    }
+
+    #[test]
+    fn test_fetch_open_bus() {
+        let mut bus = GbaBus::new();
+        bus.load_rom(&[0x12, 0x34]);
+        // open bus: 16-bit ROM bus returns halfword addresses
+        assert_eq!(
+            bus.fetch16(0x0800_0010),
+            ((0x0800_0010u32 / 2) & 0xFFFF) as u16
+        );
+        assert_eq!(bus.fetch32(0x0800_0010), bus.read32(0x0800_0010));
+    }
+
+    #[test]
+    fn test_palette_8bit_mirror() {
+        let mut bus = GbaBus::new();
+        bus.write8(0x0500_0000, 0x42);
+        assert_eq!(bus.read8(0x0500_0000), 0x42);
+        assert_eq!(bus.read8(0x0500_0001), 0x42);
     }
 
     #[test]
@@ -1324,31 +1502,103 @@ mod tests {
     }
 
     #[test]
-    fn test_flash64_16bit_read_duplicates_byte() {
+    fn test_vram_8bit_write_bg_mirrors_to_both_bytes() {
         let mut bus = GbaBus::new();
-        let mut rom = vec![0u8; 512];
-        rom[0x100..0x107].copy_from_slice(b"FLASH_V");
-        bus.load_rom(&rom);
-        bus.write8(0x0E00_5555, 0xAA);
-        bus.write8(0x0E00_2AAA, 0x55);
-        bus.write8(0x0E00_5555, 0xA0);
-        bus.write8(0x0E00_0000, 0x42);
-        assert_eq!(bus.read16(0x0E00_0000), 0x4242);
+        // mode 0 (default), BG region at offset 0x0000
+        bus.write8(0x0600_0000, 0x42);
+        assert_eq!(bus.read8(0x0600_0000), 0x42);
+        assert_eq!(bus.read8(0x0600_0001), 0x42);
     }
 
     #[test]
-    fn test_no_save_type_returns_ff() {
+    fn test_vram_8bit_write_obj_region_ignored_tile_mode() {
         let mut bus = GbaBus::new();
-        assert_eq!(bus.read8(0x0E00_0000), 0xFF);
+        // mode 0 (default): OBJ region starts at 0x10000
+        // first write a known value via 16-bit to OBJ region
+        bus.write16(0x0601_0000, 0x1234);
+        // 8-bit write to OBJ region should be ignored
+        bus.write8(0x0601_0000, 0xFF);
+        assert_eq!(bus.read16(0x0601_0000), 0x1234);
     }
 
     #[test]
-    fn test_load_rom_detects_save_type() {
+    fn test_vram_8bit_write_obj_region_ignored_bitmap_mode() {
+        let mut bus = GbaBus::new();
+        // set mode 3 (bitmap) via DISPCNT
+        bus.write16(REG_DISPCNT, 0x0003);
+        // OBJ region starts at 0x14000 in bitmap modes
+        bus.write16(0x0601_4000, 0x1234);
+        // 8-bit write to OBJ region should be ignored
+        bus.write8(0x0601_4000, 0xFF);
+        assert_eq!(bus.read16(0x0601_4000), 0x1234);
+    }
+
+    #[test]
+    fn test_vram_8bit_write_bg_allowed_bitmap_mode() {
+        let mut bus = GbaBus::new();
+        // set mode 3 (bitmap) via DISPCNT
+        bus.write16(REG_DISPCNT, 0x0003);
+        // offset 0x13FFE is still BG area in bitmap mode (< 0x14000)
+        bus.write8(0x0601_3FFE, 0xAB);
+        assert_eq!(bus.read8(0x0601_3FFE), 0xAB);
+        assert_eq!(bus.read8(0x0601_3FFF), 0xAB);
+    }
+
+    #[test]
+    fn test_sram_16bit_write_selects_byte_lane() {
         let mut bus = GbaBus::new();
         let mut rom = vec![0u8; 512];
         rom[0x100..0x106].copy_from_slice(b"SRAM_V");
         bus.load_rom(&rom);
-        assert_eq!(bus.save.save_type(), crate::gba::flash::SaveType::Sram);
+        bus.write16(0x0E00_0000, 0xAABB);
+        // byte lane 0 (even addr) -> low byte 0xBB
+        assert_eq!(bus.read8(0x0E00_0000), 0xBB);
+        // odd address -> high byte
+        bus.write16(0x0E00_0001, 0xAABB);
+        assert_eq!(bus.read8(0x0E00_0001), 0xAA);
+    }
+
+    #[test]
+    fn test_eeprom_write16_at_0x0d_reaches_eeprom() {
+        let mut bus = GbaBus::new();
+        let mut rom = vec![0u8; 4 * 1024 * 1024]; // 4MB -> 14-bit addressing
+        rom[0x100..0x108].copy_from_slice(b"EEPROM_V");
+        bus.load_rom(&rom);
+        // send read command: "11" + 14-bit addr (0) + 1 stop bit
+        bus.write16(0x0D00_0000, 1); // bit 1
+        bus.write16(0x0D00_0000, 1); // bit 1
+                                     // send 14 address bits (0) + 1 stop bit
+        for _ in 0..15 {
+            bus.write16(0x0D00_0000, 0);
+        }
+        // should now be in ReadingData state, reads return dummy/data bits
+        let val = bus.read16(0x0D00_0000);
+        // first read is dummy bit (0)
+        assert_eq!(val & 1, 0);
+    }
+
+    #[test]
+    fn test_sram_32bit_write_selects_byte_lane() {
+        let mut bus = GbaBus::new();
+        let mut rom = vec![0u8; 512];
+        rom[0x100..0x106].copy_from_slice(b"SRAM_V");
+        bus.load_rom(&rom);
+        bus.write32(0x0E00_0000, 0xAABBCCDD);
+        assert_eq!(bus.read8(0x0E00_0000), 0xDD);
+        bus.write32(0x0E00_0001, 0xAABBCCDD);
+        assert_eq!(bus.read8(0x0E00_0001), 0xCC);
+        bus.write32(0x0E00_0002, 0xAABBCCDD);
+        assert_eq!(bus.read8(0x0E00_0002), 0xBB);
+        bus.write32(0x0E00_0003, 0xAABBCCDD);
+        assert_eq!(bus.read8(0x0E00_0003), 0xAA);
+    }
+
+    #[test]
+    fn test_io_8bit_read() {
+        let mut bus = GbaBus::new();
+        bus.write16(REG_DISPCNT, 0x1234);
+        assert_eq!(bus.read8(REG_DISPCNT), 0x34);
+        assert_eq!(bus.read8(REG_DISPCNT + 1), 0x12);
     }
 
     #[test]
@@ -1372,213 +1622,6 @@ mod tests {
     fn test_io_keyinput() {
         let mut bus = GbaBus::new();
         assert_eq!(bus.read16(REG_KEYINPUT), 0x03FF);
-    }
-
-    #[test]
-    fn test_io_8bit_read() {
-        let mut bus = GbaBus::new();
-        bus.write16(REG_DISPCNT, 0x1234);
-        assert_eq!(bus.read8(REG_DISPCNT), 0x34);
-        assert_eq!(bus.read8(REG_DISPCNT + 1), 0x12);
-    }
-
-    #[test]
-    fn test_io_32bit_read() {
-        let mut bus = GbaBus::new();
-        bus.write16(REG_DISPCNT, 0x1234);
-        let val = bus.read32(REG_DISPCNT);
-        assert_eq!(val & 0xFFFF, 0x1234);
-    }
-
-    #[test]
-    fn test_unmapped_read() {
-        let mut bus = GbaBus::new();
-        assert_eq!(bus.read8(0x1000_0000), 0);
-    }
-
-    #[test]
-    fn test_reset() {
-        let mut bus = GbaBus::new();
-        bus.write32(0x0200_0000, 0xDEADBEEF);
-        bus.halt_requested = true;
-        bus.reset();
-        assert_eq!(bus.read32(0x0200_0000), 0);
-        assert!(!bus.halt_requested);
-    }
-
-    #[test]
-    fn test_bios_protection_read32_returns_bios_value() {
-        let mut bus = GbaBus::new();
-        // bios_readable is false by default; reading BIOS should return bios_value
-        assert_eq!(bus.read32(0x0000_0000), 0xE129F000);
-    }
-
-    #[test]
-    fn test_bios_protection_read16_returns_bios_value() {
-        let mut bus = GbaBus::new();
-        // low halfword of bios_value (0xE129F000)
-        assert_eq!(bus.read16(0x0000_0000), 0xF000);
-        // high halfword (addr & 2 = 2, shift by 16)
-        assert_eq!(bus.read16(0x0000_0002), 0xE129);
-    }
-
-    #[test]
-    fn test_bios_protection_read8_returns_bios_value() {
-        let mut bus = GbaBus::new();
-        assert_eq!(bus.read8(0x0000_0000), 0x00); // byte 0 of 0xE129F000
-        assert_eq!(bus.read8(0x0000_0001), 0xF0); // byte 1
-        assert_eq!(bus.read8(0x0000_0002), 0x29); // byte 2
-        assert_eq!(bus.read8(0x0000_0003), 0xE1); // byte 3
-    }
-
-    #[test]
-    fn test_bios_readable_allows_direct_access() {
-        let mut bus = GbaBus::new();
-        bus.bios_readable = true;
-        // IRQ vector at 0x18 = 0xEA000042 (branch to 0x128)
-        assert_eq!(bus.read32(0x0000_0018), 0xEA000042);
-        bus.bios_readable = false;
-        // with protection, returns bios_value instead
-        assert_eq!(bus.read32(0x0000_0018), 0xE129F000);
-    }
-
-    #[test]
-    fn test_bios_init_startup_value() {
-        let mut bus = GbaBus::new();
-        // after init, bios_value matches real GBA post-boot value
-        assert_eq!(bus.read32(0x0000_0000), 0xE129F000);
-    }
-
-    #[test]
-    fn test_bios_update_bios_value() {
-        let mut bus = GbaBus::new();
-        bus.update_bios_value(0xDEADBEEF);
-        assert_eq!(bus.read32(0x0000_0000), 0xDEADBEEF);
-    }
-
-    #[test]
-    fn test_bios_irq_handler_stubs() {
-        let mut bus = GbaBus::new();
-        bus.bios_readable = true;
-        // verify IRQ handler stub at 0x128-0x13C
-        assert_eq!(bus.read32(0x0000_0128), 0xE92D500F); // STMFD SP!, {R0-R3, R12, LR}
-        assert_eq!(bus.read32(0x0000_012C), 0xE3A00301); // MOV R0, #0x04000000
-        assert_eq!(bus.read32(0x0000_0130), 0xE28FE000); // ADD LR, PC, #0
-        assert_eq!(bus.read32(0x0000_0134), 0xE510F004); // LDR PC, [R0, #-4]
-        assert_eq!(bus.read32(0x0000_0138), 0xE8BD500F); // LDMFD SP!, {R0-R3, R12, LR}
-        assert_eq!(bus.read32(0x0000_013C), 0xE25EF004); // SUBS PC, LR, #4
-    }
-
-    #[test]
-    fn test_bios_swi_protection_value() {
-        let mut bus = GbaBus::new();
-        bus.bios_readable = true;
-        // real BIOS value at SWI return area
-        assert_eq!(bus.read32(0x0000_0190), 0xE3A02004);
-    }
-
-    #[test]
-    fn test_iwram_mirror_0x03fffffc() {
-        let mut bus = GbaBus::new();
-        // write to 0x03007FFC, read from 0x03FFFFFC (IWRAM mirror)
-        bus.write32(0x0300_7FFC, 0x12345678);
-        assert_eq!(bus.read32(0x03FF_FFFC), 0x12345678);
-    }
-
-    #[test]
-    fn test_eeprom_detection_via_load_rom() {
-        let mut bus = GbaBus::new();
-        let mut rom = vec![0u8; 512];
-        rom[0x100..0x108].copy_from_slice(b"EEPROM_V");
-        bus.load_rom(&rom);
-        assert_eq!(bus.save.save_type(), crate::gba::flash::SaveType::Eeprom);
-    }
-
-    #[test]
-    fn test_eeprom_read16_at_0x0d_returns_eeprom() {
-        let mut bus = GbaBus::new();
-        let mut rom = vec![0u8; 4 * 1024 * 1024];
-        rom[0x100..0x108].copy_from_slice(b"EEPROM_V");
-        bus.load_rom(&rom);
-        // reading from 0x0D region should go through EEPROM (returns 1 when idle)
-        let val = bus.read16(0x0D00_0000);
-        assert_eq!(val & 1, 1);
-    }
-
-    #[test]
-    fn test_eeprom_write16_at_0x0d_reaches_eeprom() {
-        let mut bus = GbaBus::new();
-        let mut rom = vec![0u8; 4 * 1024 * 1024]; // 4MB -> 14-bit addressing
-        rom[0x100..0x108].copy_from_slice(b"EEPROM_V");
-        bus.load_rom(&rom);
-        // send read command: "11" + 14-bit addr (0) + 1 stop bit
-        bus.write16(0x0D00_0000, 1); // bit 1
-        bus.write16(0x0D00_0000, 1); // bit 1
-                                     // send 14 address bits (0) + 1 stop bit
-        for _ in 0..15 {
-            bus.write16(0x0D00_0000, 0);
-        }
-        // should now be in ReadingData state, reads return dummy/data bits
-        let val = bus.read16(0x0D00_0000);
-        // first read is dummy bit (0)
-        assert_eq!(val & 1, 0);
-    }
-
-    #[test]
-    fn test_eeprom_rom_region_reads_rom() {
-        let mut bus = GbaBus::new();
-        let mut rom = vec![0u8; 512];
-        rom[0x100..0x108].copy_from_slice(b"EEPROM_V");
-        rom[0..4].copy_from_slice(&[0x12, 0x34, 0x56, 0x78]);
-        bus.load_rom(&rom);
-        // regular ROM regions read cartridge data even with EEPROM saves
-        assert_eq!(bus.read32(0x0800_0000), 0x78563412);
-        assert_eq!(bus.read16(0x0800_0000), 0x3412);
-        assert_eq!(bus.read8(0x0800_0000), 0x12);
-    }
-
-    #[test]
-    fn test_non_eeprom_rom_read_at_0x0d() {
-        let mut bus = GbaBus::new();
-        let mut rom = vec![0u8; 512];
-        rom[0x100..0x106].copy_from_slice(b"SRAM_V");
-        bus.load_rom(&rom);
-        // 0x0D region for non-EEPROM games reads ROM (returns 0 past end)
-        assert_eq!(bus.read16(0x0D00_0000), 0);
-    }
-
-    #[test]
-    fn test_load_bios() {
-        let mut bus = GbaBus::new();
-        assert!(!bus.use_real_bios);
-        let bios = vec![0x42u8; 0x4000];
-        bus.load_bios(&bios);
-        assert!(bus.use_real_bios);
-        bus.bios_readable = true;
-        assert_eq!(bus.read8(0x0000_0000), 0x42);
-    }
-
-    #[test]
-    fn test_load_bios_replaces_stubs() {
-        let mut bus = GbaBus::new();
-        bus.bios_readable = true;
-        // HLE stubs place IRQ vector at 0x18
-        assert_eq!(bus.read32(0x0000_0018), 0xEA000042);
-
-        // loading a real BIOS overwrites stubs
-        let mut bios = vec![0u8; 0x4000];
-        bios[0x18] = 0xAA;
-        bios[0x19] = 0xBB;
-        bios[0x1A] = 0xCC;
-        bios[0x1B] = 0xDD;
-        bus.load_bios(&bios);
-        assert_eq!(bus.read32(0x0000_0018), 0xDDCCBBAA);
-    }
-
-    #[test]
-    fn test_load_bios_use_real_bios_default_false() {
-        let bus = GbaBus::new();
-        assert!(!bus.use_real_bios);
     }
 
     #[test]
@@ -1847,49 +1890,6 @@ mod tests {
     }
 
     #[test]
-    fn test_vram_8bit_write_bg_mirrors_to_both_bytes() {
-        let mut bus = GbaBus::new();
-        // mode 0 (default), BG region at offset 0x0000
-        bus.write8(0x0600_0000, 0x42);
-        assert_eq!(bus.read8(0x0600_0000), 0x42);
-        assert_eq!(bus.read8(0x0600_0001), 0x42);
-    }
-
-    #[test]
-    fn test_vram_8bit_write_obj_region_ignored_tile_mode() {
-        let mut bus = GbaBus::new();
-        // mode 0 (default): OBJ region starts at 0x10000
-        // first write a known value via 16-bit to OBJ region
-        bus.write16(0x0601_0000, 0x1234);
-        // 8-bit write to OBJ region should be ignored
-        bus.write8(0x0601_0000, 0xFF);
-        assert_eq!(bus.read16(0x0601_0000), 0x1234);
-    }
-
-    #[test]
-    fn test_vram_8bit_write_obj_region_ignored_bitmap_mode() {
-        let mut bus = GbaBus::new();
-        // set mode 3 (bitmap) via DISPCNT
-        bus.write16(REG_DISPCNT, 0x0003);
-        // OBJ region starts at 0x14000 in bitmap modes
-        bus.write16(0x0601_4000, 0x1234);
-        // 8-bit write to OBJ region should be ignored
-        bus.write8(0x0601_4000, 0xFF);
-        assert_eq!(bus.read16(0x0601_4000), 0x1234);
-    }
-
-    #[test]
-    fn test_vram_8bit_write_bg_allowed_bitmap_mode() {
-        let mut bus = GbaBus::new();
-        // set mode 3 (bitmap) via DISPCNT
-        bus.write16(REG_DISPCNT, 0x0003);
-        // offset 0x13FFE is still BG area in bitmap mode (< 0x14000)
-        bus.write8(0x0601_3FFE, 0xAB);
-        assert_eq!(bus.read8(0x0601_3FFE), 0xAB);
-        assert_eq!(bus.read8(0x0601_3FFF), 0xAB);
-    }
-
-    #[test]
     fn test_reg_if_ack_updates_intrcheck() {
         let mut bus = GbaBus::new();
         // enable VBlank and raise it
@@ -1952,31 +1952,6 @@ mod tests {
         // IntrCheck should have both bits ORed
         let check2 = u16::from_le_bytes([bus.iwram[offset], bus.iwram[offset + 1]]);
         assert_eq!(check2, 0x03);
-    }
-
-    #[test]
-    fn test_bios_irq_vector_branches_to_handler() {
-        let mut bus = GbaBus::new();
-        bus.bios_readable = true;
-        // IRQ vector at 0x18 should be a branch to 0x128
-        let instr = bus.read32(0x0000_0018);
-        // B #offset: 0xEA000042 -> offset = 0x42 * 4 + 8 = 0x110
-        // target = 0x18 + 0x110 = 0x128
-        assert_eq!(instr, 0xEA000042);
-    }
-
-    #[test]
-    fn test_intr_wait_flags_default_zero() {
-        let bus = GbaBus::new();
-        assert_eq!(bus.intr_wait_flags, 0);
-    }
-
-    #[test]
-    fn test_intr_wait_flags_reset_to_zero() {
-        let mut bus = GbaBus::new();
-        bus.intr_wait_flags = 0x05;
-        bus.reset();
-        assert_eq!(bus.intr_wait_flags, 0);
     }
 
     /// Integration test: simulates a typical GBA DirectSound music playback
@@ -2321,5 +2296,30 @@ mod tests {
         bus.write16(REG_SIOCNT, (1 << 14) | (1 << 7) | 0x01);
         assert_eq!(bus.read16(REG_SIOCNT) & (1 << 7), 0);
         assert_eq!(bus.irq.if_() & IRQ_SERIAL, IRQ_SERIAL);
+    }
+
+    #[test]
+    fn test_reset() {
+        let mut bus = GbaBus::new();
+        bus.write32(0x0200_0000, 0xDEADBEEF);
+        bus.halt_requested = true;
+        bus.reset();
+        assert_eq!(bus.read32(0x0200_0000), 0);
+        assert!(!bus.halt_requested);
+    }
+
+    #[test]
+    fn test_intr_wait_flags_reset_to_zero() {
+        let mut bus = GbaBus::new();
+        bus.intr_wait_flags = 0x05;
+        bus.reset();
+        assert_eq!(bus.intr_wait_flags, 0);
+    }
+
+    #[test]
+    fn test_bios_update_bios_value() {
+        let mut bus = GbaBus::new();
+        bus.update_bios_value(0xDEADBEEF);
+        assert_eq!(bus.read32(0x0000_0000), 0xDEADBEEF);
     }
 }
