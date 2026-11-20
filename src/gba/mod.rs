@@ -568,7 +568,10 @@ impl Display for GameBoyAdvance {
 mod tests {
     use super::GameBoyAdvance;
     use crate::{
-        gba::consts::{IRQ_KEYPAD, IRQ_VBLANK, REG_KEYCNT, REG_POSTFLG},
+        gba::consts::{
+            CYCLES_PER_FRAME, FRAME_BUFFER_SIZE, IRQ_KEYPAD, IRQ_VBLANK, REG_KEYCNT, REG_POSTFLG,
+            REG_SOUNDCNT_X,
+        },
         pad::PadKey,
     };
 
@@ -629,6 +632,17 @@ mod tests {
     fn test_audio_buffer() {
         let gba = GameBoyAdvance::new();
         assert!(gba.audio_buffer().is_empty());
+    }
+
+    #[test]
+    fn test_rom_info() {
+        let mut gba = GameBoyAdvance::new();
+        assert!(gba.rom_info().is_none());
+        let mut rom = vec![0u8; 512];
+        rom[0xA0..0xA4].copy_from_slice(b"TEST");
+        rom[0xB2] = 0x96;
+        gba.load_rom(&rom).unwrap();
+        assert_eq!(gba.rom_info().unwrap().title(), "TEST");
     }
 
     #[test]
@@ -1080,6 +1094,30 @@ mod tests {
     }
 
     #[test]
+    fn test_rom_title() {
+        let mut gba = GameBoyAdvance::new();
+        assert_eq!(gba.rom_title(), "");
+        let mut rom = vec![0u8; 512];
+        rom[0xA0..0xA4].copy_from_slice(b"TEST");
+        rom[0xB2] = 0x96;
+        gba.load_rom(&rom).unwrap();
+        assert_eq!(gba.rom_title(), "TEST");
+    }
+
+    #[test]
+    fn test_audio_sampling_rate() {
+        // 1/64 of a second of emulation produces 1/64 of a
+        // second of samples for each of the audio channels
+        let mut gba = GameBoyAdvance::new();
+        gba.cpu.bus.write16(REG_SOUNDCNT_X, 0x80);
+        gba.clocks_cycles(gba.cpu_freq() as usize / 64);
+        assert_eq!(
+            gba.audio_buffer_eager(false).len(),
+            gba.audio_sampling_rate() as usize / 64 * gba.audio_channels() as usize
+        );
+    }
+
+    #[test]
     fn test_reset() {
         let mut gba = GameBoyAdvance::new();
         gba.clock();
@@ -1115,6 +1153,46 @@ mod tests {
                 assert_eq!(gba.cpu.pc(), if real_bios { 0 } else { 0x0800_0000 });
             }
         }
+    }
+
+    #[test]
+    fn test_clocks_frame_buffer() {
+        let mut gba = GameBoyAdvance::new();
+        let mut clock_frame = gba.clocks_frame_buffer(1000);
+        assert!(clock_frame.cycles >= 1000);
+        assert_eq!(clock_frame.frames, 0);
+        assert!(clock_frame.frame_buffer_eager().is_none());
+
+        let mut clock_frame = gba.clocks_frame_buffer(CYCLES_PER_FRAME as usize);
+        assert!(clock_frame.cycles >= CYCLES_PER_FRAME as u64);
+        assert_eq!(clock_frame.frames, 1);
+        assert_eq!(gba.ppu_frame(), 1);
+        assert_eq!(
+            clock_frame.frame_buffer_eager().unwrap().len(),
+            FRAME_BUFFER_SIZE
+        );
+        assert!(clock_frame.frame_buffer_eager().is_none());
+    }
+
+    #[test]
+    fn test_frame_buffer_eager() {
+        let mut gba = GameBoyAdvance::new();
+        gba.cpu.bus.ppu.set_dispcnt(0x80); // forced blank (white)
+        gba.next_frame();
+        assert_eq!(gba.frame_buffer_eager(), gba.frame_buffer());
+        assert_eq!(gba.frame_buffer_eager(), vec![0xFF; FRAME_BUFFER_SIZE]);
+    }
+
+    #[test]
+    fn test_audio_buffer_eager() {
+        let mut gba = GameBoyAdvance::new();
+        gba.cpu.bus.write16(REG_SOUNDCNT_X, 0x80);
+        gba.clocks_cycles(2048);
+        let samples = gba.audio_buffer_eager(false);
+        assert!(!samples.is_empty());
+        assert_eq!(gba.audio_buffer().len(), samples.len());
+        assert_eq!(gba.audio_buffer_eager(true), samples);
+        assert!(gba.audio_buffer().is_empty());
     }
 
     #[test]
@@ -1186,8 +1264,27 @@ mod tests {
     }
 
     #[test]
+    fn test_description() {
+        let mut gba = GameBoyAdvance::new();
+        let description = gba.description(9);
+        assert!(description.contains("Game Boy Advance"));
+        assert!(description.contains("HLE"));
+        assert!(description.contains("16.78 Mhz"));
+        assert!(description.contains("288 KB"));
+        assert!(description.contains("96 KB"));
+        gba.load_bios(&[0u8; 0x4000]);
+        assert!(gba.description(9).contains("Real BIOS"));
+    }
+
+    #[test]
     fn test_default() {
         let gba = GameBoyAdvance::default();
         assert_eq!(gba.display_width(), 240);
+    }
+
+    #[test]
+    fn test_display() {
+        let gba = GameBoyAdvance::new();
+        assert_eq!(format!("{gba}"), gba.description(9));
     }
 }
