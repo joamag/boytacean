@@ -114,38 +114,63 @@ impl Chip {
             )));
         }
 
+        // the sizes of the chip and of its write buffer are powers of two,
+        // that must fit in the address space and in the 2 byte variable of
+        // the device respectively
+        let size = 1usize
+            .checked_shl(value(0x27) as u32)
+            .ok_or(Error::DataError(String::from(
+                "Invalid flash chip size in the CFI table",
+            )))?;
+        let buffer_size =
+            1u16.checked_shl(word(0x2a) as u32)
+                .ok_or(Error::DataError(String::from(
+                    "Invalid write buffer size in the CFI table",
+                )))?;
+
         // every erase region declares the number of its sectors (minus
-        // one) and their size (in units of 256 bytes)
-        let size = 1 << value(0x27);
+        // one) and their size (in units of 256 bytes), all of them within
+        // the table and each checked against the rest of the chip before
+        // its sectors are listed
+        let invalid_regions =
+            || Error::DataError(String::from("Invalid erase regions in the CFI table"));
+        let regions = value(0x2c) as usize;
+        if 0x2d + regions * 4 > CFI_SIZE / 2 {
+            return Err(invalid_regions());
+        }
         let mut sectors = vec![];
-        for region in 0..value(0x2c) as usize {
+        let mut remaining = size;
+        for region in 0..regions {
             let offset = 0x2d + region * 4;
-            if offset + 3 >= CFI_SIZE / 2 {
-                break;
-            }
             let count = word(offset) as usize + 1;
             let sector_size = match word(offset + 2) {
                 0 => 128,
                 units => units as usize * 256,
             };
+            remaining = count
+                .checked_mul(sector_size)
+                .and_then(|region_size| remaining.checked_sub(region_size))
+                .ok_or_else(invalid_regions)?;
             sectors.extend(vec![sector_size; count]);
         }
-        if sectors.iter().sum::<usize>() != size {
-            return Err(Error::DataError(String::from(
-                "Invalid erase regions in the CFI table",
-            )));
+        if remaining != 0 {
+            return Err(invalid_regions());
         }
 
         // the typical time to erase a sector and the factor of the
         // maximum time over it, both as powers of two
         let erase_timeout = match value(0x21) {
             0 => ERASE_TIMEOUT,
-            typical => (1 << typical) << value(0x25),
+            typical => 1u32
+                .checked_shl(typical as u32 + value(0x25) as u32)
+                .ok_or(Error::DataError(String::from(
+                    "Invalid erase timeout in the CFI table",
+                )))?,
         };
 
         Ok(Self {
             size,
-            buffer_size: 1 << word(0x2a),
+            buffer_size: buffer_size as usize,
             sectors,
             erase_timeout,
         })
@@ -347,6 +372,29 @@ mod tests {
     }
 
     #[test]
+    fn test_chip_from_cfi_sizes() {
+        // the size of the chip must fit in the address space and the size
+        // of its write buffer in 2 bytes, the largest buffer included
+        for (index, value, message) in [
+            (0x17, 0x40, "Invalid flash chip size in the CFI table"),
+            (0x17, 0xff, "Invalid flash chip size in the CFI table"),
+            (0x1a, 0x10, "Invalid write buffer size in the CFI table"),
+            (0x1b, 0x01, "Invalid write buffer size in the CFI table"),
+        ] {
+            let mut values = CFI_4MB;
+            values[index] = value;
+            assert_eq!(
+                Chip::from_cfi(&build_cfi(&values)),
+                Err(Error::DataError(String::from(message)))
+            );
+        }
+        let mut values = CFI_4MB;
+        values[0x1a] = 0x0f;
+        let chip = Chip::from_cfi(&build_cfi(&values)).unwrap();
+        assert_eq!(chip.buffer_size(), 0x8000);
+    }
+
+    #[test]
     fn test_chip_from_cfi_regions() {
         // the sectors of the regions must cover the whole chip, either
         // short of it (a missing region) or past it (a wrong count)
@@ -360,6 +408,18 @@ mod tests {
                 )))
             );
         }
+
+        // as does a region past the rest of the chip (of 65536 sectors of
+        // 64 KiB, 4 GiB) once the others cover it, never listing its sectors
+        let mut values = CFI_4MB.to_vec();
+        values[0x1c] = 0x03;
+        values.extend([0xff, 0xff, 0x00, 0x01]);
+        assert_eq!(
+            Chip::from_cfi(&build_cfi(&values)),
+            Err(Error::DataError(String::from(
+                "Invalid erase regions in the CFI table"
+            )))
+        );
     }
 
     #[test]
@@ -367,6 +427,23 @@ mod tests {
         // a region count past the end of the table is not read past it
         let mut values = CFI_4MB;
         values[0x1c] = 0xff;
+        assert_eq!(
+            Chip::from_cfi(&build_cfi(&values)),
+            Err(Error::DataError(String::from(
+                "Invalid erase regions in the CFI table"
+            )))
+        );
+
+        // even when the regions within the table cover the whole chip, as
+        // 20 regions do (32749 sectors of 128 bytes and 19 of one), unlike
+        // the 21 they would be declared as
+        let mut values = CFI_4MB.to_vec();
+        values.resize(CFI_SIZE / 2 - 0x10, 0x00);
+        values[0x1d..0x25].copy_from_slice(&[0xec, 0x7f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        values[0x1c] = 20;
+        let chip = Chip::from_cfi(&build_cfi(&values)).unwrap();
+        assert_eq!(chip.sectors(), &[128; 32768]);
+        values[0x1c] = 21;
         assert_eq!(
             Chip::from_cfi(&build_cfi(&values)),
             Err(Error::DataError(String::from(
@@ -396,6 +473,22 @@ mod tests {
         values[0x11] = 0x00;
         let chip = Chip::from_cfi(&build_cfi(&values)).unwrap();
         assert_eq!(chip.erase_timeout(), ERASE_TIMEOUT);
+
+        // the timeout must fit in 32 bits, never wrapping around to zero
+        values[0x11] = 0x1e;
+        values[0x15] = 0x01;
+        let chip = Chip::from_cfi(&build_cfi(&values)).unwrap();
+        assert_eq!(chip.erase_timeout(), 1 << 31);
+        for (typical, max) in [(0x1f, 0x01), (0x20, 0x00), (0xff, 0xff)] {
+            values[0x11] = typical;
+            values[0x15] = max;
+            assert_eq!(
+                Chip::from_cfi(&build_cfi(&values)),
+                Err(Error::DataError(String::from(
+                    "Invalid erase timeout in the CFI table"
+                )))
+            );
+        }
     }
 
     #[test]
