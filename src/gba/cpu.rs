@@ -936,12 +936,117 @@ mod tests {
     }
 
     #[test]
+    fn test_reg_user() {
+        let mut cpu = make_cpu();
+        cpu.set_reg(8, 0x08);
+        cpu.set_reg(14, 0x0800_0100);
+
+        // FIQ banks R8-R14, the user values are read from the bank
+        cpu.set_cpsr(MODE_FIQ | CPSR_I);
+        cpu.set_reg(8, 0x88);
+        assert_eq!(cpu.reg_user(8), 0x08);
+        assert_eq!(cpu.reg_user(13), 0x0300_7F00);
+        assert_eq!(cpu.reg_user(14), 0x0800_0100);
+
+        // IRQ only banks R13-R14
+        cpu.set_cpsr(MODE_IRQ | CPSR_I);
+        assert_eq!(cpu.reg(13), 0x0300_7FA0);
+        assert_eq!(cpu.reg_user(8), 0x08);
+        assert_eq!(cpu.reg_user(13), 0x0300_7F00);
+        assert_eq!(cpu.reg_user(14), 0x0800_0100);
+        assert_eq!(cpu.reg_user(15), cpu.pc());
+
+        // SYS uses the user registers directly
+        cpu.set_cpsr(MODE_SYS);
+        assert_eq!(cpu.reg_user(13), 0x0300_7F00);
+        assert_eq!(cpu.reg_user(14), 0x0800_0100);
+    }
+
+    #[test]
+    fn test_set_reg_user() {
+        let mut cpu = make_cpu();
+
+        // FIQ writes R8-R14 of the user bank, not its own registers
+        cpu.set_cpsr(MODE_FIQ | CPSR_I);
+        cpu.set_reg(8, 0x88);
+        cpu.set_reg_user(8, 0x08);
+        cpu.set_reg_user(13, 0x0300_7E00);
+        assert_eq!(cpu.reg(8), 0x88);
+        assert_eq!(cpu.reg(13), 0);
+
+        // IRQ writes R0-R12 directly and R13-R14 to the user bank
+        cpu.set_cpsr(MODE_IRQ | CPSR_I);
+        cpu.set_reg_user(0, 0x42);
+        cpu.set_reg_user(12, 0x12);
+        cpu.set_reg_user(14, 0x0800_0200);
+        assert_eq!(cpu.reg(0), 0x42);
+        assert_eq!(cpu.reg(12), 0x12);
+        assert_eq!(cpu.reg(14), 0);
+
+        cpu.set_cpsr(MODE_SYS);
+        assert_eq!(cpu.reg(8), 0x08);
+        assert_eq!(cpu.reg(12), 0x12);
+        assert_eq!(cpu.reg(13), 0x0300_7E00);
+        assert_eq!(cpu.reg(14), 0x0800_0200);
+
+        // SYS writes the current registers, PC flushes the pipeline
+        cpu.set_reg_user(13, 0x0300_7D00);
+        assert_eq!(cpu.reg(13), 0x0300_7D00);
+        cpu.pipeline_valid = true;
+        cpu.set_reg_user(15, 0x0800_0000);
+        assert_eq!(cpu.pc(), 0x0800_0000);
+        assert!(!cpu.pipeline_valid);
+    }
+
+    #[test]
+    fn test_set_cpsr() {
+        let mut cpu = make_cpu();
+        let modes = [MODE_FIQ, MODE_IRQ, MODE_SVC, MODE_ABT, MODE_UND];
+        for (i, mode) in modes.iter().enumerate() {
+            cpu.set_cpsr(mode | CPSR_I);
+            cpu.set_reg(13, 0x1000 + i as u32);
+            cpu.set_reg(14, 0x2000 + i as u32);
+            cpu.set_spsr(0x3000 + i as u32);
+        }
+
+        // each privileged mode keeps its own R13, R14 and SPSR
+        cpu.set_cpsr(MODE_SYS);
+        assert_eq!(cpu.reg(13), 0x0300_7F00);
+        assert_eq!(cpu.reg(14), 0);
+        for (i, mode) in modes.iter().enumerate() {
+            cpu.set_cpsr(mode | CPSR_I);
+            assert_eq!(cpu.reg(13), 0x1000 + i as u32);
+            assert_eq!(cpu.reg(14), 0x2000 + i as u32);
+            assert_eq!(cpu.spsr(), 0x3000 + i as u32);
+        }
+
+        // R8-R12 are only banked in FIQ mode
+        cpu.set_cpsr(MODE_SYS);
+        cpu.set_reg(12, 0x12);
+        cpu.set_cpsr(MODE_FIQ | CPSR_I);
+        assert_eq!(cpu.reg(12), 0);
+        cpu.set_reg(12, 0xF12);
+        cpu.set_cpsr(MODE_IRQ | CPSR_I);
+        assert_eq!(cpu.reg(12), 0x12);
+        cpu.set_cpsr(MODE_FIQ | CPSR_I);
+        assert_eq!(cpu.reg(12), 0xF12);
+    }
+
+    #[test]
     fn test_spsr() {
         let mut cpu = make_cpu();
         // switch to SVC mode so SPSR is accessible
         cpu.set_cpsr(MODE_SVC);
         cpu.set_spsr(0x12345678);
         assert_eq!(cpu.spsr(), 0x12345678);
+
+        // USR and SYS have no SPSR, writes are ignored and reads
+        // return the CPSR
+        for mode in [MODE_USR, MODE_SYS] {
+            cpu.set_cpsr(mode);
+            cpu.set_spsr(0x12345678);
+            assert_eq!(cpu.spsr(), mode);
+        }
     }
 
     #[test]
@@ -975,6 +1080,27 @@ mod tests {
         assert!(cpu.halted());
         cpu.set_halted(false);
         assert!(!cpu.halted());
+    }
+
+    #[test]
+    fn test_exec_pc() {
+        let mut cpu = make_cpu();
+        // a flushed pipeline holds the execution address directly
+        cpu.set_reg(15, 0x0300_0000);
+        assert_eq!(cpu.exec_pc(), 0x0300_0000);
+
+        // a filled pipeline carries the prefetch offset, with the
+        // address aligned to the instruction size
+        cpu.set_reg(15, 0x0300_0002);
+        cpu.fill_pipeline();
+        assert_eq!(cpu.pc(), 0x0300_0008);
+        assert_eq!(cpu.exec_pc(), 0x0300_0000);
+
+        cpu.set_cpsr(cpu.cpsr() | CPSR_T);
+        cpu.set_reg(15, 0x0300_0003);
+        cpu.fill_pipeline();
+        assert_eq!(cpu.pc(), 0x0300_0006);
+        assert_eq!(cpu.exec_pc(), 0x0300_0002);
     }
 
     #[test]

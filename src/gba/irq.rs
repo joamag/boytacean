@@ -132,8 +132,8 @@ impl Default for IrqController {
 mod tests {
     use super::IrqController;
     use crate::gba::consts::{
-        IRQ_DMA0, IRQ_DMA3, IRQ_HBLANK, IRQ_KEYPAD, IRQ_SERIAL, IRQ_TIMER0, IRQ_TIMER3, IRQ_VBLANK,
-        IRQ_VCOUNT,
+        IRQ_DMA0, IRQ_DMA3, IRQ_HBLANK, IRQ_KEYPAD, IRQ_SERIAL, IRQ_TIMER0, IRQ_TIMER1, IRQ_TIMER2,
+        IRQ_TIMER3, IRQ_VBLANK, IRQ_VCOUNT,
     };
 
     #[test]
@@ -230,9 +230,15 @@ mod tests {
         irq.raise_timer(3);
         assert_eq!(irq.if_(), IRQ_TIMER0 | IRQ_TIMER3);
 
+        // each timer raises its own request bit
+        irq.raise_timer(1);
+        irq.raise_timer(2);
+        let all = IRQ_TIMER0 | IRQ_TIMER1 | IRQ_TIMER2 | IRQ_TIMER3;
+        assert_eq!(irq.if_(), all);
+
         // invalid index should be ignored
         irq.raise_timer(4);
-        assert_eq!(irq.if_(), IRQ_TIMER0 | IRQ_TIMER3);
+        assert_eq!(irq.if_(), all);
     }
 
     #[test]

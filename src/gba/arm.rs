@@ -835,7 +835,7 @@ fn arm_swi(cpu: &mut Arm7Tdmi, instr: u32) {
 mod tests {
     use crate::gba::{
         bus::GbaBus,
-        consts::{CPSR_I, MODE_IRQ, MODE_SYS},
+        consts::{CPSR_I, MODE_IRQ, MODE_SVC, MODE_SYS, MODE_USR},
         cpu::Arm7Tdmi,
     };
 
@@ -1077,6 +1077,76 @@ mod tests {
     }
 
     #[test]
+    fn test_arm_rscs_flags() {
+        // RSCS R1, R0, #10 (E2F0100A) with carry set (no borrow in)
+        let mut cpu = make_cpu();
+        cpu.set_flag_c(true);
+        cpu.set_reg(0, 5);
+        super::execute_arm(&mut cpu, 0xE2F0100A);
+        assert_eq!(cpu.reg(1), 5); // 10 - 5 - 0
+        assert!(cpu.flag_c());
+        assert!(!cpu.flag_v());
+
+        // carry clear borrows one more, wrapping below zero
+        cpu.set_flag_c(false);
+        cpu.set_reg(0, 10);
+        super::execute_arm(&mut cpu, 0xE2F0100A);
+        assert_eq!(cpu.reg(1), 0xFFFFFFFF); // 10 - 10 - 1
+        assert!(!cpu.flag_c());
+        assert!(cpu.flag_n());
+
+        // positive minus negative overflows into the sign bit
+        cpu.set_flag_c(true);
+        cpu.set_reg(0, 0x80000000);
+        super::execute_arm(&mut cpu, 0xE2F0100A);
+        assert_eq!(cpu.reg(1), 0x8000000A);
+        assert!(!cpu.flag_c());
+        assert!(cpu.flag_v());
+    }
+
+    #[test]
+    fn test_arm_logical_flags_rotated_carry() {
+        // a rotated immediate sets the carry to bit 31 of the operand
+        let mut cpu = make_cpu();
+        cpu.set_reg(0, 0);
+        // MOVS R0, #0x80000000 (E3B00102)
+        super::execute_arm(&mut cpu, 0xE3B00102);
+        assert_eq!(cpu.reg(0), 0x80000000);
+        assert!(cpu.flag_n());
+        assert!(cpu.flag_c());
+
+        // ORRS R1, R0, #0x80000000 (E3901102)
+        cpu.set_flag_c(false);
+        super::execute_arm(&mut cpu, 0xE3901102);
+        assert_eq!(cpu.reg(1), 0x80000000);
+        assert!(cpu.flag_n());
+        assert!(cpu.flag_c());
+
+        // BICS R1, R0, #0x80000000 (E3D01102)
+        cpu.set_flag_c(false);
+        super::execute_arm(&mut cpu, 0xE3D01102);
+        assert_eq!(cpu.reg(1), 0);
+        assert!(cpu.flag_z());
+        assert!(cpu.flag_c());
+
+        // MVNS R1, #0x80000000 (E3F01102)
+        cpu.set_flag_c(false);
+        super::execute_arm(&mut cpu, 0xE3F01102);
+        assert_eq!(cpu.reg(1), 0x7FFFFFFF);
+        assert!(!cpu.flag_n());
+        assert!(!cpu.flag_z());
+        assert!(cpu.flag_c());
+
+        // an unrotated immediate keeps the carry, MOVS R0, #1 (E3B00001)
+        super::execute_arm(&mut cpu, 0xE3B00001);
+        assert_eq!(cpu.reg(0), 1);
+        assert!(cpu.flag_c());
+        cpu.set_flag_c(false);
+        super::execute_arm(&mut cpu, 0xE3B00001);
+        assert!(!cpu.flag_c());
+    }
+
+    #[test]
     fn test_arm_mul() {
         let mut cpu = make_cpu();
         cpu.set_reg(0, 6);
@@ -1084,6 +1154,26 @@ mod tests {
         // MUL R2, R0, R1 (E0020190)
         super::execute_arm(&mut cpu, 0xE0020190);
         assert_eq!(cpu.reg(2), 42);
+    }
+
+    #[test]
+    fn test_arm_muls_flags() {
+        // MULS R2, R0, R1 (E0120190) sets N and Z from the result
+        let mut cpu = make_cpu();
+        cpu.set_reg(0, 0x80000000);
+        cpu.set_reg(1, 1);
+        super::execute_arm(&mut cpu, 0xE0120190);
+        assert_eq!(cpu.reg(2), 0x80000000);
+        assert!(cpu.flag_n());
+        assert!(!cpu.flag_z());
+
+        // the result keeps only the low 32 bits of the product
+        cpu.set_reg(0, 0x10000);
+        cpu.set_reg(1, 0x10000);
+        super::execute_arm(&mut cpu, 0xE0120190);
+        assert_eq!(cpu.reg(2), 0);
+        assert!(!cpu.flag_n());
+        assert!(cpu.flag_z());
     }
 
     #[test]
@@ -1213,6 +1303,21 @@ mod tests {
         // STRH PC, [R1] -> E1C1F0B0
         super::execute_arm(&mut cpu, 0xE1C1F0B0);
         assert_eq!(cpu.bus_read16(0x0200_0000), (pc_addr + 12) as u16);
+    }
+
+    #[test]
+    fn test_arm_ldrh_post_index_sub_writeback() {
+        // LDRH R0, [R1], #-2 (E05100B2) reads at the base and then
+        // writes back the base minus the offset
+        let mut cpu = make_cpu();
+        let base = 0x0200_0010u32;
+        cpu.bus_write16(base, 0xBEEF);
+        cpu.bus_write16(base - 2, 0xCAFE);
+        cpu.set_reg(1, base);
+
+        super::execute_arm(&mut cpu, 0xE05100B2);
+        assert_eq!(cpu.reg(0), 0xBEEF);
+        assert_eq!(cpu.reg(1), base - 2);
     }
 
     #[test]
@@ -1405,6 +1510,35 @@ mod tests {
         assert_eq!(cpu.reg(13), 0x0300_7F00); // SP_sys untouched
         cpu.set_cpsr(MODE_IRQ | CPSR_I);
         assert_eq!(cpu.reg(13), base + 20); // SP_irq written back
+    }
+
+    #[test]
+    fn test_arm_msr_fields() {
+        // MSR SPSR_sx, R0 (E166F000) only writes the status and
+        // extension bytes of the SPSR
+        let mut cpu = make_cpu();
+        cpu.set_cpsr(MODE_IRQ | CPSR_I);
+        cpu.set_spsr(0);
+        cpu.set_reg(0, 0xFFFFFFFF);
+        super::execute_arm(&mut cpu, 0xE166F000);
+        assert_eq!(cpu.spsr(), 0x00FFFF00);
+        assert_eq!(cpu.cpsr(), MODE_IRQ | CPSR_I);
+    }
+
+    #[test]
+    fn test_arm_msr_user_mode_flags_only() {
+        // MSR CPSR_fc, R0 (E129F000) in user mode only writes the
+        // flags, the control byte (mode and IRQ mask) is protected
+        let mut cpu = make_cpu();
+        cpu.set_cpsr(MODE_USR);
+        cpu.set_reg(0, 0xF000001F);
+        super::execute_arm(&mut cpu, 0xE129F000);
+        assert_eq!(cpu.cpsr(), 0xF0000000 | MODE_USR);
+
+        // a privileged mode writes the control byte as well
+        cpu.set_cpsr(MODE_SVC);
+        super::execute_arm(&mut cpu, 0xE129F000);
+        assert_eq!(cpu.cpsr(), 0xF000001F);
     }
 
     #[test]
