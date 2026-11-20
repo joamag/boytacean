@@ -475,8 +475,13 @@ fn arm_halfword_transfer(cpu: &mut Arm7Tdmi, instr: u32) {
         };
         cpu.set_reg(rd, value);
     } else {
-        // STRH (sh == 1)
-        cpu.bus_write16(addr, cpu.reg(rd) as u16);
+        // STRH (sh == 1), with Rd=PC stores PC+12 on ARM7TDMI
+        let value = if rd == 15 {
+            cpu.reg(rd).wrapping_add(4)
+        } else {
+            cpu.reg(rd)
+        };
+        cpu.bus_write16(addr, value as u16);
     }
 
     // writeback: skip if load overwrote the base register (Rd == Rn)
@@ -647,11 +652,12 @@ fn arm_block_transfer(cpu: &mut Arm7Tdmi, instr: u32) {
 
         for i in 0..16u32 {
             if reg_list & (1 << i) != 0 {
-                let value = if use_user_regs {
-                    cpu.reg_user(i)
-                } else if i == 15 {
-                    // STM with PC stores PC+12 on ARM7TDMI
+                let value = if i == 15 {
+                    // STM with PC stores PC+12 on ARM7TDMI (PC is
+                    // not banked, so the same applies with the S bit)
                     cpu.reg(i).wrapping_add(4)
+                } else if use_user_regs {
+                    cpu.reg_user(i)
                 } else if i == rn && write_back && !base_is_first {
                     wb_base
                 } else {
@@ -1195,6 +1201,19 @@ mod tests {
     }
 
     #[test]
+    fn test_arm_strh_pc_stores_plus_12() {
+        // STRH with Rd=PC stores PC+12 on ARM7TDMI
+        let mut cpu = make_cpu();
+        let pc_addr = 0x0800_0100u32;
+        cpu.set_reg(15, pc_addr + 8);
+        cpu.set_reg(1, 0x0200_0000);
+
+        // STRH PC, [R1] -> E1C1F0B0
+        super::execute_arm(&mut cpu, 0xE1C1F0B0);
+        assert_eq!(cpu.bus_read16(0x0200_0000), (pc_addr + 12) as u16);
+    }
+
+    #[test]
     fn test_arm_str_ldr() {
         let mut cpu = make_cpu();
         cpu.set_reg(0, 0xDEADBEEF);
@@ -1344,6 +1363,20 @@ mod tests {
 
         // Should store USR R8 = 32, not FIQ R8 = 64
         assert_eq!(cpu.bus_read32(mem), 32);
+    }
+
+    #[test]
+    fn test_arm_stm_user_regs_pc_stores_plus_12() {
+        // STM with S bit and PC in the list also stores PC+12
+        let mut cpu = make_cpu();
+        let pc_addr = 0x0800_0100u32;
+        cpu.set_cpsr(MODE_IRQ | CPSR_I);
+        cpu.set_reg(15, pc_addr + 8);
+        cpu.set_reg(0, 0x0200_0000);
+
+        // STMIA R0, {PC}^ -> E8C08000
+        super::execute_arm(&mut cpu, 0xE8C08000);
+        assert_eq!(cpu.bus_read32(0x0200_0000), pc_addr + 12);
     }
 
     #[test]
