@@ -124,6 +124,49 @@ jobs:
         run: |
           cd frontends/web/core && npm install --no-save ../lib && npm install && npm test
           cd ../component && npm install && npm test
+  build-python:
+    name: Build Python
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        rust-version: [
+          "1.86.0",
+          "1.87.0",
+          "1.88.0",
+          "1.89.0",
+          "1.90.0",
+          "1.91.0",
+          "latest"
+        ]
+    runs-on: ubuntu-latest
+    container: rust:${{ matrix.rust-version }}
+    steps:
+      - name: Checkout code from repository
+        uses: actions/checkout@v6
+      - name: Install Dependencies
+        run: |
+          apt-get update
+          apt-get install -y -q python3 python3-venv
+      - name: Install Rust components
+        run: |
+          rustup component add rustfmt
+          rustup component add clippy
+      - name: Print Rust information
+        run: rustc --version
+      - name: Print Python information
+        run: python3 --version
+      - name: Verify Rust code format
+        run: cargo fmt --all -- --check
+      - name: Verify Rust code linting
+        run: cargo clippy --features python -- -D warnings -A unknown-lints
+      - name: Install Python dependencies
+        run: |
+          python3 -m venv venv
+          venv/bin/pip install -r requirements.txt pytest numpy
+      - name: Build Python library
+        run: venv/bin/pip install --no-build-isolation -e .
+      - name: Run Python unit tests
+        run: venv/bin/pytest
   build-sdl:
     name: Build SDL
     timeout-minutes: 30
