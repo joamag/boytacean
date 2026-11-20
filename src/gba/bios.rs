@@ -615,16 +615,17 @@ fn swi_huff_decomp(cpu: &mut Arm7Tdmi) {
 
     let header = cpu.bus_read32(src);
     let data_size = header >> 8;
-    let bit_size = (header >> 4) & 0x0F;
+    let bit_size = header & 0x0F;
 
     if bit_size != 4 && bit_size != 8 {
         return;
     }
 
+    // the tree size byte holds the size of the tree table (including
+    // itself) in halfwords minus one, with the bitstream right after it
     let tree_size = cpu.bus_read8(src + 4) as u32;
     let tree_start = src + 5;
-    let tree_bytes = (tree_size + 1) * 2;
-    let data_start = tree_start + tree_bytes;
+    let data_start = src + 4 + (tree_size + 1) * 2;
 
     let mut src_offset = data_start;
     let mut bytes_written = 0u32;
@@ -642,9 +643,9 @@ fn swi_huff_decomp(cpu: &mut Arm7Tdmi) {
         }
 
         // traverse the tree from root
-        let mut node_offset = 0u32;
+        let mut node_addr = tree_start;
         loop {
-            let node = cpu.bus_read8(tree_start + node_offset);
+            let node = cpu.bus_read8(node_addr);
 
             if bits_left == 0 {
                 bit_buffer = cpu.bus_read32(src_offset);
@@ -659,16 +660,19 @@ fn swi_huff_decomp(cpu: &mut Arm7Tdmi) {
 
             let is_right = bit != 0;
             let child_offset = (node & 0x3F) as u32;
-            let next = (node_offset & !1) + child_offset * 2 + 2;
+            // the children are addressed from the absolute node address
+            // with its lowest bit cleared (the root sits at an odd address)
+            let next = (node_addr & !1) + child_offset * 2 + 2;
 
+            // bit 7 flags node0 (left) as data and bit 6 node1 (right)
             let is_leaf = if is_right {
-                node & 0x80 != 0
-            } else {
                 node & 0x40 != 0
+            } else {
+                node & 0x80 != 0
             };
 
             if is_leaf {
-                let leaf = cpu.bus_read8(tree_start + next + if is_right { 1 } else { 0 });
+                let leaf = cpu.bus_read8(next + if is_right { 1 } else { 0 });
                 dst_buffer |= (leaf as u32) << dst_bits;
                 dst_bits += bit_size;
 
@@ -681,7 +685,7 @@ fn swi_huff_decomp(cpu: &mut Arm7Tdmi) {
                 }
                 break;
             } else {
-                node_offset = next + if is_right { 1 } else { 0 };
+                node_addr = next + if is_right { 1 } else { 0 };
             }
         }
     }
@@ -1496,6 +1500,54 @@ mod tests {
                 };
                 assert_eq!(cpu.bus_read32(dst), expected);
             }
+        }
+    }
+
+    #[test]
+    fn test_swi_huff_decomp() {
+        // the codes 0, 10 and 11 of the three symbols are packed MSB
+        // first, with a code that crosses the bitstream word boundary
+        let message = [
+            0, 1, 2, 0, 2, 1, 0, 0, 2, 2, 2, 2, 1, 1, 1, 1, 2, 0, 1, 2, 0, 2, 2, 1,
+        ];
+        let codes = [(0b0u32, 1), (0b10, 2), (0b11, 2)];
+        let mut words = [0u32; 2];
+        let mut position = 0;
+        for symbol in message {
+            let (code, length) = codes[symbol];
+            for i in (0..length).rev() {
+                words[position / 32] |= ((code >> i) & 1) << (31 - position % 32);
+                position += 1;
+            }
+        }
+        for (bits, symbols) in [(8u32, [0x41u8, 0x42, 0x43]), (4, [0x1, 0x2, 0x3])] {
+            let mut cpu = make_cpu();
+            let size = message.len() as u32 * bits / 8;
+            cpu.bus_write32(0x0200_0000, (size << 8) | 0x20 | bits);
+
+            // the root node sits at the odd address src + 5, its node0
+            // is data and its node1 a node with two data children
+            let tree = [3, 0x80, symbols[0], 0xC0, symbols[1], symbols[2], 0, 0];
+            for (i, byte) in tree.iter().enumerate() {
+                cpu.bus_write8(0x0200_0004 + i as u32, *byte);
+            }
+            for (i, word) in words.iter().enumerate() {
+                cpu.bus_write32(0x0200_000C + i as u32 * 4, *word);
+            }
+            cpu.bus_write32(0x0200_1000 + size, 0xDEADBEEF);
+            cpu.set_reg(0, 0x0200_0000);
+            cpu.set_reg(1, 0x0200_1000);
+            assert!(!handle_swi(&mut cpu, 0x13));
+            for (i, symbol) in message.iter().enumerate() {
+                let byte = cpu.bus_read8(0x0200_1000 + i as u32 * bits / 8);
+                let value = if bits == 8 {
+                    byte
+                } else {
+                    (byte >> (i % 2 * 4)) & 0xF
+                };
+                assert_eq!(value, symbols[*symbol]);
+            }
+            assert_eq!(cpu.bus_read32(0x0200_1000 + size), 0xDEADBEEF);
         }
     }
 
