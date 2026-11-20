@@ -377,18 +377,6 @@ impl Arm7Tdmi {
             self.fill_pipeline();
         }
 
-        // Simulate the 3rd pipeline stage (fetch): on real ARM7TDMI,
-        // the fetch stage reads from PC (= executing_addr + 8) before
-        // the instruction executes. This updates bios_value so that
-        // BIOS protection returns the correct last-fetched value even
-        // when a branch flushes the pipeline.
-        if self.regs[15] < 0x4000 {
-            self.bus.bios_readable = true;
-            let prefetch = self.bus.read32(self.regs[15]);
-            self.bus.update_bios_value(prefetch);
-            self.bus.bios_readable = false;
-        }
-
         // return the current instruction from the pipeline
         // at this point regs[15] = instruction_address + 8 (ARM) or + 4 (Thumb)
         // which is the correct value for reading R15 during execution
@@ -971,21 +959,19 @@ mod tests {
     #[test]
     fn test_bios_protection_fetch_updates_value() {
         let mut cpu = make_cpu();
-        // Place an instruction in BIOS at 0x00
+        // executes ADD LR, PC, #0 of the BIOS IRQ handler at 0x130,
+        // the pipeline fill reads 0x130 and 0x134 and the prefetch
+        // of the step reads 0x138 (PC = executing address + 8)
+        cpu.set_reg(15, 0x0000_0130);
+        cpu.step();
+        assert_eq!(cpu.reg(14), 0x0000_0138);
         cpu.bus.bios_readable = true;
-        let _val_at_0 = cpu.bus.read32(0x0000_0000);
+        let val_at_134 = cpu.bus.read32(0x0000_0134);
+        let val_at_138 = cpu.bus.read32(0x0000_0138);
         cpu.bus.bios_readable = false;
-        // Set PC to BIOS address and fill pipeline
-        cpu.set_reg(15, 0x0000_0000);
-        // The fetch should update bios_value
-        // PC=0, so fill_pipeline reads from 0x00, 0x04
-        // and the fetch() prefetch reads from 0x08
-        let _instr = cpu.fetch();
-        cpu.bus.bios_readable = true;
-        let val_at_8 = cpu.bus.read32(0x0000_0008);
-        cpu.bus.bios_readable = false;
-        // bios_value should be the value at PC (= addr + 8 = 0x08)
-        assert_eq!(cpu.bus.read32(0x0000_0000), val_at_8);
+        // bios_value should be the last fetched value (at 0x138)
+        assert_ne!(val_at_134, val_at_138);
+        assert_eq!(cpu.bus.read32(0x0000_0000), val_at_138);
     }
 
     #[test]
