@@ -2,40 +2,21 @@
 //! GBxCart RW connected to a serial port.
 
 use std::{
-    fs::{remove_file, rename},
     io::{stdout, Write},
     path::Path,
-    process,
-    time::Duration,
 };
 
-use boytacean_cartridge::{
-    dumper::Dumper,
-    gbxcart::{BAUD_RATE, USB_PRODUCT_ID, USB_VENDOR_ID},
-};
+use boytacean_cartridge::{dumper::Dumper, serial::open_port};
 use boytacean_common::{
     error::Error,
-    util::{read_file, write_file},
+    util::{read_file, write_new_file},
 };
-use serialport::{available_ports, SerialPortType};
-
-/// The time to wait for a reply of the device before giving up,
-/// which is the case when it runs another firmware.
-const TIMEOUT: Duration = Duration::from_secs(2);
 
 /// Dumps the cartridge in the GBxCart RW at the provided serial port
 /// (`auto` finds it) into a ROM file in the current directory, so that
 /// it can be loaded as any other ROM file, returning its path.
 pub fn dump_cartridge(port: &str) -> Result<String, Error> {
-    let port = if port == "auto" {
-        find_port()?
-    } else {
-        String::from(port)
-    };
-    let mut serial = serialport::new(&port, BAUD_RATE)
-        .timeout(TIMEOUT)
-        .open()
-        .map_err(|err| Error::IoError(format!("Failed to open {port}: {err}")))?;
+    let (mut serial, port) = open_port(port)?;
 
     // prints the progress only when its percentage changes, as there
     // are many thousands of exchanges with the device in a dump
@@ -102,42 +83,6 @@ fn write_files(
     Ok(rom_path)
 }
 
-/// Writes the data into a new file through a temporary file (of this
-/// process alone), that is only renamed into place once written, so that
-/// an incomplete file (eg: of a failed or interrupted write) is never
-/// taken as a complete one.
-fn write_new_file(path: &str, data: &[u8]) -> Result<(), Error> {
-    let part_path = format!("{path}.{}.part", process::id());
-    if let Err(err) = write_file(&part_path, data, None) {
-        remove_file(&part_path).ok();
-        return Err(err);
-    }
-    rename(&part_path, path).map_err(|err| {
-        remove_file(&part_path).ok();
-        Error::IoError(format!("Failed to rename {part_path}: {err}"))
-    })
-}
-
-/// Finds the serial port of the first GBxCart RW connected, by the
-/// USB IDs of its serial converter.
-fn find_port() -> Result<String, Error> {
-    let ports = available_ports().map_err(|err| Error::IoError(err.to_string()))?;
-    ports
-        .into_iter()
-        .find(|port| is_gbxcart(&port.port_type))
-        .map(|port| port.port_name)
-        .ok_or(Error::CustomError(String::from(
-            "No GBxCart RW found, connect it or provide its serial port",
-        )))
-}
-
-fn is_gbxcart(port_type: &SerialPortType) -> bool {
-    matches!(
-        port_type,
-        SerialPortType::UsbPort(info) if info.vid == USB_VENDOR_ID && info.pid == USB_PRODUCT_ID
-    )
-}
-
 /// The paths of the ROM and save files for the cartridge with the
 /// provided title, set apart from any other ROM file by their name.
 fn file_paths(title: &str) -> (String, String) {
@@ -167,9 +112,8 @@ mod tests {
     };
 
     use boytacean_common::error::Error;
-    use serialport::{SerialPortType, UsbPortInfo};
 
-    use super::{dump_cartridge, file_paths, is_gbxcart, write_files, write_new_file};
+    use super::{dump_cartridge, file_paths, write_files};
 
     /// Builds an empty directory for the files of a test, unique to the
     /// test and to the process running it, so that runs never collide.
@@ -180,16 +124,6 @@ mod tests {
         }
         create_dir_all(&directory).unwrap();
         directory
-    }
-
-    fn build_usb_port(vid: u16, pid: u16) -> SerialPortType {
-        SerialPortType::UsbPort(UsbPortInfo {
-            vid,
-            pid,
-            serial_number: None,
-            manufacturer: None,
-            product: None,
-        })
     }
 
     #[test]
@@ -304,70 +238,6 @@ mod tests {
                 process::id()
             )))
         );
-    }
-
-    #[test]
-    fn test_write_new_file() {
-        // the temporary file left by an interrupted write is replaced,
-        // and no temporary file is left once the file is in place
-        let directory = build_directory("cartridge-new");
-        let path = directory
-            .join("boytacean.gb")
-            .to_string_lossy()
-            .into_owned();
-        let part_path = format!("{path}.{}.part", process::id());
-        write(&part_path, [0x0f]).unwrap();
-        write_new_file(&path, &[0x01, 0x02]).unwrap();
-        assert_eq!(read(&path).unwrap(), vec![0x01, 0x02]);
-        assert!(!Path::new(&part_path).exists());
-        remove_dir_all(directory).unwrap();
-    }
-
-    #[test]
-    fn test_write_new_file_invalid() {
-        let path = Path::new("/dev/boytacean-none").join("boytacean.gb");
-        let path = path.to_string_lossy();
-        assert_eq!(
-            write_new_file(&path, &[0x01]),
-            Err(Error::CustomError(format!(
-                "Failed to create file: {path}.{}.part",
-                process::id()
-            )))
-        );
-        assert!(!Path::new(path.as_ref()).exists());
-    }
-
-    #[test]
-    fn test_write_new_file_rename() {
-        // a directory in place of the file makes the rename fail, which
-        // must not leave the temporary file behind
-        let directory = build_directory("cartridge-rename");
-        let path = directory
-            .join("boytacean.gb")
-            .to_string_lossy()
-            .into_owned();
-        let part_path = format!("{path}.{}.part", process::id());
-        create_dir_all(&path).unwrap();
-        let result = write_new_file(&path, &[0x01]);
-        assert!(matches!(
-            result,
-            Err(Error::IoError(message)) if message.starts_with(&format!("Failed to rename {part_path}: "))
-        ));
-        assert!(!Path::new(&part_path).exists());
-        remove_dir_all(directory).unwrap();
-    }
-
-    #[test]
-    fn test_is_gbxcart() {
-        assert!(is_gbxcart(&build_usb_port(0x1a86, 0x7523)));
-    }
-
-    #[test]
-    fn test_is_gbxcart_other() {
-        assert!(!is_gbxcart(&build_usb_port(0x1a86, 0x5523)));
-        assert!(!is_gbxcart(&build_usb_port(0x0403, 0x7523)));
-        assert!(!is_gbxcart(&SerialPortType::PciPort));
-        assert!(!is_gbxcart(&SerialPortType::Unknown));
     }
 
     #[test]

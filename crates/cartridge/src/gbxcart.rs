@@ -7,7 +7,8 @@
 //! are sent in big endian.
 //!
 //! This module only encodes the commands and decodes the replies, the
-//! order in which they are sent is up to the [`crate::dumper`].
+//! order in which they are sent is up to the [`crate::dumper`] and the
+//! [`crate::flasher`].
 
 use std::fmt::{self, Display, Formatter};
 
@@ -28,11 +29,19 @@ pub const QUERY_FW_INFO: u8 = 0xa1;
 /// Sets the cartridge slot in Game Boy (DMG) mode.
 pub const SET_MODE_DMG: u8 = 0xa3;
 
+/// Powers the cartridge with 3.3V, the voltage of the flash chips of
+/// flash cartridges.
+pub const SET_VOLTAGE_3_3V: u8 = 0xa4;
+
 /// Powers the cartridge with 5V, the voltage of Game Boy cartridges.
 pub const SET_VOLTAGE_5V: u8 = 0xa5;
 
 /// Sets one of the [`Variable`]s of the firmware.
 pub const SET_VARIABLE: u8 = 0xa6;
+
+/// Sets the commands that the firmware sends to the flash chip for
+/// each buffer programmed by [`DMG_FLASH_PROGRAM`].
+pub const SET_FLASH_COMMANDS: u8 = 0xa7;
 
 /// Releases the address lines of the cartridge, done at the end.
 pub const SET_ADDR_AS_INPUTS: u8 = 0xa8;
@@ -47,6 +56,15 @@ pub const DMG_CART_WRITE: u8 = 0xb2;
 /// Resets the MBC of the cartridge, replies with [`ACK`].
 pub const DMG_MBC_RESET: u8 = 0xb4;
 
+/// Writes a value at an address of the cartridge bus, used for the
+/// commands to the flash chip of flash cartridges.
+pub const DMG_FLASH_WRITE: u8 = 0xd1;
+
+/// Programs as many bytes as the [`TRANSFER_SIZE`] at the [`ADDRESS`]
+/// of the flash chip, through the [`SET_FLASH_COMMANDS`], replies with
+/// [`ACK`] once they are programmed.
+pub const DMG_FLASH_PROGRAM: u8 = 0xd3;
+
 /// The reply of the commands that acknowledge their execution.
 pub const ACK: u8 = 0x01;
 
@@ -55,6 +73,10 @@ pub const ACCESS_MODE_ROM_READ: u32 = 0x01;
 
 /// The [`DMG_ACCESS_MODE`] value for reading the RAM.
 pub const ACCESS_MODE_RAM_READ: u32 = 0x03;
+
+/// The bytes that start the [`SET_FLASH_COMMANDS`], sent as observed in
+/// the traffic of the device as their meaning is not known.
+const FLASH_COMMANDS_HEADER: [u8; 3] = [0x01, 0x02, 0x01];
 
 /// A variable of the firmware, made of its size in bytes and of its
 /// key, keys are only unique among the variables of the same size.
@@ -71,6 +93,10 @@ pub const CART_MODE: Variable = Variable { size: 1, key: 0x00 };
 /// [`ACCESS_MODE_ROM_READ`] or [`ACCESS_MODE_RAM_READ`].
 pub const DMG_ACCESS_MODE: Variable = Variable { size: 1, key: 0x01 };
 
+/// How [`DMG_FLASH_PROGRAM`] programs the flash chip, `0x00` being the
+/// buffered programming of the [`SET_FLASH_COMMANDS`].
+pub const FLASH_PROGRAM_MODE: Variable = Variable { size: 1, key: 0x05 };
+
 /// If the chip select line is pulsed in reads, needed for the RAM.
 pub const DMG_READ_CS_PULSE: Variable = Variable { size: 1, key: 0x08 };
 
@@ -80,10 +106,18 @@ pub const DMG_WRITE_CS_PULSE: Variable = Variable { size: 1, key: 0x09 };
 /// The method used for reads, `0x01` being the default one.
 pub const DMG_READ_METHOD: Variable = Variable { size: 1, key: 0x0b };
 
-/// The number of bytes replied by each [`DMG_CART_READ`].
+/// The number of bytes replied by each [`DMG_CART_READ`] or programmed
+/// by each [`DMG_FLASH_PROGRAM`].
 pub const TRANSFER_SIZE: Variable = Variable { size: 2, key: 0x00 };
 
-/// The address of the next [`DMG_CART_READ`].
+/// The size of the write buffer of the flash chip, used by the
+/// [`DMG_FLASH_PROGRAM`].
+pub const FLASH_BUFFER_SIZE: Variable = Variable { size: 2, key: 0x01 };
+
+/// The ROM bank selected in the MBC, set right after selecting it.
+pub const DMG_ROM_BANK: Variable = Variable { size: 2, key: 0x02 };
+
+/// The address of the next [`DMG_CART_READ`] or [`DMG_FLASH_PROGRAM`].
 pub const ADDRESS: Variable = Variable { size: 4, key: 0x00 };
 
 /// Encodes the command that sets a variable of the firmware.
@@ -99,6 +133,35 @@ pub fn cart_write(address: u16, value: u8) -> Vec<u8> {
     let mut data = vec![DMG_CART_WRITE];
     data.extend_from_slice(&(address as u32).to_be_bytes());
     data.push(value);
+    data
+}
+
+/// Encodes the command that writes a value in the cartridge bus, as a
+/// command to the flash chip of a flash cartridge.
+pub fn flash_write(address: u16, value: u8) -> Vec<u8> {
+    let mut data = vec![DMG_FLASH_WRITE];
+    data.extend_from_slice(&(address as u32).to_be_bytes());
+    data.push(value);
+    data
+}
+
+/// Encodes the command that programs the provided bytes in the flash
+/// chip, as many as the [`TRANSFER_SIZE`].
+pub fn flash_program(bytes: &[u8]) -> Vec<u8> {
+    let mut data = vec![DMG_FLASH_PROGRAM];
+    data.extend_from_slice(bytes);
+    data
+}
+
+/// Encodes the command that sets the commands (address and value) that
+/// are sent to the flash chip for each programmed buffer.
+pub fn set_flash_commands(commands: &[(u16, u16)]) -> Vec<u8> {
+    let mut data = vec![SET_FLASH_COMMANDS];
+    data.extend_from_slice(&FLASH_COMMANDS_HEADER);
+    for (address, value) in commands {
+        data.extend_from_slice(&(*address as u32).to_be_bytes());
+        data.extend_from_slice(&value.to_be_bytes());
+    }
     data
 }
 
@@ -180,8 +243,9 @@ mod tests {
     use boytacean_common::error::Error;
 
     use super::{
-        cart_write, set_variable, Firmware, ADDRESS, DMG_ACCESS_MODE, DMG_READ_CS_PULSE,
-        TRANSFER_SIZE,
+        cart_write, flash_program, flash_write, set_flash_commands, set_variable, Firmware,
+        ADDRESS, DMG_ACCESS_MODE, DMG_READ_CS_PULSE, DMG_ROM_BANK, FLASH_BUFFER_SIZE,
+        FLASH_PROGRAM_MODE, TRANSFER_SIZE,
     };
 
     /// The reply to the firmware query of a GBxCart RW v1.3 running
@@ -209,6 +273,23 @@ mod tests {
     }
 
     #[test]
+    fn test_set_variable_flash() {
+        // as captured from the device when flashing a cartridge
+        assert_eq!(
+            set_variable(FLASH_BUFFER_SIZE, 0x20),
+            vec![0xa6, 0x02, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x20]
+        );
+        assert_eq!(
+            set_variable(DMG_ROM_BANK, 0x01),
+            vec![0xa6, 0x02, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x01]
+        );
+        assert_eq!(
+            set_variable(FLASH_PROGRAM_MODE, 0x00),
+            vec![0xa6, 0x01, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00]
+        );
+    }
+
+    #[test]
     fn test_cart_write() {
         assert_eq!(
             cart_write(0x6000, 0x01),
@@ -222,6 +303,52 @@ mod tests {
             cart_write(0xffff, 0xff),
             vec![0xb2, 0x00, 0x00, 0xff, 0xff, 0xff]
         );
+    }
+
+    #[test]
+    fn test_flash_write() {
+        assert_eq!(
+            flash_write(0x0aaa, 0xaa),
+            vec![0xd1, 0x00, 0x00, 0x0a, 0xaa, 0xaa]
+        );
+        assert_eq!(
+            flash_write(0x0000, 0xf0),
+            vec![0xd1, 0x00, 0x00, 0x00, 0x00, 0xf0]
+        );
+    }
+
+    #[test]
+    fn test_flash_program() {
+        assert_eq!(flash_program(&[0x6c, 0x70]), vec![0xd3, 0x6c, 0x70]);
+        assert_eq!(flash_program(&[0xff; 256]).len(), 257);
+        assert_eq!(flash_program(&[]), vec![0xd3]);
+    }
+
+    #[test]
+    fn test_set_flash_commands() {
+        // as captured from the device, for the buffered programming of
+        // the AMD command set
+        let commands = [
+            (0x0aaa, 0xaa),
+            (0x0555, 0x55),
+            (0x0000, 0x25),
+            (0x0000, 0x00),
+            (0x0000, 0x00),
+            (0x0000, 0x29),
+        ];
+        assert_eq!(
+            set_flash_commands(&commands),
+            vec![
+                0xa7, 0x01, 0x02, 0x01, 0x00, 0x00, 0x0a, 0xaa, 0x00, 0xaa, 0x00, 0x00, 0x05, 0x55,
+                0x00, 0x55, 0x00, 0x00, 0x00, 0x00, 0x00, 0x25, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x29
+            ]
+        );
+    }
+
+    #[test]
+    fn test_set_flash_commands_empty() {
+        assert_eq!(set_flash_commands(&[]), vec![0xa7, 0x01, 0x02, 0x01]);
     }
 
     #[test]

@@ -77,6 +77,10 @@ pub struct Exchange {
 }
 
 impl Exchange {
+    pub fn new(send: Vec<u8>, expect: usize) -> Self {
+        Self { send, expect }
+    }
+
     pub fn send(&self) -> &[u8] {
         &self.send
     }
@@ -157,6 +161,7 @@ pub struct Dumper {
     ram_data: Vec<u8>,
     rom_size: usize,
     ram_size: usize,
+    mapper: Option<Mapper>,
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
@@ -179,6 +184,7 @@ impl Dumper {
             ram_data: vec![],
             rom_size: 0,
             ram_size: 0,
+            mapper: None,
         }
     }
 
@@ -237,6 +243,15 @@ impl Dumper {
 }
 
 impl Dumper {
+    /// Builds a dumper that drives the provided mapper instead of the one
+    /// declared in the header, as for flash cartridges, whose MBC is not
+    /// the one of the game they hold.
+    pub fn with_mapper(mapper: Mapper) -> Self {
+        let mut dumper = Self::new();
+        dumper.mapper = Some(mapper);
+        dumper
+    }
+
     /// Feeds the reply to the last exchange, which may plan the next
     /// commands (eg: the reading of the ROM once the header is known).
     pub fn feed(&mut self, data: &[u8]) -> Result<(), Error> {
@@ -352,7 +367,10 @@ impl Dumper {
                 "Invalid cartridge header, check that a cartridge is inserted and clean its pins",
             )));
         }
-        let mapper = Mapper::from_cartridge_type(header.cartridge_type())?;
+        let mapper = match self.mapper {
+            Some(mapper) => mapper,
+            None => Mapper::from_cartridge_type(header.cartridge_type())?,
+        };
         let rom_banks = header.rom_banks()?;
         if rom_banks > mapper.max_rom_banks() {
             return Err(Error::CustomError(format!(
@@ -748,6 +766,13 @@ mod tests {
     }
 
     #[test]
+    fn test_exchange_new() {
+        let exchange = Exchange::new(vec![0xa1], 9);
+        assert_eq!(exchange.send(), &[0xa1]);
+        assert_eq!(exchange.expect(), 9);
+    }
+
+    #[test]
     fn test_exchange_send() {
         let mut dumper = Dumper::new();
         assert_eq!(dumper.next_exchange().unwrap().send(), &[QUERY_FW_INFO]);
@@ -923,6 +948,22 @@ mod tests {
             dumper.device(),
             Some(String::from("GBxCart RW v1.3 (firmware L1)"))
         );
+    }
+
+    #[test]
+    fn test_with_mapper() {
+        // a flash cartridge holding an MBC1 game of 1 MiB is driven by its
+        // own MBC5, through which the MBC1 bank switching (upper bits at
+        // 0x4000) reads the wrong banks past the first 512 KiB
+        let rom = build_rom(0x01, 0x05, 0x00);
+        let mut device = FakeDevice::new(Mapper::Mbc5, rom.clone(), vec![]);
+        assert_ne!(dump(&mut device).unwrap().rom_data(), &rom);
+
+        let mut device = FakeDevice::new(Mapper::Mbc5, rom.clone(), vec![]);
+        let mut dumper = Dumper::with_mapper(Mapper::Mbc5);
+        let dump = dumper.run(&mut device, |_| {}).unwrap();
+        assert_eq!(dump.rom_data(), &rom);
+        assert!(device.writes.iter().all(|&(address, _)| address < 0x8000));
     }
 
     #[test]
