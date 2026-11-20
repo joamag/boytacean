@@ -904,7 +904,8 @@ fn swi_sound_bias(cpu: &mut Arm7Tdmi) {
 
 /// SWI 0x1F: MidiKey2Freq - converts MIDI key to frequency.
 ///
-/// R0 = wave data pointer, R1 = MIDI key, R2 = pitch adjust (fp).
+/// R0 = wave data pointer, R1 = MIDI key, R2 = fine adjust (fp),
+/// in 1/256 of a semitone.
 fn swi_midi_key2freq(cpu: &mut Arm7Tdmi) {
     let wave = cpu.reg(0);
     let mk = cpu.reg(1);
@@ -913,8 +914,8 @@ fn swi_midi_key2freq(cpu: &mut Arm7Tdmi) {
     // read the frequency from the wave data header (at offset 4)
     let freq = cpu.bus_read32(wave + 4);
 
-    // formula: freq * 2^((mk - 180) / 12 + fp / 2^16 / 12)
-    let exponent = ((mk as f64) - 180.0) / 12.0 + (fp as f64) / 65536.0 / 12.0;
+    // formula: freq * 2^((mk - 180) / 12 + fp / 256 / 12)
+    let exponent = ((mk as f64) - 180.0) / 12.0 + (fp as f64) / 256.0 / 12.0;
     let result = (freq as f64) * (2.0f64).powf(exponent);
 
     cpu.set_reg(0, (result as u32) & 0x7FFF_FFFF);
@@ -1788,5 +1789,25 @@ mod tests {
 
         // one octave up doubles the frequency
         assert_eq!(cpu.reg(0), 14080);
+    }
+
+    #[test]
+    fn test_swi_midi_key2freq_fine_adjust() {
+        // the fine adjust is in 1/256 of a semitone, so 128 raises the
+        // frequency by half a semitone (a factor of 2^(1/24))
+        for (key, fine, freq) in [
+            (180, 128, 7246),
+            (180, 255, 7456),
+            (179, 128, 6839),
+            (168, 0, 3520),
+        ] {
+            let mut cpu = make_cpu();
+            cpu.bus_write32(0x0200_0004, 7040);
+            cpu.set_reg(0, 0x0200_0000);
+            cpu.set_reg(1, key);
+            cpu.set_reg(2, fine);
+            handle_swi(&mut cpu, 0x1F);
+            assert_eq!(cpu.reg(0), freq);
+        }
     }
 }
