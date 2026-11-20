@@ -32,7 +32,8 @@ type BoytaceanProps = {
 
     /**
      * The system to be emulated, defaults to the automatic mode in
-     * which it's inferred from the extension of the ROM.
+     * which it's inferred from the ROM, either from its extension or
+     * from its header.
      */
     system?: BoytaceanSystem;
 

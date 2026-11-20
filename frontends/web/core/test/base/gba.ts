@@ -11,7 +11,7 @@ import {
     TickParams
 } from "emukit/logic";
 
-import { GbaCore } from "../../ts/gba";
+import { GbaCore, isGbaRom } from "../../ts/gba";
 import { NullStorageAdapter, StorageAdapter } from "../../ts/storage";
 
 /**
@@ -32,6 +32,14 @@ const SRAM_ROM_URL = pathToFileURL(resolve(ROMS_PATH, "sram.gba")).href;
  * The URL of the test ROM without any kind of save support.
  */
 const NONE_ROM_URL = pathToFileURL(resolve(ROMS_PATH, "none.gba")).href;
+
+/**
+ * The URL of the Game Boy demo ROM, used to verify that it's not
+ * mistaken for a GBA one.
+ */
+const GB_ROM_URL = pathToFileURL(
+    resolve(__dirname, "../../../../../res/roms/demo/pocket.gb")
+).href;
 
 /**
  * The number of cycles in a complete frame of the GBA.
@@ -151,6 +159,38 @@ describe("GbaCore", function () {
     after(() => {
         global.fetch = fetch;
         logger.level = level;
+    });
+
+    describe("#isGbaRom()", function () {
+        it("should be able to detect a GBA ROM from its extension", () => {
+            assert.strictEqual(isGbaRom("/roms/pocket.gba"), true);
+            assert.strictEqual(isGbaRom("/roms/POCKET.GBA"), true);
+            assert.strictEqual(isGbaRom("/roms/pocket.gba?v=1"), true);
+        });
+
+        it("should be able to reject other extensions without data", () => {
+            assert.strictEqual(isGbaRom(), false);
+            assert.strictEqual(isGbaRom("/roms/pocket.gb"), false);
+            assert.strictEqual(isGbaRom("/roms/pocket.gbc"), false);
+            assert.strictEqual(isGbaRom("/roms/pocket.gb?v=.gba"), false);
+        });
+
+        it("should be able to detect a GBA ROM from its header", async () => {
+            const romData = await readRom(SRAM_ROM_URL);
+            assert.strictEqual(isGbaRom(undefined, romData), true);
+            assert.strictEqual(isGbaRom("/roms/game", romData), true);
+            assert.strictEqual(isGbaRom("game.zip", romData), true);
+        });
+
+        it("should be able to reject a ROM without a GBA header", async () => {
+            const romData = await readRom(GB_ROM_URL);
+            assert.strictEqual(isGbaRom("pocket.gb", romData), false);
+            assert.strictEqual(isGbaRom(undefined, romData), false);
+            assert.strictEqual(
+                isGbaRom(undefined, new Uint8Array([1, 2, 3])),
+                false
+            );
+        });
     });
 
     describe("#tick()", function () {

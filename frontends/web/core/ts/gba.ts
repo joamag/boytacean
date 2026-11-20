@@ -56,6 +56,35 @@ const KEYS_NAME: Record<string, number> = {
 };
 
 /**
+ * Checks if the provided ROM is a Game Boy Advance one, looking at
+ * the extension of its name (or URL) and falling back to the
+ * validation of its header whenever its data is available.
+ *
+ * The validation of the header requires the WASM module to be
+ * loaded, until then the extension is the only criteria used.
+ *
+ * @param name The name (or URL) of the ROM to be checked.
+ * @param data The contents of the ROM, in case they are available.
+ * @returns If the ROM is a Game Boy Advance one.
+ */
+export const isGbaRom = (
+    name?: string | null,
+    data?: Uint8Array | null
+): boolean => {
+    const path = name?.split("?")[0].toLowerCase() ?? "";
+    if (path.endsWith(".gba")) return true;
+    if (!data) return false;
+
+    // the validation of the header is a best effort operation, as it
+    // fails whenever the WASM module has not been loaded yet
+    try {
+        return GameBoyAdvance.verify_rom_wa(data);
+    } catch (err) {
+        return false;
+    }
+};
+
+/**
  * Top level class that controls the emulation of the Game Boy
  * Advance system, joining all the elements together to bring
  * input/output of the associated machine.

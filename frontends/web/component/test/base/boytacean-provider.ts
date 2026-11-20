@@ -1,6 +1,9 @@
 import assert from "assert";
+import { readFileSync } from "fs";
 import { createRequire } from "module";
+import { resolve } from "path";
 
+import { initSync } from "boytacean";
 import { GameBoyCore, GbaCore, NullStorageAdapter } from "boytacean-core";
 import { ComponentProps, ReactElement } from "react";
 
@@ -14,6 +17,19 @@ import {
 } from "../../react/boytacean-provider";
 
 const react = createRequire(__filename)("react") as Record<string, unknown>;
+
+/**
+ * The contents of a GBA test ROM, used to verify the detection of the
+ * system from the header of the ROM.
+ */
+const GBA_ROM_DATA = new Uint8Array(
+    readFileSync(
+        resolve(
+            __dirname,
+            "../../../../../res/roms.gba/test/jsmolka_gba-tests/sram.gba"
+        )
+    )
+);
 
 /**
  * Runs the provider with the same state, memo, and effect lifetime as
@@ -97,6 +113,16 @@ describe("BoytaceanProvider", function () {
     let start: (core: GameBoyCore | GbaCore) => Promise<void>;
     let restore: (() => void)[];
 
+    before(() => {
+        // loads the WASM module, required by the validation of the
+        // header of the ROMs that is used to infer the system
+        initSync({
+            module: readFileSync(
+                resolve(__dirname, "../../../lib/boytacean_bg.wasm")
+            )
+        });
+    });
+
     beforeEach(() => {
         provider = buildProvider();
         starts = [];
@@ -161,6 +187,25 @@ describe("BoytaceanProvider", function () {
             assert.strictEqual(
                 resolveSystem(BoytaceanSystem.Auto, "/roms/pocket.gba"),
                 BoytaceanSystem.GameBoyAdvance
+            );
+        });
+
+        it("should be able to infer the GBA system from the ROM data", () => {
+            assert.strictEqual(
+                resolveSystem(BoytaceanSystem.Auto, "game.zip", GBA_ROM_DATA),
+                BoytaceanSystem.GameBoyAdvance
+            );
+            assert.strictEqual(
+                resolveSystem(BoytaceanSystem.Auto, undefined, GBA_ROM_DATA),
+                BoytaceanSystem.GameBoyAdvance
+            );
+            assert.strictEqual(
+                resolveSystem(
+                    BoytaceanSystem.Auto,
+                    "game.gb",
+                    new Uint8Array([1, 2, 3])
+                ),
+                BoytaceanSystem.GameBoy
             );
         });
 
@@ -264,6 +309,16 @@ describe("BoytaceanProvider", function () {
                 assert.ok(stops.includes(previous));
             }
             assert.strictEqual(starts.length, 3);
+        });
+
+        it("should be able to detect a GBA ROM without its extension", async () => {
+            let value = provider.render();
+            const loaded = value.loadRom("game.bin", GBA_ROM_DATA);
+            value = provider.render();
+            await loaded;
+            assert.ok(value.core instanceof GbaCore);
+            assert.strictEqual(value.system, BoytaceanSystem.GameBoyAdvance);
+            assert.strictEqual(value.core.loadedRomName, "game.bin");
         });
 
         it("should be able to honour the explicit system on runtime loads", async () => {

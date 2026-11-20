@@ -1,6 +1,7 @@
 import {
     GameBoyCore,
     GbaCore,
+    isGbaRom,
     releaseCore,
     StorageAdapter
 } from "boytacean-core";
@@ -22,19 +23,21 @@ import {
 /**
  * Resolves the system to be emulated from the requested one and the
  * ROM that is going to be loaded, inferring it from the extension of
- * the ROM whenever the automatic mode is used.
+ * the ROM, or from its header when its data is available, whenever
+ * the automatic mode is used.
  *
  * @param system The system that has been requested by the caller.
- * @param rom The URL of the ROM that is going to be loaded.
+ * @param rom The name (or URL) of the ROM that is going to be loaded.
+ * @param data The contents of the ROM, in case they are available.
  * @returns The concrete system to be emulated.
  */
 export const resolveSystem = (
     system: BoytaceanSystem,
-    rom?: string
+    rom?: string,
+    data?: Uint8Array
 ): BoytaceanSystem.GameBoy | BoytaceanSystem.GameBoyAdvance => {
     if (system !== BoytaceanSystem.Auto) return system;
-    const path = rom?.split("?")[0].toLowerCase() ?? "";
-    return path.endsWith(".gba")
+    return isGbaRom(rom, data)
         ? BoytaceanSystem.GameBoyAdvance
         : BoytaceanSystem.GameBoy;
 };
@@ -66,7 +69,8 @@ type BoytaceanProviderProps = {
 
     /**
      * The system to be emulated, defaults to the automatic mode in
-     * which it's inferred from the extension of the ROM.
+     * which it's inferred from the ROM, either from its extension or
+     * from its header.
      */
     system?: BoytaceanSystem;
 
@@ -101,7 +105,11 @@ export const BoytaceanProvider: FC<BoytaceanProviderProps> = ({
     const [request, setRequest] = useState<RomRequest | null>(null);
     const pending = useRef<RomRequest | null>(null);
     const currentRequest = request?.source === rom ? request : null;
-    const resolved = resolveSystem(system, currentRequest?.name ?? rom);
+    const resolved = resolveSystem(
+        system,
+        currentRequest?.name ?? rom,
+        currentRequest?.data
+    );
     const core = useMemo<GameBoyCore | GbaCore>(
         () =>
             resolved === BoytaceanSystem.GameBoyAdvance

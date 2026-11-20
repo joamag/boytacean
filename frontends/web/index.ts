@@ -1,6 +1,6 @@
 import { startApp } from "emukit";
 
-import { GameboyEmulator, GbaEmulator } from "./ts";
+import { GameboyEmulator, GbaEmulator, isGbaRom } from "./ts";
 
 /**
  * List of available background theme colors that can be used
@@ -15,15 +15,6 @@ const BACKGROUNDS = [
     "2a9d8f",
     "3a5a40"
 ];
-
-/**
- * Checks if the given URL points to a GBA ROM by examining
- * the file extension.
- */
-const isGbaUrl = (url: string): boolean => {
-    const path = url.split("?")[0].toLowerCase();
-    return path.endsWith(".gba");
-};
 
 (async () => {
     // tries to load the settings from the local storage
@@ -59,7 +50,7 @@ const isGbaUrl = (url: string): boolean => {
     // determines if the emulator should run in GBA mode,
     // either via the explicit ?gba=1 parameter or by
     // examining the ROM URL file extension
-    const isGba = gba || (romUrl ? isGbaUrl(romUrl) : false);
+    const isGba = gba || isGbaRom(romUrl);
 
     // creates the appropriate emulator structure based on the
     // detected ROM type and initializes the React app with

@@ -152,7 +152,7 @@ Passing `children` to `<Boytacean />` switches it into provider only mode, so no
 | `wasmPath` | `string`          | -        | Where to load the WASM binary from, defaults to the wasm-bindgen resolution. |
 | `storage`  | `StorageAdapter`  | -        | Persistence for the battery backed RAM and the settings.                     |
 | `palette`  | `string`          | -        | Palette applied at startup, only used by the Game Boy.                       |
-| `system`   | `BoytaceanSystem` | `"auto"` | System to emulate, inferred from the ROM extension in the automatic mode.    |
+| `system`   | `BoytaceanSystem` | `"auto"` | System to emulate, inferred from the ROM in the automatic mode.              |
 | `scale`    | `number`          | `3`      | Scale factor of the display, ignored when custom children are provided.      |
 | `keyboard` | `boolean`         | `true`   | Whether the physical keyboard is bound, ignored with custom children.        |
 | `gamepad`  | `boolean`         | `true`   | Whether the on screen game pad is shown, ignored with custom children.       |
@@ -167,7 +167,7 @@ The same component runs Game Boy Advance ROMs, building a `GbaCore` instead of a
 <Boytacean rom="/roms/pocket.gba" />
 ```
 
-Use the `system` property to select it explicitly, which is required whenever the ROM is not loaded from a URL that carries the extension:
+A ROM loaded at runtime through `loadRom()` is also detected from its header, while the `rom` URL is only detected from its extension, so use the `system` property to select the system explicitly whenever that URL does not carry it:
 
 ```tsx
 import { Boytacean, BoytaceanSystem } from "boytacean-react";
