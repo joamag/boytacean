@@ -1268,6 +1268,56 @@ mod tests {
     }
 
     #[test]
+    fn test_flash64_aborted_commands() {
+        // sequences broken at each step (by a wrong address or value)
+        // leave the data untouched and return to the ready state
+        for sequence in [
+            vec![(0x5555, 0xAA), (0x2AAA, 0x55), (0x5555, 0xF0)],
+            vec![(0x5555, 0xAA), (0x2AAA, 0x55), (0x5555, 0x42)],
+            vec![(0x5555, 0xAA), (0x2AAA, 0x55), (0x1234, 0xA0)],
+            vec![
+                (0x5555, 0xAA),
+                (0x2AAA, 0x55),
+                (0x5555, 0x80),
+                (0x1234, 0xAA),
+            ],
+            vec![
+                (0x5555, 0xAA),
+                (0x2AAA, 0x55),
+                (0x5555, 0x80),
+                (0x5555, 0xAA),
+                (0x1234, 0x55),
+            ],
+            vec![
+                (0x5555, 0xAA),
+                (0x2AAA, 0x55),
+                (0x5555, 0x80),
+                (0x5555, 0xAA),
+                (0x2AAA, 0x55),
+                (0x5555, 0x42),
+            ],
+            vec![
+                (0x5555, 0xAA),
+                (0x2AAA, 0x55),
+                (0x5555, 0x80),
+                (0x5555, 0xAA),
+                (0x2AAA, 0x55),
+                (0x1234, 0x10),
+            ],
+        ] {
+            let mut save = SaveMedia::new();
+            save.save_type = SaveType::Flash64;
+            save.data[0x1000] = 0x42;
+            for (addr, value) in sequence {
+                save.write8(0x0E00_0000 + addr, value);
+            }
+            assert_eq!(save.state, FlashState::Ready);
+            assert_eq!(save.data[0x1000], 0x42);
+            assert_eq!(save.data.iter().filter(|&&b| b != 0xFF).count(), 1);
+        }
+    }
+
+    #[test]
     fn test_flash128_bank_select() {
         let mut save = SaveMedia::new();
         save.save_type = SaveType::Flash128;
