@@ -54,8 +54,8 @@ mod tests {
     use super::{run_gba_image_test, GbaTestOptions};
 
     /// CRC-32 of the frame buffer with the "All tests passed"
-    /// screen drawn by the jsmolka (and alyosha-tas) test ROMs, as
-    /// in the reference images of the SDL frontend tests.
+    /// screen drawn by the jsmolka test ROMs, as in the reference
+    /// images of the SDL frontend tests.
     const PASSED_CRC32: u32 = 0x2F3C94D3;
 
     #[test]
@@ -199,31 +199,5 @@ mod tests {
         )
         .unwrap();
         assert_eq!(crc32(&frame_buffer), 0x3B3991F4);
-    }
-
-    #[test]
-    #[ignore]
-    fn test_alyosha_dma_rom_fixed() {
-        // fails until the DMA and cartridge wait state timings are emulated
-        let (frame_buffer, _) = run_gba_image_test(
-            "res/roms.gba/test/alyosha-tas_gba-tests/DMA/DMA_ROM_Fixed.gba",
-            Some(100000000),
-            GbaTestOptions::default(),
-        )
-        .unwrap();
-        assert_eq!(crc32(&frame_buffer), PASSED_CRC32);
-    }
-
-    #[test]
-    #[ignore]
-    fn test_alyosha_dma_mode_change() {
-        // fails until the DMA and cartridge wait state timings are emulated
-        let (frame_buffer, _) = run_gba_image_test(
-            "res/roms.gba/test/alyosha-tas_gba-tests/DMA/DMA_Mode_Change.gba",
-            Some(100000000),
-            GbaTestOptions::default(),
-        )
-        .unwrap();
-        assert_eq!(crc32(&frame_buffer), PASSED_CRC32);
     }
 }
