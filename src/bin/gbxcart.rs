@@ -75,7 +75,12 @@ fn parse_args(args: &[String]) -> Option<Options> {
 
 /// The path of the save next to the provided ROM file.
 fn save_path(path: &str) -> String {
-    replace_ext(path, "sav").unwrap_or(format!("{path}.sav"))
+    // a ROM path that is a save path already gets the extension appended,
+    // so that the save never takes the path of the ROM
+    match replace_ext(path, "sav") {
+        Some(save_path) if save_path != path => save_path,
+        _ => format!("{path}.sav"),
+    }
 }
 
 /// Builds the callback that prints the progress, only when its
@@ -456,6 +461,8 @@ mod tests {
         assert_eq!(save_path("game.gb"), "game.sav");
         assert_eq!(save_path("dumps/game.gbc"), "dumps/game.sav");
         assert_eq!(save_path("game"), "game.sav");
+        assert_eq!(save_path("game.sav"), "game.sav.sav");
+        assert_eq!(save_path("dumps/game.sav"), "dumps/game.sav.sav");
     }
 
     #[test]
@@ -515,6 +522,20 @@ mod tests {
         dump(&mut transport, "/dev/ttyUSB0", &options).unwrap();
         assert_eq!(read(directory.join("game.gb")).unwrap(), rom);
         assert_eq!(read(directory.join("game.sav")).unwrap(), ram);
+        remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn test_dump_save_name() {
+        // a ROM dumped with the name of a save keeps its save apart
+        let directory = build_directory("gbxcart-save-name");
+        let rom = build_rom(0x03, 0x02);
+        let ram = vec![0x55; 0x2000];
+        let mut transport = Replay::new(dump_replies(&rom, &ram));
+        let options = build_options("dump", &directory.join("game.sav"), None, false);
+        dump(&mut transport, "/dev/ttyUSB0", &options).unwrap();
+        assert_eq!(read(directory.join("game.sav")).unwrap(), rom);
+        assert_eq!(read(directory.join("game.sav.sav")).unwrap(), ram);
         remove_dir_all(directory).unwrap();
     }
 
