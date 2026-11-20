@@ -20,7 +20,7 @@ use crate::{
     dumper::{Exchange, CHUNK_SIZE},
     flash::{
         bank_writes, cfi_writes, program_commands, reset_writes, sector_erase_writes, Chip,
-        CFI_SIZE, ERASED,
+        CFI_SIZE, ERASED, MAX_BANKS,
     },
     gbxcart::{
         cart_write, flash_program, flash_write, set_flash_commands, set_variable, Firmware,
@@ -83,13 +83,15 @@ pub struct Flasher {
     erase_polls: u32,
     programmed: usize,
     verified: usize,
+    failure: Option<Error>,
 }
 
 impl Flasher {
     /// Builds the flasher of the provided ROM, which must be made of
-    /// whole ROM banks.
+    /// whole ROM banks, as many as the MBC5 of flash cartridges selects.
     pub fn new(rom: Vec<u8>) -> Result<Self, Error> {
-        if rom.is_empty() || rom.len() % ROM_BANK_SIZE != 0 {
+        if rom.is_empty() || rom.len() % ROM_BANK_SIZE != 0 || rom.len() > MAX_BANKS * ROM_BANK_SIZE
+        {
             return Err(Error::RomSize);
         }
         Ok(Self::build(Some(rom)))
@@ -113,6 +115,7 @@ impl Flasher {
             erase_polls: 0,
             programmed: 0,
             verified: 0,
+            failure: None,
         };
         flasher.commands.push_back(Command::with_reply(
             vec![QUERY_FW_INFO],
@@ -202,10 +205,11 @@ impl Flasher {
             Target::Erase(address) => self.feed_erase(address, data)?,
             Target::Program => {
                 if data != [ACK] {
-                    return Err(Error::DataError(format!(
+                    self.fail(Error::DataError(format!(
                         "Failed to program the flash chip at 0x{:06x}",
                         self.programmed
                     )));
+                    return Ok(());
                 }
                 self.programmed += PROGRAM_SIZE;
             }
@@ -214,8 +218,12 @@ impl Flasher {
         Ok(())
     }
 
-    /// Finishes the flashing, failing in case it is not complete.
+    /// Finishes the flashing, failing in case it is not complete or
+    /// with the failure that stopped it.
     pub fn finish(&mut self) -> Result<(), Error> {
+        if let Some(failure) = self.failure.take() {
+            return Err(failure);
+        }
         if !self.is_finished() {
             return Err(Error::CustomError(String::from(
                 "The flashing of the cartridge is not complete",
@@ -296,14 +304,18 @@ impl Flasher {
                 self.push(vec![SET_VOLTAGE_5V, SET_ADDR_AS_INPUTS]);
                 return Ok(());
             }
-            (Err(err), Some(_)) => return Err(err),
+            (Err(err), Some(_)) => {
+                self.fail(err);
+                return Ok(());
+            }
         };
         if self.rom_size() > chip.size() {
-            return Err(Error::CustomError(format!(
+            self.fail(Error::CustomError(format!(
                 "The ROM ({} KiB) does not fit in the flash chip ({} KiB)",
                 self.rom_size() / 1024,
                 chip.size() / 1024
             )));
+            return Ok(());
         }
         if let Some(rom) = self.rom.take() {
             self.push_flashing(&rom, &chip);
@@ -326,9 +338,10 @@ impl Flasher {
         self.erase_polls += 1;
         let timeout = self.chip.as_ref().map_or(0, Chip::erase_timeout);
         if self.erase_polls > timeout {
-            return Err(Error::CustomError(format!(
+            self.fail(Error::CustomError(format!(
                 "Timeout erasing the flash sector at 0x{address:04x}"
             )));
+            return Ok(());
         }
         for command in Self::read_commands(address, 2, Target::Erase(address))
             .into_iter()
@@ -343,10 +356,11 @@ impl Flasher {
         let rom = self.rom.as_ref().unwrap();
         let expected = &rom[self.verified..self.verified + data.len()];
         if let Some(index) = (0..data.len()).find(|&index| data[index] != expected[index]) {
-            return Err(Error::DataError(format!(
+            self.fail(Error::DataError(format!(
                 "Verification failed at 0x{:06x}, the cartridge was not flashed correctly",
                 self.verified + index
             )));
+            return Ok(());
         }
         self.verified += data.len();
         Ok(())
@@ -386,6 +400,16 @@ impl Flasher {
             self.push_read(ROM_BANK_ADDRESS, CHUNK_SIZE, ACCESS_MODE_ROM_READ);
             self.push_reads(ROM_BANK_SIZE / CHUNK_SIZE, CHUNK_SIZE, Target::Verify);
         }
+    }
+
+    /// Stops the flashing with the provided failure, once the chip is
+    /// reset and the cartridge released, so that the cartridge is left
+    /// readable (eg: not in the CFI query mode) for the next run.
+    fn fail(&mut self, failure: Error) {
+        self.commands.clear();
+        self.push_flash_writes(&reset_writes());
+        self.push(vec![SET_VOLTAGE_5V, SET_ADDR_AS_INPUTS]);
+        self.failure = Some(failure);
     }
 
     fn push(&mut self, data: Vec<u8>) {
@@ -482,6 +506,7 @@ mod tests {
     /// missing erase gives a wrong flash.
     struct FakeDevice {
         firmware: Vec<u8>,
+        cfi: [u8; 37],
         flash: Vec<u8>,
         flash_chip: bool,
         sectors: Vec<usize>,
@@ -512,6 +537,7 @@ mod tests {
             sectors.extend(vec![0x10000; 63]);
             Self {
                 firmware: FIRMWARE_L1.to_vec(),
+                cfi: CFI_4MB,
                 flash,
                 flash_chip: true,
                 sectors,
@@ -547,7 +573,7 @@ mod tests {
 
         fn read(&mut self, address: u32) -> u8 {
             if self.cfi_mode {
-                let cfi = build_cfi(&CFI_4MB);
+                let cfi = build_cfi(&self.cfi);
                 return cfi[address as usize % CFI_SIZE];
             }
             if self.erasing > 0 {
@@ -755,9 +781,17 @@ mod tests {
 
     #[test]
     fn test_new_invalid_size() {
-        for rom in [vec![], vec![0x00; ROM_BANK_SIZE + 1], vec![0x00; 0x100]] {
+        // the ROM must be made of whole banks, no more than the 512 that
+        // the MBC5 selects, past which banks would wrap around
+        for rom in [
+            vec![],
+            vec![0x00; ROM_BANK_SIZE + 1],
+            vec![0x00; 0x100],
+            vec![0x00; 513 * ROM_BANK_SIZE],
+        ] {
             assert_eq!(Flasher::new(rom).err(), Some(Error::RomSize));
         }
+        assert!(Flasher::new(vec![0x00; 512 * ROM_BANK_SIZE]).is_ok());
     }
 
     #[test]
@@ -974,6 +1008,28 @@ mod tests {
         );
         assert!(device.erases.is_empty());
         assert_eq!(device.flash, build_flash());
+
+        // the chip is reset and the cartridge released before failing, so
+        // that the cartridge can be read again
+        assert!(!device.cfi_mode);
+        assert_eq!(device.voltages.last(), Some(&SET_VOLTAGE_5V));
+        assert_eq!(device.commands.last(), Some(&SET_ADDR_AS_INPUTS));
+    }
+
+    #[test]
+    fn test_run_unsupported_chip() {
+        let mut device = FakeDevice::new(build_flash());
+        device.cfi[3] = 0x01;
+        assert_eq!(
+            flash(&mut device, build_rom(2)).err(),
+            Some(Error::CustomError(String::from(
+                "Unsupported flash command set: 0x0001"
+            )))
+        );
+        assert!(device.erases.is_empty());
+        assert!(!device.cfi_mode);
+        assert_eq!(device.voltages.last(), Some(&SET_VOLTAGE_5V));
+        assert_eq!(device.commands.last(), Some(&SET_ADDR_AS_INPUTS));
     }
 
     #[test]
@@ -987,6 +1043,8 @@ mod tests {
             )))
         );
         assert_eq!(device.erases, vec![0x0000]);
+        assert_eq!(device.voltages.last(), Some(&SET_VOLTAGE_5V));
+        assert_eq!(device.commands.last(), Some(&SET_ADDR_AS_INPUTS));
     }
 
     #[test]
@@ -999,6 +1057,8 @@ mod tests {
                 "Failed to program the flash chip at 0x000000"
             )))
         );
+        assert_eq!(device.voltages.last(), Some(&SET_VOLTAGE_5V));
+        assert_eq!(device.commands.last(), Some(&SET_ADDR_AS_INPUTS));
     }
 
     #[test]
@@ -1011,6 +1071,8 @@ mod tests {
                 "Verification failed at 0x005123, the cartridge was not flashed correctly"
             )))
         );
+        assert_eq!(device.voltages.last(), Some(&SET_VOLTAGE_5V));
+        assert_eq!(device.commands.last(), Some(&SET_ADDR_AS_INPUTS));
     }
 
     #[test]

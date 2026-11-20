@@ -22,6 +22,10 @@ pub const ERASED: [u8; 2] = [0xff, 0xff];
 /// CFI table of the chip does not declare it.
 pub const ERASE_TIMEOUT: u32 = 4096;
 
+/// The number of banks that the MBC5 of flash cartridges can select,
+/// through the nine bits of the [`bank_writes`].
+pub const MAX_BANKS: usize = 512;
+
 /// The AMD (and Fujitsu) command set, as declared in the CFI table.
 const COMMAND_SET_AMD: u16 = 0x0002;
 
