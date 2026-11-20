@@ -388,15 +388,20 @@ fn swi_bg_affine_set(cpu: &mut Arm7Tdmi) {
         let scale_x = cpu.bus_read16(src_addr + 12) as i16 as f64 / 256.0;
         let scale_y = cpu.bus_read16(src_addr + 14) as i16 as f64 / 256.0;
         let angle_raw = cpu.bus_read16(src_addr + 16);
-        let angle = (angle_raw as f64) * 2.0 * std::f64::consts::PI / 65536.0;
+
+        // only the upper 8 bits of the angle are used, as an index
+        // into the 256 entries sine table of the real BIOS
+        let angle = ((angle_raw >> 8) as f64) * 2.0 * std::f64::consts::PI / 256.0;
 
         let cos_a = angle.cos();
         let sin_a = angle.sin();
 
-        let pa = (cos_a / scale_x * 256.0) as i16;
-        let pb = (-sin_a / scale_x * 256.0) as i16;
-        let pc = (sin_a / scale_y * 256.0) as i16;
-        let pd = (cos_a / scale_y * 256.0) as i16;
+        // scale the rotation matrix (pa = sx * cos, pb = -sx * sin,
+        // pc = sy * sin, pd = sy * cos), as the BIOS does
+        let pa = (cos_a * scale_x * 256.0) as i16;
+        let pb = (-sin_a * scale_x * 256.0) as i16;
+        let pc = (sin_a * scale_y * 256.0) as i16;
+        let pd = (cos_a * scale_y * 256.0) as i16;
 
         let start_x = original_x - (pa as i32 * display_x + pb as i32 * display_y);
         let start_y = original_y - (pc as i32 * display_x + pd as i32 * display_y);
@@ -423,15 +428,20 @@ fn swi_obj_affine_set(cpu: &mut Arm7Tdmi) {
         let scale_x = cpu.bus_read16(src_addr) as i16 as f64 / 256.0;
         let scale_y = cpu.bus_read16(src_addr + 2) as i16 as f64 / 256.0;
         let angle_raw = cpu.bus_read16(src_addr + 4);
-        let angle = (angle_raw as f64) * 2.0 * std::f64::consts::PI / 65536.0;
+
+        // only the upper 8 bits of the angle are used, as an index
+        // into the 256 entries sine table of the real BIOS
+        let angle = ((angle_raw >> 8) as f64) * 2.0 * std::f64::consts::PI / 256.0;
 
         let cos_a = angle.cos();
         let sin_a = angle.sin();
 
-        let pa = (cos_a / scale_x * 256.0) as i16;
-        let pb = (-sin_a / scale_x * 256.0) as i16;
-        let pc = (sin_a / scale_y * 256.0) as i16;
-        let pd = (cos_a / scale_y * 256.0) as i16;
+        // scale the rotation matrix (pa = sx * cos, pb = -sx * sin,
+        // pc = sy * sin, pd = sy * cos), as the BIOS does
+        let pa = (cos_a * scale_x * 256.0) as i16;
+        let pb = (-sin_a * scale_x * 256.0) as i16;
+        let pc = (sin_a * scale_y * 256.0) as i16;
+        let pd = (cos_a * scale_y * 256.0) as i16;
 
         let base = dst + i * stride * 4;
         cpu.bus_write16(base, pa as u16);
@@ -1297,6 +1307,97 @@ mod tests {
         let mut cpu = make_cpu();
         handle_swi(&mut cpu, 0x0D);
         assert_eq!(cpu.reg(0), 0xBAAE187F);
+    }
+
+    #[test]
+    fn test_swi_bg_affine_set() {
+        // (scale x, scale y, angle, pa, pb, pc, pd, start x, start y) for an
+        // original center of (64.0, 32.0) shown at the display center (120, 80)
+        let entries = [
+            (0x100, 0x100, 0x0000, 0x100, 0, 0, 0x100, -14336, -12288),
+            (0x200, 0x200, 0x0000, 0x200, 0, 0, 0x200, -45056, -32768),
+            (0x080, 0x080, 0x0000, 0x080, 0, 0, 0x080, 1024, -2048),
+            (0x100, 0x100, 0x4000, 0, -0x100, 0x100, 0, 36864, -22528),
+            (0x100, 0x100, 0x40FF, 0, -0x100, 0x100, 0, 36864, -22528),
+            (0x100, 0x100, 0x8000, -0x100, 0, 0, -0x100, 47104, 28672),
+            (0x200, 0x200, 0x2000, 362, -362, 362, 362, 1904, -64208),
+            (0x200, 0x100, 0x4000, 0, -0x200, 0x100, 0, 57344, -22528),
+            (-0x100, 0x100, 0x0000, -0x100, 0, 0, 0x100, 47104, -12288),
+            (0, 0, 0x2000, 0, 0, 0, 0, 16384, 8192),
+        ];
+        let mut cpu = make_cpu();
+        for (i, (scale_x, scale_y, angle, ..)) in entries.iter().enumerate() {
+            let src = 0x0200_0000 + i as u32 * 20;
+            cpu.bus_write32(src, 64 << 8);
+            cpu.bus_write32(src + 4, 32 << 8);
+            cpu.bus_write16(src + 8, 120);
+            cpu.bus_write16(src + 10, 80);
+            cpu.bus_write16(src + 12, *scale_x as u16);
+            cpu.bus_write16(src + 14, *scale_y as u16);
+            cpu.bus_write16(src + 16, *angle);
+        }
+        cpu.bus_write32(0x0200_1000 + entries.len() as u32 * 16, 0xDEADBEEF);
+        cpu.set_reg(0, 0x0200_0000);
+        cpu.set_reg(1, 0x0200_1000);
+        cpu.set_reg(2, entries.len() as u32);
+        handle_swi(&mut cpu, 0x0E);
+        for (i, (.., pa, pb, pc, pd, start_x, start_y)) in entries.iter().enumerate() {
+            let dst = 0x0200_1000 + i as u32 * 16;
+            assert_eq!(cpu.bus_read16(dst) as i16, *pa);
+            assert_eq!(cpu.bus_read16(dst + 2) as i16, *pb);
+            assert_eq!(cpu.bus_read16(dst + 4) as i16, *pc);
+            assert_eq!(cpu.bus_read16(dst + 6) as i16, *pd);
+            assert_eq!(cpu.bus_read32(dst + 8) as i32, *start_x);
+            assert_eq!(cpu.bus_read32(dst + 12) as i32, *start_y);
+        }
+        assert_eq!(
+            cpu.bus_read32(0x0200_1000 + entries.len() as u32 * 16),
+            0xDEADBEEF
+        );
+    }
+
+    #[test]
+    fn test_swi_obj_affine_set() {
+        // (scale x, scale y, angle, pa, pb, pc, pd)
+        let entries = [
+            (0x100, 0x100, 0x0000, 0x100, 0, 0, 0x100),
+            (0x200, 0x080, 0x0000, 0x200, 0, 0, 0x080),
+            (0x100, 0x100, 0x40FF, 0, -0x100, 0x100, 0),
+            (0x100, 0x100, 0xC000, 0, 0x100, -0x100, 0),
+            (0x200, 0x200, 0x2000, 362, -362, 362, 362),
+            (0, 0, 0x2000, 0, 0, 0, 0),
+        ];
+        for stride in [2, 8] {
+            let mut cpu = make_cpu();
+            for (i, (scale_x, scale_y, angle, ..)) in entries.iter().enumerate() {
+                let src = 0x0200_0000 + i as u32 * 8;
+                cpu.bus_write16(src, *scale_x as u16);
+                cpu.bus_write16(src + 2, *scale_y as u16);
+                cpu.bus_write16(src + 4, *angle);
+            }
+            for addr in (0x0200_1000..0x0200_1000 + 8 * stride * 4).step_by(2) {
+                cpu.bus_write16(addr, 0xBEEF);
+            }
+            cpu.set_reg(0, 0x0200_0000);
+            cpu.set_reg(1, 0x0200_1000);
+            cpu.set_reg(2, entries.len() as u32);
+            cpu.set_reg(3, stride);
+            handle_swi(&mut cpu, 0x0F);
+            for (i, (.., pa, pb, pc, pd)) in entries.iter().enumerate() {
+                let base = 0x0200_1000 + i as u32 * stride * 4;
+                assert_eq!(cpu.bus_read16(base) as i16, *pa);
+                assert_eq!(cpu.bus_read16(base + stride) as i16, *pb);
+                assert_eq!(cpu.bus_read16(base + stride * 2) as i16, *pc);
+                assert_eq!(cpu.bus_read16(base + stride * 3) as i16, *pd);
+                if stride == 8 {
+                    // the OAM attributes between the parameters are kept
+                    assert_eq!(cpu.bus_read16(base + 2), 0xBEEF);
+                    assert_eq!(cpu.bus_read16(base + 14), 0xBEEF);
+                }
+            }
+            let end = 0x0200_1000 + entries.len() as u32 * stride * 4;
+            assert_eq!(cpu.bus_read16(end), 0xBEEF);
+        }
     }
 
     #[test]
