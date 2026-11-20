@@ -967,6 +967,7 @@ mod tests {
     fn test_dma_highest_active_priority() {
         let mut dma = GbaDma::new();
         // activate channels 1 and 2
+        #[allow(clippy::needless_range_loop)]
         for i in 1..=2 {
             dma.channels[i].set_src_reg(0x0200_0000);
             dma.channels[i].set_dst_reg(0x0600_0000);

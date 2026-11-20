@@ -360,6 +360,7 @@ impl Emulator {
     }
 
     /// Switches to the system required by a new ROM and resets the emulation.
+    #[allow(clippy::large_unopt_stack_frames)]
     pub fn switch_rom(&mut self, path: &str) -> Result<(), Error> {
         let data = read_file(path)?;
         let mut system = System::from_rom(&data)?;
