@@ -17,7 +17,9 @@ use std::{
     path::Path,
 };
 
-use boytacean_cartridge::{dumper::Dumper, flasher::Flasher, header::Header, serial::open_port};
+use boytacean_cartridge::{
+    dumper::Dumper, flasher::Flasher, header::Header, mapper::Mapper, serial::open_port,
+};
 use boytacean_common::util::{read_file, replace_ext, write_new_file};
 
 /// The default file for the backup of a cartridge before flashing it.
@@ -155,32 +157,38 @@ fn flash<T: Read + Write>(
         }
     }
 
-    // without an explicit confirmation the cartridge is only probed,
-    // describing what flashing it would do
-    if !options.yes {
-        let mut probe = Flasher::probe();
-        probe.run(transport, |_| {})?;
-        if let Some(device) = probe.device() {
-            println!("{device} on {port}");
-        }
-        match probe.chip() {
-            Some(chip) => println!(
-                "Flash cartridge with a {chip}, run again with --yes to erase it and flash {path} ({} KiB) into it",
-                rom.len() / 1024
-            ),
-            None => println!("No flash chip found, the cartridge can't be flashed"),
-        }
-        return Ok(());
-    }
-
     if let Some(backup) = &options.backup {
-        if Path::new(backup).exists() {
+        if options.yes && Path::new(backup).exists() {
             return Err(format!(
                 "The backup file {backup} already exists, move it away or use --backup"
             )
             .into());
         }
-        let mut dumper = Dumper::new();
+    }
+
+    // the cartridge is probed first, so that a cartridge that can't be
+    // flashed is neither backed up nor touched, and without an explicit
+    // confirmation the probe only describes what flashing would do
+    let mut probe = Flasher::probe();
+    probe.run(transport, |_| {})?;
+    if let Some(device) = probe.device() {
+        println!("{device} on {port}");
+    }
+    let Some(chip) = probe.chip() else {
+        return Err("No flash chip found, the cartridge can't be flashed".into());
+    };
+    if !options.yes {
+        println!(
+            "Flash cartridge with a {chip}, run again with --yes to erase it and flash {path} ({} KiB) into it",
+            rom.len() / 1024
+        );
+        return Ok(());
+    }
+
+    // the backup is read through the MBC5 of the flash cartridge, as the
+    // MBC declared by the game it holds may select other banks on it
+    if let Some(backup) = &options.backup {
+        let mut dumper = Dumper::with_mapper(Mapper::Mbc5);
         let dump = dumper
             .run(transport, print_progress("Backing up cartridge"))
             .map_err(|err| {
@@ -192,9 +200,7 @@ fn flash<T: Read + Write>(
 
     flasher.run(transport, print_progress("Flashing cartridge"))?;
     println!();
-    if let (Some(device), Some(chip)) = (flasher.device(), flasher.chip()) {
-        println!("Flashed {path} into the {chip} with {device} on {port}");
-    }
+    println!("Flashed {path} into the {chip}");
     Ok(())
 }
 
@@ -496,7 +502,8 @@ mod tests {
         let old_rom = build_rom(0x00, 0x00);
         let rom = build_rom(0x03, 0x02);
         write(directory.join("game.gb"), &rom).unwrap();
-        let mut replies = dump_replies(&old_rom, &[]);
+        let mut replies = probe_replies(true);
+        replies.extend(dump_replies(&old_rom, &[]));
         replies.extend(flash_replies(&rom));
         let mut transport = Replay::new(replies);
         let options = build_options(
@@ -516,7 +523,9 @@ mod tests {
         let directory = build_directory("gbxcart-no-backup");
         let rom = build_rom(0x19, 0x00);
         write(directory.join("game.gb"), &rom).unwrap();
-        let mut transport = Replay::new(flash_replies(&rom));
+        let mut replies = probe_replies(true);
+        replies.extend(flash_replies(&rom));
+        let mut transport = Replay::new(replies);
         let options = build_options("flash", &directory.join("game.gb"), None, true);
         flash(&mut transport, "/dev/ttyUSB0", &options).unwrap();
         assert!(transport.replies.is_empty());
@@ -526,18 +535,41 @@ mod tests {
     #[test]
     fn test_flash_confirmation() {
         // without --yes the cartridge is only probed, never backed up
-        // nor flashed, both with and without a flash chip
+        // nor flashed
         let directory = build_directory("gbxcart-confirmation");
         write(directory.join("game.gb"), build_rom(0x19, 0x00)).unwrap();
-        for chip in [true, false] {
-            let mut transport = Replay::new(probe_replies(chip));
+        let mut transport = Replay::new(probe_replies(true));
+        let options = build_options(
+            "flash",
+            &directory.join("game.gb"),
+            Some(&directory.join("backup.gb")),
+            false,
+        );
+        flash(&mut transport, "/dev/ttyUSB0", &options).unwrap();
+        assert!(transport.replies.is_empty());
+        assert!(!directory.join("backup.gb").exists());
+        remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn test_flash_no_chip() {
+        // a cartridge without a flash chip is refused before it's backed
+        // up, with or without --yes
+        let directory = build_directory("gbxcart-no-chip");
+        write(directory.join("game.gb"), build_rom(0x19, 0x00)).unwrap();
+        for yes in [false, true] {
+            let mut transport = Replay::new(probe_replies(false));
             let options = build_options(
                 "flash",
                 &directory.join("game.gb"),
                 Some(&directory.join("backup.gb")),
-                false,
+                yes,
             );
-            flash(&mut transport, "/dev/ttyUSB0", &options).unwrap();
+            let result = flash(&mut transport, "/dev/ttyUSB0", &options);
+            assert_eq!(
+                result.unwrap_err().to_string(),
+                "No flash chip found, the cartridge can't be flashed"
+            );
             assert!(transport.replies.is_empty());
             assert!(!directory.join("backup.gb").exists());
         }
@@ -571,7 +603,9 @@ mod tests {
         // stops the flashing before anything is written
         let directory = build_directory("gbxcart-backup-failure");
         write(directory.join("game.gb"), build_rom(0x19, 0x00)).unwrap();
-        let mut transport = Replay::new(dump_replies(&[0xff; 0x8000], &[]));
+        let mut replies = probe_replies(true);
+        replies.extend(dump_replies(&[0xff; 0x8000], &[]));
+        let mut transport = Replay::new(replies);
         let options = build_options(
             "flash",
             &directory.join("game.gb"),
