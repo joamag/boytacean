@@ -43,10 +43,8 @@ fn print_usage() {
     println!("If max_frames is not specified, it traces up to {DEFAULT_FRAMES} frames");
     println!("Options:");
     println!("  --bios <bios.bin>      Boots the ROM through the BIOS file");
-    println!(
-        "  --watch <address>      Prints each change of the word at the hex address, stopping"
-    );
-    println!("                         at the first change of an IO register");
+    println!("  --watch <address>      Prints each change of the word at the hex address");
+    println!("                         (stopping at the first change of an IO register)");
     println!("  --until-pc <address>   Stops once the execution reaches the hex address");
 }
 
