@@ -8,11 +8,11 @@ use crate::{
     gba::{
         apu::GbaApu,
         consts::{
-            EWRAM_SIZE, IWRAM_SIZE, OAM_SIZE, PALETTE_SIZE, REG_BG0CNT, REG_BG0HOFS, REG_BG0VOFS,
-            REG_BG1CNT, REG_BG1HOFS, REG_BG1VOFS, REG_BG2CNT, REG_BG2HOFS, REG_BG2PA, REG_BG2PB,
-            REG_BG2PC, REG_BG2PD, REG_BG2VOFS, REG_BG2X, REG_BG2Y, REG_BG3CNT, REG_BG3HOFS,
-            REG_BG3PA, REG_BG3PB, REG_BG3PC, REG_BG3PD, REG_BG3VOFS, REG_BG3X, REG_BG3Y,
-            REG_BLDALPHA, REG_BLDCNT, REG_BLDY, REG_DISPCNT, REG_DISPSTAT, REG_DMA0CNT_H,
+            BIOS_SIZE, EWRAM_SIZE, IWRAM_SIZE, OAM_SIZE, PALETTE_SIZE, REG_BG0CNT, REG_BG0HOFS,
+            REG_BG0VOFS, REG_BG1CNT, REG_BG1HOFS, REG_BG1VOFS, REG_BG2CNT, REG_BG2HOFS, REG_BG2PA,
+            REG_BG2PB, REG_BG2PC, REG_BG2PD, REG_BG2VOFS, REG_BG2X, REG_BG2Y, REG_BG3CNT,
+            REG_BG3HOFS, REG_BG3PA, REG_BG3PB, REG_BG3PC, REG_BG3PD, REG_BG3VOFS, REG_BG3X,
+            REG_BG3Y, REG_BLDALPHA, REG_BLDCNT, REG_BLDY, REG_DISPCNT, REG_DISPSTAT, REG_DMA0CNT_H,
             REG_DMA0CNT_L, REG_DMA0DAD, REG_DMA0SAD, REG_DMA1CNT_H, REG_DMA1CNT_L, REG_DMA1DAD,
             REG_DMA1SAD, REG_DMA2CNT_H, REG_DMA2CNT_L, REG_DMA2DAD, REG_DMA2SAD, REG_DMA3CNT_H,
             REG_DMA3CNT_L, REG_DMA3DAD, REG_DMA3SAD, REG_FIFO_A, REG_FIFO_B, REG_HALTCNT, REG_IE,
@@ -32,11 +32,28 @@ use crate::{
     },
 };
 
-/// Size of the BIOS stub (we only need a small region for HLE stubs).
-const BIOS_SIZE: usize = 0x4000;
-
+/// Represents the GBA memory bus and controls all of the logic
+/// behind the memory access and address mapping of the 32-bit
+/// address space. The bus is responsible for routing the read and
+/// write operations of the CPU (and DMA) to the proper component
+/// or memory region.
+///
+/// Should store the BIOS, the work RAMs, the video memories and the
+/// cartridge ROM together with the memory mapped components (PPU,
+/// APU, DMA, timers, keypad, interrupt controller and save media),
+/// forwarding the access operations to them.
+///
+/// # Basic usage
+///
+/// ```rust
+/// use boytacean::gba::bus::GbaBus;
+/// let mut bus = GbaBus::default();
+/// bus.write32(0x0200_0000, 0x12345678);
+/// assert_eq!(bus.read32(0x0200_0000), 0x12345678);
+/// ```
 pub struct GbaBus {
-    /// BIOS memory (16KB, contains HLE stubs for IRQ handler etc.).
+    /// BIOS memory (16KB), holding either the HLE stubs (exception
+    /// vectors and IRQ handler) or a real BIOS ROM.
     pub bios: Box<[u8; BIOS_SIZE]>,
 
     /// External work RAM (256KB).
@@ -167,11 +184,11 @@ impl GbaBus {
     fn init_bios_stubs(&mut self) {
         // undefined instruction vector at 0x04: infinite loop (matches real BIOS)
         // on real hardware, executing an undefined instruction freezes here.
-        // our infinite loop detector in step() will catch this and panic.
         self.bios_write32(0x04, 0xEAFFFFFE); // B . (branch to self)
 
-        // SWI vector at 0x08: handled via HLE in the instruction decoder,
-        // but place a branch-to-self as a safety net for real BIOS mode.
+        // SWI vector at 0x08: SWIs are handled via HLE in the instruction
+        // decoder, the branch-to-self only catches stray jumps to the vector
+        // (loading a real BIOS replaces all of these stubs).
         self.bios_write32(0x08, 0xEAFFFFFE); // B . (branch to self)
 
         // IRQ vector at 0x18: branch to handler at 0x128
@@ -235,7 +252,7 @@ impl GbaBus {
         self.save.detect_save_type(data);
     }
 
-    // 8-bit read
+    /// Reads a byte from the given address.
     #[inline(always)]
     pub fn read8(&mut self, addr: u32) -> u8 {
         match addr >> 24 {
@@ -278,7 +295,8 @@ impl GbaBus {
         }
     }
 
-    // 16-bit read (aligned)
+    /// Reads a halfword from the given address, aligned down
+    /// to a halfword boundary.
     #[inline(always)]
     pub fn read16(&mut self, addr: u32) -> u16 {
         let addr = addr & !1;
@@ -336,7 +354,8 @@ impl GbaBus {
         }
     }
 
-    // 32-bit read (aligned)
+    /// Reads a word from the given address, aligned down
+    /// to a word boundary.
     #[inline(always)]
     pub fn read32(&mut self, addr: u32) -> u32 {
         let addr = addr & !3;
@@ -400,12 +419,13 @@ impl GbaBus {
         }
     }
 
-    // 16-bit instruction fetch (aligned)
-    //
-    // Fast path for opcode fetches: the program counter is always
-    // halfword aligned and executes from EWRAM, IWRAM or ROM in the
-    // overwhelming majority of cases, letting the alignment mask,
-    // EEPROM gating and IO handling of read16() be skipped.
+    /// Fetches a halfword instruction from the given (halfword
+    /// aligned) address.
+    ///
+    /// Fast path for opcode fetches: the program counter is always
+    /// halfword aligned and executes from EWRAM, IWRAM or ROM in the
+    /// overwhelming majority of cases, letting the alignment mask,
+    /// EEPROM gating and IO handling of read16() be skipped.
     #[inline(always)]
     pub fn fetch16(&mut self, addr: u32) -> u16 {
         match addr >> 24 {
@@ -430,10 +450,11 @@ impl GbaBus {
         }
     }
 
-    // 32-bit instruction fetch (aligned)
-    //
-    // Fast path for opcode fetches, mirroring fetch16() for the word
-    // sized fetches of ARM mode.
+    /// Fetches a word instruction from the given (word aligned)
+    /// address.
+    ///
+    /// Fast path for opcode fetches, mirroring fetch16() for the word
+    /// sized fetches of ARM mode.
     #[inline(always)]
     pub fn fetch32(&mut self, addr: u32) -> u32 {
         match addr >> 24 {
@@ -460,7 +481,7 @@ impl GbaBus {
         }
     }
 
-    // 8-bit write
+    /// Writes a byte to the given address.
     #[inline(always)]
     pub fn write8(&mut self, addr: u32, value: u8) {
         match addr >> 24 {
@@ -496,7 +517,8 @@ impl GbaBus {
         }
     }
 
-    // 16-bit write (aligned)
+    /// Writes a halfword to the given address, aligned down
+    /// to a halfword boundary.
     #[inline(always)]
     pub fn write16(&mut self, addr: u32, value: u16) {
         let raw_addr = addr;
@@ -537,7 +559,8 @@ impl GbaBus {
         }
     }
 
-    // 32-bit write (aligned)
+    /// Writes a word to the given address, aligned down
+    /// to a word boundary.
     #[inline(always)]
     pub fn write32(&mut self, addr: u32, value: u32) {
         let raw_addr = addr;
