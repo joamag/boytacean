@@ -86,6 +86,9 @@ impl VideoMode {
     }
 }
 
+/// The picture processing unit of the GBA, drawing each line of the
+/// frame from the VRAM, the palette and the OAM as the line reaches
+/// its HBlank, and raising the display interrupts and DMA triggers.
 pub struct GbaPpu {
     /// Current scanline (VCOUNT, 0-227).
     vcount: u16,
@@ -610,8 +613,9 @@ impl GbaPpu {
 
     /// Clocks the PPU by the given number of CPU cycles.
     ///
-    /// Returns flags: bit 0 = hblank, bit 1 = vblank, bit 2 = hblank IRQ,
-    /// bit 3 = vblank IRQ, bit 4 = vcount match IRQ.
+    /// Returns flags: bit 0 = hblank DMA trigger (visible lines only),
+    /// bit 1 = vblank DMA trigger, bit 2 = hblank IRQ, bit 3 = vblank IRQ,
+    /// bit 4 = vcount match IRQ.
     pub fn clock(&mut self, cycles: u32, vram: &[u8], palette: &[u8], oam: &[u8]) -> u8 {
         let mut events = 0u8;
 
@@ -622,6 +626,14 @@ impl GbaPpu {
             // entering hblank
             if self.vcount < DISPLAY_HEIGHT as u16 {
                 self.render_scanline(vram, palette, oam);
+
+                // steps the internal affine reference points right after
+                // the line is drawn, before any HBlank DMA or IRQ writes
+                // the reference points to be used by the next line
+                self.bg_ref_x[0] = self.bg_ref_x[0].wrapping_add(self.bg_pb[0] as i32);
+                self.bg_ref_y[0] = self.bg_ref_y[0].wrapping_add(self.bg_pd[0] as i32);
+                self.bg_ref_x[1] = self.bg_ref_x[1].wrapping_add(self.bg_pb[1] as i32);
+                self.bg_ref_y[1] = self.bg_ref_y[1].wrapping_add(self.bg_pd[1] as i32);
 
                 // bit 0: hblank DMA trigger (only fires within the
                 // display area, never during VBlank lines)
@@ -640,22 +652,12 @@ impl GbaPpu {
             self.dot -= CYCLES_PER_SCANLINE;
             self.vcount += 1;
 
-            // update internal affine reference points after each visible scanline;
-            // advance happens after lines 0-159 render (vcount 1-160), not on
-            // the 227->0 wrap which would shift line 0 by one row
-            if self.vcount > 0 && self.vcount <= DISPLAY_HEIGHT as u16 {
-                self.bg_ref_x[0] = self.bg_ref_x[0].wrapping_add(self.bg_pb[0] as i32);
-                self.bg_ref_y[0] = self.bg_ref_y[0].wrapping_add(self.bg_pd[0] as i32);
-                self.bg_ref_x[1] = self.bg_ref_x[1].wrapping_add(self.bg_pb[1] as i32);
-                self.bg_ref_y[1] = self.bg_ref_y[1].wrapping_add(self.bg_pd[1] as i32);
-            }
-
             if self.vcount == DISPLAY_HEIGHT as u16 {
                 // entering vblank
                 self.frame += 1;
 
-                // latch affine reference points (after advance, so latch
-                // overwrites the advance on the vblank entry scanline)
+                // latch affine reference points (overwriting the step
+                // made after drawing the last visible line)
                 self.bg_ref_x[0] = self.bg_ref_x_write[0];
                 self.bg_ref_y[0] = self.bg_ref_y_write[0];
                 self.bg_ref_x[1] = self.bg_ref_x_write[1];
@@ -847,15 +849,11 @@ impl GbaPpu {
             // find top two visible pixels (for blending)
             let mut top = PixelEntry {
                 color: backdrop,
-                priority: 5,
-                layer: Layer::Backdrop,
-                is_semi_transparent: false,
+                ..Default::default()
             };
             let mut bot = PixelEntry {
                 color: backdrop,
-                priority: 5,
-                layer: Layer::Backdrop,
-                is_semi_transparent: false,
+                ..Default::default()
             };
 
             // scans the priority sorted BG list; the first visible layer
@@ -1011,7 +1009,6 @@ impl GbaPpu {
     }
 
     /// Collects bitmap background pixels with BG2 affine transform.
-    #[allow(clippy::too_many_arguments)]
     fn collect_bitmap_bg(
         &self,
         affine_index: usize,
@@ -1033,8 +1030,10 @@ impl GbaPpu {
             _ => return,
         };
 
-        let mut ref_x = self.bg_ref_x[affine_index];
-        let mut ref_y = self.bg_ref_y[affine_index];
+        // the bitmap is drawn by BG2, with its mosaic as for the
+        // affine backgrounds
+        let cnt = self.bgcnt[2];
+        let (mut ref_x, mut ref_y) = self.mosaic_ref(affine_index, cnt);
         let pa = self.bg_pa[affine_index] as i32;
         let pc = self.bg_pc[affine_index] as i32;
 
@@ -1086,10 +1085,11 @@ impl GbaPpu {
 
             *pixel = color & !BG_NO_PIXEL;
         }
+
+        self.apply_bg_mosaic(cnt, pixels);
     }
 
     /// Collects text background pixels into per-pixel arrays.
-    #[allow(clippy::too_many_arguments)]
     fn collect_text_bg(
         &self,
         bg_index: usize,
@@ -1098,6 +1098,10 @@ impl GbaPpu {
         palette: &[u8],
         pixels: &mut [u16; DISPLAY_WIDTH],
     ) {
+        // the backgrounds only address the first 64 KiB of the VRAM,
+        // so reads past it (into the OBJ VRAM) give transparent pixels
+        let vram = &vram[..vram.len().min(0x10000)];
+
         let cnt = self.bgcnt[bg_index];
         let char_base = ((cnt >> 2) & 0x03) as usize * 0x4000;
         let screen_base = ((cnt >> 8) & 0x1F) as usize * 0x800;
@@ -1330,7 +1334,6 @@ impl GbaPpu {
     }
 
     /// Collects affine background pixels into per-pixel arrays.
-    #[allow(clippy::too_many_arguments)]
     fn collect_affine_bg(
         &self,
         affine_index: usize,
@@ -1339,6 +1342,10 @@ impl GbaPpu {
         palette: &[u8],
         pixels: &mut [u16; DISPLAY_WIDTH],
     ) {
+        // the backgrounds only address the first 64 KiB of the VRAM,
+        // so reads past it (into the OBJ VRAM) give transparent pixels
+        let vram = &vram[..vram.len().min(0x10000)];
+
         let cnt = self.bgcnt[bg_index];
         let char_base = ((cnt >> 2) & 0x03) as usize * 0x4000;
         let screen_base = ((cnt >> 8) & 0x1F) as usize * 0x800;
@@ -1359,24 +1366,7 @@ impl GbaPpu {
         let pc = self.bg_pc[affine_index] as i32;
 
         // apply vertical mosaic by using the reference point from the snapped line
-        let (mut ref_x, mut ref_y) = if cnt & (1 << 6) != 0 {
-            let mos_v = ((self.mosaic >> 4) & 0x0F) as i32 + 1;
-            if mos_v > 1 {
-                let vcount = self.vcount as i32;
-                let snapped = vcount / mos_v * mos_v;
-                let diff = vcount - snapped;
-                let pb = self.bg_pb[affine_index] as i32;
-                let pd = self.bg_pd[affine_index] as i32;
-                (
-                    self.bg_ref_x[affine_index] - pb * diff,
-                    self.bg_ref_y[affine_index] - pd * diff,
-                )
-            } else {
-                (self.bg_ref_x[affine_index], self.bg_ref_y[affine_index])
-            }
-        } else {
-            (self.bg_ref_x[affine_index], self.bg_ref_y[affine_index])
-        };
+        let (mut ref_x, mut ref_y) = self.mosaic_ref(affine_index, cnt);
 
         for pixel in pixels.iter_mut() {
             // convert fixed-point (8.8) to pixel coordinates
@@ -1423,6 +1413,33 @@ impl GbaPpu {
         }
 
         // applies horizontal mosaic as a post-pass
+        self.apply_bg_mosaic(cnt, pixels);
+    }
+
+    /// Obtains the affine reference point of a background for the
+    /// current line, the one of the first line of its mosaic block
+    /// when the vertical mosaic is enabled in its BGxCNT.
+    fn mosaic_ref(&self, affine_index: usize, cnt: u16) -> (i32, i32) {
+        if cnt & (1 << 6) != 0 {
+            let mos_v = ((self.mosaic >> 4) & 0x0F) as i32 + 1;
+            if mos_v > 1 {
+                let vcount = self.vcount as i32;
+                let snapped = vcount / mos_v * mos_v;
+                let diff = vcount - snapped;
+                let pb = self.bg_pb[affine_index] as i32;
+                let pd = self.bg_pd[affine_index] as i32;
+                return (
+                    self.bg_ref_x[affine_index] - pb * diff,
+                    self.bg_ref_y[affine_index] - pd * diff,
+                );
+            }
+        }
+        (self.bg_ref_x[affine_index], self.bg_ref_y[affine_index])
+    }
+
+    /// Applies the horizontal mosaic of a background, when enabled in
+    /// its BGxCNT, to its collected pixels.
+    fn apply_bg_mosaic(&self, cnt: u16, pixels: &mut [u16; DISPLAY_WIDTH]) {
         if cnt & (1 << 6) != 0 {
             let mos_h = (self.mosaic & 0x0F) as usize + 1;
             if mos_h > 1 {
@@ -1487,18 +1504,25 @@ impl GbaPpu {
             let y = (attr0 & 0xFF) as i32;
             let x = (attr1 & 0x01FF) as i32;
             let x = if x >= 240 { x - 512 } else { x };
-            let y = if y >= 160 { y - 256 } else { y };
 
             // check if this sprite is on the current scanline before
-            // decoding the remaining (only then needed) attributes
-            let rel_y = line as i32 - y;
-            if rel_y < 0 || rel_y >= bound_h as i32 {
+            // decoding the remaining (only then needed) attributes, the
+            // 8 bit Y wraps sprites past the bottom around to the top
+            let rel_y = (line as i32 - y) & 0xFF;
+            if rel_y >= bound_h as i32 {
                 continue;
             }
 
             let attr2 = (oam[oam_offset + 4] as u16) | ((oam[oam_offset + 5] as u16) << 8);
 
             let tile_number = (attr2 & 0x03FF) as usize;
+
+            // the bitmap modes use the OBJ tiles 0-511 for the bitmap,
+            // so sprites using them are not displayed
+            if self.video_mode() as u8 >= 3 && tile_number < 512 {
+                continue;
+            }
+
             let priority = ((attr2 >> 10) & 0x03) as u8;
             let palette_bank = ((attr2 >> 12) & 0x0F) as usize;
             let is_8bpp = attr0 & (1 << 13) != 0;
@@ -1767,6 +1791,14 @@ impl GbaPpu {
         self.bg_ref_y_write = [0; 2];
         self.bg_ref_x_raw = [0; 2];
         self.bg_ref_y_raw = [0; 2];
+        self.winh = [0; 2];
+        self.winv = [0; 2];
+        self.winin = 0;
+        self.winout = 0;
+        self.bldcnt = 0;
+        self.bldalpha = 0;
+        self.bldy = 0;
+        self.mosaic = 0;
         self.int_vblank = false;
         self.int_hblank = false;
         self.int_vcount = false;
@@ -1907,8 +1939,9 @@ mod tests {
     fn test_bg_scroll() {
         let mut ppu = GbaPpu::new();
         ppu.set_bg_hofs(0, 0x1FF);
-        ppu.set_bg_vofs(0, 0x200); // masked to 9 bits
-                                   // value is masked to 0x01FF
+
+        // the offsets are masked to 9 bits (0x01FF)
+        ppu.set_bg_vofs(0, 0x200);
         assert_eq!(ppu.bg_hofs[0], 0x1FF);
         assert_eq!(ppu.bg_vofs[0], 0x0000);
     }
@@ -1956,6 +1989,8 @@ mod tests {
         assert_eq!(ppu.winv(0), 0xC030);
         assert_eq!(ppu.winin, 0x1234);
         assert_eq!(ppu.winout, 0x5678);
+        assert_eq!(ppu.winin(), 0x1234);
+        assert_eq!(ppu.winout(), 0x5678);
     }
 
     #[test]
@@ -1967,6 +2002,8 @@ mod tests {
         assert_eq!(ppu.bldcnt, 0x00FF);
         assert_eq!(ppu.bldalpha, 0x1010);
         assert_eq!(ppu.bldy, 0x0010);
+        assert_eq!(ppu.bldcnt(), 0x00FF);
+        assert_eq!(ppu.bldalpha(), 0x1010);
         assert_eq!(ppu.bldy(), 0x0010);
     }
 
@@ -2123,10 +2160,26 @@ mod tests {
         for _ in 0..228 {
             ppu.clock(CYCLES_PER_SCANLINE, &vram, &palette, &oam);
         }
+        ppu.set_winh(0, 0xA050);
+        ppu.set_winv(1, 0xC030);
+        ppu.set_winin(0x1234);
+        ppu.set_winout(0x5678);
+        ppu.set_bldcnt(0x00FF);
+        ppu.set_bldalpha(0x1010);
+        ppu.set_bldy(0x0010);
+        ppu.set_mosaic(0x0303);
         ppu.reset();
         assert_eq!(ppu.dispcnt(), 0);
         assert_eq!(ppu.frame(), 0);
         assert_eq!(ppu.vcount(), 0);
+        assert_eq!(ppu.winh(0), 0);
+        assert_eq!(ppu.winv(1), 0);
+        assert_eq!(ppu.winin(), 0);
+        assert_eq!(ppu.winout(), 0);
+        assert_eq!(ppu.bldcnt(), 0);
+        assert_eq!(ppu.bldalpha(), 0);
+        assert_eq!(ppu.bldy(), 0);
+        assert_eq!(ppu.mosaic(), 0);
     }
 
     #[test]
@@ -2166,34 +2219,22 @@ mod tests {
     #[test]
     fn test_obj_dimensions() {
         assert_eq!(obj_dimensions(0, 0), (8, 8));
+        assert_eq!(obj_dimensions(0, 1), (16, 16));
+        assert_eq!(obj_dimensions(0, 2), (32, 32));
         assert_eq!(obj_dimensions(0, 3), (64, 64));
         assert_eq!(obj_dimensions(1, 3), (64, 32));
         assert_eq!(obj_dimensions(2, 3), (32, 64));
     }
 
     #[test]
-    fn test_obj_dimensions_all_square() {
-        assert_eq!(obj_dimensions(0, 0), (8, 8));
-        assert_eq!(obj_dimensions(0, 1), (16, 16));
-        assert_eq!(obj_dimensions(0, 2), (32, 32));
-        assert_eq!(obj_dimensions(0, 3), (64, 64));
-    }
-
-    #[test]
     fn test_video_mode() {
-        assert_eq!(VideoMode::from_u16(0), VideoMode::Mode0);
-        assert_eq!(VideoMode::from_u16(3), VideoMode::Mode3);
-        assert_eq!(VideoMode::from_u16(0x0403), VideoMode::Mode3);
-    }
-
-    #[test]
-    fn test_video_mode_all() {
         assert_eq!(VideoMode::from_u16(0), VideoMode::Mode0);
         assert_eq!(VideoMode::from_u16(1), VideoMode::Mode1);
         assert_eq!(VideoMode::from_u16(2), VideoMode::Mode2);
         assert_eq!(VideoMode::from_u16(3), VideoMode::Mode3);
         assert_eq!(VideoMode::from_u16(4), VideoMode::Mode4);
         assert_eq!(VideoMode::from_u16(5), VideoMode::Mode5);
+        assert_eq!(VideoMode::from_u16(0x0403), VideoMode::Mode3);
     }
 
     #[test]
@@ -2507,6 +2548,50 @@ mod tests {
     }
 
     #[test]
+    fn test_collect_sprites_y_wrap() {
+        let mut ppu = GbaPpu::new();
+        ppu.set_dispcnt(1 << 6); // 1D mapping
+
+        let mut vram = vec![0u8; 0x18000];
+        let mut palette = vec![0u8; 0x400];
+        let mut oam = vec![0u8; 0x400];
+
+        // sprite 0: affine and double size 64x64 (a 128x128 box) at
+        // (0, 150), zoomed 2x to fill its box, whose last 22 lines
+        // wrap around to the top of the screen
+        let attr0: u16 = 150 | (1 << 8) | (1 << 9);
+        let attr1: u16 = 3 << 14;
+        oam[0] = (attr0 & 0xFF) as u8;
+        oam[1] = ((attr0 >> 8) & 0xFF) as u8;
+        oam[2] = (attr1 & 0xFF) as u8;
+        oam[3] = ((attr1 >> 8) & 0xFF) as u8;
+        oam[6] = 0x80; // PA = 0.5
+        oam[30] = 0x80; // PD = 0.5
+
+        // the 64 tiles of the sprite in OBJ palette color 1 (white)
+        vram[0x10000..0x10800].fill(0x11);
+        palette[0x202] = 0xFF;
+        palette[0x203] = 0x7F;
+
+        let mut obj_pixels = [(0u16, 255u8, false); DISPLAY_WIDTH];
+        let mut obj_has_pixel = [false; DISPLAY_WIDTH];
+        let mut obj_window_mask = [false; DISPLAY_WIDTH];
+
+        ppu.collect_sprites(
+            10,
+            &vram,
+            &palette,
+            &oam,
+            &mut obj_pixels,
+            &mut obj_has_pixel,
+            &mut obj_window_mask,
+        );
+
+        assert!(obj_has_pixel[64]);
+        assert_eq!(obj_pixels[64].0, 0x7FFF);
+    }
+
+    #[test]
     fn test_collect_sprites_obj_window() {
         let mut ppu = GbaPpu::new();
         ppu.set_dispcnt(1 << 6); // 1D mapping
@@ -2704,6 +2789,9 @@ mod tests {
         assert_eq!(fb[1], 0x00); // G
         assert_eq!(fb[2], 0x00); // B
 
+        // drawing line 0 stepped the reference point to the one of
+        // line 1, so it's restored to draw line 0 again
+        ppu.set_bg_ref_y_lo(0, 0);
         ppu.set_dispcnt(3);
         ppu.render_mode3(0, &vram, &palette, &oam);
         assert_eq!(&ppu.frame_buffer()[..3], &[0, 0, 0]);
@@ -2851,6 +2939,9 @@ mod tests {
         assert_eq!(fb[1], 0xF8); // G
         assert_eq!(fb[2], 0x00); // B
 
+        // drawing line 0 stepped the reference point to the one of
+        // line 1, so it's restored to draw line 0 again
+        ppu.set_bg_ref_y_lo(0, 0);
         ppu.set_dispcnt(4);
         ppu.render_mode4(0, &vram, &palette, &oam);
         assert_eq!(&ppu.frame_buffer()[..3], &[0, 0, 0]);
@@ -2881,6 +2972,9 @@ mod tests {
         assert_eq!(fb[1], 0x00); // G
         assert_eq!(fb[2], 0xF8); // B
 
+        // drawing line 0 stepped the reference point to the one of
+        // line 1, so it's restored to draw line 0 again
+        ppu.set_bg_ref_y_lo(0, 0);
         ppu.set_dispcnt(5);
         ppu.render_mode5(0, &vram, &palette, &oam);
         assert_eq!(&ppu.frame_buffer()[..3], &[0, 0, 0]);
@@ -2908,10 +3002,11 @@ mod tests {
         vram[5 * 2] = (red & 0xFF) as u8;
         vram[5 * 2 + 1] = ((red >> 8) & 0xFF) as u8;
 
-        // sprite 0: 8x8, at (5, 0), priority 0
+        // sprite 0: 8x8, at (5, 0), tile 512 (the first one displayed
+        // in the bitmap modes), priority 0
         let attr0: u16 = 0;
         let attr1: u16 = 5;
-        let attr2: u16 = 0; // priority 0
+        let attr2: u16 = 512; // priority 0
         oam[0] = (attr0 & 0xFF) as u8;
         oam[1] = ((attr0 >> 8) & 0xFF) as u8;
         oam[2] = (attr1 & 0xFF) as u8;
@@ -2919,8 +3014,8 @@ mod tests {
         oam[4] = (attr2 & 0xFF) as u8;
         oam[5] = ((attr2 >> 8) & 0xFF) as u8;
 
-        // OBJ pixel at tile 0, px 0: color index 1
-        vram[0x10000] = 0x01;
+        // OBJ pixel at tile 512, px 0: color index 1
+        vram[0x14000] = 0x01;
         // OBJ palette color 1 = blue
         let blue: u16 = 0x7C00;
         palette[0x202] = (blue & 0xFF) as u8;
@@ -2946,31 +3041,94 @@ mod tests {
     }
 
     #[test]
-    fn test_winin_getter() {
+    fn test_bitmap_mode_low_obj_tiles() {
         let mut ppu = GbaPpu::new();
-        ppu.set_winin(0x1234);
-        assert_eq!(ppu.winin(), 0x1234);
+        let mut vram = vec![0u8; 0x18000];
+        let mut palette = vec![0u8; 0x400];
+        let mut oam = vec![0u8; 0x400];
+
+        // sprite 0: 8x8, at (5, 0), tile 0, which the bitmap modes use
+        // for the bitmap, with its first pixel in blue
+        oam[2] = 5;
+        vram[0x10000] = 0x01;
+        let blue: u16 = 0x7C00;
+        palette[0x202] = (blue & 0xFF) as u8;
+        palette[0x203] = ((blue >> 8) & 0xFF) as u8;
+
+        // the sprite is displayed in the tile modes only
+        let offset = 5 * 3;
+        for (mode, color) in [
+            (0, [0, 0, 0xF8]),
+            (3, [0, 0, 0]),
+            (4, [0, 0, 0]),
+            (5, [0, 0, 0]),
+        ] {
+            ppu.set_dispcnt(mode | (1 << 12) | (1 << 6));
+            ppu.render_scanline(&vram, &palette, &oam);
+            assert_eq!(&ppu.frame_buffer()[offset..offset + 3], &color);
+        }
     }
 
     #[test]
-    fn test_winout_getter() {
+    fn test_render_mode3_mosaic() {
         let mut ppu = GbaPpu::new();
-        ppu.set_winout(0x5678);
-        assert_eq!(ppu.winout(), 0x5678);
+        let mut vram = vec![0u8; 0x18000];
+        let palette = vec![0u8; 0x400];
+        let oam = vec![0u8; 0x400];
+
+        // distinct reds for the first pixels of lines 0 and 2
+        for x in 0..4 {
+            vram[x * 2] = (x + 1) as u8;
+            vram[(2 * DISPLAY_WIDTH + x) * 2] = (x + 5) as u8;
+        }
+
+        // mode 3 with the mosaic of BG2, in blocks of 4x4 pixels
+        ppu.set_dispcnt(0x0403);
+        ppu.set_bgcnt(2, 1 << 6);
+        ppu.set_mosaic(0x0033);
+
+        // line 0 repeats its first pixel across the block
+        ppu.clock(VISIBLE_DOTS, &vram, &palette, &oam);
+        for x in 0..4 {
+            assert_eq!(&ppu.frame_buffer()[x * 3..x * 3 + 3], &[8, 0, 0]);
+        }
+
+        // line 2 repeats line 0, the first line of its block
+        ppu.clock(CYCLES_PER_SCANLINE - VISIBLE_DOTS, &vram, &palette, &oam);
+        ppu.clock(CYCLES_PER_SCANLINE, &vram, &palette, &oam);
+        ppu.clock(VISIBLE_DOTS, &vram, &palette, &oam);
+        let offset = 2 * DISPLAY_WIDTH * 3;
+        assert_eq!(&ppu.frame_buffer()[offset..offset + 3], &[8, 0, 0]);
     }
 
     #[test]
-    fn test_bldcnt_getter() {
+    fn test_render_bg_obj_vram() {
         let mut ppu = GbaPpu::new();
-        ppu.set_bldcnt(0x00FF);
-        assert_eq!(ppu.bldcnt(), 0x00FF);
-    }
+        let mut vram = vec![0u8; 0x18000];
+        let mut palette = vec![0u8; 0x400];
+        let oam = vec![0u8; 0x400];
 
-    #[test]
-    fn test_bldalpha_getter() {
-        let mut ppu = GbaPpu::new();
-        ppu.set_bldalpha(0x1010);
-        assert_eq!(ppu.bldalpha(), 0x1010);
+        // BG palette color 1 in red, and the OBJ VRAM full of it
+        palette[2] = 0x1F;
+        vram[0x10000..].fill(0x01);
+
+        // text BG0, 8bpp, char base 3 (0xC000): tile 256 would start at
+        // 0x10000, past the VRAM that the backgrounds address
+        ppu.set_dispcnt(1 << 8);
+        ppu.set_bgcnt(0, (3 << 2) | (1 << 7));
+        vram[1] = 0x01;
+        ppu.render_scanline(&vram, &palette, &oam);
+        assert_eq!(&ppu.frame_buffer()[..3], &[0, 0, 0]);
+
+        // affine BG2 with a 1024x1024 map at screen base 31 (0xF800):
+        // its 17th row of tiles (texture line 128) would be read from
+        // 0x10000, while tile 1 of char base 0 is red
+        vram[64..128].fill(0x01);
+        ppu.set_dispcnt(2 | (1 << 10));
+        ppu.set_bgcnt(2, (31 << 8) | (3 << 14));
+        ppu.set_bg_ref_y_lo(0, 128 << 8);
+        ppu.render_scanline(&vram, &palette, &oam);
+        assert_eq!(&ppu.frame_buffer()[..3], &[0, 0, 0]);
     }
 
     #[test]
@@ -3016,6 +3174,28 @@ mod tests {
 
         // after rendering line 0 and advancing to line 1, ref_x should be 0 + 0x100
         assert_eq!(ppu.bg_ref_x[0], 0x0100);
+    }
+
+    #[test]
+    fn test_affine_ref_hblank_write() {
+        let mut ppu = GbaPpu::new();
+        let vram = vec![0u8; 0x18000];
+        let palette = vec![0u8; 0x400];
+        let oam = vec![0u8; 0x400];
+
+        ppu.set_bg_ref_x_lo(0, 0x0000);
+        ppu.set_bg_ref_x_hi(0, 0x0000);
+        ppu.set_bg_pb(0, 0x0100); // PB = 1.0
+
+        // the reference point is stepped as soon as line 0 is drawn,
+        // so that a write in its HBlank (eg: by an HBlank DMA) sets
+        // the reference point of line 1 as it is
+        ppu.clock(VISIBLE_DOTS, &vram, &palette, &oam);
+        assert_eq!(ppu.bg_ref_x[0], 0x0100);
+        ppu.set_bg_ref_x_lo(0, 0x0800);
+        ppu.clock(CYCLES_PER_SCANLINE - VISIBLE_DOTS, &vram, &palette, &oam);
+        assert_eq!(ppu.vcount(), 1);
+        assert_eq!(ppu.bg_ref_x[0], 0x0800);
     }
 
     #[test]

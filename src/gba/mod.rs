@@ -260,7 +260,7 @@ impl GameBoyAdvance {
         );
 
         if events & 1 != 0 {
-            // hblank DMA trigger (always fires at hblank)
+            // hblank DMA trigger (fires at the hblank of the visible lines)
             if self.dma_enabled {
                 self.cpu.bus.dma.trigger_hblank();
             }
