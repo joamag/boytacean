@@ -1,11 +1,14 @@
 use std::time::Duration;
 
-use boytacean::gba::GameBoyAdvance;
+use boytacean::{
+    gba::GameBoyAdvance,
+    gba_test::{build_gba_test, GbaTestOptions},
+};
 use criterion::{criterion_group, criterion_main, Criterion};
 
-fn make_gba_ppu() -> GameBoyAdvance {
+fn make_gba_ppu() -> Box<GameBoyAdvance> {
     let rom = include_bytes!("../res/roms.gba/test/jsmolka_gba-tests/ppu_stripes.gba");
-    let mut gba = GameBoyAdvance::new();
+    let mut gba = build_gba_test(GbaTestOptions::default());
     gba.load_rom(rom).expect("Failed to load ppu_stripes.gba");
     for _ in 0..10 {
         gba.next_frame();
@@ -13,9 +16,9 @@ fn make_gba_ppu() -> GameBoyAdvance {
     gba
 }
 
-fn make_gba_arm() -> GameBoyAdvance {
+fn make_gba_arm() -> Box<GameBoyAdvance> {
     let rom = include_bytes!("../res/roms.gba/test/jsmolka_gba-tests/arm.gba");
-    let mut gba = GameBoyAdvance::new();
+    let mut gba = build_gba_test(GbaTestOptions::default());
     gba.load_rom(rom).expect("Failed to load arm.gba");
     for _ in 0..10 {
         gba.next_frame();
@@ -23,7 +26,7 @@ fn make_gba_arm() -> GameBoyAdvance {
     gba
 }
 
-fn make_gba_halted() -> GameBoyAdvance {
+fn make_gba_halted() -> Box<GameBoyAdvance> {
     let mut gba = make_gba_ppu();
     gba.cpu.bus.irq.set_ime(true);
     gba.cpu.bus.irq.set_ie(1);
