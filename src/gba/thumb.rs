@@ -4,7 +4,7 @@
 
 use crate::gba::{
     bios::handle_swi,
-    consts::{CPSR_MODE_MASK, CPSR_T, MODE_SVC},
+    consts::{CPSR_I, CPSR_MODE_MASK, CPSR_T, MODE_SVC},
     cpu::Arm7Tdmi,
 };
 
@@ -718,7 +718,7 @@ fn thumb_swi(cpu: &mut Arm7Tdmi, instr: u16) {
     let return_addr = cpu.pc().wrapping_sub(2);
     let old_cpsr = cpu.cpsr();
 
-    cpu.set_cpsr((old_cpsr & !CPSR_MODE_MASK & !CPSR_T) | MODE_SVC | crate::gba::consts::CPSR_I);
+    cpu.set_cpsr((old_cpsr & !CPSR_MODE_MASK & !CPSR_T) | MODE_SVC | CPSR_I);
     cpu.set_spsr(old_cpsr);
     cpu.set_reg(14, return_addr);
 
@@ -783,7 +783,7 @@ mod tests {
 
     fn make_thumb_cpu() -> Arm7Tdmi {
         let mut cpu = Arm7Tdmi::new(GbaBus::new());
-        let cpsr = cpu.cpsr() | crate::gba::consts::CPSR_T;
+        let cpsr = cpu.cpsr() | CPSR_T;
         cpu.set_cpsr(cpsr);
         cpu
     }

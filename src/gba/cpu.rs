@@ -10,8 +10,8 @@ use crate::{
         arm::execute_arm,
         bus::GbaBus,
         consts::{
-            CPSR_C, CPSR_I, CPSR_MODE_MASK, CPSR_N, CPSR_T, CPSR_V, CPSR_Z, MODE_FIQ, MODE_IRQ,
-            MODE_SVC, MODE_SYS, MODE_USR,
+            CPSR_C, CPSR_I, CPSR_MODE_MASK, CPSR_N, CPSR_T, CPSR_V, CPSR_Z, MODE_ABT, MODE_FIQ,
+            MODE_IRQ, MODE_SVC, MODE_SYS, MODE_UND, MODE_USR,
         },
         thumb::execute_thumb,
     },
@@ -21,12 +21,12 @@ use crate::{
 /// Index mapping for banked SPSR: FIQ=0, SVC=1, ABT=2, IRQ=3, UND=4.
 fn mode_to_spsr_index(mode: u32) -> Option<usize> {
     match mode & CPSR_MODE_MASK {
-        0x11 => Some(0), // FIQ
-        0x13 => Some(1), // SVC
-        0x17 => Some(2), // ABT
-        0x12 => Some(3), // IRQ
-        0x1B => Some(4), // UND
-        _ => None,       // USR and SYS have no SPSR
+        MODE_FIQ => Some(0),
+        MODE_SVC => Some(1),
+        MODE_ABT => Some(2),
+        MODE_IRQ => Some(3),
+        MODE_UND => Some(4),
+        _ => None, // USR and SYS have no SPSR
     }
 }
 
@@ -627,13 +627,11 @@ impl Arm7Tdmi {
                 self.banked.svc[0] = self.regs[13];
                 self.banked.svc[1] = self.regs[14];
             }
-            0x17 => {
-                // ABT
+            MODE_ABT => {
                 self.banked.abt[0] = self.regs[13];
                 self.banked.abt[1] = self.regs[14];
             }
-            0x1B => {
-                // UND
+            MODE_UND => {
                 self.banked.und[0] = self.regs[13];
                 self.banked.und[1] = self.regs[14];
             }
@@ -660,11 +658,11 @@ impl Arm7Tdmi {
                 self.regs[13] = self.banked.svc[0];
                 self.regs[14] = self.banked.svc[1];
             }
-            0x17 => {
+            MODE_ABT => {
                 self.regs[13] = self.banked.abt[0];
                 self.regs[14] = self.banked.abt[1];
             }
-            0x1B => {
+            MODE_UND => {
                 self.regs[13] = self.banked.und[0];
                 self.regs[14] = self.banked.und[1];
             }
@@ -1724,8 +1722,8 @@ mod tests {
     fn test_enter_exception_und_mode() {
         let mut cpu = make_cpu();
         let old_cpsr = cpu.cpsr();
-        cpu.enter_exception(0x04, 0x1B); // MODE_UND
-        assert_eq!(cpu.cpsr() & CPSR_MODE_MASK, 0x1B);
+        cpu.enter_exception(0x04, MODE_UND);
+        assert_eq!(cpu.cpsr() & CPSR_MODE_MASK, MODE_UND);
         assert!(cpu.cpsr() & CPSR_I != 0); // IRQs disabled
         assert!(cpu.cpsr() & CPSR_T == 0); // ARM mode
         assert_eq!(cpu.spsr(), old_cpsr);

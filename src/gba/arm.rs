@@ -5,7 +5,7 @@
 
 use crate::gba::{
     bios::handle_swi,
-    consts::{CPSR_MODE_MASK, CPSR_T, CPSR_Z, MODE_SVC, MODE_UND},
+    consts::{CPSR_I, CPSR_MODE_MASK, CPSR_T, CPSR_Z, MODE_SVC, MODE_UND, MODE_USR},
     cpu::Arm7Tdmi,
 };
 
@@ -784,7 +784,7 @@ fn write_psr(cpu: &mut Arm7Tdmi, use_spsr: bool, value: u32, mask: u32) {
     } else {
         let old = cpu.cpsr();
         // only allow mode bits in privileged mode
-        let effective_mask = if old & CPSR_MODE_MASK == 0x10 {
+        let effective_mask = if old & CPSR_MODE_MASK == MODE_USR {
             mask & 0xFF000000 // user mode: only flags
         } else {
             mask
@@ -801,7 +801,7 @@ fn arm_swi(cpu: &mut Arm7Tdmi, instr: u32) {
     let return_addr = cpu.pc().wrapping_sub(4);
     let old_cpsr = cpu.cpsr();
 
-    cpu.set_cpsr((old_cpsr & !CPSR_MODE_MASK & !CPSR_T) | MODE_SVC | crate::gba::consts::CPSR_I);
+    cpu.set_cpsr((old_cpsr & !CPSR_MODE_MASK & !CPSR_T) | MODE_SVC | CPSR_I);
     cpu.set_spsr(old_cpsr);
     cpu.set_reg(14, return_addr);
 
