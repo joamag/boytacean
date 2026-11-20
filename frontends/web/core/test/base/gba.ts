@@ -233,6 +233,20 @@ describe("GbaCore", function () {
             assert.strictEqual(core.loadedRomInfo?.game_code(), "1337");
         });
 
+        it("should be able to reject a ROM that can not be fetched", async () => {
+            const core = buildCore();
+            const romPath = pathToFileURL(
+                resolve(ROMS_PATH, "missing.gba")
+            ).href;
+            await assert.rejects(
+                core.boot({ loadRom: true, romPath: romPath }),
+                {
+                    message: `Unable to load ROM from ${romPath} (404)`
+                }
+            );
+            assert.strictEqual(core.loaded, false);
+        });
+
         it("should be able to reuse the GBA instance", async () => {
             const core = buildCore();
             const romData = await readRom(SRAM_ROM_URL);

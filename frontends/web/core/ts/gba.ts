@@ -678,6 +678,11 @@ export class GbaCore extends EmulatorLogic {
         // loads the ROM data and converts it into the
         // target byte array buffer (to be used by WASM)
         const response = await fetch(romPath);
+        if (!response.ok) {
+            throw new Error(
+                `Unable to load ROM from ${romPath} (${response.status})`
+            );
+        }
         const blob = await response.blob();
         const arrayBuffer = await blob.arrayBuffer();
         const romData = new Uint8Array(arrayBuffer);
