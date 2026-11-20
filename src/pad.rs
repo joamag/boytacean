@@ -289,8 +289,36 @@ impl Default for Pad {
 
 #[cfg(test)]
 mod tests {
-    use super::{Pad, PadSelection};
+    use super::{Pad, PadKey, PadSelection};
     use crate::state::StateComponent;
+
+    #[test]
+    fn test_pad_key_from_u8() {
+        assert_eq!(PadKey::from_u8(1), PadKey::Up);
+        assert_eq!(PadKey::from_u8(8), PadKey::B);
+        assert_eq!(PadKey::from_u8(9), PadKey::L);
+        assert_eq!(PadKey::from_u8(10), PadKey::R);
+    }
+
+    #[test]
+    fn test_key_press_shoulders() {
+        // the Game Boy has no L and R buttons, so their presses change
+        // neither the action buttons nor the JoyPad interrupt
+        let mut pad = Pad::new();
+        pad.write(0xff00, 0x10);
+        for key in [PadKey::L, PadKey::R] {
+            pad.key_press(key);
+            assert_eq!(pad.read(0xff00), 0x1f);
+            assert!(!pad.int_pad());
+            pad.key_lift(key);
+            assert_eq!(pad.read(0xff00), 0x1f);
+        }
+
+        // as the A button does
+        pad.key_press(PadKey::A);
+        assert_eq!(pad.read(0xff00), 0x1e);
+        assert!(pad.int_pad());
+    }
 
     #[test]
     fn test_state_and_set_state() {
