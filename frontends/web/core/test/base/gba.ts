@@ -11,7 +11,7 @@ import {
     TickParams
 } from "emukit/logic";
 
-import { GbaCore, releaseGbaCore } from "../../ts/gba";
+import { GbaCore } from "../../ts/gba";
 import { NullStorageAdapter, StorageAdapter } from "../../ts/storage";
 
 /**
@@ -58,12 +58,6 @@ const buildTick = (cycles: number): TickParams => ({
 });
 
 /**
- * The set of cores that have been built by a test, released after it
- * so that the active core does not leak into the following ones.
- */
-let cores: GbaCore[] = [];
-
-/**
  * Builds a core instance backed by the provided storage adapter,
  * defaulting to a null one, so that no Web Storage API is required
  * to run the tests.
@@ -73,11 +67,7 @@ let cores: GbaCore[] = [];
  */
 const buildCore = (
     storage: StorageAdapter = new NullStorageAdapter()
-): GbaCore => {
-    const core = new GbaCore({ storage: storage });
-    cores.push(core);
-    return core;
-};
+): GbaCore => new GbaCore({ storage: storage });
 
 /**
  * Builds a storage adapter backed by the provided in memory items,
@@ -161,14 +151,6 @@ describe("GbaCore", function () {
     after(() => {
         global.fetch = fetch;
         logger.level = level;
-    });
-
-    beforeEach(() => {
-        cores = [];
-    });
-
-    afterEach(() => {
-        cores.forEach((core) => releaseGbaCore(core));
     });
 
     describe("#tick()", function () {

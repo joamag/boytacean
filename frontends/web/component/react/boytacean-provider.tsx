@@ -2,7 +2,6 @@ import {
     GameBoyCore,
     GbaCore,
     releaseCore,
-    releaseGbaCore,
     StorageAdapter
 } from "boytacean-core";
 import React, {
@@ -164,8 +163,7 @@ export const BoytaceanProvider: FC<BoytaceanProviderProps> = ({
             disposed = true;
             core.stop();
             core.unbind("booted", onBooted);
-            if (core instanceof GbaCore) releaseGbaCore(core);
-            else releaseCore(core);
+            if (core instanceof GameBoyCore) releaseCore(core);
             if (pending.current === currentRequest) {
                 currentRequest?.reject(new Error("ROM loading was cancelled"));
                 pending.current = null;

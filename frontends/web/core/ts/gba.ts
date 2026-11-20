@@ -56,54 +56,6 @@ const KEYS_NAME: Record<string, number> = {
 };
 
 /**
- * The core instance that is currently receiving the callbacks
- * triggered from the WASM side.
- *
- * The WASM module binds its callbacks to the `window` namespace,
- * which means that only a single core instance can be active at
- * any given time.
- */
-let activeCore: GbaCore | null = null;
-
-/**
- * Registers the provided core as the one that is going to receive
- * the callbacks triggered from the WASM side.
- *
- * The callbacks exposed by the WASM module are bound to the `window`
- * namespace, meaning that a single core instance can be active at
- * any given time.
- *
- * @param core The core instance to be set as the active one.
- */
-const setActiveCore = (core: GbaCore) => {
-    // warns about the takeover of the callbacks, as the previously
-    // active core stops receiving the events from that moment on,
-    // only a core that has already loaded a ROM is considered, so
-    // that the sequential creation of cores is not reported as a
-    // conflict
-    if (activeCore && activeCore !== core && activeCore.loaded) {
-        core.logger.warn(
-            "Multiple Game Boy Advance cores detected, only the last one created receives the WASM callbacks"
-        );
-    }
-    activeCore = core;
-};
-
-/**
- * Releases the provided core from the active position, so that it
- * stops receiving the callbacks triggered from the WASM side.
- *
- * A core that is not the active one is ignored, avoiding the release
- * of a core that has already been superseded by another one.
- *
- * @param core The core instance to be released.
- */
-export const releaseGbaCore = (core: GbaCore) => {
-    if (activeCore !== core) return;
-    activeCore = null;
-};
-
-/**
  * Top level class that controls the emulation of the Game Boy
  * Advance system, joining all the elements together to bring
  * input/output of the associated machine.
@@ -175,7 +127,6 @@ export class GbaCore extends EmulatorLogic {
         this.wasmPath = wasmPath ?? null;
         this.storage = storage ?? defaultStorage();
         this.extraSettings = extraSettings;
-        setActiveCore(this);
     }
 
     /**
