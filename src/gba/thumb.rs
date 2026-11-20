@@ -683,24 +683,9 @@ fn thumb_cond_branch(cpu: &mut Arm7Tdmi, instr: u16) {
     let cond = (instr >> 8) & 0xF;
     let offset = ((instr & 0xFF) as i8 as i32) * 2;
 
-    // reuse ARM condition checking
-    let condition_met = match cond {
-        0x0 => cpu.flag_z(),
-        0x1 => !cpu.flag_z(),
-        0x2 => cpu.flag_c(),
-        0x3 => !cpu.flag_c(),
-        0x4 => cpu.flag_n(),
-        0x5 => !cpu.flag_n(),
-        0x6 => cpu.flag_v(),
-        0x7 => !cpu.flag_v(),
-        0x8 => cpu.flag_c() && !cpu.flag_z(),
-        0x9 => !cpu.flag_c() || cpu.flag_z(),
-        0xA => cpu.flag_n() == cpu.flag_v(),
-        0xB => cpu.flag_n() != cpu.flag_v(),
-        0xC => !cpu.flag_z() && cpu.flag_n() == cpu.flag_v(),
-        0xD => cpu.flag_z() || cpu.flag_n() != cpu.flag_v(),
-        _ => false,
-    };
+    // reuse ARM condition checking, the always condition (0xE) is
+    // undefined for Thumb conditional branches, so it is never taken
+    let condition_met = cond != 0xE && cpu.check_condition((cond as u32) << 28);
 
     if condition_met {
         let target = (cpu.pc() as i32).wrapping_add(offset) as u32;
@@ -1015,6 +1000,37 @@ mod tests {
         let wb_base = base + 8;
         assert_eq!(cpu.bus_read32(base), 0xAA);
         assert_eq!(cpu.bus_read32(base + 4), wb_base);
+    }
+
+    #[test]
+    fn test_thumb_cond_branch() {
+        let mut cpu = make_thumb_cpu();
+        let pc = 0x08000104u32;
+        cpu.set_reg(15, pc);
+        // BEQ #+8 = 0xD004, not taken with Z clear
+        cpu.set_nz_flags(1);
+        execute_thumb(&mut cpu, 0xD004);
+        assert_eq!(cpu.pc(), pc);
+        assert_eq!(cpu.cycles, 1);
+
+        // BEQ #+8 = 0xD004, taken with Z set
+        cpu.set_nz_flags(0);
+        execute_thumb(&mut cpu, 0xD004);
+        assert_eq!(cpu.pc(), pc + 8);
+        assert_eq!(cpu.cycles, 3);
+
+        // BLE #-4 = 0xDDFE, taken with Z set
+        execute_thumb(&mut cpu, 0xDDFE);
+        assert_eq!(cpu.pc(), pc + 4);
+
+        // BGT #-4 = 0xDCFE, not taken with Z set
+        execute_thumb(&mut cpu, 0xDCFE);
+        assert_eq!(cpu.pc(), pc + 4);
+
+        // the undefined always condition (0xE) is never taken
+        execute_thumb(&mut cpu, 0xDE04);
+        assert_eq!(cpu.pc(), pc + 4);
+        assert_eq!(cpu.cycles, 1);
     }
 
     #[test]
