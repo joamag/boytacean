@@ -3,7 +3,7 @@ import { readFileSync } from "fs";
 import { createRequire } from "module";
 import { resolve } from "path";
 
-import { initSync } from "boytacean";
+import { GameBoyAdvance, initSync } from "boytacean";
 import { GameBoyCore, GbaCore, NullStorageAdapter } from "boytacean-core";
 import { ComponentProps, ReactElement } from "react";
 
@@ -404,6 +404,25 @@ describe("BoytaceanProvider", function () {
             assert.ok(value.core instanceof GbaCore);
             assert.strictEqual(value.system, BoytaceanSystem.GameBoyAdvance);
             assert.strictEqual(value.core.loadedRomName, "game.bin");
+        });
+
+        it("should be able to validate the header of a ROM only once", async () => {
+            const verify = GameBoyAdvance.verify_rom_wa;
+            let verifications = 0;
+            GameBoyAdvance.verify_rom_wa = (data: Uint8Array) => {
+                verifications++;
+                return verify(data);
+            };
+            restore.push(() => {
+                GameBoyAdvance.verify_rom_wa = verify;
+            });
+            let value = provider.render();
+            const loaded = value.loadRom("game.bin", GBA_ROM_DATA);
+            value = provider.render();
+            await loaded;
+            assert.strictEqual(provider.render(), value);
+            assert.strictEqual(provider.render(), value);
+            assert.strictEqual(verifications, 1);
         });
 
         it("should be able to honour the explicit system on runtime loads", async () => {

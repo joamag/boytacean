@@ -107,10 +107,18 @@ export const BoytaceanProvider: FC<BoytaceanProviderProps> = ({
     const pending = useRef<RomRequest | null>(null);
     const started = useRef<GameBoyCore | GbaCore | null>(null);
     const currentRequest = request?.source === rom ? request : null;
-    const resolved = resolveSystem(
-        system,
-        currentRequest?.name ?? rom,
-        currentRequest?.data
+
+    // the system is only resolved again when the ROM changes, as the
+    // validation of its header copies the complete ROM into the WASM
+    // memory, which is too expensive to be done on every render
+    const resolved = useMemo(
+        () =>
+            resolveSystem(
+                system,
+                currentRequest?.name ?? rom,
+                currentRequest?.data
+            ),
+        [system, rom, currentRequest]
     );
     const core = useMemo<GameBoyCore | GbaCore>(
         () =>
