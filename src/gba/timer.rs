@@ -75,6 +75,11 @@ impl GbaTimer {
         self.prescaler = TIMER_PRESCALERS[(value & 0x03) as usize];
         self.prescaler_shift = self.prescaler.trailing_zeros();
 
+        // keeps the elapsed prescaler cycles within the new period, so a
+        // running timer switched to a shorter prescaler does not carry
+        // a phase longer than the period itself
+        self.prescaler_counter &= self.prescaler - 1;
+
         // reload counter when transitioning from disabled to enabled
         if !was_enabled && self.enabled {
             self.counter = self.reload;
@@ -381,6 +386,31 @@ mod tests {
         timer.set_reload(0x1234);
         timer.set_control(1 << 7); // enable
         assert_eq!(timer.counter(), 0x1234);
+    }
+
+    #[test]
+    fn test_timer_control_prescaler_change() {
+        let mut timer = GbaTimer::new();
+        timer.set_reload(0xFFF0);
+        timer.set_control(0x83);
+        timer.clock(500);
+        assert_eq!(timer.counter(), 0xFFF0);
+
+        // a shorter prescaler drops the elapsed cycles beyond its period
+        timer.set_control(0x80);
+        assert_eq!(timer.cycles_to_overflow(), 16);
+        assert!(!timer.clock(1));
+        assert_eq!(timer.counter(), 0xFFF1);
+
+        // a longer prescaler keeps the elapsed cycles within its period
+        timer.set_control(0x81);
+        timer.clock(40);
+        timer.set_control(0x82);
+        assert_eq!(timer.cycles_to_overflow(), 15 * 256 - 40);
+        assert!(!timer.clock(215));
+        assert_eq!(timer.counter(), 0xFFF1);
+        assert!(!timer.clock(1));
+        assert_eq!(timer.counter(), 0xFFF2);
     }
 
     #[test]
