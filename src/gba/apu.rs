@@ -2359,6 +2359,36 @@ mod tests {
     }
 
     #[test]
+    fn test_envelope_bounds_ch2_ch4() {
+        for (index, (envelope_addr, control_addr)) in
+            [(0x0400_0069, 0x0400_006D), (0x0400_0079, 0x0400_007D)]
+                .into_iter()
+                .enumerate()
+        {
+            // volume=1 decreasing and volume=14 increasing, pace=1
+            for (envelope, volume) in [(0x11, 0), (0xE9, 15)] {
+                let mut apu = GbaApu::new();
+                apu.set_soundcnt_x(0x80);
+                apu.write_channel_reg(envelope_addr, envelope);
+                apu.write_channel_reg(control_addr, 0x80);
+
+                // the envelope stops at the volume bounds
+                let sequencer_period = CPU_FREQ / 512;
+                for _ in 0..2 {
+                    apu.sequencer_step = 7;
+                    apu.sequencer_counter = sequencer_period - 1;
+                    apu.clock(1);
+                    apu.flush();
+                }
+                let volumes = [apu.ch2_volume, apu.ch4_volume];
+                let enabled = [apu.ch2_envelope_enabled, apu.ch4_envelope_enabled];
+                assert_eq!(volumes[index], volume);
+                assert!(!enabled[index]);
+            }
+        }
+    }
+
+    #[test]
     fn test_sweep_increases_frequency() {
         let mut apu = GbaApu::new();
         apu.set_soundcnt_x(0x80);
@@ -2953,6 +2983,43 @@ mod tests {
 
         // channel should not be enabled with DAC off
         assert!(!apu.ch1_enabled);
+    }
+
+    #[test]
+    fn test_length_enable_odd_step() {
+        for (index, (dac_addr, dac, length_addr, length, control_addr)) in [
+            (0x0400_0063, 0xF0, 0x0400_0062, 0x3F, 0x0400_0065),
+            (0x0400_0069, 0xF0, 0x0400_0068, 0x3F, 0x0400_006D),
+            (0x0400_0070, 0x80, 0x0400_0072, 0xFF, 0x0400_0075),
+            (0x0400_0079, 0xF0, 0x0400_0078, 0x3F, 0x0400_007D),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let mut apu = GbaApu::new();
+            apu.set_soundcnt_x(0x80);
+            apu.sequencer_step = 1;
+            apu.write_channel_reg(dac_addr, dac);
+            apu.write_channel_reg(length_addr, length);
+            apu.write_channel_reg(control_addr, 0x80);
+            assert_eq!(apu.soundcnt_x() & (1 << index), 1 << index);
+
+            // enabling the length on an odd step (the next step does not
+            // clock it) clocks it once, expiring the last length unit
+            apu.write_channel_reg(control_addr, 0x40);
+            assert_eq!(apu.soundcnt_x() & (1 << index), 0);
+
+            // a trigger reloads the expired length, minus that extra clock
+            apu.write_channel_reg(control_addr, 0xC0);
+            assert_eq!(apu.soundcnt_x() & (1 << index), 1 << index);
+            let length_timers = [
+                apu.ch1_length_timer as u16,
+                apu.ch2_length_timer as u16,
+                apu.ch3_length_timer,
+                apu.ch4_length_timer as u16,
+            ];
+            assert_eq!(length_timers[index], if index == 2 { 255 } else { 63 });
+        }
     }
 
     #[test]

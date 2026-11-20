@@ -593,6 +593,27 @@ mod tests {
     }
 
     #[test]
+    fn test_dma_step_decrement_addr() {
+        let mut ch = DmaChannel::new();
+        ch.set_src_reg(0x0200_0010);
+        ch.set_dst_reg(0x0600_0010);
+        ch.set_count_reg(2);
+        // enable, immediate, 32-bit, src/dst decrement (bits 7-8, 5-6 = 1)
+        ch.set_control((1 << 15) | (1 << 10) | (1 << 7) | (1 << 5), 0);
+
+        ch.step();
+        assert_eq!(ch.src(), 0x0200_000C);
+        assert_eq!(ch.dst(), 0x0600_000C);
+
+        // the prohibited source increment reload increments the source
+        ch.set_control(0, 0);
+        ch.set_control((1 << 15) | (1 << 10) | (3 << 7), 0);
+        ch.step();
+        assert_eq!(ch.src(), 0x0200_0014);
+        assert_eq!(ch.dst(), 0x0600_0014);
+    }
+
+    #[test]
     fn test_dma_step_repeat_count() {
         for index in 0..4 {
             for count in [0, 2] {
