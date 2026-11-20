@@ -159,9 +159,10 @@ impl Flasher {
     }
 
     /// If the flashing is complete, with the flash chip detected and the
-    /// whole ROM (if any) programmed and verified.
+    /// whole ROM (if any) programmed and verified, without any failure.
     pub fn is_finished(&self) -> bool {
         self.detected
+            && self.failure.is_none()
             && self.commands.is_empty()
             && self.pending.is_none()
             && self.programmed == self.rom_size()
@@ -182,6 +183,55 @@ impl Flasher {
     /// Feeds the reply to the last exchange, which may plan the next
     /// commands (eg: the flashing of the ROM once the chip is known).
     pub fn feed(&mut self, data: &[u8]) -> Result<(), Error> {
+        // a reply that can't be handled stops the flashing for good, as
+        // the device is no longer in step with the commands sent to it,
+        // so that nothing else (not even a cleanup) is sent to it
+        let result = self.feed_reply(data);
+        if let Err(err) = &result {
+            self.commands.clear();
+            self.failure = Some(err.clone());
+        }
+        result
+    }
+
+    /// Finishes the flashing, failing in case it is not complete or
+    /// with the failure that stopped it.
+    pub fn finish(&mut self) -> Result<(), Error> {
+        if let Some(failure) = &self.failure {
+            return Err(failure.clone());
+        }
+        if !self.is_finished() {
+            return Err(Error::CustomError(String::from(
+                "The flashing of the cartridge is not complete",
+            )));
+        }
+        Ok(())
+    }
+
+    /// Runs the complete flashing over a blocking transport to the
+    /// device (eg: a serial port), calling back with the progress after
+    /// each exchange.
+    pub fn run<T: Read + Write, F: FnMut(f32)>(
+        &mut self,
+        transport: &mut T,
+        mut callback: F,
+    ) -> Result<(), Error> {
+        while let Some(exchange) = self.next_exchange() {
+            transport.write_all(exchange.send())?;
+            transport.flush()?;
+            let mut data = vec![0x00; exchange.expect()];
+            transport.read_exact(&mut data)?;
+            self.feed(&data)?;
+            callback(self.progress());
+        }
+        self.finish()
+    }
+
+    fn rom_size(&self) -> usize {
+        self.rom.as_ref().map_or(0, Vec::len)
+    }
+
+    fn feed_reply(&mut self, data: &[u8]) -> Result<(), Error> {
         let (target, expect) = self.pending.take().ok_or(Error::CustomError(String::from(
             "No exchange with the device in progress",
         )))?;
@@ -216,43 +266,6 @@ impl Flasher {
             Target::Verify => self.feed_verify(data)?,
         }
         Ok(())
-    }
-
-    /// Finishes the flashing, failing in case it is not complete or
-    /// with the failure that stopped it.
-    pub fn finish(&mut self) -> Result<(), Error> {
-        if let Some(failure) = self.failure.take() {
-            return Err(failure);
-        }
-        if !self.is_finished() {
-            return Err(Error::CustomError(String::from(
-                "The flashing of the cartridge is not complete",
-            )));
-        }
-        Ok(())
-    }
-
-    /// Runs the complete flashing over a blocking transport to the
-    /// device (eg: a serial port), calling back with the progress after
-    /// each exchange.
-    pub fn run<T: Read + Write, F: FnMut(f32)>(
-        &mut self,
-        transport: &mut T,
-        mut callback: F,
-    ) -> Result<(), Error> {
-        while let Some(exchange) = self.next_exchange() {
-            transport.write_all(exchange.send())?;
-            transport.flush()?;
-            let mut data = vec![0x00; exchange.expect()];
-            transport.read_exact(&mut data)?;
-            self.feed(&data)?;
-            callback(self.progress());
-        }
-        self.finish()
-    }
-
-    fn rom_size(&self) -> usize {
-        self.rom.as_ref().map_or(0, Vec::len)
     }
 
     fn feed_firmware(&mut self, data: &[u8]) -> Result<(), Error> {
@@ -846,6 +859,13 @@ mod tests {
             )))
         );
         assert_eq!(flasher.chip(), None);
+        assert!(!flasher.is_finished());
+        assert_eq!(
+            flasher.finish().err(),
+            Some(Error::CustomError(String::from(
+                "Unsupported flash command set: 0x0001"
+            )))
+        );
         assert!(!device.cfi_mode);
         assert_eq!(device.voltages.last(), Some(&SET_VOLTAGE_5V));
         assert_eq!(device.commands.last(), Some(&SET_ADDR_AS_INPUTS));
@@ -932,6 +952,17 @@ mod tests {
         flasher.next_exchange().unwrap();
         assert_eq!(
             flasher.feed(&[0x00]).err(),
+            Some(Error::DataError(String::from(
+                "Invalid acknowledgement from the device"
+            )))
+        );
+
+        // nothing else is sent once a reply fails, and the flashing
+        // finishes with that failure
+        assert!(flasher.next_exchange().is_none());
+        assert!(!flasher.is_finished());
+        assert_eq!(
+            flasher.finish().err(),
             Some(Error::DataError(String::from(
                 "Invalid acknowledgement from the device"
             )))
