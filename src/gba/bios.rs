@@ -213,6 +213,8 @@ fn swi_intr_wait(cpu: &mut Arm7Tdmi) {
     // can actually be delivered while halted
     cpu.bus.irq.set_ime(true);
     cpu.bus.intr_wait_flags = flags;
+    // the wait loop resumes at the SWI return address (LR_svc)
+    cpu.set_intr_wait_pc(cpu.reg(14));
     cpu.set_halted(true);
 }
 
@@ -231,6 +233,8 @@ fn swi_vblank_intr_wait(cpu: &mut Arm7Tdmi) {
     // can actually be delivered while halted
     cpu.bus.irq.set_ime(true);
     cpu.bus.intr_wait_flags = 1; // wait for VBlank (IRQ bit 0)
+                                 // the wait loop resumes at the SWI return address (LR_svc)
+    cpu.set_intr_wait_pc(cpu.reg(14));
     cpu.set_halted(true);
 }
 
