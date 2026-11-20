@@ -92,7 +92,8 @@ type RomRequest = {
  *
  * The core that is built depends on the system that is being
  * emulated, meaning that a new one is created whenever the system
- * changes, either explicitly or through the ROM that is loaded.
+ * changes, either explicitly or through the ROM that is loaded,
+ * while a ROM of the same system is booted on the running core.
  */
 export const BoytaceanProvider: FC<BoytaceanProviderProps> = ({
     rom,
@@ -104,6 +105,7 @@ export const BoytaceanProvider: FC<BoytaceanProviderProps> = ({
 }) => {
     const [request, setRequest] = useState<RomRequest | null>(null);
     const pending = useRef<RomRequest | null>(null);
+    const started = useRef<GameBoyCore | GbaCore | null>(null);
     const currentRequest = request?.source === rom ? request : null;
     const resolved = resolveSystem(
         system,
@@ -116,7 +118,7 @@ export const BoytaceanProvider: FC<BoytaceanProviderProps> = ({
                 ? new GbaCore({ wasmPath: wasmPath, storage: storage })
                 : new GameBoyCore({ wasmPath: wasmPath, storage: storage }),
         // eslint-disable-next-line react-hooks/exhaustive-deps
-        [resolved, rom, currentRequest]
+        [resolved]
     );
 
     useEffect(() => {
@@ -125,6 +127,14 @@ export const BoytaceanProvider: FC<BoytaceanProviderProps> = ({
             pending.current = null;
         };
     }, []);
+
+    useEffect(() => {
+        return () => {
+            core.stop();
+            if (core instanceof GameBoyCore) releaseCore(core);
+            if (started.current === core) started.current = null;
+        };
+    }, [core]);
 
     useEffect(() => {
         let disposed = false;
@@ -137,7 +147,11 @@ export const BoytaceanProvider: FC<BoytaceanProviderProps> = ({
         };
 
         const boot = async () => {
-            await core.init();
+            // in case the main loop of the core is already running the
+            // WASM module is loaded and the ROM is booted directly on it,
+            // avoiding both a second loop and the rebuild of the core
+            const running = started.current === core;
+            if (!running) await core.init();
 
             // in case the component has been unmounted while the WASM
             // module was still loading then avoids the boot operation
@@ -156,9 +170,25 @@ export const BoytaceanProvider: FC<BoytaceanProviderProps> = ({
                 return;
             }
 
+            if (running) {
+                await core.boot({
+                    loadRom: true,
+                    romPath: currentRequest ? undefined : rom
+                });
+                return;
+            }
+
             // starts the main loop of the emulator, notice that this
-            // promise is only settled once the emulator is stopped
-            await core.start({ romUrl: currentRequest ? undefined : rom });
+            // promise is only settled once the emulator is stopped, in
+            // case the start fails the loop is not running, meaning that
+            // the next ROM has to start it again
+            started.current = core;
+            try {
+                await core.start({ romUrl: currentRequest ? undefined : rom });
+            } catch (error) {
+                if (started.current === core) started.current = null;
+                throw error;
+            }
         };
         boot().catch((error: Error) => {
             if (disposed) return;
@@ -169,16 +199,14 @@ export const BoytaceanProvider: FC<BoytaceanProviderProps> = ({
 
         return () => {
             disposed = true;
-            core.stop();
             core.unbind("booted", onBooted);
-            if (core instanceof GameBoyCore) releaseCore(core);
             if (pending.current === currentRequest) {
                 currentRequest?.reject(new Error("ROM loading was cancelled"));
                 pending.current = null;
             }
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [core]);
+    }, [core, rom, currentRequest]);
 
     const value = useMemo<BoytaceanContextValue>(
         () => ({

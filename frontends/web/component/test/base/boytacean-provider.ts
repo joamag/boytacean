@@ -107,10 +107,13 @@ const buildProvider = () => {
 describe("BoytaceanProvider", function () {
     let provider: ReturnType<typeof buildProvider>;
     let starts: (GameBoyCore | GbaCore)[];
+    let boots: (GameBoyCore | GbaCore)[];
     let stops: (GameBoyCore | GbaCore)[];
     let errors: Error[];
+    let warnings: string[];
     let initialize: (core: GameBoyCore | GbaCore) => Promise<void>;
     let start: (core: GameBoyCore | GbaCore) => Promise<void>;
+    let boot: (core: GameBoyCore | GbaCore) => Promise<void>;
     let restore: (() => void)[];
 
     before(() => {
@@ -126,23 +129,32 @@ describe("BoytaceanProvider", function () {
     beforeEach(() => {
         provider = buildProvider();
         starts = [];
+        boots = [];
         stops = [];
         errors = [];
+        warnings = [];
         initialize = async () => {};
         start = async (core) => {
             core.trigger("booted");
         };
+        boot = async (core) => {
+            core.trigger("booted");
+        };
         const originalError = console.error;
+        const originalWarn = console.warn;
         console.error = (error: Error) => errors.push(error);
+        console.warn = (message: string) => warnings.push(message);
         restore = [
             () => {
                 console.error = originalError;
+                console.warn = originalWarn;
             }
         ];
         for (const prototype of [GameBoyCore.prototype, GbaCore.prototype]) {
             const original = {
                 init: prototype.init,
                 start: prototype.start,
+                boot: prototype.boot,
                 stop: prototype.stop
             };
             prototype.init = async function () {
@@ -151,6 +163,10 @@ describe("BoytaceanProvider", function () {
             prototype.start = async function () {
                 starts.push(this);
                 await start(this);
+            };
+            prototype.boot = async function () {
+                boots.push(this);
+                await boot(this);
             };
             prototype.stop = async function () {
                 stops.push(this);
@@ -260,6 +276,17 @@ describe("BoytaceanProvider", function () {
             assert.ok(stops.includes(gb.core));
         });
 
+        it("should be able to reuse the core for a ROM of the same system", async () => {
+            const value = provider.render({ rom: "pocket.gb" });
+            await new Promise((resolve) => setImmediate(resolve));
+            const next = provider.render({ rom: "another.gb" });
+            await new Promise((resolve) => setImmediate(resolve));
+            assert.strictEqual(next.core, value.core);
+            assert.deepStrictEqual(starts, [value.core]);
+            assert.deepStrictEqual(boots, [value.core]);
+            assert.deepStrictEqual(stops, []);
+        });
+
         it("should be able to report initial startup errors", async () => {
             const error = new Error("Unable to initialize WASM");
             initialize = async () => {
@@ -306,9 +333,67 @@ describe("BoytaceanProvider", function () {
                 );
                 assert.strictEqual(value.core.loadedRomName, name);
                 assert.strictEqual(value.core.loadedRomSize, 3);
-                assert.ok(stops.includes(previous));
+                assert.strictEqual(
+                    stops.includes(previous),
+                    value.core !== previous
+                );
             }
             assert.strictEqual(starts.length, 3);
+        });
+
+        it("should be able to reuse the core for a ROM of the same system", async () => {
+            let value = provider.render();
+            let loaded = value.loadRom("first.gb", new Uint8Array([1]));
+            value = provider.render();
+            await loaded;
+            loaded = value.loadRom("second.gb", new Uint8Array([2]));
+            const next = provider.render();
+            await loaded;
+            assert.strictEqual(next, value);
+            assert.strictEqual(next.core.loadedRomName, "second.gb");
+            assert.deepStrictEqual(starts, [value.core]);
+            assert.deepStrictEqual(boots, [value.core]);
+            assert.deepStrictEqual(stops, []);
+            assert.deepStrictEqual(warnings, []);
+        });
+
+        it("should be able to reject a failed boot of the running core", async () => {
+            const error = new Error("Invalid ROM");
+            boot = async () => {
+                throw error;
+            };
+            let value = provider.render();
+            let loaded = value.loadRom("first.gb", new Uint8Array([1]));
+            value = provider.render();
+            await loaded;
+            loaded = assert.rejects(
+                value.loadRom("second.gb", new Uint8Array([2])),
+                error
+            );
+            provider.render();
+            await loaded;
+            assert.deepStrictEqual(errors, []);
+        });
+
+        it("should be able to start the core again after a failed start", async () => {
+            start = async () => {
+                throw new Error("Invalid ROM");
+            };
+            let value = provider.render();
+            let loaded = assert.rejects(
+                value.loadRom("first.gb", new Uint8Array([1])),
+                /Invalid ROM/
+            );
+            value = provider.render();
+            await loaded;
+            start = async (core) => {
+                core.trigger("booted");
+            };
+            loaded = value.loadRom("second.gb", new Uint8Array([2]));
+            provider.render();
+            await loaded;
+            assert.deepStrictEqual(starts, [value.core, value.core]);
+            assert.deepStrictEqual(boots, []);
         });
 
         it("should be able to detect a GBA ROM without its extension", async () => {

@@ -12,9 +12,9 @@ export enum BoytaceanSystem {
 }
 
 /**
- * The stable set of values exposed by the Boytacean context, the
- * identity of this structure is kept stable for the complete
- * lifetime of the provider, meaning that consumers of it are never
+ * The set of values exposed by the Boytacean context, the identity
+ * of this structure only changes with either the ROM property or the
+ * system that is emulated, meaning that consumers of it are never
  * re-rendered because of emulation activity.
  *
  * High frequency information (eg: the frame buffer) is intentionally

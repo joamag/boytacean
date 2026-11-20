@@ -179,7 +179,7 @@ The display is sized from the core, so the screen switches between the 160x144 o
 
 ## Hooks
 
-* `useBoytacean()` - the context of the closest provider: the `core` instance and the `system` it emulates, plus the `play()`, `pause()`, `reset()`, `loadRom()`, `press()` and `release()` actions. Its identity is stable for the lifetime of the provider, so consumers are never re-rendered by emulation activity.
+* `useBoytacean()` - the context of the closest provider: the `core` instance and the `system` it emulates, plus the `play()`, `pause()`, `reset()`, `loadRom()`, `press()` and `release()` actions. Its identity only changes with the `rom` property or the emulated system, as a ROM of the same system is booted on the running core, so consumers are never re-rendered by emulation activity.
 * `useBoytaceanStatus()` - `booted` and `romName`, updated only when a ROM is booted.
 * `useBoytaceanStats()` - `framerate`, `cyclerate` and `emulationSpeed`, sampled every 500 ms by default (`useBoytaceanStats(interval)` to change it).
 
