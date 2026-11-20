@@ -504,11 +504,13 @@ fn swi_bit_unpack(cpu: &mut Arm7Tdmi) {
     let zero_flag = data_offset & (1 << 31) != 0;
     let offset = data_offset & 0x7FFF_FFFF;
 
-    if src_width == 0 || dst_width == 0 || dst_width > 32 {
+    // only the unit widths supported by the BIOS are accepted
+    if !matches!(src_width, 1 | 2 | 4 | 8) || !matches!(dst_width, 1 | 2 | 4 | 8 | 16 | 32) {
         return;
     }
 
     let src_mask = (1u32 << src_width) - 1;
+    let dst_mask = u32::MAX >> (32 - dst_width);
     let mut src_offset = 0u32;
     let mut dst_offset = 0u32;
     let mut dst_buffer = 0u32;
@@ -529,7 +531,7 @@ fn swi_bit_unpack(cpu: &mut Arm7Tdmi) {
                 0
             };
 
-            dst_buffer |= (unpacked & ((1u32 << dst_width) - 1)) << dst_bits;
+            dst_buffer |= (unpacked & dst_mask) << dst_bits;
             dst_bits += dst_width;
 
             if dst_bits >= 32 {
@@ -1538,6 +1540,64 @@ mod tests {
 
         // nibble 0x3 + offset 1 = 4, nibble 0x5 + offset 1 = 6
         assert_eq!(cpu.bus_read32(0x0200_1000), 0x00000604);
+    }
+
+    #[test]
+    fn test_swi_bit_unpack_8to32() {
+        let mut cpu = make_cpu();
+
+        // source: 3 bytes of 8-bit data, with a zero unit in the middle
+        cpu.bus_write8(0x0200_0000, 0x05);
+        cpu.bus_write8(0x0200_0001, 0x00);
+        cpu.bus_write8(0x0200_0002, 0xFF);
+
+        // unpack info: length=3, src_width=8, dst_width=32, offset=0x12340000
+        cpu.bus_write16(0x0200_0100, 3);
+        cpu.bus_write8(0x0200_0102, 8);
+        cpu.bus_write8(0x0200_0103, 32);
+        cpu.bus_write32(0x0200_0104, 0x1234_0000); // no zero flag
+        cpu.bus_write32(0x0200_100C, 0xDEADBEEF);
+
+        cpu.set_reg(0, 0x0200_0000);
+        cpu.set_reg(1, 0x0200_1000);
+        cpu.set_reg(2, 0x0200_0100);
+        handle_swi(&mut cpu, 0x10);
+
+        // each unit fills a whole word, the zero unit gets no offset
+        assert_eq!(cpu.bus_read32(0x0200_1000), 0x1234_0005);
+        assert_eq!(cpu.bus_read32(0x0200_1004), 0);
+        assert_eq!(cpu.bus_read32(0x0200_1008), 0x1234_00FF);
+        assert_eq!(cpu.bus_read32(0x0200_100C), 0xDEADBEEF);
+    }
+
+    #[test]
+    fn test_swi_bit_unpack_invalid_widths() {
+        // only source widths of 1, 2, 4 and 8 and destination widths
+        // of 1, 2, 4, 8, 16 and 32 bits are supported by the BIOS
+        for (src_width, dst_width) in [
+            (0, 8),
+            (3, 8),
+            (16, 32),
+            (32, 32),
+            (255, 8),
+            (1, 0),
+            (1, 3),
+            (8, 64),
+            (8, 255),
+        ] {
+            let mut cpu = make_cpu();
+            cpu.bus_write32(0x0200_0000, 0xFFFF_FFFF);
+            cpu.bus_write16(0x0200_0100, 4);
+            cpu.bus_write8(0x0200_0102, src_width);
+            cpu.bus_write8(0x0200_0103, dst_width);
+            cpu.bus_write32(0x0200_0104, 1 | (1 << 31));
+            cpu.bus_write32(0x0200_1000, 0xDEADBEEF);
+            cpu.set_reg(0, 0x0200_0000);
+            cpu.set_reg(1, 0x0200_1000);
+            cpu.set_reg(2, 0x0200_0100);
+            assert!(!handle_swi(&mut cpu, 0x10));
+            assert_eq!(cpu.bus_read32(0x0200_1000), 0xDEADBEEF);
+        }
     }
 
     #[test]
