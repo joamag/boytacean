@@ -5,6 +5,23 @@ use crate::gba::consts::{
     IRQ_TIMER1, IRQ_TIMER2, IRQ_TIMER3, IRQ_VBLANK, IRQ_VCOUNT,
 };
 
+/// Represents the GBA interrupt controller with the master enable
+/// (IME), the enabled sources (IE) and the requested interrupts (IF)
+/// registers, an interrupt is delivered to the CPU only when it is
+/// both enabled and requested while IME is set.
+///
+/// # Basic usage
+///
+/// ```rust
+/// use boytacean::gba::{consts::IRQ_VBLANK, irq::IrqController};
+/// let mut irq = IrqController::new();
+/// irq.set_ime(true);
+/// irq.set_ie(IRQ_VBLANK);
+/// irq.raise_vblank();
+/// assert!(irq.pending());
+/// irq.ack_if(IRQ_VBLANK);
+/// assert!(!irq.pending());
+/// ```
 pub struct IrqController {
     /// Interrupt Master Enable (IME) - global interrupt toggle.
     ime: bool,

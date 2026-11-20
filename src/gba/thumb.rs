@@ -415,7 +415,7 @@ fn thumb_load_store_reg(cpu: &mut Arm7Tdmi, instr: u16) {
             cpu.set_reg(rd, value);
         }
         0b100 => {
-            // LDR — misaligned addresses rotate
+            // LDR: misaligned addresses rotate
             let rotate = (addr & 3) * 8;
             let value = cpu.bus_read32(addr & !3);
             let value = if rotate != 0 {
@@ -426,7 +426,7 @@ fn thumb_load_store_reg(cpu: &mut Arm7Tdmi, instr: u16) {
             cpu.set_reg(rd, value);
         }
         0b101 => {
-            // LDRH — misaligned addresses rotate
+            // LDRH: misaligned addresses rotate
             let aligned = cpu.bus_read16(addr & !1) as u32;
             let value = if addr & 1 != 0 {
                 aligned.rotate_right(8)
@@ -441,7 +441,7 @@ fn thumb_load_store_reg(cpu: &mut Arm7Tdmi, instr: u16) {
             cpu.set_reg(rd, value);
         }
         0b111 => {
-            // LDRSH — misaligned reads as LDRSB
+            // LDRSH: misaligned reads as LDRSB
             let value = if addr & 1 != 0 {
                 cpu.bus_read8(addr) as i8 as i32 as u32
             } else {
@@ -629,7 +629,7 @@ fn thumb_ldm_stm(cpu: &mut Arm7Tdmi, instr: u16) {
     let mut addr = cpu.reg(rb);
 
     if empty_rlist {
-        // Empty register list: transfer PC, increment base by 0x40
+        // empty register list: transfer PC, increment base by 0x40
         if is_load {
             let value = cpu.bus_read32(addr);
             cpu.set_reg(15, value);
@@ -714,7 +714,7 @@ fn thumb_swi(cpu: &mut Arm7Tdmi, instr: u16) {
     } else {
         let redirected = handle_swi(cpu, comment);
 
-        // Update BIOS protection value to match what real BIOS leaves
+        // updates BIOS protection value to match what real BIOS leaves
         // after SWI dispatch (instruction at real BIOS address 0x190)
         cpu.bus.update_bios_value(0xE3A02004);
 

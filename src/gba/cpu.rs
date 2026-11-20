@@ -70,6 +70,27 @@ impl Default for BankedRegisters {
     }
 }
 
+/// Represents the Game Boy Advance CPU (ARM7TDMI) and controls all
+/// of the logic behind the fetching, decoding and execution of the
+/// ARM and Thumb instructions, the remaining components are clocked
+/// from the cycles it takes.
+///
+/// Should store the complete set of registers (including the banked
+/// ones of the privileged modes) and the status registers, together
+/// with the bus used for all the memory access operations. The SWI
+/// calls are emulated in Rust (HLE) unless a real BIOS is loaded.
+///
+/// # Basic usage
+///
+/// ```rust
+/// use boytacean::gba::{bus::GbaBus, cpu::Arm7Tdmi};
+/// let mut cpu = Arm7Tdmi::new(GbaBus::new());
+/// cpu.bus.write32(0x0300_0000, 0xE3A0002A); // MOV R0, #42
+/// cpu.set_reg(15, 0x0300_0000);
+/// let cycles = cpu.step();
+/// assert_eq!(cycles, 1);
+/// assert_eq!(cpu.reg(0), 42);
+/// ```
 pub struct Arm7Tdmi {
     /// General-purpose registers R0-R15
     /// R13 = SP, R14 = LR, R15 = PC.
@@ -469,8 +490,8 @@ impl Arm7Tdmi {
 
         let instr = self.fetch();
 
-        // prefetches the next pipeline entry BEFORE executing the instruction.
-        // On real ARM7TDMI, fetch/decode/execute happen simultaneously:
+        // prefetches the next pipeline entry BEFORE executing the instruction,
+        // on real ARM7TDMI, fetch/decode/execute happen simultaneously:
         // the fetch stage reads from PC at the same time as the execute
         // stage runs the current instruction, so self-modifying code that
         // writes to upcoming instruction addresses does not affect the
@@ -514,7 +535,7 @@ impl Arm7Tdmi {
             self.bus.bios_readable = false;
         }
 
-        // Commit the prefetched value into the pipeline (if not flushed)
+        // commits the prefetched value into the pipeline (if not flushed)
         if self.pipeline_valid {
             self.pipeline[0] = self.pipeline[1];
             if let Some(value) = prefetched {
@@ -547,7 +568,7 @@ impl Arm7Tdmi {
         if self.bus.irq.ie() == 0 && !self.halt_deadlock_warned {
             self.halt_deadlock_warned = true;
             warnln!(
-                "GBA: halt deadlock detected — CPU halted with IE=0, nothing can wake it (PC={:#010x})",
+                "GBA: halt deadlock detected, CPU halted with IE=0 and nothing can wake it (PC={:#010x})",
                 self.pc()
             );
         }
@@ -581,13 +602,16 @@ impl Arm7Tdmi {
         }
     }
 
-    /// Enters an exception (interrupt, SWI, etc).
+    /// Enters an exception (IRQ or undefined instruction), the SWI
+    /// handlers switch to SVC mode by themselves.
     pub fn enter_exception(&mut self, vector: u32, mode: u32) {
         let old_cpsr = self.cpsr;
         // for IRQ: LR_irq = next_instruction + 4
         // after pipeline advance: ARM regs[15] = instr+12, Thumb regs[15] = instr+6
         // ARM: LR = instr+12-4 = instr+8 = (instr+4)+4 ✓
         // Thumb: LR = instr+6 = (instr+2)+4 ✓
+        // for UND (raised while executing an ARM instruction, with
+        // regs[15] = instr+8): LR_und = instr+8-4 = instr+4 ✓
         let return_addr = if self.in_thumb_mode() {
             self.regs[15]
         } else {
@@ -599,7 +623,7 @@ impl Arm7Tdmi {
         self.set_spsr(old_cpsr);
         self.regs[14] = return_addr;
 
-        // jump to the exception vector — BIOS memory contains the
+        // jump to the exception vector, BIOS memory contains the
         // appropriate handler stubs (e.g. IRQ handler at 0x18 branches
         // to 0x128 which implements the standard BIOS IRQ wrapper)
         self.regs[15] = vector;
@@ -1148,8 +1172,8 @@ mod tests {
     fn test_intr_wait_unhalts_when_correct_irq() {
         let mut cpu = make_cpu();
         // simulate IntrWait waiting for VBlank (bit 0),
-        // CPU in SYS mode (CPSR_I == 0) and not halted —
-        // simulates the state after IRQ handler has returned
+        // CPU in SYS mode (CPSR_I == 0) and not halted, simulates
+        // the state after IRQ handler has returned
         cpu.intr_wait_pc = cpu.pc();
         cpu.bus.intr_wait_flags = 1;
         // IntrCheck has VBlank set
@@ -1160,7 +1184,7 @@ mod tests {
 
         cpu.step();
 
-        // should not be halted — waited interrupt was serviced
+        // should not be halted, waited interrupt was serviced
         assert!(!cpu.halted());
         // flags should be cleared
         assert_eq!(cpu.bus.intr_wait_flags, 0);
@@ -1209,7 +1233,7 @@ mod tests {
         let mut cpu = make_cpu();
         cpu.intr_wait_pc = cpu.pc();
         cpu.bus.intr_wait_flags = 1; // wait for VBlank
-                                     // IE does NOT include VBlank — only VCount (bit 2)
+                                     // IE does NOT include VBlank, only VCount (bit 2)
         cpu.bus.irq.set_ie(0x04);
         // VBlank is pending in IF
         cpu.bus.irq.raise(0x01);
@@ -1229,7 +1253,7 @@ mod tests {
 
     #[test]
     fn test_intr_wait_if_fallback_wrong_irq_in_if() {
-        // IF has the wrong interrupt — should not trigger fallback
+        // IF has the wrong interrupt, should not trigger fallback
         let mut cpu = make_cpu();
         cpu.intr_wait_pc = cpu.pc();
         cpu.bus.intr_wait_flags = 1; // wait for VBlank
@@ -1241,7 +1265,7 @@ mod tests {
 
         cpu.step();
 
-        // should re-halt — neither IntrCheck nor IF has VBlank
+        // should re-halt, neither IntrCheck nor IF has VBlank
         assert!(cpu.halted());
         assert_eq!(cpu.bus.intr_wait_flags, 1);
     }
@@ -1249,7 +1273,7 @@ mod tests {
     #[test]
     fn test_intr_wait_rehalts_after_irq_handler_returns() {
         // Mario Kart scenario: IRQ fires, handler runs and returns,
-        // but waited interrupt not yet in IntrCheck — should re-halt
+        // but waited interrupt not yet in IntrCheck, should re-halt
         let mut cpu = make_cpu();
         cpu.intr_wait_pc = cpu.pc();
         cpu.bus.intr_wait_flags = 1; // wait for VBlank
@@ -1344,14 +1368,14 @@ mod tests {
         cpu.intr_wait_pc = cpu.pc();
         cpu.bus.intr_wait_flags = 0x03; // VBlank | HBlank
         let offset = (0x0300_7FF8u32 & 0x7FFF) as usize;
-        // only HBlank in IntrCheck (bit 1) — partial match is enough
+        // only HBlank in IntrCheck (bit 1), partial match is enough
         let bytes = 0x02u16.to_le_bytes();
         cpu.bus.iwram[offset] = bytes[0];
         cpu.bus.iwram[offset + 1] = bytes[1];
 
         cpu.step();
 
-        // should unhalt — at least one waited bit matched
+        // should unhalt, at least one waited bit matched
         assert!(!cpu.halted());
         assert_eq!(cpu.bus.intr_wait_flags, 0);
         // both VBlank and HBlank bits cleared from IntrCheck
@@ -1606,7 +1630,7 @@ mod tests {
         // halt without matching IRQ should stay halted
         let mut cpu = make_cpu();
         cpu.set_halted(true);
-        // IME on but IE empty — nothing can wake it
+        // IME on but IE empty, nothing can wake it
         cpu.bus.irq.set_ime(true);
         cpu.bus.irq.raise_vblank();
 
@@ -1638,7 +1662,7 @@ mod tests {
     fn test_halt_deadlock_not_warned_when_ie_nonzero() {
         let mut cpu = make_cpu();
         cpu.set_halted(true);
-        cpu.bus.irq.set_ie(0x01); // VBlank enabled — can be woken
+        cpu.bus.irq.set_ie(0x01); // VBlank enabled, can be woken
 
         cpu.step();
 

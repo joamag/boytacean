@@ -70,7 +70,7 @@ pub fn execute_arm(cpu: &mut Arm7Tdmi, instr: u32) {
         }
         0b011 => {
             if bits_7_4 & 0x01 != 0 {
-                // undefined instruction — trigger UND exception
+                // undefined instruction, trigger UND exception
                 cpu.enter_exception(0x04, MODE_UND);
                 cpu.cycles = 1;
             } else {
@@ -91,13 +91,13 @@ pub fn execute_arm(cpu: &mut Arm7Tdmi, instr: u32) {
                 // software interrupt
                 arm_swi(cpu, instr);
             } else {
-                // coprocessor — no coprocessor on GBA, trigger UND exception
+                // coprocessor (none on GBA), trigger UND exception
                 cpu.enter_exception(0x04, MODE_UND);
                 cpu.cycles = 1;
             }
         }
         _ => {
-            // coprocessor data transfer (0b110) — trigger UND exception
+            // coprocessor data transfer (0b110), trigger UND exception
             cpu.enter_exception(0x04, MODE_UND);
             cpu.cycles = 1;
         }
@@ -112,7 +112,7 @@ fn arm_data_processing(cpu: &mut Arm7Tdmi, instr: u32) {
     let rd = (instr >> 12) & 0xF;
     let is_immediate = instr & (1 << 25) != 0;
 
-    // When operand 2 uses a register-specified shift (bit 25=0, bit 4=1),
+    // when operand 2 uses a register-specified shift (bit 25=0, bit 4=1),
     // reading PC (as Rn or Rm) returns PC+12 instead of the usual PC+8,
     // due to the extra internal cycle for reading the shift register.
     let reg_shift = !is_immediate && (instr & (1 << 4) != 0);
@@ -317,8 +317,8 @@ fn arm_data_processing(cpu: &mut Arm7Tdmi, instr: u32) {
             cpu.set_reg(rd, value);
         }
     } else if rd == 15 {
-        // TST/TEQ/CMP/CMN with Rd=R15: restore CPSR from SPSR
-        // These opcodes don't write Rd, but Rd=R15 still triggers CPSR restore
+        // TST/TEQ/CMP/CMN with Rd=R15: restore CPSR from SPSR, these
+        // opcodes don't write Rd, but Rd=R15 still triggers CPSR restore
         cpu.restore_cpsr();
     }
 
@@ -815,7 +815,7 @@ fn arm_swi(cpu: &mut Arm7Tdmi, instr: u32) {
         // HLE: handle the SWI in Rust
         let redirected = handle_swi(cpu, comment);
 
-        // Update BIOS protection value to match what real BIOS leaves
+        // updates BIOS protection value to match what real BIOS leaves
         // after SWI dispatch (instruction at real BIOS address 0x190)
         cpu.bus.update_bios_value(0xE3A02004);
 
@@ -1053,8 +1053,7 @@ mod tests {
         cpu.set_reg(0, 0);
         cpu.set_reg(1, 0); // shift amount = 0
 
-        // ADD R2, R15, R0, LSL R1 → E08F2010... wait, need proper encoding
-        // ADD Rd=2, Rn=15, Rm=0, LSL Rs=1: E08F2110
+        // ADD R2, R15, R0, LSL R1 → E08F2110
         super::execute_arm(&mut cpu, 0xE08F2110);
         assert_eq!(cpu.reg(2), addr + 12);
     }
