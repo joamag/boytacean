@@ -211,7 +211,14 @@ fn flash<T: Read + Write>(
         write_output(backup, dump.rom_data())?;
     }
 
-    flasher.run(transport, print_progress("Flashing cartridge"))?;
+    // an interrupted or failed flashing never damages the cartridge, as
+    // flashing it again always recovers it, which is told to the user
+    println!("Flashing can be run again at any point, if it's interrupted");
+    flasher
+        .run(transport, print_progress("Flashing cartridge"))
+        .map_err(|err| {
+            format!("Failed to flash the cartridge ({err}), flashing it again recovers it")
+        })?;
     println!();
     println!("Flashed {path} into the {chip}");
     Ok(())
@@ -577,6 +584,29 @@ mod tests {
         let options = build_options("flash", &directory.join("game.gb"), None, true);
         flash(&mut transport, "/dev/ttyUSB0", &options).unwrap();
         assert!(transport.replies.is_empty());
+        remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn test_flash_failure() {
+        // a failed flashing tells that flashing it again recovers it
+        let directory = build_directory("gbxcart-failure");
+        let rom = build_rom(0x19, 0x00);
+        write(directory.join("game.gb"), &rom).unwrap();
+        let mut replies = probe_replies(true);
+        replies.extend(flash_replies(&rom));
+
+        // past the probe of the tool, the probe of the flashing and the
+        // erase of the first two sectors is the first acknowledgement
+        let program = probe_replies(true).len() * 2 + 4;
+        replies[program] = 0x00;
+        let mut transport = Replay::new(replies);
+        let options = build_options("flash", &directory.join("game.gb"), None, true);
+        let result = flash(&mut transport, "/dev/ttyUSB0", &options);
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "Failed to flash the cartridge (Data error: Failed to program the flash chip at 0x000000), flashing it again recovers it"
+        );
         remove_dir_all(directory).unwrap();
     }
 
