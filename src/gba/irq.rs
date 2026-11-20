@@ -62,17 +62,6 @@ impl IrqController {
         self.ime && (self.ie & self.if_) != 0
     }
 
-    /// Returns the highest priority pending interrupt bit,
-    /// or 0 if no interrupts are pending.
-    pub fn highest_pending(&self) -> u16 {
-        let pending = self.ie & self.if_;
-        if pending == 0 {
-            return 0;
-        }
-        // lowest bit set is highest priority
-        pending & pending.wrapping_neg()
-    }
-
     pub fn raise_vblank(&mut self) {
         self.raise(IRQ_VBLANK);
     }
@@ -165,10 +154,15 @@ mod tests {
         irq.set_ie(IRQ_VBLANK | IRQ_HBLANK);
         irq.raise_vblank();
         irq.raise_hblank();
-        assert_eq!(irq.highest_pending(), IRQ_VBLANK);
+        assert_eq!(irq.if_(), IRQ_VBLANK | IRQ_HBLANK);
 
         irq.ack_if(IRQ_VBLANK);
-        assert_eq!(irq.highest_pending(), IRQ_HBLANK);
+        assert_eq!(irq.if_(), IRQ_HBLANK);
+        assert!(irq.pending());
+
+        irq.ack_if(IRQ_HBLANK);
+        assert_eq!(irq.if_(), 0);
+        assert!(!irq.pending());
     }
 
     #[test]
@@ -194,12 +188,6 @@ mod tests {
 
         irq.set_ie(IRQ_VBLANK);
         assert!(irq.pending());
-    }
-
-    #[test]
-    fn test_highest_pending_none() {
-        let irq = IrqController::new();
-        assert_eq!(irq.highest_pending(), 0);
     }
 
     #[test]
