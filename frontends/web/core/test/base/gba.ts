@@ -597,5 +597,38 @@ describe("GbaCore", function () {
                 background: "264653"
             });
         });
+
+        it("should be able to keep the settings of the Game Boy", () => {
+            const items: Record<string, string> = {
+                settings: JSON.stringify({ palette: "christmas" })
+            };
+            buildCore(buildStorage(items)).onBackground("264653");
+            assert.deepStrictEqual(JSON.parse(items["settings"]), {
+                palette: "christmas",
+                background: "264653"
+            });
+        });
+
+        it("should be able to replace invalid settings", () => {
+            const items: Record<string, string> = { settings: "invalid" };
+            buildCore(buildStorage(items)).onBackground("264653");
+            assert.deepStrictEqual(JSON.parse(items["settings"]), {
+                background: "264653"
+            });
+        });
+
+        it("should be able to survive a failing storage adapter", async () => {
+            const core = buildCore({
+                getItem: () => null,
+                setItem: () => {
+                    throw new Error("Quota exceeded");
+                }
+            });
+            const warnings = await captureWarnings(async () =>
+                core.onBackground("264653")
+            );
+            assert.strictEqual(warnings.length, 1);
+            assert.match(warnings[0], /Failed to store settings/);
+        });
     });
 });

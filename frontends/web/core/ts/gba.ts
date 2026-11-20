@@ -596,14 +596,28 @@ export class GbaCore extends EmulatorLogic {
         this.gba.set_ram_data(ramData);
     }
 
+    /**
+     * Stores the settings of the emulator, merging them with the ones
+     * that are already in the storage adapter, as these are shared
+     * with the Game Boy core, whose palette would otherwise be lost.
+     */
     protected storeSettings() {
+        // reads the settings that are currently stored, replacing them
+        // in case they are not valid, as they are going to be fully
+        // overwritten by the store operation
+        let stored = {};
+        try {
+            stored = JSON.parse(this.storage.getItem("settings") ?? "{}");
+        } catch (err) {
+            // ignores the error, starting from an empty set of settings
+        }
         const settings = {
+            ...stored,
             ...this.extraSettings
         };
 
-        // guards the storage operation as this method is called as
-        // part of the boot sequence, which should not be interrupted
-        // by a failing storage adapter
+        // guards the storage operation so that a failing storage
+        // adapter does not interrupt the caller of the operation
         try {
             this.storage.setItem("settings", JSON.stringify(settings));
         } catch (err) {
