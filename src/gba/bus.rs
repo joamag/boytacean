@@ -706,9 +706,19 @@ impl GbaBus {
         }
 
         // HALTCNT is a write-only 8-bit register at 0x04000301
-        // that shares the 16-bit address space with POSTFLG (0x04000300)
+        // that shares the 16-bit address space with POSTFLG (0x04000300),
+        // its bit 7 selects stop over halt mode, but stop mode (which
+        // also pauses video, sound and timers until a keypad, cartridge
+        // or serial IRQ) is not emulated and halts the CPU instead,
+        // matching sleep routines that only leave those IRQs enabled
         if addr == REG_HALTCNT {
             self.halt_requested = true;
+            return;
+        }
+
+        // POSTFLG byte writes must not reach HALTCNT
+        if addr == REG_POSTFLG {
+            self.postflg = value;
             return;
         }
 
@@ -882,8 +892,11 @@ impl GbaBus {
             }
             REG_SIOMLT_SEND => self.siomlt_send = value,
             REG_RCNT => self.rcnt = value,
-            REG_POSTFLG => self.postflg = value as u8,
-            REG_HALTCNT => self.halt_requested = true,
+            REG_POSTFLG => {
+                // the high byte of the halfword is written to HALTCNT
+                self.postflg = value as u8;
+                self.halt_requested = true;
+            }
             _ => {
                 // handle sound channel registers (0x60-0x7E) via byte-level writes
                 let io_offset = addr & 0x3FF;
@@ -1681,9 +1694,16 @@ mod tests {
     fn test_io_8bit_write_haltcnt() {
         let mut bus = GbaBus::new();
         bus.write8(0x0400_0300, 1);
+        assert!(!bus.halt_requested);
         bus.write8(0x0400_0301, 0);
         assert!(bus.halt_requested);
         assert_eq!(bus.postflg, 1);
+
+        // stop mode requests (bit 7) halt the CPU as well
+        let mut bus = GbaBus::new();
+        bus.write8(0x0400_0301, 0x80);
+        assert!(bus.halt_requested);
+        assert_eq!(bus.postflg, 0);
     }
 
     #[test]
@@ -1876,6 +1896,21 @@ mod tests {
         bus.write16(REG_SIOCNT, 0x2080);
         assert_eq!(bus.read16(REG_SIOMULTI0), 0xCDAB);
         assert_eq!(bus.read16(REG_SIOMLT_SEND), 0xFFFF);
+    }
+
+    #[test]
+    fn test_io_16bit_write_haltcnt() {
+        // the high byte of a POSTFLG halfword write lands in HALTCNT
+        let mut bus = GbaBus::new();
+        bus.write16(0x0400_0300, 0x0001);
+        assert!(bus.halt_requested);
+        assert_eq!(bus.postflg, 1);
+
+        // a word write covers both registers as well
+        let mut bus = GbaBus::new();
+        bus.write32(0x0400_0300, 0x0000_8001);
+        assert!(bus.halt_requested);
+        assert_eq!(bus.postflg, 1);
     }
 
     #[test]

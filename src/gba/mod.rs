@@ -568,7 +568,7 @@ impl Display for GameBoyAdvance {
 mod tests {
     use super::GameBoyAdvance;
     use crate::{
-        gba::consts::{IRQ_KEYPAD, REG_KEYCNT},
+        gba::consts::{IRQ_KEYPAD, IRQ_VBLANK, REG_KEYCNT, REG_POSTFLG},
         pad::PadKey,
     };
 
@@ -645,6 +645,18 @@ mod tests {
         let mut gba = GameBoyAdvance::new();
         let cycles = gba.clock();
         assert!(cycles >= 1);
+    }
+
+    #[test]
+    fn test_clock_halt() {
+        let mut gba = GameBoyAdvance::new();
+        gba.cpu.bus.irq.set_ie(IRQ_VBLANK);
+
+        // a halfword POSTFLG write also writes HALTCNT
+        gba.cpu.bus.write16(REG_POSTFLG, 0x0001);
+        gba.clock();
+        assert!(gba.cpu.halted());
+        assert!(!gba.cpu.bus.halt_requested);
     }
 
     #[test]
