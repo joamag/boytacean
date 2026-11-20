@@ -867,6 +867,53 @@ mod tests {
     }
 
     #[test]
+    fn test_new_sys_mode_irqs_enabled() {
+        let cpu = make_cpu();
+        assert_eq!(cpu.cpsr() & CPSR_MODE_MASK, MODE_SYS);
+        assert_eq!(cpu.cpsr() & CPSR_I, 0); // IRQs enabled
+    }
+
+    #[test]
+    fn test_new_stack_pointers() {
+        let mut cpu = make_cpu();
+        // SYS mode SP
+        assert_eq!(cpu.reg(13), 0x0300_7F00);
+        // switch to IRQ mode and check SP
+        cpu.set_cpsr(MODE_IRQ);
+        assert_eq!(cpu.reg(13), 0x0300_7FA0);
+        // switch to SVC mode and check SP
+        cpu.set_cpsr(MODE_SVC);
+        assert_eq!(cpu.reg(13), 0x0300_7FE0);
+    }
+
+    #[test]
+    fn test_bios_value_after_startup() {
+        let mut cpu = make_cpu();
+        // BIOS protection value after boot matches real GBA
+        assert_eq!(cpu.bus.read32(0x0000_0000), 0xE129F000);
+    }
+
+    #[test]
+    fn test_bios_und_vector_is_infinite_loop() {
+        let mut cpu = make_cpu();
+        cpu.bus.bios_readable = true;
+        let instr = cpu.bus.read32(0x0000_0004);
+        cpu.bus.bios_readable = false;
+        // B . = 0xEAFFFFFE (branch to self)
+        assert_eq!(instr, 0xEAFFFFFE);
+    }
+
+    #[test]
+    fn test_bios_swi_vector_is_infinite_loop() {
+        let mut cpu = make_cpu();
+        cpu.bus.bios_readable = true;
+        let instr = cpu.bus.read32(0x0000_0008);
+        cpu.bus.bios_readable = false;
+        // B . = 0xEAFFFFFE (branch to self)
+        assert_eq!(instr, 0xEAFFFFFE);
+    }
+
+    #[test]
     fn test_reset_for_bios_boot() {
         let mut cpu = make_cpu();
         cpu.set_reg(0, 0x12345678);
@@ -891,6 +938,15 @@ mod tests {
 
         cpu.set_reg(5, 0xABCD);
         assert_eq!(cpu.reg(5), 0xABCD);
+    }
+
+    #[test]
+    fn test_spsr() {
+        let mut cpu = make_cpu();
+        // switch to SVC mode so SPSR is accessible
+        cpu.set_cpsr(MODE_SVC);
+        cpu.set_spsr(0x12345678);
+        assert_eq!(cpu.spsr(), 0x12345678);
     }
 
     #[test]
@@ -927,159 +983,23 @@ mod tests {
     }
 
     #[test]
-    fn test_condition_codes() {
-        let cpu = make_cpu();
-        assert!(cpu.check_condition(0xE0000000)); // AL
-        assert!(!cpu.check_condition(0xF0000000)); // NV
-    }
-
-    #[test]
-    fn test_condition_eq_ne() {
+    fn test_bios_protection_fetch_updates_value() {
         let mut cpu = make_cpu();
-        cpu.set_nz_flags(0); // Z=1
-        assert!(cpu.check_condition(0x00000000)); // EQ
-        assert!(!cpu.check_condition(0x10000000)); // NE
-
-        cpu.set_nz_flags(1); // Z=0
-        assert!(!cpu.check_condition(0x00000000)); // EQ
-        assert!(cpu.check_condition(0x10000000)); // NE
-    }
-
-    #[test]
-    fn test_condition_cs_cc() {
-        let mut cpu = make_cpu();
-        cpu.set_flag_c(true);
-        assert!(cpu.check_condition(0x20000000)); // CS
-        assert!(!cpu.check_condition(0x30000000)); // CC
-
-        cpu.set_flag_c(false);
-        assert!(!cpu.check_condition(0x20000000)); // CS
-        assert!(cpu.check_condition(0x30000000)); // CC
-    }
-
-    #[test]
-    fn test_spsr() {
-        let mut cpu = make_cpu();
-        // switch to SVC mode so SPSR is accessible
-        cpu.set_cpsr(MODE_SVC);
-        cpu.set_spsr(0x12345678);
-        assert_eq!(cpu.spsr(), 0x12345678);
-    }
-
-    #[test]
-    fn test_enter_exception() {
-        let mut cpu = make_cpu();
-        let old_cpsr = cpu.cpsr();
-        cpu.enter_exception(0x18, MODE_IRQ);
-        assert_eq!(cpu.cpsr() & CPSR_MODE_MASK, MODE_IRQ);
-        assert!(cpu.cpsr() & CPSR_I != 0); // IRQs disabled
-        assert!(cpu.cpsr() & CPSR_T == 0); // ARM mode
-        assert_eq!(cpu.spsr(), old_cpsr); // old CPSR saved
-        assert_eq!(cpu.pc(), 0x18); // vector
-    }
-
-    #[test]
-    fn test_barrel_shift_lsl() {
-        let cpu = make_cpu();
-        let (result, carry) = cpu.barrel_shift(0x01, 0, 4);
-        assert_eq!(result, 0x10);
-        assert!(!carry);
-    }
-
-    #[test]
-    fn test_barrel_shift_lsr() {
-        let cpu = make_cpu();
-        let (result, carry) = cpu.barrel_shift(0x10, 1, 4);
-        assert_eq!(result, 0x01);
-        assert!(!carry);
-    }
-
-    #[test]
-    fn test_barrel_shift_asr() {
-        let cpu = make_cpu();
-        let (result, _carry) = cpu.barrel_shift(0x80000000, 2, 4);
-        assert_eq!(result, 0xF8000000);
-    }
-
-    #[test]
-    fn test_barrel_shift_ror() {
-        let cpu = make_cpu();
-        let (result, _carry) = cpu.barrel_shift(0x01, 3, 4);
-        assert_eq!(result, 0x10000000);
-    }
-
-    #[test]
-    fn test_barrel_shift_lsl_32() {
-        let cpu = make_cpu();
-        let (result, carry) = cpu.barrel_shift(0x01, 0, 32);
-        assert_eq!(result, 0);
-        assert!(carry); // bit 0 shifted out
-    }
-
-    #[test]
-    fn test_barrel_shift_lsr_32() {
-        let cpu = make_cpu();
-        let (result, carry) = cpu.barrel_shift(0x80000000, 1, 32);
-        assert_eq!(result, 0);
-        assert!(carry); // bit 31 shifted out
-    }
-
-    #[test]
-    fn test_barrel_shift_asr_32() {
-        let cpu = make_cpu();
-        let (result, carry) = cpu.barrel_shift(0x80000000, 2, 32);
-        assert_eq!(result, 0xFFFFFFFF); // sign extended
-        assert!(carry);
-    }
-
-    #[test]
-    fn test_barrel_shift_zero_amount() {
-        let mut cpu = make_cpu();
-        cpu.set_flag_c(true);
-        let (result, carry) = cpu.barrel_shift(0x42, 0, 0);
-        assert_eq!(result, 0x42);
-        assert!(carry); // preserves carry
-    }
-
-    #[test]
-    fn test_barrel_shift_immediate_lsr0() {
-        let cpu = make_cpu();
-        // LSR #0 is treated as LSR #32
-        let (result, carry) = cpu.barrel_shift_immediate(0x80000000, 1, 0);
-        assert_eq!(result, 0);
-        assert!(carry);
-    }
-
-    #[test]
-    fn test_barrel_shift_immediate_asr0() {
-        let cpu = make_cpu();
-        // ASR #0 is treated as ASR #32
-        let (result, carry) = cpu.barrel_shift_immediate(0x80000000, 2, 0);
-        assert_eq!(result, 0xFFFFFFFF);
-        assert!(carry);
-    }
-
-    #[test]
-    fn test_barrel_shift_immediate_rrx() {
-        let mut cpu = make_cpu();
-        cpu.set_flag_c(true);
-        // ROR #0 is treated as RRX
-        let (result, carry) = cpu.barrel_shift_immediate(0x01, 3, 0);
-        assert_eq!(result, 0x80000000); // carry shifted into bit 31
-        assert!(carry); // bit 0 shifted out
-    }
-
-    #[test]
-    fn test_bus_read_write() {
-        let mut cpu = make_cpu();
-        cpu.bus_write8(0x0200_0000, 0x42);
-        assert_eq!(cpu.bus_read8(0x0200_0000), 0x42);
-
-        cpu.bus_write16(0x0200_0002, 0x1234);
-        assert_eq!(cpu.bus_read16(0x0200_0002), 0x1234);
-
-        cpu.bus_write32(0x0200_0004, 0xDEADBEEF);
-        assert_eq!(cpu.bus_read32(0x0200_0004), 0xDEADBEEF);
+        // Place an instruction in BIOS at 0x00
+        cpu.bus.bios_readable = true;
+        let _val_at_0 = cpu.bus.read32(0x0000_0000);
+        cpu.bus.bios_readable = false;
+        // Set PC to BIOS address and fill pipeline
+        cpu.set_reg(15, 0x0000_0000);
+        // The fetch should update bios_value
+        // PC=0, so fill_pipeline reads from 0x00, 0x04
+        // and the fetch() prefetch reads from 0x08
+        let _instr = cpu.fetch();
+        cpu.bus.bios_readable = true;
+        let val_at_8 = cpu.bus.read32(0x0000_0008);
+        cpu.bus.bios_readable = false;
+        // bios_value should be the value at PC (= addr + 8 = 0x08)
+        assert_eq!(cpu.bus.read32(0x0000_0000), val_at_8);
     }
 
     #[test]
@@ -1211,81 +1131,6 @@ mod tests {
             assert_eq!(cpu.bus.irq.if_(), 2);
             assert_eq!(cpu.pc(), 0x0800_0000);
         }
-    }
-
-    #[test]
-    fn test_reset() {
-        let mut cpu = make_cpu();
-        cpu.set_reg(0, 0x12345678);
-        cpu.step();
-        assert!(cpu.cycles > 0);
-        cpu.set_halted(true);
-        cpu.reset();
-        assert_eq!(cpu.cycles, 0);
-        assert_eq!(cpu.reg(0), 0);
-        assert!(!cpu.halted());
-        assert_eq!(cpu.pc(), 0x0800_0000);
-        assert_eq!(cpu.reg(13), 0x0300_7F00); // SP_SYS
-        assert_eq!(cpu.cpsr() & CPSR_MODE_MASK, MODE_SYS);
-    }
-
-    #[test]
-    fn test_new_sys_mode_irqs_enabled() {
-        let cpu = make_cpu();
-        assert_eq!(cpu.cpsr() & CPSR_MODE_MASK, MODE_SYS);
-        assert_eq!(cpu.cpsr() & CPSR_I, 0); // IRQs enabled
-    }
-
-    #[test]
-    fn test_new_stack_pointers() {
-        let mut cpu = make_cpu();
-        // SYS mode SP
-        assert_eq!(cpu.reg(13), 0x0300_7F00);
-        // switch to IRQ mode and check SP
-        cpu.set_cpsr(MODE_IRQ);
-        assert_eq!(cpu.reg(13), 0x0300_7FA0);
-        // switch to SVC mode and check SP
-        cpu.set_cpsr(MODE_SVC);
-        assert_eq!(cpu.reg(13), 0x0300_7FE0);
-    }
-
-    #[test]
-    fn test_bios_value_after_startup() {
-        let mut cpu = make_cpu();
-        // BIOS protection value after boot matches real GBA
-        assert_eq!(cpu.bus.read32(0x0000_0000), 0xE129F000);
-    }
-
-    #[test]
-    fn test_bios_protection_fetch_updates_value() {
-        let mut cpu = make_cpu();
-        // Place an instruction in BIOS at 0x00
-        cpu.bus.bios_readable = true;
-        let _val_at_0 = cpu.bus.read32(0x0000_0000);
-        cpu.bus.bios_readable = false;
-        // Set PC to BIOS address and fill pipeline
-        cpu.set_reg(15, 0x0000_0000);
-        // The fetch should update bios_value
-        // PC=0, so fill_pipeline reads from 0x00, 0x04
-        // and the fetch() prefetch reads from 0x08
-        let _instr = cpu.fetch();
-        cpu.bus.bios_readable = true;
-        let val_at_8 = cpu.bus.read32(0x0000_0008);
-        cpu.bus.bios_readable = false;
-        // bios_value should be the value at PC (= addr + 8 = 0x08)
-        assert_eq!(cpu.bus.read32(0x0000_0000), val_at_8);
-    }
-
-    #[test]
-    fn test_enter_exception_irq_mode() {
-        let mut cpu = make_cpu();
-        let old_cpsr = cpu.cpsr();
-        cpu.enter_exception(0x18, MODE_IRQ);
-        assert_eq!(cpu.cpsr() & CPSR_MODE_MASK, MODE_IRQ);
-        assert!(cpu.cpsr() & CPSR_I != 0); // IRQs disabled in handler
-        assert!(cpu.cpsr() & CPSR_T == 0); // ARM mode
-        assert_eq!(cpu.spsr(), old_cpsr);
-        assert_eq!(cpu.pc(), 0x18);
     }
 
     #[test]
@@ -1659,6 +1504,35 @@ mod tests {
     // -- crash detection tests --
 
     #[test]
+    fn test_infinite_loop_counter_increments() {
+        let mut cpu = make_cpu();
+        // place a NOP (MOV R0, R0) at 0x08000000
+        cpu.bus.write32(0x0800_0000, 0xE1A00000); // MOV R0, R0
+                                                  // also need next instructions for pipeline
+        cpu.bus.write32(0x0800_0004, 0xE1A00000);
+        cpu.bus.write32(0x0800_0008, 0xE1A00000);
+
+        // PC starts at 0x08000000 by default (post-boot state)
+        // first step resets prev_pc
+        cpu.step();
+        assert_eq!(cpu.same_pc_count, 0);
+    }
+
+    #[test]
+    fn test_infinite_loop_counter_resets_on_different_pc() {
+        let mut cpu = make_cpu();
+        // place two different NOPs at sequential addresses
+        cpu.bus.write32(0x0800_0000, 0xE1A00000);
+        cpu.bus.write32(0x0800_0004, 0xE1A00000);
+        cpu.bus.write32(0x0800_0008, 0xE1A00000);
+        cpu.bus.write32(0x0800_000C, 0xE1A00000);
+
+        cpu.step(); // executes 0x08000000
+        cpu.step(); // executes 0x08000004 — different PC
+        assert_eq!(cpu.same_pc_count, 0);
+    }
+
+    #[test]
     fn test_halt_deadlock_warned_flag_set_on_ie_zero() {
         let mut cpu = make_cpu();
         cpu.set_halted(true);
@@ -1704,32 +1578,58 @@ mod tests {
     }
 
     #[test]
-    fn test_infinite_loop_counter_increments() {
-        let mut cpu = make_cpu();
-        // place a NOP (MOV R0, R0) at 0x08000000
-        cpu.bus.write32(0x0800_0000, 0xE1A00000); // MOV R0, R0
-                                                  // also need next instructions for pipeline
-        cpu.bus.write32(0x0800_0004, 0xE1A00000);
-        cpu.bus.write32(0x0800_0008, 0xE1A00000);
-
-        // PC starts at 0x08000000 by default (post-boot state)
-        // first step resets prev_pc
-        cpu.step();
-        assert_eq!(cpu.same_pc_count, 0);
+    fn test_condition_codes() {
+        let cpu = make_cpu();
+        assert!(cpu.check_condition(0xE0000000)); // AL
+        assert!(!cpu.check_condition(0xF0000000)); // NV
     }
 
     #[test]
-    fn test_infinite_loop_counter_resets_on_different_pc() {
+    fn test_condition_eq_ne() {
         let mut cpu = make_cpu();
-        // place two different NOPs at sequential addresses
-        cpu.bus.write32(0x0800_0000, 0xE1A00000);
-        cpu.bus.write32(0x0800_0004, 0xE1A00000);
-        cpu.bus.write32(0x0800_0008, 0xE1A00000);
-        cpu.bus.write32(0x0800_000C, 0xE1A00000);
+        cpu.set_nz_flags(0); // Z=1
+        assert!(cpu.check_condition(0x00000000)); // EQ
+        assert!(!cpu.check_condition(0x10000000)); // NE
 
-        cpu.step(); // executes 0x08000000
-        cpu.step(); // executes 0x08000004 — different PC
-        assert_eq!(cpu.same_pc_count, 0);
+        cpu.set_nz_flags(1); // Z=0
+        assert!(!cpu.check_condition(0x00000000)); // EQ
+        assert!(cpu.check_condition(0x10000000)); // NE
+    }
+
+    #[test]
+    fn test_condition_cs_cc() {
+        let mut cpu = make_cpu();
+        cpu.set_flag_c(true);
+        assert!(cpu.check_condition(0x20000000)); // CS
+        assert!(!cpu.check_condition(0x30000000)); // CC
+
+        cpu.set_flag_c(false);
+        assert!(!cpu.check_condition(0x20000000)); // CS
+        assert!(cpu.check_condition(0x30000000)); // CC
+    }
+
+    #[test]
+    fn test_enter_exception() {
+        let mut cpu = make_cpu();
+        let old_cpsr = cpu.cpsr();
+        cpu.enter_exception(0x18, MODE_IRQ);
+        assert_eq!(cpu.cpsr() & CPSR_MODE_MASK, MODE_IRQ);
+        assert!(cpu.cpsr() & CPSR_I != 0); // IRQs disabled
+        assert!(cpu.cpsr() & CPSR_T == 0); // ARM mode
+        assert_eq!(cpu.spsr(), old_cpsr); // old CPSR saved
+        assert_eq!(cpu.pc(), 0x18); // vector
+    }
+
+    #[test]
+    fn test_enter_exception_irq_mode() {
+        let mut cpu = make_cpu();
+        let old_cpsr = cpu.cpsr();
+        cpu.enter_exception(0x18, MODE_IRQ);
+        assert_eq!(cpu.cpsr() & CPSR_MODE_MASK, MODE_IRQ);
+        assert!(cpu.cpsr() & CPSR_I != 0); // IRQs disabled in handler
+        assert!(cpu.cpsr() & CPSR_T == 0); // ARM mode
+        assert_eq!(cpu.spsr(), old_cpsr);
+        assert_eq!(cpu.pc(), 0x18);
     }
 
     #[test]
@@ -1745,22 +1645,122 @@ mod tests {
     }
 
     #[test]
-    fn test_bios_und_vector_is_infinite_loop() {
-        let mut cpu = make_cpu();
-        cpu.bus.bios_readable = true;
-        let instr = cpu.bus.read32(0x0000_0004);
-        cpu.bus.bios_readable = false;
-        // B . = 0xEAFFFFFE (branch to self)
-        assert_eq!(instr, 0xEAFFFFFE);
+    fn test_barrel_shift_lsl() {
+        let cpu = make_cpu();
+        let (result, carry) = cpu.barrel_shift(0x01, 0, 4);
+        assert_eq!(result, 0x10);
+        assert!(!carry);
     }
 
     #[test]
-    fn test_bios_swi_vector_is_infinite_loop() {
+    fn test_barrel_shift_lsr() {
+        let cpu = make_cpu();
+        let (result, carry) = cpu.barrel_shift(0x10, 1, 4);
+        assert_eq!(result, 0x01);
+        assert!(!carry);
+    }
+
+    #[test]
+    fn test_barrel_shift_asr() {
+        let cpu = make_cpu();
+        let (result, _carry) = cpu.barrel_shift(0x80000000, 2, 4);
+        assert_eq!(result, 0xF8000000);
+    }
+
+    #[test]
+    fn test_barrel_shift_ror() {
+        let cpu = make_cpu();
+        let (result, _carry) = cpu.barrel_shift(0x01, 3, 4);
+        assert_eq!(result, 0x10000000);
+    }
+
+    #[test]
+    fn test_barrel_shift_lsl_32() {
+        let cpu = make_cpu();
+        let (result, carry) = cpu.barrel_shift(0x01, 0, 32);
+        assert_eq!(result, 0);
+        assert!(carry); // bit 0 shifted out
+    }
+
+    #[test]
+    fn test_barrel_shift_lsr_32() {
+        let cpu = make_cpu();
+        let (result, carry) = cpu.barrel_shift(0x80000000, 1, 32);
+        assert_eq!(result, 0);
+        assert!(carry); // bit 31 shifted out
+    }
+
+    #[test]
+    fn test_barrel_shift_asr_32() {
+        let cpu = make_cpu();
+        let (result, carry) = cpu.barrel_shift(0x80000000, 2, 32);
+        assert_eq!(result, 0xFFFFFFFF); // sign extended
+        assert!(carry);
+    }
+
+    #[test]
+    fn test_barrel_shift_zero_amount() {
         let mut cpu = make_cpu();
-        cpu.bus.bios_readable = true;
-        let instr = cpu.bus.read32(0x0000_0008);
-        cpu.bus.bios_readable = false;
-        // B . = 0xEAFFFFFE (branch to self)
-        assert_eq!(instr, 0xEAFFFFFE);
+        cpu.set_flag_c(true);
+        let (result, carry) = cpu.barrel_shift(0x42, 0, 0);
+        assert_eq!(result, 0x42);
+        assert!(carry); // preserves carry
+    }
+
+    #[test]
+    fn test_barrel_shift_immediate_lsr0() {
+        let cpu = make_cpu();
+        // LSR #0 is treated as LSR #32
+        let (result, carry) = cpu.barrel_shift_immediate(0x80000000, 1, 0);
+        assert_eq!(result, 0);
+        assert!(carry);
+    }
+
+    #[test]
+    fn test_barrel_shift_immediate_asr0() {
+        let cpu = make_cpu();
+        // ASR #0 is treated as ASR #32
+        let (result, carry) = cpu.barrel_shift_immediate(0x80000000, 2, 0);
+        assert_eq!(result, 0xFFFFFFFF);
+        assert!(carry);
+    }
+
+    #[test]
+    fn test_barrel_shift_immediate_rrx() {
+        let mut cpu = make_cpu();
+        cpu.set_flag_c(true);
+        // ROR #0 is treated as RRX
+        let (result, carry) = cpu.barrel_shift_immediate(0x01, 3, 0);
+        assert_eq!(result, 0x80000000); // carry shifted into bit 31
+        assert!(carry); // bit 0 shifted out
+    }
+
+    #[test]
+    fn test_bus_read_write() {
+        let mut cpu = make_cpu();
+        cpu.bus_write8(0x0200_0000, 0x42);
+        assert_eq!(cpu.bus_read8(0x0200_0000), 0x42);
+
+        cpu.bus_write16(0x0200_0002, 0x1234);
+        assert_eq!(cpu.bus_read16(0x0200_0002), 0x1234);
+
+        cpu.bus_write32(0x0200_0004, 0xDEADBEEF);
+        assert_eq!(cpu.bus_read32(0x0200_0004), 0xDEADBEEF);
+    }
+
+    #[test]
+    fn test_reset() {
+        let mut cpu = make_cpu();
+        cpu.set_reg(0, 0x12345678);
+        cpu.step();
+        assert!(cpu.cycles > 0);
+        cpu.set_halted(true);
+        cpu.reset();
+        assert_eq!(cpu.cycles, 0);
+        assert_eq!(cpu.reg(0), 0);
+        assert!(!cpu.halted());
+        assert_eq!(cpu.pc(), 0x0800_0000);
+        assert_eq!(cpu.reg(13), 0x0300_7F00); // SP_SYS
+        assert_eq!(cpu.cpsr() & CPSR_MODE_MASK, MODE_SYS);
     }
 }

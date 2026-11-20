@@ -789,44 +789,6 @@ mod tests {
     }
 
     #[test]
-    fn test_thumb_mov_imm() {
-        let mut cpu = make_thumb_cpu();
-        execute_thumb(&mut cpu, 0x202A);
-        assert_eq!(cpu.reg(0), 42);
-    }
-
-    #[test]
-    fn test_thumb_add_imm() {
-        let mut cpu = make_thumb_cpu();
-        execute_thumb(&mut cpu, 0x200A);
-        execute_thumb(&mut cpu, 0x3005);
-        assert_eq!(cpu.reg(0), 15);
-    }
-
-    #[test]
-    fn test_thumb_sub_imm() {
-        let mut cpu = make_thumb_cpu();
-        execute_thumb(&mut cpu, 0x2014);
-        execute_thumb(&mut cpu, 0x3805);
-        assert_eq!(cpu.reg(0), 15);
-    }
-
-    #[test]
-    fn test_thumb_cmp_imm() {
-        let mut cpu = make_thumb_cpu();
-        execute_thumb(&mut cpu, 0x200A);
-        execute_thumb(&mut cpu, 0x280A);
-        assert!(cpu.flag_z());
-    }
-
-    #[test]
-    fn test_thumb_mov_zero_sets_z() {
-        let mut cpu = make_thumb_cpu();
-        execute_thumb(&mut cpu, 0x2000);
-        assert!(cpu.flag_z());
-    }
-
-    #[test]
     fn test_thumb_lsl() {
         let mut cpu = make_thumb_cpu();
         execute_thumb(&mut cpu, 0x2001);
@@ -869,17 +831,6 @@ mod tests {
     }
 
     #[test]
-    fn test_thumb_str_ldr() {
-        let mut cpu = make_thumb_cpu();
-        cpu.set_reg(0, 0xDEADBEEF);
-        cpu.set_reg(1, 0x02000000);
-        execute_thumb(&mut cpu, 0x6008);
-        assert_eq!(cpu.bus_read32(0x02000000), 0xDEADBEEF);
-        execute_thumb(&mut cpu, 0x680A);
-        assert_eq!(cpu.reg(2), 0xDEADBEEF);
-    }
-
-    #[test]
     fn test_thumb_add_imm3() {
         let mut cpu = make_thumb_cpu();
         execute_thumb(&mut cpu, 0x200A);
@@ -893,6 +844,44 @@ mod tests {
         execute_thumb(&mut cpu, 0x200A);
         execute_thumb(&mut cpu, 0x1EC1);
         assert_eq!(cpu.reg(1), 7);
+    }
+
+    #[test]
+    fn test_thumb_mov_imm() {
+        let mut cpu = make_thumb_cpu();
+        execute_thumb(&mut cpu, 0x202A);
+        assert_eq!(cpu.reg(0), 42);
+    }
+
+    #[test]
+    fn test_thumb_add_imm() {
+        let mut cpu = make_thumb_cpu();
+        execute_thumb(&mut cpu, 0x200A);
+        execute_thumb(&mut cpu, 0x3005);
+        assert_eq!(cpu.reg(0), 15);
+    }
+
+    #[test]
+    fn test_thumb_sub_imm() {
+        let mut cpu = make_thumb_cpu();
+        execute_thumb(&mut cpu, 0x2014);
+        execute_thumb(&mut cpu, 0x3805);
+        assert_eq!(cpu.reg(0), 15);
+    }
+
+    #[test]
+    fn test_thumb_cmp_imm() {
+        let mut cpu = make_thumb_cpu();
+        execute_thumb(&mut cpu, 0x200A);
+        execute_thumb(&mut cpu, 0x280A);
+        assert!(cpu.flag_z());
+    }
+
+    #[test]
+    fn test_thumb_mov_zero_sets_z() {
+        let mut cpu = make_thumb_cpu();
+        execute_thumb(&mut cpu, 0x2000);
+        assert!(cpu.flag_z());
     }
 
     #[test]
@@ -926,6 +915,17 @@ mod tests {
         cpu.set_reg(1, 1);
         execute_thumb(&mut cpu, 0x5E42);
         assert_eq!(cpu.reg(2), 0xFFFFFF80);
+    }
+
+    #[test]
+    fn test_thumb_str_ldr() {
+        let mut cpu = make_thumb_cpu();
+        cpu.set_reg(0, 0xDEADBEEF);
+        cpu.set_reg(1, 0x02000000);
+        execute_thumb(&mut cpu, 0x6008);
+        assert_eq!(cpu.bus_read32(0x02000000), 0xDEADBEEF);
+        execute_thumb(&mut cpu, 0x680A);
+        assert_eq!(cpu.reg(2), 0xDEADBEEF);
     }
 
     #[test]

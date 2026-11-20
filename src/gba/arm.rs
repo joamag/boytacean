@@ -828,6 +828,65 @@ mod tests {
     }
 
     #[test]
+    fn test_arm_condition_fail() {
+        let mut cpu = make_cpu();
+        cpu.set_reg(0, 0);
+        // NV condition (0xF...) should not execute
+        super::execute_arm(&mut cpu, 0xF3A00005);
+        assert_eq!(cpu.reg(0), 0); // unchanged
+    }
+
+    #[test]
+    fn test_arm_undefined_instruction_0b011_bit0() {
+        // 0b011 with bit 4 set triggers UND exception
+        let mut cpu = make_cpu();
+        let old_cpsr = cpu.cpsr();
+        // Encoding: cond=AL (0xE), bits[27:25]=011, bit[4]=1
+        // 0xE6000010: undefined instruction in 0b011 space
+        super::execute_arm(&mut cpu, 0xE6000010);
+        assert_eq!(cpu.cpsr() & 0x1F, 0x1B); // MODE_UND
+        assert_eq!(cpu.pc(), 0x04); // UND vector
+        assert_eq!(cpu.spsr(), old_cpsr);
+        assert_eq!(cpu.cycles, 1);
+    }
+
+    #[test]
+    fn test_arm_coprocessor_triggers_und() {
+        // 0b111 without SWI bit: coprocessor instruction
+        let mut cpu = make_cpu();
+        let old_cpsr = cpu.cpsr();
+        // 0xEE000000: coprocessor data operation (bits[27:24]=1110)
+        super::execute_arm(&mut cpu, 0xEE000000);
+        assert_eq!(cpu.cpsr() & 0x1F, 0x1B); // MODE_UND
+        assert_eq!(cpu.pc(), 0x04);
+        assert_eq!(cpu.spsr(), old_cpsr);
+    }
+
+    #[test]
+    fn test_arm_coprocessor_data_transfer_triggers_und() {
+        // 0b110: coprocessor data transfer
+        let mut cpu = make_cpu();
+        let old_cpsr = cpu.cpsr();
+        // 0xEC000000: coprocessor data transfer (bits[27:25]=110)
+        super::execute_arm(&mut cpu, 0xEC000000);
+        assert_eq!(cpu.cpsr() & 0x1F, 0x1B); // MODE_UND
+        assert_eq!(cpu.pc(), 0x04);
+        assert_eq!(cpu.spsr(), old_cpsr);
+    }
+
+    #[test]
+    fn test_arm_undefined_saves_return_address() {
+        // UND exception should save PC in LR_und
+        let mut cpu = make_cpu();
+        let pc = 0x0800_0010u32;
+        cpu.set_reg(15, pc);
+        // trigger UND
+        super::execute_arm(&mut cpu, 0xE6000010);
+        // LR_und = PC of undefined instruction + 4
+        assert_eq!(cpu.reg(14), pc.wrapping_sub(4));
+    }
+
+    #[test]
     fn test_arm_mov() {
         let mut cpu = make_cpu();
         // MOV R0, #42 (E3A0002A)
@@ -934,26 +993,72 @@ mod tests {
     }
 
     #[test]
-    fn test_arm_condition_fail() {
+    fn test_arm_movs_flags() {
         let mut cpu = make_cpu();
-        cpu.set_reg(0, 0);
-        // NV condition (0xF...) should not execute
-        super::execute_arm(&mut cpu, 0xF3A00005);
-        assert_eq!(cpu.reg(0), 0); // unchanged
+        // MOVS R0, #0 (E3B00000) - sets Z flag
+        super::execute_arm(&mut cpu, 0xE3B00000);
+        assert!(cpu.flag_z());
+        assert!(!cpu.flag_n());
     }
 
     #[test]
-    fn test_arm_str_ldr() {
+    fn test_arm_adds_carry() {
         let mut cpu = make_cpu();
-        cpu.set_reg(0, 0xDEADBEEF);
-        cpu.set_reg(1, 0x0200_0000);
-        // STR R0, [R1] (E5810000)
-        super::execute_arm(&mut cpu, 0xE5810000);
-        assert_eq!(cpu.bus_read32(0x0200_0000), 0xDEADBEEF);
+        cpu.set_reg(0, 0xFFFFFFFF);
+        // ADDS R1, R0, #1 (E2901001) - should overflow to 0 with carry
+        super::execute_arm(&mut cpu, 0xE2901001);
+        assert_eq!(cpu.reg(1), 0);
+        assert!(cpu.flag_z());
+        assert!(cpu.flag_c());
+    }
 
-        // LDR R2, [R1] (E5912000)
-        super::execute_arm(&mut cpu, 0xE5912000);
-        assert_eq!(cpu.reg(2), 0xDEADBEEF);
+    #[test]
+    fn test_arm_data_processing_pc_plus_12_reg_shift() {
+        // When operand 2 uses a register-specified shift (bit 4=1),
+        // reading PC as Rm returns PC+12 instead of PC+8
+        let mut cpu = make_cpu();
+        // Place instruction at known address
+        let addr = 0x0200_0000u32;
+        cpu.set_reg(15, addr + 8); // pipeline: PC = addr + 8
+        cpu.set_reg(1, 0); // shift amount = 0
+
+        // MOV R0, R15, LSL R1 → E1A0011F (Rd=0, Rm=15, shift_type=LSL, Rs=R1)
+        // This has bit 4=1 (register shift), so PC should read as addr+12
+        super::execute_arm(&mut cpu, 0xE1A0011F);
+        assert_eq!(cpu.reg(0), addr + 12);
+    }
+
+    #[test]
+    fn test_arm_data_processing_pc_plus_12_rn_reg_shift() {
+        // PC as Rn with register-specified shift also returns PC+12
+        let mut cpu = make_cpu();
+        let addr = 0x0200_0000u32;
+        cpu.set_reg(15, addr + 8);
+        cpu.set_reg(0, 0);
+        cpu.set_reg(1, 0); // shift amount = 0
+
+        // ADD R2, R15, R0, LSL R1 → E08F2010... wait, need proper encoding
+        // ADD Rd=2, Rn=15, Rm=0, LSL Rs=1: E08F2110
+        super::execute_arm(&mut cpu, 0xE08F2110);
+        assert_eq!(cpu.reg(2), addr + 12);
+    }
+
+    #[test]
+    fn test_arm_cmp_rd15_restores_cpsr() {
+        // CMP/CMN/TST/TEQ with Rd=R15 should restore CPSR from SPSR
+        let mut cpu = make_cpu();
+        // Switch to FIQ mode
+        cpu.set_cpsr(0x00000011); // FIQ mode
+                                  // Set SPSR_fiq to SYS mode with N flag
+        cpu.set_spsr(0x8000001F);
+        cpu.set_reg(0, 0);
+
+        // CMP R15, R0 with Rd=R15: 0xE15FF000
+        super::execute_arm(&mut cpu, 0xE15FF000);
+
+        // CPSR should be restored from SPSR
+        assert_eq!(cpu.cpsr() & 0x1F, 0x1F); // SYS mode
+        assert!(cpu.flag_n());
     }
 
     #[test]
@@ -1043,72 +1148,57 @@ mod tests {
     }
 
     #[test]
-    fn test_arm_movs_flags() {
-        let mut cpu = make_cpu();
-        // MOVS R0, #0 (E3B00000) - sets Z flag
-        super::execute_arm(&mut cpu, 0xE3B00000);
-        assert!(cpu.flag_z());
-        assert!(!cpu.flag_n());
-    }
-
-    #[test]
-    fn test_arm_adds_carry() {
-        let mut cpu = make_cpu();
-        cpu.set_reg(0, 0xFFFFFFFF);
-        // ADDS R1, R0, #1 (E2901001) - should overflow to 0 with carry
-        super::execute_arm(&mut cpu, 0xE2901001);
-        assert_eq!(cpu.reg(1), 0);
-        assert!(cpu.flag_z());
-        assert!(cpu.flag_c());
-    }
-
-    #[test]
-    fn test_arm_data_processing_pc_plus_12_reg_shift() {
-        // When operand 2 uses a register-specified shift (bit 4=1),
-        // reading PC as Rm returns PC+12 instead of PC+8
-        let mut cpu = make_cpu();
-        // Place instruction at known address
-        let addr = 0x0200_0000u32;
-        cpu.set_reg(15, addr + 8); // pipeline: PC = addr + 8
-        cpu.set_reg(1, 0); // shift amount = 0
-
-        // MOV R0, R15, LSL R1 → E1A0011F (Rd=0, Rm=15, shift_type=LSL, Rs=R1)
-        // This has bit 4=1 (register shift), so PC should read as addr+12
-        super::execute_arm(&mut cpu, 0xE1A0011F);
-        assert_eq!(cpu.reg(0), addr + 12);
-    }
-
-    #[test]
-    fn test_arm_data_processing_pc_plus_12_rn_reg_shift() {
-        // PC as Rn with register-specified shift also returns PC+12
+    fn test_arm_swp_misaligned_rotates() {
+        // SWP with misaligned address rotates the read value
         let mut cpu = make_cpu();
         let addr = 0x0200_0000u32;
-        cpu.set_reg(15, addr + 8);
-        cpu.set_reg(0, 0);
-        cpu.set_reg(1, 0); // shift amount = 0
+        cpu.bus_write32(addr, 0x04030201);
+        cpu.set_reg(0, addr + 1); // Rn = misaligned
+        cpu.set_reg(1, 0); // Rm = value to store
 
-        // ADD R2, R15, R0, LSL R1 → E08F2010... wait, need proper encoding
-        // ADD Rd=2, Rn=15, Rm=0, LSL Rs=1: E08F2110
-        super::execute_arm(&mut cpu, 0xE08F2110);
-        assert_eq!(cpu.reg(2), addr + 12);
+        // SWP R2, R1, [R0] → E1002091
+        super::execute_arm(&mut cpu, 0xE1002091);
+        assert_eq!(cpu.reg(2), 0x04030201u32.rotate_right(8));
     }
 
     #[test]
-    fn test_arm_cmp_rd15_restores_cpsr() {
-        // CMP/CMN/TST/TEQ with Rd=R15 should restore CPSR from SPSR
+    fn test_arm_ldrh_misaligned_rotates() {
+        // LDRH from odd address rotates result by 8
         let mut cpu = make_cpu();
-        // Switch to FIQ mode
-        cpu.set_cpsr(0x00000011); // FIQ mode
-                                  // Set SPSR_fiq to SYS mode with N flag
-        cpu.set_spsr(0x8000001F);
-        cpu.set_reg(0, 0);
+        let addr = 0x0200_0000u32;
+        cpu.bus_write16(addr, 0x0020); // 32
+        cpu.set_reg(1, addr);
 
-        // CMP R15, R0 with Rd=R15: 0xE15FF000
-        super::execute_arm(&mut cpu, 0xE15FF000);
+        // LDRH R0, [R1, #1] → E1D100B1
+        super::execute_arm(&mut cpu, 0xE1D100B1);
+        assert_eq!(cpu.reg(0), 0x0020u32.rotate_right(8));
+    }
 
-        // CPSR should be restored from SPSR
-        assert_eq!(cpu.cpsr() & 0x1F, 0x1F); // SYS mode
-        assert!(cpu.flag_n());
+    #[test]
+    fn test_arm_ldrsh_misaligned_reads_byte() {
+        // LDRSH from odd address reads as LDRSB
+        let mut cpu = make_cpu();
+        let addr = 0x0200_0000u32;
+        cpu.bus_write8(addr + 1, 0x80); // -128 as signed byte
+        cpu.set_reg(1, addr);
+
+        // LDRSH R0, [R1, #1] → E1D100F1
+        super::execute_arm(&mut cpu, 0xE1D100F1);
+        assert_eq!(cpu.reg(0), 0xFFFFFF80); // sign-extended byte
+    }
+
+    #[test]
+    fn test_arm_str_ldr() {
+        let mut cpu = make_cpu();
+        cpu.set_reg(0, 0xDEADBEEF);
+        cpu.set_reg(1, 0x0200_0000);
+        // STR R0, [R1] (E5810000)
+        super::execute_arm(&mut cpu, 0xE5810000);
+        assert_eq!(cpu.bus_read32(0x0200_0000), 0xDEADBEEF);
+
+        // LDR R2, [R1] (E5912000)
+        super::execute_arm(&mut cpu, 0xE5912000);
+        assert_eq!(cpu.reg(2), 0xDEADBEEF);
     }
 
     #[test]
@@ -1148,46 +1238,6 @@ mod tests {
         // LDR R0, [R0, #4]! → E5B00004
         super::execute_arm(&mut cpu, 0xE5B00004);
         assert_eq!(cpu.reg(0), 42); // loaded value, not base+4
-    }
-
-    #[test]
-    fn test_arm_ldrh_misaligned_rotates() {
-        // LDRH from odd address rotates result by 8
-        let mut cpu = make_cpu();
-        let addr = 0x0200_0000u32;
-        cpu.bus_write16(addr, 0x0020); // 32
-        cpu.set_reg(1, addr);
-
-        // LDRH R0, [R1, #1] → E1D100B1
-        super::execute_arm(&mut cpu, 0xE1D100B1);
-        assert_eq!(cpu.reg(0), 0x0020u32.rotate_right(8));
-    }
-
-    #[test]
-    fn test_arm_ldrsh_misaligned_reads_byte() {
-        // LDRSH from odd address reads as LDRSB
-        let mut cpu = make_cpu();
-        let addr = 0x0200_0000u32;
-        cpu.bus_write8(addr + 1, 0x80); // -128 as signed byte
-        cpu.set_reg(1, addr);
-
-        // LDRSH R0, [R1, #1] → E1D100F1
-        super::execute_arm(&mut cpu, 0xE1D100F1);
-        assert_eq!(cpu.reg(0), 0xFFFFFF80); // sign-extended byte
-    }
-
-    #[test]
-    fn test_arm_swp_misaligned_rotates() {
-        // SWP with misaligned address rotates the read value
-        let mut cpu = make_cpu();
-        let addr = 0x0200_0000u32;
-        cpu.bus_write32(addr, 0x04030201);
-        cpu.set_reg(0, addr + 1); // Rn = misaligned
-        cpu.set_reg(1, 0); // Rm = value to store
-
-        // SWP R2, R1, [R0] → E1002091
-        super::execute_arm(&mut cpu, 0xE1002091);
-        assert_eq!(cpu.reg(2), 0x04030201u32.rotate_right(8));
     }
 
     #[test]
@@ -1359,55 +1409,5 @@ mod tests {
         assert_eq!(cpu.reg(14), pc.wrapping_sub(4));
         // SPSR_svc should be the old CPSR
         assert_eq!(cpu.spsr(), old_cpsr);
-    }
-
-    #[test]
-    fn test_arm_undefined_instruction_0b011_bit0() {
-        // 0b011 with bit 4 set triggers UND exception
-        let mut cpu = make_cpu();
-        let old_cpsr = cpu.cpsr();
-        // Encoding: cond=AL (0xE), bits[27:25]=011, bit[4]=1
-        // 0xE6000010: undefined instruction in 0b011 space
-        super::execute_arm(&mut cpu, 0xE6000010);
-        assert_eq!(cpu.cpsr() & 0x1F, 0x1B); // MODE_UND
-        assert_eq!(cpu.pc(), 0x04); // UND vector
-        assert_eq!(cpu.spsr(), old_cpsr);
-        assert_eq!(cpu.cycles, 1);
-    }
-
-    #[test]
-    fn test_arm_coprocessor_triggers_und() {
-        // 0b111 without SWI bit: coprocessor instruction
-        let mut cpu = make_cpu();
-        let old_cpsr = cpu.cpsr();
-        // 0xEE000000: coprocessor data operation (bits[27:24]=1110)
-        super::execute_arm(&mut cpu, 0xEE000000);
-        assert_eq!(cpu.cpsr() & 0x1F, 0x1B); // MODE_UND
-        assert_eq!(cpu.pc(), 0x04);
-        assert_eq!(cpu.spsr(), old_cpsr);
-    }
-
-    #[test]
-    fn test_arm_coprocessor_data_transfer_triggers_und() {
-        // 0b110: coprocessor data transfer
-        let mut cpu = make_cpu();
-        let old_cpsr = cpu.cpsr();
-        // 0xEC000000: coprocessor data transfer (bits[27:25]=110)
-        super::execute_arm(&mut cpu, 0xEC000000);
-        assert_eq!(cpu.cpsr() & 0x1F, 0x1B); // MODE_UND
-        assert_eq!(cpu.pc(), 0x04);
-        assert_eq!(cpu.spsr(), old_cpsr);
-    }
-
-    #[test]
-    fn test_arm_undefined_saves_return_address() {
-        // UND exception should save PC in LR_und
-        let mut cpu = make_cpu();
-        let pc = 0x0800_0010u32;
-        cpu.set_reg(15, pc);
-        // trigger UND
-        super::execute_arm(&mut cpu, 0xE6000010);
-        // LR_und = PC of undefined instruction + 4
-        assert_eq!(cpu.reg(14), pc.wrapping_sub(4));
     }
 }

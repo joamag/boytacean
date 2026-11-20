@@ -159,6 +159,19 @@ mod tests {
     }
 
     #[test]
+    fn test_irq_acknowledge() {
+        let mut irq = IrqController::new();
+        irq.set_ime(true);
+        irq.set_ie(IRQ_VBLANK | IRQ_HBLANK);
+        irq.raise_vblank();
+        irq.raise_hblank();
+        assert_eq!(irq.highest_pending(), IRQ_VBLANK);
+
+        irq.ack_if(IRQ_VBLANK);
+        assert_eq!(irq.highest_pending(), IRQ_HBLANK);
+    }
+
+    #[test]
     fn test_raise() {
         let mut irq = IrqController::new();
         irq.raise(IRQ_VBLANK);
@@ -181,19 +194,6 @@ mod tests {
 
         irq.set_ie(IRQ_VBLANK);
         assert!(irq.pending());
-    }
-
-    #[test]
-    fn test_irq_acknowledge() {
-        let mut irq = IrqController::new();
-        irq.set_ime(true);
-        irq.set_ie(IRQ_VBLANK | IRQ_HBLANK);
-        irq.raise_vblank();
-        irq.raise_hblank();
-        assert_eq!(irq.highest_pending(), IRQ_VBLANK);
-
-        irq.ack_if(IRQ_VBLANK);
-        assert_eq!(irq.highest_pending(), IRQ_HBLANK);
     }
 
     #[test]
