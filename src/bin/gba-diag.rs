@@ -7,7 +7,7 @@
 //! # Usage
 //! gba-diag <rom.gba> \[num_frames\] \[--bios <bios.bin>\] \[--audio\]
 
-use std::env;
+use std::env::{self, temp_dir};
 
 use boytacean::gba::{
     diag::{run_audio_diagnostics, run_diagnostics},
@@ -61,8 +61,9 @@ fn main() {
     }
 
     if audio_mode {
-        run_audio_diagnostics(&mut gba, num_frames);
+        run_audio_diagnostics(&mut gba, num_frames, &temp_dir())
+            .expect("Failed to run diagnostics");
     } else {
-        run_diagnostics(&mut gba, num_frames);
+        run_diagnostics(&mut gba, num_frames, &temp_dir()).expect("Failed to run diagnostics");
     }
 }
