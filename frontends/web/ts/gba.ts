@@ -81,7 +81,7 @@ export class GbaEmulator extends GbaCore implements Emulator {
                 Feature.Themes,
                 Feature.Benchmark,
                 Feature.Keyboard,
-                Feature.KeyboardGB,
+                Feature.KeyboardGBA,
                 Feature.Framerate
             ],
             ...((this.extraSettings?.debug ?? false)
