@@ -13,7 +13,7 @@
 use std::{
     env::args,
     error::Error,
-    io::{stdout, Write},
+    io::{stdout, Read, Write},
     path::Path,
 };
 
@@ -100,10 +100,9 @@ fn write_output(path: &str, data: &[u8]) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn info(options: &Options) -> Result<(), Box<dyn Error>> {
-    let (mut serial, port) = open_port(&options.port)?;
+fn info<T: Read + Write>(transport: &mut T, port: &str) -> Result<(), Box<dyn Error>> {
     let mut flasher = Flasher::probe();
-    flasher.run(&mut serial, |_| {})?;
+    flasher.run(transport, |_| {})?;
     if let Some(device) = flasher.device() {
         println!("{device} on {port}");
     }
@@ -114,11 +113,14 @@ fn info(options: &Options) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn dump(options: &Options) -> Result<(), Box<dyn Error>> {
+fn dump<T: Read + Write>(
+    transport: &mut T,
+    port: &str,
+    options: &Options,
+) -> Result<(), Box<dyn Error>> {
     let path = options.file.as_deref().unwrap_or_default();
-    let (mut serial, port) = open_port(&options.port)?;
     let mut dumper = Dumper::new();
-    let dump = dumper.run(&mut serial, print_progress("Reading cartridge"))?;
+    let dump = dumper.run(transport, print_progress("Reading cartridge"))?;
     println!();
     if let Some(device) = dumper.device() {
         println!("Read \"{}\" with {device} on {port}", dump.title());
@@ -133,7 +135,11 @@ fn dump(options: &Options) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn flash(options: &Options) -> Result<(), Box<dyn Error>> {
+fn flash<T: Read + Write>(
+    transport: &mut T,
+    port: &str,
+    options: &Options,
+) -> Result<(), Box<dyn Error>> {
     let path = options.file.as_deref().unwrap_or_default();
     let rom = read_file(path)?;
     let mut flasher = Flasher::new(rom.clone())?;
@@ -151,10 +157,9 @@ fn flash(options: &Options) -> Result<(), Box<dyn Error>> {
 
     // without an explicit confirmation the cartridge is only probed,
     // describing what flashing it would do
-    let (mut serial, port) = open_port(&options.port)?;
     if !options.yes {
         let mut probe = Flasher::probe();
-        probe.run(&mut serial, |_| {})?;
+        probe.run(transport, |_| {})?;
         if let Some(device) = probe.device() {
             println!("{device} on {port}");
         }
@@ -177,7 +182,7 @@ fn flash(options: &Options) -> Result<(), Box<dyn Error>> {
         }
         let mut dumper = Dumper::new();
         let dump = dumper
-            .run(&mut serial, print_progress("Backing up cartridge"))
+            .run(transport, print_progress("Backing up cartridge"))
             .map_err(|err| {
                 format!("Failed to back up the cartridge ({err}), use --no-backup for a blank one")
             })?;
@@ -185,7 +190,7 @@ fn flash(options: &Options) -> Result<(), Box<dyn Error>> {
         write_output(backup, dump.rom_data())?;
     }
 
-    flasher.run(&mut serial, print_progress("Flashing cartridge"))?;
+    flasher.run(transport, print_progress("Flashing cartridge"))?;
     println!();
     if let (Some(device), Some(chip)) = (flasher.device(), flasher.chip()) {
         println!("Flashed {path} into the {chip} with {device} on {port}");
@@ -199,35 +204,159 @@ fn main() -> Result<(), Box<dyn Error>> {
         print_usage();
         return Ok(());
     };
+    let (mut serial, port) = open_port(&options.port)?;
     match options.command.as_str() {
-        "info" => info(&options),
-        "dump" => dump(&options),
-        _ => flash(&options),
+        "info" => info(&mut serial, &port),
+        "dump" => dump(&mut serial, &port, &options),
+        _ => flash(&mut serial, &port, &options),
     }
 }
 
 #[cfg(test)]
 mod tests {
     use std::{
+        collections::VecDeque,
         env::temp_dir,
-        fs::{remove_file, write},
+        fs::{create_dir_all, read, remove_dir_all, write},
+        io::{self, Read, Write},
+        path::{Path, PathBuf},
         process,
     };
 
+    use boytacean_cartridge::header::NINTENDO_LOGO;
+
     use super::{dump, flash, info, parse_args, save_path, write_output, Options, BACKUP_FILE};
+
+    /// The reply to the firmware query of a GBxCart RW v1.3 running
+    /// the L1 firmware, as captured from the device.
+    const FIRMWARE_L1: [u8; 9] = [0x08, 0x4c, 0x00, 0x01, 0x04, 0x65, 0xe2, 0x1d, 0xea];
+
+    /// The CFI values from offset `0x10` of the 4 MiB flash chip of a
+    /// flash cartridge (CFI ID `01 7E`), as captured from the device.
+    const CFI_4MB: [u8; 37] = [
+        0x51, 0x52, 0x59, 0x02, 0x00, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x27, 0x36, 0x00, 0x00,
+        0x03, 0x04, 0x08, 0x0e, 0x03, 0x05, 0x03, 0x03, 0x16, 0x02, 0x00, 0x05, 0x00, 0x02, 0x07,
+        0x00, 0x20, 0x00, 0x3e, 0x00, 0x00, 0x01,
+    ];
+
+    /// A transport that replays the replies of a device in order,
+    /// ignoring what is sent to it, as the exchanges themselves are
+    /// covered by the tests of the cartridge crate.
+    struct Replay {
+        replies: VecDeque<u8>,
+    }
+
+    impl Replay {
+        fn new(replies: Vec<u8>) -> Self {
+            Self {
+                replies: replies.into(),
+            }
+        }
+    }
+
+    impl Read for Replay {
+        fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+            let count = buf.len().min(self.replies.len());
+            for byte in buf.iter_mut().take(count) {
+                *byte = self.replies.pop_front().unwrap();
+            }
+            Ok(count)
+        }
+    }
+
+    impl Write for Replay {
+        fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+            Ok(buf.len())
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    /// Builds an empty directory for the files of a test, unique to the
+    /// test and to the process running it, so that runs never collide.
+    fn build_directory(name: &str) -> PathBuf {
+        let directory = temp_dir().join(format!("boytacean-{name}-{}", process::id()));
+        if directory.exists() {
+            remove_dir_all(&directory).unwrap();
+        }
+        create_dir_all(&directory).unwrap();
+        directory
+    }
 
     fn build_args(args: &[&str]) -> Vec<String> {
         args.iter().map(|arg| String::from(*arg)).collect()
     }
 
-    fn build_options(command: &str, file: Option<&str>) -> Options {
+    fn build_options(command: &str, file: &Path, backup: Option<&Path>, yes: bool) -> Options {
         Options {
             command: String::from(command),
-            file: file.map(String::from),
-            port: String::from("/dev/boytacean-none"),
-            backup: Some(String::from(BACKUP_FILE)),
-            yes: false,
+            file: Some(file.to_string_lossy().into_owned()),
+            port: String::from("auto"),
+            backup: backup.map(|backup| backup.to_string_lossy().into_owned()),
+            yes,
         }
+    }
+
+    /// Builds a 32 KiB ROM with a valid header for the provided cartridge
+    /// type and RAM size, its bytes mixing their offsets.
+    fn build_rom(cartridge_type: u8, ram_size: u8) -> Vec<u8> {
+        let mut rom: Vec<u8> = (0..0x8000).map(|index| (index >> 3) as u8).collect();
+        rom[0x0100..0x0150].fill(0x00);
+        rom[0x0104..0x0134].copy_from_slice(&NINTENDO_LOGO);
+        rom[0x0134..0x0138].copy_from_slice(b"GAME");
+        rom[0x0147] = cartridge_type;
+        rom[0x0149] = ram_size;
+        rom[0x014d] = rom[0x0134..0x014d]
+            .iter()
+            .fold(0u8, |sum, &byte| sum.wrapping_sub(byte).wrapping_sub(1));
+        rom
+    }
+
+    /// The replies of the dump of a cartridge with the provided ROM and
+    /// RAM: the firmware, the MBC reset, the header twice, the ROM and
+    /// the RAM.
+    fn dump_replies(rom: &[u8], ram: &[u8]) -> Vec<u8> {
+        let mut replies = FIRMWARE_L1.to_vec();
+        replies.push(0x01);
+        for _ in 0..2 {
+            replies.extend_from_slice(&rom[0x0100..0x0150]);
+        }
+        replies.extend_from_slice(rom);
+        replies.extend_from_slice(ram);
+        replies
+    }
+
+    /// The replies of the probe of a cartridge, with or without a flash
+    /// chip: the firmware, the MBC reset, the start of the cartridge and
+    /// the CFI table, with every value showing up twice.
+    fn probe_replies(chip: bool) -> Vec<u8> {
+        let mut replies = FIRMWARE_L1.to_vec();
+        replies.push(0x01);
+        replies.extend(vec![0x00; 64]);
+        let mut cfi = vec![0x00; 256];
+        if chip {
+            for (offset, value) in CFI_4MB.iter().enumerate() {
+                cfi[(0x10 + offset) * 2] = *value;
+                cfi[(0x10 + offset) * 2 + 1] = *value;
+            }
+        }
+        replies.extend(cfi);
+        replies
+    }
+
+    /// The replies of the flashing of a 32 KiB ROM: the probe, then for
+    /// both banks the erase of their two sectors and the acknowledgement
+    /// of every program, and the ROM read back.
+    fn flash_replies(rom: &[u8]) -> Vec<u8> {
+        let mut replies = probe_replies(true);
+        for _ in 0..2 {
+            replies.extend([0xff; 4]);
+            replies.extend(vec![0x01; 64]);
+        }
+        replies.extend_from_slice(rom);
+        replies
     }
 
     #[test]
@@ -298,39 +427,171 @@ mod tests {
 
     #[test]
     fn test_write_output() {
-        let path = temp_dir()
-            .join(format!("boytacean-gbxcart-{}.gb", process::id()))
-            .to_string_lossy()
-            .into_owned();
+        let directory = build_directory("gbxcart-output");
+        let path = directory.join("game.gb").to_string_lossy().into_owned();
         write_output(&path, &[0x01, 0x02]).unwrap();
         assert_eq!(
             write_output(&path, &[0x03]).unwrap_err().to_string(),
             format!("The file {path} already exists, move it away first")
         );
-        remove_file(path).unwrap();
+        assert_eq!(read(&path).unwrap(), vec![0x01, 0x02]);
+        remove_dir_all(directory).unwrap();
     }
 
     #[test]
-    fn test_info_invalid_port() {
-        let result = info(&build_options("info", None));
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .starts_with("IO error: Failed to open /dev/boytacean-none: "));
+    fn test_info() {
+        for chip in [true, false] {
+            let mut transport = Replay::new(probe_replies(chip));
+            info(&mut transport, "/dev/ttyUSB0").unwrap();
+            assert!(transport.replies.is_empty());
+        }
     }
 
     #[test]
-    fn test_dump_invalid_port() {
-        let result = dump(&build_options("dump", Some("game.gb")));
+    fn test_dump() {
+        let directory = build_directory("gbxcart-dump");
+        let rom = build_rom(0x00, 0x00);
+        let mut transport = Replay::new(dump_replies(&rom, &[]));
+        let options = build_options("dump", &directory.join("game.gb"), None, false);
+        dump(&mut transport, "/dev/ttyUSB0", &options).unwrap();
+        assert_eq!(read(directory.join("game.gb")).unwrap(), rom);
+        assert!(!directory.join("game.sav").exists());
+        remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn test_dump_save() {
+        let directory = build_directory("gbxcart-save");
+        let rom = build_rom(0x03, 0x02);
+        let ram: Vec<u8> = (0..0x2000).map(|index| index as u8).collect();
+        let mut transport = Replay::new(dump_replies(&rom, &ram));
+        let options = build_options("dump", &directory.join("game.gb"), None, false);
+        dump(&mut transport, "/dev/ttyUSB0", &options).unwrap();
+        assert_eq!(read(directory.join("game.gb")).unwrap(), rom);
+        assert_eq!(read(directory.join("game.sav")).unwrap(), ram);
+        remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn test_dump_existing() {
+        let directory = build_directory("gbxcart-existing");
+        write(directory.join("game.gb"), [0x0a]).unwrap();
+        let rom = build_rom(0x00, 0x00);
+        let mut transport = Replay::new(dump_replies(&rom, &[]));
+        let options = build_options("dump", &directory.join("game.gb"), None, false);
+        let result = dump(&mut transport, "/dev/ttyUSB0", &options);
         assert!(result
             .unwrap_err()
             .to_string()
-            .starts_with("IO error: Failed to open /dev/boytacean-none: "));
+            .ends_with("already exists, move it away first"));
+        assert_eq!(read(directory.join("game.gb")).unwrap(), vec![0x0a]);
+        remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn test_flash() {
+        // the cartridge is backed up before it's flashed, the ROM being
+        // for an MBC1 (only a warning for flash cartridges)
+        let directory = build_directory("gbxcart-flash");
+        let old_rom = build_rom(0x00, 0x00);
+        let rom = build_rom(0x03, 0x02);
+        write(directory.join("game.gb"), &rom).unwrap();
+        let mut replies = dump_replies(&old_rom, &[]);
+        replies.extend(flash_replies(&rom));
+        let mut transport = Replay::new(replies);
+        let options = build_options(
+            "flash",
+            &directory.join("game.gb"),
+            Some(&directory.join("backup.gb")),
+            true,
+        );
+        flash(&mut transport, "/dev/ttyUSB0", &options).unwrap();
+        assert_eq!(read(directory.join("backup.gb")).unwrap(), old_rom);
+        assert!(transport.replies.is_empty());
+        remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn test_flash_no_backup() {
+        let directory = build_directory("gbxcart-no-backup");
+        let rom = build_rom(0x19, 0x00);
+        write(directory.join("game.gb"), &rom).unwrap();
+        let mut transport = Replay::new(flash_replies(&rom));
+        let options = build_options("flash", &directory.join("game.gb"), None, true);
+        flash(&mut transport, "/dev/ttyUSB0", &options).unwrap();
+        assert!(transport.replies.is_empty());
+        remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn test_flash_confirmation() {
+        // without --yes the cartridge is only probed, never backed up
+        // nor flashed, both with and without a flash chip
+        let directory = build_directory("gbxcart-confirmation");
+        write(directory.join("game.gb"), build_rom(0x19, 0x00)).unwrap();
+        for chip in [true, false] {
+            let mut transport = Replay::new(probe_replies(chip));
+            let options = build_options(
+                "flash",
+                &directory.join("game.gb"),
+                Some(&directory.join("backup.gb")),
+                false,
+            );
+            flash(&mut transport, "/dev/ttyUSB0", &options).unwrap();
+            assert!(transport.replies.is_empty());
+            assert!(!directory.join("backup.gb").exists());
+        }
+        remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn test_flash_existing_backup() {
+        let directory = build_directory("gbxcart-existing-backup");
+        write(directory.join("game.gb"), build_rom(0x19, 0x00)).unwrap();
+        write(directory.join("backup.gb"), [0x0a]).unwrap();
+        let mut transport = Replay::new(vec![]);
+        let options = build_options(
+            "flash",
+            &directory.join("game.gb"),
+            Some(&directory.join("backup.gb")),
+            true,
+        );
+        let result = flash(&mut transport, "/dev/ttyUSB0", &options);
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .ends_with("already exists, move it away or use --backup"));
+        assert_eq!(read(directory.join("backup.gb")).unwrap(), vec![0x0a]);
+        remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn test_flash_backup_failure() {
+        // a blank cartridge (no valid header) can't be backed up, which
+        // stops the flashing before anything is written
+        let directory = build_directory("gbxcart-backup-failure");
+        write(directory.join("game.gb"), build_rom(0x19, 0x00)).unwrap();
+        let mut transport = Replay::new(dump_replies(&[0xff; 0x8000], &[]));
+        let options = build_options(
+            "flash",
+            &directory.join("game.gb"),
+            Some(&directory.join("backup.gb")),
+            true,
+        );
+        let result = flash(&mut transport, "/dev/ttyUSB0", &options);
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .ends_with("use --no-backup for a blank one"));
+        assert!(!directory.join("backup.gb").exists());
+        remove_dir_all(directory).unwrap();
     }
 
     #[test]
     fn test_flash_missing_rom() {
-        let result = flash(&build_options("flash", Some("/dev/boytacean-none.gb")));
+        let mut transport = Replay::new(vec![]);
+        let options = build_options("flash", Path::new("/dev/boytacean-none.gb"), None, true);
+        let result = flash(&mut transport, "/dev/ttyUSB0", &options);
         assert_eq!(
             result.unwrap_err().to_string(),
             "Failed to open file: /dev/boytacean-none.gb"
@@ -340,13 +601,12 @@ mod tests {
     #[test]
     fn test_flash_invalid_rom() {
         // a ROM file must be made of whole ROM banks
-        let path = temp_dir()
-            .join(format!("boytacean-gbxcart-invalid-{}.gb", process::id()))
-            .to_string_lossy()
-            .into_owned();
-        write(&path, [0x00; 0x100]).unwrap();
-        let result = flash(&build_options("flash", Some(&path)));
+        let directory = build_directory("gbxcart-invalid");
+        write(directory.join("game.gb"), [0x00; 0x100]).unwrap();
+        let mut transport = Replay::new(vec![]);
+        let options = build_options("flash", &directory.join("game.gb"), None, true);
+        let result = flash(&mut transport, "/dev/ttyUSB0", &options);
         assert_eq!(result.unwrap_err().to_string(), "Invalid ROM size");
-        remove_file(path).unwrap();
+        remove_dir_all(directory).unwrap();
     }
 }
