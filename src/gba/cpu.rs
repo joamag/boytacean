@@ -1670,7 +1670,7 @@ mod tests {
     }
 
     #[test]
-    fn test_halt_deadlock_warned_resets_on_unhalt() {
+    fn test_halt_deadlock_warned_kept_on_unhalt() {
         let mut cpu = make_cpu();
         cpu.set_halted(true);
         cpu.bus.irq.set_ie(0);
@@ -1683,8 +1683,10 @@ mod tests {
         cpu.bus.irq.raise_vblank();
         cpu.step();
 
-        // should have unhalted and reset the flag
+        // should have unhalted, the warning is only issued once
+        // until the CPU is reset
         assert!(!cpu.halted());
+        assert!(cpu.halt_deadlock_warned);
     }
 
     #[test]
@@ -1728,18 +1730,6 @@ mod tests {
         assert!(cpu.cpsr() & CPSR_T == 0); // ARM mode
         assert_eq!(cpu.spsr(), old_cpsr); // old CPSR saved
         assert_eq!(cpu.pc(), 0x18); // vector
-    }
-
-    #[test]
-    fn test_enter_exception_irq_mode() {
-        let mut cpu = make_cpu();
-        let old_cpsr = cpu.cpsr();
-        cpu.enter_exception(0x18, MODE_IRQ);
-        assert_eq!(cpu.cpsr() & CPSR_MODE_MASK, MODE_IRQ);
-        assert!(cpu.cpsr() & CPSR_I != 0); // IRQs disabled in handler
-        assert!(cpu.cpsr() & CPSR_T == 0); // ARM mode
-        assert_eq!(cpu.spsr(), old_cpsr);
-        assert_eq!(cpu.pc(), 0x18);
     }
 
     #[test]
