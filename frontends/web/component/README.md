@@ -148,10 +148,10 @@ Passing `children` to `<Boytacean />` switches it into provider only mode, so no
 
 | Prop       | Type              | Default  | Description                                                                  |
 | ---------- | ----------------- | -------- | ---------------------------------------------------------------------------- |
-| `rom`      | `string`          | —        | URL of the ROM to load at boot, the machine stays idle when omitted.         |
-| `wasmPath` | `string`          | —        | Where to load the WASM binary from, defaults to the wasm-bindgen resolution. |
-| `storage`  | `StorageAdapter`  | —        | Persistence for the battery backed RAM and the settings.                     |
-| `palette`  | `string`          | —        | Palette applied at startup, only used by the Game Boy.                       |
+| `rom`      | `string`          | -        | URL of the ROM to load at boot, the machine stays idle when omitted.         |
+| `wasmPath` | `string`          | -        | Where to load the WASM binary from, defaults to the wasm-bindgen resolution. |
+| `storage`  | `StorageAdapter`  | -        | Persistence for the battery backed RAM and the settings.                     |
+| `palette`  | `string`          | -        | Palette applied at startup, only used by the Game Boy.                       |
 | `system`   | `BoytaceanSystem` | `"auto"` | System to emulate, inferred from the ROM extension in the automatic mode.    |
 | `scale`    | `number`          | `3`      | Scale factor of the display, ignored when custom children are provided.      |
 | `keyboard` | `boolean`         | `true`   | Whether the physical keyboard is bound, ignored with custom children.        |
@@ -179,9 +179,9 @@ The display is sized from the core, so the screen switches between the 160x144 o
 
 ## Hooks
 
-* `useBoytacean()` — the context of the closest provider: the `core` instance and the `system` it emulates, plus the `play()`, `pause()`, `reset()`, `loadRom()`, `press()` and `release()` actions. Its identity is stable for the lifetime of the provider, so consumers are never re-rendered by emulation activity.
-* `useBoytaceanStatus()` — `booted` and `romName`, updated only when a ROM is booted.
-* `useBoytaceanStats()` — `framerate`, `cyclerate` and `emulationSpeed`, sampled every 500 ms by default (`useBoytaceanStats(interval)` to change it).
+* `useBoytacean()` - the context of the closest provider: the `core` instance and the `system` it emulates, plus the `play()`, `pause()`, `reset()`, `loadRom()`, `press()` and `release()` actions. Its identity is stable for the lifetime of the provider, so consumers are never re-rendered by emulation activity.
+* `useBoytaceanStatus()` - `booted` and `romName`, updated only when a ROM is booted.
+* `useBoytaceanStats()` - `framerate`, `cyclerate` and `emulationSpeed`, sampled every 500 ms by default (`useBoytaceanStats(interval)` to change it).
 
 High frequency data such as the frame buffer is deliberately kept out of React state, bind to the events of `core` directly when you need it.
 
