@@ -381,14 +381,13 @@ impl Emulator {
             }
             return Ok(());
         }
+        // the new Game Boy comes in the mode of its cartridge, unless a
+        // mode is set in the command line
         if let System::Gb(gb) = &mut system {
-            let mode = if self.auto_mode {
-                gb.rom_i().gb_mode()
-            } else {
-                self.gb_mode
-            };
-            gb.set_mode(mode);
-            gb.load(true)?;
+            if !self.auto_mode {
+                gb.set_mode(self.gb_mode);
+                gb.load(true)?;
+            }
         }
         system.set_ppu_enabled(self.system.ppu_enabled());
         system.set_apu_enabled(self.system.apu_enabled());
