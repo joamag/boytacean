@@ -288,24 +288,61 @@ fn swi_sqrt(cpu: &mut Arm7Tdmi) {
 
 /// SWI 0x09: ArcTan - arctangent.
 ///
-/// R0 = tan (fixed point), returns R0 = angle.
+/// R0 = tan (1.1.14 fixed point), returns R0 = angle in the
+/// -PI/2 to PI/2 range (0xC000-0x4000, sign extended).
 fn swi_arctan(cpu: &mut Arm7Tdmi) {
-    let tan = cpu.reg(0) as i16 as f64 / 16384.0;
-    let angle = tan.atan();
-    let result = (angle * 16384.0 / std::f64::consts::PI) as i16;
-    cpu.set_reg(0, result as u32);
+    let tan = cpu.reg(0) as i32;
+    cpu.set_reg(0, arctan(tan) as u32);
 }
 
 /// SWI 0x0A: ArcTan2 - arctangent of y/x.
 ///
 /// R0 = x, R1 = y, returns R0 = angle (0x0000-0xFFFF).
 fn swi_arctan2(cpu: &mut Arm7Tdmi) {
-    let x = cpu.reg(0) as i16 as f64;
-    let y = cpu.reg(1) as i16 as f64;
-    let angle = y.atan2(x);
-    // convert to 0x0000-0xFFFF range
-    let result = (angle * 32768.0 / std::f64::consts::PI) as i16 as u16;
-    cpu.set_reg(0, result as u32);
+    let x = cpu.reg(0) as i32;
+    let y = cpu.reg(1) as i32;
+
+    // reduces the angle to the first octant of each half plane,
+    // as the BIOS does, so that ArcTan only sees |tan| <= 1.0
+    let result = if y == 0 {
+        if x >= 0 {
+            0x0000
+        } else {
+            0x8000
+        }
+    } else if x == 0 {
+        if y >= 0 {
+            0x4000
+        } else {
+            0xC000
+        }
+    } else if y >= 0 {
+        if x >= 0 && x >= y {
+            arctan((y << 14).wrapping_div(x))
+        } else if x < 0 && x.wrapping_neg() >= y {
+            arctan((y << 14).wrapping_div(x)) + 0x8000
+        } else {
+            0x4000 - arctan((x << 14).wrapping_div(y))
+        }
+    } else if x <= 0 && x.wrapping_neg() > y.wrapping_neg() {
+        arctan((y << 14).wrapping_div(x)) + 0x8000
+    } else if x > 0 && x >= y.wrapping_neg() {
+        arctan((y << 14).wrapping_div(x)) + 0x10000
+    } else {
+        0xC000 - arctan((x << 14).wrapping_div(y))
+    };
+    cpu.set_reg(0, result as u16 as u32);
+}
+
+/// Shared ArcTan logic, the polynomial approximation of the real
+/// BIOS (bit-exact), mapping tan(PI/4) = 0x4000 to PI/4 = 0x2000.
+fn arctan(tan: i32) -> i32 {
+    let a = -(tan.wrapping_mul(tan) >> 14);
+    let mut b = ((0xA9 * a) >> 14) + 0x390;
+    for coefficient in [0x91C, 0xFB6, 0x16AA, 0x2081, 0x3651, 0xA2F9] {
+        b = (b.wrapping_mul(a) >> 14) + coefficient;
+    }
+    (tan.wrapping_mul(b) >> 16) as i16 as i32
 }
 
 /// SWI 0x0B: CpuSet - memory copy/fill.
@@ -1241,6 +1278,58 @@ mod tests {
         cpu.set_reg(0, 0);
         handle_swi(&mut cpu, 0x08);
         assert_eq!(cpu.reg(0), 0);
+    }
+
+    #[test]
+    fn test_swi_arctan() {
+        // tan(PI / 4) = 1.0 (0x4000) maps to PI / 4 (0x2000), with the
+        // results of the BIOS polynomial sign extended to 32 bits
+        for (tan, angle) in [
+            (0x0000, 0x0000),
+            (0x1000, 0x09FB),
+            (0x2000, 0x12E4),
+            (0x3000, 0x1A37),
+            (0x4000, 0x2000),
+            (-0x2000, 0xFFFF_ED1C),
+            (-0x4000, 0xFFFF_E000),
+        ] {
+            let mut cpu = make_cpu();
+            cpu.set_reg(0, tan as u32);
+            handle_swi(&mut cpu, 0x09);
+            assert_eq!(cpu.reg(0), angle);
+        }
+    }
+
+    #[test]
+    fn test_swi_arctan2() {
+        // one point per octant and per axis, with the full circle
+        // mapped to the 0x0000-0xFFFF range
+        for (x, y, angle) in [
+            (0x4000, 0, 0x0000),
+            (0, 0x4000, 0x4000),
+            (-0x4000, 0, 0x8000),
+            (0, -0x4000, 0xC000),
+            (0, 0, 0x0000),
+            (0x4000, 0x4000, 0x2000),
+            (-0x4000, 0x4000, 0x6000),
+            (-0x4000, -0x4000, 0xA000),
+            (0x4000, -0x4000, 0xE000),
+            (0x4000, 0x2000, 0x12E4),
+            (0x2000, 0x4000, 0x2D1C),
+            (-0x2000, 0x4000, 0x52E4),
+            (-0x4000, 0x2000, 0x6D1C),
+            (-0x4000, -0x2000, 0x92E4),
+            (-0x2000, -0x4000, 0xAD1C),
+            (0x2000, -0x4000, 0xD2E4),
+            (0x4000, -0x2000, 0xED1C),
+            (i32::MIN, 1, 0x4000),
+        ] {
+            let mut cpu = make_cpu();
+            cpu.set_reg(0, x as u32);
+            cpu.set_reg(1, y as u32);
+            handle_swi(&mut cpu, 0x0A);
+            assert_eq!(cpu.reg(0), angle);
+        }
     }
 
     #[test]
