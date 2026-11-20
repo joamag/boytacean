@@ -1847,8 +1847,47 @@ fn bgr555_to_rgb888(color: u16) -> (u8, u8, u8) {
 
 #[cfg(test)]
 mod tests {
-    use super::{bgr555_to_rgb888, obj_dimensions, BlendMode, GbaPpu, Layer, VideoMode};
+    use super::{
+        bgr555_to_rgb888, obj_dimensions, BlendMode, GbaPpu, Layer, VideoMode, BG_NO_PIXEL,
+    };
     use crate::gba::consts::{CYCLES_PER_SCANLINE, DISPLAY_HEIGHT, DISPLAY_WIDTH, VISIBLE_DOTS};
+
+    /// Builds two 4bpp text backgrounds covering the whole screen, BG0
+    /// (priority 0) in red and BG1 (priority 1) in green, with their
+    /// maps at screen bases 8 and 9, the OBJ tile 0 in OBJ color 3
+    /// (blue) and every sprite disabled.
+    fn build_text_bgs(ppu: &mut GbaPpu, vram: &mut [u8], palette: &mut [u8], oam: &mut [u8]) {
+        palette[2] = 0x1F;
+        palette[4] = 0xE0;
+        palette[5] = 0x03;
+        palette[0x206] = 0x00;
+        palette[0x207] = 0x7C;
+        vram[0x20..0x40].fill(0x11);
+        vram[0x40..0x60].fill(0x22);
+        for index in 0..1024 {
+            vram[0x4000 + index * 2] = 1;
+            vram[0x4800 + index * 2] = 2;
+        }
+        vram[0x10000..0x10020].fill(0x33);
+        for index in 0..128 {
+            oam[index * 8 + 1] = 0x02;
+        }
+        ppu.set_bgcnt(0, 8 << 8);
+        ppu.set_bgcnt(1, (9 << 8) | 1);
+    }
+
+    /// Writes the attributes of a sprite into the OAM.
+    fn build_sprite(oam: &mut [u8], index: usize, attr0: u16, attr1: u16, attr2: u16) {
+        let offset = index * 8;
+        oam[offset..offset + 2].copy_from_slice(&attr0.to_le_bytes());
+        oam[offset + 2..offset + 4].copy_from_slice(&attr1.to_le_bytes());
+        oam[offset + 4..offset + 6].copy_from_slice(&attr2.to_le_bytes());
+    }
+
+    /// Obtains the RGB888 color of a pixel of line 0 of the frame.
+    fn line_pixel(ppu: &GbaPpu, x: usize) -> [u8; 3] {
+        ppu.frame_buffer()[x * 3..x * 3 + 3].try_into().unwrap()
+    }
 
     #[test]
     fn test_new() {
@@ -2222,8 +2261,15 @@ mod tests {
         assert_eq!(obj_dimensions(0, 1), (16, 16));
         assert_eq!(obj_dimensions(0, 2), (32, 32));
         assert_eq!(obj_dimensions(0, 3), (64, 64));
+        assert_eq!(obj_dimensions(1, 0), (16, 8));
+        assert_eq!(obj_dimensions(1, 1), (32, 8));
+        assert_eq!(obj_dimensions(1, 2), (32, 16));
         assert_eq!(obj_dimensions(1, 3), (64, 32));
+        assert_eq!(obj_dimensions(2, 0), (8, 16));
+        assert_eq!(obj_dimensions(2, 1), (8, 32));
+        assert_eq!(obj_dimensions(2, 2), (16, 32));
         assert_eq!(obj_dimensions(2, 3), (32, 64));
+        assert_eq!(obj_dimensions(3, 0), (8, 8));
     }
 
     #[test]
@@ -2592,6 +2638,118 @@ mod tests {
     }
 
     #[test]
+    fn test_collect_sprites_affine() {
+        let mut ppu = GbaPpu::new();
+        ppu.set_dispcnt(1 << 6); // 1D mapping
+        let mut vram = vec![0u8; 0x18000];
+        let mut palette = vec![0u8; 0x400];
+        let mut oam = vec![0u8; 0x400];
+        for color in 1..9 {
+            palette[0x200 + color * 2] = color as u8;
+        }
+
+        // tile 0 with each column in its own color (1-8), in 4bpp, and
+        // in 8bpp from tile 2 (as 8bpp tiles take two 4bpp ones)
+        for row in 0..8 {
+            vram[0x10000 + row * 4..0x10004 + row * 4].copy_from_slice(&[0x21, 0x43, 0x65, 0x87]);
+            vram[0x10040 + row * 8..0x10048 + row * 8].copy_from_slice(&[1, 2, 3, 4, 5, 6, 7, 8]);
+        }
+
+        // sprite 0: affine 8x8 at (20, 0) with the identity matrix
+        oam[6..8].copy_from_slice(&0x0100u16.to_le_bytes());
+        oam[30..32].copy_from_slice(&0x0100u16.to_le_bytes());
+        let collect = |ppu: &GbaPpu, oam: &[u8]| {
+            let mut obj_pixels = [(0u16, 255u8, false); DISPLAY_WIDTH];
+            let mut obj_has_pixel = [false; DISPLAY_WIDTH];
+            let mut obj_window_mask = [false; DISPLAY_WIDTH];
+            ppu.collect_sprites(
+                0,
+                &vram,
+                &palette,
+                oam,
+                &mut obj_pixels,
+                &mut obj_has_pixel,
+                &mut obj_window_mask,
+            );
+            (obj_pixels, obj_has_pixel, obj_window_mask)
+        };
+
+        // 4bpp and 8bpp, each column with its color
+        for (attr0, tile) in [(1 << 8, 0), ((1 << 8) | (1 << 13), 2)] {
+            build_sprite(&mut oam, 0, attr0, 20, tile);
+            let (obj_pixels, obj_has_pixel, _) = collect(&ppu, &oam);
+            assert!(!obj_has_pixel[19]);
+            assert_eq!(obj_pixels[20].0, 1);
+            assert_eq!(obj_pixels[27].0, 8);
+            assert!(!obj_has_pixel[28]);
+        }
+
+        // with the mosaic, blocks of 4 pixels repeat their first pixel
+        ppu.set_mosaic(0x0300);
+        build_sprite(&mut oam, 0, (1 << 8) | (1 << 12), 20, 0);
+        let (obj_pixels, _, _) = collect(&ppu, &oam);
+        assert_eq!(obj_pixels[22].0, 1);
+        assert_eq!(obj_pixels[25].0, 5);
+
+        // as part of the OBJ window, it only marks the window
+        build_sprite(&mut oam, 0, (1 << 8) | (2 << 10), 20, 0);
+        let (_, obj_has_pixel, obj_window_mask) = collect(&ppu, &oam);
+        assert!(!obj_has_pixel[20]);
+        assert!(obj_window_mask[20]);
+
+        // shrunk 2x, the texture only covers the middle of its box,
+        // and past the right edge of the screen it's clipped
+        oam[6..8].copy_from_slice(&0x0200u16.to_le_bytes());
+        build_sprite(&mut oam, 0, 1 << 8, 236, 0);
+        let (obj_pixels, obj_has_pixel, _) = collect(&ppu, &oam);
+        assert!(!obj_has_pixel[236]);
+        assert_eq!(obj_pixels[238].0, 1);
+        assert_eq!(obj_pixels[239].0, 3);
+    }
+
+    #[test]
+    fn test_collect_sprites_flips() {
+        let mut ppu = GbaPpu::new();
+        ppu.set_dispcnt(1 << 6); // 1D mapping
+        let mut vram = vec![0u8; 0x18000];
+        let mut palette = vec![0u8; 0x400];
+        let mut oam = vec![0u8; 0x400];
+        for color in 1..4 {
+            palette[0x200 + color * 2] = color as u8;
+        }
+
+        // tile 0 (4bpp) and tile 2 (8bpp) with pixel (0, 0) in color 1,
+        // (7, 0) in color 2 and (0, 7) in color 3
+        vram[0x10000] = 0x01;
+        vram[0x10003] = 0x20;
+        vram[0x1001C] = 0x03;
+        vram[0x10040] = 1;
+        vram[0x10047] = 2;
+        vram[0x10078] = 3;
+
+        // sprite 0: 8x8 at (236, 0) (its last 4 columns off the screen),
+        // as it is, flipped horizontally and flipped vertically
+        for (attr0, tile) in [(0, 0), (1 << 13, 2)] {
+            for (flips, color) in [(0, 1), (1 << 12, 2), (1 << 13, 3)] {
+                build_sprite(&mut oam, 0, attr0, 236 | flips, tile);
+                let mut obj_pixels = [(0u16, 255u8, false); DISPLAY_WIDTH];
+                let mut obj_has_pixel = [false; DISPLAY_WIDTH];
+                let mut obj_window_mask = [false; DISPLAY_WIDTH];
+                ppu.collect_sprites(
+                    0,
+                    &vram,
+                    &palette,
+                    &oam,
+                    &mut obj_pixels,
+                    &mut obj_has_pixel,
+                    &mut obj_window_mask,
+                );
+                assert_eq!(obj_pixels[236].0, color);
+            }
+        }
+    }
+
+    #[test]
     fn test_collect_sprites_obj_window() {
         let mut ppu = GbaPpu::new();
         ppu.set_dispcnt(1 << 6); // 1D mapping
@@ -2915,6 +3073,142 @@ mod tests {
     }
 
     #[test]
+    fn test_render_composited_windows() {
+        let mut ppu = GbaPpu::new();
+        let mut vram = vec![0u8; 0x18000];
+        let mut palette = vec![0u8; 0x400];
+        let mut oam = vec![0u8; 0x400];
+        build_text_bgs(&mut ppu, &mut vram, &mut palette, &mut oam);
+
+        // sprite 0 at x=48 as part of the OBJ window
+        build_sprite(&mut oam, 0, 2 << 10, 48, 0);
+
+        // WIN0 over x 0-15 showing BG1, WIN1 over x 16-31 showing
+        // nothing, the OBJ window showing BG1 and the outside both BGs
+        ppu.set_dispcnt(0xF000 | (1 << 6) | (1 << 8) | (1 << 9));
+        ppu.set_winh(0, 16);
+        ppu.set_winv(0, 160);
+        ppu.set_winh(1, (16 << 8) | 32);
+        ppu.set_winv(1, 160);
+        ppu.set_winin(0x0002);
+        ppu.set_winout(0x0203);
+        ppu.render_scanline(&vram, &palette, &oam);
+
+        assert_eq!(line_pixel(&ppu, 0), [0, 0xF8, 0]);
+        assert_eq!(line_pixel(&ppu, 16), [0, 0, 0]);
+        assert_eq!(line_pixel(&ppu, 48), [0, 0xF8, 0]);
+        assert_eq!(line_pixel(&ppu, 40), [0xF8, 0, 0]);
+    }
+
+    #[test]
+    fn test_render_composited_blending() {
+        let mut ppu = GbaPpu::new();
+        let mut vram = vec![0u8; 0x18000];
+        let mut palette = vec![0u8; 0x400];
+        let mut oam = vec![0u8; 0x400];
+        build_text_bgs(&mut ppu, &mut vram, &mut palette, &mut oam);
+
+        // sprite 0 in blue over x 0-7 with priority 1, between BG0 and
+        // BG1 (moved to priority 2)
+        ppu.set_bgcnt(1, (9 << 8) | 2);
+        build_sprite(&mut oam, 0, 0, 0, 1 << 10);
+        ppu.set_dispcnt((1 << 6) | (1 << 8) | (1 << 9) | (1 << 12));
+
+        // alpha blending of BG0 (target 1) at half over the sprite
+        // (target 2) at half, but not over BG1 (not a target)
+        ppu.set_bldcnt((1 << 6) | 0x01 | (1 << 12));
+        ppu.set_bldalpha(0x0808);
+        ppu.render_scanline(&vram, &palette, &oam);
+        assert_eq!(line_pixel(&ppu, 0), [0x78, 0, 0x78]);
+        assert_eq!(line_pixel(&ppu, 8), [0xF8, 0, 0]);
+
+        // full brightness increase and decrease of BG0 (target 1)
+        ppu.set_bldy(16);
+        ppu.set_bldcnt((2 << 6) | 0x01);
+        ppu.render_scanline(&vram, &palette, &oam);
+        assert_eq!(line_pixel(&ppu, 8), [0xF8, 0xF8, 0xF8]);
+        ppu.set_bldcnt((3 << 6) | 0x01);
+        ppu.render_scanline(&vram, &palette, &oam);
+        assert_eq!(line_pixel(&ppu, 8), [0, 0, 0]);
+
+        // a top layer that isn't target 1 is left as it is
+        for bldcnt in [(1 << 6) | 0x02 | (1 << 9), (2 << 6) | 0x02, (3 << 6) | 0x02] {
+            ppu.set_bldcnt(bldcnt);
+            ppu.render_scanline(&vram, &palette, &oam);
+            assert_eq!(line_pixel(&ppu, 8), [0xF8, 0, 0]);
+        }
+    }
+
+    #[test]
+    fn test_render_composited_semi_transparent() {
+        let mut ppu = GbaPpu::new();
+        let mut vram = vec![0u8; 0x18000];
+        let mut palette = vec![0u8; 0x400];
+        let mut oam = vec![0u8; 0x400];
+        build_text_bgs(&mut ppu, &mut vram, &mut palette, &mut oam);
+
+        // sprite 0 in blue over x 0-7, semi-transparent and on top
+        build_sprite(&mut oam, 0, 1 << 10, 0, 0);
+        ppu.set_dispcnt((1 << 6) | (1 << 8) | (1 << 12));
+
+        // alpha blended over BG0 (target 2) whatever the color effect
+        ppu.set_bldcnt(1 << 8);
+        ppu.set_bldalpha(0x0808);
+        ppu.render_scanline(&vram, &palette, &oam);
+        assert_eq!(line_pixel(&ppu, 0), [0x78, 0, 0x78]);
+        assert_eq!(line_pixel(&ppu, 8), [0xF8, 0, 0]);
+
+        // drawn as it is over a layer that isn't target 2
+        ppu.set_bldcnt(0);
+        ppu.render_scanline(&vram, &palette, &oam);
+        assert_eq!(line_pixel(&ppu, 0), [0, 0, 0xF8]);
+    }
+
+    #[test]
+    fn test_render_mode1_mode2() {
+        let mut ppu = GbaPpu::new();
+        let mut vram = vec![0u8; 0x18000];
+        let mut palette = vec![0u8; 0x400];
+        let oam = vec![0u8; 0x400];
+        palette[2] = 0x1F;
+        palette[4] = 0xE0;
+        palette[5] = 0x03;
+
+        // the affine maps at screen bases 0 and 1 use the tiles 1 (red)
+        // and 2 (green) of char base 1 (8bpp)
+        vram[..0x100].fill(1);
+        vram[0x800..0x900].fill(2);
+        vram[0x4040..0x4080].fill(0x01);
+        vram[0x4080..0x40C0].fill(0x02);
+
+        // the text map of BG0 at screen base 24 uses tile 1 (green) of
+        // char base 2 (4bpp), BG1 is transparent
+        vram[0x8020..0x8040].fill(0x22);
+        for index in 0..1024 {
+            vram[0xC000 + index * 2] = 1;
+        }
+        ppu.set_bgcnt(1, (2 << 2) | (25 << 8) | 3);
+
+        // mode 1: BG0 (text) and BG2 (affine), the top one by priority
+        ppu.set_dispcnt(1 | (1 << 8) | (1 << 9) | (1 << 10));
+        for (bg0_priority, bg2_priority, color) in [(1, 0, [0xF8, 0, 0]), (0, 1, [0, 0xF8, 0])] {
+            ppu.set_bgcnt(0, (2 << 2) | (24 << 8) | bg0_priority);
+            ppu.set_bgcnt(2, (1 << 2) | bg2_priority);
+            ppu.render_scanline(&vram, &palette, &oam);
+            assert_eq!(line_pixel(&ppu, 0), color);
+        }
+
+        // mode 2: BG2 and BG3 (both affine), the top one by priority
+        ppu.set_dispcnt(2 | (1 << 10) | (1 << 11));
+        for (bg2_priority, bg3_priority, color) in [(0, 1, [0xF8, 0, 0]), (1, 0, [0, 0xF8, 0])] {
+            ppu.set_bgcnt(2, (1 << 2) | bg2_priority);
+            ppu.set_bgcnt(3, (1 << 2) | (1 << 8) | bg3_priority);
+            ppu.render_scanline(&vram, &palette, &oam);
+            assert_eq!(line_pixel(&ppu, 0), color);
+        }
+    }
+
+    #[test]
     fn test_render_mode4_bitmap_composited() {
         let mut ppu = GbaPpu::new();
         // mode 4, BG2 enabled
@@ -3129,6 +3423,161 @@ mod tests {
         ppu.set_bg_ref_y_lo(0, 128 << 8);
         ppu.render_scanline(&vram, &palette, &oam);
         assert_eq!(&ppu.frame_buffer()[..3], &[0, 0, 0]);
+    }
+
+    #[test]
+    fn test_collect_text_bg_screen_sizes() {
+        let mut ppu = GbaPpu::new();
+        let mut vram = vec![0u8; 0x18000];
+        let mut palette = vec![0u8; 0x400];
+
+        // the first entry of each of the 4 screen blocks of the map at
+        // screen base 8 uses a tile of its own color (1-4)
+        for block in 0..4 {
+            palette[(block + 1) * 2] = (block + 1) as u8;
+            vram[0x20 * (block + 1)..0x20 * (block + 2)].fill(0x11 * (block + 1) as u8);
+            vram[0x4000 + block * 0x800] = (block + 1) as u8;
+        }
+
+        for (size, hofs, vofs, block) in [
+            (0, 0, 0, 0),
+            (1, 256, 0, 1),
+            (2, 0, 256, 1),
+            (3, 256, 0, 1),
+            (3, 0, 256, 2),
+            (3, 256, 256, 3),
+        ] {
+            ppu.set_bgcnt(0, (size << 14) | (8 << 8));
+            ppu.set_bg_hofs(0, hofs);
+            ppu.set_bg_vofs(0, vofs);
+            let mut pixels = [BG_NO_PIXEL; DISPLAY_WIDTH];
+            ppu.collect_text_bg(0, 0, &vram, &palette, &mut pixels);
+            assert_eq!(pixels[0], block as u16 + 1);
+        }
+    }
+
+    #[test]
+    fn test_collect_text_bg_flips() {
+        let mut ppu = GbaPpu::new();
+        let mut vram = vec![0u8; 0x18000];
+        let mut palette = vec![0u8; 0x400];
+        for color in 1..4 {
+            palette[color * 2] = color as u8;
+        }
+
+        // tile 1 with pixel (0, 0) in color 1, (7, 0) in color 2 and
+        // (0, 7) in color 3, in 4bpp and then in 8bpp
+        vram[0x20] = 0x01;
+        vram[0x23] = 0x20;
+        vram[0x3C] = 0x03;
+        for (bgcnt, is_8bpp) in [(8 << 8, false), ((8 << 8) | (1 << 7), true)] {
+            if is_8bpp {
+                vram[0x40] = 1;
+                vram[0x47] = 2;
+                vram[0x78] = 3;
+            }
+            ppu.set_bgcnt(0, bgcnt);
+
+            // the first entry of the map, as it is, flipped horizontally
+            // and flipped vertically
+            for (entry, color) in [(0x0001u16, 1), (0x0401, 2), (0x0801, 3)] {
+                vram[0x4000..0x4002].copy_from_slice(&entry.to_le_bytes());
+                let mut pixels = [BG_NO_PIXEL; DISPLAY_WIDTH];
+                ppu.collect_text_bg(0, 0, &vram, &palette, &mut pixels);
+                assert_eq!(pixels[0], color);
+            }
+        }
+    }
+
+    #[test]
+    fn test_collect_text_bg_mosaic() {
+        let mut ppu = GbaPpu::new();
+        let mut vram = vec![0u8; 0x18000];
+        let mut palette = vec![0u8; 0x400];
+        for color in 1..10 {
+            palette[color * 2] = color as u8;
+        }
+
+        // tile 1 with the pixels of row 0 in colors 1-8 and pixel (0, 7)
+        // in color 9, in 4bpp and in 8bpp, used by the whole map
+        vram[0x20..0x24].copy_from_slice(&[0x21, 0x43, 0x65, 0x87]);
+        vram[0x3C] = 0x09;
+        vram[0x40..0x48].copy_from_slice(&[1, 2, 3, 4, 5, 6, 7, 8]);
+        vram[0x78] = 9;
+
+        // blocks of 4 pixels repeat their first pixel
+        ppu.set_mosaic(0x0003);
+        for bgcnt in [(8 << 8) | (1 << 6), (8 << 8) | (1 << 6) | (1 << 7)] {
+            ppu.set_bgcnt(0, bgcnt);
+            for (entry, colors) in [
+                (0x0001u16, [1, 1, 1, 1, 5]),
+                (0x0401, [8, 8, 8, 8, 4]),
+                (0x0801, [9, 9, 9, 9, 0]),
+            ] {
+                for index in 0..32 {
+                    vram[0x4000 + index * 2..0x4002 + index * 2]
+                        .copy_from_slice(&entry.to_le_bytes());
+                }
+                let mut pixels = [BG_NO_PIXEL; DISPLAY_WIDTH];
+                ppu.collect_text_bg(0, 0, &vram, &palette, &mut pixels);
+                for (x, color) in colors.iter().enumerate() {
+                    let expected = if *color == 0 { BG_NO_PIXEL } else { *color };
+                    assert_eq!(pixels[x], expected);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_collect_affine_bg_wraparound() {
+        let mut ppu = GbaPpu::new();
+        let mut vram = vec![0u8; 0x18000];
+        let mut palette = vec![0u8; 0x400];
+        palette[2] = 0x1F;
+
+        // the last column of row 0 of the 128x128 map uses tile 1 of
+        // char base 1, in color 1
+        vram[15] = 1;
+        vram[0x4040..0x4080].fill(0x01);
+
+        // a reference point 8 pixels left of the map (-8.0)
+        ppu.set_bg_ref_x_lo(0, 0xF800);
+        ppu.set_bg_ref_x_hi(0, 0x0FFF);
+
+        // transparent without the wraparound, the last column with it
+        ppu.set_bgcnt(2, 1 << 2);
+        let mut pixels = [BG_NO_PIXEL; DISPLAY_WIDTH];
+        ppu.collect_affine_bg(0, 2, &vram, &palette, &mut pixels);
+        assert_eq!(pixels[0], BG_NO_PIXEL);
+        ppu.set_bgcnt(2, (1 << 2) | (1 << 13));
+        ppu.collect_affine_bg(0, 2, &vram, &palette, &mut pixels);
+        assert_eq!(pixels[0], 0x001F);
+    }
+
+    #[test]
+    fn test_collect_affine_bg_map_sizes() {
+        // the last column of row 0 of each map size uses tile 1 of char
+        // base 1, in color 1, past the end of the smaller maps
+        for (size, tiles) in [(1u16, 32usize), (2, 64), (3, 128)] {
+            let mut ppu = GbaPpu::new();
+            let mut vram = vec![0u8; 0x18000];
+            let mut palette = vec![0u8; 0x400];
+            palette[2] = 0x1F;
+            vram[tiles - 1] = 1;
+            vram[0x4040..0x4080].fill(0x01);
+
+            let ref_x = ((tiles - 1) * 8 * 256) as u32;
+            ppu.set_bg_ref_x_lo(0, (ref_x & 0xFFFF) as u16);
+            ppu.set_bg_ref_x_hi(0, (ref_x >> 16) as u16);
+
+            let mut pixels = [BG_NO_PIXEL; DISPLAY_WIDTH];
+            ppu.set_bgcnt(2, 1 << 2);
+            ppu.collect_affine_bg(0, 2, &vram, &palette, &mut pixels);
+            assert_eq!(pixels[0], BG_NO_PIXEL);
+            ppu.set_bgcnt(2, (1 << 2) | (size << 14));
+            ppu.collect_affine_bg(0, 2, &vram, &palette, &mut pixels);
+            assert_eq!(pixels[0], 0x001F);
+        }
     }
 
     #[test]
