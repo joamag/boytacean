@@ -4,16 +4,20 @@
 //! of recent CPU states. When execution jumps into an unmapped memory
 //! region (typical null function pointer crash) the ring buffer is
 //! dumped with full register state so the faulty code path can be
-//! identified.
+//! identified. The changes of a watched memory word are reported with
+//! the instruction that made them, and the trace can stop once the
+//! execution reaches a given address.
 //!
 //! # Usage
-//! gba-trace <rom.gba> \[max_frames\] \[--bios <bios.bin>\]
+//! gba-trace <rom.gba> \[max_frames\] \[--bios <bios.bin>\] \[--watch <address>\] \[--until-pc <address>\]
 
-use std::env;
+use std::{env::args, error::Error};
 
 use boytacean::gba::GameBoyAdvance;
+use boytacean_common::util::read_file;
 
 const RING_SIZE: usize = 65536;
+const DEFAULT_FRAMES: u64 = 600;
 
 #[derive(Clone, Copy, Default)]
 struct TraceEntry {
@@ -24,77 +28,88 @@ struct TraceEntry {
     regs: [u32; 16],
 }
 
-fn main() {
-    let args: Vec<String> = env::args().collect();
-    if args.len() < 2 {
-        eprintln!("Usage: gba-trace <rom.gba> [max_frames] [--bios <bios.bin>]");
-        std::process::exit(1);
-    }
+/// The options of a run of the utility, as provided in its arguments.
+#[derive(Clone, PartialEq, Eq, Debug)]
+struct Options {
+    rom: String,
+    frames: u64,
+    bios: Option<String>,
+    watch: Option<u32>,
+    until_pc: Option<u32>,
+}
 
-    let rom_path = &args[1];
-    let mut max_frames = 600u64;
-    let mut bios_path: Option<String> = None;
-    let mut watch_addr: Option<u32> = None;
-    let mut until_pc: Option<u32> = None;
+fn print_usage() {
+    println!("Usage: gba-trace <rom.gba> [max_frames] [options]");
+    println!("If max_frames is not specified, it traces up to {DEFAULT_FRAMES} frames");
+    println!("Options:");
+    println!("  --bios <bios.bin>      Boots the ROM through the BIOS file");
+    println!(
+        "  --watch <address>      Prints each change of the word at the hex address, stopping"
+    );
+    println!("                         at the first change of an IO register");
+    println!("  --until-pc <address>   Stops once the execution reaches the hex address");
+}
 
-    let mut i = 2;
-    while i < args.len() {
-        match args[i].as_str() {
-            "--bios" => {
-                if i + 1 < args.len() {
-                    bios_path = Some(args[i + 1].clone());
-                    i += 2;
-                } else {
-                    eprintln!("--bios requires a path argument");
-                    std::process::exit(1);
-                }
-            }
-            "--watch" => {
-                if i + 1 < args.len() {
-                    let raw = args[i + 1].trim_start_matches("0x");
-                    watch_addr = u32::from_str_radix(raw, 16).ok();
-                    i += 2;
-                } else {
-                    eprintln!("--watch requires a hex address argument");
-                    std::process::exit(1);
-                }
-            }
-            "--until-pc" => {
-                if i + 1 < args.len() {
-                    let raw = args[i + 1].trim_start_matches("0x");
-                    until_pc = u32::from_str_radix(raw, 16).ok();
-                    i += 2;
-                } else {
-                    eprintln!("--until-pc requires a hex address argument");
-                    std::process::exit(1);
-                }
-            }
-            _ => {
-                max_frames = args[i].parse::<u64>().unwrap_or(600);
-                i += 1;
-            }
+/// Parses the arguments of the utility, `None` when they are not valid.
+fn parse_args(args: &[String]) -> Option<Options> {
+    let mut options = Options {
+        rom: args.first().filter(|arg| !arg.starts_with("--"))?.clone(),
+        frames: DEFAULT_FRAMES,
+        bios: None,
+        watch: None,
+        until_pc: None,
+    };
+    let mut frames = None;
+    let mut args = args[1..].iter();
+    while let Some(arg) = args.next() {
+        match arg.as_str() {
+            "--bios" => options.bios = Some(args.next()?.clone()),
+            "--watch" => options.watch = Some(parse_address(args.next()?)?),
+            "--until-pc" => options.until_pc = Some(parse_address(args.next()?)?),
+            arg if arg.starts_with("--") || frames.is_some() => return None,
+            arg => frames = Some(arg.parse::<u64>().ok().filter(|&value| value > 0)?),
         }
     }
+    options.frames = frames.unwrap_or(DEFAULT_FRAMES);
+    Some(options)
+}
 
-    let data = std::fs::read(rom_path).expect("Failed to read ROM file");
+/// Parses an address in hexadecimal, with or without its `0x` prefix.
+fn parse_address(value: &str) -> Option<u32> {
+    let digits = value.strip_prefix("0x").unwrap_or(value);
+    if digits.is_empty() || !digits.chars().all(|digit| digit.is_ascii_hexdigit()) {
+        return None;
+    }
+    u32::from_str_radix(digits, 16).ok()
+}
+
+/// Loads the ROM of the options into a new GBA, booting it through
+/// the BIOS of the options when one is provided.
+fn load(options: &Options) -> Result<GameBoyAdvance, Box<dyn Error>> {
     let mut gba = GameBoyAdvance::new();
-    let info = gba.load_rom(&data).expect("Failed to load ROM");
+    let info = gba.load_rom(&read_file(&options.rom)?)?;
     println!("Loaded: {} ({})", info.title(), info.game_code());
 
-    if let Some(path) = &bios_path {
-        let bios_data = std::fs::read(path).expect("Failed to read BIOS file");
-        gba.load_bios(&bios_data);
+    if let Some(path) = &options.bios {
+        gba.load_bios(&read_file(path)?);
         println!("BIOS loaded from {path}");
     }
+    Ok(gba)
+}
 
+/// Traces the execution of the GBA for up to the frames of the options,
+/// stopping early when the execution enters an unmapped region, reaches
+/// the address to stop at or changes a watched IO register, returning
+/// the number of instructions executed.
+fn trace(gba: &mut GameBoyAdvance, options: &Options) -> u64 {
     let mut ring = vec![TraceEntry::default(); RING_SIZE];
     let mut ring_pos = 0usize;
     let mut ring_len = 0usize;
     let mut prev_handler = 0u32;
-    let mut prev_watch = watch_addr.map(|addr| gba.cpu.bus.read32(addr));
+    let mut prev_watch = options.watch.map(|addr| gba.cpu.bus.read32(addr));
     let mut instr_count = 0u64;
 
-    while gba.ppu_frame() < max_frames {
+    while gba.ppu_frame() < options.frames {
         let thumb = gba.cpu.cpsr() & 0x20 != 0;
         let exec_pc = if thumb {
             gba.cpu.pc().wrapping_sub(4)
@@ -129,7 +144,7 @@ fn main() {
             ring_len = ring_len.saturating_add(1).min(RING_SIZE);
         }
 
-        if let Some(target) = until_pc {
+        if let Some(target) = options.until_pc {
             if exec_pc == target || gba.cpu.pc() == target {
                 println!(
                     "\n== reached PC={:#010x} at frame {} instr {}",
@@ -137,9 +152,9 @@ fn main() {
                     gba.ppu_frame(),
                     instr_count
                 );
-                dump_regs(&gba);
-                dump_entry_state(&mut gba);
-                return;
+                dump_regs(gba);
+                dump_entry_state(gba);
+                return instr_count;
             }
         }
 
@@ -151,8 +166,8 @@ fn main() {
                 exec_pc
             );
             dump_ring(&ring, ring_pos, ring_len);
-            dump_regs(&gba);
-            return;
+            dump_regs(gba);
+            return instr_count;
         }
 
         let handler = gba.cpu.bus.read32(0x03FF_FFFC);
@@ -169,8 +184,8 @@ fn main() {
             // signature under investigation — dump the path that did it
             if prev_handler != 0 && handler == 0 {
                 dump_ring(&ring, ring_pos, ring_len);
-                dump_regs(&gba);
-                return;
+                dump_regs(gba);
+                return instr_count;
             }
             prev_handler = handler;
         }
@@ -182,7 +197,7 @@ fn main() {
         // that produced it (the last change before a crash is the writer
         // of the corrupted value); IO addresses dump the ring instead so
         // the code path into the first write can be inspected
-        if let (Some(addr), Some(prev)) = (watch_addr, prev_watch) {
+        if let (Some(addr), Some(prev)) = (options.watch, prev_watch) {
             let value = if addr >> 24 == 0x04 {
                 gba.cpu.bus.read16(addr) as u32
             } else {
@@ -200,18 +215,22 @@ fn main() {
                 );
                 if addr >> 24 == 0x04 {
                     dump_ring(&ring, ring_pos, ring_len);
-                    dump_regs(&gba);
-                    return;
+                    dump_regs(gba);
+                    return instr_count;
                 }
                 prev_watch = Some(value);
             }
         }
     }
 
-    println!("\nCompleted {max_frames} frames without crash ({instr_count} instructions)");
+    println!(
+        "\nCompleted {} frames without crash ({instr_count} instructions)",
+        options.frames
+    );
     dump_ring(&ring, ring_pos, ring_len);
-    dump_regs(&gba);
-    dump_ppu(&gba);
+    dump_regs(gba);
+    dump_ppu(gba);
+    instr_count
 }
 
 /// Dumps the IO and BIOS work RAM state relevant at ROM entry.
@@ -317,4 +336,245 @@ fn dump_regs(gba: &GameBoyAdvance) {
         print!(" r{}={:#010x}", r, gba.cpu.reg(r));
     }
     println!(" cpsr={:#010x}", gba.cpu.cpsr());
+}
+
+fn main() -> Result<(), Box<dyn Error>> {
+    let args: Vec<String> = args().skip(1).collect();
+    let Some(options) = parse_args(&args) else {
+        print_usage();
+        return Ok(());
+    };
+    let mut gba = load(&options)?;
+    trace(&mut gba, &options);
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        env::temp_dir,
+        fs::{create_dir_all, remove_dir_all, write},
+        path::PathBuf,
+        process,
+    };
+
+    use boytacean::gba::GameBoyAdvance;
+
+    use super::{load, parse_address, parse_args, trace, Options, DEFAULT_FRAMES};
+
+    /// The test ROM loaded by the tests, relative to the package root.
+    const ROM_PATH: &str = "res/roms.gba/test/jsmolka_gba-tests/arm.gba";
+
+    /// The `mov r0, r0` ARM instruction, that does nothing.
+    const NOP: u32 = 0xE1A0_0000;
+
+    /// The `b .` ARM instruction, that loops forever.
+    const LOOP: u32 = 0xEAFF_FFFE;
+
+    /// Builds an empty directory for the files of a test, unique to the
+    /// test and to the process running it, so that runs never collide.
+    fn build_directory(name: &str) -> PathBuf {
+        let directory = temp_dir().join(format!("boytacean-{name}-{}", process::id()));
+        if directory.exists() {
+            remove_dir_all(&directory).unwrap();
+        }
+        create_dir_all(&directory).unwrap();
+        directory
+    }
+
+    fn build_args(args: &[&str]) -> Vec<String> {
+        args.iter().map(|arg| String::from(*arg)).collect()
+    }
+
+    fn build_options(frames: u64, watch: Option<u32>, until_pc: Option<u32>) -> Options {
+        Options {
+            rom: String::from(ROM_PATH),
+            frames,
+            bios: None,
+            watch,
+            until_pc,
+        }
+    }
+
+    /// Builds a GBA with a minimal ROM (only the fixed value of its
+    /// header set) whose entry point runs the provided ARM program.
+    fn build_gba(program: &[u32]) -> GameBoyAdvance {
+        let mut rom = vec![0x00; 0x200];
+        rom[0xB2] = 0x96;
+        for (index, word) in program.iter().enumerate() {
+            rom[index * 4..index * 4 + 4].copy_from_slice(&word.to_le_bytes());
+        }
+        let mut gba = GameBoyAdvance::new();
+        gba.load_rom(&rom).unwrap();
+        gba
+    }
+
+    #[test]
+    fn test_parse_args() {
+        assert_eq!(
+            parse_args(&build_args(&["game.gba"])),
+            Some(Options {
+                rom: String::from("game.gba"),
+                frames: DEFAULT_FRAMES,
+                bios: None,
+                watch: None,
+                until_pc: None,
+            })
+        );
+        assert_eq!(
+            parse_args(&build_args(&[
+                "game.gba",
+                "--watch",
+                "0x03007ffc",
+                "60",
+                "--until-pc",
+                "8000000",
+                "--bios",
+                "bios.bin"
+            ])),
+            Some(Options {
+                rom: String::from("game.gba"),
+                frames: 60,
+                bios: Some(String::from("bios.bin")),
+                watch: Some(0x0300_7FFC),
+                until_pc: Some(0x0800_0000),
+            })
+        );
+    }
+
+    #[test]
+    fn test_parse_args_invalid() {
+        for args in [
+            vec![],
+            vec!["--watch", "0x03007ffc"],
+            vec!["game.gba", "100", "--bois", "x"],
+            vec!["game.gba", "100", "200"],
+            vec!["game.gba", "0"],
+            vec!["game.gba", "x"],
+            vec!["game.gba", "--until-pc", "0xZZ"],
+            vec!["game.gba", "--watch", "1003007ffc"],
+            vec!["game.gba", "--watch"],
+            vec!["game.gba", "--until-pc"],
+            vec!["game.gba", "--bios"],
+        ] {
+            assert_eq!(parse_args(&build_args(&args)), None);
+        }
+    }
+
+    #[test]
+    fn test_parse_address() {
+        assert_eq!(parse_address("0x03007ffc"), Some(0x0300_7FFC));
+        assert_eq!(parse_address("0x03007FFC"), Some(0x0300_7FFC));
+        assert_eq!(parse_address("8000000"), Some(0x0800_0000));
+        assert_eq!(parse_address("0xffffffff"), Some(u32::MAX));
+        assert_eq!(parse_address("0x100000000"), None);
+        assert_eq!(parse_address("0x"), None);
+        assert_eq!(parse_address(""), None);
+        assert_eq!(parse_address("0x0x10"), None);
+        assert_eq!(parse_address("+10"), None);
+        assert_eq!(parse_address("0xZZ"), None);
+    }
+
+    #[test]
+    fn test_load() {
+        let gba = load(&build_options(1, None, None)).unwrap();
+        assert_eq!(gba.rom_info().unwrap().title(), "GBA Tests");
+        assert!(!gba.cpu.bus.use_real_bios);
+        assert_eq!(gba.cpu.pc(), 0x0800_0000);
+    }
+
+    #[test]
+    fn test_load_bios() {
+        // a BIOS boots the ROM from its own entry point
+        let directory = build_directory("gba-trace-bios");
+        let bios = directory.join("bios.bin");
+        write(&bios, vec![0x00; 0x4000]).unwrap();
+        let mut options = build_options(1, None, None);
+        options.bios = Some(bios.to_string_lossy().into_owned());
+        let gba = load(&options).unwrap();
+        assert!(gba.cpu.bus.use_real_bios);
+        assert_eq!(gba.cpu.pc(), 0x0000_0000);
+
+        options.bios = Some(String::from("/dev/boytacean-none.bin"));
+        assert_eq!(
+            load(&options).err().unwrap().to_string(),
+            "Failed to open file: /dev/boytacean-none.bin"
+        );
+        remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn test_load_missing_rom() {
+        let mut options = build_options(1, None, None);
+        options.rom = String::from("/dev/boytacean-none.gba");
+        assert_eq!(
+            load(&options).err().unwrap().to_string(),
+            "Failed to open file: /dev/boytacean-none.gba"
+        );
+    }
+
+    #[test]
+    fn test_trace() {
+        let mut gba = build_gba(&[NOP, LOOP]);
+        assert!(trace(&mut gba, &build_options(2, None, None)) > 0);
+        assert_eq!(gba.ppu_frame(), 2);
+    }
+
+    #[test]
+    fn test_trace_unmapped() {
+        // the jump into an unmapped region stops the trace before its
+        // first instruction is executed (mov pc, #0x0F000000)
+        let mut gba = build_gba(&[NOP, 0xE3A0_F40F, LOOP]);
+        assert_eq!(trace(&mut gba, &build_options(1, None, None)), 2);
+        assert_eq!(gba.ppu_frame(), 0);
+        assert_eq!(gba.cpu.pc(), 0x0F00_0000);
+    }
+
+    #[test]
+    fn test_trace_until_pc() {
+        // stops before the instruction at the address is executed
+        let mut gba = build_gba(&[NOP, NOP, NOP, LOOP]);
+        assert_eq!(
+            trace(&mut gba, &build_options(1, None, Some(0x0800_0008))),
+            2
+        );
+        assert_eq!(gba.ppu_frame(), 0);
+
+        // an address never reached runs all the frames
+        let mut gba = build_gba(&[NOP, LOOP]);
+        trace(&mut gba, &build_options(1, None, Some(0x0800_0100)));
+        assert_eq!(gba.ppu_frame(), 1);
+    }
+
+    #[test]
+    fn test_trace_watch() {
+        // the changes of a memory word are reported without stopping
+        // (mov r0, #0x03000000; mov r1, #5; str r1, [r0]; mov r1, #6;
+        // str r1, [r0])
+        let mut gba = build_gba(&[
+            0xE3A0_0403,
+            0xE3A0_1005,
+            0xE580_1000,
+            0xE3A0_1006,
+            0xE580_1000,
+            LOOP,
+        ]);
+        trace(&mut gba, &build_options(1, Some(0x0300_0000), None));
+        assert_eq!(gba.ppu_frame(), 1);
+        assert_eq!(gba.cpu.bus.read32(0x0300_0000), 6);
+    }
+
+    #[test]
+    fn test_trace_watch_io() {
+        // the first change of an IO register stops the trace right
+        // after the instruction that made it (mov r0, #0x04000000;
+        // mov r1, #0x100; str r1, [r0])
+        let mut gba = build_gba(&[0xE3A0_0404, 0xE3A0_1C01, 0xE580_1000, LOOP]);
+        assert_eq!(
+            trace(&mut gba, &build_options(1, Some(0x0400_0000), None)),
+            3
+        );
+        assert_eq!(gba.ppu_frame(), 0);
+        assert_eq!(gba.cpu.bus.ppu.dispcnt(), 0x0100);
+    }
 }
