@@ -60,6 +60,12 @@ pub fn program_commands() -> Vec<(u16, u16)> {
     ]
 }
 
+/// The writes that select a bank of the chip in the switchable window,
+/// through the MBC5 of flash cartridges.
+pub fn bank_writes(bank: usize) -> Vec<BusWrite> {
+    vec![(0x3000, (bank >> 8) as u8 & 0x01), (0x2100, bank as u8)]
+}
+
 /// A flash chip, as described by its CFI table.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Chip {
@@ -185,8 +191,8 @@ mod tests {
     use boytacean_common::error::Error;
 
     use super::{
-        cfi_writes, program_commands, reset_writes, sector_erase_writes, Chip, CFI_SIZE,
-        ERASE_TIMEOUT,
+        bank_writes, cfi_writes, program_commands, reset_writes, sector_erase_writes, Chip,
+        CFI_SIZE, ERASE_TIMEOUT,
     };
 
     /// The CFI values from offset `0x10` of the 4 MiB flash chip of a
@@ -246,6 +252,14 @@ mod tests {
                 (0x0000, 0x29)
             ]
         );
+    }
+
+    #[test]
+    fn test_bank_writes() {
+        assert_eq!(bank_writes(0x00), vec![(0x3000, 0x00), (0x2100, 0x00)]);
+        assert_eq!(bank_writes(0xfc), vec![(0x3000, 0x00), (0x2100, 0xfc)]);
+        assert_eq!(bank_writes(0x101), vec![(0x3000, 0x01), (0x2100, 0x01)]);
+        assert_eq!(bank_writes(0x1ff), vec![(0x3000, 0x01), (0x2100, 0xff)]);
     }
 
     #[test]

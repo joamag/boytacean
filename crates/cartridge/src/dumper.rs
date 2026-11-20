@@ -77,6 +77,10 @@ pub struct Exchange {
 }
 
 impl Exchange {
+    pub fn new(send: Vec<u8>, expect: usize) -> Self {
+        Self { send, expect }
+    }
+
     pub fn send(&self) -> &[u8] {
         &self.send
     }
@@ -745,6 +749,13 @@ mod tests {
             }
             complete(dumper, device, exchange);
         }
+    }
+
+    #[test]
+    fn test_exchange_new() {
+        let exchange = Exchange::new(vec![0xa1], 9);
+        assert_eq!(exchange.send(), &[0xa1]);
+        assert_eq!(exchange.expect(), 9);
     }
 
     #[test]
