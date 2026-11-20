@@ -88,15 +88,15 @@ impl System {
 
     pub fn display_width(&self) -> usize {
         match self {
-            System::Gb(_) => 160,
-            System::Gba(_) => 240,
+            System::Gb(gb) => gb.display_width(),
+            System::Gba(gba) => gba.display_width(),
         }
     }
 
     pub fn display_height(&self) -> usize {
         match self {
-            System::Gb(_) => 144,
-            System::Gba(_) => 160,
+            System::Gb(gb) => gb.display_height(),
+            System::Gba(gba) => gba.display_height(),
         }
     }
 
@@ -182,7 +182,7 @@ impl System {
             System::Gb(gb) => {
                 let rom = gb.load_rom_file(path, ram_path)?;
                 Ok(RomInfo {
-                    title: rom.title().to_string(),
+                    title: rom.title(),
                     description: rom.description(9),
                 })
             }
@@ -313,8 +313,8 @@ impl System {
 
     pub fn rom_title(&self) -> String {
         match self {
-            System::Gb(gb) => gb.rom_i().title().to_string(),
-            System::Gba(gba) => gba.rom_title().to_string(),
+            System::Gb(gb) => gb.rom_i().title(),
+            System::Gba(gba) => gba.rom_title(),
         }
     }
 
