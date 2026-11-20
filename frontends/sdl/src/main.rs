@@ -517,7 +517,10 @@ impl Emulator {
     fn save_image(&mut self, file_path: &str) {
         let width = self.system.display_width() as u32;
         let height = self.system.display_height() as u32;
-        let pixels = self.system.frame_buffer().to_vec();
+        let pixels = match &mut self.system {
+            System::Gb(gb) => gb.frame_buffer_raw().to_vec(),
+            System::Gba(gba) => gba.frame_buffer().to_vec(),
+        };
 
         let mut image_buffer: ImageBuffer<Rgb<u8>, Vec<u8>> = ImageBuffer::new(width, height);
 

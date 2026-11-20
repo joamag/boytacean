@@ -52,6 +52,7 @@ mod tests {
         system::System,
         test::{run_image_test, TestOptions},
     };
+    use image::io::Reader as ImageReader;
 
     use super::compare_images;
     use crate::{Emulator, EmulatorOptions, VOLUME, VOLUME_GBA};
@@ -86,6 +87,37 @@ mod tests {
         remove_file(path).unwrap();
         emulator.ram_path = temp_dir().to_str().unwrap().to_string();
         emulator.stop();
+    }
+
+    #[test]
+    fn test_emulator_save_image() {
+        let _guard = EMULATOR_LOCK.lock().unwrap();
+        let path = temp_dir().join("boytacean_sdl_image_test.png");
+        let mut game_boy = GameBoy::new(Some(GameBoyMode::Dmg));
+        game_boy.load(true).unwrap();
+        let mut emulator = make_emulator(System::Gb(game_boy));
+        emulator
+            .load_rom(Some("../../res/roms/demo/pocket.gb"))
+            .unwrap();
+
+        // runs the game with a palette other than the basic one, the
+        // screenshot keeps the basic palette of the raw frame buffer
+        emulator.toggle_palette();
+        emulator.toggle_palette();
+        while emulator.system.ppu_frame() < 60 {
+            emulator.system.clock();
+        }
+        emulator.save_image(path.to_str().unwrap());
+        let image = ImageReader::open(&path)
+            .unwrap()
+            .decode()
+            .unwrap()
+            .to_rgb8();
+        if let System::Gb(game_boy) = &mut emulator.system {
+            assert_eq!(image.as_raw(), &game_boy.frame_buffer_raw().to_vec());
+            assert_ne!(image.as_raw(), &game_boy.frame_buffer().to_vec());
+        }
+        remove_file(path).unwrap();
     }
 
     #[test]
