@@ -384,6 +384,17 @@ mod tests {
     }
 
     #[test]
+    fn test_timer_overflow_flag() {
+        let mut timer = GbaTimer::new();
+        timer.set_reload(0xFFFF);
+        timer.set_control(1 << 7);
+        timer.clock(1);
+        assert!(timer.overflow());
+        timer.clear_overflow();
+        assert!(!timer.overflow());
+    }
+
+    #[test]
     fn test_timer_clock_no_overflow() {
         let mut timer = GbaTimer::new();
         timer.set_reload(0);
@@ -445,6 +456,31 @@ mod tests {
     }
 
     #[test]
+    fn test_timer_clock_batched_ticks() {
+        let mut timer = GbaTimer::new();
+        timer.set_control((1 << 7) | 0x01); // enabled, prescaler 64
+
+        // 129 cycles are two whole prescaler periods plus a remainder
+        timer.clock(129);
+        assert_eq!(timer.counter(), 2);
+
+        // the remainder carries over into the next clock
+        timer.clock(63);
+        assert_eq!(timer.counter(), 3);
+    }
+
+    #[test]
+    fn test_timer_clock_multi_overflow_wrap() {
+        let mut timer = GbaTimer::new();
+        timer.set_reload(0xFFFE);
+        timer.set_control(1 << 7);
+
+        // 5 ticks from 0xFFFE wrap through the reload value twice
+        assert!(timer.clock(5));
+        assert_eq!(timer.counter(), 0xFFFF);
+    }
+
+    #[test]
     fn test_timer_cycles_to_overflow() {
         let mut timer = GbaTimer::new();
         // disabled timers can never overflow on their own
@@ -487,39 +523,11 @@ mod tests {
     }
 
     #[test]
-    fn test_timer_overflow_flag() {
-        let mut timer = GbaTimer::new();
-        timer.set_reload(0xFFFF);
-        timer.set_control(1 << 7);
-        timer.clock(1);
-        assert!(timer.overflow());
-        timer.clear_overflow();
-        assert!(!timer.overflow());
-    }
-
-    #[test]
-    fn test_timer_clock_batched_ticks() {
-        let mut timer = GbaTimer::new();
-        timer.set_control((1 << 7) | 0x01); // enabled, prescaler 64
-
-        // 129 cycles are two whole prescaler periods plus a remainder
-        timer.clock(129);
-        assert_eq!(timer.counter(), 2);
-
-        // the remainder carries over into the next clock
-        timer.clock(63);
-        assert_eq!(timer.counter(), 3);
-    }
-
-    #[test]
-    fn test_timer_clock_multi_overflow_wrap() {
-        let mut timer = GbaTimer::new();
-        timer.set_reload(0xFFFE);
-        timer.set_control(1 << 7);
-
-        // 5 ticks from 0xFFFE wrap through the reload value twice
-        assert!(timer.clock(5));
-        assert_eq!(timer.counter(), 0xFFFF);
+    fn test_timers_new() {
+        let timers = GbaTimers::new();
+        for timer in &timers.timers {
+            assert!(!timer.enabled());
+        }
     }
 
     #[test]
@@ -530,6 +538,27 @@ mod tests {
         assert_eq!(timers.timers[0].control(), 0x80);
         timers.clock(16);
         assert_eq!(timers.read_counter(0), 16);
+    }
+
+    #[test]
+    fn test_timers_write_control_applies_pending() {
+        let mut timers = GbaTimers::new();
+        timers.write_control(0, 1 << 7);
+        timers.clock(50);
+
+        // re-writing control flushes, the elapsed time is not lost
+        timers.write_control(0, 1 << 7);
+        assert_eq!(timers.timers[0].counter(), 50);
+    }
+
+    #[test]
+    fn test_timers_read_counter_flushes() {
+        let mut timers = GbaTimers::new();
+        timers.write_control(0, 1 << 7);
+
+        // pending cycles are only applied when the counter is observed
+        timers.clock(100);
+        assert_eq!(timers.read_counter(0), 100);
     }
 
     #[test]
@@ -724,86 +753,6 @@ mod tests {
     }
 
     #[test]
-    fn test_timers_flush_applies_pending() {
-        let mut timers = GbaTimers::new();
-        timers.write_control(0, 1 << 7);
-        timers.clock(100);
-
-        timers.flush();
-        assert_eq!(timers.timers[0].counter(), 100);
-    }
-
-    #[test]
-    fn test_timers_run_pending_boundaries() {
-        let mut timers = GbaTimers::new();
-        for (i, reload) in [0xFFF8, 0xFFFB, 0xFFFD, 0xFFFF].iter().enumerate() {
-            timers.write_reload(i, *reload);
-            timers.write_control(i, if i == 3 { 0x84 } else { 0x80 });
-        }
-
-        assert_eq!(timers.cycles_to_next_overflow(), 3);
-        assert_eq!(timers.clock(3), 12);
-        assert_eq!(timers.cycles_to_next_overflow(), 2);
-        assert_eq!(timers.clock(2), 2);
-        assert_eq!(timers.cycles_to_next_overflow(), 1);
-        assert_eq!(timers.clock(1), 12);
-        assert_eq!(timers.cycles_to_next_overflow(), 2);
-        assert_eq!(timers.clock(2), 1);
-        assert_eq!(timers.cycles_to_next_overflow(), 1);
-
-        // disabling the earliest timer removes its cascade events too
-        timers.write_control(2, 0);
-        assert_eq!(timers.cycles_to_next_overflow(), 2);
-        assert_eq!(timers.clock(2), 2);
-        assert_eq!(timers.read_counter(0), 0xFFFA);
-        assert_eq!(timers.read_counter(1), 0xFFFB);
-        assert_eq!(timers.read_counter(2), 0xFFFF);
-        assert_eq!(timers.read_counter(3), 0xFFFF);
-    }
-
-    #[test]
-    fn test_timers_run_pending_cascade_order() {
-        let mut timers = GbaTimers::new();
-        for i in 0..4 {
-            timers.write_reload(i, 0xFFFF);
-            timers.write_control(i, if i == 0 { 0x80 } else { 0x84 });
-        }
-
-        assert_eq!(timers.clock(3), 15);
-        assert_eq!(timers.read_counter(0), 0xFFFF);
-        assert_eq!(timers.read_counter(1), 0xFFFF);
-        assert_eq!(timers.read_counter(2), 0xFFFF);
-        assert_eq!(timers.read_counter(3), 0xFFFF);
-
-        // a disabled timer breaks the cascade without stopping timer 0
-        timers.write_control(1, 4);
-        assert_eq!(timers.clock(2), 1);
-        assert_eq!(timers.read_counter(2), 0xFFFF);
-        assert_eq!(timers.read_counter(3), 0xFFFF);
-    }
-
-    #[test]
-    fn test_timers_write_control_applies_pending() {
-        let mut timers = GbaTimers::new();
-        timers.write_control(0, 1 << 7);
-        timers.clock(50);
-
-        // re-writing control flushes, the elapsed time is not lost
-        timers.write_control(0, 1 << 7);
-        assert_eq!(timers.timers[0].counter(), 50);
-    }
-
-    #[test]
-    fn test_timers_read_counter_flushes() {
-        let mut timers = GbaTimers::new();
-        timers.write_control(0, 1 << 7);
-
-        // pending cycles are only applied when the counter is observed
-        timers.clock(100);
-        assert_eq!(timers.read_counter(0), 100);
-    }
-
-    #[test]
     fn test_timers_clock_all_disabled() {
         let mut timers = GbaTimers::new();
 
@@ -864,14 +813,6 @@ mod tests {
     }
 
     #[test]
-    fn test_timers_new() {
-        let timers = GbaTimers::new();
-        for timer in &timers.timers {
-            assert!(!timer.enabled());
-        }
-    }
-
-    #[test]
     fn test_timers_independent() {
         let mut timers = GbaTimers::new();
 
@@ -882,5 +823,64 @@ mod tests {
         let overflows = timers.clock(1);
         assert_eq!(overflows & 1, 0); // timer 0 not enabled
         assert_eq!(overflows & 4, 4); // timer 2 overflowed
+    }
+
+    #[test]
+    fn test_timers_flush_applies_pending() {
+        let mut timers = GbaTimers::new();
+        timers.write_control(0, 1 << 7);
+        timers.clock(100);
+
+        timers.flush();
+        assert_eq!(timers.timers[0].counter(), 100);
+    }
+
+    #[test]
+    fn test_timers_run_pending_boundaries() {
+        let mut timers = GbaTimers::new();
+        for (i, reload) in [0xFFF8, 0xFFFB, 0xFFFD, 0xFFFF].iter().enumerate() {
+            timers.write_reload(i, *reload);
+            timers.write_control(i, if i == 3 { 0x84 } else { 0x80 });
+        }
+
+        assert_eq!(timers.cycles_to_next_overflow(), 3);
+        assert_eq!(timers.clock(3), 12);
+        assert_eq!(timers.cycles_to_next_overflow(), 2);
+        assert_eq!(timers.clock(2), 2);
+        assert_eq!(timers.cycles_to_next_overflow(), 1);
+        assert_eq!(timers.clock(1), 12);
+        assert_eq!(timers.cycles_to_next_overflow(), 2);
+        assert_eq!(timers.clock(2), 1);
+        assert_eq!(timers.cycles_to_next_overflow(), 1);
+
+        // disabling the earliest timer removes its cascade events too
+        timers.write_control(2, 0);
+        assert_eq!(timers.cycles_to_next_overflow(), 2);
+        assert_eq!(timers.clock(2), 2);
+        assert_eq!(timers.read_counter(0), 0xFFFA);
+        assert_eq!(timers.read_counter(1), 0xFFFB);
+        assert_eq!(timers.read_counter(2), 0xFFFF);
+        assert_eq!(timers.read_counter(3), 0xFFFF);
+    }
+
+    #[test]
+    fn test_timers_run_pending_cascade_order() {
+        let mut timers = GbaTimers::new();
+        for i in 0..4 {
+            timers.write_reload(i, 0xFFFF);
+            timers.write_control(i, if i == 0 { 0x80 } else { 0x84 });
+        }
+
+        assert_eq!(timers.clock(3), 15);
+        assert_eq!(timers.read_counter(0), 0xFFFF);
+        assert_eq!(timers.read_counter(1), 0xFFFF);
+        assert_eq!(timers.read_counter(2), 0xFFFF);
+        assert_eq!(timers.read_counter(3), 0xFFFF);
+
+        // a disabled timer breaks the cascade without stopping timer 0
+        timers.write_control(1, 4);
+        assert_eq!(timers.clock(2), 1);
+        assert_eq!(timers.read_counter(2), 0xFFFF);
+        assert_eq!(timers.read_counter(3), 0xFFFF);
     }
 }

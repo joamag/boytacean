@@ -1492,18 +1492,6 @@ mod tests {
     }
 
     #[test]
-    fn test_fifo_needs_refill() {
-        let mut channel = DirectSoundChannel::new();
-        assert!(channel.needs_refill());
-
-        // fill with 5 words = 20 samples
-        for i in 0..5 {
-            channel.write_fifo(i);
-        }
-        assert!(!channel.needs_refill());
-    }
-
-    #[test]
     fn test_fifo_max_capacity() {
         let mut channel = DirectSoundChannel::new();
         for i in 0..8 {
@@ -1512,31 +1500,6 @@ mod tests {
         // further writes should be ignored (capacity = 32)
         channel.write_fifo(0xFFFFFFFF);
         assert_eq!(channel.fifo.len(), 32);
-    }
-
-    #[test]
-    fn test_fifo_reset() {
-        let mut channel = DirectSoundChannel::new();
-        channel.write_fifo(0x01020304);
-        channel.timer_tick();
-        channel.reset_fifo();
-        assert!(channel.needs_refill());
-        assert_eq!(channel.current_sample, 0);
-    }
-
-    #[test]
-    fn test_direct_sound_output_volume() {
-        let mut channel = DirectSoundChannel::new();
-        channel.write_fifo(0x00000040); // sample = 0x40 = 64
-        channel.timer_tick();
-
-        channel.volume_full = true;
-        let full = channel.output();
-
-        channel.volume_full = false;
-        let half = channel.output();
-
-        assert_eq!(half, full / 2);
     }
 
     #[test]
@@ -1563,6 +1526,59 @@ mod tests {
             ch3.timer_tick();
             assert_eq!(ch2.current_sample, ch3.current_sample);
         }
+    }
+
+    #[test]
+    fn test_fifo_empty_keeps_last_sample() {
+        let mut channel = DirectSoundChannel::new();
+        channel.write_fifo(0x42424242);
+
+        // consume all 4 samples
+        for _ in 0..4 {
+            channel.timer_tick();
+            assert_eq!(channel.current_sample, 0x42);
+        }
+
+        // tick again with empty FIFO, should keep last sample
+        channel.timer_tick();
+        assert_eq!(channel.current_sample, 0x42);
+    }
+
+    #[test]
+    fn test_fifo_needs_refill() {
+        let mut channel = DirectSoundChannel::new();
+        assert!(channel.needs_refill());
+
+        // fill with 5 words = 20 samples
+        for i in 0..5 {
+            channel.write_fifo(i);
+        }
+        assert!(!channel.needs_refill());
+    }
+
+    #[test]
+    fn test_fifo_reset() {
+        let mut channel = DirectSoundChannel::new();
+        channel.write_fifo(0x01020304);
+        channel.timer_tick();
+        channel.reset_fifo();
+        assert!(channel.needs_refill());
+        assert_eq!(channel.current_sample, 0);
+    }
+
+    #[test]
+    fn test_direct_sound_output_volume() {
+        let mut channel = DirectSoundChannel::new();
+        channel.write_fifo(0x00000040); // sample = 0x40 = 64
+        channel.timer_tick();
+
+        channel.volume_full = true;
+        let full = channel.output();
+
+        channel.volume_full = false;
+        let half = channel.output();
+
+        assert_eq!(half, full / 2);
     }
 
     #[test]
@@ -1624,6 +1640,38 @@ mod tests {
     }
 
     #[test]
+    fn test_soundcnt_x_status_bits() {
+        let mut apu = GbaApu::new();
+        apu.set_soundcnt_x(0x80);
+
+        // no channels enabled
+        assert_eq!(apu.soundcnt_x() & 0x0F, 0);
+
+        // enable CH1
+        apu.write_channel_reg(0x0400_0063, 0xF0);
+        apu.write_channel_reg(0x0400_0065, 0x80);
+        assert_eq!(apu.soundcnt_x() & 0x01, 1);
+
+        // enable CH2
+        apu.write_channel_reg(0x0400_0069, 0xF0);
+        apu.write_channel_reg(0x0400_006D, 0x80);
+        assert_eq!(apu.soundcnt_x() & 0x02, 2);
+
+        // enable CH3
+        apu.write_channel_reg(0x0400_0070, 0x80);
+        apu.write_channel_reg(0x0400_0075, 0x80);
+        assert_eq!(apu.soundcnt_x() & 0x04, 4);
+
+        // enable CH4
+        apu.write_channel_reg(0x0400_0079, 0xF0);
+        apu.write_channel_reg(0x0400_007D, 0x80);
+        assert_eq!(apu.soundcnt_x() & 0x08, 8);
+
+        // all four + master + unused bits
+        assert_eq!(apu.soundcnt_x(), 0x8F | 0x70);
+    }
+
+    #[test]
     fn test_apu_soundcnt_x_master_disable() {
         let mut apu = GbaApu::new();
         apu.set_soundcnt_x(0x80);
@@ -1631,6 +1679,35 @@ mod tests {
 
         apu.set_soundcnt_x(0x00);
         assert_eq!(apu.soundcnt_x() & 0x80, 0);
+    }
+
+    #[test]
+    fn test_master_disable_stops_all_channels() {
+        let mut apu = GbaApu::new();
+        apu.set_soundcnt_x(0x80);
+
+        // enable all channels
+        apu.write_channel_reg(0x0400_0063, 0xF0);
+        apu.write_channel_reg(0x0400_0065, 0x80);
+        apu.write_channel_reg(0x0400_0069, 0xF0);
+        apu.write_channel_reg(0x0400_006D, 0x80);
+        apu.write_channel_reg(0x0400_0070, 0x80);
+        apu.write_channel_reg(0x0400_0075, 0x80);
+        apu.write_channel_reg(0x0400_0079, 0xF0);
+        apu.write_channel_reg(0x0400_007D, 0x80);
+
+        assert!(apu.ch1_enabled);
+        assert!(apu.ch2_enabled);
+        assert!(apu.ch3_enabled);
+        assert!(apu.ch4_enabled);
+
+        // master disable
+        apu.set_soundcnt_x(0x00);
+
+        assert!(!apu.ch1_enabled);
+        assert!(!apu.ch2_enabled);
+        assert!(!apu.ch3_enabled);
+        assert!(!apu.ch4_enabled);
     }
 
     #[test]
@@ -1666,6 +1743,48 @@ mod tests {
                 assert_eq!(apu.read_wave_ram(15), 0xAB);
             }
         }
+    }
+
+    #[test]
+    fn test_wave_bank_selection() {
+        let mut apu = GbaApu::new();
+
+        // select bank 1 for CPU access
+        apu.write_channel_reg(0x0400_0070, 0xC0);
+        apu.write_wave_ram(0, 0xAB);
+
+        // switch to bank 0 for CPU access
+        apu.write_channel_reg(0x0400_0070, 0x80);
+        apu.write_wave_ram(0, 0xCD);
+
+        // verify different data in each bank
+        apu.write_channel_reg(0x0400_0070, 0xC0);
+        assert_eq!(apu.read_wave_ram(0), 0xAB);
+        apu.write_channel_reg(0x0400_0070, 0x80);
+        assert_eq!(apu.read_wave_ram(0), 0xCD);
+    }
+
+    #[test]
+    fn test_wave_dimension_mode() {
+        let mut apu = GbaApu::new();
+
+        // enable dimension mode (bit 5)
+        apu.write_channel_reg(0x0400_0070, 0xA0);
+        assert!(apu.wave_dimension);
+
+        // in dimension mode, CPU accesses the non-playing bank
+        // bank=0, so CPU accesses bank 1
+        apu.write_channel_reg(0x0400_0070, 0xA0); // bank=0, dim=1
+        apu.write_wave_ram(0, 0x12);
+
+        apu.write_channel_reg(0x0400_0070, 0xE0); // bank=1, dim=1
+        apu.write_wave_ram(0, 0x34);
+
+        // verify they are in different banks
+        apu.write_channel_reg(0x0400_0070, 0xA0);
+        assert_eq!(apu.read_wave_ram(0), 0x12);
+        apu.write_channel_reg(0x0400_0070, 0xE0);
+        assert_eq!(apu.read_wave_ram(0), 0x34);
     }
 
     #[test]
@@ -1764,6 +1883,23 @@ mod tests {
         apu.set_soundcnt_x(0x00);
         apu.clock(1);
         assert_eq!(apu.pending_cycles, 0);
+    }
+
+    #[test]
+    fn test_clock_sample_generation_rate() {
+        let mut apu = GbaApu::new();
+        apu.set_soundcnt_x(0x80);
+
+        // clock for exactly one frame (280896 cycles)
+        // at 32768 Hz and 16.78 MHz, expect ~547 samples per frame
+        // each sample is 2 entries (stereo)
+        apu.clock(super::super::consts::CYCLES_PER_FRAME);
+        apu.flush();
+
+        let sample_count = apu.audio_buffer().len() / 2;
+        // should be approximately 547 stereo samples
+        assert!(sample_count > 540);
+        assert!(sample_count < 560);
     }
 
     #[test]
@@ -1866,6 +2002,373 @@ mod tests {
             assert_eq!(apu.sample_counter, reference.sample_counter);
             assert_eq!(apu.soundcnt_x(), reference.soundcnt_x());
         }
+    }
+
+    #[test]
+    fn test_length_counter_disables_channel() {
+        let mut apu = GbaApu::new();
+        apu.set_soundcnt_x(0x80);
+
+        // set envelope with DAC on
+        apu.write_channel_reg(0x0400_0063, 0xF0);
+        // set length = 63 (timer will be 64-63=1)
+        apu.write_channel_reg(0x0400_0062, 0x3F);
+        // trigger with length enabled
+        apu.write_channel_reg(0x0400_0065, 0xC0);
+
+        // channel should be enabled
+        assert!(apu.ch1_enabled);
+        assert_eq!(apu.ch1_length_timer, 1);
+
+        // clock enough to tick the frame sequencer at step 0 (length tick)
+        // 512 Hz = CPU_FREQ/512 cycles per tick
+        let sequencer_period = super::super::consts::CPU_FREQ / 512;
+        // advance to a length step (step 0)
+        // first we need to reach step 0 in the sequencer
+        apu.sequencer_step = 0; // step 0 dispatches length tick
+        apu.sequencer_counter = sequencer_period - 1;
+        apu.clock(1);
+        apu.flush();
+
+        // length counter should have ticked, disabling the channel
+        assert!(!apu.ch1_enabled);
+    }
+
+    #[test]
+    fn test_length_counter_does_not_tick_when_disabled() {
+        let mut apu = GbaApu::new();
+        apu.set_soundcnt_x(0x80);
+
+        // set envelope with DAC on
+        apu.write_channel_reg(0x0400_0063, 0xF0);
+        // set length = 63 (timer = 1)
+        apu.write_channel_reg(0x0400_0062, 0x3F);
+        // trigger WITHOUT length enabled (no bit 6)
+        apu.write_channel_reg(0x0400_0065, 0x80);
+
+        assert!(apu.ch1_enabled);
+        assert!(!apu.ch1_length_enabled);
+
+        // tick length step, should NOT disable channel
+        let sequencer_period = super::super::consts::CPU_FREQ / 512;
+        apu.sequencer_step = 0;
+        apu.sequencer_counter = sequencer_period - 1;
+        apu.clock(1);
+        apu.flush();
+
+        assert!(apu.ch1_enabled);
+    }
+
+    #[test]
+    fn test_ch2_trigger_and_length() {
+        let mut apu = GbaApu::new();
+        apu.set_soundcnt_x(0x80);
+
+        // set envelope with DAC on
+        apu.write_channel_reg(0x0400_0069, 0xF0);
+        // set length = 63 (timer = 64-63 = 1)
+        apu.write_channel_reg(0x0400_0068, 0x3F);
+        // trigger with length enabled
+        apu.write_channel_reg(0x0400_006D, 0xC0);
+
+        assert!(apu.ch2_enabled);
+        assert_eq!(apu.ch2_length_timer, 1);
+
+        // tick length to disable channel
+        let sequencer_period = super::super::consts::CPU_FREQ / 512;
+        apu.sequencer_step = 0;
+        apu.sequencer_counter = sequencer_period - 1;
+        apu.clock(1);
+        apu.flush();
+
+        assert!(!apu.ch2_enabled);
+    }
+
+    #[test]
+    fn test_ch3_trigger_and_length() {
+        let mut apu = GbaApu::new();
+        apu.set_soundcnt_x(0x80);
+
+        // enable DAC
+        apu.write_channel_reg(0x0400_0070, 0x80);
+        // set length = 255 (timer = 256-255 = 1)
+        apu.write_channel_reg(0x0400_0072, 0xFF);
+        // trigger with length enabled
+        apu.write_channel_reg(0x0400_0075, 0xC0);
+
+        assert!(apu.ch3_enabled);
+        assert_eq!(apu.ch3_length_timer, 1);
+
+        let sequencer_period = super::super::consts::CPU_FREQ / 512;
+        apu.sequencer_step = 0;
+        apu.sequencer_counter = sequencer_period - 1;
+        apu.clock(1);
+        apu.flush();
+
+        assert!(!apu.ch3_enabled);
+    }
+
+    #[test]
+    fn test_ch4_trigger_and_length() {
+        let mut apu = GbaApu::new();
+        apu.set_soundcnt_x(0x80);
+
+        // set envelope with DAC on
+        apu.write_channel_reg(0x0400_0079, 0xF0);
+        // set length = 63 (timer = 64-63 = 1)
+        apu.write_channel_reg(0x0400_0078, 0x3F);
+        // trigger with length enabled
+        apu.write_channel_reg(0x0400_007D, 0xC0);
+
+        assert!(apu.ch4_enabled);
+        assert_eq!(apu.ch4_length_timer, 1);
+
+        let sequencer_period = super::super::consts::CPU_FREQ / 512;
+        apu.sequencer_step = 0;
+        apu.sequencer_counter = sequencer_period - 1;
+        apu.clock(1);
+        apu.flush();
+
+        assert!(!apu.ch4_enabled);
+    }
+
+    #[test]
+    fn test_envelope_decreases_volume() {
+        let mut apu = GbaApu::new();
+        apu.set_soundcnt_x(0x80);
+
+        // set envelope: volume=15, direction=decrease(0), pace=1
+        apu.write_channel_reg(0x0400_0063, 0xF1);
+        // trigger channel 1
+        apu.write_channel_reg(0x0400_0065, 0x80);
+
+        assert_eq!(apu.ch1_volume, 15);
+
+        // advance to step 7 (envelope tick)
+        let sequencer_period = super::super::consts::CPU_FREQ / 512;
+        apu.sequencer_step = 7; // step 7 dispatches envelope tick
+        apu.sequencer_counter = sequencer_period - 1;
+        apu.clock(1);
+        apu.flush();
+
+        assert_eq!(apu.ch1_volume, 14);
+    }
+
+    #[test]
+    fn test_envelope_increases_volume() {
+        let mut apu = GbaApu::new();
+        apu.set_soundcnt_x(0x80);
+
+        // set envelope: volume=5, direction=increase(1), pace=1
+        apu.write_channel_reg(0x0400_0063, 0x59);
+        // trigger channel 1
+        apu.write_channel_reg(0x0400_0065, 0x80);
+
+        assert_eq!(apu.ch1_volume, 5);
+
+        let sequencer_period = super::super::consts::CPU_FREQ / 512;
+        apu.sequencer_step = 7; // step 7 dispatches envelope tick
+        apu.sequencer_counter = sequencer_period - 1;
+        apu.clock(1);
+        apu.flush();
+
+        assert_eq!(apu.ch1_volume, 6);
+    }
+
+    #[test]
+    fn test_envelope_stops_at_zero() {
+        let mut apu = GbaApu::new();
+        apu.set_soundcnt_x(0x80);
+
+        // set envelope: volume=1, direction=decrease(0), pace=1
+        apu.write_channel_reg(0x0400_0063, 0x11);
+        // trigger
+        apu.write_channel_reg(0x0400_0065, 0x80);
+
+        assert_eq!(apu.ch1_volume, 1);
+
+        // tick envelope
+        let sequencer_period = super::super::consts::CPU_FREQ / 512;
+        apu.sequencer_step = 7;
+        apu.sequencer_counter = sequencer_period - 1;
+        apu.clock(1);
+        apu.flush();
+
+        assert_eq!(apu.ch1_volume, 0);
+        assert!(!apu.ch1_envelope_enabled);
+
+        // tick again, should stay at 0
+        apu.sequencer_step = 7;
+        apu.sequencer_counter = sequencer_period - 1;
+        apu.clock(1);
+        apu.flush();
+
+        assert_eq!(apu.ch1_volume, 0);
+    }
+
+    #[test]
+    fn test_envelope_stops_at_fifteen() {
+        let mut apu = GbaApu::new();
+        apu.set_soundcnt_x(0x80);
+
+        // set envelope: volume=14, direction=increase(1), pace=1
+        apu.write_channel_reg(0x0400_0063, 0xE9);
+        // trigger
+        apu.write_channel_reg(0x0400_0065, 0x80);
+
+        assert_eq!(apu.ch1_volume, 14);
+
+        let sequencer_period = super::super::consts::CPU_FREQ / 512;
+        apu.sequencer_step = 7;
+        apu.sequencer_counter = sequencer_period - 1;
+        apu.clock(1);
+        apu.flush();
+
+        assert_eq!(apu.ch1_volume, 15);
+        assert!(!apu.ch1_envelope_enabled);
+    }
+
+    #[test]
+    fn test_envelope_pace_zero_disables() {
+        let mut apu = GbaApu::new();
+        apu.set_soundcnt_x(0x80);
+
+        // set envelope: volume=10, direction=decrease, pace=0 (disabled)
+        apu.write_channel_reg(0x0400_0063, 0xA0);
+        // trigger
+        apu.write_channel_reg(0x0400_0065, 0x80);
+
+        assert_eq!(apu.ch1_volume, 10);
+
+        // tick envelope, should not change volume
+        let sequencer_period = super::super::consts::CPU_FREQ / 512;
+        apu.sequencer_step = 7;
+        apu.sequencer_counter = sequencer_period - 1;
+        apu.clock(1);
+        apu.flush();
+
+        assert_eq!(apu.ch1_volume, 10);
+    }
+
+    #[test]
+    fn test_ch4_envelope() {
+        let mut apu = GbaApu::new();
+        apu.set_soundcnt_x(0x80);
+
+        // set envelope: volume=8, direction=decrease, pace=1
+        apu.write_channel_reg(0x0400_0079, 0x81);
+        // trigger
+        apu.write_channel_reg(0x0400_007D, 0x80);
+
+        assert_eq!(apu.ch4_volume, 8);
+
+        let sequencer_period = super::super::consts::CPU_FREQ / 512;
+        apu.sequencer_step = 7;
+        apu.sequencer_counter = sequencer_period - 1;
+        apu.clock(1);
+        apu.flush();
+
+        assert_eq!(apu.ch4_volume, 7);
+    }
+
+    #[test]
+    fn test_sweep_increases_frequency() {
+        let mut apu = GbaApu::new();
+        apu.set_soundcnt_x(0x80);
+
+        // sweep: pace=1, increase, slope=1
+        apu.write_channel_reg(0x0400_0060, 0x11);
+        // envelope with DAC on
+        apu.write_channel_reg(0x0400_0063, 0xF0);
+        // set frequency = 0x100
+        apu.write_channel_reg(0x0400_0064, 0x00);
+        apu.write_channel_reg(0x0400_0065, 0x81);
+
+        assert_eq!(apu.ch1_sweep_shadow, 0x100);
+
+        // sweep ticks at steps 2 and 6
+        let sequencer_period = super::super::consts::CPU_FREQ / 512;
+        apu.sequencer_step = 2; // step 2 dispatches sweep + length
+        apu.sequencer_counter = sequencer_period - 1;
+        apu.clock(1);
+        apu.flush();
+
+        // frequency should have increased: 0x100 + (0x100 >> 1) = 0x100 + 0x80 = 0x180
+        assert_eq!(apu.ch1_sweep_shadow, 0x180);
+        assert_eq!(apu.ch1_wave_length, 0x180);
+    }
+
+    #[test]
+    fn test_sweep_overflow_disables_channel() {
+        let mut apu = GbaApu::new();
+        apu.set_soundcnt_x(0x80);
+
+        // sweep: pace=1, increase, slope=0 (delta = shadow >> 0 = shadow)
+        apu.write_channel_reg(0x0400_0060, 0x10);
+        // envelope with DAC on
+        apu.write_channel_reg(0x0400_0063, 0xF0);
+        // set frequency near max = 0x700
+        apu.write_channel_reg(0x0400_0064, 0x00);
+        apu.write_channel_reg(0x0400_0065, 0x87);
+
+        assert!(apu.ch1_enabled);
+
+        let sequencer_period = super::super::consts::CPU_FREQ / 512;
+        apu.sequencer_step = 2; // step 2 dispatches sweep + length
+        apu.sequencer_counter = sequencer_period - 1;
+        apu.clock(1);
+        apu.flush();
+
+        // 0x700 + 0x700 = 0xE00 > 0x7FF, channel should be disabled
+        assert!(!apu.ch1_enabled);
+    }
+
+    #[test]
+    fn test_sweep_decrease() {
+        let mut apu = GbaApu::new();
+        apu.set_soundcnt_x(0x80);
+
+        // sweep: pace=1, decrease, slope=2
+        apu.write_channel_reg(0x0400_0060, 0x1A);
+        // envelope with DAC on
+        apu.write_channel_reg(0x0400_0063, 0xF0);
+        // set frequency = 0x200
+        apu.write_channel_reg(0x0400_0064, 0x00);
+        apu.write_channel_reg(0x0400_0065, 0x82);
+
+        assert_eq!(apu.ch1_sweep_shadow, 0x200);
+
+        let sequencer_period = super::super::consts::CPU_FREQ / 512;
+        apu.sequencer_step = 2;
+        apu.sequencer_counter = sequencer_period - 1;
+        apu.clock(1);
+        apu.flush();
+
+        // 0x200 - (0x200 >> 2) = 0x200 - 0x80 = 0x180
+        assert_eq!(apu.ch1_sweep_shadow, 0x180);
+    }
+
+    #[test]
+    fn test_sweep_pace_zero_no_sweep() {
+        let mut apu = GbaApu::new();
+        apu.set_soundcnt_x(0x80);
+
+        // sweep: pace=0 (disabled), increase, slope=1
+        apu.write_channel_reg(0x0400_0060, 0x01);
+        apu.write_channel_reg(0x0400_0063, 0xF0);
+        apu.write_channel_reg(0x0400_0064, 0x00);
+        apu.write_channel_reg(0x0400_0065, 0x82);
+
+        let original = apu.ch1_sweep_shadow;
+
+        let sequencer_period = super::super::consts::CPU_FREQ / 512;
+        apu.sequencer_step = 2;
+        apu.sequencer_counter = sequencer_period - 1;
+        apu.clock(1);
+        apu.flush();
+
+        // frequency should not change with pace=0
+        assert_eq!(apu.ch1_sweep_shadow, original);
     }
 
     #[test]
@@ -2001,185 +2504,6 @@ mod tests {
     }
 
     #[test]
-    fn test_apu_channel_trigger() {
-        let mut apu = GbaApu::new();
-        apu.set_soundcnt_x(0x80);
-        // set envelope with DAC on (volume=0xF, direction=0, pace=0)
-        apu.write_channel_reg(0x0400_0063, 0xF0);
-        // trigger channel 1
-        apu.write_channel_reg(0x0400_0065, 0x80);
-        assert_eq!(apu.soundcnt_x() & 1, 1);
-    }
-
-    #[test]
-    fn test_apu_reset() {
-        let mut apu = GbaApu::new();
-        apu.set_soundcnt_l(0x1234);
-        apu.set_soundcnt_x(0x80);
-        apu.reset();
-        assert_eq!(apu.soundcnt_l(), 0);
-        assert_eq!(apu.soundcnt_x() & 0x80, 0);
-    }
-
-    #[test]
-    fn test_length_counter_disables_channel() {
-        let mut apu = GbaApu::new();
-        apu.set_soundcnt_x(0x80);
-
-        // set envelope with DAC on
-        apu.write_channel_reg(0x0400_0063, 0xF0);
-        // set length = 63 (timer will be 64-63=1)
-        apu.write_channel_reg(0x0400_0062, 0x3F);
-        // trigger with length enabled
-        apu.write_channel_reg(0x0400_0065, 0xC0);
-
-        // channel should be enabled
-        assert!(apu.ch1_enabled);
-        assert_eq!(apu.ch1_length_timer, 1);
-
-        // clock enough to tick the frame sequencer at step 0 (length tick)
-        // 512 Hz = CPU_FREQ/512 cycles per tick
-        let sequencer_period = super::super::consts::CPU_FREQ / 512;
-        // advance to a length step (step 0)
-        // first we need to reach step 0 in the sequencer
-        apu.sequencer_step = 0; // step 0 dispatches length tick
-        apu.sequencer_counter = sequencer_period - 1;
-        apu.clock(1);
-        apu.flush();
-
-        // length counter should have ticked, disabling the channel
-        assert!(!apu.ch1_enabled);
-    }
-
-    #[test]
-    fn test_envelope_decreases_volume() {
-        let mut apu = GbaApu::new();
-        apu.set_soundcnt_x(0x80);
-
-        // set envelope: volume=15, direction=decrease(0), pace=1
-        apu.write_channel_reg(0x0400_0063, 0xF1);
-        // trigger channel 1
-        apu.write_channel_reg(0x0400_0065, 0x80);
-
-        assert_eq!(apu.ch1_volume, 15);
-
-        // advance to step 7 (envelope tick)
-        let sequencer_period = super::super::consts::CPU_FREQ / 512;
-        apu.sequencer_step = 7; // step 7 dispatches envelope tick
-        apu.sequencer_counter = sequencer_period - 1;
-        apu.clock(1);
-        apu.flush();
-
-        assert_eq!(apu.ch1_volume, 14);
-    }
-
-    #[test]
-    fn test_envelope_increases_volume() {
-        let mut apu = GbaApu::new();
-        apu.set_soundcnt_x(0x80);
-
-        // set envelope: volume=5, direction=increase(1), pace=1
-        apu.write_channel_reg(0x0400_0063, 0x59);
-        // trigger channel 1
-        apu.write_channel_reg(0x0400_0065, 0x80);
-
-        assert_eq!(apu.ch1_volume, 5);
-
-        let sequencer_period = super::super::consts::CPU_FREQ / 512;
-        apu.sequencer_step = 7; // step 7 dispatches envelope tick
-        apu.sequencer_counter = sequencer_period - 1;
-        apu.clock(1);
-        apu.flush();
-
-        assert_eq!(apu.ch1_volume, 6);
-    }
-
-    #[test]
-    fn test_sweep_increases_frequency() {
-        let mut apu = GbaApu::new();
-        apu.set_soundcnt_x(0x80);
-
-        // sweep: pace=1, increase, slope=1
-        apu.write_channel_reg(0x0400_0060, 0x11);
-        // envelope with DAC on
-        apu.write_channel_reg(0x0400_0063, 0xF0);
-        // set frequency = 0x100
-        apu.write_channel_reg(0x0400_0064, 0x00);
-        apu.write_channel_reg(0x0400_0065, 0x81);
-
-        assert_eq!(apu.ch1_sweep_shadow, 0x100);
-
-        // sweep ticks at steps 2 and 6
-        let sequencer_period = super::super::consts::CPU_FREQ / 512;
-        apu.sequencer_step = 2; // step 2 dispatches sweep + length
-        apu.sequencer_counter = sequencer_period - 1;
-        apu.clock(1);
-        apu.flush();
-
-        // frequency should have increased: 0x100 + (0x100 >> 1) = 0x100 + 0x80 = 0x180
-        assert_eq!(apu.ch1_sweep_shadow, 0x180);
-        assert_eq!(apu.ch1_wave_length, 0x180);
-    }
-
-    #[test]
-    fn test_sweep_overflow_disables_channel() {
-        let mut apu = GbaApu::new();
-        apu.set_soundcnt_x(0x80);
-
-        // sweep: pace=1, increase, slope=0 (delta = shadow >> 0 = shadow)
-        apu.write_channel_reg(0x0400_0060, 0x10);
-        // envelope with DAC on
-        apu.write_channel_reg(0x0400_0063, 0xF0);
-        // set frequency near max = 0x700
-        apu.write_channel_reg(0x0400_0064, 0x00);
-        apu.write_channel_reg(0x0400_0065, 0x87);
-
-        assert!(apu.ch1_enabled);
-
-        let sequencer_period = super::super::consts::CPU_FREQ / 512;
-        apu.sequencer_step = 2; // step 2 dispatches sweep + length
-        apu.sequencer_counter = sequencer_period - 1;
-        apu.clock(1);
-        apu.flush();
-
-        // 0x700 + 0x700 = 0xE00 > 0x7FF, channel should be disabled
-        assert!(!apu.ch1_enabled);
-    }
-
-    #[test]
-    fn test_dac_gating_ch1() {
-        let mut apu = GbaApu::new();
-        apu.set_soundcnt_x(0x80);
-
-        // set envelope with DAC on, trigger
-        apu.write_channel_reg(0x0400_0063, 0xF0);
-        apu.write_channel_reg(0x0400_0065, 0x80);
-        assert!(apu.ch1_enabled);
-
-        // write envelope with DAC off (bits 3-7 = 0)
-        apu.write_channel_reg(0x0400_0063, 0x00);
-        assert!(!apu.ch1_enabled);
-        assert!(!apu.ch1_dac);
-    }
-
-    #[test]
-    fn test_dac_gating_ch3() {
-        let mut apu = GbaApu::new();
-        apu.set_soundcnt_x(0x80);
-
-        // enable DAC
-        apu.write_channel_reg(0x0400_0070, 0x80);
-        // trigger
-        apu.write_channel_reg(0x0400_0075, 0x80);
-        assert!(apu.ch3_enabled);
-
-        // disable DAC
-        apu.write_channel_reg(0x0400_0070, 0x00);
-        assert!(!apu.ch3_enabled);
-        assert!(!apu.ch3_dac);
-    }
-
-    #[test]
     fn test_stereo_panning() {
         let mut apu = GbaApu::new();
         apu.set_soundcnt_x(0x80);
@@ -2205,40 +2529,20 @@ mod tests {
     }
 
     #[test]
-    fn test_channel_register_readback() {
-        let mut apu = GbaApu::new();
-
-        // write sweep: pace=3, decrease, slope=5
-        apu.write_channel_reg(0x0400_0060, 0x3D);
-        let readback = apu.read_channel_reg(0x0400_0060);
-        assert_eq!(readback & 0x07, 5); // slope
-        assert_ne!(readback & 0x08, 0); // decrease
-        assert_eq!((readback >> 4) & 0x07, 3); // pace
-
-        // write CH1 envelope: volume=0xA, increase, pace=3
-        apu.write_channel_reg(0x0400_0063, 0xAB);
-        let readback = apu.read_channel_reg(0x0400_0063);
-        assert_eq!(readback & 0x07, 3); // pace
-        assert_ne!(readback & 0x08, 0); // direction = increase
-        assert_eq!((readback >> 4) & 0x0F, 0x0A); // volume
-    }
-
-    #[test]
-    fn test_ch3_force_volume() {
+    fn test_length_counter_reloads_on_trigger() {
         let mut apu = GbaApu::new();
         apu.set_soundcnt_x(0x80);
 
-        // enable CH3 DAC
-        apu.write_channel_reg(0x0400_0070, 0x80);
-        // set force 75% volume (bit 7 of 0x73)
-        apu.write_channel_reg(0x0400_0073, 0x80);
+        // set envelope with DAC on
+        apu.write_channel_reg(0x0400_0063, 0xF0);
+        // set length = 0 (timer will be 64)
+        apu.write_channel_reg(0x0400_0062, 0x00);
+        // trigger with length enabled
+        apu.write_channel_reg(0x0400_0065, 0xC0);
 
-        assert!(apu.ch3_force_volume);
-        assert_eq!(apu.ch3_output_level, 0);
-
-        // verify readback
-        let readback = apu.read_channel_reg(0x0400_0073);
-        assert_ne!(readback & 0x80, 0);
+        // trigger should have reloaded timer to 64
+        assert!(apu.ch1_enabled);
+        assert!(apu.ch1_length_timer > 0);
     }
 
     #[test]
@@ -2261,323 +2565,36 @@ mod tests {
     }
 
     #[test]
-    fn test_wave_bank_selection() {
-        let mut apu = GbaApu::new();
-
-        // select bank 1 for CPU access
-        apu.write_channel_reg(0x0400_0070, 0xC0);
-        apu.write_wave_ram(0, 0xAB);
-
-        // switch to bank 0 for CPU access
-        apu.write_channel_reg(0x0400_0070, 0x80);
-        apu.write_wave_ram(0, 0xCD);
-
-        // verify different data in each bank
-        apu.write_channel_reg(0x0400_0070, 0xC0);
-        assert_eq!(apu.read_wave_ram(0), 0xAB);
-        apu.write_channel_reg(0x0400_0070, 0x80);
-        assert_eq!(apu.read_wave_ram(0), 0xCD);
-    }
-
-    #[test]
-    fn test_ch2_trigger_and_length() {
-        let mut apu = GbaApu::new();
-        apu.set_soundcnt_x(0x80);
-
-        // set envelope with DAC on
-        apu.write_channel_reg(0x0400_0069, 0xF0);
-        // set length = 63 (timer = 64-63 = 1)
-        apu.write_channel_reg(0x0400_0068, 0x3F);
-        // trigger with length enabled
-        apu.write_channel_reg(0x0400_006D, 0xC0);
-
-        assert!(apu.ch2_enabled);
-        assert_eq!(apu.ch2_length_timer, 1);
-
-        // tick length to disable channel
-        let sequencer_period = super::super::consts::CPU_FREQ / 512;
-        apu.sequencer_step = 0;
-        apu.sequencer_counter = sequencer_period - 1;
-        apu.clock(1);
-        apu.flush();
-
-        assert!(!apu.ch2_enabled);
-    }
-
-    #[test]
-    fn test_ch3_trigger_and_length() {
-        let mut apu = GbaApu::new();
-        apu.set_soundcnt_x(0x80);
-
-        // enable DAC
-        apu.write_channel_reg(0x0400_0070, 0x80);
-        // set length = 255 (timer = 256-255 = 1)
-        apu.write_channel_reg(0x0400_0072, 0xFF);
-        // trigger with length enabled
-        apu.write_channel_reg(0x0400_0075, 0xC0);
-
-        assert!(apu.ch3_enabled);
-        assert_eq!(apu.ch3_length_timer, 1);
-
-        let sequencer_period = super::super::consts::CPU_FREQ / 512;
-        apu.sequencer_step = 0;
-        apu.sequencer_counter = sequencer_period - 1;
-        apu.clock(1);
-        apu.flush();
-
-        assert!(!apu.ch3_enabled);
-    }
-
-    #[test]
-    fn test_ch4_trigger_and_length() {
-        let mut apu = GbaApu::new();
-        apu.set_soundcnt_x(0x80);
-
-        // set envelope with DAC on
-        apu.write_channel_reg(0x0400_0079, 0xF0);
-        // set length = 63 (timer = 64-63 = 1)
-        apu.write_channel_reg(0x0400_0078, 0x3F);
-        // trigger with length enabled
-        apu.write_channel_reg(0x0400_007D, 0xC0);
-
-        assert!(apu.ch4_enabled);
-        assert_eq!(apu.ch4_length_timer, 1);
-
-        let sequencer_period = super::super::consts::CPU_FREQ / 512;
-        apu.sequencer_step = 0;
-        apu.sequencer_counter = sequencer_period - 1;
-        apu.clock(1);
-        apu.flush();
-
-        assert!(!apu.ch4_enabled);
-    }
-
-    #[test]
-    fn test_length_counter_does_not_tick_when_disabled() {
-        let mut apu = GbaApu::new();
-        apu.set_soundcnt_x(0x80);
-
-        // set envelope with DAC on
-        apu.write_channel_reg(0x0400_0063, 0xF0);
-        // set length = 63 (timer = 1)
-        apu.write_channel_reg(0x0400_0062, 0x3F);
-        // trigger WITHOUT length enabled (no bit 6)
-        apu.write_channel_reg(0x0400_0065, 0x80);
-
-        assert!(apu.ch1_enabled);
-        assert!(!apu.ch1_length_enabled);
-
-        // tick length step, should NOT disable channel
-        let sequencer_period = super::super::consts::CPU_FREQ / 512;
-        apu.sequencer_step = 0;
-        apu.sequencer_counter = sequencer_period - 1;
-        apu.clock(1);
-        apu.flush();
-
-        assert!(apu.ch1_enabled);
-    }
-
-    #[test]
-    fn test_length_counter_reloads_on_trigger() {
-        let mut apu = GbaApu::new();
-        apu.set_soundcnt_x(0x80);
-
-        // set envelope with DAC on
-        apu.write_channel_reg(0x0400_0063, 0xF0);
-        // set length = 0 (timer will be 64)
-        apu.write_channel_reg(0x0400_0062, 0x00);
-        // trigger with length enabled
-        apu.write_channel_reg(0x0400_0065, 0xC0);
-
-        // trigger should have reloaded timer to 64
-        assert!(apu.ch1_enabled);
-        assert!(apu.ch1_length_timer > 0);
-    }
-
-    #[test]
-    fn test_envelope_stops_at_zero() {
-        let mut apu = GbaApu::new();
-        apu.set_soundcnt_x(0x80);
-
-        // set envelope: volume=1, direction=decrease(0), pace=1
-        apu.write_channel_reg(0x0400_0063, 0x11);
-        // trigger
-        apu.write_channel_reg(0x0400_0065, 0x80);
-
-        assert_eq!(apu.ch1_volume, 1);
-
-        // tick envelope
-        let sequencer_period = super::super::consts::CPU_FREQ / 512;
-        apu.sequencer_step = 7;
-        apu.sequencer_counter = sequencer_period - 1;
-        apu.clock(1);
-        apu.flush();
-
-        assert_eq!(apu.ch1_volume, 0);
-        assert!(!apu.ch1_envelope_enabled);
-
-        // tick again, should stay at 0
-        apu.sequencer_step = 7;
-        apu.sequencer_counter = sequencer_period - 1;
-        apu.clock(1);
-        apu.flush();
-
-        assert_eq!(apu.ch1_volume, 0);
-    }
-
-    #[test]
-    fn test_envelope_stops_at_fifteen() {
-        let mut apu = GbaApu::new();
-        apu.set_soundcnt_x(0x80);
-
-        // set envelope: volume=14, direction=increase(1), pace=1
-        apu.write_channel_reg(0x0400_0063, 0xE9);
-        // trigger
-        apu.write_channel_reg(0x0400_0065, 0x80);
-
-        assert_eq!(apu.ch1_volume, 14);
-
-        let sequencer_period = super::super::consts::CPU_FREQ / 512;
-        apu.sequencer_step = 7;
-        apu.sequencer_counter = sequencer_period - 1;
-        apu.clock(1);
-        apu.flush();
-
-        assert_eq!(apu.ch1_volume, 15);
-        assert!(!apu.ch1_envelope_enabled);
-    }
-
-    #[test]
-    fn test_envelope_pace_zero_disables() {
-        let mut apu = GbaApu::new();
-        apu.set_soundcnt_x(0x80);
-
-        // set envelope: volume=10, direction=decrease, pace=0 (disabled)
-        apu.write_channel_reg(0x0400_0063, 0xA0);
-        // trigger
-        apu.write_channel_reg(0x0400_0065, 0x80);
-
-        assert_eq!(apu.ch1_volume, 10);
-
-        // tick envelope, should not change volume
-        let sequencer_period = super::super::consts::CPU_FREQ / 512;
-        apu.sequencer_step = 7;
-        apu.sequencer_counter = sequencer_period - 1;
-        apu.clock(1);
-        apu.flush();
-
-        assert_eq!(apu.ch1_volume, 10);
-    }
-
-    #[test]
-    fn test_ch4_envelope() {
-        let mut apu = GbaApu::new();
-        apu.set_soundcnt_x(0x80);
-
-        // set envelope: volume=8, direction=decrease, pace=1
-        apu.write_channel_reg(0x0400_0079, 0x81);
-        // trigger
-        apu.write_channel_reg(0x0400_007D, 0x80);
-
-        assert_eq!(apu.ch4_volume, 8);
-
-        let sequencer_period = super::super::consts::CPU_FREQ / 512;
-        apu.sequencer_step = 7;
-        apu.sequencer_counter = sequencer_period - 1;
-        apu.clock(1);
-        apu.flush();
-
-        assert_eq!(apu.ch4_volume, 7);
-    }
-
-    #[test]
-    fn test_sweep_decrease() {
-        let mut apu = GbaApu::new();
-        apu.set_soundcnt_x(0x80);
-
-        // sweep: pace=1, decrease, slope=2
-        apu.write_channel_reg(0x0400_0060, 0x1A);
-        // envelope with DAC on
-        apu.write_channel_reg(0x0400_0063, 0xF0);
-        // set frequency = 0x200
-        apu.write_channel_reg(0x0400_0064, 0x00);
-        apu.write_channel_reg(0x0400_0065, 0x82);
-
-        assert_eq!(apu.ch1_sweep_shadow, 0x200);
-
-        let sequencer_period = super::super::consts::CPU_FREQ / 512;
-        apu.sequencer_step = 2;
-        apu.sequencer_counter = sequencer_period - 1;
-        apu.clock(1);
-        apu.flush();
-
-        // 0x200 - (0x200 >> 2) = 0x200 - 0x80 = 0x180
-        assert_eq!(apu.ch1_sweep_shadow, 0x180);
-    }
-
-    #[test]
-    fn test_sweep_pace_zero_no_sweep() {
-        let mut apu = GbaApu::new();
-        apu.set_soundcnt_x(0x80);
-
-        // sweep: pace=0 (disabled), increase, slope=1
-        apu.write_channel_reg(0x0400_0060, 0x01);
-        apu.write_channel_reg(0x0400_0063, 0xF0);
-        apu.write_channel_reg(0x0400_0064, 0x00);
-        apu.write_channel_reg(0x0400_0065, 0x82);
-
-        let original = apu.ch1_sweep_shadow;
-
-        let sequencer_period = super::super::consts::CPU_FREQ / 512;
-        apu.sequencer_step = 2;
-        apu.sequencer_counter = sequencer_period - 1;
-        apu.clock(1);
-        apu.flush();
-
-        // frequency should not change with pace=0
-        assert_eq!(apu.ch1_sweep_shadow, original);
-    }
-
-    #[test]
-    fn test_dac_gating_ch2() {
-        let mut apu = GbaApu::new();
-        apu.set_soundcnt_x(0x80);
-
-        apu.write_channel_reg(0x0400_0069, 0xF0);
-        apu.write_channel_reg(0x0400_006D, 0x80);
-        assert!(apu.ch2_enabled);
-
-        apu.write_channel_reg(0x0400_0069, 0x00);
-        assert!(!apu.ch2_enabled);
-        assert!(!apu.ch2_dac);
-    }
-
-    #[test]
-    fn test_dac_gating_ch4() {
+    fn test_ch4_width_mode_7bit() {
         let mut apu = GbaApu::new();
         apu.set_soundcnt_x(0x80);
 
         apu.write_channel_reg(0x0400_0079, 0xF0);
+        // width=7-bit (bit 3), divisor=0, shift=0
+        apu.write_channel_reg(0x0400_007C, 0x08);
         apu.write_channel_reg(0x0400_007D, 0x80);
-        assert!(apu.ch4_enabled);
 
-        apu.write_channel_reg(0x0400_0079, 0x00);
-        assert!(!apu.ch4_enabled);
-        assert!(!apu.ch4_dac);
+        assert!(apu.ch4_width_mode);
+        assert_eq!(apu.ch4_lfsr, 0x7FFF);
     }
 
     #[test]
-    fn test_trigger_with_dac_off_does_not_enable() {
+    fn test_channel_register_readback() {
         let mut apu = GbaApu::new();
-        apu.set_soundcnt_x(0x80);
 
-        // DAC off (envelope bits 3-7 = 0)
-        apu.write_channel_reg(0x0400_0063, 0x00);
-        // try to trigger
-        apu.write_channel_reg(0x0400_0065, 0x80);
+        // write sweep: pace=3, decrease, slope=5
+        apu.write_channel_reg(0x0400_0060, 0x3D);
+        let readback = apu.read_channel_reg(0x0400_0060);
+        assert_eq!(readback & 0x07, 5); // slope
+        assert_ne!(readback & 0x08, 0); // decrease
+        assert_eq!((readback >> 4) & 0x07, 3); // pace
 
-        // channel should not be enabled with DAC off
-        assert!(!apu.ch1_enabled);
+        // write CH1 envelope: volume=0xA, increase, pace=3
+        apu.write_channel_reg(0x0400_0063, 0xAB);
+        let readback = apu.read_channel_reg(0x0400_0063);
+        assert_eq!(readback & 0x07, 3); // pace
+        assert_ne!(readback & 0x08, 0); // direction = increase
+        assert_eq!((readback >> 4) & 0x0F, 0x0A); // volume
     }
 
     #[test]
@@ -2628,133 +2645,116 @@ mod tests {
     }
 
     #[test]
-    fn test_ch4_width_mode_7bit() {
+    fn test_ch3_force_volume() {
         let mut apu = GbaApu::new();
         apu.set_soundcnt_x(0x80);
 
-        apu.write_channel_reg(0x0400_0079, 0xF0);
-        // width=7-bit (bit 3), divisor=0, shift=0
-        apu.write_channel_reg(0x0400_007C, 0x08);
-        apu.write_channel_reg(0x0400_007D, 0x80);
+        // enable CH3 DAC
+        apu.write_channel_reg(0x0400_0070, 0x80);
+        // set force 75% volume (bit 7 of 0x73)
+        apu.write_channel_reg(0x0400_0073, 0x80);
 
-        assert!(apu.ch4_width_mode);
-        assert_eq!(apu.ch4_lfsr, 0x7FFF);
+        assert!(apu.ch3_force_volume);
+        assert_eq!(apu.ch3_output_level, 0);
+
+        // verify readback
+        let readback = apu.read_channel_reg(0x0400_0073);
+        assert_ne!(readback & 0x80, 0);
     }
 
     #[test]
-    fn test_master_disable_stops_all_channels() {
+    fn test_apu_channel_trigger() {
+        let mut apu = GbaApu::new();
+        apu.set_soundcnt_x(0x80);
+        // set envelope with DAC on (volume=0xF, direction=0, pace=0)
+        apu.write_channel_reg(0x0400_0063, 0xF0);
+        // trigger channel 1
+        apu.write_channel_reg(0x0400_0065, 0x80);
+        assert_eq!(apu.soundcnt_x() & 1, 1);
+    }
+
+    #[test]
+    fn test_dac_gating_ch1() {
         let mut apu = GbaApu::new();
         apu.set_soundcnt_x(0x80);
 
-        // enable all channels
+        // set envelope with DAC on, trigger
         apu.write_channel_reg(0x0400_0063, 0xF0);
         apu.write_channel_reg(0x0400_0065, 0x80);
+        assert!(apu.ch1_enabled);
+
+        // write envelope with DAC off (bits 3-7 = 0)
+        apu.write_channel_reg(0x0400_0063, 0x00);
+        assert!(!apu.ch1_enabled);
+        assert!(!apu.ch1_dac);
+    }
+
+    #[test]
+    fn test_dac_gating_ch2() {
+        let mut apu = GbaApu::new();
+        apu.set_soundcnt_x(0x80);
+
         apu.write_channel_reg(0x0400_0069, 0xF0);
         apu.write_channel_reg(0x0400_006D, 0x80);
+        assert!(apu.ch2_enabled);
+
+        apu.write_channel_reg(0x0400_0069, 0x00);
+        assert!(!apu.ch2_enabled);
+        assert!(!apu.ch2_dac);
+    }
+
+    #[test]
+    fn test_dac_gating_ch3() {
+        let mut apu = GbaApu::new();
+        apu.set_soundcnt_x(0x80);
+
+        // enable DAC
         apu.write_channel_reg(0x0400_0070, 0x80);
+        // trigger
         apu.write_channel_reg(0x0400_0075, 0x80);
+        assert!(apu.ch3_enabled);
+
+        // disable DAC
+        apu.write_channel_reg(0x0400_0070, 0x00);
+        assert!(!apu.ch3_enabled);
+        assert!(!apu.ch3_dac);
+    }
+
+    #[test]
+    fn test_dac_gating_ch4() {
+        let mut apu = GbaApu::new();
+        apu.set_soundcnt_x(0x80);
+
         apu.write_channel_reg(0x0400_0079, 0xF0);
         apu.write_channel_reg(0x0400_007D, 0x80);
-
-        assert!(apu.ch1_enabled);
-        assert!(apu.ch2_enabled);
-        assert!(apu.ch3_enabled);
         assert!(apu.ch4_enabled);
 
-        // master disable
-        apu.set_soundcnt_x(0x00);
-
-        assert!(!apu.ch1_enabled);
-        assert!(!apu.ch2_enabled);
-        assert!(!apu.ch3_enabled);
+        apu.write_channel_reg(0x0400_0079, 0x00);
         assert!(!apu.ch4_enabled);
+        assert!(!apu.ch4_dac);
     }
 
     #[test]
-    fn test_soundcnt_x_status_bits() {
+    fn test_trigger_with_dac_off_does_not_enable() {
         let mut apu = GbaApu::new();
         apu.set_soundcnt_x(0x80);
 
-        // no channels enabled
-        assert_eq!(apu.soundcnt_x() & 0x0F, 0);
-
-        // enable CH1
-        apu.write_channel_reg(0x0400_0063, 0xF0);
+        // DAC off (envelope bits 3-7 = 0)
+        apu.write_channel_reg(0x0400_0063, 0x00);
+        // try to trigger
         apu.write_channel_reg(0x0400_0065, 0x80);
-        assert_eq!(apu.soundcnt_x() & 0x01, 1);
 
-        // enable CH2
-        apu.write_channel_reg(0x0400_0069, 0xF0);
-        apu.write_channel_reg(0x0400_006D, 0x80);
-        assert_eq!(apu.soundcnt_x() & 0x02, 2);
-
-        // enable CH3
-        apu.write_channel_reg(0x0400_0070, 0x80);
-        apu.write_channel_reg(0x0400_0075, 0x80);
-        assert_eq!(apu.soundcnt_x() & 0x04, 4);
-
-        // enable CH4
-        apu.write_channel_reg(0x0400_0079, 0xF0);
-        apu.write_channel_reg(0x0400_007D, 0x80);
-        assert_eq!(apu.soundcnt_x() & 0x08, 8);
-
-        // all four + master + unused bits
-        assert_eq!(apu.soundcnt_x(), 0x8F | 0x70);
+        // channel should not be enabled with DAC off
+        assert!(!apu.ch1_enabled);
     }
 
     #[test]
-    fn test_wave_dimension_mode() {
+    fn test_apu_reset() {
         let mut apu = GbaApu::new();
-
-        // enable dimension mode (bit 5)
-        apu.write_channel_reg(0x0400_0070, 0xA0);
-        assert!(apu.wave_dimension);
-
-        // in dimension mode, CPU accesses the non-playing bank
-        // bank=0, so CPU accesses bank 1
-        apu.write_channel_reg(0x0400_0070, 0xA0); // bank=0, dim=1
-        apu.write_wave_ram(0, 0x12);
-
-        apu.write_channel_reg(0x0400_0070, 0xE0); // bank=1, dim=1
-        apu.write_wave_ram(0, 0x34);
-
-        // verify they are in different banks
-        apu.write_channel_reg(0x0400_0070, 0xA0);
-        assert_eq!(apu.read_wave_ram(0), 0x12);
-        apu.write_channel_reg(0x0400_0070, 0xE0);
-        assert_eq!(apu.read_wave_ram(0), 0x34);
-    }
-
-    #[test]
-    fn test_fifo_empty_keeps_last_sample() {
-        let mut channel = DirectSoundChannel::new();
-        channel.write_fifo(0x42424242);
-
-        // consume all 4 samples
-        for _ in 0..4 {
-            channel.timer_tick();
-            assert_eq!(channel.current_sample, 0x42);
-        }
-
-        // tick again with empty FIFO, should keep last sample
-        channel.timer_tick();
-        assert_eq!(channel.current_sample, 0x42);
-    }
-
-    #[test]
-    fn test_clock_sample_generation_rate() {
-        let mut apu = GbaApu::new();
+        apu.set_soundcnt_l(0x1234);
         apu.set_soundcnt_x(0x80);
-
-        // clock for exactly one frame (280896 cycles)
-        // at 32768 Hz and 16.78 MHz, expect ~547 samples per frame
-        // each sample is 2 entries (stereo)
-        apu.clock(super::super::consts::CYCLES_PER_FRAME);
-        apu.flush();
-
-        let sample_count = apu.audio_buffer().len() / 2;
-        // should be approximately 547 stereo samples
-        assert!(sample_count > 540);
-        assert!(sample_count < 560);
+        apu.reset();
+        assert_eq!(apu.soundcnt_l(), 0);
+        assert_eq!(apu.soundcnt_x() & 0x80, 0);
     }
 }

@@ -352,6 +352,14 @@ mod tests {
     };
 
     #[test]
+    fn test_dma_addr_control() {
+        assert_eq!(DmaAddrControl::from_u16(0), DmaAddrControl::Increment);
+        assert_eq!(DmaAddrControl::from_u16(1), DmaAddrControl::Decrement);
+        assert_eq!(DmaAddrControl::from_u16(2), DmaAddrControl::Fixed);
+        assert_eq!(DmaAddrControl::from_u16(3), DmaAddrControl::IncrementReload);
+    }
+
+    #[test]
     fn test_dma_channel_new() {
         let ch = DmaChannel::new();
         assert_eq!(ch.src_reg(), 0);
@@ -424,22 +432,35 @@ mod tests {
     }
 
     #[test]
-    fn test_dma_word_size_sound() {
-        for index in 0..4 {
-            for word_size in [false, true] {
-                let mut ch = DmaChannel::new();
-                let control =
-                    (1 << 15) | (DMA_TIMING_SPECIAL << 12) | if word_size { 1 << 10 } else { 0 };
-                ch.set_control(control, index);
-                assert_eq!(ch.word_size(), word_size || index == 1 || index == 2);
-                assert_eq!(ch.control(), control);
-                let control = control & !(DMA_TIMING_SPECIAL << 12);
-                ch.set_control(control, index);
-                assert_eq!(ch.word_size(), word_size);
-                ch.set_control(control ^ (1 << 10), index);
-                assert_eq!(ch.word_size(), !word_size);
-            }
-        }
+    fn test_dma_zero_count_max() {
+        let mut ch = DmaChannel::new();
+        ch.set_src_reg(0x0200_0000);
+        ch.set_dst_reg(0x0600_0000);
+        ch.set_count_reg(0); // 0 = max count
+
+        // enable, immediate
+        ch.set_control(1 << 15, 0);
+        assert_eq!(ch.remaining(), 0x4000); // channel 0
+
+        let mut ch3 = DmaChannel::new();
+        ch3.set_src_reg(0x0200_0000);
+        ch3.set_dst_reg(0x0600_0000);
+        ch3.set_count_reg(0);
+        ch3.set_control(1 << 15, 3); // channel 3
+        assert_eq!(ch3.remaining(), 0x10000);
+    }
+
+    #[test]
+    fn test_dma_immediate_trigger() {
+        let mut dma = GbaDma::new();
+        dma.channels[0].set_src_reg(0x0800_0000);
+        dma.channels[0].set_dst_reg(0x0600_0000);
+        dma.channels[0].set_count_reg(16);
+
+        // enable with immediate timing
+        dma.channels[0].set_control(1 << 15, 0);
+        assert!(dma.channels[0].active());
+        assert_eq!(dma.highest_active(), Some(0));
     }
 
     #[test]
@@ -456,11 +477,22 @@ mod tests {
     }
 
     #[test]
-    fn test_dma_addr_control() {
-        assert_eq!(DmaAddrControl::from_u16(0), DmaAddrControl::Increment);
-        assert_eq!(DmaAddrControl::from_u16(1), DmaAddrControl::Decrement);
-        assert_eq!(DmaAddrControl::from_u16(2), DmaAddrControl::Fixed);
-        assert_eq!(DmaAddrControl::from_u16(3), DmaAddrControl::IncrementReload);
+    fn test_dma_word_size_sound() {
+        for index in 0..4 {
+            for word_size in [false, true] {
+                let mut ch = DmaChannel::new();
+                let control =
+                    (1 << 15) | (DMA_TIMING_SPECIAL << 12) | if word_size { 1 << 10 } else { 0 };
+                ch.set_control(control, index);
+                assert_eq!(ch.word_size(), word_size || index == 1 || index == 2);
+                assert_eq!(ch.control(), control);
+                let control = control & !(DMA_TIMING_SPECIAL << 12);
+                ch.set_control(control, index);
+                assert_eq!(ch.word_size(), word_size);
+                ch.set_control(control ^ (1 << 10), index);
+                assert_eq!(ch.word_size(), !word_size);
+            }
+        }
     }
 
     #[test]
@@ -513,25 +545,6 @@ mod tests {
         ch.step();
         assert_eq!(ch.dst(), 0x0600_0000); // dst unchanged
         assert_eq!(ch.src(), 0x0200_0002); // src incremented
-    }
-
-    #[test]
-    fn test_dma_zero_count_max() {
-        let mut ch = DmaChannel::new();
-        ch.set_src_reg(0x0200_0000);
-        ch.set_dst_reg(0x0600_0000);
-        ch.set_count_reg(0); // 0 = max count
-
-        // enable, immediate
-        ch.set_control(1 << 15, 0);
-        assert_eq!(ch.remaining(), 0x4000); // channel 0
-
-        let mut ch3 = DmaChannel::new();
-        ch3.set_src_reg(0x0200_0000);
-        ch3.set_dst_reg(0x0600_0000);
-        ch3.set_count_reg(0);
-        ch3.set_control(1 << 15, 3); // channel 3
-        assert_eq!(ch3.remaining(), 0x10000);
     }
 
     #[test]
@@ -595,29 +608,6 @@ mod tests {
         ch.step();
         assert!(!ch.active());
         assert!(!ch.enabled()); // disabled after non-repeat completion
-    }
-
-    #[test]
-    fn test_dma_any_active() {
-        let mut dma = GbaDma::new();
-        assert!(!dma.any_active());
-
-        // enable with immediate timing
-        dma.channels[0].set_control(1 << 15, 0);
-        assert!(dma.any_active());
-    }
-
-    #[test]
-    fn test_dma_immediate_trigger() {
-        let mut dma = GbaDma::new();
-        dma.channels[0].set_src_reg(0x0800_0000);
-        dma.channels[0].set_dst_reg(0x0600_0000);
-        dma.channels[0].set_count_reg(16);
-
-        // enable with immediate timing
-        dma.channels[0].set_control(1 << 15, 0);
-        assert!(dma.channels[0].active());
-        assert_eq!(dma.highest_active(), Some(0));
     }
 
     #[test]
@@ -962,6 +952,16 @@ mod tests {
             dst_before,
             "dst should not be overridden"
         );
+    }
+
+    #[test]
+    fn test_dma_any_active() {
+        let mut dma = GbaDma::new();
+        assert!(!dma.any_active());
+
+        // enable with immediate timing
+        dma.channels[0].set_control(1 << 15, 0);
+        assert!(dma.any_active());
     }
 
     #[test]
