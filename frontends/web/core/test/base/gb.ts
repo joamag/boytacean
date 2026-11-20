@@ -2,6 +2,7 @@ import assert from "assert";
 
 import { Cartridge } from "boytacean";
 
+import { CartridgePort } from "../../ts/cartridge";
 import { GameBoyCore, releaseCore, SerialDevice } from "../../ts/gb";
 import { NullStorageAdapter } from "../../ts/storage";
 
@@ -152,6 +153,29 @@ describe("GameBoyCore", function () {
             await assert.rejects(buildCore().boot(), {
                 message: "Unable to load initial ROM"
             });
+        });
+    });
+
+    describe("#loadCartridge()", function () {
+        it("should be able to reject a cartridge that can not be read", async () => {
+            const core = buildCore();
+            let closed = false;
+            const port: CartridgePort = {
+                readable: null,
+                writable: null,
+                open: async () => {
+                    throw new Error("Failed to open serial port");
+                },
+                close: async () => {
+                    closed = true;
+                }
+            };
+            await assert.rejects(core.loadCartridge(port), {
+                message: "Failed to open serial port"
+            });
+            assert.strictEqual(core.loaded, false);
+            assert.strictEqual(core.instance, null);
+            assert.strictEqual(closed, true);
         });
     });
 

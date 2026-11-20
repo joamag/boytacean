@@ -30,3 +30,6 @@ pub mod timer;
 
 #[cfg(feature = "python")]
 pub mod py;
+
+#[cfg(feature = "wasm")]
+pub use boytacean_cartridge;

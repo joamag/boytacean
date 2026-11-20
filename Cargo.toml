@@ -17,7 +17,7 @@ crate-type = ["cdylib", "rlib"]
 
 [features]
 default = []
-wasm = ["wasm-bindgen", "js-sys", "boytacean-common/wasm"]
+wasm = ["wasm-bindgen", "js-sys", "boytacean-common/wasm", "boytacean-cartridge/wasm"]
 python = ["pyo3", "boytacean-common/python"]
 simd = ["boytacean-encoding/simd", "boytacean-hashing/simd"]
 debug = []
@@ -25,8 +25,10 @@ pedantic = []
 cpulog = []
 profile = []
 gen-mock = []
+cartridge = ["boytacean-cartridge/serial"]
 
 [dependencies]
+boytacean-cartridge = { path = "crates/cartridge", version = "0.13.2", optional = true }
 boytacean-common = { path = "crates/common", version = "0.13.2" }
 boytacean-encoding = { path = "crates/encoding", version = "0.13.2" }
 boytacean-hashing = { path = "crates/hashing", version = "0.13.2" }
@@ -41,6 +43,7 @@ criterion = "0.5"
 chrono = "0.4"
 regex = "1"
 built = { version = "0.7", features = ["cargo-lock"] }
+idna_adapter = "~1.1"
 
 [profile.release]
 debug = false
@@ -66,6 +69,7 @@ members = [
     "frontends/console",
     "frontends/libretro",
     "frontends/sdl",
+    "crates/cartridge",
     "crates/common",
     "crates/encoding",
     "crates/hashing"
@@ -82,6 +86,11 @@ path = "src/bin/bosc-decompress.rs"
 [[bin]]
 name = "bosc-thumbnail"
 path = "src/bin/bosc-thumbnail.rs"
+
+[[bin]]
+name = "gbxcart"
+path = "src/bin/gbxcart.rs"
+required-features = ["cartridge"]
 
 [[bench]]
 name = "color"

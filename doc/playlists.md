@@ -71,30 +71,30 @@ The richer form wraps the entries in an object, allowing playlist-level metadata
 
 These fields apply to the playlist as a whole and are only available in the [object form](#object-form).
 
-| Field          | Type      | Required | Description                                                                                              |
-| -------------- | --------- | -------- | -------------------------------------------------------------------------------------------------------- |
-| `entries`      | Entry[]   | Yes      | The list of ROM entries. See [Entry fields](#entry-fields).                                              |
-| `name`         | String    | No       | Display name of the playlist, shown in the section header and the info panel.                            |
-| `description`  | String    | No       | Free-text description, shown in the header and in a dedicated "Description" tab of the info panel.       |
-| `version`      | String    | No       | Playlist version, shown in the info panel.                                                               |
-| `author`       | String    | No       | Author name, shown as a "by …" subtitle and in the info panel.                                           |
-| `authorEmail`  | String    | No       | Author contact email, shown in the info panel.                                                           |
-| `releaseDate`  | String    | No       | Release date of the playlist (free-form text), shown in the info panel.                                  |
-| `defaultUrl`   | String    | No       | URL of a ROM to boot automatically at startup, used as a fallback when no `rom_url` parameter is given.  |
-| `useThumbnail` | Boolean   | No       | Controls thumbnail selection per entry. See [Thumbnails](#thumbnails). Defaults to `false`.              |
+| Field          | Type    | Required | Description                                                                                             |
+| -------------- | ------- | -------- | ------------------------------------------------------------------------------------------------------- |
+| `entries`      | Entry[] | Yes      | The list of ROM entries. See [Entry fields](#entry-fields).                                             |
+| `name`         | String  | No       | Display name of the playlist, shown in the section header and the info panel.                           |
+| `description`  | String  | No       | Free-text description, shown in the header and in a dedicated "Description" tab of the info panel.      |
+| `version`      | String  | No       | Playlist version, shown in the info panel.                                                              |
+| `author`       | String  | No       | Author name, shown as a "by …" subtitle and in the info panel.                                          |
+| `authorEmail`  | String  | No       | Author contact email, shown in the info panel.                                                          |
+| `releaseDate`  | String  | No       | Release date of the playlist (free-form text), shown in the info panel.                                 |
+| `defaultUrl`   | String  | No       | URL of a ROM to boot automatically at startup, used as a fallback when no `rom_url` parameter is given. |
+| `useThumbnail` | Boolean | No       | Controls thumbnail selection per entry. See [Thumbnails](#thumbnails). Defaults to `false`.             |
 
 ## Entry fields
 
 Each entry describes a single loadable ROM.
 
-| Field            | Type   | Required | Description                                                                                                          |
-| ---------------- | ------ | -------- | -------------------------------------------------------------------------------------------------------------------- |
-| `name`           | String | Yes      | Display name of the game. Included in the search filter.                                                             |
-| `url`            | String | Yes      | URL of the ROM to fetch and boot when the entry is clicked. Must be unique within the playlist and CORS-accessible.  |
-| `description`    | String | No       | Short description shown under the name. Included in the search filter.                                               |
-| `thumbnail`      | String | No       | URL of a (typically larger) cover image shown next to the entry.                                                     |
-| `thumbnailSmall` | String | No       | URL of a smaller cover image, preferred by default to keep lists lightweight. See [Thumbnails](#thumbnails).         |
-| `igdbId`         | Number | No       | The [IGDB](https://www.igdb.com) identifier of the game, reserved for metadata and future integrations.              |
+| Field            | Type   | Required | Description                                                                                                         |
+| ---------------- | ------ | -------- | ------------------------------------------------------------------------------------------------------------------- |
+| `name`           | String | Yes      | Display name of the game. Included in the search filter.                                                            |
+| `url`            | String | Yes      | URL of the ROM to fetch and boot when the entry is clicked. Must be unique within the playlist and CORS-accessible. |
+| `description`    | String | No       | Short description shown under the name. Included in the search filter.                                              |
+| `thumbnail`      | String | No       | URL of a (typically larger) cover image shown next to the entry.                                                    |
+| `thumbnailSmall` | String | No       | URL of a smaller cover image, preferred by default to keep lists lightweight. See [Thumbnails](#thumbnails).        |
+| `igdbId`         | Number | No       | The [IGDB](https://www.igdb.com) identifier of the game, reserved for metadata and future integrations.             |
 
 ## Thumbnails
 

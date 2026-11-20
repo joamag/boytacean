@@ -29,7 +29,7 @@ jobs:
         run: |
           cd frontends/sdl
           apt-get update && apt-get install -y -q zip python3-jinja2
-          cargo install cargo-vcpkg && cargo vcpkg -v build
+          cargo install cargo-vcpkg --locked && cargo vcpkg -v build
           cargo build --release
       - name: Build Libretro
         run: |
@@ -81,7 +81,7 @@ jobs:
       - name: Build SDL
         run: |
           cd frontends/sdl
-          cargo install cargo-vcpkg && cargo vcpkg -v build
+          cargo install cargo-vcpkg --locked && cargo vcpkg -v build
           cargo build --release
       - name: Build Libretro
         run: |
@@ -127,7 +127,7 @@ jobs:
       - name: Build SDL
         run: |
           cd frontends/sdl
-          cargo install cargo-vcpkg && cargo vcpkg -v build
+          cargo install cargo-vcpkg --locked && cargo vcpkg -v build
           cargo build --release
       - name: Build Libretro
         run: |
@@ -152,6 +152,8 @@ jobs:
     timeout-minutes: 30
     runs-on: ubuntu-latest
     container: rust:1.91.0
+    env:
+      SWC_NATIVE_BINDING_CACHE: /tmp/swc
     steps:
       - name: Checkout code from repository
         uses: actions/checkout@v6

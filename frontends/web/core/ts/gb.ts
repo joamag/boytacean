@@ -21,6 +21,12 @@ import {
     Validation
 } from "emukit/logic";
 
+import {
+    CartridgeInfo,
+    CartridgePort,
+    CartridgeSave,
+    readCartridge
+} from "./cartridge";
 import { PALETTES, PALETTES_MAP } from "./palettes";
 import { defaultStorage, StorageAdapter } from "./storage";
 
@@ -477,6 +483,57 @@ export class GameBoyCore extends EmulatorLogic {
         // triggers the booted event indicating that the
         // emulator has finished the loading process
         this.trigger("booted");
+    }
+
+    /**
+     * Loads the game in the cartridge of the GBxCart RW at the provided
+     * serial port, booting it as any other ROM.
+     *
+     * The save in the cartridge is only used when there's no save of
+     * the game in the storage, so that the progress made in the
+     * emulator is never lost.
+     *
+     * @param port The serial port of the GBxCart RW.
+     * @param onProgress The callback for the progress (from 0 to 1)
+     * of the read of the cartridge.
+     * @returns The information on the cartridge that has been loaded.
+     */
+    async loadCartridge(
+        port: CartridgePort,
+        onProgress?: (progress: number) => void
+    ): Promise<CartridgeInfo> {
+        const { dump, device } = await readCartridge(port, { onProgress });
+        try {
+            // pauses and boots without resuming the machine, so that the
+            // save in the cartridge (if used) is in place before the game
+            // starts running
+            await this.pause();
+            await this.boot({
+                romName: dump.title() || "cartridge.gb",
+                romData: dump.rom_data_eager(),
+                reuse: false,
+                restore: false
+            });
+            const title = this.cartridge?.title() ?? dump.title();
+            let save = CartridgeSave.None;
+            if (dump.has_ram()) {
+                save = CartridgeSave.Storage;
+                if (this.storage.getItem(title) === null) {
+                    this.gameBoy?.set_ram_data(dump.ram_data_eager());
+                    this.saveRam();
+                    save = CartridgeSave.Cartridge;
+                }
+            }
+            await this.resume();
+            return {
+                title: title,
+                device: device,
+                checksumValid: dump.checksum_valid(),
+                save: save
+            };
+        } finally {
+            dump.free();
+        }
     }
 
     setRom(name: string, data: Uint8Array, cartridge: Cartridge | null) {
