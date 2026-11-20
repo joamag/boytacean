@@ -190,7 +190,7 @@ fn swi_stop(cpu: &mut Arm7Tdmi) {
     cpu.bus_write8(0x0400_0301, 0x80);
 }
 
-/// SWI 0x04: IntrWait — halts until the requested interrupt flags
+/// SWI 0x04: IntrWait - halts until the requested interrupt flags
 /// appear in IntrCheck (0x03007FF8).
 ///
 /// Sets intr_wait_flags so the re-halt check in cpu.rs keeps the CPU halted until matched.
@@ -216,7 +216,7 @@ fn swi_intr_wait(cpu: &mut Arm7Tdmi) {
     cpu.set_halted(true);
 }
 
-/// SWI 0x05: VBlankIntrWait — waits for VBlank interrupt and is equivalent to IntrWait(1, 1).
+/// SWI 0x05: VBlankIntrWait - waits for VBlank interrupt and is equivalent to IntrWait(1, 1).
 ///
 /// Clears VBlank from IntrCheck and halts until VBlank arrives.
 fn swi_vblank_intr_wait(cpu: &mut Arm7Tdmi) {
