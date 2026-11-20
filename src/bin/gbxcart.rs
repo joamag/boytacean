@@ -76,9 +76,10 @@ fn parse_args(args: &[String]) -> Option<Options> {
 /// The path of the save next to the provided ROM file.
 fn save_path(path: &str) -> String {
     // a ROM path that is a save path already gets the extension appended,
-    // so that the save never takes the path of the ROM
+    // so that the save never takes the path of the ROM, both compared as
+    // paths (eg: on Windows, where the separators of the two may differ)
     match replace_ext(path, "sav") {
-        Some(save_path) if save_path != path => save_path,
+        Some(save_path) if Path::new(&save_path) != Path::new(path) => save_path,
         _ => format!("{path}.sav"),
     }
 }
@@ -459,7 +460,10 @@ mod tests {
     #[test]
     fn test_save_path() {
         assert_eq!(save_path("game.gb"), "game.sav");
-        assert_eq!(save_path("dumps/game.gbc"), "dumps/game.sav");
+        assert_eq!(
+            Path::new(&save_path("dumps/game.gbc")),
+            Path::new("dumps/game.sav")
+        );
         assert_eq!(save_path("game"), "game.sav");
         assert_eq!(save_path("game.sav"), "game.sav.sav");
         assert_eq!(save_path("dumps/game.sav"), "dumps/game.sav.sav");
