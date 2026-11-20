@@ -15,7 +15,7 @@ const EEPROM_SIZE_64K: usize = 8192;
 pub enum SaveType {
     /// No backup media.
     None,
-    /// 32KB SRAM (direct byte access).
+    /// 32KB SRAM or FRAM (direct byte access).
     Sram,
     /// 64KB flash (Panasonic MN63F805MNP).
     Flash64,
@@ -485,7 +485,9 @@ fn detect_from_rom(rom: &[u8]) -> SaveType {
         || find_bytes(haystack, b"FLASH_V").is_some()
     {
         SaveType::Flash64
-    } else if find_bytes(haystack, b"SRAM_V").is_some() {
+    } else if find_bytes(haystack, b"SRAM_V").is_some()
+        || find_bytes(haystack, b"SRAM_F_V").is_some()
+    {
         SaveType::Sram
     } else {
         SaveType::None
@@ -1294,6 +1296,14 @@ mod tests {
     fn test_detect_save_type_sram() {
         let mut rom = vec![0u8; 512];
         rom[0x100..0x106].copy_from_slice(b"SRAM_V");
+        assert_eq!(detect_from_rom(&rom), SaveType::Sram);
+    }
+
+    #[test]
+    fn test_detect_save_type_sram_f() {
+        // FRAM is accessed (and stored) like the 32KB SRAM
+        let mut rom = vec![0u8; 512];
+        rom[0x100..0x108].copy_from_slice(b"SRAM_F_V");
         assert_eq!(detect_from_rom(&rom), SaveType::Sram);
     }
 
