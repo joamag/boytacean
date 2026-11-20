@@ -25,6 +25,7 @@ pedantic = []
 cpulog = []
 profile = []
 gen-mock = []
+cartridge = ["boytacean-cartridge/serial"]
 
 [dependencies]
 boytacean-cartridge = { path = "crates/cartridge", version = "0.13.2", optional = true }
@@ -85,6 +86,11 @@ path = "src/bin/bosc-decompress.rs"
 [[bin]]
 name = "bosc-thumbnail"
 path = "src/bin/bosc-thumbnail.rs"
+
+[[bin]]
+name = "gbxcart"
+path = "src/bin/gbxcart.rs"
+required-features = ["cartridge"]
 
 [[bench]]
 name = "color"
