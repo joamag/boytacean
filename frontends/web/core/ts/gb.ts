@@ -536,7 +536,7 @@ export class GameBoyCore extends EmulatorLogic {
         }
     }
 
-    setRom(name: string, data: Uint8Array, cartridge: Cartridge) {
+    setRom(name: string, data: Uint8Array, cartridge: Cartridge | null) {
         this.romName = name;
         this.romData = data;
         this.romSize = data.length;

@@ -71,6 +71,7 @@ impl From<PadSelection> for u8 {
 }
 
 #[cfg_attr(feature = "wasm", wasm_bindgen)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum PadKey {
     Up,
     Down,
@@ -80,6 +81,8 @@ pub enum PadKey {
     Select,
     A,
     B,
+    L,
+    R,
 }
 
 impl PadKey {
@@ -93,6 +96,8 @@ impl PadKey {
             6 => PadKey::Select,
             7 => PadKey::A,
             8 => PadKey::B,
+            9 => PadKey::L,
+            10 => PadKey::R,
             _ => panic!("Invalid pad key value: {value}"),
         }
     }
@@ -196,6 +201,7 @@ impl Pad {
             PadKey::Select => self.select = true,
             PadKey::A => self.a = true,
             PadKey::B => self.b = true,
+            PadKey::L | PadKey::R => return,
         }
 
         // signals that a JoyPad interrupt is pending to be
@@ -213,6 +219,7 @@ impl Pad {
             PadKey::Select => self.select = false,
             PadKey::A => self.a = false,
             PadKey::B => self.b = false,
+            PadKey::L | PadKey::R => {}
         }
     }
 
@@ -282,8 +289,36 @@ impl Default for Pad {
 
 #[cfg(test)]
 mod tests {
-    use super::{Pad, PadSelection};
+    use super::{Pad, PadKey, PadSelection};
     use crate::state::StateComponent;
+
+    #[test]
+    fn test_pad_key_from_u8() {
+        assert_eq!(PadKey::from_u8(1), PadKey::Up);
+        assert_eq!(PadKey::from_u8(8), PadKey::B);
+        assert_eq!(PadKey::from_u8(9), PadKey::L);
+        assert_eq!(PadKey::from_u8(10), PadKey::R);
+    }
+
+    #[test]
+    fn test_key_press_shoulders() {
+        // the Game Boy has no L and R buttons, so their presses change
+        // neither the action buttons nor the JoyPad interrupt
+        let mut pad = Pad::new();
+        pad.write(0xff00, 0x10);
+        for key in [PadKey::L, PadKey::R] {
+            pad.key_press(key);
+            assert_eq!(pad.read(0xff00), 0x1f);
+            assert!(!pad.int_pad());
+            pad.key_lift(key);
+            assert_eq!(pad.read(0xff00), 0x1f);
+        }
+
+        // as the A button does
+        pad.key_press(PadKey::A);
+        assert_eq!(pad.read(0xff00), 0x1e);
+        assert!(pad.int_pad());
+    }
 
     #[test]
     fn test_state_and_set_state() {

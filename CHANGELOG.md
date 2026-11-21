@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Documentation for the React package, covering components, hooks and keys with a complete quick start
 * Games can be loaded straight from their cartridge with a GBxCart RW, in the web and SDL front-ends - [#54](https://github.com/joamag/boytacean/issues/54)
 * ROMs can be flashed onto flash cartridges with a GBxCart RW, through a new command-line tool that also dumps cartridges - [#59](https://github.com/joamag/boytacean/issues/59)
+* Game Boy Advance emulation in the web and SDL front-ends, with the system picked from the ROM and the saves of its cartridges kept - [#41](https://github.com/joamag/boytacean/issues/41) [#42](https://github.com/joamag/boytacean/issues/42) [#43](https://github.com/joamag/boytacean/issues/43) [#44](https://github.com/joamag/boytacean/issues/44) [#45](https://github.com/joamag/boytacean/issues/45) [#49](https://github.com/joamag/boytacean/issues/49) [#50](https://github.com/joamag/boytacean/issues/50) [#51](https://github.com/joamag/boytacean/issues/51) [#52](https://github.com/joamag/boytacean/issues/52)
+* Game Boy Advance support in the core and React packages, with its shoulder buttons on the on-screen game pad and on the Q and W keys
 
 ### Changed
 
@@ -25,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+* SDL software rendering requiring an OpenGL-capable video driver
 * Batched CPU stepping is now bounded, instead of running an unlimited number of instructions
 * MBC2 RAM is mirrored across its whole address range, as in the real hardware
 * Loading of ROM + RAM cartridges, and of saves smaller than the RAM of their cartridge

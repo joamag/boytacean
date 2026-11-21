@@ -1,9 +1,16 @@
 .gamepad {
     align-items: center;
     display: flex;
+    flex-wrap: wrap;
     gap: 24px;
     justify-content: center;
     user-select: none;
+}
+
+.gamepad .gamepad-shoulders {
+    display: flex;
+    flex-basis: 100%;
+    justify-content: space-between;
 }
 
 .gamepad .gamepad-dpad {
@@ -65,7 +72,8 @@
     width: 48px;
 }
 
-.gamepad .gamepad-button.menu {
+.gamepad .gamepad-button.menu,
+.gamepad .gamepad-button.shoulder {
     font-size: 10px;
     height: 22px;
     width: 64px;
