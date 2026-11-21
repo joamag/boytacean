@@ -80,17 +80,16 @@ impl SdlSystem {
         // creates the window that is going to be used to display
         // the graphics of the emulator, this is going to be used
         // to display the graphics of the emulator
-        let window = video_subsystem
-            .window(
-                title,
-                (scale * width as f32) as u32,
-                (scale * height as f32) as u32,
-            )
-            .resizable()
-            .position_centered()
-            .opengl()
-            .build()
-            .unwrap();
+        let mut window = video_subsystem.window(
+            title,
+            (scale * width as f32) as u32,
+            (scale * height as f32) as u32,
+        );
+        window.resizable().position_centered();
+        if opengl {
+            window.opengl();
+        }
+        let window = window.build().unwrap();
 
         let (canvas, gl_context, window) = if opengl {
             let gl_context = window.gl_create_context().unwrap();

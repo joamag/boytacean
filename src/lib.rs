@@ -10,6 +10,8 @@ pub mod devices;
 pub mod diag;
 pub mod dma;
 pub mod gb;
+pub mod gba;
+pub mod gba_test;
 pub mod gen;
 pub mod info;
 pub mod inst;
@@ -22,8 +24,12 @@ pub mod ppu_fast;
 pub mod rom;
 pub mod serial;
 pub mod state;
+pub mod system;
 pub mod test;
 pub mod timer;
 
 #[cfg(feature = "python")]
 pub mod py;
+
+#[cfg(feature = "wasm")]
+pub use boytacean_cartridge;

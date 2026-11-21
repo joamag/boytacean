@@ -1,0 +1,17 @@
+[package]
+name = "boytacean-cartridge"
+description = "Cartridge dumping library for Boytacen."
+version = "0.14.0"
+authors = ["João Magalhães <joamag@gmail.com>"]
+license = "Apache-2.0"
+edition = "2021"
+rust-version = "1.86.0"
+
+[features]
+wasm = ["wasm-bindgen", "boytacean-common/wasm"]
+serial = ["serialport"]
+
+[dependencies]
+boytacean-common = { path = "../common", version = "0.14.0" }
+wasm-bindgen = { version = "0.2", optional = true }
+serialport = { version = "4", default-features = false, optional = true }

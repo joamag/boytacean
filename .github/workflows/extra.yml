@@ -17,7 +17,7 @@ jobs:
           rustup override set 1.86.0
           rustup default stable-msvc
       - name: Cache SDL build
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.vcpkg-root
@@ -25,10 +25,12 @@ jobs:
             ~/vcpkg
             target/vcpkg
           key: vcpkg-${{ runner.os }}-${{ hashFiles('frontends/sdl/Cargo.toml') }}
+          restore-keys: |
+            vcpkg-${{ runner.os }}-
       - name: Setup SDL
         run: |
           cd frontends/sdl
-          cargo install cargo-vcpkg && cargo vcpkg -v build
+          cargo install cargo-vcpkg --locked && cargo vcpkg -v build
       - name: Test Base
         run: cargo test
       - name: Build Base
@@ -38,7 +40,9 @@ jobs:
           cd frontends/sdl
           cargo test
       - name: Test All
-        run: cargo test --all
+        run: cargo test --all --features cartridge
+      - name: Test Profile
+        run: cargo test --features profile diag::tests
       - name: Build SDL
         run: |
           cd frontends/sdl
@@ -59,7 +63,7 @@ jobs:
           rustup install 1.86.0
           rustup override set 1.86.0
       - name: Cache SDL build
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.vcpkg-root
@@ -67,10 +71,12 @@ jobs:
             ~/vcpkg
             target/vcpkg
           key: vcpkg-${{ runner.os }}-${{ hashFiles('frontends/sdl/Cargo.toml') }}
+          restore-keys: |
+            vcpkg-${{ runner.os }}-
       - name: Setup SDL
         run: |
           cd frontends/sdl
-          cargo install cargo-vcpkg && cargo vcpkg -v build
+          cargo install cargo-vcpkg --locked && cargo vcpkg -v build
       - name: Test Base
         run: cargo test
       - name: Build Base
@@ -80,11 +86,13 @@ jobs:
           cd frontends/sdl
           cargo test
       - name: Test All
-        run: cargo test --all
+        run: cargo test --all --features cartridge
+      - name: Test Profile
+        run: cargo test --features profile diag::tests
       - name: Build SDL
         run: |
           cd frontends/sdl
-          cargo install cargo-vcpkg && cargo vcpkg -v build
+          cargo install cargo-vcpkg --locked && cargo vcpkg -v build
           cargo build --release
       - name: Build Libretro
         run: |

@@ -1,6 +1,6 @@
 import React, { CSSProperties, FC } from "react";
 
-import { useBoytacean } from "./boytacean-context";
+import { BoytaceanSystem, useBoytacean } from "./boytacean-context";
 
 import "./boytacean-gamepad.css";
 
@@ -41,6 +41,7 @@ const GamepadButton: FC<GamepadButtonProps> = ({
                 event.preventDefault();
                 release(button);
             }}
+            onTouchCancel={() => release(button)}
         >
             {label}
         </button>
@@ -54,53 +55,70 @@ const GamepadButton: FC<GamepadButtonProps> = ({
 export const BoytaceanGamepad: FC<BoytaceanGamepadProps> = ({
     className,
     style
-}) => (
-    <div className={["gamepad", className].join(" ")} style={style}>
-        <div className="gamepad-dpad">
-            <GamepadButton
-                button="ArrowUp"
-                label="▲"
-                className="gamepad-button up"
-            />
-            <GamepadButton
-                button="ArrowLeft"
-                label="◀"
-                className="gamepad-button left"
-            />
-            <GamepadButton
-                button="ArrowRight"
-                label="▶"
-                className="gamepad-button right"
-            />
-            <GamepadButton
-                button="ArrowDown"
-                label="▼"
-                className="gamepad-button down"
-            />
+}) => {
+    const { system } = useBoytacean();
+    return (
+        <div className={["gamepad", className].join(" ")} style={style}>
+            {system === BoytaceanSystem.GameBoyAdvance && (
+                <div className="gamepad-shoulders">
+                    <GamepadButton
+                        button="L"
+                        label="L"
+                        className="gamepad-button shoulder"
+                    />
+                    <GamepadButton
+                        button="R"
+                        label="R"
+                        className="gamepad-button shoulder"
+                    />
+                </div>
+            )}
+            <div className="gamepad-dpad">
+                <GamepadButton
+                    button="ArrowUp"
+                    label="▲"
+                    className="gamepad-button up"
+                />
+                <GamepadButton
+                    button="ArrowLeft"
+                    label="◀"
+                    className="gamepad-button left"
+                />
+                <GamepadButton
+                    button="ArrowRight"
+                    label="▶"
+                    className="gamepad-button right"
+                />
+                <GamepadButton
+                    button="ArrowDown"
+                    label="▼"
+                    className="gamepad-button down"
+                />
+            </div>
+            <div className="gamepad-actions">
+                <GamepadButton
+                    button="B"
+                    label="B"
+                    className="gamepad-button action"
+                />
+                <GamepadButton
+                    button="A"
+                    label="A"
+                    className="gamepad-button action"
+                />
+            </div>
+            <div className="gamepad-menu">
+                <GamepadButton
+                    button="Select"
+                    label="SELECT"
+                    className="gamepad-button menu"
+                />
+                <GamepadButton
+                    button="Start"
+                    label="START"
+                    className="gamepad-button menu"
+                />
+            </div>
         </div>
-        <div className="gamepad-actions">
-            <GamepadButton
-                button="B"
-                label="B"
-                className="gamepad-button action"
-            />
-            <GamepadButton
-                button="A"
-                label="A"
-                className="gamepad-button action"
-            />
-        </div>
-        <div className="gamepad-menu">
-            <GamepadButton
-                button="Select"
-                label="SELECT"
-                className="gamepad-button menu"
-            />
-            <GamepadButton
-                button="Start"
-                label="START"
-                className="gamepad-button menu"
-            />
-        </div>
-    </div>
-);
+    );
+};

@@ -1,6 +1,6 @@
 import { startApp } from "emukit";
 
-import { GameboyEmulator } from "./ts";
+import { GameboyEmulator, GbaEmulator, isGbaRom } from "./ts";
 
 /**
  * List of available background theme colors that can be used
@@ -36,6 +36,7 @@ const BACKGROUNDS = [
     const keyboard = ["1", "true", "True"].includes(
         params.get("keyboard") ?? ""
     );
+    const gba = ["1", "true", "True"].includes(params.get("gba") ?? "");
     const palette = params.get("palette") ?? settings["palette"] ?? undefined;
     const background =
         params.get("background") ??
@@ -46,13 +47,27 @@ const BACKGROUNDS = [
     const playlistUrl =
         params.get("playlist_url") ?? params.get("playlist") ?? undefined;
 
-    // creates the emulator structure and initializes the
-    // React app with both the parameters and the emulator
-    const emulator = new GameboyEmulator({
-        background: background,
-        debug: debug || verbose
-    });
-    if (playlistUrl) {
+    // determines if the emulator should run in GBA mode,
+    // either via the explicit ?gba=1 parameter or by
+    // examining the ROM URL file extension
+    const isGba = gba || isGbaRom(romUrl);
+
+    // creates the appropriate emulator structure based on the
+    // detected ROM type and initializes the React app with
+    // both the parameters and the emulator
+    const emulator: GameboyEmulator | GbaEmulator = isGba
+        ? new GbaEmulator({
+              background: background,
+              debug: debug || verbose
+          })
+        : new GameboyEmulator({
+              background: background,
+              debug: debug || verbose
+          });
+
+    // loads the playlist if a playlist URL was provided, this
+    // feature is only supported by the Game Boy emulator
+    if (playlistUrl && emulator instanceof GameboyEmulator) {
         emulator.playlistUrl = playlistUrl;
         await emulator.loadPlaylist();
     }
@@ -70,7 +85,7 @@ const BACKGROUNDS = [
         debug: debug,
         keyboard: keyboard,
         sections: sections,
-        palette: palette,
+        palette: isGba ? undefined : palette,
         background: background,
         backgrounds: BACKGROUNDS
     });
@@ -81,6 +96,10 @@ const BACKGROUNDS = [
 
     // starts the emulator with the provided ROM URL, using
     // the playlist default URL as fallback if available
-    const defaultRomUrl = romUrl ?? emulator.defaultRomUrl ?? undefined;
+    const defaultRomUrl =
+        romUrl ??
+        (emulator instanceof GameboyEmulator
+            ? (emulator.defaultRomUrl ?? undefined)
+            : undefined);
     await emulator.start({ romUrl: defaultRomUrl });
 })();

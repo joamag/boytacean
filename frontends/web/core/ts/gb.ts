@@ -21,6 +21,12 @@ import {
     Validation
 } from "emukit/logic";
 
+import {
+    CartridgeInfo,
+    CartridgePort,
+    CartridgeSave,
+    readCartridge
+} from "./cartridge";
 import { PALETTES, PALETTES_MAP } from "./palettes";
 import { defaultStorage, StorageAdapter } from "./storage";
 
@@ -479,7 +485,58 @@ export class GameBoyCore extends EmulatorLogic {
         this.trigger("booted");
     }
 
-    setRom(name: string, data: Uint8Array, cartridge: Cartridge) {
+    /**
+     * Loads the game in the cartridge of the GBxCart RW at the provided
+     * serial port, booting it as any other ROM.
+     *
+     * The save in the cartridge is only used when there's no save of
+     * the game in the storage, so that the progress made in the
+     * emulator is never lost.
+     *
+     * @param port The serial port of the GBxCart RW.
+     * @param onProgress The callback for the progress (from 0 to 1)
+     * of the read of the cartridge.
+     * @returns The information on the cartridge that has been loaded.
+     */
+    async loadCartridge(
+        port: CartridgePort,
+        onProgress?: (progress: number) => void
+    ): Promise<CartridgeInfo> {
+        const { dump, device } = await readCartridge(port, { onProgress });
+        try {
+            // pauses and boots without resuming the machine, so that the
+            // save in the cartridge (if used) is in place before the game
+            // starts running
+            await this.pause();
+            await this.boot({
+                romName: dump.title() || "cartridge.gb",
+                romData: dump.rom_data_eager(),
+                reuse: false,
+                restore: false
+            });
+            const title = this.cartridge?.title() ?? dump.title();
+            let save = CartridgeSave.None;
+            if (dump.has_ram()) {
+                save = CartridgeSave.Storage;
+                if (this.storage.getItem(title) === null) {
+                    this.gameBoy?.set_ram_data(dump.ram_data_eager());
+                    this.saveRam();
+                    save = CartridgeSave.Cartridge;
+                }
+            }
+            await this.resume();
+            return {
+                title: title,
+                device: device,
+                checksumValid: dump.checksum_valid(),
+                save: save
+            };
+        } finally {
+            dump.free();
+        }
+    }
+
+    setRom(name: string, data: Uint8Array, cartridge: Cartridge | null) {
         this.romName = name;
         this.romData = data;
         this.romSize = data.length;
@@ -889,14 +946,16 @@ export class GameBoyCore extends EmulatorLogic {
         // this should be an expensive operation, uses fallback
         // logic to determine if the new set of arguments for
         // wasm-bindgen should be used
+        //
+        // any failure of the resolved path falls back to the default
+        // resolution of wasm-bindgen, as the path is a best effort
+        // guess that does not hold in every bundler layout, while the
+        // default one is relative to the module of the binary itself
         try {
             await (wasmPath ? _wasm({ module_or_path: wasmPath }) : _wasm());
         } catch (err) {
-            if (err instanceof TypeError) {
-                await _wasm();
-            } else {
-                throw err;
-            }
+            if (!wasmPath) throw err;
+            await _wasm();
         }
 
         // in case the set hook flag is set, then tries to
@@ -915,17 +974,63 @@ export class GameBoyCore extends EmulatorLogic {
 
     /**
      * Resolves the default location of the WASM binary, which is the
-     * one distributed next to the `boytacean` package.
+     * one distributed by the `boytacean` package.
+     *
+     * The binary is looked up through the `boytacean` package itself,
+     * so that it's found under any `node_modules` layout, falling
+     * back to the sibling `lib` directory that is only present in the
+     * web front-end of the repository.
+     *
+     * Whenever neither of them applies null is returned, handing the
+     * resolution over to wasm-bindgen, which looks the binary up next
+     * to its own module and is therefore correct in the browser.
      *
      * @returns The URL of the WASM binary or null in case it cannot
      * be resolved in the current environment.
      */
     protected static defaultWasmPath(): string | null {
+        // asks the module resolver for the real location of the binary,
+        // this is the most reliable strategy but it's only available
+        // outside of the browser (eg: Node.js), where it also survives
+        // an arbitrary `node_modules` layout (hoisted, nested, ...)
         try {
-            return new URL("../../lib/boytacean_bg.wasm", import.meta.url).href;
+            const resolve = (
+                import.meta as ImportMeta & {
+                    resolve?: (specifier: string) => string;
+                }
+            ).resolve;
+            if (resolve) return resolve("boytacean/boytacean_bg.wasm");
         } catch (err) {
-            return null;
+            // ignores the error and moves to the next strategy, as the
+            // specifier may not be resolvable from this module
         }
+
+        // falls back to the `lib` directory that sits next to the core
+        // in the web front-end of the repository, where the WASM binary
+        // is generated by `wasm-pack` instead of being installed
+        //
+        // only a file URL is considered, as that is the shape of a
+        // module that runs straight from the repository, while a
+        // bundled or installed module would otherwise be handed a
+        // directory that does not exist in its own layout
+        //
+        // notice that no attempt is made to resolve the binary through
+        // a bare specifier, as bundlers resolve those at build time and
+        // the `boytacean` package is aliased to a local file in the web
+        // front-end, the browser case is instead covered by the default
+        // resolution of wasm-bindgen, which looks the binary up next to
+        // its own module and is reached whenever null is returned here
+        try {
+            const base = import.meta.url;
+            if (base.startsWith("file:") && !base.includes("/node_modules/")) {
+                return new URL("../../lib/boytacean_bg.wasm", base).href;
+            }
+        } catch (err) {
+            // ignores the error and hands the resolution over to
+            // wasm-bindgen by returning null below
+        }
+
+        return null;
     }
 
     protected static async fetchRom(

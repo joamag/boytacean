@@ -1,6 +1,7 @@
 import { StorageAdapter } from "boytacean-core";
 import React, { CSSProperties, FC, ReactNode } from "react";
 
+import { BoytaceanSystem } from "./boytacean-context";
 import { BoytaceanGamepad } from "./boytacean-gamepad";
 import { BoytaceanKeyboard } from "./boytacean-keyboard";
 import { BoytaceanProvider } from "./boytacean-provider";
@@ -24,9 +25,17 @@ type BoytaceanProps = {
     storage?: StorageAdapter;
 
     /**
-     * The name of the palette to be set at startup.
+     * The name of the palette to be set at startup, only used by the
+     * Game Boy system as the GBA has no palette support.
      */
     palette?: string;
+
+    /**
+     * The system to be emulated, defaults to the automatic mode in
+     * which it's inferred from the ROM, either from its extension or
+     * from its header.
+     */
+    system?: BoytaceanSystem;
 
     /**
      * The scale factor to be applied to the display, ignored in case
@@ -75,6 +84,7 @@ export const Boytacean: FC<BoytaceanProps> & {
     wasmPath,
     storage,
     palette,
+    system,
     scale = 3,
     keyboard = true,
     gamepad = true,
@@ -87,6 +97,7 @@ export const Boytacean: FC<BoytaceanProps> & {
         wasmPath={wasmPath}
         storage={storage}
         palette={palette}
+        system={system}
     >
         {children ?? (
             <div className={className} style={style}>

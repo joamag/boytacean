@@ -1,7 +1,46 @@
-import { GameBoyCore, releaseCore, StorageAdapter } from "boytacean-core";
-import React, { FC, ReactNode, useEffect, useMemo, useState } from "react";
+import {
+    GameBoyCore,
+    GbaCore,
+    isGbaRom,
+    releaseCore,
+    StorageAdapter
+} from "boytacean-core";
+import React, {
+    FC,
+    ReactNode,
+    useEffect,
+    useMemo,
+    useRef,
+    useState
+} from "react";
 
-import { BoytaceanContext, BoytaceanContextValue } from "./boytacean-context";
+import {
+    BoytaceanContext,
+    BoytaceanContextValue,
+    BoytaceanSystem
+} from "./boytacean-context";
+
+/**
+ * Resolves the system to be emulated from the requested one and the
+ * ROM that is going to be loaded, inferring it from the extension of
+ * the ROM, or from its header when its data is available, whenever
+ * the automatic mode is used.
+ *
+ * @param system The system that has been requested by the caller.
+ * @param rom The name (or URL) of the ROM that is going to be loaded.
+ * @param data The contents of the ROM, in case they are available.
+ * @returns The concrete system to be emulated.
+ */
+export const resolveSystem = (
+    system: BoytaceanSystem,
+    rom?: string,
+    data?: Uint8Array
+): BoytaceanSystem.GameBoy | BoytaceanSystem.GameBoyAdvance => {
+    if (system !== BoytaceanSystem.Auto) return system;
+    return isGbaRom(rom, data)
+        ? BoytaceanSystem.GameBoyAdvance
+        : BoytaceanSystem.GameBoy;
+};
 
 type BoytaceanProviderProps = {
     /**
@@ -23,66 +62,186 @@ type BoytaceanProviderProps = {
     storage?: StorageAdapter;
 
     /**
-     * The name of the palette to be set at startup.
+     * The name of the palette to be set at startup, only used by the
+     * Game Boy system as the GBA has no palette support.
      */
     palette?: string;
+
+    /**
+     * The system to be emulated, defaults to the automatic mode in
+     * which it's inferred from the ROM, either from its extension or
+     * from its header.
+     */
+    system?: BoytaceanSystem;
 
     children?: ReactNode;
 };
 
+type RomRequest = {
+    source?: string;
+    name: string;
+    data: Uint8Array;
+    resolve: () => void;
+    reject: (error: Error) => void;
+};
+
 /**
- * Provides a Game Boy core to the components under it, taking care
+ * Provides an emulator core to the components under it, taking care
  * of the complete lifecycle of the emulator, meaning that the core
  * is booted on mount and stopped on unmount.
+ *
+ * The core that is built depends on the system that is being
+ * emulated, meaning that a new one is created whenever the system
+ * changes, either explicitly or through the ROM that is loaded,
+ * while a ROM of the same system is booted on the running core.
  */
 export const BoytaceanProvider: FC<BoytaceanProviderProps> = ({
     rom,
     wasmPath,
     storage,
     palette,
+    system = BoytaceanSystem.Auto,
     children
 }) => {
-    const [core] = useState(
-        () => new GameBoyCore({ wasmPath: wasmPath, storage: storage })
+    const [request, setRequest] = useState<RomRequest | null>(null);
+    const pending = useRef<RomRequest | null>(null);
+    const started = useRef<GameBoyCore | GbaCore | null>(null);
+    const currentRequest = request?.source === rom ? request : null;
+
+    // the system is only resolved again when the ROM changes, as the
+    // validation of its header copies the complete ROM into the WASM
+    // memory, which is too expensive to be done on every render
+    const resolved = useMemo(
+        () =>
+            resolveSystem(
+                system,
+                currentRequest?.name ?? rom,
+                currentRequest?.data
+            ),
+        [system, rom, currentRequest]
+    );
+    const core = useMemo<GameBoyCore | GbaCore>(
+        () =>
+            resolved === BoytaceanSystem.GameBoyAdvance
+                ? new GbaCore({ wasmPath: wasmPath, storage: storage })
+                : new GameBoyCore({ wasmPath: wasmPath, storage: storage }),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [resolved]
     );
 
     useEffect(() => {
+        return () => {
+            pending.current?.reject(new Error("ROM loading was cancelled"));
+            pending.current = null;
+        };
+    }, []);
+
+    useEffect(() => {
+        return () => {
+            core.stop();
+            if (core instanceof GameBoyCore) releaseCore(core);
+            if (started.current === core) started.current = null;
+        };
+    }, [core]);
+
+    useEffect(() => {
         let disposed = false;
+        if (request && !currentRequest) setRequest(null);
+
+        const onBooted = () => {
+            if (disposed) return;
+            currentRequest?.resolve();
+            if (pending.current === currentRequest) pending.current = null;
+        };
 
         const boot = async () => {
-            await core.init();
+            // in case the main loop of the core is already running the
+            // WASM module is loaded and the ROM is booted directly on it,
+            // avoiding both a second loop and the rebuild of the core
+            const running = started.current === core;
+            if (!running) await core.init();
 
             // in case the component has been unmounted while the WASM
             // module was still loading then avoids the boot operation
             if (disposed) return;
-            if (palette) core.palette = palette;
+
+            // the palette is only supported by the Game Boy system,
+            // as the GBA drives the colors from the ROM itself
+            if (palette && core instanceof GameBoyCore) {
+                core.palette = palette;
+            }
+
+            if (currentRequest) {
+                core.setRom(currentRequest.name, currentRequest.data, null);
+                core.bind("booted", onBooted);
+            } else if (!rom) {
+                return;
+            }
+
+            if (running) {
+                await core.boot({
+                    loadRom: true,
+                    romPath: currentRequest ? undefined : rom
+                });
+                return;
+            }
 
             // starts the main loop of the emulator, notice that this
-            // promise is only settled once the emulator is stopped
-            await core.start({ romUrl: rom });
+            // promise is only settled once the emulator is stopped, in
+            // case the start fails the loop is not running, meaning that
+            // the next ROM has to start it again
+            started.current = core;
+            try {
+                await core.start({ romUrl: currentRequest ? undefined : rom });
+            } catch (error) {
+                if (started.current === core) started.current = null;
+                throw error;
+            }
         };
-        boot();
+        boot().catch((error: Error) => {
+            if (disposed) return;
+            if (currentRequest) currentRequest.reject(error);
+            else console.error(error);
+            if (pending.current === currentRequest) pending.current = null;
+        });
 
         return () => {
             disposed = true;
-            core.stop();
-            releaseCore(core);
+            core.unbind("booted", onBooted);
+            if (pending.current === currentRequest) {
+                currentRequest?.reject(new Error("ROM loading was cancelled"));
+                pending.current = null;
+            }
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [core, rom]);
+    }, [core, rom, currentRequest]);
 
     const value = useMemo<BoytaceanContextValue>(
         () => ({
             core: core,
+            system: resolved,
             play: () => core.resume(),
             pause: () => core.pause(),
             reset: () => core.reset(),
             loadRom: (name: string, data: Uint8Array) =>
-                core.boot({ romName: name, romData: data, reuse: false }),
+                new Promise<void>((resolve, reject) => {
+                    pending.current?.reject(
+                        new Error("ROM loading was cancelled")
+                    );
+                    const request = {
+                        source: rom,
+                        name,
+                        data,
+                        resolve,
+                        reject
+                    };
+                    pending.current = request;
+                    setRequest(request);
+                }),
             press: (key: string) => core.keyPress(key),
             release: (key: string) => core.keyLift(key)
         }),
-        [core]
+        [core, resolved, rom]
     );
 
     return (

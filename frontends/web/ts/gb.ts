@@ -13,10 +13,11 @@ import {
 } from "emukit";
 import { loadAsync } from "jszip";
 
-import { GameBoyCore } from "../core";
+import { GameBoyCore, hasCartridgeSupport } from "../core";
 import { Info } from "../lib/boytacean";
 import info from "../package.json";
 import {
+    CartridgeSection,
     DebugAudio,
     DebugGeneral,
     DebugSettings,
@@ -27,6 +28,7 @@ import {
     TestSection
 } from "../react";
 
+import { GbaEmulator } from "./gba";
 import { fetchPlaylist, Playlist } from "./playlist";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -164,6 +166,13 @@ export class GameboyEmulator extends GameBoyCore implements Emulator {
                 node: SerialSection({ emulator: this })
             }
         ];
+        if (hasCartridgeSupport()) {
+            _sections.push({
+                name: "Cartridge",
+                icon: require("../res/cartridge.svg"),
+                node: CartridgeSection({ emulator: this })
+            });
+        }
         if (this._playlistUrl) {
             _sections.push({
                 name: "Playlist",
@@ -315,7 +324,7 @@ export class GameboyEmulator extends GameBoyCore implements Emulator {
 
 declare global {
     interface Window {
-        emulator: GameboyEmulator;
+        emulator: GameboyEmulator | GbaEmulator;
     }
 
     interface Console {

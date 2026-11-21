@@ -1,10 +1,20 @@
-import { GameBoyCore } from "boytacean-core";
+import { GameBoyCore, GbaCore } from "boytacean-core";
 import { createContext, useContext } from "react";
 
 /**
- * The stable set of values exposed by the Boytacean context, the
- * identity of this structure is kept stable for the complete
- * lifetime of the provider, meaning that consumers of it are never
+ * Enumeration with the complete set of systems that can be emulated
+ * by the component, used to select the core to be built.
+ */
+export enum BoytaceanSystem {
+    Auto = "auto",
+    GameBoy = "gb",
+    GameBoyAdvance = "gba"
+}
+
+/**
+ * The set of values exposed by the Boytacean context, the identity
+ * of this structure only changes with either the ROM property or the
+ * system that is emulated, meaning that consumers of it are never
  * re-rendered because of emulation activity.
  *
  * High frequency information (eg: the frame buffer) is intentionally
@@ -16,7 +26,13 @@ export type BoytaceanContextValue = {
      * The core instance that is driving the emulation, provides
      * access to the complete set of low level operations.
      */
-    core: GameBoyCore;
+    core: GameBoyCore | GbaCore;
+
+    /**
+     * The system that is currently being emulated by the core, as
+     * resolved from the `system` property and the ROM.
+     */
+    system: BoytaceanSystem.GameBoy | BoytaceanSystem.GameBoyAdvance;
 
     /**
      * Resumes the emulation in case it's currently paused.

@@ -19,6 +19,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 *
 
+## [0.14.0] - 2026-11-21
+
+### Added
+
+* Documentation for the React package, covering components, hooks and keys with a complete quick start
+* Games can be loaded straight from their cartridge with a GBxCart RW, in the web and SDL front-ends - [#54](https://github.com/joamag/boytacean/issues/54)
+* ROMs can be flashed onto flash cartridges with a GBxCart RW, through a new command-line tool that also dumps cartridges - [#59](https://github.com/joamag/boytacean/issues/59)
+* Game Boy Advance emulation in the web and SDL front-ends, with the system picked from the ROM and the saves of its cartridges kept - [#41](https://github.com/joamag/boytacean/issues/41) [#42](https://github.com/joamag/boytacean/issues/42) [#43](https://github.com/joamag/boytacean/issues/43) [#44](https://github.com/joamag/boytacean/issues/44) [#45](https://github.com/joamag/boytacean/issues/45) [#49](https://github.com/joamag/boytacean/issues/49) [#50](https://github.com/joamag/boytacean/issues/50) [#51](https://github.com/joamag/boytacean/issues/51) [#52](https://github.com/joamag/boytacean/issues/52)
+* Game Boy Advance support in the core and React packages, with its shoulder buttons on the on-screen game pad and on the Q and W keys
+
+### Changed
+
+* Faster and more resilient release builds through caching of native dependencies
+* Smaller and faster pixel packed frame buffers, which no longer carry two thirds of unused space
+* Faster pixel drawing, worth up to 10% more frames per second in Game Boy Color games
+* Frames are converted to the 15 bit color format in about half the time
+* Faster audio emulation, worth up to 18% more frames per second in games with sound
+* Frames are handed to the native and Python front-ends more than twice as fast on the original Game Boy
+* Faster CPU emulation, worth up to 7% more frames per second natively and up to 24% on the web
+
+### Fixed
+
+* SDL software rendering requiring an OpenGL-capable video driver
+* Batched CPU stepping is now bounded, instead of running an unlimited number of instructions
+* MBC2 RAM is mirrored across its whole address range, as in the real hardware
+* Loading of ROM + RAM cartridges, and of saves smaller than the RAM of their cartridge
+* Loading of the default WASM binary when the core package is installed from npm
+* Build of the web front-end after the change in the WASM binary resolution
+* Builds on older Rust versions after dependency releases raised their minimum supported version
+* Builds on Rust 1.86 after a new release of a Unicode dependency, which is no longer used
+* Web front-end builds in GitHub Actions after a new release of a build dependency rejected the cache location of the build containers
+* SDL, documentation, Windows and Mac builds in GitHub Actions after new releases of the dependencies of a build tool required a newer Rust version
+* Nightly documentation builds in GitHub Actions after a new Clippy check on the stack usage of debug builds
+
 ## [0.13.2] - 2026-07-28
 
 ### Added

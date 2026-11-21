@@ -89,6 +89,8 @@ jobs:
         node-version: ["18"]
     runs-on: ubuntu-latest
     container: rust:${{ matrix.rust-version }}
+    env:
+      SWC_NATIVE_BINDING_CACHE: /tmp/swc
     steps:
       - name: Checkout code from repository
         uses: actions/checkout@v6
@@ -113,7 +115,7 @@ jobs:
       - name: Build WASM Web binary
         run: wasm-pack build --release --target=web --out-dir=frontends/web/lib -- --features wasm
       - name: Install Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node-version }}
       - name: Build and lint Web code
@@ -122,6 +124,50 @@ jobs:
         run: |
           cd frontends/web/core && npm install --no-save ../lib && npm install && npm test
           cd ../component && npm install && npm test
+  build-python:
+    name: Build Python
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        rust-version: [
+          "1.86.0",
+          "1.87.0",
+          "1.88.0",
+          "1.89.0",
+          "1.90.0",
+          "1.91.0",
+          "latest"
+        ]
+    runs-on: ubuntu-latest
+    container: rust:${{ matrix.rust-version }}
+    steps:
+      - name: Checkout code from repository
+        uses: actions/checkout@v6
+      - name: Install Dependencies
+        run: |
+          apt-get update
+          apt-get install -y -q python3 python3-venv
+      - name: Install Rust components
+        run: |
+          rustup component add rustfmt
+          rustup component add clippy
+      - name: Print Rust information
+        run: rustc --version
+      - name: Print Python information
+        run: python3 --version
+      - name: Verify Rust code format
+        run: cargo fmt --all -- --check
+      - name: Verify Rust code linting
+        run: cargo clippy --features python -- -D warnings -A unknown-lints
+      - name: Install Python dependencies
+        run: |
+          python3 -m venv venv
+          venv/bin/pip install --upgrade pip
+          venv/bin/pip install -r requirements.txt pytest numpy
+      - name: Build Python library
+        run: venv/bin/pip install --no-build-isolation -e .
+      - name: Run Python unit tests
+        run: venv/bin/pytest
   build-sdl:
     name: Build SDL
     timeout-minutes: 30
@@ -152,7 +198,7 @@ jobs:
       - name: Print Rust information
         run: rustc --version
       - name: Cache SDL build
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.vcpkg-root
@@ -160,8 +206,11 @@ jobs:
             ~/vcpkg
             target/vcpkg
           key: vcpkg-${{ runner.os }}-${{ matrix.rust-version }}-${{ hashFiles('frontends/sdl/Cargo.toml') }}
+          restore-keys: |
+            vcpkg-${{ runner.os }}-${{ matrix.rust-version }}-
+            vcpkg-${{ runner.os }}-
       - name: Install SDL dependencies
-        run: cd frontends/sdl && cargo install cargo-vcpkg && cargo vcpkg -v build
+        run: cd frontends/sdl && cargo install cargo-vcpkg --locked && cargo vcpkg -v build
       - name: Verify Rust code format
         run: cd frontends/sdl && cargo fmt --all -- --check
       - name: Verify Rust code linting
@@ -169,7 +218,9 @@ jobs:
       - name: Run unit tests
         run: cd frontends/sdl && cargo test
       - name: Run all unit tests
-        run: cargo test --all
+        run: cargo test --all --features cartridge
+      - name: Run profile unit tests
+        run: cargo test --features profile diag::tests
       - name: Build development version
         run: cd frontends/sdl && cargo build
       - name: Build release version
@@ -315,7 +366,7 @@ jobs:
       - name: Print Rust information
         run: rustc --version
       - name: Cache SDL build
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.vcpkg-root
@@ -323,8 +374,11 @@ jobs:
             ~/vcpkg
             target/vcpkg
           key: vcpkg-${{ runner.os }}-${{ matrix.rust-image }}-${{ hashFiles('frontends/sdl/Cargo.toml') }}
+          restore-keys: |
+            vcpkg-${{ runner.os }}-${{ matrix.rust-image }}-
+            vcpkg-${{ runner.os }}-
       - name: Install SDL dependencies
-        run: cd frontends/sdl && cargo install cargo-vcpkg && cargo vcpkg -v build
+        run: cd frontends/sdl && cargo install cargo-vcpkg --locked && cargo vcpkg -v build
       - name: Verify Rust code format
         run: cd frontends/sdl && cargo fmt --all -- --check
       - name: Verify Rust code linting
@@ -335,4 +389,7 @@ jobs:
         run: cargo doc --all --all-features
         env:
           PYO3_USE_ABI3_FORWARD_COMPATIBILITY: 1
+        if: matrix.rust-image == 'rustlang/rust:nightly'
+      - name: Run all unit tests with SIMD
+        run: cargo test --all --features simd
         if: matrix.rust-image == 'rustlang/rust:nightly'

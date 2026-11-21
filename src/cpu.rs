@@ -27,6 +27,7 @@ use crate::{
     inst::{EXTENDED, INSTRUCTIONS},
     mmu::Mmu,
     pad::Pad,
+    panic_gb,
     ppu::Ppu,
     serial::Serial,
     state::{StateComponent, StateFormat},
@@ -37,6 +38,29 @@ pub const PREFIX: u8 = 0xcb;
 
 pub type Instruction = &'static (fn(&mut Cpu), u8, &'static str);
 
+/// Represents the Game Boy CPU (Sharp LR35902) and controls all of
+/// the logic behind the fetching, decoding and execution of the
+/// instructions. The CPU is responsible for driving the emulation,
+/// as the remaining components are clocked from the cycles it takes.
+///
+/// Should store the complete set of registers and flags together
+/// with the MMU (Memory Management Unit), used for all the memory
+/// bus access operations. The instruction set implementation lives
+/// in the `inst` module.
+///
+/// Current implementation is compatible with both DMG and CGB.
+///
+/// # Basic usage
+///
+/// ```rust
+/// use boytacean::cpu::Cpu;
+/// let mut cpu = Cpu::default();
+/// cpu.boot();
+/// cpu.mmu.allocate_default();
+/// cpu.pc = 0xc000;
+/// let cycles = cpu.clock();
+/// assert_eq!(cycles, 4);
+/// ```
 pub struct Cpu {
     pub pc: u16,
     pub sp: u16,
@@ -195,106 +219,68 @@ impl Cpu {
         }
 
         // checks the IME (interrupt master enable) is enabled and then checks
-        // if there's any interrupt to be handled, in case there's one, tries
-        // to check which one should be handled and then handles it
+        // if there's any interrupt to be handled, in case there's one, the one
+        // with the highest priority (lowest bit) is handled, sharing the steps
+        // that are common to every interrupt so that the dispatch stays small
         // this code assumes that the're no more that one interrupt triggered
         // per clock cycle, this is a limitation of the current implementation
         if self.ime && pending != 0 {
-            if pending & 0x01 == 0x01 {
-                debugln!("Going to run V-Blank interrupt handler (0x40)");
+            self.disable_int();
+            self.push_word(pc);
 
-                self.disable_int();
-                self.push_word(pc);
-                self.pc = 0x40;
+            // in case the CPU is currently halted waiting
+            // for an interrupt, releases it
+            self.halted = false;
 
-                // notifies the MMU about the V-Blank interrupt,
-                // this may trigger some additional operations
-                self.mmu.vblank();
+            match pending.trailing_zeros() {
+                0 => {
+                    debugln!("Going to run V-Blank interrupt handler (0x40)");
+                    self.pc = 0x40;
 
-                // acknowledges that the V-Blank interrupt has been
-                // properly handled
-                self.mmu.ppu().ack_vblank();
+                    // notifies the MMU about the V-Blank interrupt,
+                    // this may trigger some additional operations
+                    self.mmu.vblank();
 
-                // in case the CPU is currently halted waiting
-                // for an interrupt, releases it
-                if self.halted {
-                    self.halted = false;
+                    // acknowledges that the V-Blank interrupt has been
+                    // properly handled
+                    self.mmu.ppu().ack_vblank();
                 }
+                1 => {
+                    debugln!("Going to run LCD STAT interrupt handler (0x48)");
+                    self.pc = 0x48;
 
-                return 20;
-            } else if pending & 0x02 == 0x02 {
-                debugln!("Going to run LCD STAT interrupt handler (0x48)");
-
-                self.disable_int();
-                self.push_word(pc);
-                self.pc = 0x48;
-
-                // acknowledges that the STAT interrupt has been
-                // properly handled
-                self.mmu.ppu().ack_stat();
-
-                // in case the CPU is currently halted waiting
-                // for an interrupt, releases it
-                if self.halted {
-                    self.halted = false;
+                    // acknowledges that the STAT interrupt has been
+                    // properly handled
+                    self.mmu.ppu().ack_stat();
                 }
+                2 => {
+                    debugln!("Going to run Timer interrupt handler (0x50)");
+                    self.pc = 0x50;
 
-                return 20;
-            } else if pending & 0x04 == 0x04 {
-                debugln!("Going to run Timer interrupt handler (0x50)");
-
-                self.disable_int();
-                self.push_word(pc);
-                self.pc = 0x50;
-
-                // acknowledges that the timer interrupt has been
-                // properly handled
-                self.mmu.timer().ack_tima();
-
-                // in case the CPU is currently halted waiting
-                // for an interrupt, releases it
-                if self.halted {
-                    self.halted = false;
+                    // acknowledges that the timer interrupt has been
+                    // properly handled
+                    self.mmu.timer().ack_tima();
                 }
+                3 => {
+                    debugln!("Going to run Serial interrupt handler (0x58)");
+                    self.pc = 0x58;
 
-                return 20;
-            } else if pending & 0x08 == 0x08 {
-                debugln!("Going to run Serial interrupt handler (0x58)");
-
-                self.disable_int();
-                self.push_word(pc);
-                self.pc = 0x58;
-
-                // acknowledges that the serial interrupt has been
-                // properly handled
-                self.mmu.serial().ack_serial();
-
-                // in case the CPU is currently halted waiting
-                // for an interrupt, releases it
-                if self.halted {
-                    self.halted = false;
+                    // acknowledges that the serial interrupt has been
+                    // properly handled
+                    self.mmu.serial().ack_serial();
                 }
+                4 => {
+                    debugln!("Going to run JoyPad interrupt handler (0x60)");
+                    self.pc = 0x60;
 
-                return 20;
-            } else if pending & 0x10 == 0x10 {
-                debugln!("Going to run JoyPad interrupt handler (0x60)");
-
-                self.disable_int();
-                self.push_word(pc);
-                self.pc = 0x60;
-
-                // acknowledges that the pad interrupt has been
-                // properly handled
-                self.mmu.pad().ack_pad();
-
-                // in case the CPU is currently halted waiting
-                // for an interrupt, releases it
-                if self.halted {
-                    self.halted = false;
+                    // acknowledges that the pad interrupt has been
+                    // properly handled
+                    self.mmu.pad().ack_pad();
                 }
-
-                return 20;
+                bit => panic_gb!("Invalid interrupt bit: {}", bit),
             }
+
+            return 20;
         }
 
         // in case the CPU is currently in the halted state
@@ -977,6 +963,107 @@ mod tests {
         assert_eq!(cpu.sp, 0xfffc);
         assert!(!cpu.mmu.ppu().int_vblank());
         assert!(!cpu.ime());
+        assert_eq!(cpu.mmu.read(0xfffc), 0x00);
+        assert_eq!(cpu.mmu.read(0xfffd), 0xc0);
+    }
+
+    /// Tests that every interrupt is dispatched to its own handler
+    /// address, acknowledging only its own request flag.
+    #[test]
+    fn test_int_handled_vectors() {
+        for (bit, address) in [
+            (0x01, 0x40),
+            (0x02, 0x48),
+            (0x04, 0x50),
+            (0x08, 0x58),
+            (0x10, 0x60),
+        ] {
+            let mut cpu = Cpu::default();
+            cpu.boot();
+            cpu.mmu.allocate_default();
+
+            cpu.pc = 0xc000;
+            cpu.sp = 0xfffe;
+            cpu.mmu.write(0xc000, 0x00);
+            cpu.mmu.ie = 0x1f;
+            cpu.mmu.ppu().set_int_vblank(bit == 0x01);
+            cpu.mmu.ppu().set_int_stat(bit == 0x02);
+            cpu.mmu.timer().set_int_tima(bit == 0x04);
+            cpu.mmu.serial().set_int_serial(bit == 0x08);
+            cpu.mmu.pad().set_int_pad(bit == 0x10);
+            cpu.enable_int();
+
+            let cycles = cpu.clock();
+            assert_eq!(cycles, 20);
+            assert_eq!(cpu.pc, address);
+            assert_eq!(cpu.sp, 0xfffc);
+            assert!(!cpu.ime());
+            assert_eq!(cpu.mmu.read(0xfffc), 0x00);
+            assert_eq!(cpu.mmu.read(0xfffd), 0xc0);
+            assert!(!cpu.mmu.ppu().int_vblank());
+            assert!(!cpu.mmu.ppu().int_stat());
+            assert!(!cpu.mmu.timer().int_tima());
+            assert!(!cpu.mmu.serial().int_serial());
+            assert!(!cpu.mmu.pad().int_pad());
+        }
+    }
+
+    /// Tests that, with several interrupts pending, the one with the
+    /// highest priority (lowest bit) is handled first, leaving the
+    /// others pending for when interrupts are enabled again.
+    #[test]
+    fn test_int_handled_priority() {
+        let mut cpu = Cpu::default();
+        cpu.boot();
+        cpu.mmu.allocate_default();
+
+        cpu.pc = 0xc000;
+        cpu.sp = 0xfffe;
+        cpu.mmu.write(0xc000, 0x00);
+        cpu.mmu.ie = 0x1e;
+        cpu.mmu.ppu().set_int_vblank(true);
+        cpu.mmu.timer().set_int_tima(true);
+        cpu.mmu.pad().set_int_pad(true);
+        cpu.enable_int();
+
+        // the V-Blank interrupt is not enabled in IE, so the timer
+        // one is the pending interrupt with the highest priority
+        let cycles = cpu.clock();
+        assert_eq!(cycles, 20);
+        assert_eq!(cpu.pc, 0x50);
+        assert!(!cpu.mmu.timer().int_tima());
+        assert!(cpu.mmu.ppu().int_vblank());
+        assert!(cpu.mmu.pad().int_pad());
+
+        cpu.enable_int();
+        let cycles = cpu.clock();
+        assert_eq!(cycles, 20);
+        assert_eq!(cpu.pc, 0x60);
+        assert_eq!(cpu.sp, 0xfffa);
+        assert!(!cpu.mmu.pad().int_pad());
+        assert!(cpu.mmu.ppu().int_vblank());
+    }
+
+    /// Tests that the CPU is released from the halted state when an
+    /// interrupt is handled with IME enabled.
+    #[test]
+    fn test_int_handled_halted() {
+        let mut cpu = Cpu::default();
+        cpu.boot();
+        cpu.mmu.allocate_default();
+
+        cpu.pc = 0xc000;
+        cpu.sp = 0xfffe;
+        cpu.mmu.ie = 0x04;
+        cpu.mmu.timer().set_int_tima(true);
+        cpu.enable_int();
+        cpu.halted = true;
+
+        let cycles = cpu.clock();
+        assert_eq!(cycles, 20);
+        assert_eq!(cpu.pc, 0x50);
+        assert!(!cpu.halted);
+        assert!(!cpu.mmu.timer().int_tima());
         assert_eq!(cpu.mmu.read(0xfffc), 0x00);
         assert_eq!(cpu.mmu.read(0xfffd), 0xc0);
     }
