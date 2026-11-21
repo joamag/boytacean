@@ -920,10 +920,13 @@ impl Cartridge {
     /// Sets the RAM data of the cartridge, keeping at least the size of
     /// the allocated RAM, as a save can be smaller than it (eg: the 512
     /// bytes of the MBC2) and the RAM is accessed without bound checks.
+    /// The data is copied into the buffer of the RAM, so that the pointers
+    /// to it (eg: the one of a libretro frontend) remain valid.
     pub fn set_ram_data(&mut self, data: &[u8]) {
-        let mut ram_data = data.to_vec();
-        ram_data.resize(max(data.len(), self.ram_data.len()), 0x00);
-        self.ram_data = ram_data;
+        let length = max(data.len(), self.ram_data.len());
+        self.ram_data.clear();
+        self.ram_data.extend_from_slice(data);
+        self.ram_data.resize(length, 0x00);
     }
 
     pub fn clear_ram_data(&mut self) {
@@ -1412,5 +1415,23 @@ mod tests {
         assert_eq!(&rom.ram_data()[..2048], &[0x01; 2048]);
         assert_eq!(&rom.ram_data()[2048..], &[0x00; 6144]);
         assert_eq!(rom.read(0xbfff), 0x00);
+    }
+
+    #[test]
+    fn test_set_ram_data_buffer() {
+        // the RAM keeps its buffer when set, so that the pointers to it
+        // (eg: the one of a libretro frontend) remain valid
+        let mut rom = Cartridge::new();
+        rom.set_data(&vec![0; 0x8000]).unwrap();
+        let buffer = rom.ram_data().as_ptr();
+        rom.set_ram_data(&[0x01; 8192]);
+        assert_eq!(rom.ram_data().as_ptr(), buffer);
+        assert_eq!(rom.ram_data(), &vec![0x01; 8192]);
+
+        rom.set_ram_data(&[0x02; 2048]);
+        assert_eq!(rom.ram_data().as_ptr(), buffer);
+        assert_eq!(rom.ram_data().len(), 8192);
+        assert_eq!(&rom.ram_data()[..2048], &[0x02; 2048]);
+        assert_eq!(&rom.ram_data()[2048..], &[0x00; 6144]);
     }
 }
