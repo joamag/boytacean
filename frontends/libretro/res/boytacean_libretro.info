@@ -1,10 +1,10 @@
 # Software Information
 display_name = "Nintendo - Game Boy / Color (Boytacean)"
-authors ="João Magalhães"
+authors = "João Magalhães"
 supported_extensions = "gb|gbc"
 corename = "Boytacean"
 categories = "Emulator"
-license = "Apache-2."
+license = "Apache-2.0"
 permissions = ""
 display_version = "0.14.0"
 
