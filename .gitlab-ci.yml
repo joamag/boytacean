@@ -59,6 +59,7 @@ build-wasm:
     - cd frontends/web && npm install && NODE_ENV=production npm run build && npm run lint
     - cd core && npm install --no-save ../lib && npm install && npm test && cd ..
     - cd component && npm install && npm test && cd ..
+    - npm test
   artifacts:
     paths:
       - frontends/web/dist

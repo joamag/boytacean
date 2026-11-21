@@ -124,6 +124,7 @@ jobs:
         run: |
           cd frontends/web/core && npm install --no-save ../lib && npm install && npm test
           cd ../component && npm install && npm test
+          cd .. && npm test
   build-python:
     name: Build Python
     timeout-minutes: 30
