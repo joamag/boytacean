@@ -13,7 +13,7 @@ pub const RETRO_PIXEL_FORMAT_XRGB8888: usize = 1;
 pub const RETRO_PIXEL_FORMAT_RGB565: usize = 2;
 
 pub const RETRO_MEMORY_SAVE_RAM: u32 = 0;
-pub const RETRO_MEMORY_SYSTEM_RAM: u32 = 0;
+pub const RETRO_MEMORY_SYSTEM_RAM: u32 = 2;
 
 pub const RETRO_DEVICE_JOYPAD: usize = 1;
 
