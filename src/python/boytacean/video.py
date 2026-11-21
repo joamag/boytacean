@@ -7,7 +7,10 @@ from tempfile import mkdtemp
 
 from os.path import exists, join
 
-from PIL.Image import Image
+try:
+    from PIL.Image import Image
+except ImportError:
+    Image = Any
 
 from .boytacean import (
     DISPLAY_WIDTH,
