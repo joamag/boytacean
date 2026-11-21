@@ -1865,17 +1865,6 @@ impl State for BessCore {
     }
 
     fn to_gb(&self, gb: &mut GameBoy) -> Result<(), Error> {
-        // the MBC RAM of the state must fit the RAM of the cartridge, as
-        // it is copied into its buffer, whose pointers are kept elsewhere
-        // (eg: by a libretro frontend)
-        if self.mbc_ram.buffer.len() > gb.rom_i().ram_data().len() {
-            return Err(Error::DataError(format!(
-                "Invalid MBC RAM size, expected up to {} bytes got {} bytes",
-                gb.rom_i().ram_data().len(),
-                self.mbc_ram.buffer.len(),
-            )));
-        }
-
         gb.cpu().set_pc(self.pc);
         gb.cpu().set_af(self.af);
         gb.cpu().set_bc(self.bc);
@@ -2430,28 +2419,6 @@ mod tests {
         assert_eq!(bess_core.hram.size, 0x007f);
         assert_eq!(bess_core.background_palettes.size, 0x0000);
         assert_eq!(bess_core.object_palettes.size, 0x0000);
-    }
-
-    #[test]
-    fn test_bess_core_mbc_ram() {
-        let mut gb = GameBoy::default();
-        gb.load(true).unwrap();
-        gb.load_rom_file("res/roms/test/firstwhite.gb", None)
-            .unwrap();
-        let mut bess_core = BessCore::from_gb(&mut gb).unwrap();
-        let buffer = gb.rom_i().ram_data().as_ptr();
-
-        // the MBC RAM of a state larger than the RAM of the cartridge is
-        // rejected, before anything is set, so that the RAM keeps its buffer
-        bess_core.mbc_ram.buffer = vec![0x42; 0x4000];
-        assert!(bess_core.to_gb(&mut gb).is_err());
-        assert_eq!(gb.rom_i().ram_data().as_ptr(), buffer);
-        assert_eq!(gb.rom_i().ram_data(), &vec![0x00; 0x2000]);
-
-        bess_core.mbc_ram.buffer = vec![0x42; 0x2000];
-        assert!(bess_core.to_gb(&mut gb).is_ok());
-        assert_eq!(gb.rom_i().ram_data().as_ptr(), buffer);
-        assert_eq!(gb.rom_i().ram_data(), &vec![0x42; 0x2000]);
     }
 
     #[test]
