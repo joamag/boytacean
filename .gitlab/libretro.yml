@@ -1,41 +1,193 @@
+# DESCRIPTION: GitLab CI/CD for libRetro (NOT FOR GitLab-proper)
+#
+# The Rust templates build the crate at the root of the repository, which
+# is the emulator library, while the core is frontends/libretro, a member
+# of the workspace. The jobs build the core instead, and copy its library,
+# libboytacean_libretro, to the name the templates expect, lib${CORENAME}.
+
 .core-defs:
   variables:
     CORENAME: boytacean
+    MANIFEST: frontends/libretro/Cargo.toml
+    LIB: boytacean_libretro
+
+include:
+  # Windows 64-bit
+  - project: 'libretro-infrastructure/ci-templates'
+    file: '/rust-windows-x64.yml'
+
+  # Windows 32-bit
+  - project: 'libretro-infrastructure/ci-templates'
+    file: '/rust-windows-i686.yml'
+
+  # Linux 64-bit
+  - project: 'libretro-infrastructure/ci-templates'
+    file: '/rust-linux-x64.yml'
+
+  # Linux 32-bit
+  - project: 'libretro-infrastructure/ci-templates'
+    file: '/rust-linux-i686.yml'
+
+  # Linux aarch64
+  - project: 'libretro-infrastructure/ci-templates'
+    file: '/rust-linux-aarch64.yml'
+
+  # macOS/iOS/tvOS
+  - project: 'libretro-infrastructure/ci-templates'
+    file: '/rust-apple.yml'
+
+  # Android
+  - project: 'libretro-infrastructure/ci-templates'
+    file: '/rust-android-jni.yml'
+
+  # webOS
+  - project: 'libretro-infrastructure/ci-templates'
+    file: '/rust-webos.yml'
 
 stages:
   - build-prepare
   - build-shared
   - build-static
 
+# Linux and Windows: the after_script of the templates renames and strips.
+.core-build:
+  script:
+    - cargo build --release --target ${TARGET_ARCH} --manifest-path ${MANIFEST}
+    - cd target/${TARGET_ARCH}/release
+    - if [ -f lib${LIB}.so ]; then cp lib${LIB}.so lib${CORENAME}.so; fi
+    - if [ -f ${LIB}.dll ]; then cp ${LIB}.dll ${CORENAME}.dll; fi
+
+# Android: cargo-ndk puts the ARM libraries in target/<abi>, the x86 ones
+# in target/<triple>/release: TARGET_DIR, where the after_script looks.
+.core-build-android:
+  script:
+    - cd frontends/libretro
+    - cargo ndk -t $ANDROID_ABI -o ../../target build --release
+    - cp ${CI_PROJECT_DIR}/${TARGET_DIR}/lib${LIB}.so ${CI_PROJECT_DIR}/${TARGET_DIR}/lib${CORENAME}.so
+
+# Apple: the script of the templates, with the core's manifest and library.
+.core-build-apple:
+  variables:
+    CARGO_BUILD: cargo build
+  script:
+    - if [ "$DSYM_CORE_LIB" -eq 1 ]; then export CARGO_PROFILE_RELEASE_DEBUG=true; fi
+    - $CARGO_BUILD --release --target ${TARGET_ARCH} --manifest-path ${MANIFEST}
+    - mv target/${TARGET_ARCH}/release/lib${LIB}.dylib ${CORENAME}_libretro.dylib
+    - if [ "$DSYM_CORE_LIB" -eq 1 ]; then dsymutil-18 ${CORENAME}_libretro.dylib -o ${CORENAME}_libretro.dylib.dSYM; fi
+    - if [ "$STRIP_CORE_LIB" -eq 1 ]; then $STRIP -S ${CORENAME}_libretro.dylib; fi
+    - if [ "$DSYM_CORE_LIB" -eq 1 ]; then zip -r ${CORENAME}_libretro.dylib.dSYM.zip ${CORENAME}_libretro.dylib.dSYM; fi
+
+# webOS: the script of the template, with the core's manifest and library.
+.core-build-webos:
+  script:
+    - cargo build --release --target $CARGO_TARGET --manifest-path ${MANIFEST} -j $NUMPROC
+    - mv target/${CARGO_TARGET}/release/lib${LIB}.so ${LIBNAME}
+    - if [ $STRIP_CORE_LIB -eq 1 ]; then $STRIP --strip-unneeded ${LIBNAME}; fi
+
+# Windows 64-bit. The image's MinGW-w64 (Ubuntu 18.04's) predates
+# GetHostNameW, which Rust's standard library imports from ws2_32.dll: an
+# import library of its own supplies it.
 libretro-build-windows-x64:
   extends:
+    - .libretro-rust-windows-x64-default
     - .core-defs
-  tags:
-    - msvc2010
-  stage: build-shared
+    - .core-build
   script:
-    - cd frontends/libretro
-    - cargo build --release
-    - mv ../../target/release/${CORENAME}_libretro.dll .
-  artifacts:
-    paths:
-    - ${CORENAME}_libretro.dll
-    expire_in: 10 min
-  rules:
-    - if: "$BUILD_WINDOWS"
-  dependencies: []
+    - mkdir -p target/mingw-compat
+    - printf 'LIBRARY ws2_32.dll\nEXPORTS\nGetHostNameW\n' > target/mingw-compat/ws2_32_compat.def
+    - x86_64-w64-mingw32-dlltool -d target/mingw-compat/ws2_32_compat.def -l target/mingw-compat/libws2_32_compat.a
+    - export RUSTFLAGS="-L ${CI_PROJECT_DIR}/target/mingw-compat -C link-arg=-lws2_32_compat"
+    - !reference [.core-build, script]
 
+# Windows 32-bit
+libretro-build-windows-i686:
+  extends:
+    - .libretro-rust-windows-i686-default
+    - .core-defs
+    - .core-build
+
+# Linux 64-bit
 libretro-build-linux-x64:
   extends:
+    - .libretro-rust-linux-x64-default
     - .core-defs
-  stage: build-shared
-  script:
-    - cd frontends/libretro
-    - cargo build --release
-    - cd ../..
-    - mv target/release/lib${CORENAME}_libretro.so ${CORENAME}_libretro.so
-  artifacts:
-    paths:
-    - ${CORENAME}_libretro.so
-    expire_in: 10 min
-  dependencies: []
+    - .core-build
+
+# Linux 32-bit
+libretro-build-linux-i686:
+  extends:
+    - .libretro-rust-linux-i686-default
+    - .core-defs
+    - .core-build
+
+# Linux aarch64
+libretro-build-linux-aarch64:
+  extends:
+    - .libretro-rust-linux-aarch64-default
+    - .core-defs
+    - .core-build
+
+# macOS 64-bit
+libretro-build-osx-x64:
+  extends:
+    - .libretro-rust-osx-x86_64-default
+    - .core-defs
+    - .core-build-apple
+
+# macOS ARM 64-bit
+libretro-build-osx-arm64:
+  extends:
+    - .libretro-rust-osx-arm64-default
+    - .core-defs
+    - .core-build-apple
+
+# iOS
+libretro-build-ios-arm64:
+  extends:
+    - .libretro-rust-ios-arm64-default
+    - .core-defs
+    - .core-build-apple
+
+# tvOS: the standard library built from source on nightly.
+libretro-build-tvos-arm64:
+  extends:
+    - .libretro-rust-tvos-arm64-default
+    - .core-defs
+    - .core-build-apple
+  variables:
+    CARGO_BUILD: cargo +nightly build -Zbuild-std
+
+# Android ARMv7a
+android-armeabi-v7a:
+  extends:
+    - .libretro-rust-android-jni-armeabi-v7a
+    - .core-defs
+    - .core-build-android
+
+# Android ARMv8a
+android-arm64-v8a:
+  extends:
+    - .libretro-rust-android-jni-arm64-v8a
+    - .core-defs
+    - .core-build-android
+
+# Android 32-bit x86
+android-x86:
+  extends:
+    - .libretro-rust-android-jni-x86
+    - .core-defs
+    - .core-build-android
+
+# Android 64-bit x86
+android-x86_64:
+  extends:
+    - .libretro-rust-android-jni-x86_64
+    - .core-defs
+    - .core-build-android
+
+# webOS
+libretro-build-webos-armv7a:
+  extends:
+    - .libretro-rust-webos-armv7a-default
+    - .core-defs
+    - .core-build-webos

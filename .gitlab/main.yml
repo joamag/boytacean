@@ -1,197 +1,198 @@
-# DESCRIPTION: GitLab CI/CD for libRetro (NOT FOR GitLab-proper)
-#
-# The CI/CD configuration file of the project in git.libretro.com, set in
-# its settings, as the .gitlab-ci.yml of the repository is the pipeline of
-# its own GitLab.
-#
-# The Rust templates build the crate at the root of the repository, which
-# is the emulator library, while the core is frontends/libretro, a member
-# of the workspace. The jobs build the core instead, and copy its library,
-# libboytacean_libretro, to the name the templates expect, lib${CORENAME}.
+image: hivesolutions/ubuntu_dev
 
-.core-defs:
-  variables:
-    CORENAME: boytacean
-    MANIFEST: frontends/libretro/Cargo.toml
-    LIB: boytacean_libretro
-
-include:
-  # Windows 64-bit
-  - project: 'libretro-infrastructure/ci-templates'
-    file: '/rust-windows-x64.yml'
-
-  # Windows 32-bit
-  - project: 'libretro-infrastructure/ci-templates'
-    file: '/rust-windows-i686.yml'
-
-  # Linux 64-bit
-  - project: 'libretro-infrastructure/ci-templates'
-    file: '/rust-linux-x64.yml'
-
-  # Linux 32-bit
-  - project: 'libretro-infrastructure/ci-templates'
-    file: '/rust-linux-i686.yml'
-
-  # Linux aarch64
-  - project: 'libretro-infrastructure/ci-templates'
-    file: '/rust-linux-aarch64.yml'
-
-  # macOS/iOS/tvOS
-  - project: 'libretro-infrastructure/ci-templates'
-    file: '/rust-apple.yml'
-
-  # Android
-  - project: 'libretro-infrastructure/ci-templates'
-    file: '/rust-android-jni.yml'
-
-  # webOS
-  - project: 'libretro-infrastructure/ci-templates'
-    file: '/rust-webos.yml'
+variables:
+  NETLIFY_SITE_ID: b35133d1-a986-49d9-9d2a-5704f1174757
+  NETLIFY_AUTH_TOKEN: $NETLIFY_AUTH_TOKEN
+  CLOUDFLARE_API_TOKEN: $CLOUDFLARE_API_TOKEN
+  CRATES_TOKEN: $CRATES_TOKEN
+  NPM_TOKEN: $NPM_TOKEN
 
 stages:
-  - build-prepare
-  - build-shared
-  - build-static
+  - build
+  - test
+  - deploy
 
-# Linux and Windows: the after_script of the templates renames and strips.
-.core-build:
+before_script:
+  - source ./.gitlab/common.sh
+  - apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y -q pkg-config g++ cmake jq
+  - curl -sf -L https://static.rust-lang.org/rustup.sh | sh -s -- -y
+  - export PATH=$PATH:$HOME/.cargo/bin
+  - curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.1/install.sh | bash
+  - export NVM_DIR="$HOME/.nvm"
+  - \[ -s "$NVM_DIR/nvm.sh" \] && \. "$NVM_DIR/nvm.sh"
+  - \[ -s "$NVM_DIR/bash_completion" \] && \. "$NVM_DIR/bash_completion"
+  - nvm install 20
+
+build-rust:
+  stage: build
+  parallel:
+    matrix:
+      - RUST_VERSION: ["1.86.0", "1.87.0", "stable", "nightly"]
   script:
-    - cargo build --release --target ${TARGET_ARCH} --manifest-path ${MANIFEST}
-    - cd target/${TARGET_ARCH}/release
-    - if [ -f lib${LIB}.so ]; then cp lib${LIB}.so lib${CORENAME}.so; fi
-    - if [ -f ${LIB}.dll ]; then cp ${LIB}.dll ${CORENAME}.dll; fi
+    - rustup toolchain install $RUST_VERSION
+    - rustup override set $RUST_VERSION
+    - rustup component add rustfmt
+    - rustup component add clippy
+    - rustc --version
+    - cargo fmt --all -- --check
+    - if [[ $RUST_VERSION != nightly ]]; then cargo clippy -- -D warnings -A unknown-lints; fi
+    - cargo build --features gen-mock
+    - cargo build --release --features gen-mock
 
-# Android: cargo-ndk puts the ARM libraries in target/<abi>, the x86 ones
-# in target/<triple>/release: TARGET_DIR, where the after_script looks.
-.core-build-android:
+build-wasm:
+  stage: build
+  parallel:
+    matrix:
+      - RUST_VERSION: ["1.91.0"]
   script:
-    - cd frontends/libretro
-    - cargo ndk -t $ANDROID_ABI -o ../../target build --release
-    - cp ${CI_PROJECT_DIR}/${TARGET_DIR}/lib${LIB}.so ${CI_PROJECT_DIR}/${TARGET_DIR}/lib${CORENAME}.so
+    - rustup toolchain install $RUST_VERSION
+    - rustup override set $RUST_VERSION
+    - rustc --version
+    - cargo install wasm-pack
+    - wasm-pack build --release --target=web --out-dir=frontends/web/lib -- --features wasm
+    - cd frontends/web && npm install && NODE_ENV=production npm run build && npm run lint
+    - cd core && npm install --no-save ../lib && npm install && npm test && cd ..
+    - cd component && npm install && npm test && cd ..
+    - npm test
+  artifacts:
+    paths:
+      - frontends/web/dist
+      - frontends/web/lib
+    expire_in: 1 day
 
-# Apple: the script of the templates, with the core's manifest and library.
-.core-build-apple:
-  variables:
-    CARGO_BUILD: cargo build
+build-pyo3:
+  stage: build
+  parallel:
+    matrix:
+      - RUST_VERSION: ["1.86.0"]
   script:
-    - if [ "$DSYM_CORE_LIB" -eq 1 ]; then export CARGO_PROFILE_RELEASE_DEBUG=true; fi
-    - $CARGO_BUILD --release --target ${TARGET_ARCH} --manifest-path ${MANIFEST}
-    - mv target/${TARGET_ARCH}/release/lib${LIB}.dylib ${CORENAME}_libretro.dylib
-    - if [ "$DSYM_CORE_LIB" -eq 1 ]; then dsymutil-18 ${CORENAME}_libretro.dylib -o ${CORENAME}_libretro.dylib.dSYM; fi
-    - if [ "$STRIP_CORE_LIB" -eq 1 ]; then $STRIP -S ${CORENAME}_libretro.dylib; fi
-    - if [ "$DSYM_CORE_LIB" -eq 1 ]; then zip -r ${CORENAME}_libretro.dylib.dSYM.zip ${CORENAME}_libretro.dylib.dSYM; fi
+    - rustup toolchain install $RUST_VERSION
+    - rustup override set $RUST_VERSION
+    - rustc --version
+    - cargo build --features python
+    - cargo build --release --features python
 
-# webOS: the script of the template, with the core's manifest and library.
-.core-build-webos:
+build-boot:
+  stage: build
   script:
-    - cargo build --release --target $CARGO_TARGET --manifest-path ${MANIFEST} -j $NUMPROC
-    - mv target/${CARGO_TARGET}/release/lib${LIB}.so ${LIBNAME}
-    - if [ $STRIP_CORE_LIB -eq 1 ]; then $STRIP --strip-unneeded ${LIBNAME}; fi
+    - install_rgbds
+    - cd src/boot
+    - make
 
-# Windows 64-bit. The image's MinGW-w64 (Ubuntu 18.04's) predates
-# GetHostNameW, which Rust's standard library imports from ws2_32.dll: an
-# import library of its own supplies it.
-libretro-build-windows-x64:
-  extends:
-    - .libretro-rust-windows-x64-default
-    - .core-defs
-    - .core-build
+test-rust:
+  stage: test
+  parallel:
+    matrix:
+      - RUST_VERSION: ["1.86.0", "1.87.0", "stable", "nightly"]
   script:
-    - mkdir -p target/mingw-compat
-    - printf 'LIBRARY ws2_32.dll\nEXPORTS\nGetHostNameW\n' > target/mingw-compat/ws2_32_compat.def
-    - x86_64-w64-mingw32-dlltool -d target/mingw-compat/ws2_32_compat.def -l target/mingw-compat/libws2_32_compat.a
-    - export RUSTFLAGS="-L ${CI_PROJECT_DIR}/target/mingw-compat -C link-arg=-lws2_32_compat"
-    - !reference [.core-build, script]
+    - rustup toolchain install $RUST_VERSION
+    - rustup override set $RUST_VERSION
+    - rustc --version
+    - if [[ $RUST_VERSION != nightly ]]; then cargo test; fi
+    - if [[ $RUST_VERSION != nightly ]]; then cargo bench --features gen-mock; fi
+    - if [[ $RUST_VERSION == nightly ]]; then cargo bench --features gen-mock,simd; fi
 
-# Windows 32-bit
-libretro-build-windows-i686:
-  extends:
-    - .libretro-rust-windows-i686-default
-    - .core-defs
-    - .core-build
+test-pyo3:
+  stage: test
+  parallel:
+    matrix:
+      - RUST_VERSION: ["1.86.0"]
+  script:
+    - rustup toolchain install $RUST_VERSION
+    - rustup override set $RUST_VERSION
+    - rustc --version
+    - python3 setup.py test
 
-# Linux 64-bit
-libretro-build-linux-x64:
-  extends:
-    - .libretro-rust-linux-x64-default
-    - .core-defs
-    - .core-build
+deploy-netlify-preview:
+  stage: deploy
+  script:
+    - cd frontends/web/dist
+    - cp -rp ../static/* .
+    - npm_config_yes=true npx --loglevel verbose --package=netlify-cli netlify deploy --no-build --dir=.
+  dependencies:
+    - build-wasm
+  only:
+    - master
 
-# Linux 32-bit
-libretro-build-linux-i686:
-  extends:
-    - .libretro-rust-linux-i686-default
-    - .core-defs
-    - .core-build
+deploy-netlify-prod:
+  stage: deploy
+  script:
+    - cd frontends/web/dist
+    - cp -rp ../static/* .
+    - npm_config_yes=true npx --loglevel verbose --package=netlify-cli netlify deploy --no-build --dir=. --prod
+  dependencies:
+    - build-wasm
+  only:
+    - tags
 
-# Linux aarch64
-libretro-build-linux-aarch64:
-  extends:
-    - .libretro-rust-linux-aarch64-default
-    - .core-defs
-    - .core-build
+deploy-cloudflare-master:
+  stage: deploy
+  script:
+    - cd frontends/web/dist
+    - cp -rp ../static/* .
+    - npm_config_yes=true npx --loglevel verbose wrangler pages deploy . --project-name=boytacean --branch master
+  dependencies:
+    - build-wasm
+  only:
+    - master
 
-# macOS 64-bit
-libretro-build-osx-x64:
-  extends:
-    - .libretro-rust-osx-x86_64-default
-    - .core-defs
-    - .core-build-apple
+deploy-cloudflare-stable:
+  stage: deploy
+  script:
+    - cd frontends/web/dist
+    - cp -rp ../static/* .
+    - npm_config_yes=true npx --loglevel verbose wrangler pages deploy . --project-name=boytacean --branch stable
+  dependencies:
+    - build-wasm
+  only:
+    - stable
 
-# macOS ARM 64-bit
-libretro-build-osx-arm64:
-  extends:
-    - .libretro-rust-osx-arm64-default
-    - .core-defs
-    - .core-build-apple
+deploy-cloudflare-prod:
+  stage: deploy
+  script:
+    - cd frontends/web/dist
+    - cp -rp ../static/* .
+    - npm_config_yes=true npx --loglevel verbose wrangler pages deploy . --project-name=boytacean --branch prod
+    - npm_config_yes=true npx --loglevel verbose wrangler pages deploy . --project-name=boytacean --branch production
+    - npm_config_yes=true npx --loglevel verbose wrangler pages deploy . --project-name=boytacean --branch main
+  dependencies:
+    - build-wasm
+  only:
+    - tags
 
-# iOS
-libretro-build-ios-arm64:
-  extends:
-    - .libretro-rust-ios-arm64-default
-    - .core-defs
-    - .core-build-apple
+deploy-crates:
+  stage: deploy
+  script:
+    - cargo login $CRATES_TOKEN
+    - cargo publish --package boytacean-common --no-verify
+    - cargo publish --package boytacean-hashing --no-verify
+    - cargo publish --package boytacean-encoding --no-verify
+    - cargo publish --package boytacean-cartridge --no-verify
+    - cargo publish --package boytacean --no-verify
+  dependencies:
+    - build-rust
+  only:
+    - tags
 
-# tvOS: the standard library built from source on nightly.
-libretro-build-tvos-arm64:
-  extends:
-    - .libretro-rust-tvos-arm64-default
-    - .core-defs
-    - .core-build-apple
-  variables:
-    CARGO_BUILD: cargo +nightly build -Zbuild-std
+deploy-npm:
+  stage: deploy
+  script:
+    - echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
+    - cd frontends/web/lib && npm publish
+    - cd ../core && npm install --no-save ../lib && npm install && npm publish
+    - cd ../component && npm install && npm publish
+  dependencies:
+    - build-wasm
+  only:
+    - tags
 
-# Android ARMv7a
-android-armeabi-v7a:
-  extends:
-    - .libretro-rust-android-jni-armeabi-v7a
-    - .core-defs
-    - .core-build-android
-
-# Android ARMv8a
-android-arm64-v8a:
-  extends:
-    - .libretro-rust-android-jni-arm64-v8a
-    - .core-defs
-    - .core-build-android
-
-# Android 32-bit x86
-android-x86:
-  extends:
-    - .libretro-rust-android-jni-x86
-    - .core-defs
-    - .core-build-android
-
-# Android 64-bit x86
-android-x86_64:
-  extends:
-    - .libretro-rust-android-jni-x86_64
-    - .core-defs
-    - .core-build-android
-
-# webOS
-libretro-build-webos-armv7a:
-  extends:
-    - .libretro-rust-webos-armv7a-default
-    - .core-defs
-    - .core-build-webos
+deploy-pypi:
+  stage: deploy
+  script:
+    - pip3 install twine wheel
+    - python3 setup.py sdist
+    - python3 -m twine upload -u ${PYPI_USERNAME} -p ${PYPI_PASSWORD} dist/*
+  dependencies:
+    - build-pyo3
+  only:
+    - tags
