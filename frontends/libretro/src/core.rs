@@ -2,6 +2,7 @@ use std::{
     collections::HashMap,
     ffi::CStr,
     fmt::{self, Display, Formatter},
+    mem::take,
     os::raw::{c_char, c_uint, c_void},
     ptr::{self, addr_of},
     slice::from_raw_parts,
@@ -30,7 +31,7 @@ use crate::{
         RETRO_DEVICE_ID_JOYPAD_X, RETRO_DEVICE_ID_JOYPAD_Y, RETRO_DEVICE_JOYPAD,
         RETRO_ENVIRONMENT_GET_GAME_INFO_EXT, RETRO_ENVIRONMENT_GET_VARIABLE,
         RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, RETRO_ENVIRONMENT_SET_CONTENT_INFO_OVERRIDE,
-        RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, RETRO_ENVIRONMENT_SET_VARIABLES,
+        RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, RETRO_ENVIRONMENT_SET_VARIABLES, RETRO_MEMORY_SAVE_RAM,
         RETRO_PIXEL_FORMAT_XRGB8888,
     },
     palettes::get_palette,
@@ -197,7 +198,12 @@ pub extern "C" fn retro_deinit() {
 pub extern "C" fn retro_reset() {
     debugln!("retro_reset()");
     let emulator = unsafe { EMULATOR.as_mut().unwrap() };
+
+    // the save RAM is kept in the same buffer across the reload, as
+    // the frontend keeps the pointer to it (eg: for its autosave)
+    let ram_data = take(emulator.rom().ram_data_mut());
     emulator.reload().unwrap();
+    *emulator.rom().ram_data_mut() = ram_data;
 }
 
 /// # Safety
@@ -427,15 +433,23 @@ pub extern "C" fn retro_unload_game() {
 }
 
 #[no_mangle]
-pub extern "C" fn retro_get_memory_size(_memory_id: u32) -> usize {
+pub extern "C" fn retro_get_memory_size(memory_id: u32) -> usize {
     debugln!("retro_get_memory_size()");
-    0
+    let rom = unsafe { EMULATOR.as_ref().unwrap() }.rom_i();
+    if memory_id != RETRO_MEMORY_SAVE_RAM || !rom.has_battery() {
+        return 0;
+    }
+    rom.ram_data().len()
 }
 
 #[no_mangle]
-pub extern "C" fn retro_get_memory_data(_memory_id: u32) -> *mut c_void {
+pub extern "C" fn retro_get_memory_data(memory_id: u32) -> *mut c_void {
     debugln!("retro_get_memory_data()");
-    std::ptr::null_mut()
+    if retro_get_memory_size(memory_id) == 0 {
+        return std::ptr::null_mut();
+    }
+    let rom = unsafe { EMULATOR.as_mut().unwrap() }.rom();
+    rom.ram_data_mut().as_mut_ptr() as *mut c_void
 }
 
 #[no_mangle]
@@ -603,12 +617,25 @@ fn retro_key_to_pad(retro_key: RetroJoypad) -> Option<PadKey> {
 
 #[cfg(test)]
 mod tests {
-    use std::{ffi::CStr, ptr};
+    use std::{
+        ffi::CStr,
+        os::raw::{c_char, c_void},
+        ptr,
+        sync::Mutex,
+    };
 
     use boytacean::info::Info;
 
-    use super::retro_get_system_info;
-    use crate::structs::RetroSystemInfo;
+    use super::{
+        retro_get_memory_data, retro_get_memory_size, retro_get_system_info, retro_init,
+        retro_load_game, retro_reset, retro_set_environment, EMULATOR,
+    };
+    use crate::{
+        consts::{RETRO_MEMORY_SAVE_RAM, RETRO_MEMORY_SYSTEM_RAM},
+        structs::{RetroGameInfo, RetroSystemInfo},
+    };
+
+    static EMULATOR_LOCK: Mutex<()> = Mutex::new(());
 
     /// The info file of the core, used by RetroArch to describe
     /// the core, that must agree with the core itself.
@@ -623,6 +650,45 @@ mod tests {
             .find(|(name, _)| name.trim() == key)
             .map(|(_, value)| value.trim().trim_matches('"'))
             .unwrap()
+    }
+
+    /// Environment callback of a frontend that supports no
+    /// command, as the tests run without a frontend.
+    extern "C" fn environment(_command: u32, _data: *const c_void) -> bool {
+        false
+    }
+
+    /// Initializes the core and loads the game with the provided
+    /// ROM data, as a frontend does.
+    fn load_game(data: &[u8]) {
+        retro_init();
+        retro_set_environment(Some(environment));
+        let game = RetroGameInfo {
+            path: "test.gb\0".as_ptr() as *const c_char,
+            data: data.as_ptr() as *const c_void,
+            size: data.len(),
+            meta: ptr::null(),
+        };
+        assert!(unsafe { retro_load_game(&game) });
+    }
+
+    #[test]
+    fn test_retro_reset() {
+        let _guard = EMULATOR_LOCK.lock().unwrap();
+        load_game(include_bytes!("../../../res/roms/game/shocklobster.gb"));
+        let data = retro_get_memory_data(RETRO_MEMORY_SAVE_RAM) as *mut u8;
+        assert!(!data.is_null());
+        unsafe { *data = 0x42 };
+        retro_reset();
+
+        // the save RAM must stay in the same buffer, as the frontend
+        // keeps its pointer, with its contents kept across the reset
+        assert_eq!(
+            retro_get_memory_data(RETRO_MEMORY_SAVE_RAM) as *mut u8,
+            data
+        );
+        let emulator = unsafe { EMULATOR.as_mut().unwrap() };
+        assert_eq!(emulator.rom_i().ram_data()[0], 0x42);
     }
 
     #[test]
@@ -667,5 +733,51 @@ mod tests {
         assert_eq!(other.library_name, info.library_name);
         assert_eq!(other.library_version, info.library_version);
         assert_eq!(other.valid_extensions, info.valid_extensions);
+    }
+
+    #[test]
+    fn test_retro_get_memory_size() {
+        let _guard = EMULATOR_LOCK.lock().unwrap();
+        load_game(include_bytes!("../../../res/roms/game/shocklobster.gb"));
+        assert_eq!(retro_get_memory_size(RETRO_MEMORY_SAVE_RAM), 8192);
+        assert_eq!(retro_get_memory_size(RETRO_MEMORY_SYSTEM_RAM), 0);
+
+        // a cartridge with RAM but without battery has nothing to save
+        load_game(include_bytes!(
+            "../../../res/roms/test/blargg/cgb_sound/cgb_sound.gb"
+        ));
+        assert_eq!(retro_get_memory_size(RETRO_MEMORY_SAVE_RAM), 0);
+
+        // while a cartridge with battery and without RAM in its header
+        // keeps the RAM bank allocated for it (as the built-in RAM of the
+        // MBC2), saved as the other frontends do in `save_ram_file()`
+        load_game(include_bytes!("../../../res/roms/test/rtc3test.gb"));
+        assert_eq!(retro_get_memory_size(RETRO_MEMORY_SAVE_RAM), 8192);
+    }
+
+    #[test]
+    fn test_retro_get_memory_data() {
+        let _guard = EMULATOR_LOCK.lock().unwrap();
+        load_game(include_bytes!("../../../res/roms/game/shocklobster.gb"));
+        let data = retro_get_memory_data(RETRO_MEMORY_SAVE_RAM) as *mut u8;
+        assert!(!data.is_null());
+        assert!(retro_get_memory_data(RETRO_MEMORY_SYSTEM_RAM).is_null());
+
+        // the pointer must be the RAM of the cartridge itself, so that the
+        // game reads the saves loaded by the frontend into it, and the
+        // frontend reads the writes of the game
+        let emulator = unsafe { EMULATOR.as_mut().unwrap() };
+        emulator.write_memory(0x0000, 0x0a);
+        unsafe { *data.add(1) = 0x42 };
+        assert_eq!(emulator.read_memory(0xa001), 0x42);
+        emulator.write_memory(0xa002, 0x24);
+        assert_eq!(unsafe { *data.add(2) }, 0x24);
+
+        load_game(include_bytes!(
+            "../../../res/roms/test/blargg/cgb_sound/cgb_sound.gb"
+        ));
+        assert!(retro_get_memory_data(RETRO_MEMORY_SAVE_RAM).is_null());
+        load_game(include_bytes!("../../../res/roms/test/rtc3test.gb"));
+        assert!(!retro_get_memory_data(RETRO_MEMORY_SAVE_RAM).is_null());
     }
 }
