@@ -26,7 +26,11 @@ const FILTERS: Record<string, string> = {
  * @returns The shader, or undefined if it can not be loaded.
  */
 export const loadShader = async (name: string): Promise<Shader | undefined> => {
-    const filter = FILTERS[name];
+    // only the own filters are considered, the name is provided by
+    // the user (eg: `constructor`) so it must not reach the prototype
+    const filter = Object.prototype.hasOwnProperty.call(FILTERS, name)
+        ? FILTERS[name]
+        : undefined;
     if (!filter) {
         console.warn(`Unknown shader ${name}`);
         return undefined;
