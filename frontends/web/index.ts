@@ -1,6 +1,6 @@
 import { startApp } from "emukit";
 
-import { GameboyEmulator, GbaEmulator, isGbaRom } from "./ts";
+import { GameboyEmulator, GbaEmulator, isGbaRom, loadShader } from "./ts";
 
 /**
  * List of available background theme colors that can be used
@@ -46,6 +46,7 @@ const BACKGROUNDS = [
         undefined;
     const playlistUrl =
         params.get("playlist_url") ?? params.get("playlist") ?? undefined;
+    const shader = params.get("shader") ?? undefined;
 
     // determines if the emulator should run in GBA mode,
     // either via the explicit ?gba=1 parameter or by
@@ -87,7 +88,8 @@ const BACKGROUNDS = [
         sections: sections,
         palette: isGba ? undefined : palette,
         background: background,
-        backgrounds: BACKGROUNDS
+        backgrounds: BACKGROUNDS,
+        shader: shader ? await loadShader(shader) : undefined
     });
 
     // sets the emulator in the global scope this is useful
