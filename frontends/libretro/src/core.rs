@@ -2,7 +2,6 @@ use std::{
     collections::HashMap,
     ffi::CStr,
     fmt::{self, Display, Formatter},
-    mem::take,
     os::raw::{c_char, c_uint, c_void},
     ptr::{self, addr_of},
     slice::from_raw_parts,
@@ -198,12 +197,7 @@ pub extern "C" fn retro_deinit() {
 pub extern "C" fn retro_reset() {
     debugln!("retro_reset()");
     let emulator = unsafe { EMULATOR.as_mut().unwrap() };
-
-    // the save RAM is kept in the same buffer across the reload, as
-    // the frontend keeps the pointer to it (eg: for its autosave)
-    let ram_data = take(emulator.rom().ram_data_mut());
     emulator.reload().unwrap();
-    *emulator.rom().ram_data_mut() = ram_data;
 }
 
 /// # Safety
@@ -628,7 +622,8 @@ mod tests {
 
     use super::{
         retro_get_memory_data, retro_get_memory_size, retro_get_system_info, retro_init,
-        retro_load_game, retro_reset, retro_set_environment, EMULATOR,
+        retro_load_game, retro_reset, retro_serialize, retro_serialize_size, retro_set_environment,
+        retro_unserialize, EMULATOR,
     };
     use crate::{
         consts::{RETRO_MEMORY_SAVE_RAM, RETRO_MEMORY_SYSTEM_RAM},
@@ -779,5 +774,32 @@ mod tests {
         assert!(retro_get_memory_data(RETRO_MEMORY_SAVE_RAM).is_null());
         load_game(include_bytes!("../../../res/roms/test/rtc3test.gb"));
         assert!(!retro_get_memory_data(RETRO_MEMORY_SAVE_RAM).is_null());
+    }
+
+    #[test]
+    fn test_retro_unserialize() {
+        let _guard = EMULATOR_LOCK.lock().unwrap();
+        load_game(include_bytes!("../../../res/roms/game/shocklobster.gb"));
+        let data = retro_get_memory_data(RETRO_MEMORY_SAVE_RAM) as *mut u8;
+        assert!(!data.is_null());
+        unsafe { *data = 0x42 };
+        let mut state = vec![0u8; retro_serialize_size()];
+        assert!(retro_serialize(
+            state.as_mut_ptr() as *mut c_void,
+            state.len()
+        ));
+        unsafe { *data = 0x24 };
+        assert!(retro_unserialize(
+            state.as_ptr() as *const c_void,
+            state.len()
+        ));
+
+        // the save RAM of the state must be loaded into the same buffer,
+        // as the frontend keeps its pointer (eg: for its autosave)
+        assert_eq!(
+            retro_get_memory_data(RETRO_MEMORY_SAVE_RAM) as *mut u8,
+            data
+        );
+        assert_eq!(unsafe { *data }, 0x42);
     }
 }
