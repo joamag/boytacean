@@ -207,10 +207,14 @@ pub extern "C" fn retro_reset() {
 pub unsafe extern "C" fn retro_get_system_info(info: *mut RetroSystemInfo) {
     debugln!("retro_get_system_info()");
 
-    INFO.name_s = format!("{}\0", Info::name());
-    INFO.name = INFO.name_s.as_str();
-    INFO.version_s = format!("v{}\0", Info::version());
-    INFO.version = INFO.version_s.as_str();
+    // the strings are only created once, as the pointers to them must
+    // remain valid for the frontend after any following call
+    if INFO.name_s.is_empty() {
+        INFO.name_s = format!("{}\0", Info::name());
+        INFO.name = INFO.name_s.as_str();
+        INFO.version_s = format!("v{}\0", Info::version());
+        INFO.version = INFO.version_s.as_str();
+    }
 
     (*info).library_name = INFO.name.as_ptr() as *const c_char;
     (*info).library_version = INFO.version.as_ptr() as *const c_char;
@@ -594,5 +598,74 @@ fn retro_key_to_pad(retro_key: RetroJoypad) -> Option<PadKey> {
         RetroJoypad::RetroDeviceIdJoypadA => Some(PadKey::A),
         RetroJoypad::RetroDeviceIdJoypadB => Some(PadKey::B),
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{ffi::CStr, ptr};
+
+    use boytacean::info::Info;
+
+    use super::retro_get_system_info;
+    use crate::structs::RetroSystemInfo;
+
+    /// The info file of the core, used by RetroArch to describe
+    /// the core, that must agree with the core itself.
+    const INFO_FILE: &str = include_str!("../res/boytacean_libretro.info");
+
+    /// Obtains the value of the field with the provided key
+    /// in the info file of the core.
+    fn info_value(key: &str) -> &'static str {
+        INFO_FILE
+            .lines()
+            .filter_map(|line| line.split_once('='))
+            .find(|(name, _)| name.trim() == key)
+            .map(|(_, value)| value.trim().trim_matches('"'))
+            .unwrap()
+    }
+
+    #[test]
+    fn test_retro_get_system_info() {
+        let mut info = RetroSystemInfo {
+            library_name: ptr::null(),
+            library_version: ptr::null(),
+            valid_extensions: ptr::null(),
+            need_fullpath: 1,
+            block_extract: 1,
+        };
+        unsafe { retro_get_system_info(&mut info) };
+        let (library_name, library_version, valid_extensions) = unsafe {
+            (
+                CStr::from_ptr(info.library_name).to_str().unwrap(),
+                CStr::from_ptr(info.library_version).to_str().unwrap(),
+                CStr::from_ptr(info.valid_extensions).to_str().unwrap(),
+            )
+        };
+        assert_eq!(library_name, Info::name());
+        assert_eq!(library_version, format!("v{}", Info::version()));
+        assert_eq!(valid_extensions, "gb|gbc");
+        assert_eq!(info.need_fullpath, 0);
+        assert_eq!(info.block_extract, 0);
+
+        // the info file must describe the core as it reports itself
+        assert_eq!(info_value("corename"), library_name);
+        assert_eq!(info_value("display_version"), Info::version());
+        assert_eq!(info_value("supported_extensions"), valid_extensions);
+        assert_eq!(info_value("license"), env!("CARGO_PKG_LICENSE"));
+
+        // the pointers must be statically allocated, so the ones of
+        // a previous call must remain valid after a new call
+        let mut other = RetroSystemInfo {
+            library_name: ptr::null(),
+            library_version: ptr::null(),
+            valid_extensions: ptr::null(),
+            need_fullpath: 1,
+            block_extract: 1,
+        };
+        unsafe { retro_get_system_info(&mut other) };
+        assert_eq!(other.library_name, info.library_name);
+        assert_eq!(other.library_version, info.library_version);
+        assert_eq!(other.valid_extensions, info.valid_extensions);
     }
 }

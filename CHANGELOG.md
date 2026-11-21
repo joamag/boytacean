@@ -11,14 +11,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * Optional shaders in the web front-end (CRT, bilinear and smooth bilinear), the same as in the SDL front-end, chosen through a URL parameter
 * Documentation of the web front-end parameters for the Game Boy Advance mode, the shaders and the background color
+* Builds of the libretro core in the libretro infrastructure, the step before RetroArch can download it from its Online Updater - [#32](https://gitlab.stage.hive.pt/joamag/boytacean/-/issues/32)
 
 ### Changed
 
-*
+* Dependency versions locked for every build of the project, from the libretro core to the Python package - [#32](https://gitlab.stage.hive.pt/joamag/boytacean/-/issues/32)
 
 ### Fixed
 
-*
+* License of the libretro core information file - [#32](https://gitlab.stage.hive.pt/joamag/boytacean/-/issues/32)
+* Name and version of the libretro core that could become invalid in RetroArch after being requested again - [#32](https://gitlab.stage.hive.pt/joamag/boytacean/-/issues/32)
+* Python package that could not be installed from its source package, as part of its sources was missing
 
 ## [0.14.0] - 2026-11-21
 

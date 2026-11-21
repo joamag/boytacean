@@ -3,8 +3,6 @@
 
 .DS_Store
 
-Cargo.lock
-
 /.vscode/settings.json
 
 /.eggs
