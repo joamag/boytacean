@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-import sys
+from sys import argv, exit
 
 STRIP_EXTRA = False
 
@@ -50,10 +50,10 @@ def lre_decode(encoded_data):
 
 
 if __name__ == "__main__":
-    if not len(sys.argv) > 3:
+    if not len(argv) > 3:
         print("Usage: lre.py <mode> <infile> <outfile>")
-        sys.exit(1)
-    mode, infile, outfile = sys.argv[1:]
+        exit(1)
+    mode, infile, outfile = argv[1:]
 
     if mode in ("encode", "compress"):
         operation = lre_encode
