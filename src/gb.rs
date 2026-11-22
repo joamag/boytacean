@@ -21,6 +21,7 @@ use std::{
     collections::VecDeque,
     fmt::{self, Display, Formatter},
     io::Read,
+    mem::take,
     sync::{Arc, Mutex},
 };
 #[cfg(feature = "wasm")]
@@ -1368,10 +1369,14 @@ impl GameBoy {
     /// This function is inline and should be optimized by the compiler.
     #[inline(always)]
     pub fn reload(&mut self) -> Result<(), Error> {
+        // the RAM of the cartridge is moved into the reloaded one, keeping
+        // its buffer, so that the pointers to it (eg: the one of a libretro
+        // frontend) remain valid
+        let ram_data = take(self.rom().ram_data_mut());
         let rom = self.rom().clone();
         self.reset();
         self.load(true)?;
-        self.load_cartridge(rom)?;
+        *self.load_cartridge(rom)?.ram_data_mut() = ram_data;
         Ok(())
     }
 
@@ -1863,5 +1868,24 @@ mod tests {
             assert_eq!(rgb1555[index], 0x8aca, "at index {index}");
             assert_eq!(rgb565[index], 0x15aa, "at index {index}");
         }
+    }
+
+    /// Tests that the reload of the machine keeps the RAM of the cartridge,
+    /// in the same buffer, so that the pointers to it remain valid.
+    #[test]
+    fn test_reload() {
+        let mut game_boy = GameBoy::new(None);
+        game_boy.load(true).unwrap();
+        game_boy
+            .load_rom(include_bytes!("../res/roms/game/shocklobster.gb"), None)
+            .unwrap();
+        game_boy.rom().ram_data_mut()[0] = 0x42;
+        let buffer = game_boy.rom_i().ram_data().as_ptr();
+        let title = game_boy.rom_i().title();
+        game_boy.reload().unwrap();
+        assert_eq!(game_boy.rom_i().ram_data().as_ptr(), buffer);
+        assert_eq!(game_boy.rom_i().ram_data().len(), 8192);
+        assert_eq!(game_boy.rom_i().ram_data()[0], 0x42);
+        assert_eq!(game_boy.rom_i().title(), title);
     }
 }
