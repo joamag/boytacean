@@ -1,12 +1,12 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-import unittest
+from unittest import TestCase, main
 
 from pb12 import pb12_encode, pb12_decode
 
 
-class TestPB12Compression(unittest.TestCase):
+class TestPB12Compression(TestCase):
     def test_compression_decompression(self):
         compressed_data = b"".join(
             pb12_encode(b"hello world! hello world! hello world!")
@@ -38,4 +38,4 @@ class TestPB12Compression(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    main()
