@@ -1,10 +1,8 @@
-import sys
-import unittest
+from sys import modules
+from unittest import TestCase, skipUnless
 
 from typing import Any
 from importlib import import_module
-
-import boytacean
 
 
 def _has_module(name: str) -> bool:
@@ -20,29 +18,30 @@ def _import_video(pillow: bool = True):
     # imports a new instance of the video module, as if Pillow was not
     # installed when requested, restoring the previous modules afterwards
     names = ("boytacean.video", "PIL", "PIL.Image")
-    modules = {name: sys.modules.get(name) for name in names}
-    video = getattr(boytacean, "video", None)
+    previous = {name: modules.get(name) for name in names}
+    package = import_module("boytacean")
+    video = getattr(package, "video", None)
     try:
-        sys.modules.pop("boytacean.video", None)
+        modules.pop("boytacean.video", None)
         if not pillow:
-            sys.modules["PIL"] = None
-            sys.modules["PIL.Image"] = None
+            modules["PIL"] = None
+            modules["PIL.Image"] = None
         return import_module("boytacean.video")
     finally:
-        for name, module in modules.items():
+        for name, module in previous.items():
             if module is None:
-                sys.modules.pop(name, None)
+                modules.pop(name, None)
             else:
-                sys.modules[name] = module
-        boytacean.video = video
+                modules[name] = module
+        package.video = video
 
 
-requires_pillow = unittest.skipUnless(
+requires_pillow = skipUnless(
     _has_module("PIL"), "Pillow not installed; skipping image-dependent test"
 )
 
 
-class VideoTest(unittest.TestCase):
+class VideoTest(TestCase):
 
     @requires_pillow
     def test_import(self):
