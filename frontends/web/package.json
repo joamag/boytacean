@@ -1,6 +1,6 @@
 {
     "name": "boytacean-web",
-    "version": "0.14.0",
+    "version": "0.15.0",
     "description": "The web version of Boytacean",
     "repository": {
         "type": "git",
@@ -14,6 +14,8 @@
         "nodemon": "nodemon --exec \"parcel --no-cache index.html\"",
         "pretty": "prettier --config .prettierrc \"./**/*.{js,ts,tsx,json}\" --write",
         "start": "npm run build",
+        "test": "npm run test:mocha",
+        "test:mocha": "mocha --require tsx/cjs --recursive --extension ts test",
         "watch": "parcel watch index.html"
     },
     "source": "index.ts",
@@ -26,11 +28,12 @@
         "@typescript-eslint/eslint-plugin": "^7.18.0",
         "@typescript-eslint/parser": "^7.18.0",
         "buffer": "^6.0.3",
-        "emukit": "^0.10.26",
+        "emukit": "^0.10.27",
         "eslint": "^8.57.1",
         "eslint-plugin-import": "^2.31.0",
         "eslint-plugin-react-hooks": "^5.2.0",
         "jszip": "^3.10.1",
+        "mocha": "^11.1.0",
         "nodemon": "^3.1.9",
         "parcel": "^2.14.0",
         "prettier": "^3.5.3",
@@ -40,6 +43,7 @@
         "react-dom": "^18.3.1",
         "recoil": "^0.7.7",
         "svgo": "^3.3.2",
+        "tsx": "^4.19.3",
         "typescript": "^5.8.2",
         "webgl-plot": "^0.7.2"
     },

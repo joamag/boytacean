@@ -73,7 +73,7 @@ It's also important to completely delete the `target` directory.
 ### I'm having difficulties building SDL for arm64 in Mac OS
 
 Try the above strategy and also try to remove `~/.cache/vcpkg`.
-If that does not work try to remove the `Cargo.lock` file to flush dependencies.
+If that does not work try to run `cargo update` to refresh the dependencies in `Cargo.lock`.
 
 A quick shortcut to the complete set of operations would be:
 

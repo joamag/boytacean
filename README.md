@@ -1,6 +1,6 @@
 # [Boytacean](https://boytacean.joao.me)
 
-A Game Boy emulator that is written in Rust 🦀.
+A Game Boy and Game Boy Advance emulator that is written in Rust 🦀.
 
 <a href="https://boytacean.joao.me" target="_blank"><img src="https://github.com/joamag/boytacean/raw/master/res/videos/002-mario.low.gif" width="360" /></a>
 
@@ -9,6 +9,7 @@ A Game Boy emulator that is written in Rust 🦀.
 ## Features
 
 * Game Boy (DMG) and Game Boy Color (CGB) emulation
+* Game Boy Advance (GBA) emulation
 * Simple navigable source-code
 * Web, [SDL](https://www.libsdl.org) and [Libretro](https://www.libretro.com) front-ends
 * Audio, with a pretty accurate APU
@@ -21,6 +22,9 @@ A Game Boy emulator that is written in Rust 🦀.
 * Cheat support using [Game Genie](https://en.wikipedia.org/wiki/Game_Genie) and [GameShark](https://pt.wikipedia.org/wiki/GameShark) codes
 * Variable CPU clock speed
 * Accurate PPU - passes [dmg-acid2](https://github.com/mattcurrie/dmg-acid2) and [cgb-acid2](https://github.com/mattcurrie/cgb-acid2) tests
+* Accurate GBA CPU and memory - passes the [gba-tests](https://github.com/jsmolka/gba-tests) of jsmolka (ARM, Thumb, memory, BIOS and saves)
+* GBA BIOS calls emulated (HLE), so that no BIOS is needed, with an optional real BIOS
+* GBA saves in SRAM, Flash and EEPROM cartridges
 
 For the Web front-end...
 
@@ -39,6 +43,7 @@ What's still missing...
 * Low-level cycle accurate system emulation
 * [Game Boy Camera](https://en.wikipedia.org/wiki/Game_Boy_Camera) emulation
 * NetPlay gaming support
+* Save states and cheats for the Game Boy Advance
 
 ## Deployments
 
@@ -110,12 +115,16 @@ You can use some GET parameters to control the initial behavior of the emulator.
 | -------------- | ------- | ---------------------------------------------------------------------------------------------- |
 | `rom_url`      | String  | The URL from which the initial ROM is going to be loaded, should support CORS.                 |
 | `url`          | String  | The same as `rom_url`.                                                                         |
+| `gba`          | Boolean | If the emulator should start in GBA mode, also picked when the ROM URL ends in `.gba`.         |
 | `fullscreen`   | Boolean | If the emulator should start in fullscreen mode.                                               |
 | `fs`           | Boolean | The same as `fullscreen`.                                                                      |
 | `debug`        | Boolean | If the "debugger" should start visible and information shown in `verbose` mode.                |
 | `verbose`      | Boolean | If information should be shown in verbose mode.                                                |
 | `keyboard`     | Boolean | If the on-screen keyboard should start visible.                                                |
 | `palette`      | String  | The name of the palette to be set at startup( eg: `christmas`, `hogwards`, `mariobros`, etc.). |
+| `background`   | String  | The background color of the emulator area, one of the theme colors (eg: `264653`, `1b1a17`).   |
+| `theme`        | String  | The same as `background`.                                                                      |
+| `shader`       | String  | The WebGL shader used to draw the display (eg: `crt`, `bilinear`, `smooth_bilinear`).          |
 | `playlist_url` | String  | The URL of a JSON playlist file containing a list of ROMs to be loaded, should support CORS.   |
 | `playlist`     | String  | The same as `playlist_url`.                                                                    |
 
@@ -137,7 +146,7 @@ Love Gameboy emulation? Want to contribute to Boytacean? That's awesome! Your co
 
 To get started, please take a look at our [Contributing Guidelines](CONTRIBUTING.md). Whether you're fixing bugs, adding new features, or helping with documentation, every contribution is valuable and greatly appreciated!
 
-Don't hesitate to reach out if you have any questions. Join us in making Boytacean the best Gameboy emulator out there!
+Don't hesitate to reach out if you have any questions. Join us in making Boytacean the best Game Boy and Game Boy Advance emulator out there!
 
 ## License
 

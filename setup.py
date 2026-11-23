@@ -1,46 +1,46 @@
-import os
-import sys
+from os.path import dirname, join, normpath
+from sys import executable
 
 try:
-    import setuptools
+    from setuptools import find_packages, setup
 except ImportError:
-    import subprocess
+    from subprocess import call
 
-    errno = subprocess.call([sys.executable, "-m", "pip", "install", "setuptools"])
+    errno = call([executable, "-m", "pip", "install", "setuptools"])
     if errno:
         print("Please install setuptools package")
         raise SystemExit(errno)
     else:
-        import setuptools
+        from setuptools import find_packages, setup
 
 try:
-    import setuptools_rust
+    from setuptools_rust import Binding, RustExtension
 except ImportError:
-    import subprocess
+    from subprocess import call
 
-    errno = subprocess.call([sys.executable, "-m", "pip", "install", "setuptools-rust"])
+    errno = call([executable, "-m", "pip", "install", "setuptools-rust"])
     if errno:
         print("Please install setuptools-rust package")
         raise SystemExit(errno)
     else:
-        import setuptools_rust
+        from setuptools_rust import Binding, RustExtension
 
-setuptools.setup(
+setup(
     name="boytacean",
-    version="0.14.0",
+    version="0.15.0",
     author="João Magalhães",
     author_email="joamag@gmail.com",
     description="A Game Boy emulator that is written in Rust",
     license="Apache License, Version 2.0",
     keywords="gameboy emulator rust",
     url="https://boytacean.joao.me",
-    packages=setuptools.find_packages(where=os.path.normpath("src/python")),
+    packages=find_packages(where=normpath("src/python")),
     test_suite="boytacean.test",
-    package_dir={"": os.path.normpath("src/python")},
+    package_dir={"": normpath("src/python")},
     rust_extensions=[
-        setuptools_rust.RustExtension(
+        RustExtension(
             "boytacean.boytacean",
-            binding=setuptools_rust.Binding.PyO3,
+            binding=Binding.PyO3,
             features=["python"],
             debug=False,
         )
@@ -64,7 +64,7 @@ setuptools.setup(
         "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3.12",
     ],
-    long_description=open(os.path.join(os.path.dirname(__file__), "README.md"), "rb")
+    long_description=open(join(dirname(__file__), "README.md"), "rb")
     .read()
     .decode("utf-8"),
     long_description_content_type="text/markdown",

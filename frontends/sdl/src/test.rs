@@ -41,7 +41,7 @@ mod tests {
     use std::{
         env::temp_dir,
         ffi::CString,
-        fs::{create_dir, read, remove_dir, remove_file, write},
+        fs::{copy, create_dir, read, remove_dir, remove_file, write},
         sync::Mutex,
     };
 
@@ -49,13 +49,14 @@ mod tests {
         gb::{GameBoy, GameBoyMode},
         gba::GameBoyAdvance,
         gba_test::{run_gba_image_test, GbaTestOptions},
-        system::System,
+        pad::PadKey,
+        system::{System, VOLUME, VOLUME_GBA},
         test::{run_image_test, TestOptions},
     };
     use image::io::Reader as ImageReader;
 
     use super::compare_images;
-    use crate::{Emulator, EmulatorOptions, VOLUME, VOLUME_GBA};
+    use crate::{Emulator, EmulatorOptions};
 
     static EMULATOR_LOCK: Mutex<()> = Mutex::new(());
 
@@ -238,6 +239,58 @@ mod tests {
             panic!("Expected Game Boy Advance system");
         }
         emulator.stop();
+    }
+
+    #[test]
+    fn test_emulator_reset() {
+        let _guard = EMULATOR_LOCK.lock().unwrap();
+        for (source, name, system, size) in [
+            (
+                "../../res/roms/game/shocklobster.gb",
+                "boytacean_sdl_reset_test.gb",
+                System::Gb(GameBoy::new(None)),
+                0x2000,
+            ),
+            (
+                "../../res/roms.gba/test/jsmolka_gba-tests/sram.gba",
+                "boytacean_sdl_reset_test.gba",
+                System::Gba(GameBoyAdvance::new()),
+                0x8000,
+            ),
+        ] {
+            let rom_path = temp_dir().join(name);
+            let ram_path = rom_path.with_extension("sav");
+            copy(source, &rom_path).unwrap();
+            let mut emulator = make_emulator(system);
+            if let System::Gb(gb) = &mut emulator.system {
+                gb.load(true).unwrap();
+            }
+            write(&ram_path, vec![0x24; size]).unwrap();
+            emulator.load_rom(Some(rom_path.to_str().unwrap())).unwrap();
+            assert_eq!(emulator.system.ram_data()[0], 0x24);
+            emulator.system.ram_data_mut()[0] = 0x42;
+            while emulator.system.ppu_frame() < 10 {
+                emulator.system.clock();
+            }
+            emulator.system.key_press(PadKey::A);
+            emulator.reset().unwrap();
+
+            // the game is restarted in memory, keeping its save RAM as it
+            // is (not the one of the file) and the held keys
+            assert_eq!(emulator.system.ppu_frame(), 0);
+            assert_eq!(emulator.system.ram_data()[0], 0x42);
+            assert_eq!(emulator.rom_path, rom_path.to_str().unwrap());
+            match &mut emulator.system {
+                System::Gb(gb) => {
+                    gb.pad().write(0xff00, 0x10); // selects the action keys
+                    assert_eq!(gb.pad_i().read(0xff00) & 0x01, 0x00);
+                }
+                System::Gba(gba) => assert_eq!(gba.cpu.bus.pad.keyinput() & 0x01, 0x00),
+            }
+            assert!(emulator.system.next_frame() > 0);
+            remove_file(rom_path).unwrap();
+            remove_file(ram_path).unwrap();
+        }
     }
 
     #[test]

@@ -19,6 +19,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 *
 
+## [0.15.0] - 2026-11-23
+
+### Added
+
+* Optional shaders in the web front-end (CRT, bilinear and smooth bilinear), the same as in the SDL front-end, chosen through a URL parameter
+* Documentation of the web front-end parameters for the Game Boy Advance mode, the shaders and the background color
+* Builds of the libretro core in the libretro infrastructure, the step before RetroArch can download it from its Online Updater - [#32](https://gitlab.stage.hive.pt/joamag/boytacean/-/issues/32)
+* Game Boy Advance games in the libretro core, with their saves and an optional BIOS - [#64](https://github.com/joamag/boytacean/issues/64)
+* Description of the Game Boy Advance emulation in the README
+* Default demo ROM for the Game Boy Advance in the web front-end, GeBurtstAg by zeichensystem
+
+### Changed
+
+* Dependency versions locked for every build of the project, from the libretro core to the Python package - [#32](https://gitlab.stage.hive.pt/joamag/boytacean/-/issues/32)
+
+### Fixed
+
+* License of the libretro core information file - [#32](https://gitlab.stage.hive.pt/joamag/boytacean/-/issues/32)
+* Name and version of the libretro core that could become invalid in RetroArch after being requested again - [#32](https://gitlab.stage.hive.pt/joamag/boytacean/-/issues/32)
+* Python package that could not be installed from its source package, as part of its sources was missing
+* In-game saves of the libretro core, which RetroArch could not keep - [#67](https://github.com/joamag/boytacean/issues/67)
+* Installation of the Python package from source with pip, which failed without setuptools-rust - [#65](https://github.com/joamag/boytacean/issues/65)
+* Import of the Python package without Pillow, which is optional - [#65](https://github.com/joamag/boytacean/issues/65)
+* Decoding of the compressed boot ROM logo, which failed on Python 3 - [#69](https://github.com/joamag/boytacean/issues/69)
+* Buttons held while resetting a Game Boy Advance game, which the game saw as released until pressed again - [#74](https://github.com/joamag/boytacean/issues/74)
+* In-game saves lost by a reset in the SDL front-end, which read the save file again instead of keeping the save in memory - [#74](https://github.com/joamag/boytacean/issues/74)
+
 ## [0.14.0] - 2026-11-21
 
 ### Added
@@ -54,14 +81,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Nightly documentation builds in GitHub Actions after a new Clippy check on the stack usage of debug builds
 
 ## [0.13.2] - 2026-07-28
-
-### Added
-
-*
-
-### Changed
-
-*
 
 ### Fixed
 

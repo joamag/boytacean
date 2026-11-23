@@ -1,6 +1,6 @@
 [package]
 name = "boytacean-sdl"
-version = "0.14.0"
+version = "0.15.0"
 authors = ["João Magalhães <joamag@gmail.com>"]
 description = "An SDL frontend for Boytacen"
 license = "Apache-2.0"
@@ -17,9 +17,9 @@ cpulog = ["boytacean/cpulog"]
 cartridge = ["boytacean-cartridge/serial"]
 
 [dependencies]
-boytacean = { path = "../..", version = "0.14.0" }
-boytacean-cartridge = { path = "../../crates/cartridge", version = "0.14.0", optional = true }
-boytacean-common = { path = "../../crates/common", version = "0.14.0" }
+boytacean = { path = "../..", version = "0.15.0" }
+boytacean-cartridge = { path = "../../crates/cartridge", version = "0.15.0", optional = true }
+boytacean-common = { path = "../../crates/common", version = "0.15.0" }
 clap = { version = "4", features = ["derive"] }
 image = "0.24"
 chrono = "0.4"

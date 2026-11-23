@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-import sys
+from sys import argv, exit
 
 STRIP_EXTRA = False
 
@@ -40,20 +40,19 @@ def lre_decode(encoded_data):
 
     while index < length:
         run_length = encoded_data[index]
-        run_length = ord(run_length)
         if run_length == 0:
             break
-        decoded.extend(encoded_data[index + 1] * run_length)
+        decoded.extend(bytes([encoded_data[index + 1]]) * run_length)
         index += 2
 
     return bytes(decoded)
 
 
 if __name__ == "__main__":
-    if not len(sys.argv) > 3:
+    if not len(argv) > 3:
         print("Usage: lre.py <mode> <infile> <outfile>")
-        sys.exit(1)
-    mode, infile, outfile = sys.argv[1:]
+        exit(1)
+    mode, infile, outfile = argv[1:]
 
     if mode in ("encode", "compress"):
         operation = lre_encode
