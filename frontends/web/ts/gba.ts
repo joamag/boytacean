@@ -17,6 +17,8 @@ import info from "../package.json";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 declare const require: any;
 
+const ROM_PATH = require("../../../res/roms.gba/demo/geburtstag/geburtstag.gba");
+
 /**
  * Top level class that controls the GBA emulator behaviour, adapting
  * the headless GBA core into the EmuKit emulator interface,
@@ -31,19 +33,20 @@ export class GbaEmulator extends GbaCore implements Emulator {
     }
 
     /**
-     * Starts the current machine, returning silently in case there's
-     * no ROM to be booted, as there's no default ROM for the GBA,
-     * meaning that the emulator waits for a ROM to be loaded via the
-     * file uploader.
+     * Starts the current machine, booting the default demo ROM
+     * (GeBurtstAg) in case no other ROM is provided, as the Game
+     * Boy emulator does with its own demo ROM.
      *
      * @param options The options that are going to be used in the
      * starting of the machine.
      */
     async boot(
-        options = {} as { romPath?: string; romData?: Uint8Array | null }
+        { romPath = ROM_PATH, ...options } = {} as {
+            romPath?: string;
+            romData?: Uint8Array | null;
+        }
     ) {
-        if (!options.romPath && !options.romData && !this.loaded) return;
-        await super.boot(options);
+        await super.boot({ romPath: romPath, ...options });
     }
 
     get name(): string {
