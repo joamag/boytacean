@@ -62,6 +62,13 @@ impl GbaPad {
         self.keyinput |= bit;
     }
 
+    /// Resets the keypad registers (KEYCNT and the pending interrupt),
+    /// keeping the held keys, as these remain held across a reset.
+    pub fn reset(&mut self) {
+        self.keycnt = 0;
+        self.int_keypad = false;
+    }
+
     fn key_bit(key: PadKey) -> u16 {
         match key {
             PadKey::A => 1 << 0,
@@ -215,6 +222,22 @@ mod tests {
         for key in &keys {
             pad.key_lift(*key);
         }
+        assert_eq!(pad.keyinput(), 0x03FF);
+    }
+
+    #[test]
+    fn test_reset() {
+        let mut pad = GbaPad::new();
+        pad.set_keycnt((1 << 14) | 0x0001);
+        pad.key_press(PadKey::A);
+        assert!(pad.int_keypad());
+        pad.reset();
+
+        // the registers are reset, while the held keys remain held
+        assert_eq!(pad.keycnt(), 0);
+        assert!(!pad.int_keypad());
+        assert_eq!(pad.keyinput(), 0x03FE);
+        pad.key_lift(PadKey::A);
         assert_eq!(pad.keyinput(), 0x03FF);
     }
 
