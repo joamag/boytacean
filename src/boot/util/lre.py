@@ -40,10 +40,9 @@ def lre_decode(encoded_data):
 
     while index < length:
         run_length = encoded_data[index]
-        run_length = ord(run_length)
         if run_length == 0:
             break
-        decoded.extend(encoded_data[index + 1] * run_length)
+        decoded.extend(bytes([encoded_data[index + 1]]) * run_length)
         index += 2
 
     return bytes(decoded)
