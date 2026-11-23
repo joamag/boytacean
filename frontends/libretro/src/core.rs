@@ -2,36 +2,27 @@
 //! such as RetroArch, running either a Game Boy or a Game Boy Advance
 //! through the unified [`System`] of the emulator.
 //!
-//! The frontend drives the core through the `retro_*` functions, that
-//! are exported with the C ABI: the core is initialized and receives
-//! the callbacks of the frontend (`retro_init()`, `retro_set_environment()`
-//! and the other setters), loads a game from its ROM data, creating the
-//! [`System`] of that ROM (`retro_load_game()`), and then runs it for a
-//! frame on each call of `retro_run()`. As the API is a C one, the state
-//! of the core lives in statics (the emulator, the callbacks of the
-//! frontend and the buffers shared with it).
+//! The frontend drives the core through the exported `retro_*`
+//! functions: the core is initialized with the callbacks of the
+//! frontend, loads a game creating the [`System`] of its ROM, and runs
+//! it for a frame on each `retro_run()`, keeping its state in statics,
+//! as the API is a C one.
 //!
-//! Each run clocks the system for the cycles of a frame, at its speed,
-//! counting the cycles run beyond it in the next one, and sends the new
-//! frames to the frontend (in the XRGB8888 pixel format) as they are
-//! completed, then the audio samples (scaled into the 16 bits range, at
-//! the same level for both systems), and finally polls the input of the
-//! frontend, pressing and lifting the keys whose state changed. The
-//! system is matched once per frame, outside of the hot loop of its
-//! clocks, with the loop of the GBA kept out of line, so that the one of
-//! the Game Boy is optimized as when it was the only one.
+//! Each run clocks the system for the cycles of a frame (counting the
+//! ones run beyond it in the next one), sends its new frames in the
+//! XRGB8888 format and its audio samples (at the same level for both
+//! systems), and polls the input, pressing and lifting only the keys
+//! that changed. The system is matched once per frame, outside of the
+//! hot loop of its clocks, with the loop of the GBA kept out of line.
 //!
-//! The save RAM of the cartridge (SRAM, flash or EEPROM) is exposed to
-//! the frontend as its buffer itself (`retro_get_memory_data()`), which
-//! the frontend keeps for its saves, so that buffer must remain the same
-//! across resets and state loads (as [`System::reload`] keeps it), with
-//! the EEPROM of the GBA starting with its largest size, as its size is
-//! only known once the game accesses it.
+//! The save RAM of the cartridge is exposed as its buffer itself, kept
+//! by the frontend, so it remains the same across resets and state
+//! loads (as [`System::reload`] keeps it), with the EEPROM of the GBA
+//! starting at its largest size, unknown until the game accesses it.
 //!
-//! Save states (in the BESS format), cheats and the DMG palette option
-//! are only supported by the Game Boy, while the GBA, whose BIOS calls
-//! are emulated, loads its BIOS (`gba_bios.bin`) from the system
-//! directory of the frontend when present.
+//! Save states, cheats and the DMG palette are only supported by the
+//! Game Boy, while the GBA loads its optional BIOS (`gba_bios.bin`)
+//! from the system directory of the frontend.
 
 use std::{
     collections::HashMap,
