@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Installation of the Python package from source with pip, which failed without setuptools-rust - [#65](https://github.com/joamag/boytacean/issues/65)
 * Import of the Python package without Pillow, which is optional - [#65](https://github.com/joamag/boytacean/issues/65)
 * Decoding of the compressed boot ROM logo, which failed on Python 3 - [#69](https://github.com/joamag/boytacean/issues/69)
+* Buttons held while resetting a Game Boy Advance game in the libretro core, which the game saw as released until pressed again
 
 ## [0.14.0] - 2026-11-21
 
