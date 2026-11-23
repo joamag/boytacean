@@ -47,14 +47,6 @@ use sdl2::{
 /// the window size to be displayed.
 const SCREEN_SCALE: f32 = 3.0;
 
-/// Base audio volume to be used as the basis of the
-/// amplification level of the volume for the Game Boy.
-const VOLUME: f32 = 64.0;
-
-/// Audio normalization factor for the GBA, scaled proportionally
-/// to the GB volume (web uses 100/32768, SDL uses 64/20972).
-const VOLUME_GBA: f32 = 20972.0;
-
 /// The rate (in seconds) at which the current battery
 /// backed RAM is going to be stored into the file system.
 const STORE_RATE: u8 = 5;
@@ -184,7 +176,7 @@ impl Emulator {
     pub fn new(system: System, options: EmulatorOptions) -> Self {
         let logic_frequency = system.cpu_freq();
         let visual_frequency = system.visual_freq();
-        let volume = if system.is_gba() { VOLUME_GBA } else { VOLUME };
+        let volume = system.audio_volume();
         let gb_mode = if let System::Gb(gb) = &system {
             gb.mode()
         } else {
@@ -404,11 +396,7 @@ impl Emulator {
         }
         self.logic_frequency = self.system.cpu_freq();
         self.visual_frequency = self.system.visual_freq();
-        self.volume = if self.system.is_gba() {
-            VOLUME_GBA
-        } else {
-            VOLUME
-        };
+        self.volume = self.system.audio_volume();
         self.next_tick_time = 0.0;
         self.next_tick_time_i = 0;
         self.start_base();
@@ -448,12 +436,9 @@ impl Emulator {
     }
 
     pub fn reset(&mut self) -> Result<(), Error> {
-        self.system.reset();
-        if let System::Gb(gb) = &mut self.system {
-            gb.load(true)?;
-        }
-        self.load_rom(None)?;
-        Ok(())
+        // the loaded game is restarted in memory, keeping its ROM, its
+        // save RAM and the held keys, as the libretro core does
+        self.system.reload()
     }
 
     pub fn apply_cheats(&mut self, cheats: &Vec<String>) {
