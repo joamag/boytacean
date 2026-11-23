@@ -9,7 +9,7 @@ A Game Boy and Game Boy Advance emulator that is written in Rust 🦀.
 ## Features
 
 * Game Boy (DMG) and Game Boy Color (CGB) emulation
-* Game Boy Advance (GBA) emulation, in the Web, SDL and Libretro front-ends
+* Game Boy Advance (GBA) emulation
 * GBA BIOS calls emulated (HLE), so that no BIOS is needed, with an optional real BIOS
 * GBA saves in SRAM, Flash and EEPROM cartridges
 * Simple navigable source-code
