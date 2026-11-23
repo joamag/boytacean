@@ -324,6 +324,19 @@ impl System {
             System::Gba(gba) => gba.reset(),
         }
     }
+
+    /// Restarts the loaded game, as the reset of the console does,
+    /// keeping its ROM, its save RAM (in the same buffer, so that the
+    /// pointers to it remain valid) and the held keys.
+    pub fn reload(&mut self) -> Result<(), Error> {
+        match self {
+            System::Gb(gb) => gb.reload(),
+            System::Gba(gba) => {
+                gba.reset();
+                Ok(())
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -789,5 +802,61 @@ mod tests {
         system.clock();
         system.reset();
         assert_eq!(system.ppu_frame(), 0);
+    }
+
+    #[test]
+    fn test_reload_gb() {
+        let mut system =
+            System::from_rom(include_bytes!("../res/roms/game/shocklobster.gb")).unwrap();
+        let buffer = if let System::Gb(gb) = &mut system {
+            gb.rom().ram_data_mut()[0] = 0x42;
+            gb.rom_i().ram_data().as_ptr()
+        } else {
+            panic!("Expected Game Boy system");
+        };
+        let title = system.rom_title();
+        system.next_frame();
+        system.key_press(PadKey::A);
+        system.reload().unwrap();
+
+        // the game restarts with its ROM, its save RAM (in the same
+        // buffer) and the held keys
+        assert_eq!(system.ppu_frame(), 0);
+        assert_eq!(system.rom_title(), title);
+        if let System::Gb(gb) = &mut system {
+            assert_eq!(gb.rom_i().ram_data().as_ptr(), buffer);
+            assert_eq!(gb.rom_i().ram_data()[0], 0x42);
+            gb.pad().write(0xff00, 0x10); // selects the action keys
+            assert_eq!(gb.pad_i().read(0xff00) & 0x01, 0x00);
+        }
+        assert!(system.next_frame() > 0);
+    }
+
+    #[test]
+    fn test_reload_gba() {
+        let mut system = System::from_rom(include_bytes!(
+            "../res/roms.gba/test/jsmolka_gba-tests/sram.gba"
+        ))
+        .unwrap();
+        let buffer = if let System::Gba(gba) = &mut system {
+            gba.cpu.bus.save.data[0] = 0x42;
+            gba.cpu.bus.save.data.as_ptr()
+        } else {
+            panic!("Expected GBA system");
+        };
+        system.next_frame();
+        system.key_press(PadKey::A);
+        system.reload().unwrap();
+
+        // the game restarts with its ROM, its save RAM (in the same
+        // buffer) and the held keys
+        assert_eq!(system.ppu_frame(), 0);
+        assert_eq!(system.rom_title(), "GBA Tests");
+        if let System::Gba(gba) = &system {
+            assert_eq!(gba.cpu.bus.save.data.as_ptr(), buffer);
+            assert_eq!(gba.cpu.bus.save.data[0], 0x42);
+            assert_eq!(gba.cpu.bus.pad.keyinput() & 0x01, 0x00);
+        }
+        assert!(system.next_frame() > 0);
     }
 }
