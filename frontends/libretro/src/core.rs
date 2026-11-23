@@ -1,3 +1,7 @@
+//! Implementation of the libretro API, the core loaded by frontends
+//! such as RetroArch, running either a Game Boy or a Game Boy Advance
+//! through the unified [`System`] of the emulator.
+
 use std::{
     collections::HashMap,
     ffi::CStr,
@@ -70,15 +74,25 @@ const EEPROM_SIZE: usize = 8192;
 /// from the system directory of the frontend when present.
 const BIOS_GBA: &str = "gba_bios.bin";
 
+/// The emulator of the loaded game, either a Game Boy or a GBA,
+/// created for the system of its ROM.
 static mut EMULATOR: Option<System> = None;
+/// The pressed state of each key of the joypad, as last polled,
+/// so that only the keys whose state changed are pressed or lifted.
 static mut KEY_STATES: Option<HashMap<RetroJoypad, bool>> = None;
+/// The buffer of the frame sent to the frontend, with its pixels
+/// in the XRGB8888 format (the pixel format set for the core).
 static mut FRAME_BUFFER: [u32; FRAME_BUFFER_SIZE] = [0x00; FRAME_BUFFER_SIZE];
+/// The name and version of the core, created only once, as the
+/// pointers to them must remain valid for the frontend.
 static mut INFO: LibRetroInfo = LibRetroInfo {
     name: "",
     version: "",
     name_s: String::new(),
     version_s: String::new(),
 };
+/// The extended information of the loaded game, filled by the
+/// frontend, used for the size of its ROM file.
 static mut GAME_INFO_EXT: RetroGameInfoExt = RetroGameInfoExt {
     full_path: std::ptr::null(),
     archive_path: std::ptr::null(),
@@ -93,24 +107,40 @@ static mut GAME_INFO_EXT: RetroGameInfoExt = RetroGameInfoExt {
     persistent_data: 0,
 };
 
+/// The system directory of the frontend, filled by it, where the
+/// BIOS of the GBA is looked for.
 static mut SYSTEM_DIRECTORY: *const c_char = std::ptr::null();
 
+/// The cycles run beyond the limit of the previous frame, that are
+/// counted in the next one, keeping the timing of the system.
 static mut PENDING_CYCLES: u32 = 0_u32;
 
+/// The callback of the frontend for its environment commands.
 static mut ENVIRONMENT_CALLBACK: Option<extern "C" fn(u32, *const c_void) -> bool> = None;
+/// The callback of the frontend that receives each new frame.
 static mut VIDEO_REFRESH_CALLBACK: Option<extern "C" fn(*const u8, c_uint, c_uint, usize)> = None;
+/// The callback of the frontend for a single audio sample, unused,
+/// as the samples are sent in batches.
 static mut AUDIO_SAMPLE_CALLBACK: Option<extern "C" fn(i16, i16)> = None;
+/// The callback of the frontend that receives the audio samples.
 static mut AUDIO_SAMPLE_BATCH_CALLBACK: Option<extern "C" fn(*const i16, usize)> = None;
+/// The callback of the frontend that polls its input devices.
 static mut INPUT_POLL_CALLBACK: Option<extern "C" fn()> = None;
+/// The callback of the frontend for the state of each input key.
 static mut INPUT_STATE_CALLBACK: Option<
     extern "C" fn(port: u32, device: u32, index: u32, id: u32) -> i16,
 > = None;
+/// If any of the core options changed, as reported by the frontend,
+/// so that their values are read again.
 static mut UPDATED: bool = false;
+/// The palette core option, whose value is read from the frontend.
 static mut VARIABLE: RetroVariable = RetroVariable {
     key: "palette\0".as_ptr() as *const c_char,
     value: std::ptr::null(),
 };
 
+/// The core options declared to the frontend, the palette of the
+/// DMG, terminated by an empty entry.
 const VARIABLES: [RetroVariable; 2] = [
     RetroVariable {
         key: "palette\0".as_ptr() as *const c_char,
@@ -122,6 +152,10 @@ const VARIABLES: [RetroVariable; 2] = [
         value: std::ptr::null(),
     },
 ];
+
+/// The content information override declared to the frontend, for
+/// the extensions of the core, whose ROMs are loaded from memory (no
+/// full path needed), terminated by an empty entry.
 const INFO_OVERRIDE: [RetroSystemContentInfoOverride; 2] = [
     RetroSystemContentInfoOverride {
         extensions: "gb|gbc|gba\0".as_ptr() as *const c_char,
@@ -135,6 +169,8 @@ const INFO_OVERRIDE: [RetroSystemContentInfoOverride; 2] = [
     },
 ];
 
+/// The keys of the joypad polled from the frontend, the ones with
+/// a key in the emulated systems.
 const KEYS: [RetroJoypad; 10] = [
     RetroJoypad::RetroDeviceIdJoypadUp,
     RetroJoypad::RetroDeviceIdJoypadDown,
@@ -148,6 +184,8 @@ const KEYS: [RetroJoypad; 10] = [
     RetroJoypad::RetroDeviceIdJoypadR,
 ];
 
+/// The keys of the libretro joypad, with the ids used by the
+/// frontend for them.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum RetroJoypad {
     RetroDeviceIdJoypadB = RETRO_DEVICE_ID_JOYPAD_B,
@@ -169,6 +207,7 @@ pub enum RetroJoypad {
 }
 
 impl RetroJoypad {
+    /// Obtains the readable name of the key.
     pub fn description(&self) -> &'static str {
         match self {
             RetroJoypad::RetroDeviceIdJoypadY => "Y",
@@ -197,12 +236,14 @@ impl Display for RetroJoypad {
     }
 }
 
+/// Obtains the version of the libretro API implemented by the core.
 #[no_mangle]
 pub extern "C" fn retro_api_version() -> c_uint {
     debugln!("retro_api_version()");
     RETRO_API_VERSION
 }
 
+/// Initializes the core, with a Game Boy until a game is loaded.
 #[no_mangle]
 pub extern "C" fn retro_init() {
     debugln!("retro_init()");
@@ -212,11 +253,13 @@ pub extern "C" fn retro_init() {
     }
 }
 
+/// Deinitializes the core, with nothing to release.
 #[no_mangle]
 pub extern "C" fn retro_deinit() {
     debugln!("retro_deinit()");
 }
 
+/// Resets the loaded game, as the reset of the system does.
 #[no_mangle]
 pub extern "C" fn retro_reset() {
     debugln!("retro_reset()");
@@ -230,6 +273,9 @@ pub extern "C" fn retro_reset() {
     }
 }
 
+/// Fills the information of the core, its name, version and the
+/// extensions of the ROMs it loads (from memory).
+///
 /// # Safety
 ///
 /// This function should be called only within Libretro context.
@@ -253,6 +299,9 @@ pub unsafe extern "C" fn retro_get_system_info(info: *mut RetroSystemInfo) {
     (*info).block_extract = u8::from(false);
 }
 
+/// Fills the audio and video information of the loaded system,
+/// setting the pixel format of its frames (XRGB8888).
+///
 /// # Safety
 ///
 /// This function should be called only within Libretro context.
@@ -282,6 +331,8 @@ pub unsafe extern "C" fn retro_get_system_av_info(info: *mut RetroSystemAvInfo) 
     }
 }
 
+/// Sets the environment callback of the frontend, declaring to it
+/// the core options and the content information override.
 #[no_mangle]
 pub extern "C" fn retro_set_environment(
     callback: Option<extern "C" fn(u32, *const c_void) -> bool>,
@@ -301,11 +352,15 @@ pub extern "C" fn retro_set_environment(
     }
 }
 
+/// Sets the device of a controller port, ignored, as the joypad
+/// is the only device of the core.
 #[no_mangle]
 pub extern "C" fn retro_set_controller_port_device() {
     debugln!("retro_set_controller_port_device()");
 }
 
+/// Runs the loaded system for the cycles of a frame, sending its
+/// frames and audio to the frontend and polling its input.
 #[no_mangle]
 pub extern "C" fn retro_run() {
     let emulator = unsafe { EMULATOR.as_mut().unwrap() };
@@ -316,6 +371,9 @@ pub extern "C" fn retro_run() {
     let input_state_cb = unsafe { INPUT_STATE_CALLBACK.as_ref().unwrap() };
     let key_states = unsafe { KEY_STATES.as_mut().unwrap() };
 
+    // the system runs for the cycles of a frame, at its current speed
+    // (eg: the double speed of the Game Boy Color), starting with the
+    // cycles run beyond the limit of the previous frame
     let mut counter_cycles = unsafe { PENDING_CYCLES };
     let cycle_limit = (emulator.cpu_freq() as f32 * emulator.multiplier() as f32
         / emulator.visual_freq())
@@ -384,6 +442,9 @@ pub extern "C" fn retro_run() {
     // we must handle it by sending it to the audio callback and
     // clearing the audio buffer
     if !emulator.audio_buffer().is_empty() {
+        // the samples are scaled into the 16 bits range of the frontend,
+        // the ones of the Game Boy multiplied by 256 and the ones of the
+        // GBA normalized to the same level
         let audio_buffer = if emulator.is_gba() {
             emulator
                 .audio_buffer()
@@ -401,6 +462,8 @@ pub extern "C" fn retro_run() {
         emulator.clear_audio_buffer();
     }
 
+    // polls the input of the frontend, pressing and lifting the keys
+    // whose state changed since the previous frame
     input_poll_cb();
 
     for key in KEYS {
@@ -418,12 +481,16 @@ pub extern "C" fn retro_run() {
     }
 }
 
+/// Obtains the region of the core (NTSC), the one of its timing.
 #[no_mangle]
 pub extern "C" fn retro_get_region() -> u32 {
     debugln!("retro_get_region()");
     REGION_NTSC
 }
 
+/// Loads the game with the ROM data provided by the frontend,
+/// creating the emulator for its system (Game Boy or GBA).
+///
 /// # Safety
 ///
 /// This function should be called only within Libretro context.
@@ -431,6 +498,9 @@ pub extern "C" fn retro_get_region() -> u32 {
 pub unsafe extern "C" fn retro_load_game(game: *const RetroGameInfo) -> bool {
     debugln!("retro_load_game()");
     let environment_cb = ENVIRONMENT_CALLBACK.as_ref().unwrap();
+
+    // obtains the extended information of the game, used for the
+    // size of its ROM file, printed when it is loaded
     if !environment_cb(
         RETRO_ENVIRONMENT_GET_GAME_INFO_EXT,
         addr_of!(GAME_INFO_EXT) as *const _ as *const c_void,
@@ -446,6 +516,8 @@ pub unsafe extern "C" fn retro_load_game(game: *const RetroGameInfo) -> bool {
             (*game).size
         },
     );
+    // creates the emulator for the system of the ROM (Game Boy or GBA),
+    // ready to run, from the ROM data loaded by the frontend
     let data_buffer = from_raw_parts((*game).data as *const u8, (*game).size);
     let mut instance = System::from_rom(data_buffer).unwrap();
 
@@ -478,10 +550,13 @@ pub unsafe extern "C" fn retro_load_game(game: *const RetroGameInfo) -> bool {
         }
     }
     EMULATOR = Some(instance);
+
+    // applies the values of the core options to the new emulator
     update_vars();
     true
 }
 
+/// Loads a special game (eg: made of several ROMs), unsupported.
 #[no_mangle]
 pub extern "C" fn retro_load_game_special(
     _system: u32,
@@ -492,6 +567,7 @@ pub extern "C" fn retro_load_game_special(
     false
 }
 
+/// Unloads the game, resetting the emulator.
 #[no_mangle]
 pub extern "C" fn retro_unload_game() {
     debugln!("retro_unload_game()");
@@ -499,6 +575,8 @@ pub extern "C" fn retro_unload_game() {
     instance.reset();
 }
 
+/// Obtains the size of the memory of the provided type, the save
+/// RAM of the cartridges with a battery being the only one exposed.
 #[no_mangle]
 pub extern "C" fn retro_get_memory_size(memory_id: u32) -> usize {
     debugln!("retro_get_memory_size()");
@@ -512,6 +590,9 @@ pub extern "C" fn retro_get_memory_size(memory_id: u32) -> usize {
     }
 }
 
+/// Obtains the pointer to the memory of the provided type, the
+/// buffer of the save RAM itself, read and written by the frontend
+/// (eg: for its saves), or null when there is none.
 #[no_mangle]
 pub extern "C" fn retro_get_memory_data(memory_id: u32) -> *mut c_void {
     debugln!("retro_get_memory_data()");
@@ -524,6 +605,7 @@ pub extern "C" fn retro_get_memory_data(memory_id: u32) -> *mut c_void {
     }
 }
 
+/// Obtains the size of the save states of the loaded system.
 #[no_mangle]
 pub extern "C" fn retro_serialize_size() -> usize {
     debugln!("retro_serialize_size()");
@@ -542,6 +624,8 @@ pub extern "C" fn retro_serialize_size() -> usize {
         .len()
 }
 
+/// Saves the state of the loaded system into the provided buffer,
+/// in the BESS format, failing when the buffer is too small.
 #[no_mangle]
 pub extern "C" fn retro_serialize(data: *mut c_void, size: usize) -> bool {
     debugln!("retro_serialize()");
@@ -570,12 +654,15 @@ pub extern "C" fn retro_serialize(data: *mut c_void, size: usize) -> bool {
             return false;
         }
     }
+
+    // copies the state into the buffer of the frontend, that fits it
     unsafe {
         ptr::copy_nonoverlapping(state.as_ptr(), data as *mut u8, state.len());
     }
     true
 }
 
+/// Loads the state of the loaded system from the provided buffer.
 #[no_mangle]
 pub extern "C" fn retro_unserialize(data: *const c_void, size: usize) -> bool {
     debugln!("retro_unserialize()");
@@ -594,6 +681,7 @@ pub extern "C" fn retro_unserialize(data: *const c_void, size: usize) -> bool {
     true
 }
 
+/// Removes all the cheats of the loaded system.
 #[no_mangle]
 pub extern "C" fn retro_cheat_reset() {
     debugln!("retro_cheat_reset()");
@@ -603,6 +691,9 @@ pub extern "C" fn retro_cheat_reset() {
     }
 }
 
+/// Adds the provided cheat code (Game Genie or GameShark) to the
+/// loaded system.
+///
 /// # Safety
 ///
 /// This function should be called only within Libretro context.
@@ -631,6 +722,8 @@ pub unsafe extern "C" fn retro_cheat_set(_index: c_uint, enabled: bool, code: *c
     }
 }
 
+/// Sets the video refresh callback of the frontend, that receives
+/// the frames of the core.
 #[no_mangle]
 pub extern "C" fn retro_set_video_refresh(
     callback: Option<extern "C" fn(*const u8, c_uint, c_uint, usize)>,
@@ -641,6 +734,8 @@ pub extern "C" fn retro_set_video_refresh(
     }
 }
 
+/// Sets the audio sample callback of the frontend, for a single
+/// sample (unused, as the samples are sent in batches).
 #[no_mangle]
 pub extern "C" fn retro_set_audio_sample(callback: Option<extern "C" fn(i16, i16)>) {
     debugln!("retro_set_audio_sample()");
@@ -649,6 +744,8 @@ pub extern "C" fn retro_set_audio_sample(callback: Option<extern "C" fn(i16, i16
     }
 }
 
+/// Sets the audio sample batch callback of the frontend, that
+/// receives the audio samples of the core.
 #[no_mangle]
 pub extern "C" fn retro_set_audio_sample_batch(callback: Option<extern "C" fn(*const i16, usize)>) {
     debugln!("retro_set_audio_sample_batch()");
@@ -657,6 +754,8 @@ pub extern "C" fn retro_set_audio_sample_batch(callback: Option<extern "C" fn(*c
     }
 }
 
+/// Sets the input poll callback of the frontend, called before
+/// reading the state of the keys.
 #[no_mangle]
 pub extern "C" fn retro_set_input_poll(callback: Option<extern "C" fn()>) {
     debugln!("retro_set_input_poll()");
@@ -665,6 +764,8 @@ pub extern "C" fn retro_set_input_poll(callback: Option<extern "C" fn()>) {
     }
 }
 
+/// Sets the input state callback of the frontend, that reports the
+/// state of each key of the joypad.
 #[no_mangle]
 pub extern "C" fn retro_set_input_state(
     callback: Option<extern "C" fn(port: u32, device: u32, index: u32, id: u32) -> i16>,
@@ -724,10 +825,14 @@ fn run_gba(gba: &mut GameBoyAdvance, mut counter_cycles: u32, cycle_limit: u32) 
     }
 }
 
+/// Reads the values of the core options from the frontend, applying
+/// them to the emulator.
 unsafe fn update_vars() {
     update_palette();
 }
 
+/// Reads the palette core option from the frontend, applying its
+/// colors to the DMG palette of the Game Boy.
 unsafe fn update_palette() {
     let emulator = EMULATOR.as_mut().unwrap();
     let environment_cb = ENVIRONMENT_CALLBACK.as_ref().unwrap();
@@ -737,6 +842,8 @@ unsafe fn update_palette() {
     ) {
         warnln!("Failed to get variable");
     }
+
+    // without a value for the option the palette is kept as is
     if VARIABLE.value.is_null() {
         return;
     }
@@ -749,6 +856,8 @@ unsafe fn update_palette() {
     }
 }
 
+/// Converts a key of the libretro joypad into the key of the
+/// emulated systems, if it has one.
 fn retro_key_to_pad(retro_key: RetroJoypad) -> Option<PadKey> {
     match retro_key {
         RetroJoypad::RetroDeviceIdJoypadUp => Some(PadKey::Up),
