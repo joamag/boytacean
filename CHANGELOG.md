@@ -23,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Name and version of the libretro core that could become invalid in RetroArch after being requested again - [#32](https://gitlab.stage.hive.pt/joamag/boytacean/-/issues/32)
 * Python package that could not be installed from its source package, as part of its sources was missing
 * In-game saves of the libretro core, which RetroArch could not keep - [#67](https://github.com/joamag/boytacean/issues/67)
+* Installation of the Python package from source with pip, which failed without setuptools-rust - [#65](https://github.com/joamag/boytacean/issues/65)
+* Import of the Python package without Pillow, which is optional - [#65](https://github.com/joamag/boytacean/issues/65)
 
 ## [0.14.0] - 2026-11-21
 

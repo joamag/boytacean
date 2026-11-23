@@ -1,6 +1,6 @@
-import os
-import tempfile
-import unittest
+from os import unlink
+from tempfile import NamedTemporaryFile
+from unittest import TestCase, skipUnless
 
 from io import BytesIO
 from os.path import dirname, exists, realpath, join
@@ -38,24 +38,24 @@ def _has_module(name: str) -> bool:
         return False
 
 
-requires_pocket = unittest.skipUnless(
+requires_pocket = skipUnless(
     exists(POCKET_ROM_PATH),
     f"pocket.gb not present at {POCKET_ROM_PATH}; skipping ROM-dependent test",
 )
-requires_acid2 = unittest.skipUnless(
+requires_acid2 = skipUnless(
     exists(ACID2_ROM_PATH),
     f"dmg_acid2.gb not present at {ACID2_ROM_PATH}; skipping ROM-dependent test",
 )
 
-requires_numpy = unittest.skipUnless(
+requires_numpy = skipUnless(
     _has_module("numpy"), "numpy not installed; skipping ndarray-dependent test"
 )
-requires_pillow = unittest.skipUnless(
+requires_pillow = skipUnless(
     _has_module("PIL"), "Pillow not installed; skipping image-dependent test"
 )
 
 
-class PyBoyV2Test(unittest.TestCase):
+class PyBoyV2Test(TestCase):
 
     def test_alias(self):
         self.assertIs(PyBoy, PyBoyV2)
@@ -154,7 +154,7 @@ class PyBoyV2Test(unittest.TestCase):
 
 
 @requires_pocket
-class PyBoyV1Test(unittest.TestCase):
+class PyBoyV1Test(TestCase):
 
     def test_pocket(self):
         with PyBoyV1(
@@ -200,7 +200,7 @@ class PyBoyV1Test(unittest.TestCase):
 
 
 @requires_acid2
-class TileTest(unittest.TestCase):
+class TileTest(TestCase):
 
     @requires_numpy
     @requires_pillow
@@ -229,7 +229,7 @@ class TileTest(unittest.TestCase):
 
 
 @requires_acid2
-class SpriteTest(unittest.TestCase):
+class SpriteTest(TestCase):
 
     def test_sprite(self):
         with PyBoyV2(ACID2_ROM_PATH, window="headless", sound_emulated=False) as pb:
@@ -258,7 +258,7 @@ class SpriteTest(unittest.TestCase):
 
 
 @requires_acid2
-class TileMapTest(unittest.TestCase):
+class TileMapTest(TestCase):
 
     def test_tilemap_attributes(self):
         with PyBoyV2(ACID2_ROM_PATH, window="headless", sound_emulated=False) as pb:
@@ -300,7 +300,7 @@ class TileMapTest(unittest.TestCase):
                 TileMap(pb, "INVALID")
 
 
-class GameWrapperTest(unittest.TestCase):
+class GameWrapperTest(TestCase):
 
     @requires_pocket
     def test_generic_wrapper_auto_selected(self):
@@ -376,10 +376,10 @@ class GameWrapperTest(unittest.TestCase):
 
 
 @requires_acid2
-class SymbolLookupTest(unittest.TestCase):
+class SymbolLookupTest(TestCase):
 
     def _write_sym(self) -> str:
-        sym = tempfile.NamedTemporaryFile(
+        sym = NamedTemporaryFile(
             suffix=".sym", mode="w", delete=False, encoding="utf-8"
         )
         sym.write("[labels]\n; comment\n00:0100 EntryPoint\n02:6000 BankedFunc\n")
@@ -400,11 +400,11 @@ class SymbolLookupTest(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     pb.symbol_lookup("nope")
         finally:
-            os.unlink(path)
+            unlink(path)
 
 
 @requires_acid2
-class HookTest(unittest.TestCase):
+class HookTest(TestCase):
 
     def test_register_and_deregister(self):
         with PyBoyV2(ACID2_ROM_PATH, window="headless", sound_emulated=False) as pb:
@@ -434,7 +434,7 @@ class HookTest(unittest.TestCase):
 
 
 @requires_acid2
-class MemoryScannerTest(unittest.TestCase):
+class MemoryScannerTest(TestCase):
 
     def test_scan_exact(self):
         with PyBoyV2(ACID2_ROM_PATH, window="headless", sound_emulated=False) as pb:
@@ -498,7 +498,7 @@ class MemoryScannerTest(unittest.TestCase):
 
 
 @requires_acid2
-class GameSharkTest(unittest.TestCase):
+class GameSharkTest(TestCase):
 
     def test_apply_8bit_write(self):
         with PyBoyV2(ACID2_ROM_PATH, window="headless", sound_emulated=False) as pb:
@@ -542,7 +542,7 @@ class GameSharkTest(unittest.TestCase):
 
 
 @requires_acid2
-class BotSupportManagerTest(unittest.TestCase):
+class BotSupportManagerTest(TestCase):
 
     def test_manager_type(self):
         with PyBoyV1(ACID2_ROM_PATH, disable_renderer=True, sound_emulated=False) as pb:

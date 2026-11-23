@@ -13,8 +13,8 @@ Usage:
     mode: the output format (buffer, hex, hexbytes, bytes)
 """
 
-import sys
-import binascii
+from sys import argv
+from binascii import hexlify
 
 
 def print_buffer(filename, mode="buffer"):
@@ -36,7 +36,7 @@ def print_buffer(filename, mode="buffer"):
             counter += 1
 
     elif mode == "hexbytes":
-        hex_data = binascii.hexlify(data).decode()
+        hex_data = hexlify(data).decode()
         escaped_data = "".join(
             "\\x" + hex_data[i : i + 2] for i in range(0, len(hex_data), 2)
         )
@@ -51,13 +51,13 @@ def _ord(byte):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
+    if len(argv) < 2:
         print("Missing arguments")
         exit(1)
 
     mode = "buffer"
 
-    if len(sys.argv) > 2:
-        mode = sys.argv[2]
+    if len(argv) > 2:
+        mode = argv[2]
 
-    print_buffer(sys.argv[1], mode=mode)
+    print_buffer(argv[1], mode=mode)

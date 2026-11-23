@@ -1,4 +1,4 @@
-import unittest
+from unittest import TestCase, skipUnless
 
 from os.path import dirname, exists, realpath, join
 
@@ -8,9 +8,9 @@ CURRENT_DIR = dirname(realpath(__file__))
 POCKET_ROM_PATH = join(CURRENT_DIR, "../../../../res/roms/demo/pocket.gb")
 
 
-class BaseTest(unittest.TestCase):
+class BaseTest(TestCase):
 
-    @unittest.skipUnless(
+    @skipUnless(
         exists(POCKET_ROM_PATH),
         f"pocket.gb not present at {POCKET_ROM_PATH}; skipping ROM-dependent test",
     )
