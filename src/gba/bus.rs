@@ -1051,9 +1051,9 @@ impl GbaBus {
         self.save.reset();
         self.ppu.reset();
         self.apu.reset();
+        self.pad.reset();
         self.dma = GbaDma::new();
         self.timers = GbaTimers::new();
-        self.pad = GbaPad::new();
         self.irq = IrqController::new();
         self.waitcnt = 0;
         self.siocnt = 0;
@@ -1081,14 +1081,17 @@ impl Default for GbaBus {
 #[cfg(test)]
 mod tests {
     use super::GbaBus;
-    use crate::gba::consts::{
-        IRQ_SERIAL, REG_BG2PA, REG_BG2PB, REG_BG2PC, REG_BG2PD, REG_BG2X, REG_BG2Y, REG_BG3PA,
-        REG_BG3PB, REG_BG3PC, REG_BG3PD, REG_BG3X, REG_BG3Y, REG_BLDALPHA, REG_BLDCNT, REG_BLDY,
-        REG_DISPCNT, REG_DMA0SAD, REG_DMA1CNT_H, REG_DMA1CNT_L, REG_DMA1DAD, REG_DMA1SAD,
-        REG_FIFO_A, REG_IE, REG_IF, REG_IME, REG_KEYINPUT, REG_MOSAIC, REG_RCNT, REG_SIOCNT,
-        REG_SIOMLT_SEND, REG_SIOMULTI0, REG_SIOMULTI1, REG_SIOMULTI3, REG_SOUNDCNT_H,
-        REG_SOUNDCNT_L, REG_SOUNDCNT_X, REG_TM0CNT_H, REG_TM0CNT_L, REG_WIN0H, REG_WIN0V,
-        REG_WIN1H, REG_WIN1V, REG_WININ, REG_WINOUT,
+    use crate::{
+        gba::consts::{
+            IRQ_SERIAL, REG_BG2PA, REG_BG2PB, REG_BG2PC, REG_BG2PD, REG_BG2X, REG_BG2Y, REG_BG3PA,
+            REG_BG3PB, REG_BG3PC, REG_BG3PD, REG_BG3X, REG_BG3Y, REG_BLDALPHA, REG_BLDCNT,
+            REG_BLDY, REG_DISPCNT, REG_DMA0SAD, REG_DMA1CNT_H, REG_DMA1CNT_L, REG_DMA1DAD,
+            REG_DMA1SAD, REG_FIFO_A, REG_IE, REG_IF, REG_IME, REG_KEYINPUT, REG_MOSAIC, REG_RCNT,
+            REG_SIOCNT, REG_SIOMLT_SEND, REG_SIOMULTI0, REG_SIOMULTI1, REG_SIOMULTI3,
+            REG_SOUNDCNT_H, REG_SOUNDCNT_L, REG_SOUNDCNT_X, REG_TM0CNT_H, REG_TM0CNT_L, REG_WIN0H,
+            REG_WIN0V, REG_WIN1H, REG_WIN1V, REG_WININ, REG_WINOUT,
+        },
+        pad::PadKey,
     };
 
     #[test]
@@ -2369,9 +2372,15 @@ mod tests {
         bus.write16(REG_SIOMLT_SEND, 0x1234);
         bus.write16(REG_SIOCNT, 0x2083);
         bus.write16(REG_RCNT, 0x8000);
+        bus.pad.set_keycnt((1 << 14) | 0x0001);
+        bus.pad.key_press(PadKey::A);
         bus.reset();
         assert_eq!(bus.read32(0x0200_0000), 0);
         assert!(!bus.halt_requested);
+
+        // the keypad registers are reset, keeping the held keys
+        assert_eq!(bus.pad.keycnt(), 0);
+        assert_eq!(bus.pad.keyinput(), 0x03FE);
 
         // BIOS open bus and serial state match a cold boot
         assert_eq!(bus.read32(0x0000_0000), 0xE129F000);

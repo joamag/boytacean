@@ -21,7 +21,16 @@ use crate::{
     gba::{rom::is_gba_rom, GameBoyAdvance},
     pad::PadKey,
     rom::Cartridge,
+    state::{SaveStateFormat, StateManager},
 };
+
+/// Base audio volume to be used as the basis of the
+/// amplification level of the volume for the Game Boy.
+pub const VOLUME: f32 = 64.0;
+
+/// Audio normalization factor for the GBA, scaled proportionally
+/// to the GB volume (web uses 100/32768, SDL uses 64/20972).
+pub const VOLUME_GBA: f32 = 20972.0;
 
 /// ROM/Cartridge information returned by [`System::load_rom_file`].
 ///
@@ -200,15 +209,36 @@ impl System {
         }
     }
 
-    pub fn save_ram_file(&self, path: &str) -> Result<(), Error> {
+    /// If the cartridge of the loaded game has a battery, keeping
+    /// its save RAM, which should then be persisted (eg: in a file).
+    pub fn has_battery(&self) -> bool {
         match self {
-            System::Gb(gb) if gb.rom_i().has_battery() => {
-                boytacean_common::util::write_file(path, gb.rom_i().ram_data(), None)?;
-            }
-            System::Gba(gba) if gba.has_battery() => {
-                boytacean_common::util::write_file(path, &gba.cpu.bus.save.data, None)?;
-            }
-            _ => {}
+            System::Gb(gb) => gb.rom_i().has_battery(),
+            System::Gba(gba) => gba.has_battery(),
+        }
+    }
+
+    /// Obtains the save RAM of the cartridge of the loaded game.
+    pub fn ram_data(&self) -> &[u8] {
+        match self {
+            System::Gb(gb) => gb.rom_i().ram_data(),
+            System::Gba(gba) => &gba.cpu.bus.save.data,
+        }
+    }
+
+    /// Obtains the save RAM of the cartridge of the loaded game to be
+    /// written, as a slice, so that its buffer (and the pointers to it,
+    /// eg: the one of a libretro frontend) remains the same.
+    pub fn ram_data_mut(&mut self) -> &mut [u8] {
+        match self {
+            System::Gb(gb) => gb.rom().ram_data_mut(),
+            System::Gba(gba) => &mut gba.cpu.bus.save.data,
+        }
+    }
+
+    pub fn save_ram_file(&self, path: &str) -> Result<(), Error> {
+        if self.has_battery() {
+            boytacean_common::util::write_file(path, self.ram_data(), None)?;
         }
         Ok(())
     }
@@ -297,6 +327,16 @@ impl System {
         }
     }
 
+    /// Obtains the audio volume of the system, the level of its samples,
+    /// used by the frontends to normalize them, so that both systems
+    /// play at the same level.
+    pub fn audio_volume(&self) -> f32 {
+        match self {
+            System::Gb(_) => VOLUME,
+            System::Gba(_) => VOLUME_GBA,
+        }
+    }
+
     pub fn description_debug(&self) -> String {
         match self {
             System::Gb(gb) => gb.description_debug(),
@@ -324,6 +364,71 @@ impl System {
             System::Gba(gba) => gba.reset(),
         }
     }
+
+    /// Restarts the loaded game, as the reset of the console does,
+    /// keeping its ROM, its save RAM (in the same buffer, so that the
+    /// pointers to it remain valid) and the held keys.
+    pub fn reload(&mut self) -> Result<(), Error> {
+        match self {
+            System::Gb(gb) => gb.reload(),
+            System::Gba(gba) => {
+                gba.reset();
+                Ok(())
+            }
+        }
+    }
+
+    /// If the system supports save states, which only the Game Boy does.
+    pub fn has_states(&self) -> bool {
+        match self {
+            System::Gb(_) => true,
+            System::Gba(_) => false,
+        }
+    }
+
+    /// Saves the state of the system in the provided format (or the
+    /// default one), failing for a system without save states.
+    pub fn save_state(&mut self, format: Option<SaveStateFormat>) -> Result<Vec<u8>, Error> {
+        match self {
+            System::Gb(gb) => StateManager::save(gb, format, None),
+            System::Gba(_) => Err(Error::NotImplemented),
+        }
+    }
+
+    /// Loads the provided state into the system, failing for a system
+    /// without save states.
+    pub fn load_state(&mut self, data: &[u8]) -> Result<(), Error> {
+        match self {
+            System::Gb(gb) => StateManager::load(data, gb, None, None),
+            System::Gba(_) => Err(Error::NotImplemented),
+        }
+    }
+
+    /// If the system supports cheats (Game Genie and GameShark codes),
+    /// which only the Game Boy does.
+    pub fn has_cheats(&self) -> bool {
+        match self {
+            System::Gb(_) => true,
+            System::Gba(_) => false,
+        }
+    }
+
+    /// Adds the provided cheat code to the system, failing for a system
+    /// without cheats.
+    pub fn add_cheat_code(&mut self, code: &str) -> Result<bool, Error> {
+        match self {
+            System::Gb(gb) => gb.add_cheat_code(code),
+            System::Gba(_) => Err(Error::NotImplemented),
+        }
+    }
+
+    /// Removes all the cheats of the system, if it has any.
+    pub fn reset_cheats(&mut self) {
+        match self {
+            System::Gb(gb) => gb.reset_cheats(),
+            System::Gba(_) => {}
+        }
+    }
 }
 
 #[cfg(test)]
@@ -333,11 +438,14 @@ mod tests {
         fs::{read, remove_file, write},
     };
 
+    use boytacean_common::error::Error;
+
     use super::System;
     use crate::{
         gb::{GameBoy, GameBoyMode},
         gba::GameBoyAdvance,
         pad::PadKey,
+        state::{SaveStateFormat, StateManager},
     };
 
     #[test]
@@ -634,6 +742,73 @@ mod tests {
     }
 
     #[test]
+    fn test_has_battery() {
+        for (data, battery) in [
+            (
+                include_bytes!("../res/roms/game/shocklobster.gb").as_slice(),
+                true,
+            ),
+            (
+                include_bytes!("../res/roms/test/blargg/cgb_sound/cgb_sound.gb"),
+                false,
+            ),
+            (
+                include_bytes!("../res/roms.gba/test/jsmolka_gba-tests/sram.gba"),
+                true,
+            ),
+            (
+                include_bytes!("../res/roms.gba/test/jsmolka_gba-tests/none.gba"),
+                false,
+            ),
+        ] {
+            let system = System::from_rom(data).unwrap();
+            assert_eq!(system.has_battery(), battery);
+        }
+    }
+
+    #[test]
+    fn test_ram_data() {
+        let system = System::from_rom(include_bytes!("../res/roms/game/shocklobster.gb")).unwrap();
+        if let System::Gb(gb) = &system {
+            assert_eq!(system.ram_data().as_ptr(), gb.rom_i().ram_data().as_ptr());
+        }
+        assert_eq!(system.ram_data().len(), 8192);
+        let system = System::from_rom(include_bytes!(
+            "../res/roms.gba/test/jsmolka_gba-tests/sram.gba"
+        ))
+        .unwrap();
+        if let System::Gba(gba) = &system {
+            assert_eq!(system.ram_data().as_ptr(), gba.cpu.bus.save.data.as_ptr());
+        }
+        assert_eq!(system.ram_data().len(), 0x8000);
+    }
+
+    #[test]
+    fn test_ram_data_mut() {
+        // the writes to the save RAM are read by the game, in the same
+        // buffer as the one of the save RAM to be read
+        let mut system =
+            System::from_rom(include_bytes!("../res/roms/game/shocklobster.gb")).unwrap();
+        let buffer = system.ram_data().as_ptr();
+        system.ram_data_mut()[1] = 0x42;
+        assert_eq!(system.ram_data_mut().as_ptr(), buffer);
+        if let System::Gb(gb) = &mut system {
+            gb.write_memory(0x0000, 0x0a);
+            assert_eq!(gb.read_memory(0xa001), 0x42);
+        }
+        let mut system = System::from_rom(include_bytes!(
+            "../res/roms.gba/test/jsmolka_gba-tests/sram.gba"
+        ))
+        .unwrap();
+        let buffer = system.ram_data().as_ptr();
+        system.ram_data_mut()[1] = 0x42;
+        assert_eq!(system.ram_data_mut().as_ptr(), buffer);
+        if let System::Gba(gba) = &mut system {
+            assert_eq!(gba.cpu.bus.read8(0x0e000001), 0x42);
+        }
+    }
+
+    #[test]
     fn test_save_ram_file_without_battery() {
         for system in [
             System::Gb(GameBoy::new(None)),
@@ -749,6 +924,14 @@ mod tests {
     }
 
     #[test]
+    fn test_audio_volume() {
+        let system = System::Gb(GameBoy::new(None));
+        assert_eq!(system.audio_volume(), 64.0);
+        let system = System::Gba(GameBoyAdvance::new());
+        assert_eq!(system.audio_volume(), 20972.0);
+    }
+
+    #[test]
     fn test_description_debug() {
         let system = System::from_rom(include_bytes!("../res/roms/demo/pocket.gb")).unwrap();
         if let System::Gb(gb) = &system {
@@ -789,5 +972,147 @@ mod tests {
         system.clock();
         system.reset();
         assert_eq!(system.ppu_frame(), 0);
+    }
+
+    #[test]
+    fn test_reload_gb() {
+        let mut system =
+            System::from_rom(include_bytes!("../res/roms/game/shocklobster.gb")).unwrap();
+        let buffer = if let System::Gb(gb) = &mut system {
+            gb.rom().ram_data_mut()[0] = 0x42;
+            gb.rom_i().ram_data().as_ptr()
+        } else {
+            panic!("Expected Game Boy system");
+        };
+        let title = system.rom_title();
+        system.next_frame();
+        system.key_press(PadKey::A);
+        system.reload().unwrap();
+
+        // the game restarts with its ROM, its save RAM (in the same
+        // buffer) and the held keys
+        assert_eq!(system.ppu_frame(), 0);
+        assert_eq!(system.rom_title(), title);
+        if let System::Gb(gb) = &mut system {
+            assert_eq!(gb.rom_i().ram_data().as_ptr(), buffer);
+            assert_eq!(gb.rom_i().ram_data()[0], 0x42);
+            gb.pad().write(0xff00, 0x10); // selects the action keys
+            assert_eq!(gb.pad_i().read(0xff00) & 0x01, 0x00);
+        }
+        assert!(system.next_frame() > 0);
+    }
+
+    #[test]
+    fn test_reload_gba() {
+        let mut system = System::from_rom(include_bytes!(
+            "../res/roms.gba/test/jsmolka_gba-tests/sram.gba"
+        ))
+        .unwrap();
+        let buffer = if let System::Gba(gba) = &mut system {
+            gba.cpu.bus.save.data[0] = 0x42;
+            gba.cpu.bus.save.data.as_ptr()
+        } else {
+            panic!("Expected GBA system");
+        };
+        system.next_frame();
+        system.key_press(PadKey::A);
+        system.reload().unwrap();
+
+        // the game restarts with its ROM, its save RAM (in the same
+        // buffer) and the held keys
+        assert_eq!(system.ppu_frame(), 0);
+        assert_eq!(system.rom_title(), "GBA Tests");
+        if let System::Gba(gba) = &system {
+            assert_eq!(gba.cpu.bus.save.data.as_ptr(), buffer);
+            assert_eq!(gba.cpu.bus.save.data[0], 0x42);
+            assert_eq!(gba.cpu.bus.pad.keyinput() & 0x01, 0x00);
+        }
+        assert!(system.next_frame() > 0);
+    }
+
+    #[test]
+    fn test_has_states() {
+        assert!(System::Gb(GameBoy::new(None)).has_states());
+        assert!(!System::Gba(GameBoyAdvance::new()).has_states());
+    }
+
+    #[test]
+    fn test_save_state() {
+        let mut system = System::from_rom(include_bytes!("../res/roms/demo/pocket.gb")).unwrap();
+        let state = system.save_state(Some(SaveStateFormat::Bess)).unwrap();
+        if let System::Gb(gb) = &mut system {
+            let expected = StateManager::save(gb, Some(SaveStateFormat::Bess), None).unwrap();
+            assert_eq!(state, expected);
+        }
+        let mut system = System::Gba(GameBoyAdvance::new());
+        assert_eq!(system.save_state(None), Err(Error::NotImplemented));
+    }
+
+    #[test]
+    fn test_load_state() {
+        // the state restores the memory of the system, as it was saved
+        let mut system = System::from_rom(include_bytes!("../res/roms/demo/pocket.gb")).unwrap();
+        if let System::Gb(gb) = &mut system {
+            gb.write_memory(0xc000, 0x42);
+        }
+        let state = system.save_state(Some(SaveStateFormat::Bess)).unwrap();
+        if let System::Gb(gb) = &mut system {
+            gb.write_memory(0xc000, 0x24);
+        }
+        system.load_state(&state).unwrap();
+        if let System::Gb(gb) = &mut system {
+            assert_eq!(gb.read_memory(0xc000), 0x42);
+        }
+        assert!(system.load_state(&[0x00; 16]).is_err());
+        let mut system = System::Gba(GameBoyAdvance::new());
+        assert_eq!(system.load_state(&state), Err(Error::NotImplemented));
+    }
+
+    #[test]
+    fn test_has_cheats() {
+        assert!(System::Gb(GameBoy::new(None)).has_cheats());
+        assert!(!System::Gba(GameBoyAdvance::new()).has_cheats());
+    }
+
+    #[test]
+    fn test_add_cheat_code() {
+        let mut system =
+            System::from_rom(include_bytes!("../res/roms/game/shocklobster.gb")).unwrap();
+        assert_eq!(system.add_cheat_code("00A-17B-C49"), Ok(true));
+        if let System::Gb(gb) = &system {
+            assert!(gb
+                .rom_i()
+                .game_genie()
+                .as_ref()
+                .unwrap()
+                .contains_addr(0x4a17));
+        }
+        assert!(system.add_cheat_code("invalid").is_err());
+        let mut system = System::Gba(GameBoyAdvance::new());
+        assert_eq!(
+            system.add_cheat_code("00A-17B-C49"),
+            Err(Error::NotImplemented)
+        );
+    }
+
+    #[test]
+    fn test_reset_cheats() {
+        let mut system =
+            System::from_rom(include_bytes!("../res/roms/game/shocklobster.gb")).unwrap();
+        system.add_cheat_code("00A-17B-C49").unwrap();
+        system.reset_cheats();
+        if let System::Gb(gb) = &system {
+            assert!(!gb
+                .rom_i()
+                .game_genie()
+                .as_ref()
+                .unwrap()
+                .contains_addr(0x4a17));
+        }
+
+        // the GBA has no cheats to remove
+        let mut system = System::Gba(GameBoyAdvance::new());
+        system.reset_cheats();
+        assert!(system.is_gba());
     }
 }
