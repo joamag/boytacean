@@ -1,6 +1,6 @@
 # [Boytacean](https://boytacean.joao.me)
 
-A Game Boy emulator that is written in Rust 🦀.
+A Game Boy and Game Boy Advance emulator that is written in Rust 🦀.
 
 <a href="https://boytacean.joao.me" target="_blank"><img src="https://github.com/joamag/boytacean/raw/master/res/videos/002-mario.low.gif" width="360" /></a>
 
@@ -9,6 +9,9 @@ A Game Boy emulator that is written in Rust 🦀.
 ## Features
 
 * Game Boy (DMG) and Game Boy Color (CGB) emulation
+* Game Boy Advance (GBA) emulation, in the Web, SDL and Libretro front-ends
+* GBA BIOS calls emulated (HLE), so that no BIOS is needed, with an optional real BIOS
+* GBA saves in SRAM, Flash and EEPROM cartridges
 * Simple navigable source-code
 * Web, [SDL](https://www.libsdl.org) and [Libretro](https://www.libretro.com) front-ends
 * Audio, with a pretty accurate APU
@@ -21,6 +24,7 @@ A Game Boy emulator that is written in Rust 🦀.
 * Cheat support using [Game Genie](https://en.wikipedia.org/wiki/Game_Genie) and [GameShark](https://pt.wikipedia.org/wiki/GameShark) codes
 * Variable CPU clock speed
 * Accurate PPU - passes [dmg-acid2](https://github.com/mattcurrie/dmg-acid2) and [cgb-acid2](https://github.com/mattcurrie/cgb-acid2) tests
+* Accurate GBA CPU and memory - passes the [gba-tests](https://github.com/jsmolka/gba-tests) of jsmolka (ARM, Thumb, memory, BIOS and saves)
 
 For the Web front-end...
 
@@ -39,6 +43,7 @@ What's still missing...
 * Low-level cycle accurate system emulation
 * [Game Boy Camera](https://en.wikipedia.org/wiki/Game_Boy_Camera) emulation
 * NetPlay gaming support
+* Save states and cheats for the Game Boy Advance
 
 ## Deployments
 
@@ -141,7 +146,7 @@ Love Gameboy emulation? Want to contribute to Boytacean? That's awesome! Your co
 
 To get started, please take a look at our [Contributing Guidelines](CONTRIBUTING.md). Whether you're fixing bugs, adding new features, or helping with documentation, every contribution is valuable and greatly appreciated!
 
-Don't hesitate to reach out if you have any questions. Join us in making Boytacean the best Gameboy emulator out there!
+Don't hesitate to reach out if you have any questions. Join us in making Boytacean the best Game Boy and Game Boy Advance emulator out there!
 
 ## License
 
