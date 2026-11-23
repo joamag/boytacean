@@ -17,7 +17,7 @@ import info from "../package.json";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 declare const require: any;
 
-const ROM_PATH = require("../../../res/roms.gba/demo/geburtstag/geburtstag.gba");
+const ROM_PATH = require("../../../res/roms.gba/demo/geburtstag.gba");
 
 /**
  * Top level class that controls the GBA emulator behaviour, adapting
