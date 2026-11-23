@@ -10,8 +10,6 @@ A Game Boy and Game Boy Advance emulator that is written in Rust 🦀.
 
 * Game Boy (DMG) and Game Boy Color (CGB) emulation
 * Game Boy Advance (GBA) emulation
-* GBA BIOS calls emulated (HLE), so that no BIOS is needed, with an optional real BIOS
-* GBA saves in SRAM, Flash and EEPROM cartridges
 * Simple navigable source-code
 * Web, [SDL](https://www.libsdl.org) and [Libretro](https://www.libretro.com) front-ends
 * Audio, with a pretty accurate APU
@@ -25,6 +23,8 @@ A Game Boy and Game Boy Advance emulator that is written in Rust 🦀.
 * Variable CPU clock speed
 * Accurate PPU - passes [dmg-acid2](https://github.com/mattcurrie/dmg-acid2) and [cgb-acid2](https://github.com/mattcurrie/cgb-acid2) tests
 * Accurate GBA CPU and memory - passes the [gba-tests](https://github.com/jsmolka/gba-tests) of jsmolka (ARM, Thumb, memory, BIOS and saves)
+* GBA BIOS calls emulated (HLE), so that no BIOS is needed, with an optional real BIOS
+* GBA saves in SRAM, Flash and EEPROM cartridges
 
 For the Web front-end...
 
