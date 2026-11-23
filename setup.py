@@ -27,7 +27,7 @@ except ImportError:
 
 setup(
     name="boytacean",
-    version="0.14.0",
+    version="0.15.0",
     author="João Magalhães",
     author_email="joamag@gmail.com",
     description="A Game Boy emulator that is written in Rust",

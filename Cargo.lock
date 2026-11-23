@@ -108,7 +108,7 @@ checksum = "3ded4057c258ba199e2d26386d3af3780957ecaee6c4ef4041c6b4b8b97c0b06"
 
 [[package]]
 name = "boytacean"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "boytacean-cartridge",
  "boytacean-common",
@@ -126,7 +126,7 @@ dependencies = [
 
 [[package]]
 name = "boytacean-cartridge"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "boytacean-common",
  "serialport",
@@ -135,7 +135,7 @@ dependencies = [
 
 [[package]]
 name = "boytacean-common"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "js-sys",
  "pyo3",
@@ -144,7 +144,7 @@ dependencies = [
 
 [[package]]
 name = "boytacean-console"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "boytacean",
  "clap",
@@ -152,7 +152,7 @@ dependencies = [
 
 [[package]]
 name = "boytacean-encoding"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "boytacean-common",
  "boytacean-hashing",
@@ -160,21 +160,21 @@ dependencies = [
 
 [[package]]
 name = "boytacean-hashing"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "boytacean-common",
 ]
 
 [[package]]
 name = "boytacean-libretro"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "boytacean",
 ]
 
 [[package]]
 name = "boytacean-sdl"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "boytacean",
  "boytacean-cartridge",

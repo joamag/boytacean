@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+*
+
+### Changed
+
+*
+
+### Fixed
+
+*
+
+## [0.15.0] - 2026-11-23
+
+### Added
+
 * Optional shaders in the web front-end (CRT, bilinear and smooth bilinear), the same as in the SDL front-end, chosen through a URL parameter
 * Documentation of the web front-end parameters for the Game Boy Advance mode, the shaders and the background color
 * Builds of the libretro core in the libretro infrastructure, the step before RetroArch can download it from its Online Updater - [#32](https://gitlab.stage.hive.pt/joamag/boytacean/-/issues/32)
