@@ -123,7 +123,7 @@ const INFO_OVERRIDE: [RetroSystemContentInfoOverride; 2] = [
     },
 ];
 
-const KEYS: [RetroJoypad; 8] = [
+const KEYS: [RetroJoypad; 10] = [
     RetroJoypad::RetroDeviceIdJoypadUp,
     RetroJoypad::RetroDeviceIdJoypadDown,
     RetroJoypad::RetroDeviceIdJoypadLeft,
@@ -132,6 +132,8 @@ const KEYS: [RetroJoypad; 8] = [
     RetroJoypad::RetroDeviceIdJoypadSelect,
     RetroJoypad::RetroDeviceIdJoypadA,
     RetroJoypad::RetroDeviceIdJoypadB,
+    RetroJoypad::RetroDeviceIdJoypadL,
+    RetroJoypad::RetroDeviceIdJoypadR,
 ];
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
@@ -676,6 +678,8 @@ fn retro_key_to_pad(retro_key: RetroJoypad) -> Option<PadKey> {
         RetroJoypad::RetroDeviceIdJoypadSelect => Some(PadKey::Select),
         RetroJoypad::RetroDeviceIdJoypadA => Some(PadKey::A),
         RetroJoypad::RetroDeviceIdJoypadB => Some(PadKey::B),
+        RetroJoypad::RetroDeviceIdJoypadL => Some(PadKey::L),
+        RetroJoypad::RetroDeviceIdJoypadR => Some(PadKey::R),
         _ => None,
     }
 }
@@ -694,18 +698,23 @@ mod tests {
         gb::{GameBoy, GameBoyMode},
         gba::GameBoyAdvance,
         info::Info,
+        pad::PadKey,
         system::System,
     };
 
     use super::{
         retro_cheat_reset, retro_cheat_set, retro_get_memory_data, retro_get_memory_size,
-        retro_get_system_av_info, retro_get_system_info, retro_init, retro_load_game, retro_reset,
-        retro_run, retro_serialize, retro_serialize_size, retro_set_audio_sample_batch,
-        retro_set_environment, retro_set_input_poll, retro_set_input_state,
-        retro_set_video_refresh, retro_unserialize, update_palette, EMULATOR, VOLUME_GBA,
+        retro_get_system_av_info, retro_get_system_info, retro_init, retro_key_to_pad,
+        retro_load_game, retro_reset, retro_run, retro_serialize, retro_serialize_size,
+        retro_set_audio_sample_batch, retro_set_environment, retro_set_input_poll,
+        retro_set_input_state, retro_set_video_refresh, retro_unserialize, update_palette,
+        RetroJoypad, EMULATOR, VOLUME_GBA,
     };
     use crate::{
-        consts::{RETRO_ENVIRONMENT_GET_VARIABLE, RETRO_MEMORY_SAVE_RAM, RETRO_MEMORY_SYSTEM_RAM},
+        consts::{
+            RETRO_DEVICE_ID_JOYPAD_L, RETRO_DEVICE_ID_JOYPAD_R, RETRO_ENVIRONMENT_GET_VARIABLE,
+            RETRO_MEMORY_SAVE_RAM, RETRO_MEMORY_SYSTEM_RAM,
+        },
         palettes::get_palette,
         structs::{
             RetroGameGeometry, RetroGameInfo, RetroSystemAvInfo, RetroSystemInfo,
@@ -722,6 +731,10 @@ mod tests {
     /// The audio samples sent by the core, as kept by the audio
     /// sample batch callback.
     static mut AUDIO: Vec<i16> = Vec::new();
+
+    /// The keys pressed in the frontend, as a mask of their ids,
+    /// returned by the input state callback.
+    static mut PRESSED: u16 = 0;
 
     /// The ROM of the jsmolka test suite used to run the GBA,
     /// which draws a static image.
@@ -777,9 +790,20 @@ mod tests {
     /// Input poll callback of a frontend, with nothing to poll.
     extern "C" fn input_poll() {}
 
-    /// Input state callback of a frontend, without any key pressed.
-    extern "C" fn input_state(_port: u32, _device: u32, _index: u32, _id: u32) -> i16 {
-        0
+    /// Input state callback of a frontend, with the keys of the
+    /// mask of pressed keys.
+    extern "C" fn input_state(_port: u32, _device: u32, _index: u32, id: u32) -> i16 {
+        unsafe { (PRESSED >> id & 0x1) as i16 }
+    }
+
+    /// Sets the callbacks of a frontend needed to run the core,
+    /// keeping its frames and audio, and with no key pressed.
+    fn set_callbacks() {
+        retro_set_video_refresh(Some(video_refresh));
+        retro_set_audio_sample_batch(Some(audio_sample_batch));
+        retro_set_input_poll(Some(input_poll));
+        retro_set_input_state(Some(input_state));
+        unsafe { PRESSED = 0 };
     }
 
     /// Initializes the core and loads the game with the provided
@@ -932,10 +956,7 @@ mod tests {
             (GBA_ROM, 240, 160),
         ] {
             load_game(data);
-            retro_set_video_refresh(Some(video_refresh));
-            retro_set_audio_sample_batch(Some(audio_sample_batch));
-            retro_set_input_poll(Some(input_poll));
-            retro_set_input_state(Some(input_state));
+            set_callbacks();
             for _ in 0..10 {
                 retro_run();
             }
@@ -997,6 +1018,37 @@ mod tests {
                 assert!(samples.iter().any(|v| v.abs() > 128));
             }
         }
+    }
+
+    #[test]
+    fn test_retro_run_keys() {
+        let _guard = EMULATOR_LOCK.lock().unwrap();
+        load_game(GBA_ROM);
+        set_callbacks();
+
+        // the shoulder buttons of the frontend are the L and R of the
+        // GBA, pressed and lifted as the other keys (active low)
+        unsafe { PRESSED = 1 << RETRO_DEVICE_ID_JOYPAD_L | 1 << RETRO_DEVICE_ID_JOYPAD_R };
+        retro_run();
+        if let System::Gba(gba) = unsafe { EMULATOR.as_ref().unwrap() } {
+            assert_eq!(gba.cpu.bus.pad.keyinput() & 0x0300, 0x0000);
+        } else {
+            panic!("Expected GBA system");
+        }
+        unsafe { PRESSED = 0 };
+        retro_run();
+        if let System::Gba(gba) = unsafe { EMULATOR.as_ref().unwrap() } {
+            assert_eq!(gba.cpu.bus.pad.keyinput() & 0x0300, 0x0300);
+        } else {
+            panic!("Expected GBA system");
+        }
+
+        // while the Game Boy, that has no shoulder buttons, ignores them
+        load_game(include_bytes!("../../../res/roms/demo/pocket.gb"));
+        set_callbacks();
+        unsafe { PRESSED = 1 << RETRO_DEVICE_ID_JOYPAD_L | 1 << RETRO_DEVICE_ID_JOYPAD_R };
+        retro_run();
+        assert!(unsafe { EMULATOR.as_ref().unwrap() }.is_gb());
     }
 
     #[test]
@@ -1210,5 +1262,23 @@ mod tests {
         retro_set_environment(Some(environment_palette));
         unsafe { update_palette() };
         assert!(unsafe { EMULATOR.as_ref().unwrap() }.is_gba());
+    }
+
+    #[test]
+    fn test_retro_key_to_pad() {
+        assert_eq!(
+            retro_key_to_pad(RetroJoypad::RetroDeviceIdJoypadA),
+            Some(PadKey::A)
+        );
+        assert_eq!(
+            retro_key_to_pad(RetroJoypad::RetroDeviceIdJoypadL),
+            Some(PadKey::L)
+        );
+        assert_eq!(
+            retro_key_to_pad(RetroJoypad::RetroDeviceIdJoypadR),
+            Some(PadKey::R)
+        );
+        assert_eq!(retro_key_to_pad(RetroJoypad::RetroDeviceIdJoypadX), None);
+        assert_eq!(retro_key_to_pad(RetroJoypad::RetroDeviceIdJoypadL2), None);
     }
 }
