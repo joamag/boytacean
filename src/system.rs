@@ -200,15 +200,36 @@ impl System {
         }
     }
 
-    pub fn save_ram_file(&self, path: &str) -> Result<(), Error> {
+    /// If the cartridge of the loaded game has a battery, keeping
+    /// its save RAM, which should then be persisted (eg: in a file).
+    pub fn has_battery(&self) -> bool {
         match self {
-            System::Gb(gb) if gb.rom_i().has_battery() => {
-                boytacean_common::util::write_file(path, gb.rom_i().ram_data(), None)?;
-            }
-            System::Gba(gba) if gba.has_battery() => {
-                boytacean_common::util::write_file(path, &gba.cpu.bus.save.data, None)?;
-            }
-            _ => {}
+            System::Gb(gb) => gb.rom_i().has_battery(),
+            System::Gba(gba) => gba.has_battery(),
+        }
+    }
+
+    /// Obtains the save RAM of the cartridge of the loaded game.
+    pub fn ram_data(&self) -> &[u8] {
+        match self {
+            System::Gb(gb) => gb.rom_i().ram_data(),
+            System::Gba(gba) => &gba.cpu.bus.save.data,
+        }
+    }
+
+    /// Obtains the save RAM of the cartridge of the loaded game to be
+    /// written, as a slice, so that its buffer (and the pointers to it,
+    /// eg: the one of a libretro frontend) remains the same.
+    pub fn ram_data_mut(&mut self) -> &mut [u8] {
+        match self {
+            System::Gb(gb) => gb.rom().ram_data_mut(),
+            System::Gba(gba) => &mut gba.cpu.bus.save.data,
+        }
+    }
+
+    pub fn save_ram_file(&self, path: &str) -> Result<(), Error> {
+        if self.has_battery() {
+            boytacean_common::util::write_file(path, self.ram_data(), None)?;
         }
         Ok(())
     }
@@ -644,6 +665,73 @@ mod tests {
         write(&path, [0]).unwrap();
         assert!(system.load_rom_file(path.to_str().unwrap(), None).is_err());
         remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn test_has_battery() {
+        for (data, battery) in [
+            (
+                include_bytes!("../res/roms/game/shocklobster.gb").as_slice(),
+                true,
+            ),
+            (
+                include_bytes!("../res/roms/test/blargg/cgb_sound/cgb_sound.gb"),
+                false,
+            ),
+            (
+                include_bytes!("../res/roms.gba/test/jsmolka_gba-tests/sram.gba"),
+                true,
+            ),
+            (
+                include_bytes!("../res/roms.gba/test/jsmolka_gba-tests/none.gba"),
+                false,
+            ),
+        ] {
+            let system = System::from_rom(data).unwrap();
+            assert_eq!(system.has_battery(), battery);
+        }
+    }
+
+    #[test]
+    fn test_ram_data() {
+        let system = System::from_rom(include_bytes!("../res/roms/game/shocklobster.gb")).unwrap();
+        if let System::Gb(gb) = &system {
+            assert_eq!(system.ram_data().as_ptr(), gb.rom_i().ram_data().as_ptr());
+        }
+        assert_eq!(system.ram_data().len(), 8192);
+        let system = System::from_rom(include_bytes!(
+            "../res/roms.gba/test/jsmolka_gba-tests/sram.gba"
+        ))
+        .unwrap();
+        if let System::Gba(gba) = &system {
+            assert_eq!(system.ram_data().as_ptr(), gba.cpu.bus.save.data.as_ptr());
+        }
+        assert_eq!(system.ram_data().len(), 0x8000);
+    }
+
+    #[test]
+    fn test_ram_data_mut() {
+        // the writes to the save RAM are read by the game, in the same
+        // buffer as the one of the save RAM to be read
+        let mut system =
+            System::from_rom(include_bytes!("../res/roms/game/shocklobster.gb")).unwrap();
+        let buffer = system.ram_data().as_ptr();
+        system.ram_data_mut()[1] = 0x42;
+        assert_eq!(system.ram_data_mut().as_ptr(), buffer);
+        if let System::Gb(gb) = &mut system {
+            gb.write_memory(0x0000, 0x0a);
+            assert_eq!(gb.read_memory(0xa001), 0x42);
+        }
+        let mut system = System::from_rom(include_bytes!(
+            "../res/roms.gba/test/jsmolka_gba-tests/sram.gba"
+        ))
+        .unwrap();
+        let buffer = system.ram_data().as_ptr();
+        system.ram_data_mut()[1] = 0x42;
+        assert_eq!(system.ram_data_mut().as_ptr(), buffer);
+        if let System::Gba(gba) = &mut system {
+            assert_eq!(gba.cpu.bus.read8(0x0e000001), 0x42);
+        }
     }
 
     #[test]
