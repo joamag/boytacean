@@ -2,7 +2,9 @@ use std::{
     collections::HashMap,
     ffi::CStr,
     fmt::{self, Display, Formatter},
+    fs::read,
     os::raw::{c_char, c_uint, c_void},
+    path::Path,
     ptr::{self, addr_of},
     slice::from_raw_parts,
 };
@@ -29,10 +31,10 @@ use crate::{
         RETRO_DEVICE_ID_JOYPAD_R2, RETRO_DEVICE_ID_JOYPAD_R3, RETRO_DEVICE_ID_JOYPAD_RIGHT,
         RETRO_DEVICE_ID_JOYPAD_SELECT, RETRO_DEVICE_ID_JOYPAD_START, RETRO_DEVICE_ID_JOYPAD_UP,
         RETRO_DEVICE_ID_JOYPAD_X, RETRO_DEVICE_ID_JOYPAD_Y, RETRO_DEVICE_JOYPAD,
-        RETRO_ENVIRONMENT_GET_GAME_INFO_EXT, RETRO_ENVIRONMENT_GET_VARIABLE,
-        RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, RETRO_ENVIRONMENT_SET_CONTENT_INFO_OVERRIDE,
-        RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, RETRO_ENVIRONMENT_SET_VARIABLES, RETRO_MEMORY_SAVE_RAM,
-        RETRO_PIXEL_FORMAT_XRGB8888,
+        RETRO_ENVIRONMENT_GET_GAME_INFO_EXT, RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY,
+        RETRO_ENVIRONMENT_GET_VARIABLE, RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE,
+        RETRO_ENVIRONMENT_SET_CONTENT_INFO_OVERRIDE, RETRO_ENVIRONMENT_SET_PIXEL_FORMAT,
+        RETRO_ENVIRONMENT_SET_VARIABLES, RETRO_MEMORY_SAVE_RAM, RETRO_PIXEL_FORMAT_XRGB8888,
     },
     palettes::get_palette,
     structs::{
@@ -64,6 +66,10 @@ const VOLUME_GBA: i32 = 20972;
 /// the save RAM of the EEPROM cartridges until the game sets it.
 const EEPROM_SIZE: usize = 8192;
 
+/// The name of the file of the BIOS of the GBA, optional, loaded
+/// from the system directory of the frontend when present.
+const BIOS_GBA: &str = "gba_bios.bin";
+
 static mut EMULATOR: Option<System> = None;
 static mut KEY_STATES: Option<HashMap<RetroJoypad, bool>> = None;
 static mut FRAME_BUFFER: [u32; FRAME_BUFFER_SIZE] = [0x00; FRAME_BUFFER_SIZE];
@@ -86,6 +92,8 @@ static mut GAME_INFO_EXT: RetroGameInfoExt = RetroGameInfoExt {
     file_in_archive: 0,
     persistent_data: 0,
 };
+
+static mut SYSTEM_DIRECTORY: *const c_char = std::ptr::null();
 
 static mut PENDING_CYCLES: u32 = 0_u32;
 
@@ -457,6 +465,25 @@ pub unsafe extern "C" fn retro_load_game(game: *const RetroGameInfo) -> bool {
         if gba.cpu.bus.save.save_type() == SaveType::Eeprom {
             gba.set_ram_data(vec![0xff; EEPROM_SIZE]);
         }
+
+        // the BIOS of the GBA is optional, as its calls are emulated (HLE),
+        // being loaded from the system directory of the frontend if present
+        if environment_cb(
+            RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY,
+            addr_of!(SYSTEM_DIRECTORY) as *const _ as *const c_void,
+        ) && !SYSTEM_DIRECTORY.is_null()
+        {
+            let directory = CStr::from_ptr(SYSTEM_DIRECTORY).to_str().unwrap();
+            let path = Path::new(directory).join(BIOS_GBA);
+            if let Ok(data) = read(&path) {
+                infoln!(
+                    "Loading GBA BIOS in Boytacean from '{}' ({} bytes)...",
+                    path.display(),
+                    data.len()
+                );
+                gba.load_bios(&data);
+            }
+        }
     }
     EMULATOR = Some(instance);
     update_vars();
@@ -700,7 +727,9 @@ fn retro_key_to_pad(retro_key: RetroJoypad) -> Option<PadKey> {
 #[cfg(test)]
 mod tests {
     use std::{
-        ffi::CStr,
+        env::temp_dir,
+        ffi::{CStr, CString},
+        fs::{create_dir_all, remove_dir_all, write},
         os::raw::{c_char, c_uint, c_void},
         ptr,
         slice::from_raw_parts,
@@ -721,11 +750,12 @@ mod tests {
         retro_load_game, retro_reset, retro_run, retro_serialize, retro_serialize_size,
         retro_set_audio_sample_batch, retro_set_environment, retro_set_input_poll,
         retro_set_input_state, retro_set_video_refresh, retro_unserialize, update_palette,
-        RetroJoypad, EMULATOR, VOLUME_GBA,
+        RetroJoypad, BIOS_GBA, EMULATOR, VOLUME_GBA,
     };
     use crate::{
         consts::{
-            RETRO_DEVICE_ID_JOYPAD_L, RETRO_DEVICE_ID_JOYPAD_R, RETRO_ENVIRONMENT_GET_VARIABLE,
+            RETRO_DEVICE_ID_JOYPAD_L, RETRO_DEVICE_ID_JOYPAD_R,
+            RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY, RETRO_ENVIRONMENT_GET_VARIABLE,
             RETRO_MEMORY_SAVE_RAM, RETRO_MEMORY_SYSTEM_RAM,
         },
         palettes::get_palette,
@@ -748,6 +778,10 @@ mod tests {
     /// The keys pressed in the frontend, as a mask of their ids,
     /// returned by the input state callback.
     static mut PRESSED: u16 = 0;
+
+    /// The system directory of the frontend, as returned by the
+    /// environment callback that supports it.
+    static mut SYSTEM_DIRECTORY: Option<CString> = None;
 
     /// The ROM of the jsmolka test suite used to run the GBA,
     /// which draws a static image.
@@ -787,6 +821,17 @@ mod tests {
         }
         let variable = data as *mut RetroVariable;
         unsafe { (*variable).value = "christmas\0".as_ptr() as *const c_char };
+        true
+    }
+
+    /// Environment callback of a frontend that only supports the
+    /// command to get its system directory.
+    extern "C" fn environment_system(command: u32, data: *const c_void) -> bool {
+        if command != RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY {
+            return false;
+        }
+        let directory = data as *mut *const c_char;
+        unsafe { *directory = SYSTEM_DIRECTORY.as_ref().unwrap().as_ptr() };
         true
     }
 
@@ -835,6 +880,12 @@ mod tests {
     /// Initializes the core and loads the game with the provided
     /// ROM data, as a frontend does.
     fn load_game(data: &[u8]) {
+        load_game_environment(data, environment);
+    }
+
+    /// Initializes the core and loads the game with the provided
+    /// ROM data, as a frontend with the provided environment does.
+    fn load_game_environment(data: &[u8], environment: extern "C" fn(u32, *const c_void) -> bool) {
         retro_init();
         retro_set_environment(Some(environment));
         let game = RetroGameInfo {
@@ -922,6 +973,8 @@ mod tests {
         assert_eq!(info_value("display_version"), Info::version());
         assert_eq!(info_value("supported_extensions"), valid_extensions);
         assert_eq!(info_value("license"), env!("CARGO_PKG_LICENSE"));
+        assert_eq!(info_value("firmware0_path"), BIOS_GBA);
+        assert_eq!(info_value("firmware0_opt"), "true");
 
         // the pointers must be statically allocated, so the ones of
         // a previous call must remain valid after a new call
@@ -1121,6 +1174,48 @@ mod tests {
         } else {
             panic!("Expected Game Boy system");
         }
+    }
+
+    #[test]
+    fn test_retro_load_game_bios() {
+        let _guard = EMULATOR_LOCK.lock().unwrap();
+        let directory = temp_dir().join("boytacean_libretro_bios_test");
+        create_dir_all(&directory).unwrap();
+        unsafe { SYSTEM_DIRECTORY = Some(CString::new(directory.to_str().unwrap()).unwrap()) };
+
+        // without the BIOS in the system directory of the frontend, the BIOS
+        // calls of the GBA are emulated, with the ROM booted directly
+        load_game_environment(GBA_ROM, environment_system);
+        if let System::Gba(gba) = unsafe { EMULATOR.as_ref().unwrap() } {
+            assert!(!gba.cpu.bus.use_real_bios);
+            assert_eq!(gba.cpu.pc(), 0x0800_0000);
+        } else {
+            panic!("Expected GBA system");
+        }
+
+        // while with it the GBA boots through the BIOS
+        write(directory.join(BIOS_GBA), vec![0u8; 0x4000]).unwrap();
+        load_game_environment(GBA_ROM, environment_system);
+        if let System::Gba(gba) = unsafe { EMULATOR.as_ref().unwrap() } {
+            assert!(gba.cpu.bus.use_real_bios);
+            assert_eq!(gba.cpu.pc(), 0x0000_0000);
+        } else {
+            panic!("Expected GBA system");
+        }
+
+        // that is not loaded by the Game Boy, nor without a system directory
+        load_game_environment(
+            include_bytes!("../../../res/roms/demo/pocket.gb"),
+            environment_system,
+        );
+        assert!(unsafe { EMULATOR.as_ref().unwrap() }.is_gb());
+        load_game(GBA_ROM);
+        if let System::Gba(gba) = unsafe { EMULATOR.as_ref().unwrap() } {
+            assert!(!gba.cpu.bus.use_real_bios);
+        } else {
+            panic!("Expected GBA system");
+        }
+        remove_dir_all(&directory).unwrap();
     }
 
     #[test]
