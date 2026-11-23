@@ -17,7 +17,7 @@ use boytacean::{
     info::Info,
     infoln,
     pad::PadKey,
-    ppu::DISPLAY_SIZE,
+    ppu::{DISPLAY_HEIGHT, DISPLAY_SIZE, DISPLAY_WIDTH},
     state::{SaveStateFormat, StateManager},
     system::System,
     warnln,
@@ -316,8 +316,6 @@ pub extern "C" fn retro_run() {
     let input_state_cb = unsafe { INPUT_STATE_CALLBACK.as_ref().unwrap() };
     let key_states = unsafe { KEY_STATES.as_mut().unwrap() };
 
-    let mut last_frame = emulator.ppu_frame();
-
     let mut counter_cycles = unsafe { PENDING_CYCLES };
     let cycle_limit = (emulator.cpu_freq() as f32 * emulator.multiplier() as f32
         / emulator.visual_freq())
@@ -339,53 +337,47 @@ pub extern "C" fn retro_run() {
         }
     }
 
-    loop {
-        // limits the number of ticks to the typical number
-        // of cycles expected for the current logic cycle
-        if counter_cycles >= cycle_limit {
-            unsafe { PENDING_CYCLES = counter_cycles - cycle_limit };
-            break;
-        }
+    // the system is matched once, outside of the loop (the hot path of
+    // the core), so that each clock (an instruction) runs without the
+    // dispatch of the system, with the loop of the GBA in `run_gba()`
+    match emulator {
+        System::Gb(gb) => {
+            let mut last_frame = gb.ppu_frame();
 
-        // runs the system clock, this operation should
-        // include the advance of both the CPU, PPU, APU
-        // and any other frequency based component of the system
-        counter_cycles += emulator.clock();
-
-        // in case a new frame is available in the emulator
-        // then the frame must be pushed into display
-        if emulator.ppu_frame() != last_frame {
-            let width = emulator.display_width();
-            let height = emulator.display_height();
-            unsafe {
-                match emulator {
-                    System::Gb(gb) => {
-                        FRAME_BUFFER[..DISPLAY_SIZE]
-                            .copy_from_slice(&gb.frame_buffer_xrgb8888_u32());
-                    }
-                    System::Gba(gba) => {
-                        for (pixel, color) in FRAME_BUFFER
-                            .iter_mut()
-                            .zip(gba.frame_buffer().chunks_exact(RGB888_SIZE))
-                        {
-                            *pixel = ((color[0] as u32) << 16)
-                                | ((color[1] as u32) << 8)
-                                | color[2] as u32;
-                        }
-                    }
+            loop {
+                // limits the number of ticks to the typical number
+                // of cycles expected for the current logic cycle
+                if counter_cycles >= cycle_limit {
+                    unsafe { PENDING_CYCLES = counter_cycles - cycle_limit };
+                    break;
                 }
-                video_refresh_cb(
-                    FRAME_BUFFER.as_ptr() as *const u8,
-                    width as u32,
-                    height as u32,
-                    width * XRGB8888_SIZE,
-                );
-            }
 
-            // obtains the index of the current PPU frame, this value
-            // is going to be used to detect for new frame presence
-            last_frame = emulator.ppu_frame();
+                // runs the Game Boy clock, this operation should
+                // include the advance of both the CPU, PPU, APU
+                // and any other frequency based component of the system
+                counter_cycles += gb.clock() as u32;
+
+                // in case a new frame is available in the emulator
+                // then the frame must be pushed into display
+                if gb.ppu_frame() != last_frame {
+                    let frame_buffer = gb.frame_buffer_xrgb8888_u32();
+                    unsafe {
+                        FRAME_BUFFER[..DISPLAY_SIZE].copy_from_slice(&frame_buffer);
+                        video_refresh_cb(
+                            FRAME_BUFFER.as_ptr() as *const u8,
+                            DISPLAY_WIDTH as u32,
+                            DISPLAY_HEIGHT as u32,
+                            DISPLAY_WIDTH * XRGB8888_SIZE,
+                        );
+                    }
+
+                    // obtains the index of the current PPU frame, this value
+                    // is going to be used to detect for new frame presence
+                    last_frame = gb.ppu_frame();
+                }
+            }
         }
+        System::Gba(gba) => run_gba(gba, counter_cycles, cycle_limit),
     }
 
     // in case there's new audio data available in the emulator
@@ -680,6 +672,55 @@ pub extern "C" fn retro_set_input_state(
     debugln!("retro_set_input_state()");
     unsafe {
         INPUT_STATE_CALLBACK = callback;
+    }
+}
+
+/// Runs the GBA for the cycles of a frame, starting with the provided
+/// ones, pushing its new frames into display, as `retro_run()` does
+/// for the Game Boy.
+///
+/// Kept out of line so that the (hotter) loop of the Game Boy, in
+/// `retro_run()`, is optimized as when it was the only one.
+#[inline(never)]
+fn run_gba(gba: &mut GameBoyAdvance, mut counter_cycles: u32, cycle_limit: u32) {
+    let video_refresh_cb = unsafe { VIDEO_REFRESH_CALLBACK.as_ref().unwrap() };
+    let mut last_frame = gba.ppu_frame();
+
+    loop {
+        // limits the number of ticks to the typical number
+        // of cycles expected for the current logic cycle
+        if counter_cycles >= cycle_limit {
+            unsafe { PENDING_CYCLES = counter_cycles - cycle_limit };
+            break;
+        }
+
+        // runs the GBA clock, advancing the CPU and the
+        // other frequency based components of the system
+        counter_cycles += gba.clock();
+
+        // in case a new frame is available in the emulator
+        // then the frame must be pushed into display, with
+        // its RGB888 pixels converted into XRGB8888
+        if gba.ppu_frame() != last_frame {
+            unsafe {
+                for (pixel, color) in FRAME_BUFFER
+                    .iter_mut()
+                    .zip(gba.frame_buffer().chunks_exact(RGB888_SIZE))
+                {
+                    *pixel = ((color[0] as u32) << 16) | ((color[1] as u32) << 8) | color[2] as u32;
+                }
+                video_refresh_cb(
+                    FRAME_BUFFER.as_ptr() as *const u8,
+                    GameBoyAdvance::DISPLAY_WIDTH as u32,
+                    GameBoyAdvance::DISPLAY_HEIGHT as u32,
+                    GameBoyAdvance::DISPLAY_WIDTH * XRGB8888_SIZE,
+                );
+            }
+
+            // obtains the index of the current PPU frame, this value
+            // is going to be used to detect for new frame presence
+            last_frame = gba.ppu_frame();
+        }
     }
 }
 
