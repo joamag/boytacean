@@ -23,6 +23,14 @@ use crate::{
     rom::Cartridge,
 };
 
+/// Base audio volume to be used as the basis of the
+/// amplification level of the volume for the Game Boy.
+const VOLUME: f32 = 64.0;
+
+/// Audio normalization factor for the GBA, scaled proportionally
+/// to the GB volume (web uses 100/32768, SDL uses 64/20972).
+const VOLUME_GBA: f32 = 20972.0;
+
 /// ROM/Cartridge information returned by [`System::load_rom_file`].
 ///
 /// Provides both the title (for window titles, etc.) and the full
@@ -315,6 +323,16 @@ impl System {
         match self {
             System::Gb(gb) => gb.audio_channels(),
             System::Gba(gba) => gba.audio_channels(),
+        }
+    }
+
+    /// Obtains the audio volume of the system, the level of its samples,
+    /// used by the frontends to normalize them, so that both systems
+    /// play at the same level.
+    pub fn audio_volume(&self) -> f32 {
+        match self {
+            System::Gb(_) => VOLUME,
+            System::Gba(_) => VOLUME_GBA,
         }
     }
 
@@ -847,6 +865,14 @@ mod tests {
         ] {
             assert_eq!(system.audio_channels(), 2);
         }
+    }
+
+    #[test]
+    fn test_audio_volume() {
+        let system = System::Gb(GameBoy::new(None));
+        assert_eq!(system.audio_volume(), 64.0);
+        let system = System::Gba(GameBoyAdvance::new());
+        assert_eq!(system.audio_volume(), 20972.0);
     }
 
     #[test]
