@@ -11,7 +11,7 @@ use boytacean::{
     color::{RGB888_SIZE, XRGB8888_SIZE},
     debugln,
     gb::GameBoy,
-    gba::GameBoyAdvance,
+    gba::{flash::SaveType, GameBoyAdvance},
     info::Info,
     infoln,
     pad::PadKey,
@@ -59,6 +59,10 @@ const FRAME_BUFFER_SIZE: usize = GameBoyAdvance::DISPLAY_WIDTH * GameBoyAdvance:
 /// complete range of the 16 bits, being the level that matches the
 /// one of the Game Boy samples (64), as in the SDL frontend.
 const VOLUME_GBA: i32 = 20972;
+
+/// The size of the largest EEPROM of the GBA (64 Kbit), the size of
+/// the save RAM of the EEPROM cartridges until the game sets it.
+const EEPROM_SIZE: usize = 8192;
 
 static mut EMULATOR: Option<System> = None;
 static mut KEY_STATES: Option<HashMap<RetroJoypad, bool>> = None;
@@ -443,7 +447,18 @@ pub unsafe extern "C" fn retro_load_game(game: *const RetroGameInfo) -> bool {
         },
     );
     let data_buffer = from_raw_parts((*game).data as *const u8, (*game).size);
-    EMULATOR = Some(System::from_rom(data_buffer).unwrap());
+    let mut instance = System::from_rom(data_buffer).unwrap();
+
+    // the size of the EEPROM of the GBA (512 bytes or 8 KiB) is only known
+    // once the game accesses it, so its save RAM starts with the largest
+    // one, loading the saves of both, and only shrinks in place, so that
+    // the pointer to it, kept by the frontend, remains valid
+    if let System::Gba(gba) = &mut instance {
+        if gba.cpu.bus.save.save_type() == SaveType::Eeprom {
+            gba.set_ram_data(vec![0xff; EEPROM_SIZE]);
+        }
+    }
+    EMULATOR = Some(instance);
     update_vars();
     true
 }
@@ -468,15 +483,14 @@ pub extern "C" fn retro_unload_game() {
 #[no_mangle]
 pub extern "C" fn retro_get_memory_size(memory_id: u32) -> usize {
     debugln!("retro_get_memory_size()");
-    let emulator = unsafe { EMULATOR.as_ref().unwrap() };
-    let System::Gb(gb) = emulator else {
-        return 0;
-    };
-    let rom = gb.rom_i();
-    if memory_id != RETRO_MEMORY_SAVE_RAM || !rom.has_battery() {
+    if memory_id != RETRO_MEMORY_SAVE_RAM {
         return 0;
     }
-    rom.ram_data().len()
+    match unsafe { EMULATOR.as_ref().unwrap() } {
+        System::Gb(gb) if gb.rom_i().has_battery() => gb.rom_i().ram_data().len(),
+        System::Gba(gba) if gba.has_battery() => gba.cpu.bus.save.data.len(),
+        _ => 0,
+    }
 }
 
 #[no_mangle]
@@ -485,11 +499,10 @@ pub extern "C" fn retro_get_memory_data(memory_id: u32) -> *mut c_void {
     if retro_get_memory_size(memory_id) == 0 {
         return std::ptr::null_mut();
     }
-    let emulator = unsafe { EMULATOR.as_mut().unwrap() };
-    let System::Gb(gb) = emulator else {
-        return std::ptr::null_mut();
-    };
-    gb.rom().ram_data_mut().as_mut_ptr() as *mut c_void
+    match unsafe { EMULATOR.as_mut().unwrap() } {
+        System::Gb(gb) => gb.rom().ram_data_mut().as_mut_ptr() as *mut c_void,
+        System::Gba(gba) => gba.cpu.bus.save.data.as_mut_ptr() as *mut c_void,
+    }
 }
 
 #[no_mangle]
@@ -696,7 +709,7 @@ mod tests {
 
     use boytacean::{
         gb::{GameBoy, GameBoyMode},
-        gba::GameBoyAdvance,
+        gba::{flash::SaveType, GameBoyAdvance},
         info::Info,
         pad::PadKey,
         system::System,
@@ -740,6 +753,10 @@ mod tests {
     /// which draws a static image.
     const GBA_ROM: &[u8] =
         include_bytes!("../../../res/roms.gba/test/jsmolka_gba-tests/ppu_stripes.gba");
+
+    /// The ROM of the jsmolka test suite with a GBA SRAM.
+    const GBA_SRAM_ROM: &[u8] =
+        include_bytes!("../../../res/roms.gba/test/jsmolka_gba-tests/sram.gba");
 
     /// The info file of the core, used by RetroArch to describe
     /// the core, that must agree with the core itself.
@@ -806,6 +823,15 @@ mod tests {
         unsafe { PRESSED = 0 };
     }
 
+    /// Builds the ROM of a GBA cartridge with an EEPROM, from a test
+    /// ROM without a save, with the EEPROM signature appended.
+    fn eeprom_rom() -> Vec<u8> {
+        let mut data =
+            include_bytes!("../../../res/roms.gba/test/jsmolka_gba-tests/none.gba").to_vec();
+        data.extend_from_slice(b"EEPROM_V");
+        data
+    }
+
     /// Initializes the core and loads the game with the provided
     /// ROM data, as a frontend does.
     fn load_game(data: &[u8]) {
@@ -845,18 +871,27 @@ mod tests {
     #[test]
     fn test_retro_reset_gba() {
         let _guard = EMULATOR_LOCK.lock().unwrap();
-        load_game(GBA_ROM);
+        load_game(GBA_SRAM_ROM);
+        let data = retro_get_memory_data(RETRO_MEMORY_SAVE_RAM) as *mut u8;
+        assert!(!data.is_null());
+        unsafe { *data = 0x42 };
         let emulator = unsafe { EMULATOR.as_mut().unwrap() };
         emulator.next_frame();
         assert_eq!(emulator.ppu_frame(), 1);
         retro_reset();
 
-        // the GBA is reset keeping its ROM, ready to run again
+        // the GBA is reset keeping its ROM, ready to run again, and its
+        // save RAM in the same buffer, with its contents
         let emulator = unsafe { EMULATOR.as_mut().unwrap() };
         assert!(emulator.is_gba());
         assert_eq!(emulator.ppu_frame(), 0);
         assert_eq!(emulator.rom_title(), "GBA Tests");
         assert!(emulator.next_frame() > 0);
+        assert_eq!(
+            retro_get_memory_data(RETRO_MEMORY_SAVE_RAM) as *mut u8,
+            data
+        );
+        assert_eq!(unsafe { *data }, 0x42);
     }
 
     #[test]
@@ -1069,6 +1104,16 @@ mod tests {
         let emulator = unsafe { EMULATOR.as_ref().unwrap() };
         assert!(emulator.is_gba());
         assert_eq!(emulator.rom_title(), "GBA Tests");
+
+        // the EEPROM of the GBA starts with the largest size (8 KiB), as
+        // its size is unknown until the game accesses it
+        load_game(&eeprom_rom());
+        if let System::Gba(gba) = unsafe { EMULATOR.as_ref().unwrap() } {
+            assert_eq!(gba.cpu.bus.save.save_type(), SaveType::Eeprom);
+            assert_eq!(gba.cpu.bus.save.data, vec![0xff; 8192]);
+        } else {
+            panic!("Expected GBA system");
+        }
         load_game(include_bytes!("../../../res/roms/demo/pocket.gb"));
         if let System::Gb(gb) = unsafe { EMULATOR.as_ref().unwrap() } {
             assert_eq!(gb.mode(), GameBoyMode::Dmg);
@@ -1099,6 +1144,32 @@ mod tests {
     }
 
     #[test]
+    fn test_retro_get_memory_size_gba() {
+        let _guard = EMULATOR_LOCK.lock().unwrap();
+        for (data, size) in [
+            (GBA_SRAM_ROM.to_vec(), 0x8000),
+            (
+                include_bytes!("../../../res/roms.gba/test/jsmolka_gba-tests/flash64.gba").to_vec(),
+                0x10000,
+            ),
+            (
+                include_bytes!("../../../res/roms.gba/test/jsmolka_gba-tests/flash128.gba")
+                    .to_vec(),
+                0x20000,
+            ),
+            (eeprom_rom(), 0x2000),
+            (
+                include_bytes!("../../../res/roms.gba/test/jsmolka_gba-tests/none.gba").to_vec(),
+                0,
+            ),
+        ] {
+            load_game(&data);
+            assert_eq!(retro_get_memory_size(RETRO_MEMORY_SAVE_RAM), size);
+            assert_eq!(retro_get_memory_size(RETRO_MEMORY_SYSTEM_RAM), 0);
+        }
+    }
+
+    #[test]
     fn test_retro_get_memory_data() {
         let _guard = EMULATOR_LOCK.lock().unwrap();
         load_game(include_bytes!("../../../res/roms/game/shocklobster.gb"));
@@ -1125,6 +1196,49 @@ mod tests {
         assert!(retro_get_memory_data(RETRO_MEMORY_SAVE_RAM).is_null());
         load_game(include_bytes!("../../../res/roms/test/rtc3test.gb"));
         assert!(!retro_get_memory_data(RETRO_MEMORY_SAVE_RAM).is_null());
+    }
+
+    #[test]
+    fn test_retro_get_memory_data_gba() {
+        let _guard = EMULATOR_LOCK.lock().unwrap();
+        load_game(GBA_SRAM_ROM);
+        let data = retro_get_memory_data(RETRO_MEMORY_SAVE_RAM) as *mut u8;
+        assert!(!data.is_null());
+        assert!(retro_get_memory_data(RETRO_MEMORY_SYSTEM_RAM).is_null());
+
+        // the pointer must be the save RAM of the cartridge itself, read
+        // and written by the game, as the one of the Game Boy
+        if let System::Gba(gba) = unsafe { EMULATOR.as_mut().unwrap() } {
+            unsafe { *data.add(1) = 0x42 };
+            assert_eq!(gba.cpu.bus.read8(0x0e000001), 0x42);
+            gba.cpu.bus.write8(0x0e000002, 0x24);
+            assert_eq!(unsafe { *data.add(2) }, 0x24);
+        } else {
+            panic!("Expected GBA system");
+        }
+
+        // the EEPROM keeps its buffer when the game sets its size, either
+        // the largest one (as loaded) or the smallest one (shrunk in place),
+        // as it starts with the largest size, never growing afterwards
+        for (count, size) in [(17, 8192), (9, 512)] {
+            load_game(&eeprom_rom());
+            assert_eq!(retro_get_memory_size(RETRO_MEMORY_SAVE_RAM), 8192);
+            let data = retro_get_memory_data(RETRO_MEMORY_SAVE_RAM) as *mut u8;
+            unsafe { *data = 0x42 };
+            if let System::Gba(gba) = unsafe { EMULATOR.as_mut().unwrap() } {
+                gba.cpu.bus.save.start_eeprom_transfer(count);
+            }
+            assert_eq!(
+                retro_get_memory_data(RETRO_MEMORY_SAVE_RAM) as *mut u8,
+                data
+            );
+            assert_eq!(retro_get_memory_size(RETRO_MEMORY_SAVE_RAM), size);
+            assert_eq!(unsafe { *data }, 0x42);
+        }
+        load_game(include_bytes!(
+            "../../../res/roms.gba/test/jsmolka_gba-tests/none.gba"
+        ));
+        assert!(retro_get_memory_data(RETRO_MEMORY_SAVE_RAM).is_null());
     }
 
     #[test]
