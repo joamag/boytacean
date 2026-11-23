@@ -1051,9 +1051,9 @@ impl GbaBus {
         self.save.reset();
         self.ppu.reset();
         self.apu.reset();
+        self.pad.reset();
         self.dma = GbaDma::new();
         self.timers = GbaTimers::new();
-        self.pad.reset();
         self.irq = IrqController::new();
         self.waitcnt = 0;
         self.siocnt = 0;
