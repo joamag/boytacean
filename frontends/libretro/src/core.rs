@@ -22,8 +22,8 @@ use boytacean::{
     infoln,
     pad::PadKey,
     ppu::{DISPLAY_HEIGHT, DISPLAY_SIZE, DISPLAY_WIDTH},
-    state::{SaveStateFormat, StateManager},
-    system::System,
+    state::SaveStateFormat,
+    system::{System, VOLUME},
     warnln,
 };
 
@@ -61,10 +61,10 @@ struct LibRetroInfo {
 /// of any of the systems (the 240x160 of the GBA).
 const FRAME_BUFFER_SIZE: usize = GameBoyAdvance::DISPLAY_WIDTH * GameBoyAdvance::DISPLAY_HEIGHT;
 
-/// Audio normalization factor for the GBA, whose samples use the
-/// complete range of the 16 bits, being the level that matches the
-/// one of the Game Boy samples (64), as in the SDL frontend.
-const VOLUME_GBA: i32 = 20972;
+/// The scale of the audio samples of the Game Boy into the 16 bits
+/// range of the frontend, from its audio volume, being a constant so
+/// that the scaling of its samples is as fast as possible (a shift).
+const AUDIO_SCALE: i16 = (16384.0 / VOLUME) as i16;
 
 /// The size of the largest EEPROM of the GBA (64 Kbit), the size of
 /// the save RAM of the EEPROM cartridges until the game sets it.
@@ -265,17 +265,9 @@ pub extern "C" fn retro_reset() {
     debugln!("retro_reset()");
     let emulator = unsafe { EMULATOR.as_mut().unwrap() };
 
-    // the Game Boy is reloaded with its cartridge, while the GBA
-    // is reset, keeping its ROM (and the save RAM of both)
-    match emulator {
-        System::Gb(gb) => gb.reload().unwrap(),
-        System::Gba(gba) => gba.reset(),
-    }
-
-    // the reset of the GBA releases all its keys, so the key states are
-    // cleared, for the keys held in the frontend to be pressed again in
-    // the next frame (pressing them again in the Game Boy has no effect)
-    unsafe { KEY_STATES.as_mut().unwrap().clear() };
+    // the loaded game is restarted, keeping its ROM, its save RAM (in
+    // the same buffer, kept by the frontend) and the held keys
+    emulator.reload().unwrap();
 }
 
 /// Fills the information of the core, its name, version and the
@@ -447,20 +439,22 @@ pub extern "C" fn retro_run() {
     // we must handle it by sending it to the audio callback and
     // clearing the audio buffer
     if !emulator.audio_buffer().is_empty() {
-        // the samples are scaled into the 16 bits range of the frontend,
-        // the ones of the Game Boy multiplied by 256 and the ones of the
-        // GBA normalized to the same level
+        // the samples are scaled into the 16 bits range of the frontend
+        // from the audio volume of the system (the level of its samples),
+        // so that both systems play at the same level, with the constant
+        // scale of the Game Boy (256) keeping its scaling a shift
         let audio_buffer = if emulator.is_gba() {
+            let scale = 16384.0 / emulator.audio_volume();
             emulator
                 .audio_buffer()
                 .iter()
-                .map(|v| (*v as i32 * 64 * 256 / VOLUME_GBA) as i16)
+                .map(|v| (*v as f32 * scale) as i16)
                 .collect::<Vec<i16>>()
         } else {
             emulator
                 .audio_buffer()
                 .iter()
-                .map(|v| *v * 256)
+                .map(|v| *v * AUDIO_SCALE)
                 .collect::<Vec<i16>>()
         };
         sample_batch_cb(audio_buffer.as_ptr(), audio_buffer.len() / 2_usize);
@@ -590,14 +584,11 @@ pub extern "C" fn retro_unload_game() {
 #[no_mangle]
 pub extern "C" fn retro_get_memory_size(memory_id: u32) -> usize {
     debugln!("retro_get_memory_size()");
-    if memory_id != RETRO_MEMORY_SAVE_RAM {
+    let emulator = unsafe { EMULATOR.as_ref().unwrap() };
+    if memory_id != RETRO_MEMORY_SAVE_RAM || !emulator.has_battery() {
         return 0;
     }
-    match unsafe { EMULATOR.as_ref().unwrap() } {
-        System::Gb(gb) if gb.rom_i().has_battery() => gb.rom_i().ram_data().len(),
-        System::Gba(gba) if gba.has_battery() => gba.cpu.bus.save.data.len(),
-        _ => 0,
-    }
+    emulator.ram_data().len()
 }
 
 /// Obtains the pointer to the memory of the provided type, the
@@ -609,10 +600,8 @@ pub extern "C" fn retro_get_memory_data(memory_id: u32) -> *mut c_void {
     if retro_get_memory_size(memory_id) == 0 {
         return std::ptr::null_mut();
     }
-    match unsafe { EMULATOR.as_mut().unwrap() } {
-        System::Gb(gb) => gb.rom().ram_data_mut().as_mut_ptr() as *mut c_void,
-        System::Gba(gba) => gba.cpu.bus.save.data.as_mut_ptr() as *mut c_void,
-    }
+    let emulator = unsafe { EMULATOR.as_mut().unwrap() };
+    emulator.ram_data_mut().as_mut_ptr() as *mut c_void
 }
 
 /// Obtains the size of the save states of the loaded system.
@@ -621,15 +610,16 @@ pub extern "C" fn retro_serialize_size() -> usize {
     debugln!("retro_serialize_size()");
     let emulator = unsafe { EMULATOR.as_mut().unwrap() };
 
-    // save states are only supported for the Game Boy, a zero size
-    // tells the frontend that the GBA has none
-    let System::Gb(instance) = emulator else {
+    // save states are only supported by the Game Boy, a zero size
+    // tells the frontend that the system (the GBA) has none
+    if !emulator.has_states() {
         return 0;
-    };
+    }
 
     // uses BESS file format for its static nature, meaning that the final
     // size of the serialized state is known in advance
-    StateManager::save(instance, Some(SaveStateFormat::Bess), None)
+    emulator
+        .save_state(Some(SaveStateFormat::Bess))
         .unwrap()
         .len()
 }
@@ -640,10 +630,10 @@ pub extern "C" fn retro_serialize_size() -> usize {
 pub extern "C" fn retro_serialize(data: *mut c_void, size: usize) -> bool {
     debugln!("retro_serialize()");
     let emulator = unsafe { EMULATOR.as_mut().unwrap() };
-    let System::Gb(instance) = emulator else {
+    if !emulator.has_states() {
         return false;
-    };
-    let state = match StateManager::save(instance, Some(SaveStateFormat::Bess), None) {
+    }
+    let state = match emulator.save_state(Some(SaveStateFormat::Bess)) {
         Ok(state) => state,
         Err(err) => {
             warnln!("Failed to save state: {}", err);
@@ -677,11 +667,11 @@ pub extern "C" fn retro_serialize(data: *mut c_void, size: usize) -> bool {
 pub extern "C" fn retro_unserialize(data: *const c_void, size: usize) -> bool {
     debugln!("retro_unserialize()");
     let emulator = unsafe { EMULATOR.as_mut().unwrap() };
-    let System::Gb(instance) = emulator else {
+    if !emulator.has_states() {
         return false;
-    };
+    }
     let state = unsafe { from_raw_parts(data as *const u8, size) };
-    if let Err(err) = StateManager::load(state, instance, None, None) {
+    if let Err(err) = emulator.load_state(state) {
         warnln!("Failed to load state: {}", err);
         #[allow(unreachable_code)]
         {
@@ -696,9 +686,7 @@ pub extern "C" fn retro_unserialize(data: *const c_void, size: usize) -> bool {
 pub extern "C" fn retro_cheat_reset() {
     debugln!("retro_cheat_reset()");
     let emulator = unsafe { EMULATOR.as_mut().unwrap() };
-    if let System::Gb(gb) = emulator {
-        gb.reset_cheats();
-    }
+    emulator.reset_cheats();
 }
 
 /// Adds the provided cheat code (Game Genie or GameShark) to the
@@ -718,16 +706,16 @@ pub unsafe extern "C" fn retro_cheat_set(_index: c_uint, enabled: bool, code: *c
     let code_c = CStr::from_ptr(code);
     let code_s = code_c.to_string_lossy().into_owned();
 
-    // cheats are only supported for the Game Boy
+    // cheats are only supported by the Game Boy
     let emulator = EMULATOR.as_mut().unwrap();
-    let System::Gb(gb) = emulator else {
+    if !emulator.has_cheats() {
         warnln!("Failed to add cheat code ({}): not supported", code_s);
         #[allow(unreachable_code)]
         {
             return;
         }
-    };
-    if let Err(err) = gb.add_cheat_code(&code_s) {
+    }
+    if let Err(err) = emulator.add_cheat_code(&code_s) {
         warnln!("Failed to add cheat code ({}): {}", code_s, err);
     }
 }
@@ -910,7 +898,7 @@ mod tests {
         retro_load_game, retro_reset, retro_run, retro_serialize, retro_serialize_size,
         retro_set_audio_sample_batch, retro_set_environment, retro_set_input_poll,
         retro_set_input_state, retro_set_video_refresh, retro_unserialize, update_palette,
-        RetroJoypad, BIOS_GBA, EMULATOR, VOLUME_GBA,
+        RetroJoypad, AUDIO_SCALE, BIOS_GBA, EMULATOR,
     };
     use crate::{
         consts::{
@@ -1118,11 +1106,11 @@ mod tests {
             panic!("Expected GBA system");
         }
 
-        // the reset of the GBA releases all its keys, so that a key held
-        // in the frontend must be pressed again by the next run
+        // a key held in the frontend remains held across the reset of
+        // the GBA, as on the Game Boy, without being pressed again
         retro_reset();
         if let System::Gba(gba) = unsafe { EMULATOR.as_ref().unwrap() } {
-            assert_eq!(gba.cpu.bus.pad.keyinput() & 0x0001, 0x0001);
+            assert_eq!(gba.cpu.bus.pad.keyinput() & 0x0001, 0x0000);
         } else {
             panic!("Expected GBA system");
         }
@@ -1280,16 +1268,20 @@ mod tests {
             let audio = unsafe { AUDIO.clone() };
             assert!(!samples.is_empty());
             assert!(audio.len() > samples.len());
+            let scale = 16384.0 / emulator.audio_volume();
             let expected = samples
                 .iter()
                 .map(|v| {
                     if emulator.is_gba() {
-                        (*v as i32 * 64 * 256 / VOLUME_GBA) as i16
+                        (*v as f32 * scale) as i16
                     } else {
                         *v * 256
                     }
                 })
                 .collect::<Vec<i16>>();
+            if emulator.is_gb() {
+                assert_eq!(AUDIO_SCALE, scale as i16);
+            }
             assert_eq!(audio[..samples.len()], expected);
             if emulator.is_gba() {
                 assert!(samples.iter().any(|v| v.abs() > 128));

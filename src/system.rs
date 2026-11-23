@@ -26,11 +26,11 @@ use crate::{
 
 /// Base audio volume to be used as the basis of the
 /// amplification level of the volume for the Game Boy.
-const VOLUME: f32 = 64.0;
+pub const VOLUME: f32 = 64.0;
 
 /// Audio normalization factor for the GBA, scaled proportionally
 /// to the GB volume (web uses 100/32768, SDL uses 64/20972).
-const VOLUME_GBA: f32 = 20972.0;
+pub const VOLUME_GBA: f32 = 20972.0;
 
 /// ROM/Cartridge information returned by [`System::load_rom_file`].
 ///
