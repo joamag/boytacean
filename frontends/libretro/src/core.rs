@@ -271,6 +271,11 @@ pub extern "C" fn retro_reset() {
         System::Gb(gb) => gb.reload().unwrap(),
         System::Gba(gba) => gba.reset(),
     }
+
+    // the reset of the GBA releases all its keys, so the key states are
+    // cleared, for the keys held in the frontend to be pressed again in
+    // the next frame (pressing them again in the Game Boy has no effect)
+    unsafe { KEY_STATES.as_mut().unwrap().clear() };
 }
 
 /// Fills the information of the core, its name, version and the
@@ -550,6 +555,11 @@ pub unsafe extern "C" fn retro_load_game(game: *const RetroGameInfo) -> bool {
         }
     }
     EMULATOR = Some(instance);
+
+    // the new emulator starts with all its keys released, so the key
+    // states are cleared, for the keys held in the frontend to be pressed
+    // again in the next frame (eg: when the core is not initialized again)
+    KEY_STATES.as_mut().unwrap().clear();
 
     // applies the values of the core options to the new emulator
     update_vars();
@@ -904,7 +914,7 @@ mod tests {
     };
     use crate::{
         consts::{
-            RETRO_DEVICE_ID_JOYPAD_L, RETRO_DEVICE_ID_JOYPAD_R,
+            RETRO_DEVICE_ID_JOYPAD_A, RETRO_DEVICE_ID_JOYPAD_L, RETRO_DEVICE_ID_JOYPAD_R,
             RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY, RETRO_ENVIRONMENT_GET_VARIABLE,
             RETRO_MEMORY_SAVE_RAM, RETRO_MEMORY_SYSTEM_RAM,
         },
@@ -1093,6 +1103,35 @@ mod tests {
             data
         );
         assert_eq!(unsafe { *data }, 0x42);
+    }
+
+    #[test]
+    fn test_retro_reset_keys() {
+        let _guard = EMULATOR_LOCK.lock().unwrap();
+        load_game(GBA_ROM);
+        set_callbacks();
+        unsafe { PRESSED = 1 << RETRO_DEVICE_ID_JOYPAD_A };
+        retro_run();
+        if let System::Gba(gba) = unsafe { EMULATOR.as_ref().unwrap() } {
+            assert_eq!(gba.cpu.bus.pad.keyinput() & 0x0001, 0x0000);
+        } else {
+            panic!("Expected GBA system");
+        }
+
+        // the reset of the GBA releases all its keys, so that a key held
+        // in the frontend must be pressed again by the next run
+        retro_reset();
+        if let System::Gba(gba) = unsafe { EMULATOR.as_ref().unwrap() } {
+            assert_eq!(gba.cpu.bus.pad.keyinput() & 0x0001, 0x0001);
+        } else {
+            panic!("Expected GBA system");
+        }
+        retro_run();
+        if let System::Gba(gba) = unsafe { EMULATOR.as_ref().unwrap() } {
+            assert_eq!(gba.cpu.bus.pad.keyinput() & 0x0001, 0x0000);
+        } else {
+            panic!("Expected GBA system");
+        }
     }
 
     #[test]
@@ -1366,6 +1405,37 @@ mod tests {
             panic!("Expected GBA system");
         }
         remove_dir_all(&directory).unwrap();
+    }
+
+    #[test]
+    fn test_retro_load_game_keys() {
+        let _guard = EMULATOR_LOCK.lock().unwrap();
+        load_game(GBA_ROM);
+        set_callbacks();
+        unsafe { PRESSED = 1 << RETRO_DEVICE_ID_JOYPAD_A };
+        retro_run();
+
+        // a game loaded without initializing the core again starts with
+        // all the keys released, so that a key held in the frontend must
+        // be pressed again by the next run
+        let game = RetroGameInfo {
+            path: "test.gba\0".as_ptr() as *const c_char,
+            data: GBA_ROM.as_ptr() as *const c_void,
+            size: GBA_ROM.len(),
+            meta: ptr::null(),
+        };
+        assert!(unsafe { retro_load_game(&game) });
+        if let System::Gba(gba) = unsafe { EMULATOR.as_ref().unwrap() } {
+            assert_eq!(gba.cpu.bus.pad.keyinput() & 0x0001, 0x0001);
+        } else {
+            panic!("Expected GBA system");
+        }
+        retro_run();
+        if let System::Gba(gba) = unsafe { EMULATOR.as_ref().unwrap() } {
+            assert_eq!(gba.cpu.bus.pad.keyinput() & 0x0001, 0x0000);
+        } else {
+            panic!("Expected GBA system");
+        }
     }
 
     #[test]
