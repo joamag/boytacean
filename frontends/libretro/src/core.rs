@@ -1,6 +1,28 @@
 //! Implementation of the libretro API, the core loaded by frontends
 //! such as RetroArch, running either a Game Boy or a Game Boy Advance
 //! through the unified [`System`] of the emulator.
+//!
+//! The frontend drives the core through the exported `retro_*`
+//! functions: the core is initialized with the callbacks of the
+//! frontend, loads a game creating the [`System`] of its ROM, and runs
+//! it for a frame on each `retro_run()`, keeping its state in statics,
+//! as the API is a C one.
+//!
+//! Each run clocks the system for the cycles of a frame (counting the
+//! ones run beyond it in the next one), sends its new frames in the
+//! XRGB8888 format and its audio samples (at the same level for both
+//! systems), and polls the input, pressing and lifting only the keys
+//! that changed. The system is matched once per frame, outside of the
+//! hot loop of its clocks, with the loop of the GBA kept out of line.
+//!
+//! The save RAM of the cartridge is exposed as its buffer itself, kept
+//! by the frontend, so it remains the same across resets and state
+//! loads (as [`System::reload`] keeps it), with the EEPROM of the GBA
+//! starting at its largest size, unknown until the game accesses it.
+//!
+//! Save states, cheats and the DMG palette are only supported by the
+//! Game Boy, while the GBA loads its optional BIOS (`gba_bios.bin`)
+//! from the system directory of the frontend.
 
 use std::{
     collections::HashMap,
